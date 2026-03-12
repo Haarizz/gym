@@ -14,6 +14,7 @@ import { Calendar as CalendarComponent } from "../components/ui/calendar";
 import { Checkbox } from "../components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu";
 import { MemberApprovalModal } from "../components/shared/member-approval-modal";
+import { MemberAddons } from "./member-addons";
 import { 
   Plus, 
   Search, 
@@ -48,6 +49,8 @@ import {
   XCircle,
   Bell,
   ShieldBan,
+  DollarSign,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
@@ -157,6 +160,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [reportPage, setReportPage] = useState(1);
   const [reportPageSize] = useState(20);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   
   // Report filters
   const [reportType, setReportType] = useState("membership");
@@ -280,12 +284,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     return () => window.removeEventListener('pendingMembersUpdated', loadPendingMembers);
   }, []);
 
-  // Handle tab navigation - redirect to dedicated screens
-  useEffect(() => {
-    if (activeTab === "addons" && onNavigate) {
-      onNavigate("member-addons");
-    }
-  }, [activeTab, onNavigate]);
 
   const getStatusBadgeClass = (status: string) => {
     switch (status.toLowerCase()) {
@@ -787,14 +785,24 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         </Card>
       </div>
 
+      <style>{`
+        @keyframes tabSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: tabSlideIn 0.22s ease-out;
+        }
+      `}</style>
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="members">All Members</TabsTrigger>
-          <TabsTrigger value="renewals">Renewals & Upgrades</TabsTrigger>
-          <TabsTrigger value="addons">Add-ons</TabsTrigger>
-          <TabsTrigger value="receipts">Member Receipts</TabsTrigger>
-          <TabsTrigger value="freeze">Freeze/Unfreeze</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="members" className="flex-1">All Members</TabsTrigger>
+          <TabsTrigger value="renewals" className="flex-1">Renewals & Upgrades</TabsTrigger>
+          <TabsTrigger value="addons" className="flex-1">Add-ons</TabsTrigger>
+          <TabsTrigger value="receipts" className="flex-1">Member Receipts</TabsTrigger>
+          <TabsTrigger value="freeze" className="flex-1">Freeze/Unfreeze</TabsTrigger>
+          <TabsTrigger value="reports" className="flex-1">Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="members" className="space-y-6">
@@ -1055,36 +1063,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </Card>
         </TabsContent>
 
-        <TabsContent value="renewals" className="space-y-6">
-          {/* Header with Breadcrumb */}
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-2">
-            <span>Community</span>
-            <ChevronRight className="h-4 w-4" />
-            <span>Members</span>
-            <ChevronRight className="h-4 w-4" />
-            <span className="text-foreground font-medium">Renewals & Upgrades</span>
-          </div>
-          
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="bg-gradient-primary p-3 rounded-xl text-white">
-              <RefreshCw className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold">Renewals & Upgrades</h2>
-              <p className="text-sm text-muted-foreground">Seamlessly manage member renewal and upgrade operations</p>
-            </div>
-          </div>
-
+        <TabsContent value="renewals" className="space-y-5">
           {/* Step 1: Search Member Section */}
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader className="bg-gradient-light">
-              <div className="flex items-center space-x-2">
-                <div className="bg-gradient-primary text-white rounded-full w-8 h-8 flex items-center justify-center">
+            <CardHeader className="border-b bg-slate-50/50 py-4">
+              <div className="flex items-center space-x-3">
+                <div className="bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm font-semibold shrink-0">
                   1
                 </div>
-                <CardTitle>Search Member</CardTitle>
+                <div>
+                  <CardTitle className="text-base">Search Member</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">Search by Name, Mobile, Member ID, or Email</CardDescription>
+                </div>
               </div>
-              <CardDescription>Search by Name, Mobile, Member ID, or Email</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="relative">
@@ -1218,13 +1209,16 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           {/* Step 2: Choose New Plan */}
           {selectedMemberForRenewal && (
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="bg-gradient-light">
+              <CardHeader className="border-b bg-slate-50/50 py-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="bg-gradient-primary text-white rounded-full w-8 h-8 flex items-center justify-center">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm font-semibold shrink-0">
                       2
                     </div>
-                    <CardTitle>Choose New Plan</CardTitle>
+                    <div>
+                      <CardTitle className="text-base">Choose New Plan</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">Select a membership plan to renew or upgrade</CardDescription>
+                    </div>
                   </div>
                   <Button
                     variant="outline"
@@ -1235,7 +1229,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     Compare Plans
                   </Button>
                 </div>
-                <CardDescription>Select a membership plan to renew or upgrade</CardDescription>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1335,14 +1328,16 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           {/* Step 3: Payment Section */}
           {selectedNewPlan && (
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="bg-gradient-light">
-                <div className="flex items-center space-x-2">
-                  <div className="bg-gradient-primary text-white rounded-full w-8 h-8 flex items-center justify-center">
+              <CardHeader className="border-b bg-slate-50/50 py-4">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm font-semibold shrink-0">
                     3
                   </div>
-                  <CardTitle>Payment Details</CardTitle>
+                  <div>
+                    <CardTitle className="text-base">Payment Details</CardTitle>
+                    <CardDescription className="text-xs mt-0.5">Configure payment method and apply discounts</CardDescription>
+                  </div>
                 </div>
-                <CardDescription>Configure payment method and apply discounts</CardDescription>
               </CardHeader>
               <CardContent className="pt-6 space-y-6">
                 {/* Plan Amount */}
@@ -1480,14 +1475,16 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           {/* Step 4: Confirmation */}
           {selectedNewPlan && (
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="bg-gradient-light">
-                <div className="flex items-center space-x-2">
-                  <div className="bg-gradient-primary text-white rounded-full w-8 h-8 flex items-center justify-center">
+              <CardHeader className="border-b bg-slate-50/50 py-4">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm font-semibold shrink-0">
                     4
                   </div>
-                  <CardTitle>Confirmation</CardTitle>
+                  <div>
+                    <CardTitle className="text-base">Confirmation</CardTitle>
+                    <CardDescription className="text-xs mt-0.5">Review details before processing</CardDescription>
+                  </div>
                 </div>
-                <CardDescription>Review details before processing</CardDescription>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="bg-white border-2 border-primary/20 rounded-lg p-6 space-y-4">
@@ -1624,31 +1621,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
           {/* Empty State */}
           {!selectedMemberForRenewal && (
-            <Card className="border-2 border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <div className="bg-gradient-light p-6 rounded-full mb-4">
-                  <RefreshCw className="h-12 w-12 text-primary" />
+            <Card className="border-primary/10 shadow-md">
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="bg-primary/5 p-4 rounded-full mb-4">
+                  <RefreshCw className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Start by Searching a Member</h3>
-                <p className="text-muted-foreground text-center max-w-md">
-                  Search for a member using the search bar above to begin the renewal or upgrade process.
-                  The system will automatically detect whether it's a renewal or upgrade based on the selected plan.
+                <h3 className="text-lg font-semibold mb-2">Search a Member to Get Started</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Use the search bar above to find a member. The system will automatically detect whether it's a renewal or upgrade.
                 </p>
               </CardContent>
             </Card>
           )}
         </TabsContent>
 
-        <TabsContent value="addons" className="space-y-6">
-          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle>Member Add-ons</CardTitle>
-              <CardDescription>Purchase additional services and packages</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Feature coming soon...</p>
-            </CardContent>
-          </Card>
+        <TabsContent value="addons">
+          <MemberAddons embedded />
         </TabsContent>
 
         <TabsContent value="receipts" className="space-y-6">
@@ -1773,9 +1761,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </div>
           
           <div className="flex items-center space-x-3 mb-6">
-            <div className="bg-gradient-primary p-3 rounded-xl text-white">
-              <BarChart3 className="h-6 w-6" />
-            </div>
             <div>
               <h2 className="text-2xl font-bold">Membership Report</h2>
               <p className="text-sm text-muted-foreground">Generate comprehensive membership transaction reports</p>
@@ -1927,33 +1912,36 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
                 {reportGenerated && (
                   <>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        const menu = document.getElementById('export-menu');
-                        if (menu) menu.classList.toggle('hidden');
-                      }}
-                      className="relative"
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Export Report
-                      <div id="export-menu" className="hidden absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-lg z-10 min-w-[150px]">
-                        <button 
-                          onClick={() => handleExport('excel')}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
-                        >
-                          <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
-                          Export as Excel
-                        </button>
-                        <button 
-                          onClick={() => handleExport('pdf')}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center"
-                        >
-                          <FileText className="mr-2 h-4 w-4 text-red-600" />
-                          Export as PDF
-                        </button>
-                      </div>
-                    </Button>
+                    <div className="relative">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowExportMenu(v => !v)}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export Report
+                      </Button>
+                      {showExportMenu && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                          <div className="absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-lg z-50 w-48">
+                            <button
+                              onClick={() => { handleExport('excel'); setShowExportMenu(false); }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center rounded-t-lg"
+                            >
+                              <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
+                              Export as Excel
+                            </button>
+                            <button
+                              onClick={() => { handleExport('pdf'); setShowExportMenu(false); }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center rounded-b-lg"
+                            >
+                              <FileText className="mr-2 h-4 w-4 text-red-600" />
+                              Export as PDF
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
 
                     <Button 
                       variant="outline"
@@ -1971,42 +1959,50 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           {/* Report Output Section */}
           {reportGenerated && (
             <>
-              {/* Summary Toast Tab (Sticky) */}
-              <div className="sticky top-16 z-30 bg-white border-l-4 border-primary shadow-lg rounded-lg p-4">
-                <div className="flex flex-wrap items-center gap-4 text-sm">
-                  <div className="flex items-center">
-                    <span className="font-semibold text-primary mr-2">📊 Summary:</span>
+              {/* Summary Bar (Sticky) */}
+              <div className="sticky top-16 z-30 bg-white border border-border shadow-md rounded-lg px-8 py-3">
+                <div className="flex items-center gap-0 overflow-x-auto">
+                  <div className="flex items-center gap-1.5 font-semibold text-primary text-sm pr-4 shrink-0">
+                    <BarChart3 className="h-4 w-4" />
+                    Summary
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-muted-foreground">Total Records:</span>
-                    <span className="font-bold">{reportSummary.totalRecords}</span>
+                  <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground whitespace-nowrap">Total Records</span>
+                    <span className="font-bold ml-1">{reportSummary.totalRecords}</span>
                   </div>
-                  <div className="h-4 w-px bg-gray-300" />
-                  <div className="flex items-center space-x-2">
-                    <span className="text-muted-foreground">Total Amount:</span>
-                    <span className="font-bold text-green-600">AED {reportSummary.totalAmount.toLocaleString()}</span>
+                  <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
+                    <DollarSign className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                    <span className="text-muted-foreground whitespace-nowrap">Total Amount</span>
+                    <span className="font-bold text-green-600 ml-1">AED {reportSummary.totalAmount.toLocaleString()}</span>
                   </div>
-                  <div className="h-4 w-px bg-gray-300" />
-                  <div className="flex items-center space-x-2">
-                    <span className="text-muted-foreground">Total Cash:</span>
-                    <span className="font-bold text-emerald-600">AED {reportSummary.totalCash.toLocaleString()}</span>
+                  <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
+                    <Banknote className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <span className="text-muted-foreground whitespace-nowrap">Total Cash</span>
+                    <span className="font-bold text-emerald-600 ml-1">AED {reportSummary.totalCash.toLocaleString()}</span>
                   </div>
-                  <div className="h-4 w-px bg-gray-300" />
-                  <div className="flex items-center space-x-2">
-                    <span className="text-muted-foreground">Total Card:</span>
-                    <span className="font-bold text-sky-600">AED {reportSummary.totalCard.toLocaleString()}</span>
+                  <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
+                    <CreditCard className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                    <span className="text-muted-foreground whitespace-nowrap">Total Card</span>
+                    <span className="font-bold text-sky-600 ml-1">AED {reportSummary.totalCard.toLocaleString()}</span>
                   </div>
-                  <div className="h-4 w-px bg-gray-300" />
-                  <div className="flex items-center space-x-2">
-                    <span className="text-muted-foreground">Total Due:</span>
-                    <span className="font-bold text-amber-600">AED {reportSummary.totalDue.toLocaleString()}</span>
+                  <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
+                    <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                    <span className="text-muted-foreground whitespace-nowrap">Total Due</span>
+                    <span className="font-bold text-amber-600 ml-1">AED {reportSummary.totalDue.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
 
               {/* Data Table */}
-              <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow overflow-hidden">
-                <CardContent className="p-0">
+              <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Report Results
+                    <Badge variant="secondary" className="ml-1">{reportData.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader className="bg-slate-50/50">
@@ -2074,31 +2070,50 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   </div>
 
                   {/* Pagination */}
-                  <div className="flex items-center justify-between p-4 border-t">
-                    <div className="text-sm text-muted-foreground">
-                      Showing {reportStartIndex + 1} to {Math.min(reportEndIndex, reportData.length)} of {reportData.length} transactions
-                    </div>
-                    <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-between pt-4 mt-2 border-t">
+                    <p className="text-sm text-muted-foreground">
+                      Showing <span className="font-medium text-foreground">{reportStartIndex + 1}</span>–<span className="font-medium text-foreground">{Math.min(reportEndIndex, reportData.length)}</span> of <span className="font-medium text-foreground">{reportData.length}</span> transactions
+                    </p>
+                    <div className="flex items-center gap-1">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setReportPage(p => Math.max(1, p - 1))}
                         disabled={reportPage === 1}
+                        className="h-8 px-3"
                       >
-                        <ChevronLeft className="h-4 w-4" />
+                        <ChevronLeft className="h-4 w-4 mr-1" />
                         Previous
                       </Button>
-                      <div className="text-sm">
-                        Page {reportPage} of {reportTotalPages}
-                      </div>
+                      {Array.from({ length: Math.min(reportTotalPages, 5) }, (_, i) => {
+                        const page = reportTotalPages <= 5
+                          ? i + 1
+                          : reportPage <= 3
+                            ? i + 1
+                            : reportPage >= reportTotalPages - 2
+                              ? reportTotalPages - 4 + i
+                              : reportPage - 2 + i;
+                        return (
+                          <Button
+                            key={page}
+                            variant={reportPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setReportPage(page)}
+                            className="h-8 w-8 p-0"
+                          >
+                            {page}
+                          </Button>
+                        );
+                      })}
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setReportPage(p => Math.min(reportTotalPages, p + 1))}
                         disabled={reportPage === reportTotalPages}
+                        className="h-8 px-3"
                       >
                         Next
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
                   </div>
