@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   Download,
   Filter,
-  ShoppingCart,
   Clock,
   FileText,
 } from "lucide-react";
@@ -56,6 +55,7 @@ import {
 
 interface MemberAddonsProps {
   onNavigate?: (section: string) => void;
+  embedded?: boolean;
 }
 
 interface Member {
@@ -263,7 +263,7 @@ const mockTransactions: AddonTransaction[] = [
   },
 ];
 
-export function MemberAddons({ onNavigate }: MemberAddonsProps) {
+export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -407,17 +407,14 @@ export function MemberAddons({ onNavigate }: MemberAddonsProps) {
   const activeAddons = transactions.filter((txn) => txn.status === "Active").length;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b bg-white">
+    <div className={embedded ? "" : "min-h-screen bg-background"}>
+      <div className={embedded ? "" : "border-b bg-white"}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-[#0047ab] to-[#00c5cb]">
-                  <ShoppingCart className="h-6 w-6 text-white" />
-                </div>
                 <div>
-                  <h1 className="text-2xl text-foreground">
+                  <h1 className="text-2xl font-semibold text-foreground">
                     Member Add-ons
                   </h1>
                   <p className="text-muted-foreground">
@@ -427,83 +424,90 @@ export function MemberAddons({ onNavigate }: MemberAddonsProps) {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button
-                onClick={handleOpenPurchaseModal}
-                className="gap-2 bg-gradient-to-r from-[#0047ab] to-[#00c5cb] text-white hover:opacity-90"
-              >
-                <Plus className="h-4 w-4" />
+              <Button onClick={handleOpenPurchaseModal}>
+                <Plus className="mr-2 h-4 w-4" />
                 Purchase An Add-On
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => onNavigate && onNavigate("members")}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Members
-              </Button>
+              {!embedded && (
+                <Button
+                  variant="outline"
+                  onClick={() => onNavigate && onNavigate("members")}
+                  className="gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Members
+                </Button>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Transactions</p>
-                    <p className="text-2xl mt-1">{transactions.length}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-blue-100">
-                    <FileText className="h-6 w-6 text-blue-600" />
-                  </div>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Transactions</CardTitle>
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <FileText className="h-5 w-5 text-blue-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{transactions.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">All time add-on purchases</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Active Add-ons</p>
-                    <p className="text-2xl mt-1">{activeAddons}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-green-100">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Active Add-ons</CardTitle>
+                <div className="p-2 rounded-lg bg-green-100">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{activeAddons}</p>
+                <p className="text-xs text-muted-foreground mt-1">Currently active services</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Revenue</p>
-                    <p className="text-2xl mt-1">AED {totalRevenue}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-purple-100">
-                    <DollarSign className="h-6 w-6 text-purple-600" />
-                  </div>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+                <div className="p-2 rounded-lg bg-purple-100">
+                  <DollarSign className="h-5 w-5 text-purple-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">AED {totalRevenue}</p>
+                <p className="text-xs text-muted-foreground mt-1">From add-on sales</p>
               </CardContent>
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search by Transaction ID, Member Name, Member ID, or Add-on..."
-                value={transactionSearchQuery}
-                onChange={(e) => setTransactionSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+        </div>
+      </div>
 
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
+      <div className="p-6">
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                Recent Add-on Transactions
+                <Badge variant="secondary" className="ml-1">
+                  {filteredTransactions.length}
+                </Badge>
+              </CardTitle>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search by Transaction ID, Member Name, or Add-on..."
+                  value={transactionSearchQuery}
+                  onChange={(e) => setTransactionSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
               <Select value={transactionStatusFilter} onValueChange={setTransactionStatusFilter}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full sm:w-44">
                   <SelectValue placeholder="Filter by Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -514,36 +518,21 @@ export function MemberAddons({ onNavigate }: MemberAddonsProps) {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl flex items-center gap-2 text-foreground">
-            <Clock className="h-5 w-5 text-[#0047ab]" />
-            Recent Add-on Transactions
-            <Badge variant="secondary" className="ml-2">
-              {filteredTransactions.length}
-            </Badge>
-          </h2>
-        </div>
-
-        <Card>
-          <CardContent className="p-0">
+          </CardHeader>
+          <CardContent>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="font-semibold">Transaction ID</TableHead>
-                    <TableHead className="font-semibold">Member</TableHead>
-                    <TableHead className="font-semibold">Add-on Name</TableHead>
-                    <TableHead className="font-semibold">Purchase Date</TableHead>
-                    <TableHead className="font-semibold">Start Date</TableHead>
-                    <TableHead className="font-semibold">Expiry Date</TableHead>
-                    <TableHead className="font-semibold">Amount (AED)</TableHead>
-                    <TableHead className="font-semibold">Payment Mode</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10">#</TableHead>
+                    <TableHead>Transaction ID</TableHead>
+                    <TableHead>Member</TableHead>
+                    <TableHead>Add-on Name</TableHead>
+                    <TableHead>Purchase Date</TableHead>
+                    <TableHead>Expiry Date</TableHead>
+                    <TableHead>Amount (AED)</TableHead>
+                    <TableHead>Payment Mode</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -554,28 +543,22 @@ export function MemberAddons({ onNavigate }: MemberAddonsProps) {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredTransactions.map((txn) => (
-                      <TableRow 
+                    filteredTransactions.map((txn, index) => (
+                      <TableRow
                         key={txn.id}
-                        className={txn.status === "Active" ? "bg-green-50/50" : ""}
+                        className="hover:bg-slate-50/50 transition-colors"
                       >
+                        <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
                         <TableCell className="font-medium">{txn.id}</TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{txn.memberName}</p>
-                            <p className="text-sm text-muted-foreground">{txn.memberId}</p>
+                            <p className="text-xs text-muted-foreground">{txn.memberId}</p>
                           </div>
                         </TableCell>
-                        <TableCell className="max-w-xs">{txn.addonName}</TableCell>
+                        <TableCell>{txn.addonName}</TableCell>
                         <TableCell>
                           {txn.purchaseDate.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </TableCell>
-                        <TableCell>
-                          {txn.startDate.toLocaleDateString("en-GB", {
                             day: "2-digit",
                             month: "short",
                             year: "numeric",

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Card, CardContent } from "../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -815,254 +815,170 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1>New Member</h1>
-          <p className="text-muted-foreground">Create a new member profile with membership details.</p>
+    <div>
+      {/* Page Header */}
+      <div className="px-4 sm:px-6 py-4 border-b bg-gradient-to-r from-slate-50 to-blue-50/50">
+        <div className="flex items-center gap-3 max-w-5xl mx-auto">
+          <Button variant="outline" size="sm" onClick={() => onNavigate?.('members')} className="gap-2 shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back</span>
+          </Button>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center justify-center w-9 h-9 bg-primary rounded-lg shrink-0">
+              <Users className="h-4 w-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold text-foreground">New Member Registration</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">Fill in the details to register a new gym member</p>
+            </div>
+          </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
-          <X className="h-5 w-5" />
-        </Button>
       </div>
-      
-      <Card>
-        <CardContent className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+
+      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Top Section - Member Photo */}
-            <div className="p-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-dashed border-blue-200">
-              <div className="text-center space-y-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">Member Photo</h2>
-                  <p className="text-gray-600">Add a profile photo for easy member identification</p>
-                </div>
-                
-                {/* Large Profile Image Placeholder */}
-                <div className="flex justify-center">
-                  <div className="relative">
-                    <div className="w-32 h-32 rounded-full bg-white shadow-lg border-4 border-white flex items-center justify-center overflow-hidden">
+            <Card className="border border-blue-100 bg-gradient-to-r from-blue-50/50 to-indigo-50/40 shadow-sm">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+                  {/* Avatar */}
+                  <div className="relative shrink-0">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white shadow-md border-4 border-white flex items-center justify-center overflow-hidden">
                       {formData.profilePhoto ? (
-                        <img 
-                          src={formData.profilePhoto} 
-                          alt="Member" 
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={formData.profilePhoto} alt="Member" className="w-full h-full object-cover" />
                       ) : (
                         <div className="text-center">
-                          <User className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                          <p className="text-xs text-gray-500">No photo</p>
+                          <User className="h-7 w-7 sm:h-9 sm:w-9 text-gray-300 mx-auto mb-0.5" />
+                          <p className="text-xs text-gray-400">No photo</p>
                         </div>
                       )}
                     </div>
                     {formData.profilePhoto && (
-                      <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2">
-                        <Check className="h-4 w-4 text-white" />
+                      <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1.5">
+                        <Check className="h-3 w-3 text-white" />
                       </div>
                     )}
                   </div>
-                </div>
-                
-                {/* Photo Action Buttons */}
-                <div className="flex justify-center space-x-4">
-                  <div className="relative">
-                    <Button
-                      type="button"
-                      size="lg"
-                      onClick={startCamera}
-                      disabled={cameraAvailable === false}
-                      className={`px-8 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200 ${
-                        cameraAvailable === false 
-                          ? 'bg-gray-400 cursor-not-allowed opacity-60' 
-                          : 'bg-blue-600 hover:bg-blue-700 text-white'
-                      }`}
-                    >
-                      <Camera className="h-5 w-5 mr-2" />
-                      {cameraAvailable === null ? 'Checking Camera...' : 
-                       cameraAvailable === false ? 'Camera Unavailable' : 
-                       'Capture Photo'}
-                    </Button>
-                    {cameraAvailable === false && cameraError && (
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1 bg-red-100 text-red-700 text-xs rounded-lg whitespace-nowrap max-w-48 text-center">
-                        {cameraError}
+                  {/* Info + Buttons */}
+                  <div className="flex-1 text-center sm:text-left">
+                    <h2 className="text-base font-semibold text-gray-900 mb-0.5">Member Photo</h2>
+                    <p className="text-sm text-gray-500 mb-3">Add a profile photo for easy member identification</p>
+                    <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                      <div className="relative">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={startCamera}
+                          disabled={cameraAvailable === false}
+                          className={`gap-2 ${cameraAvailable === false ? 'bg-gray-300 cursor-not-allowed opacity-60 text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                        >
+                          <Camera className="h-4 w-4" />
+                          {cameraAvailable === null ? 'Checking...' : cameraAvailable === false ? 'Unavailable' : 'Capture Photo'}
+                        </Button>
+                        {cameraAvailable === false && cameraError && (
+                          <div className="absolute top-full left-0 mt-1 px-3 py-1 bg-red-100 text-red-700 text-xs rounded-lg whitespace-nowrap z-10">
+                            {cameraError}
+                          </div>
+                        )}
                       </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Upload Photo
+                      </Button>
+                    </div>
+                    {cameraAvailable === false && (
+                      <p className="text-xs text-amber-600 flex items-center gap-1 mt-2 justify-center sm:justify-start">
+                        <Upload className="h-3 w-3" /> Use Upload Photo instead
+                      </p>
+                    )}
+                    {formData.profilePhoto && (
+                      <Badge className="bg-green-100 text-green-800 mt-2 w-fit gap-1">
+                        <Check className="h-3 w-3" /> Photo Added
+                      </Badge>
                     )}
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline" 
-                    size="lg"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-blue-200 text-blue-700 hover:bg-blue-50 px-8 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    <Upload className="h-5 w-5 mr-2" />
-                    Upload Photo
-                  </Button>
                 </div>
-                
-                {formData.profilePhoto && (
-                  <div className="text-center">
-                    <Badge className="bg-green-100 text-green-800 px-3 py-1">
-                      <Check className="h-3 w-3 mr-1" />
-                      Photo Added
-                    </Badge>
-                  </div>
-                )}
-                
-                {/* Camera Instructions */}
-                {cameraAvailable === true && (
-                  <div className="text-center text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                    <p className="mb-1">📸 <strong>Camera Ready!</strong> Click "Capture Photo" to take a picture</p>
-                    <p className="text-xs">If prompted, please allow camera access for the best experience</p>
-                  </div>
-                )}
-                
-                {cameraAvailable === false && (
-                  <div className="text-center text-sm text-gray-600 bg-yellow-50 p-3 rounded-lg">
-                    <p className="mb-1">📁 <strong>Upload Only</strong></p>
-                    <p className="text-xs">Camera not available - please use the "Upload Photo" option</p>
-                  </div>
-                )}
-              </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoUpload}
-                className="hidden"
-              />
-            </div>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+              </CardContent>
+            </Card>
 
-            {/* Form Fields */}
-            
-            {/* Membership Type Section - NEW */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3 border-b pb-3">
-                <div className="flex items-center justify-center w-8 h-8 bg-gradient-primary rounded-full">
-                  <Users className="h-4 w-4 text-white" />
+            {/* Membership Type Section */}
+            <Card className="border-primary/10 shadow-sm">
+              <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg shrink-0">
+                    <Users className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Membership Type</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">Select the type of membership for this registration</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-primary">Membership Type</h2>
-                  <p className="text-gray-600 text-sm">Select the type of membership for this registration</p>
-                </div>
-              </div>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-2">
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Individual Option */}
-                <div 
-                  className={`relative p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
-                    formData.membershipType === 'individual' 
-                      ? 'border-primary bg-gradient-light shadow-lg' 
-                      : 'border-gray-200 hover:border-primary/50 hover:shadow-md'
-                  }`}
-                  onClick={() => {
-                    setFormData({...formData, membershipType: 'individual'});
-                    setFamilyMembers([]);
-                  }}
-                >
-                  <div className="flex flex-col items-center text-center space-y-2">
-                    <div className={`flex items-center justify-center w-12 h-12 rounded-full ${
-                      formData.membershipType === 'individual' ? 'bg-gradient-primary' : 'bg-gray-100'
-                    }`}>
-                      <User className={`h-6 w-6 ${
-                        formData.membershipType === 'individual' ? 'text-white' : 'text-gray-600'
-                      }`} />
-                    </div>
-                    <h3 className={`font-semibold ${
-                      formData.membershipType === 'individual' ? 'text-primary' : 'text-gray-900'
-                    }`}>Individual</h3>
-                    <p className="text-xs text-gray-600">Single person membership</p>
-                    {formData.membershipType === 'individual' && (
-                      <div className="absolute top-2 right-2">
-                        <Check className="h-5 w-5 text-primary" />
-                      </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { value: 'individual', label: 'Individual', sub: 'Single person', icon: <User className="h-5 w-5" />, onClick: () => { setFormData({...formData, membershipType: 'individual'}); setFamilyMembers([]); } },
+                  { value: 'family', label: 'Family', sub: 'Multiple members', icon: <Heart className="h-5 w-5" />, onClick: () => setFormData({...formData, membershipType: 'family'}) },
+                  { value: 'corporate', label: 'Corporate', sub: 'Company-sponsored', icon: <Building2 className="h-5 w-5" />, onClick: () => { setFormData({...formData, membershipType: 'corporate'}); setFamilyMembers([]); } },
+                ].map((opt) => (
+                  <div
+                    key={opt.value}
+                    className={`relative p-3 sm:p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      formData.membershipType === opt.value
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-gray-200 hover:border-primary/40 hover:bg-gray-50'
+                    }`}
+                    onClick={opt.onClick}
+                  >
+                    {formData.membershipType === opt.value && (
+                      <div className="absolute top-2 right-2"><Check className="h-4 w-4 text-primary" /></div>
                     )}
-                  </div>
-                </div>
-                
-                {/* Family Option */}
-                <div 
-                  className={`relative p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
-                    formData.membershipType === 'family' 
-                      ? 'border-primary bg-gradient-light shadow-lg' 
-                      : 'border-gray-200 hover:border-primary/50 hover:shadow-md'
-                  }`}
-                  onClick={() => setFormData({...formData, membershipType: 'family'})}
-                >
-                  <div className="flex flex-col items-center text-center space-y-2">
-                    <div className={`flex items-center justify-center w-12 h-12 rounded-full ${
-                      formData.membershipType === 'family' ? 'bg-gradient-primary' : 'bg-gray-100'
-                    }`}>
-                      <Heart className={`h-6 w-6 ${
-                        formData.membershipType === 'family' ? 'text-white' : 'text-gray-600'
-                      }`} />
-                    </div>
-                    <h3 className={`font-semibold ${
-                      formData.membershipType === 'family' ? 'text-primary' : 'text-gray-900'
-                    }`}>Family</h3>
-                    <p className="text-xs text-gray-600">Multiple family members</p>
-                    {formData.membershipType === 'family' && (
-                      <div className="absolute top-2 right-2">
-                        <Check className="h-5 w-5 text-primary" />
+                    <div className="flex flex-col items-center text-center gap-2">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${formData.membershipType === opt.value ? 'bg-primary' : 'bg-gray-100'}`}>
+                        <span className={formData.membershipType === opt.value ? 'text-white' : 'text-gray-500'}>{opt.icon}</span>
                       </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Corporate Option */}
-                <div 
-                  className={`relative p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
-                    formData.membershipType === 'corporate' 
-                      ? 'border-primary bg-gradient-light shadow-lg' 
-                      : 'border-gray-200 hover:border-primary/50 hover:shadow-md'
-                  }`}
-                  onClick={() => {
-                    setFormData({...formData, membershipType: 'corporate'});
-                    setFamilyMembers([]);
-                  }}
-                >
-                  <div className="flex flex-col items-center text-center space-y-2">
-                    <div className={`flex items-center justify-center w-12 h-12 rounded-full ${
-                      formData.membershipType === 'corporate' ? 'bg-gradient-primary' : 'bg-gray-100'
-                    }`}>
-                      <Building2 className={`h-6 w-6 ${
-                        formData.membershipType === 'corporate' ? 'text-white' : 'text-gray-600'
-                      }`} />
-                    </div>
-                    <h3 className={`font-semibold ${
-                      formData.membershipType === 'corporate' ? 'text-primary' : 'text-gray-900'
-                    }`}>Corporate</h3>
-                    <p className="text-xs text-gray-600">Company-sponsored membership</p>
-                    {formData.membershipType === 'corporate' && (
-                      <div className="absolute top-2 right-2">
-                        <Check className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className={`text-sm font-semibold ${formData.membershipType === opt.value ? 'text-primary' : 'text-gray-800'}`}>{opt.label}</p>
+                        <p className="text-xs text-gray-400 hidden sm:block">{opt.sub}</p>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-              
               {formData.membershipType && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Selected:</strong> {formData.membershipType.charAt(0).toUpperCase() + formData.membershipType.slice(1)} Membership
-                    {formData.membershipType === 'family' && ' - You can add family members in the next section'}
+                <div className="mt-3 flex items-center gap-2 p-2.5 bg-primary/5 border border-primary/20 rounded-lg">
+                  <Check className="h-4 w-4 text-primary shrink-0" />
+                  <p className="text-sm text-primary font-medium">
+                    {formData.membershipType.charAt(0).toUpperCase() + formData.membershipType.slice(1)} Membership selected
+                    {formData.membershipType === 'family' && ' — add family members in Personal Info below'}
                   </p>
                 </div>
               )}
-            </div>
-            
-            {/* Identity & Registration Section - Top Section */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3 border-b pb-3">
-                <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full">
-                  <Hash className="h-4 w-4 text-white" />
+              </CardContent>
+            </Card>
+
+            {/* Identity & Registration Section */}
+            <Card className="border-primary/10 shadow-sm">
+              <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg shrink-0">
+                    <Hash className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Identity & Registration</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">Member ID and document details</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Identity & Registration</h2>
-                  <p className="text-gray-600 text-sm">Member identification and document details</p>
-                </div>
-              </div>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-2">
               
               {/* Member ID, Reg Doc Number, Reg Doc Date - 3 Column Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1133,122 +1049,75 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </p>
                 </div>
               </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Personal Information Section */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3 border-b pb-3">
-                <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full">
-                  <User className="h-4 w-4 text-white" />
+            <Card className="border-primary/10 shadow-sm">
+              <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-green-600 rounded-lg shrink-0">
+                    <User className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Personal Information</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">Member personal and contact details</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
-                  <p className="text-gray-600 text-sm">Member personal and contact details</p>
-                </div>
-              </div>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-2 space-y-4">
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                  placeholder="John"
-                  required
-                />
+                <Label htmlFor="firstName" className="mb-1.5 block">First Name <span className="text-red-500">*</span></Label>
+                <Input id="firstName" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} placeholder="John" required />
               </div>
               <div>
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                  placeholder="Doe"
-                  required
-                />
+                <Label htmlFor="lastName" className="mb-1.5 block">Last Name <span className="text-red-500">*</span></Label>
+                <Input id="lastName" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} placeholder="Doe" required />
               </div>
             </div>
-            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="email" className="mb-1.5 block">Email <span className="text-red-500">*</span></Label>
+                <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="john.doe@email.com" required />
+              </div>
+              <div>
+                <Label htmlFor="phone" className="mb-1.5 block">Phone <span className="text-red-500">*</span></Label>
+                <Input id="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+971 XX XXX XXXX" required />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="gender" className="mb-1.5 block">Gender</Label>
+                <Select value={formData.gender} onValueChange={(v) => setFormData({...formData, gender: v, genderOther: v !== 'other' ? '' : formData.genderOther})}>
+                  <SelectTrigger id="gender"><SelectValue placeholder="Select Gender (Optional)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="non-binary">Non-Binary</SelectItem>
+                    <SelectItem value="transgender">Transgender</SelectItem>
+                    <SelectItem value="prefer-not-to-say">Prefer Not to Say</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                {formData.gender === 'other' && (
+                  <Input className="mt-2" value={formData.genderOther} onChange={(e) => setFormData({...formData, genderOther: e.target.value})} placeholder="Please specify" />
+                )}
+              </div>
+              <div>
+                <Label htmlFor="nationality" className="mb-1.5 block">Nationality</Label>
+                <Select value={formData.nationality} onValueChange={(v) => setFormData({...formData, nationality: v})}>
+                  <SelectTrigger id="nationality"><SelectValue placeholder="Select Country" /></SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {COUNTRIES.map((country) => <SelectItem key={country} value={country}>{country}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div>
-              <Label htmlFor="gender">
-                <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4" />
-                  <span>Gender</span>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    💡 Select gender as per preference
-                  </span>
-                </div>
-              </Label>
-              <Select
-                value={formData.gender}
-                onValueChange={(value) => {
-                  setFormData({...formData, gender: value, genderOther: value !== 'other' ? '' : formData.genderOther});
-                }}
-              >
-                <SelectTrigger id="gender">
-                  <SelectValue placeholder="Select Gender (Optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="non-binary">Non-Binary</SelectItem>
-                  <SelectItem value="transgender">Transgender</SelectItem>
-                  <SelectItem value="prefer-not-to-say">Prefer Not to Say</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              {/* Show text input when "Other" is selected */}
-              {formData.gender === 'other' && (
-                <div className="mt-3">
-                  <Label htmlFor="genderOther" className="text-sm">
-                    Please specify
-                  </Label>
-                  <Input
-                    id="genderOther"
-                    value={formData.genderOther}
-                    onChange={(e) => setFormData({...formData, genderOther: e.target.value})}
-                    placeholder="Please specify your gender"
-                    className="mt-1"
-                  />
-                </div>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  placeholder="john.doe@email.com"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  placeholder="(555) 123-4567"
-                  required
-                />
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="address">Address</Label>
-              <Textarea
-                id="address"
-                value={formData.address}
-                onChange={(e) => setFormData({...formData, address: e.target.value})}
-                placeholder="123 Main St, City, State"
-                rows={2}
-              />
+              <Label htmlFor="address" className="mb-1.5 block">Address</Label>
+              <Textarea id="address" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} placeholder="123 Main St, City" rows={2} />
             </div>
             
             {/* Family Members Section */}
@@ -1333,112 +1202,60 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               </div>
             )}
             
-            <div>
-              <Label htmlFor="nationality">
-                <div className="flex items-center space-x-2">
-                  <Globe className="h-4 w-4" />
-                  <span>Nationality</span>
-                </div>
-              </Label>
-              <Select
-                value={formData.nationality}
-                onValueChange={(value) => setFormData({...formData, nationality: value})}
-              >
-                <SelectTrigger id="nationality">
-                  <SelectValue placeholder="🔽 Select Nationality" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {COUNTRIES.map((country) => (
-                    <SelectItem key={country} value={country}>
-                      {country}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                💡 Tip: Start typing to search for a country
-              </p>
-            </div>
-            
-            {/* Membership Dates Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="joiningDate">
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Joining Date</span>
-                  </div>
-                </Label>
-                <Input
-                  id="joiningDate"
-                  type="date"
-                  value={formData.joiningDate}
-                  onChange={(e) => setFormData({...formData, joiningDate: e.target.value})}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Date member officially joins the community
-                </p>
+                <Label htmlFor="joiningDate" className="mb-1.5 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />Joining Date</Label>
+                <Input id="joiningDate" type="date" value={formData.joiningDate} onChange={(e) => setFormData({...formData, joiningDate: e.target.value})} />
+                <p className="text-xs text-muted-foreground mt-1">Date member officially joins</p>
               </div>
-              
               <div>
-                <Label htmlFor="startDate">
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Start Date</span>
-                  </div>
-                </Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Actual service/membership start date
-                </p>
+                <Label htmlFor="startDate" className="mb-1.5 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />Start Date</Label>
+                <Input id="startDate" type="date" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
+                <p className="text-xs text-muted-foreground mt-1">Membership service start date</p>
               </div>
             </div>
-            </div>
-            
-            {/* Membership Plans Section - Banner Style */}
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full">
-                    <CreditCard className="h-4 w-4 text-white" />
+              </CardContent>
+            </Card>
+
+            {/* Membership Plans Section */}
+            <Card className="border-primary/10 shadow-sm">
+              <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 bg-purple-600 rounded-lg shrink-0">
+                      <CreditCard className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Choose Membership Plan</CardTitle>
+                      <p className="text-xs text-muted-foreground mt-0.5">Select the right plan for this member</p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Choose Membership Plan</h2>
-                    <p className="text-gray-600 text-sm">Select the perfect membership plan for this member</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Select value={membershipTypeFilter} onValueChange={setMembershipTypeFilter}>
+                      <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="All Types" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="individual">Individual</SelectItem>
+                        <SelectItem value="family">Family</SelectItem>
+                        <SelectItem value="corporate">Corporate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={programFilter} onValueChange={setProgramFilter}>
+                      <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="All Programs" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Programs</SelectItem>
+                        <SelectItem value="strength">Strength</SelectItem>
+                        <SelectItem value="cardio">Cardio</SelectItem>
+                        <SelectItem value="group">Group Classes</SelectItem>
+                        <SelectItem value="premium">Premium</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <Select value={membershipTypeFilter} onValueChange={setMembershipTypeFilter}>
-                    <SelectTrigger className="w-52">
-                      <SelectValue placeholder="Membership Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="individual">Individual</SelectItem>
-                      <SelectItem value="family">Family</SelectItem>
-                      <SelectItem value="corporate">Corporate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={programFilter} onValueChange={setProgramFilter}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Filter Programs" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Programs</SelectItem>
-                      <SelectItem value="strength">Strength Training</SelectItem>
-                      <SelectItem value="cardio">Cardio Programs</SelectItem>
-                      <SelectItem value="group">Group Classes</SelectItem>
-                      <SelectItem value="premium">Premium Services</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-2 space-y-3">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Premium Plan Banner */}
               <div className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-300 cursor-pointer ${
                 formData.membershipPlan === 'premium-annual' 
@@ -1449,7 +1266,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Popular Badge */}
                 <div className="absolute -top-1 -right-1">
                   <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white px-4 py-1 rounded-bl-lg rounded-tr-2xl text-xs font-semibold shadow-lg">
-                    ⭐ MOST POPULAR
+                    MOST POPULAR
                   </div>
                 </div>
                 
@@ -1671,7 +1488,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Student Badge */}
                 <div className="absolute -top-1 -right-1">
                   <div className="bg-gradient-to-r from-orange-400 to-amber-500 text-white px-4 py-1 rounded-bl-lg rounded-tr-2xl text-xs font-semibold shadow-lg">
-                    🎓 STUDENT DISCOUNT
+                    STUDENT DISCOUNT
                   </div>
                 </div>
                 
@@ -1739,6 +1556,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </Button>
                 </div>
               </div>
+              </div>{/* end plans grid */}
 
               {/* Selected Plan Summary */}
               {formData.membershipPlan && (
@@ -1759,20 +1577,23 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                 </div>
               )}
-            </div>
-            
-            {/* Health Information Section - Improved */}
-            <div className="space-y-6">
-              {/* Section Header */}
-              <div className="flex items-center space-x-3 border-b border-slate-200 pb-4">
-                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-[#2B7A78] to-[#21615f] rounded-full">
-                  <Activity className="h-5 w-5 text-white" />
+              </CardContent>
+            </Card>
+
+            {/* Health Information Section */}
+            <Card className="border-primary/10 shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-teal-600 rounded-full shrink-0">
+                    <Activity className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold">Health Information</CardTitle>
+                    <p className="text-sm text-muted-foreground">Medical details for member safety and emergency preparedness</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-semibold" style={{ color: '#2B7A78' }}>Health Information</h2>
-                  <p className="text-gray-600 text-sm">Medical details for member safety and emergency preparedness</p>
-                </div>
-              </div>
+              </CardHeader>
+              <CardContent className="pt-0">
 
               {/* Health Info Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1992,7 +1813,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                           <p>• Medical Conditions: {formData.medicalConditions.substring(0, 50)}{formData.medicalConditions.length > 50 ? '...' : ''}</p>
                         )}
                         {formData.allergies && (
-                          <p className="text-red-700 font-medium">• ⚠️ Allergies: {formData.allergies.substring(0, 50)}{formData.allergies.length > 50 ? '...' : ''}</p>
+                          <p className="text-red-700 font-medium">• Allergies: {formData.allergies.substring(0, 50)}{formData.allergies.length > 50 ? '...' : ''}</p>
                         )}
                         {formData.currentMedications && (
                           <p>• Medications: {formData.currentMedications.substring(0, 50)}{formData.currentMedications.length > 50 ? '...' : ''}</p>
@@ -2005,24 +1826,26 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                 </div>
               )}
-            </div>
-            
-            <div className="flex space-x-3 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="flex-1"
-                onClick={() => onNavigate?.('members')}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1 bg-green-600 hover:bg-green-700">
-                Create Member
-              </Button>
+              </CardContent>
+            </Card>
+
+            <div className="flex items-center justify-between gap-3 py-4 border-t bg-slate-50/60 rounded-xl px-4">
+              <p className="text-sm text-muted-foreground">All required fields must be filled before submitting.</p>
+              <div className="flex gap-3 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onNavigate?.('members')}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-green-600 hover:bg-green-700 px-8">
+                  Create Member
+                </Button>
+              </div>
             </div>
           </form>
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Camera Capture Dialog */}
       <Dialog open={cameraDialogOpen} onOpenChange={(open) => !open && stopCamera()}>
@@ -2073,12 +1896,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             {/* Camera status and tips */}
             <div className="space-y-3">
               <div className="text-center text-sm text-gray-600">
-                <p>💡 <strong>Photography Tips:</strong></p>
+                <p><strong>Photography Tips:</strong></p>
                 <div className="flex justify-center space-x-4 mt-2 text-xs">
-                  <span>✓ Good lighting</span>
-                  <span>✓ Look at camera</span>
-                  <span>✓ Center face in circle</span>
-                  <span>✓ Remove glasses if possible</span>
+                  <span>Good lighting</span>
+                  <span>Look at camera</span>
+                  <span>Center face in circle</span>
+                  <span>Remove glasses if possible</span>
                 </div>
               </div>
               
@@ -2660,7 +2483,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </p>
                     )}
                     <p className="text-xs text-green-600 mt-1">
-                      💡 Minimum required: {getFinalPrice().toFixed(2)} AED
+                      Minimum required: {getFinalPrice().toFixed(2)} AED
                     </p>
                   </div>
 
@@ -2681,7 +2504,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </span>
                     </div>
                     <p className="text-xs text-green-600 mt-1">
-                      💡 Amount to return to customer
+                      Amount to return to customer
                     </p>
                   </div>
                 </div>
@@ -2770,7 +2593,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </p>
                     )}
                     <p className="text-xs text-orange-600 mt-1">
-                      💡 Leave empty for full credit
+                      Leave empty for full credit
                     </p>
                   </div>
                   
