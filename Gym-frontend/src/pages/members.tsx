@@ -47,6 +47,7 @@ import {
   Eye,
   XCircle,
   Bell,
+  ShieldBan,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
@@ -300,6 +301,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const activeMembers = members.filter(m => m.membership_status === "active").length;
   const inactiveMembers = members.filter(m => m.membership_status === "inactive").length;
   const expiredMembers = members.filter(m => m.membership_status === "expired").length;
+  const frozenMembers = members.filter(m => m.membership_status === "frozen").length;
+  const suspendedMembers = members.filter(m => m.membership_status === "suspended").length;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -704,7 +707,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Total Members</CardTitle>
@@ -754,6 +757,32 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{expiredMembers}</div>
             <p className="text-xs text-muted-foreground">Need renewal</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Freezed</CardTitle>
+            <div className="bg-cyan-50 p-2 rounded-lg">
+              <Snowflake className="h-4 w-4 text-cyan-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-cyan-600">{frozenMembers}</div>
+            <p className="text-xs text-muted-foreground">Membership frozen</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Suspended</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <ShieldBan className="h-4 w-4 text-orange-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{suspendedMembers}</div>
+            <p className="text-xs text-muted-foreground">Suspended members</p>
           </CardContent>
         </Card>
       </div>
