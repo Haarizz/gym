@@ -146,7 +146,6 @@ import {
   AvatarImage,
 } from "./components/ui/avatar";
 import { Toaster } from "./components/ui/sonner";
-import { SystemStatus } from "./components/shared/system-status";
 
 const menuItems = [
   {
@@ -510,6 +509,20 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Online status
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // App state
   const [activeSection, setActiveSection] =
@@ -1048,7 +1061,7 @@ export default function App() {
   // Show loading screen while checking authentication
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex items-center justify-center bg-gray-50" style={{ minHeight: 'calc(100vh / 0.9)' }}>
         <div className="text-center">
           <div className="flex items-center justify-center space-x-3 mb-4">
             <div className="bg-primary rounded-xl p-3">
@@ -1083,7 +1096,7 @@ export default function App() {
   // Show main app if authenticated
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex w-full" style={{ minHeight: 'calc(100vh / 0.9)' }}>
         <Sidebar className="hidden md:flex bg-gradient-primary">
           <SidebarHeader className="border-b border-sidebar-border p-4">
             <div className="flex items-center space-x-3">
@@ -1159,16 +1172,22 @@ export default function App() {
 
           <SidebarFooter className="border-t border-sidebar-border p-4">
             <div className="flex items-center space-x-3 mb-4">
-              <Avatar className="h-8 w-8 border-2 border-white/20">
-                <AvatarImage src="/avatars/admin.jpg" />
-                <AvatarFallback className="bg-white/20 text-white">
-                  {user?.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase() || "GM"}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="h-8 w-8 border-2 border-white/20">
+                  <AvatarImage src="/avatars/admin.jpg" />
+                  <AvatarFallback className="bg-white/20 text-white">
+                    {user?.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase() || "GM"}
+                  </AvatarFallback>
+                </Avatar>
+                <span
+                  className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white"
+                  style={{ backgroundColor: isOnline ? '#4ade80' : '#ef4444' }}
+                />
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate text-white">
                   {user?.name || "Gym Manager"}
@@ -1191,24 +1210,20 @@ export default function App() {
         </Sidebar>
 
         <main className="flex-1 overflow-auto min-w-0">
-          <header className="border-b border-primary/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 sticky top-0 z-40 shadow-sm">
+          <header className="border-b border-primary/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 sticky top-0 z-40 shadow-sm md:hidden">
             <div className="flex h-16 items-center px-4">
-              <SidebarTrigger className="mr-4 md:hidden" />
-              <div className="flex items-center space-x-3 md:hidden">
+              <SidebarTrigger className="mr-4" />
+              <div className="flex items-center space-x-3">
                 <div className="bg-gradient-primary text-white rounded-xl p-2 shadow-md">
                   <Dumbbell className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="font-bold bg-gradient-primary bg-clip-text text-transparent">GymBios</h2>
+                  <h2 className="font-bold" style={{ color: '#2B7A78' }}>GymBios</h2>
                 </div>
               </div>
               <div className="flex-1" />
-              <div className="flex items-center space-x-3">
-                <SystemStatus />
-                <span className="text-sm text-muted-foreground hidden sm:inline font-medium">
-                  {user?.name || 'Gym Manager'}
-                </span>
-                <Avatar className="h-8 w-8 md:hidden border-2 border-primary/20">
+              <div className="relative">
+                <Avatar className="h-8 w-8 border-2 border-primary/20">
                   <AvatarFallback className="bg-gradient-primary text-white">
                     {user?.name
                       .split(" ")
@@ -1217,6 +1232,10 @@ export default function App() {
                       .toUpperCase() || "GM"}
                   </AvatarFallback>
                 </Avatar>
+                <span
+                  className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white"
+                  style={{ backgroundColor: isOnline ? '#4ade80' : '#ef4444' }}
+                />
               </div>
             </div>
           </header>

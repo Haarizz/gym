@@ -548,6 +548,7 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
+    zoom: 0.9;
   }
 
   :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) h1 {
@@ -8392,4 +8393,9 @@ html {
   .space-x-8 > :not([hidden]) ~ :not([hidden]) {
     margin-left: 1.5rem;
   }
+}
+
+/* Fix: compensate sidebar fixed height for body zoom: 0.9 */
+[data-slot="sidebar-container"] {
+  height: calc(100svh / 0.9) !important;
 }

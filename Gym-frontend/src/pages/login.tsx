@@ -170,7 +170,7 @@ export function Login({ onLogin }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="flex" style={{ minHeight: 'calc(100vh / 0.9)' }}>
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-primary relative overflow-hidden">
         {/* Background Pattern */}
