@@ -52,6 +52,7 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
+import { FaCircleCheck, FaCircleArrowUp, FaArrowsRotate, FaArrowUp, FaArrowRight } from 'react-icons/fa6';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
 import { authService } from '../utils/supabase/auth-service';
@@ -1285,41 +1286,40 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 
                 {/* Operation Type Indicator */}
                 {operationType && (
-                  <Card className={`mt-6 border-2 ${
-                    operationType === 'renewal' 
-                      ? 'border-green-500 bg-green-50' 
-                      : 'border-red-500 bg-red-50'
+                  <div className={`mt-4 rounded-xl border overflow-hidden ${
+                    operationType === 'renewal'
+                      ? 'border-green-200 bg-gradient-to-br from-green-50 via-white to-emerald-50/60'
+                      : 'border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50/60'
                   }`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-center space-x-3">
-                        {operationType === 'renewal' ? (
-                          <>
-                            <div className="bg-green-500 text-white rounded-full p-2">
-                              <RefreshCw className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-green-800">🟢 Detected as Renewal</p>
-                              <p className="text-sm text-green-700">
-                                Member is renewing their current plan: {selectedNewPlan.name}
-                              </p>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="bg-red-500 text-white rounded-full p-2">
-                              <TrendingUp className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-red-800">🔴 Detected as Upgrade</p>
-                              <p className="text-sm text-red-700">
-                                Member is upgrading from {getMembershipPlan(selectedMemberForRenewal)} to {selectedNewPlan.name}
-                              </p>
-                            </div>
-                          </>
-                        )}
+                    <div className={`h-0.5 w-full ${operationType === 'renewal' ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`} />
+                    <div className="flex flex-col items-center text-center gap-2 px-6 py-4">
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-xl shadow-sm ${
+                        operationType === 'renewal'
+                          ? 'bg-gradient-to-br from-green-500 to-emerald-600'
+                          : 'bg-gradient-to-br from-orange-500 to-amber-600'
+                      }`}>
+                        {operationType === 'renewal'
+                          ? <FaArrowsRotate size={17} className="text-white" />
+                          : <FaCircleArrowUp size={17} className="text-white" />
+                        }
                       </div>
-                    </CardContent>
-                  </Card>
+                      <p className={`text-sm font-semibold ${operationType === 'renewal' ? 'text-green-800' : 'text-orange-800'}`}>
+                        {operationType === 'renewal' ? 'Detected as Renewal' : 'Detected as Upgrade'}
+                      </p>
+                      {operationType === 'renewal' ? (
+                        <p className="text-xs text-muted-foreground">
+                          Member is renewing their current plan:{' '}
+                          <span className={`font-medium text-green-700`}>{selectedNewPlan.name}</span>
+                        </p>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="font-medium text-orange-700 px-1.5 py-0.5 bg-orange-100/80 rounded-md">{getMembershipPlan(selectedMemberForRenewal)}</span>
+                          <FaArrowRight size={9} className="text-muted-foreground/60 shrink-0" />
+                          <span className="font-medium text-amber-700 px-1.5 py-0.5 bg-amber-100/80 rounded-md">{selectedNewPlan.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1508,7 +1508,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <div>
                       <Label className="text-xs text-muted-foreground">Operation Type</Label>
                       <Badge className={operationType === 'renewal' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                        {operationType === 'renewal' ? '🔁 Renewal' : '⬆️ Upgrade'}
+                        <span className="flex items-center gap-1">
+                          {operationType === 'renewal'
+                            ? <><FaArrowsRotate size={12} /> Renewal</>
+                            : <><FaArrowUp size={12} /> Upgrade</>}
+                        </span>
                       </Badge>
                     </div>
                     <div>
@@ -1622,7 +1626,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           {/* Empty State */}
           {!selectedMemberForRenewal && (
             <Card className="border-primary/10 shadow-md">
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+              <CardContent className="flex flex-col items-center justify-center pt-20 pb-16 text-center">
                 <div className="bg-primary/5 p-4 rounded-full mb-4">
                   <RefreshCw className="h-6 w-6 text-primary" />
                 </div>
