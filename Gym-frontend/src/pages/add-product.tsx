@@ -1,0 +1,1527 @@
+import React, { useState, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { Switch } from "../components/ui/switch";
+import { Badge } from "../components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Checkbox } from "../components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../components/ui/collapsible";
+import {
+  Package,
+  Upload,
+  BarChart3,
+  Printer,
+  RefreshCw,
+  Plus,
+  X,
+  Save,
+  FileText,
+  Image as ImageIcon,
+  Palette,
+  Calculator,
+  Archive,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  Copy,
+  Edit,
+  Trash2,
+  AlertCircle,
+  CheckCircle,
+  Zap,
+  Grid3X3,
+  Hash,
+  Tags,
+  Layers,
+  Warehouse,
+  DollarSign,
+  Percent,
+  ChefHat,
+  ShoppingCart,
+  Box,
+  Ruler,
+  Palette as PaletteIcon,
+  Shirt,
+  Gauge,
+} from "lucide-react";
+import { toast } from "sonner";
+
+// Types
+interface ProductUnit {
+  id: string;
+  unit: string;
+  conversionFactor: number;
+  costPrice: number;
+  sellingPrice: number;
+  barcode: string;
+}
+
+interface RecipeIngredient {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  costImpact: number;
+}
+
+interface ProductVariant {
+  id: string;
+  variantName: string;
+  sku: string;
+  barcode: string;
+  price: number;
+  stock: number;
+  image?: string;
+  attributes: Record<string, string>;
+}
+
+interface ProductAttribute {
+  id: string;
+  name: string;
+  values: string[];
+}
+
+interface AddProductProps {
+  onNavigate?: (section: string) => void;
+}
+
+export function AddProduct({ onNavigate }: AddProductProps) {
+  const [activeTab, setActiveTab] = useState("basic-info");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Basic Product Information
+  const [productName, setProductName] = useState("");
+  const [sku, setSku] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [description, setDescription] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  
+  // Product Images
+  const [productImages, setProductImages] = useState<string[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Barcode Settings
+  const [barcodeTemplate, setBarcodeTemplate] = useState("");
+  const [generatedBarcode, setGeneratedBarcode] = useState("");
+  
+  // Pricing & Multi-Unit Setup
+  const [defaultUnit, setDefaultUnit] = useState("");
+  const [defaultPrice, setDefaultPrice] = useState("");
+  const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
+  
+  // Recipe / Production Formula
+  const [isManufactured, setIsManufactured] = useState(false);
+  const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([]);
+  const [totalCost, setTotalCost] = useState(0);
+  
+  // Item Variants & Attributes
+  const [hasVariants, setHasVariants] = useState(false);
+  const [productAttributes, setProductAttributes] = useState<ProductAttribute[]>([]);
+  const [productVariants, setProductVariants] = useState<ProductVariant[]>([]);
+  
+  // Inventory & Stock Settings
+  const [openingStock, setOpeningStock] = useState("");
+  const [reorderLevel, setReorderLevel] = useState("");
+  const [selectedWarehouse, setSelectedWarehouse] = useState("");
+  
+  // Collapsible states
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  // Mock data
+  const categories = [
+    "Supplements", "Equipment", "Apparel", "Accessories", "Food & Beverages", "Services"
+  ];
+  
+  const brands = [
+    "Optimum Nutrition", "BSN", "MuscleTech", "Dymatize", "Gold Standard", "MyProtein", "House Brand"
+  ];
+  
+  const barcodeTemplates = [
+    "Code 128", "Code 39", "EAN-13", "UPC-A", "QR Code"
+  ];
+  
+  const units = [
+    "Piece", "Box", "Bottle", "Pack", "Kg", "Gram", "Liter", "ML", "Dozen", "Pair"
+  ];
+  
+  const warehouses = [
+    "Main Warehouse", "Downtown Store", "Mall Branch", "Marina Store", "Online Stock"
+  ];
+
+  const attributeTypes = [
+    { id: "color", name: "Color", values: ["Red", "Blue", "Green", "Black", "White", "Yellow", "Purple", "Orange"] },
+    { id: "size", name: "Size", values: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"] },
+    { id: "material", name: "Material", values: ["Cotton", "Polyester", "Blend", "Nylon", "Spandex"] },
+    { id: "flavor", name: "Flavor", values: ["Vanilla", "Chocolate", "Strawberry", "Banana", "Unflavored"] },
+    { id: "weight", name: "Weight", values: ["1kg", "2kg", "5kg", "10kg"] },
+  ];
+
+  // Event Handlers
+  const handleImageUpload = useCallback(async (files: FileList | null) => {
+    if (!files) return;
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    
+    const validFiles = Array.from(files).filter(file => {
+      const isValidType = file.type.startsWith('image/');
+      const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
+      
+      if (!isValidType) {
+        toast.error(`${file.name} is not a valid image file`);
+        return false;
+      }
+      
+      if (!isValidSize) {
+        toast.error(`${file.name} is too large. Maximum size is 5MB`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    if (validFiles.length === 0) {
+      setIsUploading(false);
+      return;
+    }
+    
+    const totalFiles = validFiles.length;
+    let processedFiles = 0;
+    
+    for (const file of validFiles) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setProductImages(prev => {
+            const newImages = [...prev, e.target.result as string];
+            if (newImages.length > 10) {
+              toast.warning("Maximum 10 images allowed. Some images were not added.");
+              return prev.slice(0, 10);
+            }
+            return newImages;
+          });
+          
+          processedFiles++;
+          setUploadProgress((processedFiles / totalFiles) * 100);
+          
+          if (processedFiles === totalFiles) {
+            setIsUploading(false);
+            setUploadProgress(0);
+            toast.success(`${totalFiles} image(s) uploaded successfully`);
+          }
+        }
+      };
+      
+      reader.onerror = () => {
+        toast.error(`Failed to upload ${file.name}`);
+        processedFiles++;
+        setUploadProgress((processedFiles / totalFiles) * 100);
+        
+        if (processedFiles === totalFiles) {
+          setIsUploading(false);
+          setUploadProgress(0);
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    handleImageUpload(e.dataTransfer.files);
+  };
+
+  const generateBarcode = () => {
+    if (!barcodeTemplate) {
+      toast.error("Please select a barcode template first");
+      return;
+    }
+    
+    let newBarcode = "";
+    
+    // Generate barcode based on template
+    switch (barcodeTemplate) {
+      case "Code 128":
+      case "Code 39":
+        newBarcode = `${sku || "PRD"}${Date.now().toString().slice(-6)}`;
+        break;
+      case "EAN-13":
+        newBarcode = `${Math.floor(Math.random() * 1000000000000)}`.padStart(12, '0');
+        // Add check digit (simplified)
+        const checkDigit = newBarcode.split('').reduce((sum, digit, index) => {
+          return sum + parseInt(digit) * (index % 2 === 0 ? 1 : 3);
+        }, 0) % 10;
+        newBarcode += (10 - checkDigit) % 10;
+        break;
+      case "UPC-A":
+        newBarcode = `${Math.floor(Math.random() * 100000000000)}`.padStart(11, '0');
+        break;
+      case "QR Code":
+        newBarcode = `QR-${sku || "PRD"}-${Date.now()}`;
+        break;
+      default:
+        newBarcode = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    }
+    
+    setGeneratedBarcode(newBarcode);
+    toast.success(`${barcodeTemplate} barcode generated successfully!`);
+  };
+
+  const printBarcode = () => {
+    if (!generatedBarcode) {
+      toast.error("Please generate a barcode first");
+      return;
+    }
+    
+    if (!barcodeTemplate) {
+      toast.error("No barcode template selected");
+      return;
+    }
+    
+    // Simulate printing process
+    toast.success(`Printing ${barcodeTemplate} barcode: ${generatedBarcode}`);
+    
+    // In a real implementation, you would integrate with a barcode printing service
+    console.log(`Printing barcode: ${generatedBarcode} using template: ${barcodeTemplate}`);
+  };
+
+  const addProductUnit = () => {
+    const newUnit: ProductUnit = {
+      id: Date.now().toString(),
+      unit: "",
+      conversionFactor: 1,
+      costPrice: 0,
+      sellingPrice: 0,
+      barcode: "",
+    };
+    setProductUnits([...productUnits, newUnit]);
+  };
+
+  const updateProductUnit = (id: string, field: keyof ProductUnit, value: any) => {
+    setProductUnits(prev => 
+      prev.map(unit => 
+        unit.id === id ? { ...unit, [field]: value } : unit
+      )
+    );
+  };
+
+  const removeProductUnit = (id: string) => {
+    setProductUnits(prev => prev.filter(unit => unit.id !== id));
+  };
+
+  const addRecipeIngredient = () => {
+    const newIngredient: RecipeIngredient = {
+      id: Date.now().toString(),
+      productId: "",
+      productName: "",
+      quantity: 0,
+      unit: "",
+      costImpact: 0,
+    };
+    setRecipeIngredients([...recipeIngredients, newIngredient]);
+  };
+
+  const updateRecipeIngredient = (id: string, field: keyof RecipeIngredient, value: any) => {
+    setRecipeIngredients(prev => 
+      prev.map(ingredient => 
+        ingredient.id === id ? { ...ingredient, [field]: value } : ingredient
+      )
+    );
+    
+    // Recalculate total cost
+    const newTotal = recipeIngredients.reduce((sum, ingredient) => sum + ingredient.costImpact, 0);
+    setTotalCost(newTotal);
+  };
+
+  const removeRecipeIngredient = (id: string) => {
+    setRecipeIngredients(prev => prev.filter(ingredient => ingredient.id !== id));
+  };
+
+  const addAttribute = () => {
+    const newAttribute: ProductAttribute = {
+      id: Date.now().toString(),
+      name: "",
+      values: [],
+    };
+    setProductAttributes([...productAttributes, newAttribute]);
+  };
+
+  const updateAttribute = (id: string, field: keyof ProductAttribute, value: any) => {
+    setProductAttributes(prev =>
+      prev.map(attr =>
+        attr.id === id ? { ...attr, [field]: value } : attr
+      )
+    );
+  };
+
+  const removeAttribute = (id: string) => {
+    setProductAttributes(prev => prev.filter(attr => attr.id !== id));
+  };
+
+  const generateVariants = () => {
+    if (productAttributes.length === 0) {
+      toast.error("Please add attributes first");
+      return;
+    }
+
+    const combinations: ProductVariant[] = [];
+    const generate = (current: Record<string, string>, index: number) => {
+      if (index === productAttributes.length) {
+        const variantName = Object.values(current).join(" / ");
+        combinations.push({
+          id: Date.now().toString() + combinations.length,
+          variantName,
+          sku: `${sku}-${combinations.length + 1}`,
+          barcode: "",
+          price: parseFloat(defaultPrice) || 0,
+          stock: 0,
+          attributes: { ...current },
+        });
+        return;
+      }
+
+      const attribute = productAttributes[index];
+      attribute.values.forEach(value => {
+        generate({ ...current, [attribute.name]: value }, index + 1);
+      });
+    };
+
+    generate({}, 0);
+    setProductVariants(combinations);
+    toast.success(`Generated ${combinations.length} variants`);
+  };
+
+  const toggleSection = (sectionId: string) => {
+    setCollapsedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSave = async (saveAndNew = false) => {
+    setIsSubmitting(true);
+    
+    // Validation
+    if (!productName.trim()) {
+      toast.error("Product name is required");
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (!sku.trim()) {
+      toast.error("SKU is required");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast.success(`Product "${productName}" saved successfully!`);
+      
+      if (saveAndNew) {
+        // Reset form for new product
+        setProductName("");
+        setSku("");
+        setSelectedCategory("");
+        setSelectedBrand("");
+        setDescription("");
+        setProductImages([]);
+        setGeneratedBarcode("");
+        setDefaultPrice("");
+        setProductUnits([]);
+        setRecipeIngredients([]);
+        setProductVariants([]);
+        setProductAttributes([]);
+        setOpeningStock("");
+        setReorderLevel("");
+        setActiveTab("basic-info");
+      } else {
+        // Navigate back to products list
+        onNavigate?.("products");
+      }
+    } catch (error) {
+      toast.error("Failed to save product");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    onNavigate?.("products");
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-primary rounded-lg p-2">
+              <Package className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Add New Product</h1>
+              <p className="text-sm text-gray-600">
+                Create a new product with complete details and variants
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <Button variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => handleSave(true)}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
+              Save & New
+            </Button>
+            <Button 
+              onClick={() => handleSave(false)}
+              disabled={isSubmitting}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {isSubmitting ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Product
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="p-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          {/* Tab Navigation */}
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="basic-info" className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Basic Info</span>
+            </TabsTrigger>
+            <TabsTrigger value="images-barcode" className="flex items-center space-x-2">
+              <ImageIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Images & Barcode</span>
+            </TabsTrigger>
+            <TabsTrigger value="pricing-units" className="flex items-center space-x-2">
+              <DollarSign className="h-4 w-4" />
+              <span className="hidden sm:inline">Pricing & Units</span>
+            </TabsTrigger>
+            <TabsTrigger value="recipe-production" className="flex items-center space-x-2">
+              <ChefHat className="h-4 w-4" />
+              <span className="hidden sm:inline">Recipe</span>
+            </TabsTrigger>
+            <TabsTrigger value="variants-attributes" className="flex items-center space-x-2">
+              <Palette className="h-4 w-4" />
+              <span className="hidden sm:inline">Variants</span>
+            </TabsTrigger>
+            <TabsTrigger value="inventory-stock" className="flex items-center space-x-2">
+              <Archive className="h-4 w-4" />
+              <span className="hidden sm:inline">Inventory</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Tab Content */}
+          
+          {/* Basic Product Information */}
+          <TabsContent value="basic-info">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <span>Basic Product Information</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="product-name">Product Name *</Label>
+                    <Input
+                      id="product-name"
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
+                      placeholder="Enter product name"
+                      className="input-focus"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="sku">SKU / Product Code *</Label>
+                    <Input
+                      id="sku"
+                      value={sku}
+                      onChange={(e) => setSku(e.target.value)}
+                      placeholder="Enter SKU or product code"
+                      className="input-focus"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="brand">Brand</Label>
+                    <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select brand" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {brands.map((brand) => (
+                          <SelectItem key={brand} value={brand}>
+                            {brand}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter product description"
+                    rows={4}
+                    className="input-focus"
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="status"
+                    checked={isActive}
+                    onCheckedChange={setIsActive}
+                  />
+                  <Label htmlFor="status">Active Status</Label>
+                  <Badge variant={isActive ? "default" : "secondary"} className={isActive ? "bg-success" : ""}>
+                    {isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Images & Barcode */}
+          <TabsContent value="images-barcode">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Product Images */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <ImageIcon className="h-5 w-5 text-primary" />
+                    <span>Product Images</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Upload Area */}
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                      isDragOver ? 'border-primary bg-primary/5' : 'border-gray-300'
+                    } ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
+                    {isUploading ? (
+                      <div className="space-y-3">
+                        <RefreshCw className="h-8 w-8 text-primary mx-auto animate-spin" />
+                        <p className="text-sm text-gray-600">Uploading images...</p>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-primary h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${uploadProgress}%` }}
+                          ></div>
+                        </div>
+                        <p className="text-xs text-gray-500">{Math.round(uploadProgress)}% complete</p>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          Drag & drop images here, or{" "}
+                          <label className="text-primary cursor-pointer hover:underline">
+                            browse
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/jpeg,image/png,image/gif,image/webp"
+                              className="hidden"
+                              onChange={(e) => handleImageUpload(e.target.files)}
+                            />
+                          </label>
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Support for JPG, PNG, GIF, WebP (Max 5MB each, up to 10 images)
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Image Preview */}
+                  {productImages.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-gray-900">Uploaded Images ({productImages.length}/10)</h4>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setProductImages([])}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Clear All
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {productImages.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={image}
+                              alt={`Product ${index + 1}`}
+                              className="w-full h-20 object-cover rounded-lg border shadow-sm hover:shadow-md transition-shadow"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all duration-200 flex items-center justify-center">
+                              <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => {
+                                    // Preview image in full size
+                                    const newWindow = window.open();
+                                    if (newWindow) {
+                                      newWindow.document.write(`<img src="${image}" style="max-width:100%;max-height:100%;"/>`);
+                                    }
+                                  }}
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => setProductImages(prev => prev.filter((_, i) => i !== index))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            {index === 0 && (
+                              <Badge className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-xs bg-primary">
+                                Primary
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Barcode Settings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    <span>Barcode Settings</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="barcode-template">Barcode Template</Label>
+                    <Select value={barcodeTemplate} onValueChange={setBarcodeTemplate}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select barcode template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {barcodeTemplates.map((template) => (
+                          <SelectItem key={template} value={template}>
+                            <div className="flex items-center space-x-2">
+                              <Hash className="h-4 w-4" />
+                              <span>{template}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Choose the appropriate barcode format for your business needs
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      onClick={generateBarcode} 
+                      disabled={!barcodeTemplate}
+                      className="bg-primary hover:bg-primary/90"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Generate
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={printBarcode} 
+                      disabled={!generatedBarcode}
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      Print
+                    </Button>
+                  </div>
+                  
+                  {barcodeTemplate && !generatedBarcode && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
+                        <div className="text-xs text-blue-800">
+                          <p className="font-medium">Template: {barcodeTemplate}</p>
+                          <p className="mt-1">
+                            {barcodeTemplate === "EAN-13" && "13-digit European Article Number"}
+                            {barcodeTemplate === "UPC-A" && "12-digit Universal Product Code"}
+                            {barcodeTemplate === "Code 128" && "High-density linear barcode"}
+                            {barcodeTemplate === "Code 39" && "Alphanumeric barcode standard"}
+                            {barcodeTemplate === "QR Code" && "2D matrix barcode with high data capacity"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {generatedBarcode && (
+                    <div className="space-y-3">
+                      <div className="bg-gray-50 border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="text-sm font-medium text-gray-900">Generated Barcode:</Label>
+                          <Badge variant="secondary" className="text-xs">
+                            {barcodeTemplate}
+                          </Badge>
+                        </div>
+                        
+                        {/* Barcode Visual Representation */}
+                        <div className="bg-white border rounded p-3 mb-3 text-center">
+                          {barcodeTemplate === "QR Code" ? (
+                            <div className="inline-block bg-gray-900 text-white p-2 rounded">
+                              <div className="text-xs font-mono">QR Code</div>
+                              <div className="text-xs mt-1">Scan Ready</div>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex justify-center space-x-1">
+                                {Array.from({ length: 30 }).map((_, i) => (
+                                  <div
+                                    key={i}
+                                    className="w-1 bg-gray-900"
+                                    style={{
+                                      height: `${Math.random() * 20 + 30}px`,
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                              <div className="text-xs font-mono text-gray-600">
+                                Visual Barcode Representation
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="font-mono text-sm flex items-center justify-between bg-white border rounded p-2">
+                          <span className="text-gray-900">{generatedBarcode}</span>
+                          <div className="flex space-x-1">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={() => {
+                                navigator.clipboard.writeText(generatedBarcode);
+                                toast.success("Barcode copied to clipboard");
+                              }}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={generateBarcode}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded p-2">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Barcode ready for printing and scanning</span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Pricing & Multi-Unit Setup */}
+          <TabsContent value="pricing-units">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                  <span>Pricing & Multi-Unit Setup</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Default Unit & Price */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="default-unit">Default Unit</Label>
+                    <Select value={defaultUnit} onValueChange={setDefaultUnit}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {units.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="default-price">Default Price (AED)</Label>
+                    <Input
+                      id="default-price"
+                      type="number"
+                      step="0.01"
+                      value={defaultPrice}
+                      onChange={(e) => setDefaultPrice(e.target.value)}
+                      placeholder="0.00"
+                      className="input-focus"
+                    />
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <Button onClick={addProductUnit} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Unit
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Multiple Units Table */}
+                {productUnits.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-medium">Multiple Units</h3>
+                      <Badge variant="secondary">{productUnits.length} units</Badge>
+                    </div>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="table-header">Unit</TableHead>
+                            <TableHead className="table-header">Conversion Factor</TableHead>
+                            <TableHead className="table-header">Cost Price (AED)</TableHead>
+                            <TableHead className="table-header">Selling Price (AED)</TableHead>
+                            <TableHead className="table-header">Barcode</TableHead>
+                            <TableHead className="table-header">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {productUnits.map((unit) => (
+                            <TableRow key={unit.id}>
+                              <TableCell>
+                                <Select
+                                  value={unit.unit}
+                                  onValueChange={(value) => updateProductUnit(unit.id, "unit", value)}
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue placeholder="Unit" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {units.map((u) => (
+                                      <SelectItem key={u} value={u}>
+                                        {u}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={unit.conversionFactor}
+                                  onChange={(e) => updateProductUnit(unit.id, "conversionFactor", parseFloat(e.target.value))}
+                                  className="w-20"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={unit.costPrice}
+                                  onChange={(e) => updateProductUnit(unit.id, "costPrice", parseFloat(e.target.value))}
+                                  className="w-24"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={unit.sellingPrice}
+                                  onChange={(e) => updateProductUnit(unit.id, "sellingPrice", parseFloat(e.target.value))}
+                                  className="w-24"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  value={unit.barcode}
+                                  onChange={(e) => updateProductUnit(unit.id, "barcode", e.target.value)}
+                                  placeholder="Barcode"
+                                  className="w-32"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeProductUnit(unit.id)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Recipe / Production Formula */}
+          <TabsContent value="recipe-production">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <ChefHat className="h-5 w-5 text-primary" />
+                  <span>Recipe / Production Formula</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is-manufactured"
+                    checked={isManufactured}
+                    onCheckedChange={setIsManufactured}
+                  />
+                  <Label htmlFor="is-manufactured">
+                    This product is manufactured (requires recipe)
+                  </Label>
+                </div>
+                
+                {isManufactured && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium">Recipe Ingredients</h3>
+                      <Button onClick={addRecipeIngredient} size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Ingredient
+                      </Button>
+                    </div>
+                    
+                    {recipeIngredients.length > 0 && (
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="table-header">Ingredient (Product)</TableHead>
+                              <TableHead className="table-header">Quantity</TableHead>
+                              <TableHead className="table-header">Unit</TableHead>
+                              <TableHead className="table-header">Cost Impact (AED)</TableHead>
+                              <TableHead className="table-header">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {recipeIngredients.map((ingredient) => (
+                              <TableRow key={ingredient.id}>
+                                <TableCell>
+                                  <Input
+                                    value={ingredient.productName}
+                                    onChange={(e) => updateRecipeIngredient(ingredient.id, "productName", e.target.value)}
+                                    placeholder="Select ingredient"
+                                    className="w-full"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={ingredient.quantity}
+                                    onChange={(e) => updateRecipeIngredient(ingredient.id, "quantity", parseFloat(e.target.value))}
+                                    className="w-20"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={ingredient.unit}
+                                    onValueChange={(value) => updateRecipeIngredient(ingredient.id, "unit", value)}
+                                  >
+                                    <SelectTrigger className="w-24">
+                                      <SelectValue placeholder="Unit" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {units.map((unit) => (
+                                        <SelectItem key={unit} value={unit}>
+                                          {unit}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={ingredient.costImpact}
+                                    onChange={(e) => updateRecipeIngredient(ingredient.id, "costImpact", parseFloat(e.target.value))}
+                                    className="w-24"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeRecipeIngredient(ingredient.id)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                    
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Total Recipe Cost:</span>
+                        <span className="text-lg font-semibold text-primary">
+                          {totalCost.toFixed(2)} AED
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Item Variants & Attributes */}
+          <TabsContent value="variants-attributes">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Palette className="h-5 w-5 text-primary" />
+                  <span>Item Variants & Attributes</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="has-variants"
+                    checked={hasVariants}
+                    onCheckedChange={setHasVariants}
+                  />
+                  <Label htmlFor="has-variants">
+                    Item with Variants (sizes, colors, etc.)
+                  </Label>
+                </div>
+                
+                {hasVariants && (
+                  <div className="space-y-6">
+                    {/* Attributes Configuration */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-medium">Product Attributes</h3>
+                        <Button onClick={addAttribute} size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Attribute
+                        </Button>
+                      </div>
+                      
+                      {productAttributes.length > 0 && (
+                        <div className="space-y-3">
+                          {productAttributes.map((attribute) => (
+                            <div key={attribute.id} className="border rounded-lg p-4">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Attribute Name</Label>
+                                  <Select
+                                    value={attribute.name}
+                                    onValueChange={(value) => {
+                                      const selectedType = attributeTypes.find(t => t.name === value);
+                                      updateAttribute(attribute.id, "name", value);
+                                      if (selectedType) {
+                                        updateAttribute(attribute.id, "values", selectedType.values);
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select attribute" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {attributeTypes.map((type) => (
+                                        <SelectItem key={type.id} value={type.name}>
+                                          {type.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <Label>Values</Label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {attribute.values.map((value, index) => (
+                                      <Badge key={index} variant="secondary" className="flex items-center space-x-1">
+                                        <span>{value}</span>
+                                        <button
+                                          onClick={() => {
+                                            const newValues = attribute.values.filter((_, i) => i !== index);
+                                            updateAttribute(attribute.id, "values", newValues);
+                                          }}
+                                          className="ml-1 text-red-500 hover:text-red-700"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-end">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeAttribute(attribute.id)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Generate Variants */}
+                    {productAttributes.length > 0 && (
+                      <div>
+                        <Button onClick={generateVariants} className="w-full">
+                          <Zap className="h-4 w-4 mr-2" />
+                          Auto-Generate Variant Combinations
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {/* Variants Table */}
+                    {productVariants.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-medium">Product Variants</h3>
+                          <Badge variant="secondary">{productVariants.length} variants</Badge>
+                        </div>
+                        <div className="border rounded-lg overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="table-header">Variant</TableHead>
+                                <TableHead className="table-header">SKU</TableHead>
+                                <TableHead className="table-header">Barcode</TableHead>
+                                <TableHead className="table-header">Price (AED)</TableHead>
+                                <TableHead className="table-header">Stock</TableHead>
+                                <TableHead className="table-header">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {productVariants.map((variant) => (
+                                <TableRow key={variant.id}>
+                                  <TableCell className="font-medium">{variant.variantName}</TableCell>
+                                  <TableCell>
+                                    <Input
+                                      value={variant.sku}
+                                      onChange={(e) => {
+                                        setProductVariants(prev =>
+                                          prev.map(v =>
+                                            v.id === variant.id ? { ...v, sku: e.target.value } : v
+                                          )
+                                        );
+                                      }}
+                                      className="w-32"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      value={variant.barcode}
+                                      onChange={(e) => {
+                                        setProductVariants(prev =>
+                                          prev.map(v =>
+                                            v.id === variant.id ? { ...v, barcode: e.target.value } : v
+                                          )
+                                        );
+                                      }}
+                                      placeholder="Barcode"
+                                      className="w-32"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={variant.price}
+                                      onChange={(e) => {
+                                        setProductVariants(prev =>
+                                          prev.map(v =>
+                                            v.id === variant.id ? { ...v, price: parseFloat(e.target.value) } : v
+                                          )
+                                        );
+                                      }}
+                                      className="w-24"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      value={variant.stock}
+                                      onChange={(e) => {
+                                        setProductVariants(prev =>
+                                          prev.map(v =>
+                                            v.id === variant.id ? { ...v, stock: parseInt(e.target.value) } : v
+                                          )
+                                        );
+                                      }}
+                                      className="w-20"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setProductVariants(prev => prev.filter(v => v.id !== variant.id));
+                                      }}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Inventory & Stock Settings */}
+          <TabsContent value="inventory-stock">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Archive className="h-5 w-5 text-primary" />
+                  <span>Inventory & Stock Settings</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="opening-stock">Opening Stock</Label>
+                    <Input
+                      id="opening-stock"
+                      type="number"
+                      value={openingStock}
+                      onChange={(e) => setOpeningStock(e.target.value)}
+                      placeholder="0"
+                      className="input-focus"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="reorder-level">Reorder Level</Label>
+                    <Input
+                      id="reorder-level"
+                      type="number"
+                      value={reorderLevel}
+                      onChange={(e) => setReorderLevel(e.target.value)}
+                      placeholder="0"
+                      className="input-focus"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="warehouse">Warehouse / Location</Label>
+                    <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select warehouse" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {warehouses.map((warehouse) => (
+                          <SelectItem key={warehouse} value={warehouse}>
+                            {warehouse}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-blue-900">Inventory Management</h4>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Opening stock will be automatically added to the selected warehouse. 
+                        Reorder level helps trigger low stock alerts when inventory falls below this threshold.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <h3 className="font-medium">Stock Summary</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-gray-50 p-3 rounded-lg text-center">
+                      <div className="text-2xl font-semibold text-primary">
+                        {openingStock || "0"}
+                      </div>
+                      <div className="text-sm text-gray-600">Opening Stock</div>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg text-center">
+                      <div className="text-2xl font-semibold text-warning">
+                        {reorderLevel || "0"}
+                      </div>
+                      <div className="text-sm text-gray-600">Reorder Level</div>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg text-center">
+                      <div className="text-2xl font-semibold text-success">
+                        {productVariants.length || "1"}
+                      </div>
+                      <div className="text-sm text-gray-600">SKU Count</div>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg text-center">
+                      <div className="text-2xl font-semibold text-secondary">
+                        {selectedWarehouse ? "1" : "0"}
+                      </div>
+                      <div className="text-sm text-gray-600">Warehouse</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
+

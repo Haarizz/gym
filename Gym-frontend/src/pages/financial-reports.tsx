@@ -1,0 +1,770 @@
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { Badge } from "../components/ui/badge";
+import { Calendar } from "../components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import {
+  FileText,
+  Download,
+  Calendar as CalendarIcon,
+  TrendingUp,
+  Building2,
+  DollarSign,
+  Receipt,
+  BookOpen,
+  Landmark,
+  CreditCard,
+  BarChart3,
+  Filter,
+  RefreshCw,
+  Eye,
+  ExternalLink,
+  PieChart,
+  Calculator,
+  Banknote,
+  ArrowUpDown,
+  CheckSquare,
+  Clock,
+} from "lucide-react";
+import { format, subMonths, subYears } from "date-fns";
+import { cn } from "../components/ui/utils";
+
+// Types
+interface DateRange {
+  from: Date;
+  to: Date;
+}
+
+interface ReportData {
+  id: string;
+  accountCode?: string;
+  accountName?: string;
+  debit?: number;
+  credit?: number;
+  balance?: number;
+  amount?: number;
+  description?: string;
+  date?: string;
+  category?: string;
+  period?: string;
+}
+
+interface Report {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  category: "primary" | "secondary" | "supporting";
+  ifrsCompliant: boolean;
+  lastGenerated?: string;
+  status: "ready" | "generating" | "outdated";
+}
+
+// Mock data for reports
+const reportDefinitions: Report[] = [
+  {
+    id: "profit-loss",
+    title: "Statement of Profit or Loss (P&L)",
+    description: "Comprehensive income statement showing revenue, expenses, and profitability",
+    icon: TrendingUp,
+    category: "primary",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:30",
+    status: "ready",
+  },
+  {
+    id: "balance-sheet",
+    title: "Statement of Financial Position",
+    description: "Balance sheet showing assets, liabilities, and equity position",
+    icon: Building2,
+    category: "primary",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:30",
+    status: "ready",
+  },
+  {
+    id: "cash-flow",
+    title: "Statement of Cash Flows",
+    description: "Cash flow analysis from operating, investing, and financing activities",
+    icon: DollarSign,
+    category: "primary",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:25",
+    status: "ready",
+  },
+  {
+    id: "trial-balance",
+    title: "Trial Balance",
+    description: "Complete listing of all account balances for verification",
+    icon: Calculator,
+    category: "secondary",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:35",
+    status: "ready",
+  },
+  {
+    id: "day-book",
+    title: "Day Book (General Ledger)",
+    description: "Chronological record of all transactions by date",
+    icon: BookOpen,
+    category: "supporting",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:20",
+    status: "ready",
+  },
+  {
+    id: "bank-book",
+    title: "Bank Book",
+    description: "Bank transactions with reconciliation status and balances",
+    icon: Landmark,
+    category: "supporting",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:40",
+    status: "ready",
+  },
+  {
+    id: "fund-flow",
+    title: "Fund Flow Statement",
+    description: "Sources and uses of funds analysis for working capital management",
+    icon: ArrowUpDown,
+    category: "secondary",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:15",
+    status: "ready",
+  },
+  {
+    id: "pdc-report",
+    title: "Post-Dated Cheques (PDC) Report",
+    description: "Incoming and outgoing PDCs with maturity and status tracking",
+    icon: Receipt,
+    category: "supporting",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:10",
+    status: "ready",
+  },
+];
+
+// Mock P&L data
+const profitLossData = [
+  { category: "Revenue", accounts: [
+    { accountName: "Membership Revenue", currentPeriod: 125000, priorPeriod: 118000 },
+    { accountName: "Personal Training Revenue", currentPeriod: 35000, priorPeriod: 32000 },
+    { accountName: "Class & Drop-in Revenue", currentPeriod: 18000, priorPeriod: 16500 },
+    { accountName: "Retail & Merchandise Revenue", currentPeriod: 8500, priorPeriod: 7200 },
+    { accountName: "Other Operating Income", currentPeriod: 2500, priorPeriod: 2100 },
+  ]},
+  { category: "Cost of Sales", accounts: [
+    { accountName: "Cost of Goods Sold (Retail)", currentPeriod: -4250, priorPeriod: -3600 },
+    { accountName: "Trainer Commission", currentPeriod: -10500, priorPeriod: -9600 },
+  ]},
+  { category: "Operating Expenses", accounts: [
+    { accountName: "Employee Benefits Expense", currentPeriod: -45000, priorPeriod: -42000 },
+    { accountName: "Depreciation & Amortisation", currentPeriod: -8500, priorPeriod: -8200 },
+    { accountName: "Rent & Utilities", currentPeriod: -25000, priorPeriod: -24000 },
+    { accountName: "Marketing & Advertising", currentPeriod: -6500, priorPeriod: -5800 },
+    { accountName: "Repairs & Maintenance", currentPeriod: -3200, priorPeriod: -2900 },
+    { accountName: "Software & Hosting", currentPeriod: -2800, priorPeriod: -2600 },
+    { accountName: "Administrative Expenses", currentPeriod: -4200, priorPeriod: -3800 },
+  ]},
+  { category: "Finance", accounts: [
+    { accountName: "Finance Income", currentPeriod: 150, priorPeriod: 200 },
+    { accountName: "Finance Expense", currentPeriod: -1200, priorPeriod: -1100 },
+  ]},
+];
+
+// Mock Balance Sheet data
+const balanceSheetData = [
+  { category: "Non-current Assets", accounts: [
+    { accountName: "Property, Plant & Equipment", amount: 285000 },
+    { accountName: "Right-of-use Assets", amount: 45000 },
+    { accountName: "Intangible Assets", amount: 15000 },
+    { accountName: "Deferred Tax Assets", amount: 2500 },
+  ]},
+  { category: "Current Assets", accounts: [
+    { accountName: "Inventories", amount: 12000 },
+    { accountName: "Trade & Other Receivables", amount: 18500 },
+    { accountName: "Prepayments", amount: 8200 },
+    { accountName: "Cash & Cash Equivalents", amount: 45300 },
+  ]},
+  { category: "Equity", accounts: [
+    { accountName: "Share Capital", amount: 100000 },
+    { accountName: "Retained Earnings", amount: 165500 },
+    { accountName: "Other Reserves", amount: 12000 },
+  ]},
+  { category: "Non-current Liabilities", accounts: [
+    { accountName: "Long-term Borrowings", amount: 85000 },
+    { accountName: "Lease Liabilities", amount: 38000 },
+    { accountName: "Deferred Tax Liabilities", amount: 4200 },
+  ]},
+  { category: "Current Liabilities", accounts: [
+    { accountName: "Trade & Other Payables", amount: 15800 },
+    { accountName: "Contract Liabilities", amount: 22000 },
+    { accountName: "Short-term Borrowings", amount: 8000 },
+    { accountName: "Tax Payable", amount: 3500 },
+  ]},
+];
+
+// Mock Trial Balance data
+const trialBalanceData = [
+  { accountCode: "1000", accountName: "Cash at Bank", debit: 45300, credit: 0 },
+  { accountCode: "1100", accountName: "Trade Receivables", debit: 18500, credit: 0 },
+  { accountCode: "1200", accountName: "Inventory", debit: 12000, credit: 0 },
+  { accountCode: "1500", accountName: "Equipment", debit: 285000, credit: 0 },
+  { accountCode: "2000", accountName: "Trade Payables", debit: 0, credit: 15800 },
+  { accountCode: "2100", accountName: "Contract Liabilities", debit: 0, credit: 22000 },
+  { accountCode: "3000", accountName: "Share Capital", debit: 0, credit: 100000 },
+  { accountCode: "3100", accountName: "Retained Earnings", debit: 0, credit: 165500 },
+  { accountCode: "4000", accountName: "Membership Revenue", debit: 0, credit: 125000 },
+  { accountCode: "4100", accountName: "Training Revenue", debit: 0, credit: 35000 },
+  { accountCode: "5000", accountName: "Staff Salaries", debit: 45000, credit: 0 },
+  { accountCode: "5100", accountName: "Rent Expense", debit: 25000, credit: 0 },
+];
+
+export function FinancialReports() {
+  const [selectedReport, setSelectedReport] = useState<string>("");
+  const [selectedBranch, setSelectedBranch] = useState("all");
+  const [selectedPeriod, setSelectedPeriod] = useState("current-month");
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: subMonths(new Date(), 1),
+    to: new Date(),
+  });
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [reportCategory, setReportCategory] = useState("all");
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+
+  // Filter reports based on category
+  const filteredReports = reportDefinitions.filter(report => 
+    reportCategory === "all" || report.category === reportCategory
+  );
+
+  const branches = ["All Branches", "Downtown", "Mall Branch", "Marina Branch"];
+
+  const handleGenerateReport = async (reportId: string) => {
+    setIsGeneratingReport(true);
+    setSelectedReport(reportId);
+    
+    // Simulate report generation
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    setIsGeneratingReport(false);
+  };
+
+  const handleExportReport = (format: "csv" | "excel" | "pdf") => {
+    console.log(`Exporting ${selectedReport} as ${format}`);
+    // Implementation for export functionality
+  };
+
+  const calculateTotals = (data: any[], field: string) => {
+    return data.reduce((sum, item) => sum + (item[field] || 0), 0);
+  };
+
+  const StatusBadge = ({ status }: { status: Report["status"] }) => {
+    const statusConfig = {
+      ready: { color: "bg-green-100 text-green-800", label: "Ready" },
+      generating: { color: "bg-yellow-100 text-yellow-800", label: "Generating" },
+      outdated: { color: "bg-red-100 text-red-800", label: "Outdated" },
+    };
+
+    const config = statusConfig[status];
+    return (
+      <Badge variant="secondary" className={config.color}>
+        {config.label}
+      </Badge>
+    );
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="bg-primary rounded-lg p-2">
+            <FileText className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Financial Reports</h1>
+            <p className="text-sm text-gray-600">
+              IFRS-compliant financial reports and statements
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          <Button variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh All
+          </Button>
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export Package
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Report Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="branch">Branch/Entity</Label>
+              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch} value={branch.toLowerCase().replace(/\s+/g, '-')}>
+                      {branch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="period">Period</Label>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="current-month">Current Month</SelectItem>
+                  <SelectItem value="last-month">Last Month</SelectItem>
+                  <SelectItem value="current-quarter">Current Quarter</SelectItem>
+                  <SelectItem value="last-quarter">Last Quarter</SelectItem>
+                  <SelectItem value="current-year">Current Year</SelectItem>
+                  <SelectItem value="last-year">Last Year</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category">Report Category</Label>
+              <Select value={reportCategory} onValueChange={setReportCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="primary">Primary Statements</SelectItem>
+                  <SelectItem value="secondary">Secondary Reports</SelectItem>
+                  <SelectItem value="supporting">Supporting Reports</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Custom Date Range</Label>
+              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dateRange && "text-muted-foreground"
+                    )}
+                    disabled={selectedPeriod !== "custom"}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange?.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "LLL dd, y")} -{" "}
+                          {format(dateRange.to, "LLL dd, y")}
+                        </>
+                      ) : (
+                        format(dateRange.from, "LLL dd, y")
+                      )
+                    ) : (
+                      <span>Pick a date range</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={(range) => {
+                      if (range) {
+                        setDateRange(range as DateRange);
+                      }
+                    }}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Report Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {filteredReports.map((report) => (
+          <Card key={report.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-primary/10 rounded-lg p-2">
+                    <report.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm leading-tight">{report.title}</h3>
+                  </div>
+                </div>
+                <StatusBadge status={report.status} />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {report.description}
+              </p>
+              
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span className="flex items-center">
+                  <CheckSquare className="h-3 w-3 mr-1" />
+                  IFRS Compliant
+                </span>
+                {report.lastGenerated && (
+                  <span className="flex items-center">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {format(new Date(report.lastGenerated), "MMM dd, HH:mm")}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex space-x-2">
+                <Button 
+                  size="sm" 
+                  className="flex-1 bg-primary hover:bg-primary/90"
+                  onClick={() => handleGenerateReport(report.id)}
+                  disabled={isGeneratingReport}
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  View
+                </Button>
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Report Viewer Dialog */}
+      {selectedReport && (
+        <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport("")}>
+          <DialogContent className="max-w-6xl max-h-[80vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {reportDefinitions.find(r => r.id === selectedReport)?.title}
+              </DialogTitle>
+              <DialogDescription>
+                Period: {format(dateRange.from, "MMM dd, yyyy")} - {format(dateRange.to, "MMM dd, yyyy")} | 
+                Branch: {selectedBranch === "all" ? "All Branches" : selectedBranch}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Export Actions */}
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" size="sm" onClick={() => handleExportReport("csv")}>
+                  <Download className="h-4 w-4 mr-2" />
+                  CSV
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleExportReport("excel")}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Excel
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleExportReport("pdf")}>
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+              </div>
+
+              {/* Report Content */}
+              {isGeneratingReport ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-gray-600">Generating report...</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {selectedReport === "profit-loss" && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Statement of Profit or Loss</h3>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="font-semibold text-primary">Account</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Current Period (AED)</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Prior Period (AED)</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Variance (%)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {profitLossData.map((section, sectionIndex) => (
+                              <React.Fragment key={sectionIndex}>
+                                <TableRow className="bg-gray-50">
+                                  <TableCell colSpan={4} className="font-semibold text-primary">
+                                    {section.category}
+                                  </TableCell>
+                                </TableRow>
+                                {section.accounts.map((account, accountIndex) => {
+                                  const variance = account.priorPeriod !== 0 
+                                    ? ((account.currentPeriod - account.priorPeriod) / Math.abs(account.priorPeriod) * 100).toFixed(1)
+                                    : "N/A";
+                                  
+                                  return (
+                                    <TableRow key={accountIndex}>
+                                      <TableCell className="pl-6">{account.accountName}</TableCell>
+                                      <TableCell className="text-right">
+                                        {account.currentPeriod.toLocaleString()}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {account.priorPeriod.toLocaleString()}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <span className={variance !== "N/A" && parseFloat(variance) > 0 ? "text-green-600" : "text-red-600"}>
+                                          {variance !== "N/A" ? `${variance}%` : "N/A"}
+                                        </span>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                                {sectionIndex === 0 && (
+                                  <TableRow className="bg-blue-50 font-semibold">
+                                    <TableCell>Total Revenue</TableCell>
+                                    <TableCell className="text-right">
+                                      {section.accounts.reduce((sum, acc) => sum + acc.currentPeriod, 0).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {section.accounts.reduce((sum, acc) => sum + acc.priorPeriod, 0).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-right">-</TableCell>
+                                  </TableRow>
+                                )}
+                              </React.Fragment>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedReport === "balance-sheet" && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Statement of Financial Position</h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-primary">Assets</h4>
+                          <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="font-semibold text-primary">Account</TableHead>
+                                  <TableHead className="font-semibold text-primary text-right">Amount (AED)</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {balanceSheetData.filter(section => 
+                                  section.category.includes("Assets")
+                                ).map((section, sectionIndex) => (
+                                  <React.Fragment key={sectionIndex}>
+                                    <TableRow className="bg-gray-50">
+                                      <TableCell colSpan={2} className="font-semibold text-primary">
+                                        {section.category}
+                                      </TableCell>
+                                    </TableRow>
+                                    {section.accounts.map((account, accountIndex) => (
+                                      <TableRow key={accountIndex}>
+                                        <TableCell className="pl-6">{account.accountName}</TableCell>
+                                        <TableCell className="text-right">
+                                          {account.amount.toLocaleString()}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </React.Fragment>
+                                ))}
+                                <TableRow className="bg-blue-50 font-semibold">
+                                  <TableCell>Total Assets</TableCell>
+                                  <TableCell className="text-right">
+                                    {balanceSheetData
+                                      .filter(section => section.category.includes("Assets"))
+                                      .reduce((total, section) => 
+                                        total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
+                                      ).toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-primary">Equity & Liabilities</h4>
+                          <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="font-semibold text-primary">Account</TableHead>
+                                  <TableHead className="font-semibold text-primary text-right">Amount (AED)</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {balanceSheetData.filter(section => 
+                                  !section.category.includes("Assets")
+                                ).map((section, sectionIndex) => (
+                                  <React.Fragment key={sectionIndex}>
+                                    <TableRow className="bg-gray-50">
+                                      <TableCell colSpan={2} className="font-semibold text-primary">
+                                        {section.category}
+                                      </TableCell>
+                                    </TableRow>
+                                    {section.accounts.map((account, accountIndex) => (
+                                      <TableRow key={accountIndex}>
+                                        <TableCell className="pl-6">{account.accountName}</TableCell>
+                                        <TableCell className="text-right">
+                                          {account.amount.toLocaleString()}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </React.Fragment>
+                                ))}
+                                <TableRow className="bg-blue-50 font-semibold">
+                                  <TableCell>Total Equity & Liabilities</TableCell>
+                                  <TableCell className="text-right">
+                                    {balanceSheetData
+                                      .filter(section => !section.category.includes("Assets"))
+                                      .reduce((total, section) => 
+                                        total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
+                                      ).toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedReport === "trial-balance" && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Trial Balance</h3>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="font-semibold text-primary">Account Code</TableHead>
+                              <TableHead className="font-semibold text-primary">Account Name</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Debit (AED)</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Credit (AED)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {trialBalanceData.map((account, index) => (
+                              <TableRow key={index}>
+                                <TableCell>{account.accountCode}</TableCell>
+                                <TableCell>{account.accountName}</TableCell>
+                                <TableCell className="text-right">
+                                  {account.debit > 0 ? account.debit.toLocaleString() : "-"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {account.credit > 0 ? account.credit.toLocaleString() : "-"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-blue-50 font-semibold">
+                              <TableCell colSpan={2}>Total</TableCell>
+                              <TableCell className="text-right">
+                                {trialBalanceData.reduce((sum, acc) => sum + acc.debit, 0).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {trialBalanceData.reduce((sum, acc) => sum + acc.credit, 0).toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Other reports would follow similar patterns */}
+                  {selectedReport === "cash-flow" && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Statement of Cash Flows</h3>
+                      <div className="text-center py-8 text-gray-500">
+                        <BarChart3 className="h-12 w-12 mx-auto mb-4" />
+                        <p>Cash Flow Statement implementation in progress</p>
+                        <p className="text-sm">Operating, Investing, and Financing Activities</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {["day-book", "bank-book", "fund-flow", "pdc-report"].includes(selectedReport) && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">
+                        {reportDefinitions.find(r => r.id === selectedReport)?.title}
+                      </h3>
+                      <div className="text-center py-8 text-gray-500">
+                        <FileText className="h-12 w-12 mx-auto mb-4" />
+                        <p>Report implementation in progress</p>
+                        <p className="text-sm">IFRS-compliant data structure ready</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
