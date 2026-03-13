@@ -24,6 +24,8 @@ import {
   Save,
   X,
   Key,
+  Activity,
+  Eye,
   ChevronUp,
   ChevronDown,
   Info,
@@ -53,10 +55,10 @@ const trainingStreams = [
 
 // Sample facilities data - only active facilities
 const availableFacilities = [
-  { id: "FAC-001", name: "Basketball Court", icon: "🏀", status: "Active" },
-  { id: "FAC-002", name: "Swimming Pool", icon: "🏊", status: "Active" },
-  { id: "FAC-003", name: "Padel Court", icon: "🎾", status: "Active" },
-  { id: "FAC-004", name: "Football Ground", icon: "⚽", status: "Active" }
+  { id: "FAC-001", name: "Basketball Court", icon: Activity, status: "Active" },
+  { id: "FAC-002", name: "Swimming Pool", icon: Snowflake, status: "Active" },
+  { id: "FAC-003", name: "Padel Court", icon: Building2, status: "Active" },
+  { id: "FAC-004", name: "Football Ground", icon: Users, status: "Active" }
 ];
 
 // Sample promotions and campaigns data from promotions-campaign component
@@ -74,7 +76,7 @@ const availablePromotions = [
     id: 2,
     name: "Student Discount", 
     type: "Fixed Amount",
-    discount: "$20",
+    discount: "AED 20",
     validPeriod: "1/9/2024 - 31/12/2024",
     status: "Active",
     category: "Demographic"
@@ -92,7 +94,7 @@ const availablePromotions = [
     id: 4,
     name: "Referral Bonus",
     type: "Fixed Amount",
-    discount: "$50",
+    discount: "AED 50",
     validPeriod: "1/1/2024 - 31/12/2024",
     status: "Active",
     category: "Referral"
@@ -248,6 +250,7 @@ export function ManagePlans() {
   const [plans, setPlans] = useState<Plan[]>(samplePlans);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [viewingPlan, setViewingPlan] = useState<Plan | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDuration, setFilterDuration] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -423,6 +426,10 @@ export function ManagePlans() {
     setPlans([...plans, duplicatedPlan]);
   };
 
+  const handleViewPlan = (plan: Plan) => {
+    setViewingPlan(plan);
+  };
+
   const handleDeletePlan = (planId: number) => {
     setPlans(plans.filter(p => p.id !== planId));
   };
@@ -574,7 +581,7 @@ export function ManagePlans() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1>Manage Plans</h1>
+          <h1 className="text-3xl font-bold">Manage Plans</h1>
           <p className="text-muted-foreground">Create and manage membership plans, class packages, and training programs.</p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
@@ -585,10 +592,12 @@ export function ManagePlans() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Plans</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Plans</CardTitle>
+            <div className="p-2 rounded-lg bg-blue-100">
+              <CreditCard className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{plans.length}</div>
@@ -596,10 +605,12 @@ export function ManagePlans() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Plans</CardTitle>
-            <Settings className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Plans</CardTitle>
+            <div className="p-2 rounded-lg bg-green-100">
+              <Settings className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
@@ -609,23 +620,27 @@ export function ManagePlans() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Price</CardTitle>
-            <DollarSign className="h-4 w-4 text-blue-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Average Price</CardTitle>
+            <div className="p-2 rounded-lg bg-blue-100">
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              ${(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
+              AED {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
             </div>
             <p className="text-xs text-muted-foreground">Across all plans</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Family Plans</CardTitle>
-            <Users className="h-4 w-4 text-purple-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Family Plans</CardTitle>
+            <div className="p-2 rounded-lg bg-purple-100">
+              <Users className="h-4 w-4 text-purple-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
@@ -637,7 +652,7 @@ export function ManagePlans() {
       </div>
 
       {/* Plan Overview / List */}
-      <Card>
+      <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
         <CardHeader>
           <CardTitle>Plan Overview</CardTitle>
           <CardDescription>View and manage all membership plans</CardDescription>
@@ -695,8 +710,8 @@ export function ManagePlans() {
         
         <CardContent>
           <Table>
-            <TableHeader>
-              <TableRow>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="hover:bg-transparent">
                 <TableHead>Plan Name</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Type</TableHead>
@@ -711,7 +726,7 @@ export function ManagePlans() {
             </TableHeader>
             <TableBody>
               {filteredPlans.map((plan) => (
-                <TableRow key={plan.id}>
+                <TableRow key={plan.id} className="hover:bg-slate-50/50 transition-colors">
                   <TableCell>
                     <div>
                       <div className="font-medium">{plan.name}</div>
@@ -846,15 +861,42 @@ export function ManagePlans() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditPlan(plan)}>
-                        <Edit className="h-4 w-4" />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 border-primary/20 hover:bg-blue-50"
+                        onClick={() => handleViewPlan(plan)}
+                        title="View Plan"
+                      >
+                        <Eye className="h-4 w-4 text-blue-600" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDuplicatePlan(plan)}>
-                        <Copy className="h-4 w-4" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 border-primary/20 hover:bg-amber-50"
+                        onClick={() => handleEditPlan(plan)}
+                        title="Edit Plan"
+                      >
+                        <Edit className="h-4 w-4 text-amber-600" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeletePlan(plan.id)}>
-                        <Trash2 className="h-4 w-4" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 border-primary/20 hover:bg-purple-50"
+                        onClick={() => handleDuplicatePlan(plan)}
+                        title="Duplicate Plan"
+                      >
+                        <Copy className="h-4 w-4 text-purple-600" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 border-primary/20 hover:bg-red-50"
+                        onClick={() => handleDeletePlan(plan.id)}
+                        title="Delete Plan"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>
                     </div>
                   </TableCell>
@@ -864,6 +906,133 @@ export function ManagePlans() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Plan View Dialog */}
+      <Dialog open={!!viewingPlan} onOpenChange={(open) => !open && setViewingPlan(null)}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Plan Details</DialogTitle>
+            <DialogDescription>Overview of the selected plan configuration.</DialogDescription>
+          </DialogHeader>
+
+          {viewingPlan && (
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">{viewingPlan.name}</h3>
+                  <p className="text-sm text-muted-foreground">{viewingPlan.type}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={getStatusColor(viewingPlan.status)}>{viewingPlan.status}</Badge>
+                  <Badge className={getTypeColor(viewingPlan.planType)}>{viewingPlan.planType}</Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Duration</p>
+                  <p className="font-semibold">{viewingPlan.duration}</p>
+                </div>
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Price</p>
+                  <p className="font-semibold text-primary">AED {viewingPlan.price}</p>
+                </div>
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Discount</p>
+                  <p className="font-semibold">{viewingPlan.discount ? `${viewingPlan.discount}%` : "—"}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Assignable Trainers</p>
+                  {viewingPlan.assignableTrainers.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {viewingPlan.assignableTrainers.map((trainer) => (
+                        <Badge key={trainer} variant="outline" className="text-xs">
+                          {trainer}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-1">No trainers assigned</p>
+                  )}
+                </div>
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Max Sessions</p>
+                  <p className="font-semibold">{viewingPlan.maxSessions ?? "Unlimited"}</p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg border bg-white">
+                <p className="text-xs text-muted-foreground">Training Streams</p>
+                {viewingPlan.trainingStreams.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {getTrainingStreamNames(viewingPlan.trainingStreams).map((stream) => (
+                      <Badge key={stream} variant="outline" className="text-xs">
+                        {stream}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">No streams selected</p>
+                )}
+              </div>
+
+              <div className="p-3 rounded-lg border bg-white">
+                <p className="text-xs text-muted-foreground">Facilities</p>
+                {viewingPlan.selectedFacilities.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {getFacilityNames(viewingPlan.selectedFacilities).map((facility) => (
+                      <Badge key={facility} variant="outline" className="text-xs">
+                        {facility}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">No facilities</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Promotions</p>
+                  {viewingPlan.selectedPromotions.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {getPromotionNames(viewingPlan.selectedPromotions).map((promo) => (
+                        <Badge key={promo} variant="outline" className="text-xs bg-green-50 text-green-700">
+                          {promo}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-1">No promotions</p>
+                  )}
+                </div>
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Campaigns</p>
+                  {viewingPlan.selectedCampaigns.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {getCampaignNames(viewingPlan.selectedCampaigns).map((campaign) => (
+                        <Badge key={campaign} variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                          {campaign}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-1">No campaigns</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg border bg-white">
+                <p className="text-xs text-muted-foreground">Description</p>
+                <p className="text-sm mt-1 text-foreground">{viewingPlan.description || "No description provided."}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Plan Creation / Editing Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={handleCloseDialog}>
@@ -1245,7 +1414,9 @@ export function ManagePlans() {
                   {availableFacilities.length > 0 ? (
                     <>
                       <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto border rounded-md p-3">
-                        {availableFacilities.map((facility) => (
+                        {availableFacilities.map((facility) => {
+                          const FacilityIcon = facility.icon;
+                          return (
                           <div key={facility.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`facility-${facility.id}`}
@@ -1256,7 +1427,7 @@ export function ManagePlans() {
                               htmlFor={`facility-${facility.id}`}
                               className="text-sm cursor-pointer flex-1 flex items-center gap-2"
                             >
-                              <span className="text-lg">{facility.icon}</span>
+                              <FacilityIcon className="h-4 w-4 text-primary" />
                               <span>{facility.name}</span>
                             </Label>
                             <Badge 
@@ -1266,7 +1437,7 @@ export function ManagePlans() {
                               Active
                             </Badge>
                           </div>
-                        ))}
+                        )})}
                       </div>
 
                       <div className="text-sm text-muted-foreground">
