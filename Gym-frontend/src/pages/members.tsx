@@ -153,6 +153,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [totalPages, setTotalPages] = useState(1);
   const [totalMembers, setTotalMembers] = useState(0);
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
+  const [photoViewer, setPhotoViewer] = useState<{ src: string; name: string } | null>(null);
   
   // Membership Report states
   const [reportGenerated, setReportGenerated] = useState(false);
@@ -419,6 +421,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const getMembershipEndDate = (member: Member) => member.membership_end_date || member.expiry_date || '';
   const getMembershipFee = (member: Member) => member.membership_fee || member.monthly_fee;
   const getTotalVisits = (member: Member) => member.total_visits || 0;
+  const avatarPool = ["/avatars/sarah.jpg", "/avatars/mike.jpg", "/avatars/emily.jpg"];
+  const getMemberAvatar = (member: any) => {
+    const explicit =
+      member?.avatar ||
+      member?.photo ||
+      member?.photo_url ||
+      member?.profile_photo ||
+      member?.image;
+    if (explicit) return explicit;
+    const seed = String(getMemberId(member) || member?.name || "");
+    const hash = seed.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return avatarPool[hash % avatarPool.length];
+  };
 
   // Helper function to get membership category (Individual, Family, Corporate)
   const getMembershipCategory = (member: Member): string => {
@@ -464,9 +479,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   };
 
   // Function to open member history/analytics
-  const openMemberHistory = (memberId: string) => {
-    console.log('Opening member history for:', memberId);
-    // Navigate to member history & analytics screen
+  const openMemberHistory = (member: Member) => {
+    const payload = {
+      id: getMemberId(member),
+      name: member.name,
+      photo: getMemberAvatar(member),
+    };
+    localStorage.setItem("selectedMemberAnalytics", JSON.stringify(payload));
     onNavigate?.('member-history-analytics');
   };
 
@@ -889,11 +908,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       return (
                         <TableRow key={member.id} className="hover:bg-slate-50/50 transition-colors">
                           <TableCell className="flex items-center space-x-3">
-                            <Avatar>
-                              <AvatarFallback>
-                                {member.name.split(' ').map(n => n[0]).join('')}
-                              </AvatarFallback>
-                            </Avatar>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPhotoViewer({ src: getMemberAvatar(member), name: member.name });
+                                setIsPhotoViewerOpen(true);
+                              }}
+                              className="rounded-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+                              title="View photo"
+                            >
+                              <Avatar>
+                                <AvatarImage src={getMemberAvatar(member)} alt={member.name} />
+                                <AvatarFallback>
+                                  {member.name.split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                            </button>
                             <div>
                               <div className="font-medium">{member.name}</div>
                               <div className="text-sm text-muted-foreground">
@@ -1004,7 +1034,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                   <>
                                     <DropdownMenuItem
                                       className="cursor-pointer"
-                                      onClick={() => openMemberHistory(getMemberId(member))}
+                                      onClick={() => openMemberHistory(member)}
                                     >
                                       <BarChart3 className="h-4 w-4 mr-2" />
                                       View Analytics
@@ -1028,6 +1058,24 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   )}
                 </TableBody>
               </Table>
+
+              <Dialog open={isPhotoViewerOpen} onOpenChange={setIsPhotoViewerOpen}>
+                <DialogContent className="w-[300px] sm:max-w-[300px] p-5">
+                  <DialogHeader>
+                    <DialogTitle>Member Photo</DialogTitle>
+                    <DialogDescription>{photoViewer?.name}</DialogDescription>
+                  </DialogHeader>
+                  <div className="flex items-center justify-center py-2">
+                    {photoViewer && (
+                      <img
+                        src={photoViewer.src}
+                        alt={photoViewer.name}
+                        className="h-48 w-48 rounded-lg object-cover shadow-md"
+                      />
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               {/* Pagination Controls */}
               {totalPages > 1 && (
@@ -2128,7 +2176,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
           {/* Empty State */}
           {!reportGenerated && !reportLoading && (
-            <Card>
+            <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <div className="bg-gradient-light p-6 rounded-full mb-4">
                   <BarChart3 className="h-12 w-12 text-primary" />

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -16,17 +16,21 @@ import {
   Clock,
   FileText,
 } from "lucide-react";
+import { FaCircleCheck, FaStar } from "react-icons/fa6";
 import {
-  FaDumbbell,
-  FaAppleWhole,
-  FaUsers,
-  FaHeart,
-  FaBox,
-  FaCircle,
-  FaTriangleExclamation,
-  FaCircleCheck,
-  FaStar,
-} from "react-icons/fa6";
+  HiOutlineBolt,
+  HiOutlineClock,
+  HiOutlineCube,
+  HiOutlineHeart,
+  HiOutlineMagnifyingGlass,
+  HiOutlinePlus,
+  HiOutlineSquares2X2,
+  HiOutlineUserCircle,
+  HiOutlineUserGroup,
+  HiOutlineSparkles,
+  HiMiniCheckCircle,
+  HiMiniExclamationTriangle,
+} from "react-icons/hi2";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -90,12 +94,13 @@ interface Addon {
 }
 
 const getCategoryIcon = (category: string) => {
+  const baseClass = "text-white block shrink-0";
   switch (category) {
-    case "Training":  return <FaDumbbell size={18} className="text-white" />;
-    case "Nutrition": return <FaAppleWhole size={18} className="text-white" />;
-    case "Classes":   return <FaUsers size={18} className="text-white" />;
-    case "Spa":       return <FaHeart size={18} className="text-white" />;
-    default:          return <FaBox size={18} className="text-white" />;
+    case "Training":  return <HiOutlineBolt size={16} className={baseClass} />;
+    case "Nutrition": return <HiOutlineSparkles size={16} className={baseClass} />;
+    case "Classes":   return <HiOutlineUserGroup size={16} className={baseClass} />;
+    case "Spa":       return <HiOutlineHeart size={16} className={baseClass} />;
+    default:          return <HiOutlineCube size={16} className={baseClass} />;
   }
 };
 
@@ -306,6 +311,15 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardApplied, setRewardApplied] = useState(false);
   const [finalAmountAfterReward, setFinalAmountAfterReward] = useState<number>(0);
+
+  useEffect(() => {
+    if (isPurchaseModalOpen) {
+      document.body.classList.add("overflow-hidden");
+      return () => {
+        document.body.classList.remove("overflow-hidden");
+      };
+    }
+  }, [isPurchaseModalOpen]);
 
   const handleMemberSearch = () => {
     const found = mockMembers.find(
@@ -622,12 +636,12 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
 
       {/* Purchase Add-on Modal */}
       <Dialog open={isPurchaseModalOpen} onOpenChange={setIsPurchaseModalOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="w-[96vw] max-w-[1100px] sm:max-w-[1100px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
           {/* Modal Header */}
-          <div className="sticky top-0 z-10 px-6 pt-6 pb-4 border-b bg-white/95 backdrop-blur-sm">
+          <div className="px-6 pt-6 pb-4 border-b bg-white/95 backdrop-blur-sm shrink-0">
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary shadow-sm shrink-0">
-                <Package className="h-[18px] w-[18px] text-white" />
+              <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-primary shadow-sm shrink-0">
+                <HiOutlineSquares2X2 size={20} className="text-white block shrink-0" />
               </div>
               <div>
                 <h2 className="text-base font-bold tracking-tight">Purchase An Add-On</h2>
@@ -636,11 +650,12 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             </div>
           </div>
 
-          <div className="space-y-5 p-6">
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="space-y-6 px-6 py-7">
             {/* Step 1 */}
             <div className="rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="h-0.5 w-full bg-gradient-to-r from-blue-500 to-blue-400" />
-              <div className="px-5 py-4">
+              <div className="px-6 py-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">1</div>
                   <div>
@@ -650,7 +665,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                 </div>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4 shrink-0" />
                     <Input
                       placeholder="Search by Member ID, Name, or Phone"
                       value={searchQuery}
@@ -666,11 +681,11 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
               </div>
 
               {selectedMember && (
-                <div className="mx-5 mb-4 rounded-xl border border-blue-200 bg-blue-50/40 overflow-hidden">
+                <div className="mx-6 mb-4 rounded-xl border border-blue-200 bg-blue-50/40 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-blue-100">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm shrink-0">
-                        <User className="h-4 w-4 text-white" />
+                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm shrink-0">
+                        <HiOutlineUserCircle size={20} className="text-white block shrink-0" />
                       </div>
                       <div>
                         <p className="text-sm font-semibold">{selectedMember.name}</p>
@@ -679,7 +694,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                     </div>
                     <Badge className={selectedMember.status === "Active" ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700"}>
                       <span className="flex items-center gap-1.5">
-                        {selectedMember.status === "Active" && <FaCircle size={6} className="text-green-500" />}
+                        {selectedMember.status === "Active" && <HiMiniCheckCircle size={12} className="text-green-500 block shrink-0" />}
                         {selectedMember.status}
                       </span>
                     </Badge>
@@ -696,7 +711,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                       </p>
                       {getDaysUntilExpiry(selectedMember.validTill) < 10 && (
                         <p className="text-[10px] text-red-500 mt-0.5 flex items-center gap-1">
-                          <FaTriangleExclamation size={9} /> Expires soon
+                          <HiMiniExclamationTriangle size={14} className="block shrink-0" /> Expires soon
                         </p>
                       )}
                     </div>
@@ -712,7 +727,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             {/* Step 2 */}
             <div className="rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="h-0.5 w-full bg-gradient-to-r from-purple-500 to-violet-400" />
-              <div className="px-5 py-4">
+              <div className="px-6 py-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold shrink-0">2</div>
@@ -740,21 +755,22 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                   {filteredAddons.map((addon) => (
                     <div
                       key={addon.id}
-                      className="rounded-xl border border-border bg-white shadow-sm overflow-hidden hover:shadow-md hover:border-primary/30 transition-all duration-200"
+                      className="rounded-xl border border-border bg-white shadow-sm overflow-hidden hover:shadow-md hover:border-primary/30 transition-all duration-200 flex flex-col h-full"
                     >
                       <div className={`h-0.5 w-full bg-gradient-to-r ${getCategoryColor(addon.category)}`} />
-                      <div className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br ${getCategoryColor(addon.category)} shadow-sm shrink-0`}>
-                            {getCategoryIcon(addon.category)}
+                      <div className="p-4 flex flex-col h-full">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center bg-gradient-to-br ${getCategoryColor(addon.category)} shadow-sm shrink-0`}>
+                            <span className="flex items-center justify-center">{getCategoryIcon(addon.category)}</span>
                           </div>
                           <Badge variant="secondary" className="text-[10px]">{addon.category}</Badge>
                         </div>
                         <p className="text-sm font-semibold leading-snug mb-1">{addon.name}</p>
                         <p className="text-[11px] text-muted-foreground mb-3">{addon.description}</p>
-                        <div className="flex items-center justify-between mb-3 pt-2 border-t">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
+                        <div className="mt-auto">
+                          <div className="flex items-center justify-between mb-3 pt-2 border-t">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <HiOutlineClock className="h-4 w-4 shrink-0" />
                             {addon.validity} days
                           </div>
                           <span className="text-sm font-bold text-primary">AED {addon.price}</span>
@@ -765,18 +781,20 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                           className="w-full h-8 text-xs gap-1.5"
                           disabled={!selectedMember}
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <HiOutlinePlus className="h-4 w-4 shrink-0" />
                           Add to Member
                         </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+            </div>
           </div>
 
-          <div className="px-6 py-4 border-t bg-slate-50/60 flex justify-end">
+          <div className="px-6 py-4 border-t bg-slate-50/60 flex justify-end shrink-0">
             <Button
               variant="outline"
               onClick={() => {
@@ -906,7 +924,9 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
               Cancel
             </Button>
             <Button onClick={handleConfirmPurchase} className="gap-2">
-              <FaCircleCheck size={14} />
+              <span className="inline-flex items-center justify-center w-4 h-4 shrink-0">
+                <FaCircleCheck className="w-4 h-4" />
+              </span>
               Confirm Purchase
             </Button>
           </div>
@@ -917,7 +937,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
         <DialogContent className="max-w-sm p-0">
           {/* Success header */}
-          <div className="flex flex-col items-center text-center px-6 pt-7 pb-5 border-b">
+          <div className="flex flex-col items-center text-center px-8 pt-10 pb-7 border-b">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-md mb-4">
               <FaCircleCheck size={26} className="text-white" />
             </div>
@@ -926,7 +946,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
           </div>
 
           {/* Receipt summary */}
-          <div className="px-6 py-4 space-y-2">
+          <div className="px-8 py-6 space-y-2">
             {[
               { label: "Add-on", value: selectedAddon?.name },
               { label: "Amount", value: `AED ${customAmount}` },
@@ -946,7 +966,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
           </div>
 
           {/* Congrats note */}
-          <div className="mx-6 mb-5 bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2.5">
+          <div className="mx-8 mb-7 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-2.5">
             <div className="shrink-0 w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center mt-0.5">
               <FaStar size={12} className="text-blue-600" />
             </div>
@@ -956,7 +976,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             </p>
           </div>
 
-          <div className="px-6 py-4 border-t bg-slate-50/60 flex gap-2">
+          <div className="px-8 py-6 border-t bg-slate-50/60 flex gap-2">
             <Button variant="outline" className="flex-1 gap-2 text-xs h-9">
               <Download className="h-3.5 w-3.5" />
               Download Receipt
