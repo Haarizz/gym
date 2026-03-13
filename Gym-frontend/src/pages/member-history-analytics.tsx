@@ -396,7 +396,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   });
 
   useEffect(() => {
-    const stored = localStorage.getItem("selectedMemberAnalytics");
+    const stored = sessionStorage.getItem("selectedMemberAnalytics");
     if (stored) {
       try {
         const parsed = JSON.parse(stored);

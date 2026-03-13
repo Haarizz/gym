@@ -1149,10 +1149,10 @@ export function PlansServicesCatalog() {
         onSubmitDraft={(draftData) => {
           setPendingMembers(prev => [...prev, draftData]);
           
-          // Save to localStorage (simulating backend)
-          const existing = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+          // Save to sessionStorage (simulating backend)
+          const existing = JSON.parse(sessionStorage.getItem('pendingMembers') || '[]');
           existing.push(draftData);
-          localStorage.setItem('pendingMembers', JSON.stringify(existing));
+          sessionStorage.setItem('pendingMembers', JSON.stringify(existing));
           
           // Notify other components
           window.dispatchEvent(new Event('pendingMembersUpdated'));

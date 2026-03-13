@@ -23,13 +23,13 @@ class AuthService {
 
   // ── Session lifecycle ────────────────────────────────────────────────────
 
-  /** Restore session from localStorage on app load. */
+  /** Restore session from sessionStorage on app load. */
   async initialize(): Promise<boolean> {
-    const storedToken = localStorage.getItem("token");
+    const storedToken = sessionStorage.getItem("token");
     if (!storedToken) return false;
 
     // Try to reconstruct user from stored data
-    const storedUserRaw = localStorage.getItem("gymbios_user");
+    const storedUserRaw = sessionStorage.getItem("gymbios_user");
     if (storedUserRaw) {
       try {
         this.user = JSON.parse(storedUserRaw);
@@ -39,9 +39,9 @@ class AuthService {
     }
 
     if (!this.user) {
-      const username  = localStorage.getItem("username")     || "User";
-      const email     = localStorage.getItem("gymbios_email")|| "user@example.com";
-      const rolesRaw  = localStorage.getItem("roles");
+      const username  = sessionStorage.getItem("username")     || "User";
+      const email     = sessionStorage.getItem("gymbios_email")|| "user@example.com";
+      const rolesRaw  = sessionStorage.getItem("roles");
       const roles: string[] = rolesRaw ? JSON.parse(rolesRaw) : [];
 
       this.user = {
@@ -82,13 +82,13 @@ class AuthService {
         };
         this.accessToken = result.token;
 
-        localStorage.setItem("token",              result.token);
-        localStorage.setItem("username",           username);
-        localStorage.setItem("roles",              JSON.stringify(roles));
-        localStorage.setItem("gymbios_email",      email);
-        localStorage.setItem("gymbios_user",       JSON.stringify(this.user));
-        localStorage.setItem("gymbios_auth",       "true");
-        localStorage.setItem("gymbios_auth_source","backend");
+        sessionStorage.setItem("token",              result.token);
+        sessionStorage.setItem("username",           username);
+        sessionStorage.setItem("roles",              JSON.stringify(roles));
+        sessionStorage.setItem("gymbios_email",      email);
+        sessionStorage.setItem("gymbios_user",       JSON.stringify(this.user));
+        sessionStorage.setItem("gymbios_auth",       "true");
+        sessionStorage.setItem("gymbios_auth_source","backend");
 
         return { success: true };
       }
@@ -128,14 +128,14 @@ class AuthService {
     this.user        = null;
     this.accessToken = null;
 
-    localStorage.removeItem("token");
-    localStorage.removeItem("username");
-    localStorage.removeItem("roles");
-    localStorage.removeItem("gymbios_email");
-    localStorage.removeItem("gymbios_user");
-    localStorage.removeItem("gymbios_auth");
-    localStorage.removeItem("gymbios_auth_source");
-    localStorage.removeItem("gymbios_demo_mode");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("username");
+    sessionStorage.removeItem("roles");
+    sessionStorage.removeItem("gymbios_email");
+    sessionStorage.removeItem("gymbios_user");
+    sessionStorage.removeItem("gymbios_auth");
+    sessionStorage.removeItem("gymbios_auth_source");
+    sessionStorage.removeItem("gymbios_demo_mode");
   }
 
   // ── State accessors ──────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ class AuthService {
   }
 
   getAccessToken(): string | null {
-    return this.accessToken || localStorage.getItem("token");
+    return this.accessToken || sessionStorage.getItem("token");
   }
 
   isAuthenticated(): boolean {

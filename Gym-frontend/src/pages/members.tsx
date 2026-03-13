@@ -243,10 +243,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     plansService.getPlans('Active').then(setApiPlans).catch(() => {});
   }, []);
 
-  // Load pending members from localStorage
+  // Load pending members from sessionStorage
   useEffect(() => {
     const loadPendingMembers = () => {
-      const stored = localStorage.getItem('pendingMembers');
+      const stored = sessionStorage.getItem('pendingMembers');
       if (stored) {
         try {
           setPendingMembers(JSON.parse(stored));
@@ -508,7 +508,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       name: member.name,
       photo: getMemberAvatar(member),
     };
-    localStorage.setItem("selectedMemberAnalytics", JSON.stringify(payload));
+    sessionStorage.setItem("selectedMemberAnalytics", JSON.stringify(payload));
     onNavigate?.('member-history-analytics');
   };
 
@@ -522,12 +522,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     // Remove from pending list
     const updated = pendingMembers.filter(m => m.memberId !== approvalData.memberId);
     setPendingMembers(updated);
-    localStorage.setItem('pendingMembers', JSON.stringify(updated));
+    sessionStorage.setItem('pendingMembers', JSON.stringify(updated));
 
     // Save to active members (simulated)
-    const existingMembers = JSON.parse(localStorage.getItem('activeMembers') || '[]');
+    const existingMembers = JSON.parse(sessionStorage.getItem('activeMembers') || '[]');
     existingMembers.push(approvalData);
-    localStorage.setItem('activeMembers', JSON.stringify(existingMembers));
+    sessionStorage.setItem('activeMembers', JSON.stringify(existingMembers));
 
     // Notify other components
     window.dispatchEvent(new Event('pendingMembersUpdated'));
@@ -539,7 +539,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const handleRejectDraft = (draftId: string) => {
     const updated = pendingMembers.filter(m => m.memberId !== draftId);
     setPendingMembers(updated);
-    localStorage.setItem('pendingMembers', JSON.stringify(updated));
+    sessionStorage.setItem('pendingMembers', JSON.stringify(updated));
     
     // Notify other components
     window.dispatchEvent(new Event('pendingMembersUpdated'));

@@ -4,6 +4,8 @@ import React, {
   useCallback,
   useEffect,
 } from "react";
+import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { ProtectedRoute } from "./components/shared/ProtectedRoute";
 import { authService, User } from "./utils/supabase/auth-service";
 import {
   Sidebar,
@@ -152,51 +154,61 @@ const menuItems = [
     title: "Dashboard",
     icon: LayoutDashboard,
     id: "dashboard",
+    path: "/dashboard",
   },
   {
     title: "Community",
     icon: Heart,
     id: "community",
+    path: "/community",
     subItems: [
       {
         title: "Members",
         icon: Users,
         id: "members",
+        path: "/members",
       },
       {
         title: "Billing",
         icon: Receipt,
         id: "billing",
+        path: "/billing",
       },
       {
         title: "Manage Plans",
         icon: Settings,
         id: "manage-plans",
+        path: "/manage-plans",
       },
       {
         title: "Attendance",
         icon: UserCheck,
         id: "attendance",
+        path: "/attendance",
       },
       {
         title: "Check In",
         icon: LogIn,
         id: "check-in",
+        path: "/check-in",
       },
       {
         title: "Training Streams",
         icon: Video,
         id: "training-streams",
+        path: "/training-streams",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "reports",
+        path: "/reports",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "analytics",
+        path: "/analytics",
       },
     ],
   },
@@ -204,56 +216,67 @@ const menuItems = [
     title: "Member Connect",
     icon: UserPlus,
     id: "member-connect",
+    path: "/member-connect",
     subItems: [
       {
         title: "Promotions & Campaign",
         icon: Megaphone,
         id: "promotions-campaign",
+        path: "/promotions-campaign",
       },
       {
         title: "Referrals",
         icon: Share,
         id: "referrals",
+        path: "/referrals",
       },
       {
         title: "Leads",
         icon: Target,
         id: "leads",
+        path: "/leads",
       },
       {
         title: "Follow-ups",
         icon: Phone,
         id: "follow-ups",
+        path: "/follow-ups",
       },
       {
         title: "Messaging",
         icon: MessageSquare,
         id: "messaging",
+        path: "/messaging",
       },
       {
         title: "Automations",
         icon: Zap,
         id: "automations",
+        path: "/automations",
       },
       {
         title: "Post-Workout Check-in",
         icon: CheckCircle,
         id: "post-workout-checkin",
+        path: "/post-workout-checkin",
       },
       {
         title: "Plans & Services Catalog",
         icon: BookOpen,
         id: "plans-services-catalog",
+        path: "/plans-services-catalog",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "member-connect-reports",
+        path: "/member-connect-reports",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "member-connect-analytics",
+        path: "/member-connect-analytics",
       },
     ],
   },
@@ -261,56 +284,67 @@ const menuItems = [
     title: "Sales & Purchases",
     icon: ShoppingCart,
     id: "sales-purchases",
+    path: "/sales-purchases",
     subItems: [
       {
         title: "Point of Sale",
         icon: CreditCard,
         id: "point-of-sale",
+        path: "/point-of-sale",
       },
       {
         title: "Products",
         icon: Package,
         id: "products",
+        path: "/products",
       },
       {
         title: "Category",
         icon: Tag,
         id: "category",
+        path: "/category",
       },
       {
         title: "Purchase Order",
         icon: ClipboardList,
         id: "purchase-order",
+        path: "/purchase-order",
       },
       {
         title: "Purchase",
         icon: ShoppingBag,
         id: "purchase",
+        path: "/purchase",
       },
       {
         title: "Wastage / Returns",
         icon: ArrowLeftRight,
         id: "wastage-returns",
+        path: "/wastage-returns",
       },
       {
         title: "Production / Recipe",
         icon: ChefHat,
         id: "production-recipe",
+        path: "/production-recipe",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "sales-reports",
+        path: "/sales-reports",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "sales-analytics",
+        path: "/sales-analytics",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "sales-settings",
+        path: "/sales-settings",
       },
     ],
   },
@@ -318,56 +352,67 @@ const menuItems = [
     title: "Financials",
     icon: Calculator,
     id: "financials",
+    path: "/financials",
     subItems: [
       {
         title: "Ledgers",
         icon: BookOpen,
         id: "ledgers",
+        path: "/ledgers",
       },
       {
         title: "Receipt Voucher",
         icon: Receipt,
         id: "receipt-voucher",
+        path: "/receipt-voucher",
       },
       {
         title: "Journal Voucher",
         icon: FileText,
         id: "journal-voucher",
+        path: "/journal-voucher",
       },
       {
         title: "Payment Voucher",
         icon: Banknote,
         id: "payment-voucher",
+        path: "/payment-voucher",
       },
       {
         title: "Bank Reconciliations",
         icon: Landmark,
         id: "bank-reconciliations",
+        path: "/bank-reconciliations",
       },
       {
         title: "Expenses",
         icon: TrendingDown,
         id: "expenses",
+        path: "/expenses",
       },
       {
         title: "Tax Compliance",
         icon: Receipt,
         id: "tax-compliance",
+        path: "/tax-compliance",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "financial-reports",
+        path: "/financial-reports",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "financial-analytics",
+        path: "/financial-analytics",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "financial-settings",
+        path: "/financial-settings",
       },
     ],
   },
@@ -375,56 +420,67 @@ const menuItems = [
     title: "Payroll & Employees",
     icon: UserCog,
     id: "payroll-employees",
+    path: "/payroll-employees",
     subItems: [
       {
         title: "Staffs & Trainers",
         icon: Users,
         id: "staffs-trainers",
+        path: "/staffs-trainers",
       },
       {
         title: "Trainings & Classes",
         icon: GraduationCap,
         id: "trainings-classes",
+        path: "/trainings-classes",
       },
       {
         title: "Bookings",
         icon: Calendar,
         id: "bookings",
+        path: "/bookings",
       },
       {
         title: "Payroll",
         icon: DollarSign,
         id: "payroll",
+        path: "/payroll",
       },
       {
         title: "Salary Payments",
         icon: Wallet,
         id: "salary-payments",
+        path: "/salary-payments",
       },
       {
         title: "Salary Advances",
         icon: TrendingUp,
         id: "salary-advances",
+        path: "/salary-advances",
       },
       {
         title: "Recruitment",
         icon: Briefcase,
         id: "recruitment",
+        path: "/recruitment",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "payroll-reports",
+        path: "/payroll-reports",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "payroll-analytics",
+        path: "/payroll-analytics",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "payroll-settings",
+        path: "/payroll-settings",
       },
     ],
   },
@@ -432,31 +488,37 @@ const menuItems = [
     title: "Assets",
     icon: Building2,
     id: "assets",
+    path: "/assets",
     subItems: [
       {
         title: "Manage Assets",
         icon: Package,
         id: "manage-assets",
+        path: "/manage-assets",
       },
       {
         title: "Transactions",
         icon: RefreshCcw,
         id: "asset-transactions",
+        path: "/asset-transactions",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "asset-reports",
+        path: "/asset-reports",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "asset-analytics",
+        path: "/asset-analytics",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "asset-settings",
+        path: "/asset-settings",
       },
     ],
   },
@@ -464,47 +526,58 @@ const menuItems = [
     title: "GymOS",
     icon: Cog,
     id: "gymos",
+    path: "/gymos",
   },
   {
     title: "BiOS",
     icon: Brain,
     id: "bios",
+    path: "/bios",
   },
   {
     title: "Member Hub",
     icon: Users,
     id: "member-hub",
+    path: "/member-hub",
   },
   {
     title: "GymBios Pricing",
     icon: CreditCard,
     id: "gymbios-pricing",
+    path: "/gymbios-pricing",
   },
   {
     title: "My Profile",
     icon: UserIcon,
     id: "my-profile",
+    path: "/my-profile",
     subItems: [
       {
         title: "My Targets",
         icon: TargetIcon,
         id: "my-targets",
+        path: "/my-targets",
       },
       {
         title: "My Performance",
         icon: Activity,
         id: "my-performance",
+        path: "/my-performance",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "profile-settings",
+        path: "/profile-settings",
       },
     ],
   },
 ];
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -524,13 +597,16 @@ export default function App() {
     };
   }, []);
 
-  // App state
-  const [activeSection, setActiveSection] =
-    useState("dashboard");
+  // Use location.pathname to figure out active section for styling mostly
+  const currentPath = location.pathname;
+  const activeSectionPathId = currentPath === '/' ? 'dashboard' : currentPath.slice(1);
+
   const [expandedItems, setExpandedItems] = useState<string[]>(
     [],
   );
-  const [navigationParams, setNavigationParams] = useState<Record<string, any>>({});
+  
+  // Provide navigation params from location state if available
+  const navigationParams = location.state || {};
   
   // Emergency route detection
   const [isEmergencyRoute, setIsEmergencyRoute] = useState(false);
@@ -610,15 +686,15 @@ export default function App() {
       await authService.signOut();
       setIsAuthenticated(false);
       setUser(null);
-      setActiveSection("dashboard");
+      navigate("/dashboard");
     } catch (error) {
       console.error('Logout error:', error);
       // Force logout on error
       setIsAuthenticated(false);
       setUser(null);
-      setActiveSection("dashboard");
+      navigate("/dashboard");
     }
-  }, []);
+  }, [navigate]);
 
   const toggleExpanded = useCallback((itemId: string) => {
     setExpandedItems((prev) =>
@@ -630,8 +706,11 @@ export default function App() {
 
   const handleNavClick = useCallback(
     (sectionId: string, params?: Record<string, any>) => {
-      setActiveSection(sectionId);
-      setNavigationParams(params || {});
+      // Create path from sectionId
+      let path = sectionId.startsWith('/') ? sectionId : `/${sectionId}`;
+      
+      // Execute React Router navigation
+      navigate(path, { state: params });
 
       // Auto-expand Community for its sub-items
       const communitySubItems = [
@@ -760,293 +839,198 @@ export default function App() {
     [expandedItems],
   );
 
-  const renderContent = useMemo(() => {
-    switch (activeSection) {
-      case "dashboard":
-        return <Dashboard onNavigate={handleNavClick} />;
-      case "community":
-        return <Community />;
-      case "members":
-        return <Members onNavigate={handleNavClick} initialTab={navigationParams.tab} />;
-      case "add-member":
-        return <AddMember onNavigate={handleNavClick} />;
-      case "billing":
-        return <Billing onNavigate={handleNavClick} />;
-      case "create-receipt":
-        return <CreateReceipt onNavigate={handleNavClick} />;
-      case "manage-plans":
-        return <ManagePlans />;
-      case "attendance":
-        return <Attendance onNavigate={handleNavClick} />;
-      case "attendance-reports":
-        return <AttendanceReports onNavigate={handleNavClick} />;
-      case "member-history-analytics":
-        return <MemberHistoryAnalytics onNavigate={handleNavClick} memberId={navigationParams.memberId} />;
-      case "check-in":
-        return <CheckIn />;
-      case "training-streams":
-        return <TrainingStreams onNavigate={handleNavClick} />;
-      case "facilities":
-        return <Facilities onNavigate={handleNavClick} />;
-      case "reports":
-        return <ReportsAnalytics onNavigate={handleNavClick} />;
-      case "custom-reports":
-        return <CustomReports onNavigate={handleNavClick} />;
-      case "member-addons":
-        return <MemberAddons onNavigate={handleNavClick} />;
-      case "member-receipts":
-        return <MemberReceipts onNavigate={handleNavClick} />;
-      case "freeze-unfreeze":
-        return <FreezeUnfreeze onNavigate={handleNavClick} />;
-      case "analytics":
-        return <CommunityAnalytics />;
-      case "member-connect":
-        return <MemberConnect />;
-      case "promotions-campaign":
-        return <PromotionsCampaign />;
-      case "referrals":
-        return <Referrals />;
-      case "leads":
-        return <Leads />;
-      case "follow-ups":
-        return <FollowUps />;
-      case "messaging":
-        return <Messaging />;
-      case "automations":
-        return <Automations />;
-      case "post-workout-checkin":
-        return <PostWorkoutCheckin />;
-      case "plans-services-catalog":
-        return <PlansServicesCatalog />;
-      case "member-connect-reports":
-        return <MemberConnectReports />;
-      case "member-connect-analytics":
-        return <MemberConnectAnalytics />;
-      case "sales-purchases":
-        return <SalesPurchases />;
-      case "point-of-sale":
-        return <PointOfSale />;
-      case "products":
-        return <Products onNavigate={handleNavClick} />;
-      case "add-product":
-        return <AddProduct onNavigate={handleNavClick} />;
-      case "category":
-        return (
-          <div className="p-6">
-            <h1>Category</h1>
-            <p className="text-muted-foreground">
-              Organize products and services into categories for
-              better inventory management and sales tracking.
-            </p>
-          </div>
-        );
-      case "purchase-order":
-        return <PurchaseOrder />;
-      case "purchase":
-        return <Purchase />;
-      case "wastage-returns":
-        return <WastageReturns />;
-      case "production-recipe":
-        return (
-          <div className="p-6">
-            <h1>Production / Recipe</h1>
-            <p className="text-muted-foreground">
-              Manage recipes for gym cafe items, protein shakes,
-              and track production costs and ingredients.
-            </p>
-          </div>
-        );
-      case "sales-reports":
-        return (
-          <div className="p-6">
-            <h1>Sales Reports</h1>
-            <p className="text-muted-foreground">
-              Comprehensive sales reporting including revenue
-              tracking, product performance, and transaction
-              analysis.
-            </p>
-          </div>
-        );
-      case "sales-analytics":
-        return (
-          <div className="p-6">
-            <h1>Sales Analytics</h1>
-            <p className="text-muted-foreground">
-              Advanced analytics for sales performance, customer
-              purchasing patterns, and revenue optimization
-              insights.
-            </p>
-          </div>
-        );
-      case "sales-settings":
-        return (
-          <div className="p-6">
-            <h1>Sales Settings</h1>
-            <p className="text-muted-foreground">
-              Configure sales system settings including tax
-              rates, payment methods, and transaction
-              preferences.
-            </p>
-          </div>
-        );
-      case "financials":
-        return <Financials />;
-      case "ledgers":
-        return <Ledgers />;
-      case "receipt-voucher":
-        return <ReceiptVoucher />;
-      case "journal-voucher":
-        return (
-          <div className="p-6">
-            <h1>Journal Voucher</h1>
-            <p className="text-muted-foreground">
-              Create journal entries for adjustments,
-              corrections, and non-cash transactions.
-            </p>
-          </div>
-        );
-      case "payment-voucher":
-        return <PaymentVoucher />;
-      case "bank-reconciliations":
-        return <BankReconciliation />;
-      case "expenses":
-        return <Expenses />;
-      case "tax-compliance":
-        return <TaxCompliance />;
-      case "financial-reports":
-        return <FinancialReports />;
-      case "financial-analytics":
-        return <FinancialAnalytics />;
-      case "financial-settings":
-        return (
-          <div className="p-6">
-            <h1>Financial Settings</h1>
-            <p className="text-muted-foreground">
-              Configure financial system settings including
-              accounting periods, tax rates, and chart of
-              accounts.
-            </p>
-          </div>
-        );
-      case "payroll-employees":
-        return <PayrollEmployees />;
-      case "staffs-trainers":
-        return <StaffsTrainers onNavigate={handleNavClick} />;
-      case "set-targets":
-        return <SetTargets onNavigate={handleNavClick} />;
-      case "targets-overview":
-        return <TargetsOverview onNavigate={handleNavClick} />;
-      case "my-targets":
-        return <MyTargets />;
-      case "my-performance":
-        return <MyPerformance onNavigate={handleNavClick} />;
-      case "profile-settings":
-        return (
-          <div className="p-6">
-            <h1>Profile Settings</h1>
-            <p className="text-muted-foreground">
-              Manage your personal profile, notification preferences, and account settings.
-            </p>
-          </div>
-        );
-      case "my-profile":
-        return <MyProfile onNavigate={handleNavClick} />;
-      case "trainings-classes":
-        return <TrainingsClasses onNavigate={handleNavClick} />;
-      case "bookings":
-        return <Bookings onNavigate={handleNavClick} />;
-      case "payroll":
-        return <Payroll onNavigate={handleNavClick} />;
-      case "salary-payments":
-        return <SalaryPayments onNavigate={handleNavClick} />;
-      case "salary-advances":
-        return <SalaryAdvances onNavigate={handleNavClick} />;
-      case "recruitment":
-        return <Recruitment />;
-      case "payroll-reports":
-        return (
-          <div className="p-6">
-            <h1>Payroll Reports</h1>
-            <p className="text-muted-foreground">
-              Generate comprehensive payroll reports including
-              salary summaries, tax reports, and employee
-              earnings.
-            </p>
-          </div>
-        );
-      case "payroll-analytics":
-        return (
-          <div className="p-6">
-            <h1>Payroll Analytics</h1>
-            <p className="text-muted-foreground">
-              Advanced analytics for payroll costs, employee
-              performance metrics, and workforce insights.
-            </p>
-          </div>
-        );
-      case "payroll-settings":
-        return (
-          <div className="p-6">
-            <h1>Payroll Settings</h1>
-            <p className="text-muted-foreground">
-              Configure payroll system settings including tax
-              rates, benefit calculations, and payment
-              schedules.
-            </p>
-          </div>
-        );
-      case "assets":
-        return <Assets />;
-      case "manage-assets":
-        return <ManageAssets />;
-      case "asset-transactions":
-        return <AssetTransactions />;
-      case "asset-reports":
-        return (
-          <div className="p-6">
-            <h1>Asset Reports</h1>
-            <p className="text-muted-foreground">
-              Generate detailed asset reports including
-              depreciation schedules, asset registers, and
-              valuation summaries.
-            </p>
-          </div>
-        );
-      case "asset-analytics":
-        return (
-          <div className="p-6">
-            <h1>Asset Analytics</h1>
-            <p className="text-muted-foreground">
-              Advanced analytics for asset utilization, ROI
-              tracking, maintenance costs, and performance
-              optimization insights.
-            </p>
-          </div>
-        );
-      case "asset-settings":
-        return (
-          <div className="p-6">
-            <h1>Asset Settings</h1>
-            <p className="text-muted-foreground">
-              Configure asset management settings including
-              depreciation methods, category classifications,
-              and maintenance schedules.
-            </p>
-          </div>
-        );
-      case "gymos":
-        return <GymOS onNavigate={handleNavClick} />;
-
-      case "bios":
-        return <BiOS />;
-      case "member-hub":
-        return <MemberHub />;
-      case "gymbios-pricing":
-        return <GymBiosPricing />;
-      default:
-        return <Dashboard onNavigate={handleNavClick} />;
-      }
-  }, [activeSection, navigationParams, handleNavClick]);
+  const renderContent = (
+    <Routes>
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/dashboard" element={<Dashboard onNavigate={handleNavClick} />} />
+      <Route path="/community" element={<Community />} />
+      <Route path="/members" element={<Members onNavigate={handleNavClick} initialTab={navigationParams.tab} />} />
+      <Route path="/members/add" element={<AddMember onNavigate={handleNavClick} />} />
+      <Route path="/add-member" element={<Navigate to="/members/add" replace />} />
+      <Route path="/billing" element={<Billing onNavigate={handleNavClick} />} />
+      <Route path="/create-receipt" element={<CreateReceipt onNavigate={handleNavClick} />} />
+      <Route path="/manage-plans" element={<ManagePlans />} />
+      <Route path="/attendance" element={<Attendance onNavigate={handleNavClick} />} />
+      <Route path="/attendance-reports" element={<AttendanceReports onNavigate={handleNavClick} />} />
+      <Route path="/member-history-analytics" element={<MemberHistoryAnalytics onNavigate={handleNavClick} memberId={navigationParams.memberId} />} />
+      <Route path="/check-in" element={<CheckIn />} />
+      <Route path="/training-streams" element={<TrainingStreams onNavigate={handleNavClick} />} />
+      <Route path="/facilities" element={<Facilities onNavigate={handleNavClick} />} />
+      <Route path="/reports" element={<ReportsAnalytics onNavigate={handleNavClick} />} />
+      <Route path="/custom-reports" element={<CustomReports onNavigate={handleNavClick} />} />
+      <Route path="/member-addons" element={<MemberAddons onNavigate={handleNavClick} />} />
+      <Route path="/member-receipts" element={<MemberReceipts onNavigate={handleNavClick} />} />
+      <Route path="/freeze-unfreeze" element={<FreezeUnfreeze onNavigate={handleNavClick} />} />
+      <Route path="/analytics" element={<CommunityAnalytics />} />
+      
+      <Route path="/member-connect" element={<MemberConnect />} />
+      <Route path="/promotions-campaign" element={<PromotionsCampaign />} />
+      <Route path="/referrals" element={<Referrals />} />
+      <Route path="/leads" element={<Leads />} />
+      <Route path="/follow-ups" element={<FollowUps />} />
+      <Route path="/messaging" element={<Messaging />} />
+      <Route path="/automations" element={<Automations />} />
+      <Route path="/post-workout-checkin" element={<PostWorkoutCheckin />} />
+      <Route path="/plans-services-catalog" element={<PlansServicesCatalog />} />
+      <Route path="/member-connect-reports" element={<MemberConnectReports />} />
+      <Route path="/member-connect-analytics" element={<MemberConnectAnalytics />} />
+      
+      <Route path="/sales-purchases" element={<SalesPurchases />} />
+      <Route path="/point-of-sale" element={<PointOfSale />} />
+      <Route path="/products" element={<Products onNavigate={handleNavClick} />} />
+      <Route path="/add-product" element={<AddProduct onNavigate={handleNavClick} />} />
+      <Route path="/category" element={
+        <div className="p-6">
+          <h1>Category</h1>
+          <p className="text-muted-foreground">
+            Organize products and services into categories for better inventory management and sales tracking.
+          </p>
+        </div>
+      } />
+      <Route path="/purchase-order" element={<PurchaseOrder />} />
+      <Route path="/purchase" element={<Purchase />} />
+      <Route path="/wastage-returns" element={<WastageReturns />} />
+      <Route path="/production-recipe" element={
+        <div className="p-6">
+          <h1>Production / Recipe</h1>
+          <p className="text-muted-foreground">
+            Manage recipes for gym cafe items, protein shakes, and track production costs and ingredients.
+          </p>
+        </div>
+      } />
+      <Route path="/sales-reports" element={
+        <div className="p-6">
+          <h1>Sales Reports</h1>
+          <p className="text-muted-foreground">
+            Comprehensive sales reporting including revenue tracking, product performance, and transaction analysis.
+          </p>
+        </div>
+      } />
+      <Route path="/sales-analytics" element={
+        <div className="p-6">
+          <h1>Sales Analytics</h1>
+          <p className="text-muted-foreground">
+            Advanced analytics for sales performance, customer purchasing patterns, and revenue optimization insights.
+          </p>
+        </div>
+      } />
+      <Route path="/sales-settings" element={
+        <div className="p-6">
+          <h1>Sales Settings</h1>
+          <p className="text-muted-foreground">
+            Configure sales system settings including tax rates, payment methods, and transaction preferences.
+          </p>
+        </div>
+      } />
+      
+      <Route path="/financials" element={<Financials />} />
+      <Route path="/ledgers" element={<Ledgers />} />
+      <Route path="/receipt-voucher" element={<ReceiptVoucher />} />
+      <Route path="/journal-voucher" element={
+        <div className="p-6">
+          <h1>Journal Voucher</h1>
+          <p className="text-muted-foreground">
+            Create journal entries for adjustments, corrections, and non-cash transactions.
+          </p>
+        </div>
+      } />
+      <Route path="/payment-voucher" element={<PaymentVoucher />} />
+      <Route path="/bank-reconciliations" element={<BankReconciliation />} />
+      <Route path="/expenses" element={<Expenses />} />
+      <Route path="/tax-compliance" element={<TaxCompliance />} />
+      <Route path="/financial-reports" element={<FinancialReports />} />
+      <Route path="/financial-analytics" element={<FinancialAnalytics />} />
+      <Route path="/financial-settings" element={
+        <div className="p-6">
+          <h1>Financial Settings</h1>
+          <p className="text-muted-foreground">
+            Configure financial system settings including accounting periods, tax rates, and chart of accounts.
+          </p>
+        </div>
+      } />
+      
+      <Route path="/payroll-employees" element={<PayrollEmployees />} />
+      <Route path="/staffs-trainers" element={<StaffsTrainers onNavigate={handleNavClick} />} />
+      <Route path="/set-targets" element={<SetTargets onNavigate={handleNavClick} />} />
+      <Route path="/targets-overview" element={<TargetsOverview onNavigate={handleNavClick} />} />
+      <Route path="/my-targets" element={<MyTargets />} />
+      <Route path="/my-performance" element={<MyPerformance onNavigate={handleNavClick} />} />
+      <Route path="/profile-settings" element={
+        <div className="p-6">
+          <h1>Profile Settings</h1>
+          <p className="text-muted-foreground">
+            Manage your personal profile, notification preferences, and account settings.
+          </p>
+        </div>
+      } />
+      <Route path="/my-profile" element={<MyProfile onNavigate={handleNavClick} />} />
+      <Route path="/trainings-classes" element={<TrainingsClasses onNavigate={handleNavClick} />} />
+      <Route path="/bookings" element={<Bookings onNavigate={handleNavClick} />} />
+      <Route path="/payroll" element={<Payroll onNavigate={handleNavClick} />} />
+      <Route path="/salary-payments" element={<SalaryPayments onNavigate={handleNavClick} />} />
+      <Route path="/salary-advances" element={<SalaryAdvances onNavigate={handleNavClick} />} />
+      <Route path="/recruitment" element={<Recruitment />} />
+      <Route path="/payroll-reports" element={
+        <div className="p-6">
+          <h1>Payroll Reports</h1>
+          <p className="text-muted-foreground">
+            Generate comprehensive payroll reports including salary summaries, tax reports, and employee earnings.
+          </p>
+        </div>
+      } />
+      <Route path="/payroll-analytics" element={
+        <div className="p-6">
+          <h1>Payroll Analytics</h1>
+          <p className="text-muted-foreground">
+            Advanced analytics for payroll costs, employee performance metrics, and workforce insights.
+          </p>
+        </div>
+      } />
+      <Route path="/payroll-settings" element={
+        <div className="p-6">
+          <h1>Payroll Settings</h1>
+          <p className="text-muted-foreground">
+            Configure payroll system settings including tax rates, benefit calculations, and payment schedules.
+          </p>
+        </div>
+      } />
+      
+      <Route path="/assets" element={<Assets />} />
+      <Route path="/manage-assets" element={<ManageAssets />} />
+      <Route path="/asset-transactions" element={<AssetTransactions />} />
+      <Route path="/asset-reports" element={
+        <div className="p-6">
+          <h1>Asset Reports</h1>
+          <p className="text-muted-foreground">
+            Generate detailed asset reports including depreciation schedules, asset registers, and valuation summaries.
+          </p>
+        </div>
+      } />
+      <Route path="/asset-analytics" element={
+        <div className="p-6">
+          <h1>Asset Analytics</h1>
+          <p className="text-muted-foreground">
+            Advanced analytics for asset utilization, ROI tracking, maintenance costs, and performance optimization insights.
+          </p>
+        </div>
+      } />
+      <Route path="/asset-settings" element={
+        <div className="p-6">
+          <h1>Asset Settings</h1>
+          <p className="text-muted-foreground">
+            Configure asset management settings including depreciation methods, category classifications, and maintenance schedules.
+          </p>
+        </div>
+      } />
+      
+      <Route path="/gymos" element={<GymOS onNavigate={handleNavClick} />} />
+      <Route path="/bios" element={<BiOS />} />
+      <Route path="/member-hub" element={<MemberHub />} />
+      <Route path="/gymbios-pricing" element={<GymBiosPricing />} />
+      
+      <Route path="*" element={<Dashboard onNavigate={handleNavClick} />} />
+    </Routes>
+  );
 
   // Handle emergency route (bypass authentication)
   if (isEmergencyRoute && emergencyMemberId) {
@@ -1120,14 +1104,14 @@ export default function App() {
                     onClick={() => {
                       if (item.subItems) {
                         toggleExpanded(item.id);
-                        setActiveSection(item.id);
+                        handleNavClick(item.path || item.id);
                       } else {
-                        setActiveSection(item.id);
+                        handleNavClick(item.path || item.id);
                       }
                     }}
-                    isActive={activeSection === item.id}
+                    isActive={activeSectionPathId === item.id}
                     className={`w-full justify-start sidebar-item text-white hover:bg-white/10 transition-all duration-300 ${
-                      activeSection === item.id ? 'sidebar-item-active' : ''
+                      activeSectionPathId === item.id ? 'sidebar-item-active' : ''
                     }`}
                   >
                     <item.icon className="mr-3 h-4 w-4 sidebar-icon" />
@@ -1150,13 +1134,13 @@ export default function App() {
                           <SidebarMenuButton
                             key={subItem.id}
                             onClick={() =>
-                              handleNavClick(subItem.id)
+                              handleNavClick(subItem.path || subItem.id)
                             }
                             isActive={
-                              activeSection === subItem.id
+                              activeSectionPathId === subItem.id
                             }
                             className={`w-full justify-start text-sm py-2 sidebar-item text-white/90 hover:bg-white/10 transition-all duration-300 ${
-                              activeSection === subItem.id ? 'sidebar-item-active' : ''
+                              activeSectionPathId === subItem.id ? 'sidebar-item-active' : ''
                             }`}
                           >
                             <subItem.icon className="mr-3 h-4 w-4 sidebar-icon" />
@@ -1242,7 +1226,9 @@ export default function App() {
 
           <div className="flex-1">
             <ErrorBoundary>
-              {renderContent}
+              <ProtectedRoute isAuthenticated={isAuthenticated}>
+                {renderContent}
+              </ProtectedRoute>
             </ErrorBoundary>
           </div>
         </main>
