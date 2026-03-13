@@ -1,4 +1,6 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { plansService, Plan as MembershipPlanData } from '../utils/supabase/plans-service';
+import { membersService } from '../utils/supabase/members-service';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -145,64 +147,20 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     ));
   };
   
-  // Membership plans with types and programs
-  const membershipPlans = [
-    {
-      id: 'premium-annual',
-      name: 'Premium Annual',
-      price: 1200,
-      originalPrice: 1440,
-      savings: 240,
-      duration: '12 Months',
-      description: 'Complete fitness experience',
-      membershipTypes: ['individual', 'family', 'corporate'],
-      programs: ['all', 'strength', 'cardio', 'group', 'premium'],
-      features: ['Personal Training', 'All Equipment', 'Group Classes', 'Nutrition Plan', '2 Guest Passes', '+20 More']
-    },
-    {
-      id: 'standard-monthly',
-      name: 'Standard Monthly',
-      price: 299,
-      duration: '1 Month',
-      description: 'Essential fitness access',
-      membershipTypes: ['individual', 'corporate'],
-      programs: ['all', 'strength', 'cardio', 'group'],
-      features: ['All Equipment', 'Group Classes', 'Locker Access', '1 Guest Pass', '+10 More']
-    },
-    {
-      id: 'family-package',
-      name: 'Family Package',
-      price: 899,
-      duration: '1 Month',
-      description: 'Perfect for the whole family',
-      membershipTypes: ['family'],
-      programs: ['all', 'group'],
-      features: ['4 Family Members', 'All Equipment', 'Group Classes', 'Kids Zone Access', 'Family Locker']
-    },
-    {
-      id: 'corporate-wellness',
-      name: 'Corporate Wellness',
-      price: 599,
-      duration: '1 Month',
-      description: 'Customized corporate plans',
-      membershipTypes: ['corporate'],
-      programs: ['all', 'strength', 'cardio', 'premium'],
-      features: ['Group Discounts', 'Flexible Hours', 'Wellness Programs', 'Health Assessments', 'Corporate Events']
-    }
-  ];
-  
-  // Filter membership plans based on selected filters
+  // Active membership plans from backend
+  const [apiPlans, setApiPlans] = useState<MembershipPlanData[]>([]);
+
+  useEffect(() => {
+    plansService.getPlans('Active')
+      .then(data => setApiPlans(data))
+      .catch(err => console.error('Failed to load membership plans:', err));
+  }, []);
+
   const getFilteredMembershipPlans = () => {
-    return membershipPlans.filter(plan => {
-      // Filter by membership type
-      const membershipTypeMatch = membershipTypeFilter === 'all' || 
-        plan.membershipTypes.includes(membershipTypeFilter);
-      
-      // Filter by program
-      const programMatch = programFilter === 'all' || 
-        plan.programs.includes(programFilter);
-      
-      return membershipTypeMatch && programMatch;
+    return apiPlans.filter(plan => {
+      const typeMatch = membershipTypeFilter === 'all' ||
+        plan.planType.toLowerCase() === membershipTypeFilter.toLowerCase();
+      return typeMatch;
     });
   };
 
@@ -505,18 +463,21 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
   // Get membership plan details and pricing
   const getMembershipDetails = () => {
-    switch (formData.membershipPlan) {
-      case 'premium-annual':
-        return { name: 'Premium Annual', price: 1200, originalPrice: 1440, savings: 240 };
-      case 'standard-monthly':
-        return { name: 'Standard Monthly', price: 299, originalPrice: null, savings: null };
-      case 'basic-monthly':
-        return { name: 'Basic Monthly', price: 149, originalPrice: null, savings: null };
-      case 'student-special':
-        return { name: 'Student Special', price: 99, originalPrice: 149, savings: 50 };
-      default:
-        return { name: 'Unknown Plan', price: 0, originalPrice: null, savings: null };
-    }
+    const plan = apiPlans.find(p => p.id.toString() === formData.membershipPlan);
+    if (!plan) return { name: 'Unknown Plan', price: 0, originalPrice: null, savings: null };
+    const originalPrice = plan.discount && plan.discount > 0
+      ? Number(plan.price)
+      : null;
+    const discountedPrice = plan.discount && plan.discount > 0
+      ? Number(plan.price) * (1 - Number(plan.discount) / 100)
+      : Number(plan.price);
+    const savings = originalPrice ? originalPrice - discountedPrice : null;
+    return {
+      name: plan.name,
+      price: Math.round(discountedPrice * 100) / 100,
+      originalPrice,
+      savings: savings ? Math.round(savings * 100) / 100 : null,
+    };
   };
   
   // Get final price with discount applied
@@ -683,7 +644,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   };
 
   // Handle payment confirmation
-  const handlePaymentConfirm = () => {
+  const handlePaymentConfirm = async () => {
     if (!selectedPaymentMethod) {
       toast.error('Please select a payment method');
       return;
@@ -749,17 +710,82 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       })
     };
 
-    console.log('New member data:', formData);
-    console.log('Payment data:', finalPaymentData);
-    
+    // Determine payment status
+    let paymentStatus = 'paid';
+    if (selectedPaymentMethod === 'credit' && paymentData.remainingAmount > 0) {
+      paymentStatus = 'pending';
+    }
+
+    // Resolve the selected plan name
+    const selectedPlan = apiPlans.find(p => p.id.toString() === formData.membershipPlan);
+    const planName = selectedPlan?.name || formData.membershipPlan;
+    const planType = selectedPlan?.planType || '';
+
+    // Build ISO date strings
+    const toIso = (dateStr: string) => dateStr ? `${dateStr}T00:00:00Z` : '';
+
+    // Compute membership end date from start date + plan duration
+    const computeEndDate = (startDateStr: string, durationValue: string, durationType: string): string => {
+      if (!startDateStr || !durationValue || !durationType) return '';
+      const start = new Date(startDateStr);
+      const val = parseInt(durationValue);
+      if (isNaN(val)) return '';
+      switch (durationType.toLowerCase()) {
+        case 'days':   start.setDate(start.getDate() + val); break;
+        case 'weeks':  start.setDate(start.getDate() + val * 7); break;
+        case 'months': start.setMonth(start.getMonth() + val); break;
+        case 'years':  start.setFullYear(start.getFullYear() + val); break;
+      }
+      return start.toISOString().split('T')[0];
+    };
+
+    const endDateStr = selectedPlan
+      ? computeEndDate(formData.startDate, selectedPlan.durationValue, selectedPlan.durationType)
+      : '';
+
+    // Build the member payload (snake_case to match global Jackson SNAKE_CASE strategy)
+    const memberPayload = {
+      name: `${formData.firstName} ${formData.lastName}`.trim(),
+      email: formData.email,
+      phone: formData.phone,
+      membership_type: planType,
+      membership_status: 'active',
+      membership_plan: planName,
+      join_date: toIso(formData.joiningDate),
+      membership_start_date: toIso(formData.startDate),
+      membership_end_date: toIso(endDateStr),
+      expiry_date: toIso(endDateStr),
+      payment_status: paymentStatus,
+      monthly_fee: membershipDetails.price,
+      membership_fee: finalPrice,
+      total_visits: 0,
+      emergency_contact: formData.emergencyContact,
+      emergency_contact_name: formData.emergencyContactName,
+      emergency_contact_phone: formData.emergencyContactPhone,
+      date_of_birth: formData.dateOfBirth,
+      blood_type: formData.bloodType,
+      medical_conditions: formData.medicalConditions,
+      allergies: formData.allergies,
+      current_medications: formData.currentMedications,
+      health_notes: formData.healthNotes || '',
+    };
+
+    // Submit to backend
+    try {
+      await membersService.createMember(memberPayload as Parameters<typeof membersService.createMember>[0]);
+    } catch (err) {
+      console.error('Failed to create member:', err);
+      toast.error('Failed to create member. Please try again.');
+      return;
+    }
+
     // Show success toast with payment info
     let paymentDescription = '';
     const discountInfo = discountAmount > 0 ? ` (Discount: -AED ${discountAmount.toFixed(2)})` : '';
-    
+
     if (selectedPaymentMethod === 'cash') {
       const paidAmount = parseFloat(paymentData.paidAmount);
       const payBackAmount = Math.max(0, paidAmount - finalPrice);
-      
       if (payBackAmount > 0) {
         paymentDescription = `Payment: AED ${paidAmount.toFixed(2)} (Cash - Fully Paid, Return: AED ${payBackAmount.toFixed(2)})${discountInfo}`;
       } else {
@@ -778,15 +804,15 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     } else {
       paymentDescription = `Payment: AED ${finalPrice.toFixed(2)} (${selectedPaymentMethod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())})`;
     }
-    
+
     toast.success('Member created successfully!', {
       description: `${formData.firstName} ${formData.lastName} has been added. ${paymentDescription}`,
       duration: 6000
     });
-    
+
     // Close payment dialog
     setPaymentDialogOpen(false);
-    
+
     // Navigate back to members list
     setTimeout(() => {
       onNavigate?.('members');
@@ -1241,322 +1267,93 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         <SelectItem value="corporate">Corporate</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Select value={programFilter} onValueChange={setProgramFilter}>
-                      <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All Programs" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Programs</SelectItem>
-                        <SelectItem value="strength">Strength</SelectItem>
-                        <SelectItem value="cardio">Cardio</SelectItem>
-                        <SelectItem value="group">Group Classes</SelectItem>
-                        <SelectItem value="premium">Premium</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-2 space-y-3">
 
+              {apiPlans.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No active membership plans found. Please create plans in Manage Plans first.
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Premium Plan Banner */}
-              <div className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-300 cursor-pointer ${
-                formData.membershipPlan === 'premium-annual' 
-                  ? 'border-purple-500 bg-gradient-to-r from-purple-50 to-indigo-50 shadow-lg scale-[1.02]' 
-                  : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-md'
-              }`}
-              onClick={() => setFormData({...formData, membershipPlan: 'premium-annual'})}>
-                {/* Popular Badge */}
-                <div className="absolute -top-1 -right-1">
-                  <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white px-4 py-1 rounded-bl-lg rounded-tr-2xl text-xs font-semibold shadow-lg">
-                    MOST POPULAR
-                  </div>
-                </div>
-                
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl">
-                        <FaCreditCard className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-900">Premium Annual</h3>
-                        <p className="text-gray-600">Complete fitness experience</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold text-purple-600">1,200 <span className="text-lg text-gray-500">AED</span></div>
-                      <div className="text-sm text-gray-500 line-through">1,440 AED</div>
-                      <div className="text-xs text-green-600 font-semibold">Save 240 AED</div>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-4 gap-6 mb-4">
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-gray-900">12</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Months</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-green-600">∞</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Access</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-blue-600">25+</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Programs</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-orange-600">VIP</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Priority</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">Personal Training</Badge>
-                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">All Equipment</Badge>
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Group Classes</Badge>
-                    <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">Nutrition Plan</Badge>
-                    <Badge className="bg-red-100 text-red-800 hover:bg-red-100">2 Guest Passes</Badge>
-                    <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100">+20 More</Badge>
-                  </div>
-                  
-                  <Button 
-                    className={`w-full ${
-                      formData.membershipPlan === 'premium-annual'
-                        ? 'bg-purple-600 hover:bg-purple-700'
-                        : 'bg-gray-800 hover:bg-gray-900'
-                    } text-white transition-all duration-200`}
-                    size="lg"
+              {getFilteredMembershipPlans().map((plan) => {
+                const isSelected = formData.membershipPlan === plan.id.toString();
+                const discountedPrice = plan.discount && Number(plan.discount) > 0
+                  ? Number(plan.price) * (1 - Number(plan.discount) / 100)
+                  : Number(plan.price);
+                const originalPrice = plan.discount && Number(plan.discount) > 0
+                  ? Number(plan.price)
+                  : null;
+                return (
+                  <div
+                    key={plan.id}
+                    className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-300 cursor-pointer ${
+                      isSelected
+                        ? 'border-purple-500 bg-gradient-to-r from-purple-50 to-indigo-50 shadow-lg scale-[1.02]'
+                        : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-md'
+                    }`}
+                    onClick={() => setFormData({ ...formData, membershipPlan: plan.id.toString() })}
                   >
-                    {formData.membershipPlan === 'premium-annual' ? (
-                      <>
-                        <FaCheck className="h-4 w-4 mr-2" />
-                        Selected
-                      </>
-                    ) : (
-                      'Select Premium Annual'
-                    )}
-                  </Button>
-                </div>
-              </div>
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl">
+                            <FaCreditCard className="h-6 w-6 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
+                            <p className="text-gray-600">{plan.description || plan.planType}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-3xl font-bold text-purple-600">
+                            {Math.round(discountedPrice * 100) / 100} <span className="text-lg text-gray-500">AED</span>
+                          </div>
+                          {originalPrice && (
+                            <div className="text-sm text-gray-500 line-through">{originalPrice} AED</div>
+                          )}
+                          {plan.discount && Number(plan.discount) > 0 && (
+                            <div className="text-xs text-green-600 font-semibold">{plan.discount}% OFF</div>
+                          )}
+                        </div>
+                      </div>
 
-              {/* Standard Monthly Plan Banner */}
-              <div className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-300 cursor-pointer ${
-                formData.membershipPlan === 'standard-monthly' 
-                  ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-cyan-50 shadow-lg scale-[1.02]' 
-                  : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
-              }`}
-              onClick={() => setFormData({...formData, membershipPlan: 'standard-monthly'})}>
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl">
-                        <FaDumbbell className="h-6 w-6 text-white" />
+                      <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-gray-900">{plan.durationValue || '-'}</div>
+                          <div className="text-xs text-gray-500 uppercase tracking-wide">{plan.durationType || 'Duration'}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-blue-600">{plan.planType}</div>
+                          <div className="text-xs text-gray-500 uppercase tracking-wide">Type</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-green-600">{plan.maxSessions ?? '∞'}</div>
+                          <div className="text-xs text-gray-500 uppercase tracking-wide">Sessions</div>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-900">Standard Monthly</h3>
-                        <p className="text-gray-600">Essential fitness access</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold text-blue-600">299 <span className="text-lg text-gray-500">AED</span></div>
-                      <div className="text-sm text-gray-500">per month</div>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-4 gap-6 mb-4">
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-gray-900">1</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Month</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-green-600">∞</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Access</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-blue-600">15+</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Programs</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-orange-600">STD</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Priority</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">All Equipment</Badge>
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Group Classes</Badge>
-                    <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">Locker Access</Badge>
-                    <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">1 Guest Pass</Badge>
-                    <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100">+10 More</Badge>
-                  </div>
-                  
-                  <Button 
-                    className={`w-full ${
-                      formData.membershipPlan === 'standard-monthly'
-                        ? 'bg-blue-600 hover:bg-blue-700'
-                        : 'bg-gray-800 hover:bg-gray-900'
-                    } text-white transition-all duration-200`}
-                    size="lg"
-                  >
-                    {formData.membershipPlan === 'standard-monthly' ? (
-                      <>
-                        <FaCheck className="h-4 w-4 mr-2" />
-                        Selected
-                      </>
-                    ) : (
-                      'Select Standard Monthly'
-                    )}
-                  </Button>
-                </div>
-              </div>
 
-              {/* Basic Plan Banner */}
-              <div className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-300 cursor-pointer ${
-                formData.membershipPlan === 'basic-monthly' 
-                  ? 'border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 shadow-lg scale-[1.02]' 
-                  : 'border-gray-200 bg-white hover:border-green-300 hover:shadow-md'
-              }`}
-              onClick={() => setFormData({...formData, membershipPlan: 'basic-monthly'})}>
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl">
-                        <FaHeart className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-900">Basic Monthly</h3>
-                        <p className="text-gray-600">Get started with fitness</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold text-green-600">149 <span className="text-lg text-gray-500">AED</span></div>
-                      <div className="text-sm text-gray-500">per month</div>
+                      <Button
+                        className={`w-full ${
+                          isSelected ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-800 hover:bg-gray-900'
+                        } text-white transition-all duration-200`}
+                        size="lg"
+                      >
+                        {isSelected ? (
+                          <>
+                            <FaCheck className="h-4 w-4 mr-2" />
+                            Selected
+                          </>
+                        ) : (
+                          `Select ${plan.name}`
+                        )}
+                      </Button>
                     </div>
                   </div>
-                  
-                  <div className="grid grid-cols-4 gap-6 mb-4">
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-gray-900">1</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Month</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-orange-600">8-22</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Hours</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-blue-600">8+</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Programs</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-green-600">Basic</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Priority</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Gym Access</Badge>
-                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Basic Equipment</Badge>
-                    <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">Cardio Zone</Badge>
-                    <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">Locker Access</Badge>
-                    <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100">+5 More</Badge>
-                  </div>
-                  
-                  <Button 
-                    className={`w-full ${
-                      formData.membershipPlan === 'basic-monthly'
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : 'bg-gray-800 hover:bg-gray-900'
-                    } text-white transition-all duration-200`}
-                    size="lg"
-                  >
-                    {formData.membershipPlan === 'basic-monthly' ? (
-                      <>
-                        <FaCheck className="h-4 w-4 mr-2" />
-                        Selected
-                      </>
-                    ) : (
-                      'Select Basic Monthly'
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Student Plan Banner */}
-              <div className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-300 cursor-pointer ${
-                formData.membershipPlan === 'student-special' 
-                  ? 'border-orange-500 bg-gradient-to-r from-orange-50 to-amber-50 shadow-lg scale-[1.02]' 
-                  : 'border-gray-200 bg-white hover:border-orange-300 hover:shadow-md'
-              }`}
-              onClick={() => setFormData({...formData, membershipPlan: 'student-special'})}>
-                {/* Student Badge */}
-                <div className="absolute -top-1 -right-1">
-                  <div className="bg-gradient-to-r from-orange-400 to-amber-500 text-white px-4 py-1 rounded-bl-lg rounded-tr-2xl text-xs font-semibold shadow-lg">
-                    STUDENT DISCOUNT
-                  </div>
-                </div>
-                
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-orange-500 to-amber-600 rounded-xl">
-                        <FaGraduationCap className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-900">Student Special</h3>
-                        <p className="text-gray-600">Perfect for students</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold text-orange-600">99 <span className="text-lg text-gray-500">AED</span></div>
-                      <div className="text-sm text-gray-500 line-through">149 AED</div>
-                      <div className="text-xs text-green-600 font-semibold">34% OFF</div>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-4 gap-6 mb-4">
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-gray-900">1</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Month</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-orange-600">6-20</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Hours</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-blue-600">10+</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Programs</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-orange-600">STD</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Priority</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">Student ID Required</Badge>
-                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Gym Access</Badge>
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Group Classes</Badge>
-                    <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">Study Area</Badge>
-                    <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100">+7 More</Badge>
-                  </div>
-                  
-                  <Button 
-                    className={`w-full ${
-                      formData.membershipPlan === 'student-special'
-                        ? 'bg-orange-600 hover:bg-orange-700'
-                        : 'bg-gray-800 hover:bg-gray-900'
-                    } text-white transition-all duration-200`}
-                    size="lg"
-                  >
-                    {formData.membershipPlan === 'student-special' ? (
-                      <>
-                        <FaCheck className="h-4 w-4 mr-2" />
-                        Selected
-                      </>
-                    ) : (
-                      'Select Student Special'
-                    )}
-                  </Button>
-                </div>
-              </div>
+                );
+              })}
               </div>{/* end plans grid */}
 
               {/* Selected Plan Summary */}
@@ -1569,10 +1366,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     <div>
                       <p className="font-semibold text-green-800">Plan Selected</p>
                       <p className="text-sm text-green-600">
-                        {formData.membershipPlan === 'premium-annual' && 'Premium Annual - 1,200 AED (Save 240 AED)'}
-                        {formData.membershipPlan === 'standard-monthly' && 'Standard Monthly - 299 AED/month'}
-                        {formData.membershipPlan === 'basic-monthly' && 'Basic Monthly - 149 AED/month'}
-                        {formData.membershipPlan === 'student-special' && 'Student Special - 99 AED/month (34% OFF)'}
+                        {getMembershipDetails().name} — {getMembershipDetails().price} AED
+                        {getMembershipDetails().savings ? ` (Save ${getMembershipDetails().savings} AED)` : ''}
                       </p>
                     </div>
                   </div>
