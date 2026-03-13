@@ -43,6 +43,26 @@ public class MemberResponseDTO {
     private String createdAt;
     private String updatedAt;
 
+    private String gender;
+    private String nationality;
+    private String address;
+    private String photoUrl;
+    private String chronicIllnesses;
+    private Double height;
+    private Double weight;
+    private String regDocNumber;
+    private String regDocDate;
+    private java.math.BigDecimal outstandingBalance;
+    private String lastPaymentDate;
+    private String nextPaymentDate;
+    private String paymentMethodUsed;
+    private java.math.BigDecimal discountApplied;
+
+    // Family plan fields
+    private Boolean isFamilyHead;
+    private String familyHeadId;
+    private String relationshipToHead;
+
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public static MemberResponseDTO fromEntity(Member m) {
@@ -78,6 +98,23 @@ public class MemberResponseDTO {
         dto.freezeReason         = m.getFreezeReason();
         dto.createdAt            = m.getCreatedAt()            != null ? m.getCreatedAt().format(ISO) + "Z"            : null;
         dto.updatedAt            = m.getUpdatedAt()            != null ? m.getUpdatedAt().format(ISO) + "Z"            : null;
+        dto.gender              = m.getGender();
+        dto.nationality         = m.getNationality();
+        dto.address             = m.getAddress();
+        dto.photoUrl            = m.getPhotoUrl();
+        dto.chronicIllnesses    = m.getChronicIllnesses();
+        dto.height              = m.getHeight();
+        dto.weight              = m.getWeight();
+        dto.regDocNumber        = m.getRegDocNumber();
+        dto.regDocDate          = m.getRegDocDate()          != null ? m.getRegDocDate().format(ISO) + "Z"          : null;
+        dto.outstandingBalance  = m.getOutstandingBalance();
+        dto.lastPaymentDate     = m.getLastPaymentDate()     != null ? m.getLastPaymentDate().format(ISO) + "Z"     : null;
+        dto.nextPaymentDate     = m.getNextPaymentDate()     != null ? m.getNextPaymentDate().format(ISO) + "Z"     : null;
+        dto.paymentMethodUsed   = m.getPaymentMethodUsed();
+        dto.discountApplied     = m.getDiscountApplied();
+        dto.isFamilyHead        = m.getIsFamilyHead();
+        dto.familyHeadId        = m.getFamilyHeadId();
+        dto.relationshipToHead  = m.getRelationshipToHead();
         return dto;
     }
 
@@ -114,4 +151,21 @@ public class MemberResponseDTO {
     public String getFreezeReason() { return freezeReason; }
     public String getCreatedAt() { return createdAt; }
     public String getUpdatedAt() { return updatedAt; }
+    public String getGender() { return gender; }
+    public String getNationality() { return nationality; }
+    public String getAddress() { return address; }
+    public String getPhotoUrl() { return photoUrl; }
+    public String getChronicIllnesses() { return chronicIllnesses; }
+    public Double getHeight() { return height; }
+    public Double getWeight() { return weight; }
+    public String getRegDocNumber() { return regDocNumber; }
+    public String getRegDocDate() { return regDocDate; }
+    public java.math.BigDecimal getOutstandingBalance() { return outstandingBalance; }
+    public String getLastPaymentDate() { return lastPaymentDate; }
+    public String getNextPaymentDate() { return nextPaymentDate; }
+    public String getPaymentMethodUsed() { return paymentMethodUsed; }
+    public java.math.BigDecimal getDiscountApplied() { return discountApplied; }
+    public Boolean getIsFamilyHead() { return isFamilyHead; }
+    public String getFamilyHeadId() { return familyHeadId; }
+    public String getRelationshipToHead() { return relationshipToHead; }
 }

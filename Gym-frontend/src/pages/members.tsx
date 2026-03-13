@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -58,6 +59,7 @@ import { membersService, Member } from '../utils/supabase/members-service';
 import { plansService, Plan } from '../utils/supabase/plans-service';
 import { authService } from '../utils/supabase/auth-service';
 import { receiptsService, Receipt as ApiReceipt } from '../utils/supabase/receipts-service';
+import { FaPlus } from 'react-icons/fa6';
 
 const membershipPlans = [
   { 
@@ -109,6 +111,7 @@ interface MembersProps {
 
 
 export function Members({ onNavigate, initialTab = "members" }: MembersProps = {}) {
+  const navigate = useNavigate();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -292,7 +295,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   };
 
   const handleAddMember = () => {
-    onNavigate?.('add-member');
+    navigate('/members/add');
   };
   
   // Handle generate report
@@ -482,6 +485,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   // Helper function to get amount due
   const getAmountDue = (member: Member): number => {
+    if (member.outstanding_balance !== undefined) {
+      return member.outstanding_balance;
+    }
     if (member.payment_status === 'overdue') {
       return getMembershipFee(member) * 0.5; // 50% of monthly fee as example
     }
@@ -493,6 +499,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   // Helper function to get payment due date
   const getPaymentDueDate = (member: Member): string => {
+    if (member.next_payment_date) {
+      try {
+        return new Date(member.next_payment_date).toLocaleDateString('en-GB');
+      } catch (e) {
+        console.error('Invalid date:', member.next_payment_date);
+      }
+    }
     if (member.payment_status === 'overdue' || member.payment_status === 'pending') {
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7); // 7 days from now
@@ -932,6 +945,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <TableHead>Contact</TableHead>
                     <TableHead>Membership</TableHead>
                     <TableHead>Membership Type</TableHead>
+                    <TableHead>Family Head</TableHead>
                     <TableHead>Plan Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Expiry Date</TableHead>
@@ -944,7 +958,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 <TableBody>
                   {combinedMembers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center py-8">
+                      <TableCell colSpan={12} className="text-center py-8">
                         <p className="text-muted-foreground">No members found.</p>
                         <Button className="mt-4" onClick={handleAddMember}>
                           <Plus className="mr-2 h-4 w-4" />
@@ -1001,6 +1015,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                             </span>
                           </TableCell>
                           <TableCell>
+                            {member.membership_type?.toLowerCase() === 'family' ? (
+                              member.is_family_head ? (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Head</span>
+                              ) : (
+                                <div className="text-xs">
+                                  <div className="font-medium text-slate-700">{member.family_head_id || '—'}</div>
+                                  {member.relationship_to_head && (
+                                    <div className="text-slate-500">({member.relationship_to_head})</div>
+                                  )}
+                                </div>
+                              )
+                            ) : (
+                              <span className="text-slate-400 text-xs">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold text-slate-700">
                                 {planDetails.plan}
@@ -1035,22 +1065,25 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           </TableCell>
                           <TableCell>
                             <span
-                              className={`font-semibold ${
-                                amountDue > 0 ? 'text-red-600' : 'text-green-600'
+                              className={`font-medium ${
+                                amountDue > 0 ? 'text-red-600' : 'text-emerald-600'
                               }`}
                             >
-                              {amountDue > 0 ? `AED ${amountDue.toFixed(2)}` : '0.00'}
+                              {amountDue > 0 ? `AED ${amountDue.toFixed(2)}` : 'AED 0.00'}
                             </span>
                           </TableCell>
                           <TableCell>
                             {paymentDueDate ? paymentDueDate : '—'}
                           </TableCell>
-                          <TableCell>{getTotalVisits(member)}</TableCell>
+                          <TableCell>
+                            <span className="text-slate-600 font-medium">{getTotalVisits(member)}</span>
+                          </TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreVertical className="h-4 w-4" />
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreVertical className="h-4 w-4 text-slate-500" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48">
@@ -1103,6 +1136,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                     <DropdownMenuItem className="cursor-pointer">
                                       <Mail className="h-4 w-4 mr-2" />
                                       Send Message
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      onClick={() => navigate(`/members/edit/${getMemberId(member)}`)}
+                                    >
+                                      <FaPlus className="h-4 w-4 mr-2" />
+                                      Edit Member
                                     </DropdownMenuItem>
                                   </>
                                 )}
