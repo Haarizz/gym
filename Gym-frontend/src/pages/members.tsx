@@ -55,7 +55,9 @@ import {
 import { FaCircleCheck, FaCircleArrowUp, FaArrowsRotate, FaArrowUp, FaArrowRight } from 'react-icons/fa6';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
+import { plansService, Plan } from '../utils/supabase/plans-service';
 import { authService } from '../utils/supabase/auth-service';
+import { receiptsService, Receipt as ApiReceipt } from '../utils/supabase/receipts-service';
 
 const membershipPlans = [
   { 
@@ -105,42 +107,6 @@ interface MembersProps {
   initialTab?: string;
 }
 
-// Mock data for membership report
-const generateMockReportData = () => {
-  const transactions = [];
-  const membershipTypes = ['Individual', 'Family', 'Corporate'];
-  const transactionTypes = ['New', 'Renewal', 'Add-on', 'Single Day'];
-  const plans = ['Basic Monthly', 'Standard Monthly', 'Premium Monthly', 'Premium Annual', 'Gold Plan', 'Platinum Plan'];
-  const payModes = ['Cash', 'Card', 'Credit'];
-  
-  for (let i = 1; i <= 124; i++) {
-    const amount = Math.floor(Math.random() * 3000) + 500;
-    const cashAmount = payModes[Math.floor(Math.random() * 3)] === 'Cash' ? amount : 0;
-    const cardAmount = payModes[Math.floor(Math.random() * 3)] === 'Card' ? amount : 0;
-    const dueAmount = Math.random() > 0.9 ? Math.floor(Math.random() * 500) : 0;
-    
-    transactions.push({
-      id: i,
-      docDate: new Date(2025, 9, Math.floor(Math.random() * 13) + 1).toLocaleDateString('en-GB'),
-      docNo: `INV-${String(400 + i).padStart(5, '0')}`,
-      memberId: `M-${String(200 + i).padStart(5, '0')}`,
-      memberName: `Member ${i}`,
-      photo: null,
-      mobile: `050${String(1000000 + i).slice(-7)}`,
-      membershipType: membershipTypes[Math.floor(Math.random() * membershipTypes.length)],
-      transactionType: transactionTypes[Math.floor(Math.random() * transactionTypes.length)],
-      plan: plans[Math.floor(Math.random() * plans.length)],
-      amount: amount,
-      mode: payModes[Math.floor(Math.random() * payModes.length)],
-      cash: cashAmount,
-      card: cardAmount,
-      due: dueAmount,
-      dueDate: dueAmount > 0 ? new Date(2025, 10, Math.floor(Math.random() * 30) + 1).toLocaleDateString('en-GB') : '–',
-    });
-  }
-  
-  return transactions;
-};
 
 export function Members({ onNavigate, initialTab = "members" }: MembersProps = {}) {
   const [members, setMembers] = useState<Member[]>([]);
@@ -153,6 +119,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [totalPages, setTotalPages] = useState(1);
   const [totalMembers, setTotalMembers] = useState(0);
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
+  const [profileMember, setProfileMember] = useState<Member | null>(null);
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
   const [photoViewer, setPhotoViewer] = useState<{ src: string; name: string } | null>(null);
   
@@ -183,6 +151,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [includeSummary, setIncludeSummary] = useState(true);
   const [exportFormat, setExportFormat] = useState("excel");
   
+  // API Plans for Renewals tab
+  const [apiPlans, setApiPlans] = useState<Plan[]>([]);
+
   // Renewals & Upgrades states
   const [renewalSearchTerm, setRenewalSearchTerm] = useState("");
   const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
@@ -267,6 +238,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     return () => clearTimeout(timer);
   }, [searchTerm, selectedStatus, currentPage]);
 
+  // Load active plans for Renewals tab
+  useEffect(() => {
+    plansService.getPlans('Active').then(setApiPlans).catch(() => {});
+  }, []);
+
   // Load pending members from localStorage
   useEffect(() => {
     const loadPendingMembers = () => {
@@ -320,32 +296,79 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   };
   
   // Handle generate report
-  const handleGenerateReport = () => {
+  const handleGenerateReport = async () => {
     setReportLoading(true);
-    
-    setTimeout(() => {
-      let data = generateMockReportData();
-      
-      // Apply filters
-      if (membershipType !== "all") {
-        data = data.filter(d => d.membershipType === membershipType);
-      }
+    try {
+      const filters: { transactionType?: string; status?: string } = {};
       if (transactionType !== "all") {
-        data = data.filter(d => d.transactionType === transactionType);
+        const typeMap: Record<string, string> = {
+          "New": "Membership",
+          "Renewal": "Renewal",
+          "Add-on": "Add-on",
+          "Single Day": "Daily Entry",
+        };
+        filters.transactionType = typeMap[transactionType] || transactionType;
       }
+
+      const res = await receiptsService.getReceipts(filters, { limit: 500 });
+      let receipts = res.receipts;
+
+      // Apply date range filter
+      const today = new Date();
+      if (dateRange === "last-7-days") {
+        const cutoff = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        receipts = receipts.filter(r => r.transaction_date && new Date(r.transaction_date) >= cutoff);
+      } else if (dateRange === "last-30-days") {
+        const cutoff = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+        receipts = receipts.filter(r => r.transaction_date && new Date(r.transaction_date) >= cutoff);
+      } else if (dateRange === "last-90-days") {
+        const cutoff = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+        receipts = receipts.filter(r => r.transaction_date && new Date(r.transaction_date) >= cutoff);
+      } else if (dateRange === "custom" && customDateFrom && customDateTo) {
+        receipts = receipts.filter(r => {
+          if (!r.transaction_date) return false;
+          const d = new Date(r.transaction_date);
+          return d >= customDateFrom && d <= customDateTo;
+        });
+      }
+
+      // Apply payment mode filter
       if (payMode !== "all") {
-        data = data.filter(d => d.mode === payMode);
+        receipts = receipts.filter(r => r.payment_method?.toLowerCase() === payMode.toLowerCase());
       }
-      
+
+      // Map to the report row shape expected by the existing table JSX
+      const data = receipts.map((r, i) => ({
+        id: i + 1,
+        docDate: r.transaction_date ? new Date(r.transaction_date).toLocaleDateString('en-GB') : '—',
+        docNo: r.receipt_no || '—',
+        memberId: r.member_id || '—',
+        memberName: r.member_name || '—',
+        photo: null,
+        mobile: r.member_phone || '—',
+        membershipType: '—',
+        transactionType: r.transaction_type || '—',
+        plan: r.plan_name || '—',
+        amount: Number(r.amount || 0),
+        mode: r.payment_method || '—',
+        cash: r.payment_method === 'Cash' ? Number(r.amount || 0) : 0,
+        card: r.payment_method === 'Card' ? Number(r.amount || 0) : 0,
+        due: r.status === 'Pending' ? Number(r.amount || 0) : 0,
+        dueDate: r.status === 'Pending' && r.transaction_date ? new Date(r.transaction_date).toLocaleDateString('en-GB') : '—',
+      }));
+
       setReportData(data);
       setReportGenerated(true);
-      setReportLoading(false);
       setReportPage(1);
-      
+
       toast.success('Report Generated', {
         description: `Found ${data.length} transactions matching your criteria.`,
       });
-    }, 1500);
+    } catch {
+      toast.error('Failed to generate report. Please try again.');
+    } finally {
+      setReportLoading(false);
+    }
   };
   
   // Calculate report summary
@@ -576,17 +599,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   
   const handlePlanSelection = (plan: any) => {
     setSelectedNewPlan(plan);
-    
+
     if (selectedMemberForRenewal) {
-      // Get current plan
-      const currentPlan = membershipPlans.find(p => p.name === selectedMemberForRenewal.membership_plan);
-      
-      if (currentPlan?.id === plan.id) {
+      const currentPlanName = selectedMemberForRenewal.membership_plan;
+      if (plan.name === currentPlanName) {
         setOperationType("renewal");
-      } else if (currentPlan && plan.level > currentPlan.level) {
-        setOperationType("upgrade");
-      } else if (currentPlan && plan.level < currentPlan.level) {
-        setOperationType("upgrade"); // Downgrade also counts as upgrade operation
       } else {
         setOperationType("upgrade");
       }
@@ -605,21 +622,21 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     return Math.max(0, total);
   };
   
-  const handleProcessRenewalUpgrade = () => {
+  const handleProcessRenewalUpgrade = async () => {
     if (!selectedMemberForRenewal || !selectedNewPlan) {
       toast.error('Missing Information', {
         description: 'Please select a member and a plan.',
       });
       return;
     }
-    
+
     const totalAmount = calculateTotalAmount();
-    
+
     // Validate payment
     if (splitPayment) {
       const cash = parseFloat(cashAmount) || 0;
       const card = parseFloat(cardAmount) || 0;
-      
+
       if (cash + card < totalAmount) {
         toast.error('Insufficient Payment', {
           description: 'Total payment must equal the plan amount.',
@@ -627,10 +644,47 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         return;
       }
     }
-    
+
+    // Compute new end date from plan duration
+    const computeEndDate = (durationValue: string, durationType: string): string => {
+      const start = new Date();
+      const val = parseInt(durationValue);
+      if (isNaN(val)) return '';
+      switch ((durationType || '').toLowerCase()) {
+        case 'days':   start.setDate(start.getDate() + val); break;
+        case 'weeks':  start.setDate(start.getDate() + val * 7); break;
+        case 'months': start.setMonth(start.getMonth() + val); break;
+        case 'years':  start.setFullYear(start.getFullYear() + val); break;
+      }
+      return start.toISOString().split('T')[0] + 'T00:00:00Z';
+    };
+
+    const newEndDate = computeEndDate(
+      selectedNewPlan.durationValue || '',
+      selectedNewPlan.durationType || ''
+    );
+
+    // Call backend
+    try {
+      const memberId = getMemberId(selectedMemberForRenewal);
+      await membersService.renewMember(String(memberId), {
+        planName: selectedNewPlan.name,
+        membershipEndDate: newEndDate,
+        membershipFee: totalAmount,
+        paymentStatus: 'paid',
+        membershipType: selectedNewPlan.planType,
+        membershipStatus: 'active',
+      });
+      // Refresh member list
+      loadMembers();
+    } catch (err) {
+      toast.error('Failed to process renewal. Please try again.');
+      return;
+    }
+
     // Show success modal
     setShowSuccessModal(true);
-    
+
     // Reset form after 3 seconds
     setTimeout(() => {
       setShowSuccessModal(false);
@@ -1039,7 +1093,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                       <BarChart3 className="h-4 w-4 mr-2" />
                                       View Analytics
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem className="cursor-pointer">
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      onClick={() => { setProfileMember(member); setIsProfileDialogOpen(true); }}
+                                    >
                                       <Eye className="h-4 w-4 mr-2" />
                                       View Profile
                                     </DropdownMenuItem>
@@ -1074,6 +1131,117 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       />
                     )}
                   </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Member Profile Dialog */}
+              <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
+                <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center space-x-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={profileMember ? getMemberAvatar(profileMember) : ''} />
+                        <AvatarFallback>{profileMember?.name.split(' ').map((n: string) => n[0]).join('')}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div>{profileMember?.name}</div>
+                        <div className="text-sm font-normal text-muted-foreground">{profileMember ? getMemberId(profileMember) : ''}</div>
+                      </div>
+                    </DialogTitle>
+                  </DialogHeader>
+                  {profileMember && (
+                    <div className="space-y-4 mt-2">
+                      {/* Basic Info */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Email</Label>
+                          <p className="text-sm font-medium">{profileMember.email || '—'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Phone</Label>
+                          <p className="text-sm font-medium">{profileMember.phone || '—'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Membership Plan</Label>
+                          <p className="text-sm font-medium">{getMembershipPlan(profileMember) || '—'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Status</Label>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(profileMember.membership_status)}`}>
+                            {profileMember.membership_status}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Start Date</Label>
+                          <p className="text-sm">{getMembershipStartDate(profileMember) ? new Date(getMembershipStartDate(profileMember)).toLocaleDateString('en-GB') : '—'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Expiry Date</Label>
+                          <p className="text-sm">{getMembershipEndDate(profileMember) ? new Date(getMembershipEndDate(profileMember)).toLocaleDateString('en-GB') : '—'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Membership Fee</Label>
+                          <p className="text-sm font-medium">AED {getMembershipFee(profileMember)}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Payment Status</Label>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${profileMember.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {profileMember.payment_status}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Total Visits</Label>
+                          <p className="text-sm">{getTotalVisits(profileMember)}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Date of Birth</Label>
+                          <p className="text-sm">{(profileMember as any).date_of_birth ? new Date((profileMember as any).date_of_birth).toLocaleDateString('en-GB') : '—'}</p>
+                        </div>
+                      </div>
+                      {/* Emergency Contact */}
+                      {(profileMember.emergency_contact || (profileMember as any).emergency_contact_name) && (
+                        <div className="border-t pt-3">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Emergency Contact</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Name</Label>
+                              <p className="text-sm">{(profileMember as any).emergency_contact_name || profileMember.emergency_contact || '—'}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Phone</Label>
+                              <p className="text-sm">{(profileMember as any).emergency_contact_phone || profileMember.emergency_phone || '—'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* Health Info */}
+                      {((profileMember as any).blood_type || (profileMember as any).medical_conditions || (profileMember as any).allergies) && (
+                        <div className="border-t pt-3">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Health Information</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            {(profileMember as any).blood_type && (
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Blood Type</Label>
+                                <p className="text-sm">{(profileMember as any).blood_type}</p>
+                              </div>
+                            )}
+                            {(profileMember as any).medical_conditions && (
+                              <div className="space-y-1 col-span-2">
+                                <Label className="text-xs text-muted-foreground">Medical Conditions</Label>
+                                <p className="text-sm">{(profileMember as any).medical_conditions}</p>
+                              </div>
+                            )}
+                            {(profileMember as any).allergies && (
+                              <div className="space-y-1 col-span-2">
+                                <Label className="text-xs text-muted-foreground">Allergies</Label>
+                                <p className="text-sm">{(profileMember as any).allergies}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </DialogContent>
               </Dialog>
 
@@ -1281,16 +1449,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {membershipPlans.map((plan) => {
+                  {apiPlans.length === 0 && (
+                    <p className="text-sm text-muted-foreground col-span-3 text-center py-4">No active plans found.</p>
+                  )}
+                  {apiPlans.map((plan) => {
                     const isCurrentPlan = plan.name === getMembershipPlan(selectedMemberForRenewal);
                     const isSelected = selectedNewPlan?.id === plan.id;
-                    
+                    const discountedPrice = plan.discount && plan.discount > 0
+                      ? plan.price * (1 - plan.discount / 100)
+                      : plan.price;
+
                     return (
                       <Card
                         key={plan.id}
                         className={`cursor-pointer transition-all hover:shadow-lg ${
-                          isSelected 
-                            ? 'border-2 border-primary shadow-lg scale-105' 
+                          isSelected
+                            ? 'border-2 border-primary shadow-lg scale-105'
                             : 'border hover:border-primary/50'
                         } ${isCurrentPlan ? 'bg-blue-50' : ''}`}
                         onClick={() => handlePlanSelection(plan)}
@@ -1299,28 +1473,26 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           <div className="flex items-start justify-between mb-4">
                             <div>
                               <h3 className="font-bold text-lg">{plan.name}</h3>
-                              <p className="text-sm text-muted-foreground">{plan.duration}</p>
+                              <p className="text-sm text-muted-foreground">{plan.duration || `${plan.durationValue} ${plan.durationType}`}</p>
                             </div>
                             {isCurrentPlan && (
                               <Badge className="bg-blue-100 text-blue-800">Current</Badge>
                             )}
                           </div>
-                          
+
                           <div className="mb-4">
                             <div className="text-3xl font-bold text-primary">
-                              {plan.price} <span className="text-base font-normal text-muted-foreground">AED</span>
+                              {discountedPrice.toFixed(2)} <span className="text-base font-normal text-muted-foreground">AED</span>
                             </div>
+                            {plan.discount > 0 && (
+                              <p className="text-xs text-muted-foreground line-through">{plan.price} AED</p>
+                            )}
                           </div>
-                          
-                          <div className="space-y-2">
-                            {plan.features.map((feature, index) => (
-                              <div key={index} className="flex items-start space-x-2">
-                                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                                <span className="text-sm">{feature}</span>
-                              </div>
-                            ))}
-                          </div>
-                          
+
+                          {plan.description && (
+                            <p className="text-sm text-muted-foreground mb-3">{plan.description}</p>
+                          )}
+
                           {isSelected && (
                             <Button className="w-full mt-4 bg-gradient-primary" size="sm">
                               Selected
@@ -1648,20 +1820,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {membershipPlans.map((plan) => (
+                    {apiPlans.map((plan) => (
                       <TableRow key={plan.id} className="hover:bg-slate-50/50 transition-colors">
                         <TableCell className="font-semibold">{plan.name}</TableCell>
                         <TableCell className="font-bold text-primary">{plan.price} AED</TableCell>
-                        <TableCell>{plan.duration}</TableCell>
+                        <TableCell>{plan.duration || `${plan.durationValue} ${plan.durationType}`}</TableCell>
                         <TableCell>
-                          <div className="space-y-1">
-                            {plan.features.map((feature, index) => (
-                              <div key={index} className="text-sm flex items-start">
-                                <CheckCircle className="h-3 w-3 text-green-600 mr-1 mt-0.5 flex-shrink-0" />
-                                {feature}
-                              </div>
-                            ))}
-                          </div>
+                          <span className="text-sm text-muted-foreground">{plan.description || '—'}</span>
                         </TableCell>
                       </TableRow>
                     ))}

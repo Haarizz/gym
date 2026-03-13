@@ -41,9 +41,37 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
+                // Public endpoints — no token required
                 .requestMatchers("/api/auth/**").permitAll()
+
+                // Admin-only endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                // Manager + Admin endpoints
                 .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
+
+                // Payroll & HR — restricted to HR and Admin
+                .requestMatchers("/api/payroll/**", "/api/employees/**", "/api/recruitment/**")
+                    .hasAnyRole("ADMIN", "HR")
+
+                // Financial endpoints — Accountant, Manager, Admin
+                .requestMatchers("/api/billing/**", "/api/expenses/**", "/api/ledgers/**", "/api/financials/**")
+                    .hasAnyRole("ADMIN", "MANAGER", "ACCOUNTANT")
+
+                // Core gym operations — any authenticated user
+                .requestMatchers(
+                    "/api/members/**",
+                    "/api/staff/**",
+                    "/api/attendance/**",
+                    "/api/products/**",
+                    "/api/plans/**",
+                    "/api/leads/**",
+                    "/api/bookings/**",
+                    "/api/classes/**",
+                    "/api/dashboard/**"
+                ).authenticated()
+
+                // Any other /api/** endpoint also requires authentication
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -74,16 +102,20 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Assuming Vite default dev server runs on port 5173
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
                 "http://localhost:3000",
                 "http://127.0.0.1:3000"
         ));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        // Allow all headers so any header the frontend sends (Content-Type, Authorization, etc.) is accepted
+        configuration.setAllowedHeaders(List.of("*"));
+        // Expose Authorization so the frontend can read it from responses if needed
+        configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
+        // Cache preflight response for 1 hour to reduce OPTIONS round-trips
+        configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

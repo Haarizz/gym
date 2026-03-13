@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { plansService, Plan } from '../utils/supabase/plans-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -24,6 +25,8 @@ import {
   Save,
   X,
   Key,
+  Activity,
+  Eye,
   ChevronUp,
   ChevronDown,
   Info,
@@ -53,10 +56,10 @@ const trainingStreams = [
 
 // Sample facilities data - only active facilities
 const availableFacilities = [
-  { id: "FAC-001", name: "Basketball Court", icon: "🏀", status: "Active" },
-  { id: "FAC-002", name: "Swimming Pool", icon: "🏊", status: "Active" },
-  { id: "FAC-003", name: "Padel Court", icon: "🎾", status: "Active" },
-  { id: "FAC-004", name: "Football Ground", icon: "⚽", status: "Active" }
+  { id: "FAC-001", name: "Basketball Court", icon: Activity, status: "Active" },
+  { id: "FAC-002", name: "Swimming Pool", icon: Snowflake, status: "Active" },
+  { id: "FAC-003", name: "Padel Court", icon: Building2, status: "Active" },
+  { id: "FAC-004", name: "Football Ground", icon: Users, status: "Active" }
 ];
 
 // Sample promotions and campaigns data from promotions-campaign component
@@ -74,7 +77,7 @@ const availablePromotions = [
     id: 2,
     name: "Student Discount", 
     type: "Fixed Amount",
-    discount: "$20",
+    discount: "AED 20",
     validPeriod: "1/9/2024 - 31/12/2024",
     status: "Active",
     category: "Demographic"
@@ -92,7 +95,7 @@ const availablePromotions = [
     id: 4,
     name: "Referral Bonus",
     type: "Fixed Amount",
-    discount: "$50",
+    discount: "AED 50",
     validPeriod: "1/1/2024 - 31/12/2024",
     status: "Active",
     category: "Referral"
@@ -143,111 +146,14 @@ const availableCampaigns = [
   }
 ];
 
-// Sample plans data
-const samplePlans = [
-  {
-    id: 1,
-    name: "Basic Monthly",
-    type: "Membership",
-    duration: "1 month",
-    durationType: "Monthly",
-    price: 49.99,
-    discount: 0,
-    status: "Active",
-    maxSessions: null,
-    assignableTrainers: [],
-    description: "Access to gym equipment and basic facilities",
-    planType: "Individual",
-    trainingStreams: [1, 2, 3, 5], // Strength Training, Cardio & HIIT, Yoga & Mindfulness, Group Classes
-    selectedPromotions: [2], // Student Discount
-    selectedCampaigns: [2], // Member Appreciation Week
-    selectedFacilities: ["FAC-001", "FAC-002"] // Basketball Court, Swimming Pool
-  },
-  {
-    id: 2,
-    name: "Premium Annual",
-    type: "Membership", 
-    duration: "12 months",
-    durationType: "Annual",
-    price: 499.99,
-    discount: 15,
-    status: "Active",
-    maxSessions: null,
-    assignableTrainers: [],
-    description: "Full gym access with group classes included",
-    planType: "Individual",
-    trainingStreams: [1, 2, 3, 4, 5, 6, 7, 8], // Most training streams
-    selectedPromotions: [1, 5], // New Year Special, Early Bird Special
-    selectedCampaigns: [1, 2, 3], // January Fitness Challenge, Member Appreciation Week, Bring a Friend Month
-    selectedFacilities: ["FAC-001", "FAC-002", "FAC-003", "FAC-004"] // All facilities
-  },
-  {
-    id: 3,
-    name: "Personal Training Package",
-    type: "Personal Training",
-    duration: "8 sessions",
-    durationType: "Sessions",
-    price: 800.00,
-    discount: 0,
-    status: "Active",
-    maxSessions: 8,
-    assignableTrainers: ["John Smith", "Sarah Wilson"],
-    description: "One-on-one personal training sessions",
-    planType: "Individual",
-    trainingStreams: [6, 9], // Personal Training, Martial Arts
-    selectedPromotions: [4], // Referral Bonus
-    selectedCampaigns: [],
-    selectedFacilities: [] // No facilities included
-  },
-  {
-    id: 4,
-    name: "Family Plan",
-    type: "Membership",
-    duration: "6 months",
-    durationType: "Monthly",
-    price: 129.99,
-    discount: 20,
-    status: "Active",
-    maxSessions: null,
-    assignableTrainers: [],
-    description: "Gym access for up to 4 family members",
-    planType: "Family",
-    trainingStreams: [1, 2, 3, 5, 10], // Strength Training, Cardio & HIIT, Yoga & Mindfulness, Group Classes, Senior Fitness
-    selectedPromotions: [],
-    selectedCampaigns: [3], // Bring a Friend Month
-    selectedFacilities: ["FAC-002", "FAC-004"] // Swimming Pool, Football Ground
-  },
-  {
-    id: 5,
-    name: "Corporate Wellness",
-    type: "Membership",
-    duration: "12 months",
-    durationType: "Annual",
-    price: 2999.99,
-    discount: 25,
-    status: "Inactive",
-    maxSessions: null,
-    assignableTrainers: [],
-    description: "Corporate membership for employee wellness programs",
-    planType: "Corporate",
-    trainingStreams: [1, 2, 3, 4, 5], // Basic wellness streams
-    selectedPromotions: [],
-    selectedCampaigns: [],
-    selectedFacilities: ["FAC-001", "FAC-003"] // Basketball Court, Padel Court
-  }
-];
-
-type Plan = typeof samplePlans[0] & {
-  trainingStreams: number[];
-  selectedPromotions: number[];
-  selectedCampaigns: number[];
-  selectedFacilities: string[];
-};
 
 export function ManagePlans() {
-  const [plans, setPlans] = useState<Plan[]>(samplePlans);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [viewingPlan, setViewingPlan] = useState<Plan | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDuration, setFilterDuration] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -292,6 +198,23 @@ export function ManagePlans() {
   // Freeze Policy Configuration state
   const [isFreezePolicyOpen, setIsFreezePolicyOpen] = useState(false);
 
+  useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await plansService.getPlans();
+        setPlans(data);
+      } catch (err) {
+        setError('Failed to load plans. Please try again.');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadPlans();
+  }, []);
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -323,29 +246,42 @@ export function ManagePlans() {
     });
   };
 
-  const handleCreatePlan = () => {
-    const newPlan: Plan = {
-      id: Date.now(),
-      name: formData.name,
-      type: formData.type as "Membership" | "Class Package" | "Personal Training",
-      duration: formData.durationType === "Sessions" ? `${formData.durationValue} sessions` : `${formData.durationValue} ${formData.durationType.toLowerCase()}`,
-      durationType: formData.durationType,
-      price: parseFloat(formData.price),
-      discount: parseFloat(formData.discount) || 0,
-      status: formData.status as "Active" | "Inactive",
-      maxSessions: formData.maxSessions ? parseInt(formData.maxSessions) : null,
-      assignableTrainers: formData.assignableTrainers ? formData.assignableTrainers.split(",").map(t => t.trim()) : [],
-      description: formData.description,
-      planType: formData.planType as "Individual" | "Family" | "Corporate",
-      trainingStreams: formData.trainingStreams,
-      selectedPromotions: formData.selectedPromotions,
-      selectedCampaigns: formData.selectedCampaigns,
-      selectedFacilities: formData.selectedFacilities
-    };
-
-    setPlans([...plans, newPlan]);
-    setShowCreateDialog(false);
-    resetForm();
+  const handleCreatePlan = async () => {
+    try {
+      const created = await plansService.createPlan({
+        name: formData.name,
+        type: formData.type,
+        planType: formData.planType,
+        durationType: formData.durationType,
+        durationValue: formData.durationValue,
+        price: parseFloat(formData.price as string) || 0,
+        discount: parseFloat(formData.discount as string) || 0,
+        status: formData.status,
+        description: formData.description,
+        maxSessions: formData.maxSessions ? parseInt(formData.maxSessions as string) : null,
+        assignableTrainers: formData.assignableTrainers ? (formData.assignableTrainers as string).split(",").map(t => t.trim()) : [],
+        membershipCapacity: formData.membershipCapacity,
+        maxCapacity: formData.maxCapacity ? parseInt(formData.maxCapacity as string) : null,
+        attendanceLimit: formData.attendanceLimit,
+        attendanceValue: formData.attendanceValue ? parseInt(formData.attendanceValue as string) : null,
+        attendancePeriod: formData.attendancePeriod,
+        maxFreezeDays: formData.maxFreezeDays ? parseInt(formData.maxFreezeDays as string) : null,
+        maxFreezeOccurrences: formData.maxFreezeOccurrences ? parseInt(formData.maxFreezeOccurrences as string) : null,
+        chargePerExtraDay: formData.chargePerExtraDay ? parseFloat(formData.chargePerExtraDay as string) : null,
+        freeDaysAllowed: formData.freeDaysAllowed ? parseInt(formData.freeDaysAllowed as string) : null,
+        autoUnfreeze: formData.autoUnfreeze,
+        trainingStreams: formData.trainingStreams,
+        selectedFacilities: formData.selectedFacilities,
+        selectedPromotions: formData.selectedPromotions,
+        selectedCampaigns: formData.selectedCampaigns,
+      });
+      setPlans([...plans, created]);
+      setShowCreateDialog(false);
+      resetForm();
+    } catch (err) {
+      console.error('Failed to create plan:', err);
+      setError('Failed to create plan. Please try again.');
+    }
   };
 
   const handleEditPlan = (plan: Plan) => {
@@ -354,77 +290,94 @@ export function ManagePlans() {
       name: plan.name,
       type: plan.type,
       durationType: plan.durationType,
-      durationValue: plan.duration.split(" ")[0],
+      durationValue: plan.durationValue || plan.duration.split(" ")[0],
       price: plan.price.toString(),
       discount: plan.discount.toString(),
       maxSessions: plan.maxSessions?.toString() || "",
-      assignableTrainers: plan.assignableTrainers.join(", "),
+      assignableTrainers: (plan.assignableTrainers || []).join(", "),
       description: plan.description,
       planType: plan.planType,
       status: plan.status,
-      trainingStreams: plan.trainingStreams || [], // Load existing training streams
-      membershipCapacity: "Unlimited", // Default to Unlimited for editing too
-      maxCapacity: "0",
-      attendanceLimit: "Unlimited", // Default to Unlimited for editing too
-      attendanceValue: "3",
-      attendancePeriod: "Payment",
-      selectedPromotions: plan.selectedPromotions || [], // Load existing promotions
-      selectedCampaigns: plan.selectedCampaigns || [], // Load existing campaigns
-      selectedFacilities: plan.selectedFacilities || [], // Load existing facilities
-      // Freeze Policy Configuration - with defaults for existing plans
-      maxFreezeDays: (plan as any).maxFreezeDays?.toString() || "30",
-      maxFreezeOccurrences: (plan as any).maxFreezeOccurrences?.toString() || "2",
-      chargePerExtraDay: (plan as any).chargePerExtraDay?.toString() || "5",
-      freeDaysAllowed: (plan as any).freeDaysAllowed?.toString() || "10",
-      autoUnfreeze: (plan as any).autoUnfreeze !== undefined ? (plan as any).autoUnfreeze : true
+      trainingStreams: plan.trainingStreams || [],
+      membershipCapacity: plan.membershipCapacity || "Unlimited",
+      maxCapacity: plan.maxCapacity?.toString() || "0",
+      attendanceLimit: plan.attendanceLimit || "Unlimited",
+      attendanceValue: plan.attendanceValue?.toString() || "3",
+      attendancePeriod: plan.attendancePeriod || "Payment",
+      selectedPromotions: plan.selectedPromotions || [],
+      selectedCampaigns: plan.selectedCampaigns || [],
+      selectedFacilities: plan.selectedFacilities || [],
+      maxFreezeDays: plan.maxFreezeDays?.toString() || "30",
+      maxFreezeOccurrences: plan.maxFreezeOccurrences?.toString() || "2",
+      chargePerExtraDay: plan.chargePerExtraDay?.toString() || "5",
+      freeDaysAllowed: plan.freeDaysAllowed?.toString() || "10",
+      autoUnfreeze: plan.autoUnfreeze !== undefined ? plan.autoUnfreeze : true
     });
     setShowCreateDialog(true);
   };
 
-  const handleUpdatePlan = () => {
+  const handleUpdatePlan = async () => {
     if (!editingPlan) return;
-    
-    const updatedPlan: Plan = {
-      ...editingPlan,
-      name: formData.name,
-      type: formData.type as "Membership" | "Class Package" | "Personal Training",
-      duration: formData.durationType === "Sessions" ? `${formData.durationValue} sessions` : `${formData.durationValue} ${formData.durationType.toLowerCase()}`,
-      durationType: formData.durationType,
-      price: parseFloat(formData.price),
-      discount: parseFloat(formData.discount) || 0,
-      status: formData.status as "Active" | "Inactive",
-      maxSessions: formData.maxSessions ? parseInt(formData.maxSessions) : null,
-      assignableTrainers: formData.assignableTrainers ? formData.assignableTrainers.split(",").map(t => t.trim()) : [],
-      description: formData.description,
-      planType: formData.planType as "Individual" | "Family" | "Corporate",
-      trainingStreams: formData.trainingStreams,
-      selectedPromotions: formData.selectedPromotions,
-      selectedCampaigns: formData.selectedCampaigns,
-      selectedFacilities: formData.selectedFacilities
-    };
-
-    setPlans(plans.map(p => p.id === editingPlan.id ? updatedPlan : p));
-    setShowCreateDialog(false);
-    setEditingPlan(null);
-    resetForm();
+    try {
+      const updated = await plansService.updatePlan(editingPlan.id, {
+        name: formData.name,
+        type: formData.type,
+        planType: formData.planType,
+        durationType: formData.durationType,
+        durationValue: formData.durationValue,
+        price: parseFloat(formData.price as string) || 0,
+        discount: parseFloat(formData.discount as string) || 0,
+        status: formData.status,
+        description: formData.description,
+        maxSessions: formData.maxSessions ? parseInt(formData.maxSessions as string) : null,
+        assignableTrainers: formData.assignableTrainers ? (formData.assignableTrainers as string).split(",").map(t => t.trim()) : [],
+        membershipCapacity: formData.membershipCapacity,
+        maxCapacity: formData.maxCapacity ? parseInt(formData.maxCapacity as string) : null,
+        attendanceLimit: formData.attendanceLimit,
+        attendanceValue: formData.attendanceValue ? parseInt(formData.attendanceValue as string) : null,
+        attendancePeriod: formData.attendancePeriod,
+        maxFreezeDays: formData.maxFreezeDays ? parseInt(formData.maxFreezeDays as string) : null,
+        maxFreezeOccurrences: formData.maxFreezeOccurrences ? parseInt(formData.maxFreezeOccurrences as string) : null,
+        chargePerExtraDay: formData.chargePerExtraDay ? parseFloat(formData.chargePerExtraDay as string) : null,
+        freeDaysAllowed: formData.freeDaysAllowed ? parseInt(formData.freeDaysAllowed as string) : null,
+        autoUnfreeze: formData.autoUnfreeze,
+        trainingStreams: formData.trainingStreams,
+        selectedFacilities: formData.selectedFacilities,
+        selectedPromotions: formData.selectedPromotions,
+        selectedCampaigns: formData.selectedCampaigns,
+      });
+      setPlans(plans.map(p => p.id === editingPlan.id ? updated : p));
+      setShowCreateDialog(false);
+      setEditingPlan(null);
+      resetForm();
+    } catch (err) {
+      console.error('Failed to update plan:', err);
+      setError('Failed to update plan. Please try again.');
+    }
   };
 
-  const handleDuplicatePlan = (plan: Plan) => {
-    const duplicatedPlan: Plan = {
-      ...plan,
-      id: Date.now(),
-      name: `${plan.name} (Copy)`,
-      status: "Inactive",
-      trainingStreams: plan.trainingStreams || [],
-      selectedPromotions: plan.selectedPromotions || [],
-      selectedCampaigns: plan.selectedCampaigns || [],
-      selectedFacilities: plan.selectedFacilities || []
-    };
-    setPlans([...plans, duplicatedPlan]);
+  const handleDuplicatePlan = async (plan: Plan) => {
+    try {
+      const duplicated = await plansService.duplicatePlan(plan.id);
+      setPlans([...plans, duplicated]);
+    } catch (err) {
+      console.error('Failed to duplicate plan:', err);
+      setError('Failed to duplicate plan. Please try again.');
+    }
   };
 
-  const handleDeletePlan = (planId: number) => {
-    setPlans(plans.filter(p => p.id !== planId));
+  const handleViewPlan = (plan: Plan) => {
+    setViewingPlan(plan);
+  };
+
+  const handleDeletePlan = async (planId: number) => {
+    try {
+      await plansService.deletePlan(planId);
+      setPlans(plans.filter(p => p.id !== planId));
+    } catch (err) {
+      console.error('Failed to delete plan:', err);
+      setError('Failed to delete plan. Please try again.');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -569,12 +522,25 @@ export function ManagePlans() {
     }));
   };
 
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Loading plans...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-md px-4 py-3 text-sm">
+          {error}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1>Manage Plans</h1>
+          <h1 className="text-3xl font-bold">Manage Plans</h1>
           <p className="text-muted-foreground">Create and manage membership plans, class packages, and training programs.</p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
@@ -585,10 +551,12 @@ export function ManagePlans() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Plans</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Plans</CardTitle>
+            <div className="p-2 rounded-lg bg-blue-100">
+              <CreditCard className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{plans.length}</div>
@@ -596,10 +564,12 @@ export function ManagePlans() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Plans</CardTitle>
-            <Settings className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Plans</CardTitle>
+            <div className="p-2 rounded-lg bg-green-100">
+              <Settings className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
@@ -609,23 +579,27 @@ export function ManagePlans() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Price</CardTitle>
-            <DollarSign className="h-4 w-4 text-blue-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Average Price</CardTitle>
+            <div className="p-2 rounded-lg bg-blue-100">
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              ${(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
+              AED {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
             </div>
             <p className="text-xs text-muted-foreground">Across all plans</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Family Plans</CardTitle>
-            <Users className="h-4 w-4 text-purple-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Family Plans</CardTitle>
+            <div className="p-2 rounded-lg bg-purple-100">
+              <Users className="h-4 w-4 text-purple-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
@@ -637,7 +611,7 @@ export function ManagePlans() {
       </div>
 
       {/* Plan Overview / List */}
-      <Card>
+      <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
         <CardHeader>
           <CardTitle>Plan Overview</CardTitle>
           <CardDescription>View and manage all membership plans</CardDescription>
@@ -695,8 +669,8 @@ export function ManagePlans() {
         
         <CardContent>
           <Table>
-            <TableHeader>
-              <TableRow>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="hover:bg-transparent">
                 <TableHead>Plan Name</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Type</TableHead>
@@ -711,7 +685,7 @@ export function ManagePlans() {
             </TableHeader>
             <TableBody>
               {filteredPlans.map((plan) => (
-                <TableRow key={plan.id}>
+                <TableRow key={plan.id} className="hover:bg-slate-50/50 transition-colors">
                   <TableCell>
                     <div>
                       <div className="font-medium">{plan.name}</div>
@@ -846,15 +820,42 @@ export function ManagePlans() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditPlan(plan)}>
-                        <Edit className="h-4 w-4" />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 border-primary/20 hover:bg-blue-50"
+                        onClick={() => handleViewPlan(plan)}
+                        title="View Plan"
+                      >
+                        <Eye className="h-4 w-4 text-blue-600" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDuplicatePlan(plan)}>
-                        <Copy className="h-4 w-4" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 border-primary/20 hover:bg-amber-50"
+                        onClick={() => handleEditPlan(plan)}
+                        title="Edit Plan"
+                      >
+                        <Edit className="h-4 w-4 text-amber-600" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeletePlan(plan.id)}>
-                        <Trash2 className="h-4 w-4" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 border-primary/20 hover:bg-purple-50"
+                        onClick={() => handleDuplicatePlan(plan)}
+                        title="Duplicate Plan"
+                      >
+                        <Copy className="h-4 w-4 text-purple-600" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 border-primary/20 hover:bg-red-50"
+                        onClick={() => handleDeletePlan(plan.id)}
+                        title="Delete Plan"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>
                     </div>
                   </TableCell>
@@ -864,6 +865,133 @@ export function ManagePlans() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Plan View Dialog */}
+      <Dialog open={!!viewingPlan} onOpenChange={(open) => !open && setViewingPlan(null)}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Plan Details</DialogTitle>
+            <DialogDescription>Overview of the selected plan configuration.</DialogDescription>
+          </DialogHeader>
+
+          {viewingPlan && (
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">{viewingPlan.name}</h3>
+                  <p className="text-sm text-muted-foreground">{viewingPlan.type}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={getStatusColor(viewingPlan.status)}>{viewingPlan.status}</Badge>
+                  <Badge className={getTypeColor(viewingPlan.planType)}>{viewingPlan.planType}</Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Duration</p>
+                  <p className="font-semibold">{viewingPlan.duration}</p>
+                </div>
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Price</p>
+                  <p className="font-semibold text-primary">AED {viewingPlan.price}</p>
+                </div>
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Discount</p>
+                  <p className="font-semibold">{viewingPlan.discount ? `${viewingPlan.discount}%` : "—"}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Assignable Trainers</p>
+                  {viewingPlan.assignableTrainers.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {viewingPlan.assignableTrainers.map((trainer) => (
+                        <Badge key={trainer} variant="outline" className="text-xs">
+                          {trainer}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-1">No trainers assigned</p>
+                  )}
+                </div>
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Max Sessions</p>
+                  <p className="font-semibold">{viewingPlan.maxSessions ?? "Unlimited"}</p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg border bg-white">
+                <p className="text-xs text-muted-foreground">Training Streams</p>
+                {viewingPlan.trainingStreams.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {getTrainingStreamNames(viewingPlan.trainingStreams).map((stream) => (
+                      <Badge key={stream} variant="outline" className="text-xs">
+                        {stream}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">No streams selected</p>
+                )}
+              </div>
+
+              <div className="p-3 rounded-lg border bg-white">
+                <p className="text-xs text-muted-foreground">Facilities</p>
+                {viewingPlan.selectedFacilities.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {getFacilityNames(viewingPlan.selectedFacilities).map((facility) => (
+                      <Badge key={facility} variant="outline" className="text-xs">
+                        {facility}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">No facilities</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Promotions</p>
+                  {viewingPlan.selectedPromotions.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {getPromotionNames(viewingPlan.selectedPromotions).map((promo) => (
+                        <Badge key={promo} variant="outline" className="text-xs bg-green-50 text-green-700">
+                          {promo}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-1">No promotions</p>
+                  )}
+                </div>
+                <div className="p-3 rounded-lg border bg-white">
+                  <p className="text-xs text-muted-foreground">Campaigns</p>
+                  {viewingPlan.selectedCampaigns.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {getCampaignNames(viewingPlan.selectedCampaigns).map((campaign) => (
+                        <Badge key={campaign} variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                          {campaign}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-1">No campaigns</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg border bg-white">
+                <p className="text-xs text-muted-foreground">Description</p>
+                <p className="text-sm mt-1 text-foreground">{viewingPlan.description || "No description provided."}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Plan Creation / Editing Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={handleCloseDialog}>
@@ -1245,7 +1373,9 @@ export function ManagePlans() {
                   {availableFacilities.length > 0 ? (
                     <>
                       <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto border rounded-md p-3">
-                        {availableFacilities.map((facility) => (
+                        {availableFacilities.map((facility) => {
+                          const FacilityIcon = facility.icon;
+                          return (
                           <div key={facility.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`facility-${facility.id}`}
@@ -1256,7 +1386,7 @@ export function ManagePlans() {
                               htmlFor={`facility-${facility.id}`}
                               className="text-sm cursor-pointer flex-1 flex items-center gap-2"
                             >
-                              <span className="text-lg">{facility.icon}</span>
+                              <FacilityIcon className="h-4 w-4 text-primary" />
                               <span>{facility.name}</span>
                             </Label>
                             <Badge 
@@ -1266,7 +1396,7 @@ export function ManagePlans() {
                               Active
                             </Badge>
                           </div>
-                        ))}
+                        )})}
                       </div>
 
                       <div className="text-sm text-muted-foreground">
