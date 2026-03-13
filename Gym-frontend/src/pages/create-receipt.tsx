@@ -137,9 +137,12 @@ const mockMembers = [
 
 interface CreateReceiptProps {
   onNavigate?: (section: string) => void;
+  layout?: "page" | "modal";
 }
 
-export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
+export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProps) {
+  const isModal = layout === "modal";
+  const panelCardClass = "border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-white";
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -321,45 +324,33 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-white">
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-[#2B7A78] to-[#00c5cb]">
-                  <Receipt className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl text-foreground">Create Receipt</h1>
-                  <p className="text-muted-foreground">
-                    Search member, settle payments, and generate receipts
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => onNavigate && onNavigate("billing")}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Billing
-              </Button>
-            </div>
+    <div className={isModal ? "bg-background" : "min-h-screen bg-background"}>
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Create Receipt</h1>
+            <p className="text-muted-foreground">
+              Manage member receipts, dues, and payment collections.
+            </p>
           </div>
+          {!isModal && onNavigate && (
+            <Button
+              variant="outline"
+              onClick={() => onNavigate("billing")}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Billing
+            </Button>
+          )}
         </div>
-      </div>
 
-      {/* Main Content - Two Column Layout */}
-      <div className="p-6">
+        {/* Main Content - Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Search & Member Info */}
           <div className="space-y-6">
             {/* Search Section */}
-            <Card>
+            <Card className={panelCardClass}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Search className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -385,7 +376,7 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
                   
                   {/* Auto-suggestion Dropdown */}
                   {showSuggestions && searchTerm && filteredMembers.length > 0 && (
-                    <Card className="absolute z-10 w-full mt-2 max-h-80 overflow-y-auto">
+                    <Card className="absolute z-10 w-full mt-2 max-h-80 overflow-y-auto border-slate-200/80 shadow-md">
                       <CardContent className="p-2">
                         {filteredMembers.map((member) => (
                           <div
@@ -424,7 +415,7 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
 
             {/* Selected Member Card */}
             {selectedMember && (
-              <Card style={{ borderColor: '#2B7A78', borderWidth: '2px' }}>
+              <Card className={`${panelCardClass} ring-1 ring-[#2B7A78]/20`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <User className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -494,7 +485,7 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
 
             {/* Outstanding Dues */}
             {selectedMember && selectedMember.outstandingDues.length > 0 && (
-              <Card>
+              <Card className={panelCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
@@ -539,16 +530,16 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
                 <CardContent>
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-3 px-2 text-sm font-semibold">Doc. No</th>
-                          <th className="text-left py-3 px-2 text-sm font-semibold">Date</th>
-                          <th className="text-left py-3 px-2 text-sm font-semibold">Transaction Type</th>
-                          <th className="text-right py-3 px-2 text-sm font-semibold">Actual</th>
-                          <th className="text-right py-3 px-2 text-sm font-semibold">Paid</th>
-                          <th className="text-right py-3 px-2 text-sm font-semibold">Due</th>
-                          <th className="text-center py-3 px-2 text-sm font-semibold">Due Date</th>
-                          <th className="text-right py-3 px-2 text-sm font-semibold">💰 Pay Now</th>
+                      <thead className="bg-slate-50/50">
+                        <tr className="hover:bg-transparent">
+                          <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">Doc. No</th>
+                          <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">Date</th>
+                          <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">Transaction Type</th>
+                          <th className="text-right py-3 px-2 text-sm font-semibold text-foreground">Actual</th>
+                          <th className="text-right py-3 px-2 text-sm font-semibold text-foreground">Paid</th>
+                          <th className="text-right py-3 px-2 text-sm font-semibold text-foreground">Due</th>
+                          <th className="text-center py-3 px-2 text-sm font-semibold text-foreground">Due Date</th>
+                          <th className="text-right py-3 px-2 text-sm font-semibold text-foreground">Pay Now</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -558,7 +549,7 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
                           return (
                             <tr 
                               key={due.docNo} 
-                              className={`border-b hover:bg-[#DFF5F4]/30 transition-colors ${
+                              className={`border-b border-gray-100 hover:bg-slate-50/50 transition-colors ${
                                 hasPayment ? 'bg-[#DFF5F4]/20' : ''
                               }`}
                             >
@@ -608,9 +599,9 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
                         })}
                       </tbody>
                       <tfoot>
-                        <tr className="bg-[#DFF5F4]/50">
+                        <tr className="bg-slate-50/50">
                           <td colSpan={7} className="py-3 px-2 text-right">
-                            <span className="text-sm">✅ Total to Pay Now:</span>
+                            <span className="text-sm">Total to Pay Now:</span>
                           </td>
                           <td className="py-3 px-2 text-right">
                             <span className="text-lg" style={{ color: '#2B7A78' }}>
@@ -624,15 +615,17 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
 
                   {calculateTotalPayment() > 0 && (
                     <div className="mt-4 space-y-2">
-                      <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                      <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-blue-700 mt-0.5" />
                         <p className="text-sm text-blue-800">
-                          💡 <strong>Partial Settlement Allowed:</strong> You can enter partial amounts for multiple bills
+                          <strong>Partial Settlement Allowed:</strong> You can enter partial amounts for multiple bills
                         </p>
                       </div>
                       {autoApplyAmount && parseFloat(autoApplyAmount) > 0 && (
-                        <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                        <div className="p-3 rounded-lg bg-green-50 border border-green-200 flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-700 mt-0.5" />
                           <p className="text-sm text-green-800">
-                            ✅ <strong>FIFO Method Applied:</strong> Amount distributed to oldest bills first (First In, First Out)
+                            <strong>FIFO Method Applied:</strong> Amount distributed to oldest bills first (First In, First Out)
                           </p>
                         </div>
                       )}
@@ -644,7 +637,7 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
 
             {/* No Outstanding Dues */}
             {selectedMember && selectedMember.outstandingDues.length === 0 && (
-              <Card>
+              <Card className={panelCardClass}>
                 <CardContent className="pt-6">
                   <div className="text-center py-8">
                     <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-3" />
@@ -662,7 +655,7 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
           <div className="space-y-6">
             {/* Payment Section */}
             {selectedMember && selectedMember.outstandingDues.length > 0 && (
-              <Card>
+              <Card className={panelCardClass}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <DollarSign className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -777,7 +770,7 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
 
             {/* Receipt Summary */}
             {selectedMember && selectedMember.outstandingDues.length > 0 && (
-              <Card style={{ borderColor: '#2B7A78', borderWidth: '2px' }}>
+              <Card className={`${panelCardClass} ring-1 ring-[#2B7A78]/20`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Receipt className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -915,7 +908,7 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
 
             {/* Instructions Card */}
             {!selectedMember && (
-              <Card>
+              <Card className={panelCardClass}>
                 <CardContent className="pt-6">
                   <div className="text-center py-8 space-y-4">
                     <div className="p-4 rounded-full bg-[#DFF5F4] w-20 h-20 mx-auto flex items-center justify-center">
@@ -929,13 +922,20 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
                     </div>
                     <div className="text-left space-y-2 bg-[#F9FAFB] p-4 rounded-lg">
                       <p className="text-sm"><strong>Features:</strong></p>
-                      <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                        <li>✓ Multi-bill settlement in single receipt</li>
-                        <li>✓ Partial payment support</li>
-                        <li>✓ Auto-apply to oldest dues</li>
-                        <li>✓ Instant receipt generation</li>
-                        <li>✓ Send via SMS, Email, or WhatsApp</li>
-                      </ul>
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        {[
+                          "Multi-bill settlement in single receipt",
+                          "Partial payment support",
+                          "Auto-apply to oldest dues",
+                          "Instant receipt generation",
+                          "Send via SMS, Email, or WhatsApp"
+                        ].map((feature) => (
+                          <div key={feature} className="flex items-start gap-2">
+                            <CheckCircle className="h-4 w-4 text-emerald-600 mt-0.5" />
+                            <span>{feature}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -1187,4 +1187,5 @@ export function CreateReceipt({ onNavigate }: CreateReceiptProps) {
     </div>
   );
 }
+
 

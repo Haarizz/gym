@@ -301,12 +301,24 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         </div>
       </div>
 
+      <style>{`
+        @keyframes tabSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: tabSlideIn 0.22s ease-out;
+        }
+      `}</style>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Collection</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Collection</CardTitle>
+            <div className="p-2 rounded-lg bg-blue-100">
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">AED {totalCollected.toLocaleString()}</div>
@@ -316,10 +328,12 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue Payments</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Payments</CardTitle>
+            <div className="p-2 rounded-lg bg-red-100">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{overdueCount}</div>
@@ -329,10 +343,12 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Due Soon</CardTitle>
-            <Clock className="h-4 w-4 text-orange-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Due Soon</CardTitle>
+            <div className="p-2 rounded-lg bg-orange-100">
+              <Clock className="h-4 w-4 text-orange-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{dueSoonCount}</div>
@@ -342,10 +358,12 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Collection Rate</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Collection Rate</CardTitle>
+            <div className="p-2 rounded-lg bg-green-100">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">94%</div>
@@ -357,14 +375,14 @@ export function Billing({ onNavigate }: BillingProps = {}) {
       </div>
 
       <Tabs defaultValue="receipts" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="receipts">Member Receipts</TabsTrigger>
-          <TabsTrigger value="dues">Member Due</TabsTrigger>
-          <TabsTrigger value="collection">Total Collection</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="receipts" className="flex-1">Member Receipts</TabsTrigger>
+          <TabsTrigger value="dues" className="flex-1">Member Due</TabsTrigger>
+          <TabsTrigger value="collection" className="flex-1">Total Collection</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receipts" className="space-y-6">
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -434,8 +452,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               </div>
 
               <Table>
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Receipt #</TableHead>
                     <TableHead>Member</TableHead>
                     <TableHead>Service</TableHead>
@@ -449,7 +467,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                 </TableHeader>
                 <TableBody>
                   {filteredReceipts.map((receipt) => (
-                    <TableRow key={receipt.id}>
+                    <TableRow key={receipt.id} className="hover:bg-slate-50/50 transition-colors">
                       <TableCell className="font-medium">
                         {receipt.invoiceNumber}
                       </TableCell>
@@ -485,15 +503,15 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => setSelectedReceipt(receipt)}>
-                            <FileText className="h-4 w-4" />
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" className="h-8 w-8 p-0 border-primary/20 hover:bg-blue-50" onClick={() => setSelectedReceipt(receipt)}>
+                            <FileText className="h-4 w-4 text-blue-600" />
                           </Button>
-                          <Button variant="outline" size="sm">
-                            <Download className="h-4 w-4" />
+                          <Button variant="outline" size="sm" className="h-8 w-8 p-0 border-primary/20 hover:bg-green-50">
+                            <Download className="h-4 w-4 text-green-600" />
                           </Button>
-                          <Button variant="outline" size="sm">
-                            <Send className="h-4 w-4" />
+                          <Button variant="outline" size="sm" className="h-8 w-8 p-0 border-primary/20 hover:bg-purple-50">
+                            <Send className="h-4 w-4 text-purple-600" />
                           </Button>
                         </div>
                       </TableCell>
@@ -506,7 +524,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         </TabsContent>
 
         <TabsContent value="dues" className="space-y-6">
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -521,8 +539,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Member</TableHead>
                     <TableHead>Membership</TableHead>
                     <TableHead>Amount Due</TableHead>
@@ -535,7 +553,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                 </TableHeader>
                 <TableBody>
                   {memberDues.map((due) => (
-                    <TableRow key={due.id}>
+                    <TableRow key={due.id} className="hover:bg-slate-50/50 transition-colors">
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
@@ -569,16 +587,16 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
-                          <Button variant="outline" size="sm">
-                            <Send className="h-4 w-4" />
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" className="h-8 w-8 p-0 border-primary/20 hover:bg-blue-50">
+                            <Send className="h-4 w-4 text-blue-600" />
                           </Button>
-                          <Button variant="outline" size="sm">
-                            <CreditCard className="h-4 w-4" />
+                          <Button variant="outline" size="sm" className="h-8 w-8 p-0 border-primary/20 hover:bg-green-50">
+                            <CreditCard className="h-4 w-4 text-green-600" />
                           </Button>
                           {due.status === "Overdue" && (
-                            <Button variant="outline" size="sm" className="text-red-600">
-                              <AlertCircle className="h-4 w-4" />
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0 border-primary/20 hover:bg-red-50">
+                              <AlertCircle className="h-4 w-4 text-red-600" />
                             </Button>
                           )}
                         </div>
@@ -591,7 +609,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Overdue Summary</CardTitle>
               </CardHeader>
@@ -615,7 +633,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
@@ -642,7 +660,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         </TabsContent>
 
         <TabsContent value="collection" className="space-y-6">
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Total Collection Analytics</CardTitle>
               <CardDescription>Revenue collection trends and performance metrics</CardDescription>
@@ -662,12 +680,12 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>This Month</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">${totalCollected.toLocaleString()}</div>
+                <div className="text-3xl font-bold">AED {totalCollected.toLocaleString()}</div>
                 <p className="text-sm text-muted-foreground">
                   {((totalCollected / monthlyTarget) * 100).toFixed(1)}% of target
                 </p>
@@ -682,13 +700,13 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Average Monthly</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">
-                  ${Math.round(collectionData.reduce((sum, item) => sum + item.collected, 0) / collectionData.length).toLocaleString()}
+                  AED {Math.round(collectionData.reduce((sum, item) => sum + item.collected, 0) / collectionData.length).toLocaleString()}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Based on 9 months
@@ -696,7 +714,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Growth Rate</CardTitle>
               </CardHeader>
@@ -709,28 +727,28 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             </Card>
           </div>
 
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Collection by Payment Method</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 border rounded">
-                  <div className="text-2xl font-bold">65%</div>
-                  <p className="text-sm text-muted-foreground">Credit Card</p>
-                </div>
-                <div className="text-center p-4 border rounded">
-                  <div className="text-2xl font-bold">20%</div>
-                  <p className="text-sm text-muted-foreground">Bank Transfer</p>
-                </div>
-                <div className="text-center p-4 border rounded">
-                  <div className="text-2xl font-bold">10%</div>
-                  <p className="text-sm text-muted-foreground">Cash</p>
-                </div>
-                <div className="text-center p-4 border rounded">
-                  <div className="text-2xl font-bold">5%</div>
-                  <p className="text-sm text-muted-foreground">Check</p>
-                </div>
+              <div className="space-y-4">
+                {[
+                  { label: "Credit Card", value: 65, color: "text-blue-600", bar: "bg-blue-600" },
+                  { label: "Bank Transfer", value: 20, color: "text-indigo-600", bar: "bg-indigo-600" },
+                  { label: "Cash", value: 10, color: "text-emerald-600", bar: "bg-emerald-600" },
+                  { label: "Check", value: 5, color: "text-amber-600", bar: "bg-amber-600" },
+                ].map((item) => (
+                  <div key={item.label} className="p-4 rounded-lg bg-white shadow-sm border border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-foreground">{item.label}</p>
+                      <span className={`text-sm font-semibold ${item.color}`}>{item.value}%</span>
+                    </div>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-slate-200/60 overflow-hidden">
+                      <div className={`h-full rounded-full ${item.bar}`} style={{ width: `${item.value}%` }} />
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
