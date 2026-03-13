@@ -103,6 +103,61 @@ public class Member extends BaseEntity {
     @Column(name = "freeze_reason")
     private String freezeReason;
 
+    // Additional profile fields
+    @Column(name = "gender")
+    private String gender;
+
+    @Column(name = "nationality")
+    private String nationality;
+
+    @Column(name = "address", columnDefinition = "TEXT")
+    private String address;
+
+    @Column(name = "photo_url", columnDefinition = "TEXT")
+    private String photoUrl;
+
+    @Column(name = "chronic_illnesses", columnDefinition = "TEXT")
+    private String chronicIllnesses;
+
+    @Column(name = "height")
+    private Double height;
+
+    @Column(name = "weight")
+    private Double weight;
+
+    // Identity / Registration document
+    @Column(name = "reg_doc_number")
+    private String regDocNumber;
+
+    @Column(name = "reg_doc_date")
+    private LocalDateTime regDocDate;
+
+    // Financial tracking
+    @Column(name = "outstanding_balance", precision = 10, scale = 2)
+    private java.math.BigDecimal outstandingBalance;
+
+    @Column(name = "last_payment_date")
+    private LocalDateTime lastPaymentDate;
+
+    @Column(name = "next_payment_date")
+    private LocalDateTime nextPaymentDate;
+
+    @Column(name = "payment_method_used")
+    private String paymentMethodUsed;
+
+    @Column(name = "discount_applied", precision = 10, scale = 2)
+    private java.math.BigDecimal discountApplied;
+
+    // Family plan fields
+    @Column(name = "is_family_head")
+    private Boolean isFamilyHead = false;
+
+    @Column(name = "family_head_id")
+    private String familyHeadId;
+
+    @Column(name = "relationship_to_head")
+    private String relationshipToHead;
+
     public Member() {}
 
     // ── Getters & Setters ───────────────────────────────────────────────────
@@ -193,4 +248,55 @@ public class Member extends BaseEntity {
 
     public String getFreezeReason() { return freezeReason; }
     public void setFreezeReason(String freezeReason) { this.freezeReason = freezeReason; }
+
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
+
+    public String getNationality() { return nationality; }
+    public void setNationality(String nationality) { this.nationality = nationality; }
+
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+
+    public String getPhotoUrl() { return photoUrl; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+
+    public String getChronicIllnesses() { return chronicIllnesses; }
+    public void setChronicIllnesses(String chronicIllnesses) { this.chronicIllnesses = chronicIllnesses; }
+
+    public Double getHeight() { return height; }
+    public void setHeight(Double height) { this.height = height; }
+
+    public Double getWeight() { return weight; }
+    public void setWeight(Double weight) { this.weight = weight; }
+
+    public String getRegDocNumber() { return regDocNumber; }
+    public void setRegDocNumber(String regDocNumber) { this.regDocNumber = regDocNumber; }
+
+    public LocalDateTime getRegDocDate() { return regDocDate; }
+    public void setRegDocDate(LocalDateTime regDocDate) { this.regDocDate = regDocDate; }
+
+    public java.math.BigDecimal getOutstandingBalance() { return outstandingBalance; }
+    public void setOutstandingBalance(java.math.BigDecimal outstandingBalance) { this.outstandingBalance = outstandingBalance; }
+
+    public LocalDateTime getLastPaymentDate() { return lastPaymentDate; }
+    public void setLastPaymentDate(LocalDateTime lastPaymentDate) { this.lastPaymentDate = lastPaymentDate; }
+
+    public LocalDateTime getNextPaymentDate() { return nextPaymentDate; }
+    public void setNextPaymentDate(LocalDateTime nextPaymentDate) { this.nextPaymentDate = nextPaymentDate; }
+
+    public String getPaymentMethodUsed() { return paymentMethodUsed; }
+    public void setPaymentMethodUsed(String paymentMethodUsed) { this.paymentMethodUsed = paymentMethodUsed; }
+
+    public java.math.BigDecimal getDiscountApplied() { return discountApplied; }
+    public void setDiscountApplied(java.math.BigDecimal discountApplied) { this.discountApplied = discountApplied; }
+
+    public Boolean getIsFamilyHead() { return isFamilyHead; }
+    public void setIsFamilyHead(Boolean isFamilyHead) { this.isFamilyHead = isFamilyHead; }
+
+    public String getFamilyHeadId() { return familyHeadId; }
+    public void setFamilyHeadId(String familyHeadId) { this.familyHeadId = familyHeadId; }
+
+    public String getRelationshipToHead() { return relationshipToHead; }
+    public void setRelationshipToHead(String relationshipToHead) { this.relationshipToHead = relationshipToHead; }
 }

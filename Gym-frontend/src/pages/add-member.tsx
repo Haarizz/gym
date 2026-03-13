@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { plansService, Plan as MembershipPlanData } from '../utils/supabase/plans-service';
 import { membersService } from '../utils/supabase/members-service';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -84,6 +85,10 @@ interface AddMemberProps {
 }
 
 export function AddMember({ onNavigate }: AddMemberProps = {}) {
+  const { memberId: routeMemberId } = useParams();
+  const navigate = useNavigate();
+  const isEditMode = Boolean(routeMemberId);
+
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
@@ -93,6 +98,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null);
   const [cameraError, setCameraError] = useState<string>('');
+  const [internalId, setInternalId] = useState<string | null>(null);
   
   // Payment popup state management
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -130,20 +136,22 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   
   // Family members management
   const addFamilyMember = () => {
-    const newMember = {
-      id: `family-${Date.now()}`,
-      name: ''
-    };
-    setFamilyMembers([...familyMembers, newMember]);
+    setFamilyMembers([...familyMembers, { id: `family-${Date.now()}`, name: '', relationship: '' }]);
   };
-  
+
   const removeFamilyMember = (id: string) => {
     setFamilyMembers(familyMembers.filter(member => member.id !== id));
   };
-  
+
   const updateFamilyMemberName = (id: string, name: string) => {
-    setFamilyMembers(familyMembers.map(member => 
+    setFamilyMembers(familyMembers.map(member =>
       member.id === id ? { ...member, name } : member
+    ));
+  };
+
+  const updateFamilyMemberRelationship = (id: string, relationship: string) => {
+    setFamilyMembers(familyMembers.map(member =>
+      member.id === id ? { ...member, relationship } : member
     ));
   };
   
@@ -166,13 +174,72 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
   // Initialize Member ID on component mount
   React.useEffect(() => {
-    if (!formData.memberId) {
+    if (isEditMode && routeMemberId) {
+      Promise.all([
+        membersService.getMembers({ search: routeMemberId }),
+        plansService.getPlans('Active')
+      ]).then(([response, plans]) => {
+        setApiPlans(plans);
+        const member = response.members.find((m: any) => m.member_id === routeMemberId || m.id === routeMemberId);
+        if (member) {
+          // Parse the date strings if they exist, to fit the input format (YYYY-MM-DD)
+          const formatToDateStr = (isoDate: string | undefined | null) => {
+            if (!isoDate) return '';
+            const d = new Date(isoDate);
+            return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+          };
+
+          const names = (member.name || '').split(' ');
+          const fName = names[0] || '';
+          const lName = names.slice(1).join(' ') || '';
+
+          // Resolve plan ID from plan name so end-date computation works
+          const matchedPlan = plans.find((p: any) => p.name === member.membership_plan);
+
+          setFormData(prev => ({
+            ...prev,
+            memberId: member.member_id || '',
+            membershipType: member.membership_type || '',
+            firstName: fName,
+            lastName: lName,
+            email: member.email || '',
+            phone: member.phone || '',
+            address: member.address || '',
+            nationality: member.nationality || '',
+            gender: member.gender || '',
+            regDocNumber: member.reg_doc_number || '',
+            regDocDate: formatToDateStr(member.reg_doc_date),
+            joiningDate: formatToDateStr(member.join_date || member.membership_start_date),
+            startDate: formatToDateStr(member.membership_start_date || member.join_date),
+            endDate: formatToDateStr(member.membership_end_date || member.expiry_date),
+            membershipPlan: matchedPlan ? matchedPlan.id.toString() : (member.membership_plan || ''),
+            profilePhoto: member.photo_url || null,
+            medicalConditions: member.medical_conditions || '',
+            allergies: member.allergies || '',
+            currentMedications: member.current_medications || '',
+            chronicIllnesses: member.chronic_illnesses || '',
+            bloodType: member.blood_type || '',
+            dateOfBirth: formatToDateStr(member.date_of_birth),
+            height: member.height?.toString() || '',
+            weight: member.weight?.toString() || '',
+            emergencyContact: member.emergency_contact || '',
+            emergencyContactName: member.emergency_contact_name || '',
+            emergencyContactPhone: member.emergency_contact_phone || '',
+            healthNotes: member.health_notes || ''
+          }));
+          setInternalId(member.id);
+        }
+      }).catch((err: any) => {
+        console.error("Failed to load member for edit", err);
+        toast.error("Failed to load member details.");
+      });
+    } else if (!formData.memberId) {
       setFormData(prev => ({
         ...prev,
         memberId: generateMemberId()
       }));
     }
-  }, []);
+  }, [isEditMode, routeMemberId]);
 
   // Check camera availability on component mount
   React.useEffect(() => {
@@ -272,6 +339,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     genderOther: '',
     joiningDate: '',
     startDate: '',
+    endDate: '',    // existing end date loaded in edit mode
     membershipPlan: '',
     emergencyContact: '',
     profilePhoto: null as string | null,
@@ -282,13 +350,15 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     emergencyContactName: '',
     emergencyContactPhone: '',
     bloodType: '',
+    dateOfBirth: '',
     height: '',
     weight: '',
-    chronicIllnesses: ''
+    chronicIllnesses: '',
+    healthNotes: ''
   });
   
   // Family members state
-  const [familyMembers, setFamilyMembers] = useState<Array<{ id: string; name: string }>>([]);
+  const [familyMembers, setFamilyMembers] = useState<Array<{ id: string; name: string; relationship: string }>>([]);
   
   // Membership plan filters
   const [programFilter, setProgramFilter] = useState('all');
@@ -456,14 +526,38 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       });
       return;
     }
-    
-    // Open payment selection popup
-    setPaymentDialogOpen(true);
+
+    // Family membership validation
+    if (formData.membershipType === 'family' && !isEditMode) {
+      if (familyMembers.length === 0) {
+        toast.error('Please add at least one family member', {
+          description: 'Family memberships require at least one additional family member.',
+          duration: 4000
+        });
+        return;
+      }
+      const incomplete = familyMembers.find(fm => !fm.name.trim() || !fm.relationship.trim());
+      if (incomplete) {
+        toast.error('Please complete all family member entries', {
+          description: 'Each family member must have a name and relationship.',
+          duration: 4000
+        });
+        return;
+      }
+    }
+
+    // Open payment selection popup (or skip if edit mode)
+    if (isEditMode) {
+      handlePaymentConfirm();
+    } else {
+      setPaymentDialogOpen(true);
+    }
   };
 
   // Get membership plan details and pricing
   const getMembershipDetails = () => {
-    const plan = apiPlans.find(p => p.id.toString() === formData.membershipPlan);
+    const plan = apiPlans.find(p => p.id.toString() === formData.membershipPlan)
+      || apiPlans.find(p => p.name === formData.membershipPlan);
     if (!plan) return { name: 'Unknown Plan', price: 0, originalPrice: null, savings: null };
     const originalPrice = plan.discount && plan.discount > 0
       ? Number(plan.price)
@@ -645,23 +739,25 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
   // Handle payment confirmation
   const handlePaymentConfirm = async () => {
-    if (!selectedPaymentMethod) {
+    if (!isEditMode && !selectedPaymentMethod) {
       toast.error('Please select a payment method');
       return;
     }
 
     // Validate based on payment method
-    if (selectedPaymentMethod === 'cash') {
-      if (!validateCashPayment()) {
+    if (!isEditMode || selectedPaymentMethod) {
+      if (selectedPaymentMethod === 'cash') {
+        if (!validateCashPayment()) {
+          return;
+        }
+      } else if (selectedPaymentMethod === 'credit') {
+        if (!validateCreditPayment()) {
+          return;
+        }
+      } else if (selectedPaymentMethod === 'multi-pay' && !validateSplitPayment()) {
+        toast.error('Split payment amounts must equal the total membership fee');
         return;
       }
-    } else if (selectedPaymentMethod === 'credit') {
-      if (!validateCreditPayment()) {
-        return;
-      }
-    } else if (selectedPaymentMethod === 'multi-pay' && !validateSplitPayment()) {
-      toast.error('Split payment amounts must equal the total membership fee');
-      return;
     }
 
     // Process payment and create member
@@ -717,7 +813,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     }
 
     // Resolve the selected plan name
-    const selectedPlan = apiPlans.find(p => p.id.toString() === formData.membershipPlan);
+    const selectedPlan = apiPlans.find(p => p.id.toString() === formData.membershipPlan)
+      || apiPlans.find(p => p.name === formData.membershipPlan);
     const planName = selectedPlan?.name || formData.membershipPlan;
     const planType = selectedPlan?.planType || '';
 
@@ -739,85 +836,79 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       return start.toISOString().split('T')[0];
     };
 
-    const endDateStr = selectedPlan
+    // Compute end date from plan duration; fall back to existing endDate in edit mode
+    const computedEnd = selectedPlan
       ? computeEndDate(formData.startDate, selectedPlan.durationValue, selectedPlan.durationType)
       : '';
+    const endDateStr = computedEnd || formData.endDate || '';
 
-    // Build the member payload (snake_case to match global Jackson SNAKE_CASE strategy)
     const memberPayload = {
       name: `${formData.firstName} ${formData.lastName}`.trim(),
       email: formData.email,
       phone: formData.phone,
       membership_type: planType,
-      membership_status: 'active',
+      membership_status: 'active' as const,
       membership_plan: planName,
       join_date: toIso(formData.joiningDate),
       membership_start_date: toIso(formData.startDate),
       membership_end_date: toIso(endDateStr),
       expiry_date: toIso(endDateStr),
-      payment_status: paymentStatus,
+      payment_status: paymentStatus as any,
       monthly_fee: membershipDetails.price,
-      membership_fee: finalPrice,
-      total_visits: 0,
+      membership_fee: getFinalPrice(),
       emergency_contact: formData.emergencyContact,
       emergency_contact_name: formData.emergencyContactName,
       emergency_contact_phone: formData.emergencyContactPhone,
-      date_of_birth: formData.dateOfBirth,
+      date_of_birth: toIso(formData.dateOfBirth),
       blood_type: formData.bloodType,
       medical_conditions: formData.medicalConditions,
       allergies: formData.allergies,
       current_medications: formData.currentMedications,
+      chronic_illnesses: formData.chronicIllnesses,
       health_notes: formData.healthNotes || '',
+      outstanding_balance: (selectedPaymentMethod ? (finalPaymentData as any).outstandingBalance : 0),
+      last_payment_date: selectedPaymentMethod ? toIso(new Date().toISOString().split('T')[0]) : undefined,
+      next_payment_date: selectedPaymentMethod ? toIso((finalPaymentData as any).paymentDueDate || '') : undefined,
+      payment_method_used: selectedPaymentMethod || undefined,
+      discount_applied: discountAmount || 0,
+      reg_doc_number: formData.regDocNumber,
+      reg_doc_date: toIso(formData.regDocDate),
+      address: formData.address,
+      nationality: formData.nationality,
+      gender: formData.gender,
+      height: formData.height ? parseFloat(formData.height) : undefined,
+      weight: formData.weight ? parseFloat(formData.weight) : undefined,
+      photo_url: formData.profilePhoto || undefined,
+      // Family plan: mark primary member as head and include family members array
+      is_family_head: formData.membershipType === 'family' && familyMembers.length > 0 ? true : undefined,
+      family_members: (!isEditMode && formData.membershipType === 'family' && familyMembers.length > 0)
+        ? familyMembers.map(fm => ({ name: fm.name, relationship: fm.relationship }))
+        : undefined,
     };
 
-    // Submit to backend
     try {
-      await membersService.createMember(memberPayload as Parameters<typeof membersService.createMember>[0]);
+      const updatePayload: Partial<Parameters<typeof membersService.updateMember>[1]> & Record<string, any> = {
+        ...memberPayload,
+      } as Partial<Parameters<typeof membersService.updateMember>[1]> & Record<string, any>;
+
+      if (isEditMode && internalId) {
+        await membersService.updateMember(internalId, updatePayload);
+      } else {
+        await membersService.createMember({ ...memberPayload, total_visits: 0 } as any);
+      }
+      toast.success(isEditMode ? 'Member updated successfully!' : 'Member registered successfully!');
+      onNavigate?.('members');
+      navigate('/members');
     } catch (err) {
-      console.error('Failed to create member:', err);
-      toast.error('Failed to create member. Please try again.');
+      console.error(isEditMode ? 'Failed to update member:' : 'Failed to create member:', err);
+      toast.error(isEditMode ? 'Failed to update member. Please try again.' : 'Failed to create member. Please try again.');
       return;
     }
-
-    // Show success toast with payment info
-    let paymentDescription = '';
-    const discountInfo = discountAmount > 0 ? ` (Discount: -AED ${discountAmount.toFixed(2)})` : '';
-
-    if (selectedPaymentMethod === 'cash') {
-      const paidAmount = parseFloat(paymentData.paidAmount);
-      const payBackAmount = Math.max(0, paidAmount - finalPrice);
-      if (payBackAmount > 0) {
-        paymentDescription = `Payment: AED ${paidAmount.toFixed(2)} (Cash - Fully Paid, Return: AED ${payBackAmount.toFixed(2)})${discountInfo}`;
-      } else {
-        paymentDescription = `Payment: AED ${paidAmount.toFixed(2)} (Cash - Fully Paid)${discountInfo}`;
-      }
-    } else if (selectedPaymentMethod === 'credit') {
-      const received = parseFloat(paymentData.receivedAmount || '0');
-      const remaining = paymentData.remainingAmount;
-      if (remaining > 0) {
-        paymentDescription = `Payment: AED ${received.toFixed(2)} received, AED ${remaining.toFixed(2)} due by ${paymentData.paymentDueDate}${discountInfo}`;
-      } else {
-        paymentDescription = `Payment: Full credit (AED ${finalPrice.toFixed(2)} due by ${paymentData.paymentDueDate})${discountInfo}`;
-      }
-    } else if (selectedPaymentMethod === 'multi-pay') {
-      paymentDescription = `Payment: Split payment (Cash: AED ${splitPayment.cash}, Card: AED ${splitPayment.card})${discountInfo}`;
-    } else {
-      paymentDescription = `Payment: AED ${finalPrice.toFixed(2)} (${selectedPaymentMethod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())})`;
-    }
-
-    toast.success('Member created successfully!', {
-      description: `${formData.firstName} ${formData.lastName} has been added. ${paymentDescription}`,
-      duration: 6000
-    });
-
-    // Close payment dialog
+    
     setPaymentDialogOpen(false);
-
-    // Navigate back to members list
-    setTimeout(() => {
-      onNavigate?.('members');
-    }, 1000);
   };
+
+
 
   // Handle payment dialog close
   const handlePaymentCancel = () => {
@@ -850,8 +941,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             <span className="hidden sm:inline">Back</span>
           </Button>
           <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-foreground">New Member Registration</h1>
-            <p className="text-xs text-muted-foreground hidden sm:block">Fill in the details to register a new gym member</p>
+            <h1 className="text-lg font-semibold text-foreground">{isEditMode ? 'Edit Member Profile' : 'New Member Registration'}</h1>
+            <p className="text-xs text-muted-foreground hidden sm:block">{isEditMode ? 'Update the details for this gym member' : 'Fill in the details to register a new gym member'}</p>
           </div>
         </div>
       </div>
@@ -1179,28 +1270,54 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 ) : (
                   <div className="space-y-3">
                     {familyMembers.map((member, index) => (
-                      <div key={member.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-primary/20">
-                        <div className="flex items-center justify-center w-8 h-8 bg-gradient-light rounded-full flex-shrink-0">
+                      <div key={member.id} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-primary/20">
+                        <div className="flex items-center justify-center w-8 h-8 bg-gradient-light rounded-full flex-shrink-0 mt-6">
                           <FaUser className="h-4 w-4 text-primary" />
                         </div>
-                        <div className="flex-1">
-                          <Label htmlFor={`family-member-${member.id}`} className="text-sm text-gray-600 mb-1 block">
-                            Family Member {index + 1}
-                          </Label>
-                          <Input
-                            id={`family-member-${member.id}`}
-                            value={member.name}
-                            onChange={(e) => updateFamilyMemberName(member.id, e.target.value)}
-                            placeholder="Enter full name"
-                            className="border-primary/20"
-                          />
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor={`family-member-${member.id}`} className="text-sm text-gray-600 mb-1 block">
+                              Family Member {index + 1} Name *
+                            </Label>
+                            <Input
+                              id={`family-member-${member.id}`}
+                              value={member.name}
+                              onChange={(e) => updateFamilyMemberName(member.id, e.target.value)}
+                              placeholder="Enter full name"
+                              className="border-primary/20"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`family-rel-${member.id}`} className="text-sm text-gray-600 mb-1 block">
+                              Relationship *
+                            </Label>
+                            <Select
+                              value={member.relationship}
+                              onValueChange={(val) => updateFamilyMemberRelationship(member.id, val)}
+                            >
+                              <SelectTrigger id={`family-rel-${member.id}`} className="border-primary/20">
+                                <SelectValue placeholder="Select relationship" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Wife">Wife</SelectItem>
+                                <SelectItem value="Husband">Husband</SelectItem>
+                                <SelectItem value="Son">Son</SelectItem>
+                                <SelectItem value="Daughter">Daughter</SelectItem>
+                                <SelectItem value="Father">Father</SelectItem>
+                                <SelectItem value="Mother">Mother</SelectItem>
+                                <SelectItem value="Brother">Brother</SelectItem>
+                                <SelectItem value="Sister">Sister</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => removeFamilyMember(member.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 mt-5"
                         >
                           <FaXmark className="h-4 w-4" />
                         </Button>
@@ -1636,7 +1753,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   Cancel
                 </Button>
                 <Button type="submit" className="bg-green-600 hover:bg-green-700 px-8">
-                  Create Member
+                  {isEditMode ? 'Update Member' : 'Create Member'}
                 </Button>
               </div>
             </div>
@@ -2496,7 +2613,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               disabled={!selectedPaymentMethod || (selectedPaymentMethod === 'multi-pay' && !validateSplitPayment())}
             >
               <FaCheck className="h-4 w-4 mr-2" />
-              Confirm Payment & Create Member
+              {isEditMode ? 'Update Member' : 'Confirm Payment & Create Member'}
             </Button>
           </div>
         </DialogContent>

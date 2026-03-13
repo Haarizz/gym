@@ -23,6 +23,7 @@ export interface Member {
   membership_end_date?: string;
   membership_fee?: number;
   total_visits?: number;
+  photo_url?: string;
   date_of_birth?: string;
   blood_type?: string;
   medical_conditions?: string;
@@ -34,6 +35,22 @@ export interface Member {
   freeze_start_date?: string;
   freeze_end_date?: string;
   freeze_reason?: string;
+  outstanding_balance?: number;
+  last_payment_date?: string;
+  next_payment_date?: string;
+  payment_method?: string;
+  discount_applied?: number;
+  reg_doc_number?: string;
+  reg_doc_date?: string;
+  address?: string;
+  nationality?: string;
+  gender?: string;
+  height?: number;
+  weight?: number;
+  chronic_illnesses?: string;
+  is_family_head?: boolean;
+  family_head_id?: string;
+  relationship_to_head?: string;
 }
 
 export interface MemberFilters {

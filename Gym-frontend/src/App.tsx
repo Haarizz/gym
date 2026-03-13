@@ -846,6 +846,7 @@ export default function App() {
       <Route path="/community" element={<Community />} />
       <Route path="/members" element={<Members onNavigate={handleNavClick} initialTab={navigationParams.tab} />} />
       <Route path="/members/add" element={<AddMember onNavigate={handleNavClick} />} />
+      <Route path="/members/edit/:memberId" element={<AddMember onNavigate={handleNavClick} />} />
       <Route path="/add-member" element={<Navigate to="/members/add" replace />} />
       <Route path="/billing" element={<Billing onNavigate={handleNavClick} />} />
       <Route path="/create-receipt" element={<CreateReceipt onNavigate={handleNavClick} />} />

@@ -1,5 +1,6 @@
 package com.company.project.services;
 
+import com.company.project.dto.FamilyMemberDTO;
 import com.company.project.dto.FreezeRequestDTO;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
@@ -76,6 +77,16 @@ public class MemberService {
         applyRequest(request, member);
         if (member.getTotalVisits() == null) member.setTotalVisits(0);
 
+        // Determine family head flag
+        boolean hasFamily = request.getFamilyMembers() != null && !request.getFamilyMembers().isEmpty();
+        boolean isFamilyType = "Family".equalsIgnoreCase(member.getMembershipType())
+                || "family".equalsIgnoreCase(member.getMembershipType());
+        if (isFamilyType && hasFamily) {
+            member.setIsFamilyHead(true);
+        } else if (request.getIsFamilyHead() != null) {
+            member.setIsFamilyHead(request.getIsFamilyHead());
+        }
+
         // First save to get the auto-generated DB id
         Member saved = memberRepository.save(member);
 
@@ -86,7 +97,47 @@ public class MemberService {
         // Auto-create a receipt for the new member
         receiptService.createReceiptForMember(saved, "New", saved.getPaymentStatus());
 
+        // Create linked family member records
+        if (isFamilyType && hasFamily) {
+            for (FamilyMemberDTO fm : request.getFamilyMembers()) {
+                if (fm.getName() == null || fm.getName().isBlank()) continue;
+                createFamilyMemberRecord(fm, saved);
+            }
+        }
+
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * Create a family member record linked to the given head member.
+     * Inherits plan, dates, and financial info from the head.
+     */
+    private void createFamilyMemberRecord(FamilyMemberDTO fm, Member head) {
+        Member dep = new Member();
+        dep.setName(fm.getName());
+        // Auto-generate a unique placeholder email so the NOT NULL / UNIQUE constraint is satisfied
+        String safeEmail = "family_" + head.getMemberId() + "_"
+                + fm.getName().trim().toLowerCase().replaceAll("[^a-z0-9]", "_")
+                + "_" + System.currentTimeMillis() + "@family.local";
+        dep.setEmail(safeEmail);
+        dep.setMembershipType(head.getMembershipType());
+        dep.setMembershipStatus(head.getMembershipStatus());
+        dep.setMembershipPlan(head.getMembershipPlan());
+        dep.setMembershipStartDate(head.getMembershipStartDate());
+        dep.setMembershipEndDate(head.getMembershipEndDate());
+        dep.setExpiryDate(head.getExpiryDate());
+        dep.setJoinDate(head.getJoinDate());
+        dep.setMonthlyFee(head.getMonthlyFee());
+        dep.setMembershipFee(head.getMembershipFee());
+        dep.setPaymentStatus(head.getPaymentStatus());
+        dep.setTotalVisits(0);
+        dep.setIsFamilyHead(false);
+        dep.setFamilyHeadId(head.getMemberId());
+        dep.setRelationshipToHead(fm.getRelationship());
+
+        Member savedDep = memberRepository.save(dep);
+        savedDep.setMemberId("MBR-" + String.format("%010d", savedDep.getId()));
+        memberRepository.save(savedDep);
     }
 
     public MemberResponseDTO updateMember(Long id, MemberRequestDTO request) {
@@ -176,6 +227,23 @@ public class MemberService {
         if (r.getAllergies()           != null) m.setAllergies(r.getAllergies());
         if (r.getCurrentMedications()  != null) m.setCurrentMedications(r.getCurrentMedications());
         if (r.getHealthNotes()         != null) m.setHealthNotes(r.getHealthNotes());
+        if (r.getGender()              != null) m.setGender(r.getGender());
+        if (r.getNationality()         != null) m.setNationality(r.getNationality());
+        if (r.getAddress()             != null) m.setAddress(r.getAddress());
+        if (r.getPhotoUrl()            != null) m.setPhotoUrl(r.getPhotoUrl());
+        if (r.getChronicIllnesses()    != null) m.setChronicIllnesses(r.getChronicIllnesses());
+        if (r.getHeight()              != null) m.setHeight(r.getHeight());
+        if (r.getWeight()              != null) m.setWeight(r.getWeight());
+        if (r.getRegDocNumber()        != null) m.setRegDocNumber(r.getRegDocNumber());
+        if (r.getRegDocDate()          != null) m.setRegDocDate(parseDateTime(r.getRegDocDate()));
+        if (r.getOutstandingBalance()  != null) m.setOutstandingBalance(r.getOutstandingBalance());
+        if (r.getLastPaymentDate()     != null) m.setLastPaymentDate(parseDateTime(r.getLastPaymentDate()));
+        if (r.getNextPaymentDate()     != null) m.setNextPaymentDate(parseDateTime(r.getNextPaymentDate()));
+        if (r.getPaymentMethodUsed()   != null) m.setPaymentMethodUsed(r.getPaymentMethodUsed());
+        if (r.getDiscountApplied()     != null) m.setDiscountApplied(r.getDiscountApplied());
+        if (r.getIsFamilyHead()        != null) m.setIsFamilyHead(r.getIsFamilyHead());
+        if (r.getFamilyHeadId()        != null) m.setFamilyHeadId(r.getFamilyHeadId());
+        if (r.getRelationshipToHead()  != null) m.setRelationshipToHead(r.getRelationshipToHead());
     }
 
     /**
