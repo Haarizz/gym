@@ -52,6 +52,7 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
+import { FaCircleCheck, FaCircleArrowUp, FaArrowsRotate, FaArrowUp, FaArrowRight } from 'react-icons/fa6';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
 import { authService } from '../utils/supabase/auth-service';
@@ -152,6 +153,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [totalPages, setTotalPages] = useState(1);
   const [totalMembers, setTotalMembers] = useState(0);
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
+  const [photoViewer, setPhotoViewer] = useState<{ src: string; name: string } | null>(null);
   
   // Membership Report states
   const [reportGenerated, setReportGenerated] = useState(false);
@@ -418,6 +421,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const getMembershipEndDate = (member: Member) => member.membership_end_date || member.expiry_date || '';
   const getMembershipFee = (member: Member) => member.membership_fee || member.monthly_fee;
   const getTotalVisits = (member: Member) => member.total_visits || 0;
+  const avatarPool = ["/avatars/sarah.jpg", "/avatars/mike.jpg", "/avatars/emily.jpg"];
+  const getMemberAvatar = (member: any) => {
+    const explicit =
+      member?.avatar ||
+      member?.photo ||
+      member?.photo_url ||
+      member?.profile_photo ||
+      member?.image;
+    if (explicit) return explicit;
+    const seed = String(getMemberId(member) || member?.name || "");
+    const hash = seed.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return avatarPool[hash % avatarPool.length];
+  };
 
   // Helper function to get membership category (Individual, Family, Corporate)
   const getMembershipCategory = (member: Member): string => {
@@ -463,9 +479,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   };
 
   // Function to open member history/analytics
-  const openMemberHistory = (memberId: string) => {
-    console.log('Opening member history for:', memberId);
-    // Navigate to member history & analytics screen
+  const openMemberHistory = (member: Member) => {
+    const payload = {
+      id: getMemberId(member),
+      name: member.name,
+      photo: getMemberAvatar(member),
+    };
+    localStorage.setItem("selectedMemberAnalytics", JSON.stringify(payload));
     onNavigate?.('member-history-analytics');
   };
 
@@ -888,11 +908,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       return (
                         <TableRow key={member.id} className="hover:bg-slate-50/50 transition-colors">
                           <TableCell className="flex items-center space-x-3">
-                            <Avatar>
-                              <AvatarFallback>
-                                {member.name.split(' ').map(n => n[0]).join('')}
-                              </AvatarFallback>
-                            </Avatar>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPhotoViewer({ src: getMemberAvatar(member), name: member.name });
+                                setIsPhotoViewerOpen(true);
+                              }}
+                              className="rounded-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+                              title="View photo"
+                            >
+                              <Avatar>
+                                <AvatarImage src={getMemberAvatar(member)} alt={member.name} />
+                                <AvatarFallback>
+                                  {member.name.split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                            </button>
                             <div>
                               <div className="font-medium">{member.name}</div>
                               <div className="text-sm text-muted-foreground">
@@ -1003,7 +1034,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                   <>
                                     <DropdownMenuItem
                                       className="cursor-pointer"
-                                      onClick={() => openMemberHistory(getMemberId(member))}
+                                      onClick={() => openMemberHistory(member)}
                                     >
                                       <BarChart3 className="h-4 w-4 mr-2" />
                                       View Analytics
@@ -1027,6 +1058,24 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   )}
                 </TableBody>
               </Table>
+
+              <Dialog open={isPhotoViewerOpen} onOpenChange={setIsPhotoViewerOpen}>
+                <DialogContent className="w-[300px] sm:max-w-[300px] p-5">
+                  <DialogHeader>
+                    <DialogTitle>Member Photo</DialogTitle>
+                    <DialogDescription>{photoViewer?.name}</DialogDescription>
+                  </DialogHeader>
+                  <div className="flex items-center justify-center py-2">
+                    {photoViewer && (
+                      <img
+                        src={photoViewer.src}
+                        alt={photoViewer.name}
+                        className="h-48 w-48 rounded-lg object-cover shadow-md"
+                      />
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               {/* Pagination Controls */}
               {totalPages > 1 && (
@@ -1285,41 +1334,40 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 
                 {/* Operation Type Indicator */}
                 {operationType && (
-                  <Card className={`mt-6 border-2 ${
-                    operationType === 'renewal' 
-                      ? 'border-green-500 bg-green-50' 
-                      : 'border-red-500 bg-red-50'
+                  <div className={`mt-4 rounded-xl border overflow-hidden ${
+                    operationType === 'renewal'
+                      ? 'border-green-200 bg-gradient-to-br from-green-50 via-white to-emerald-50/60'
+                      : 'border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50/60'
                   }`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-center space-x-3">
-                        {operationType === 'renewal' ? (
-                          <>
-                            <div className="bg-green-500 text-white rounded-full p-2">
-                              <RefreshCw className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-green-800">🟢 Detected as Renewal</p>
-                              <p className="text-sm text-green-700">
-                                Member is renewing their current plan: {selectedNewPlan.name}
-                              </p>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="bg-red-500 text-white rounded-full p-2">
-                              <TrendingUp className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-red-800">🔴 Detected as Upgrade</p>
-                              <p className="text-sm text-red-700">
-                                Member is upgrading from {getMembershipPlan(selectedMemberForRenewal)} to {selectedNewPlan.name}
-                              </p>
-                            </div>
-                          </>
-                        )}
+                    <div className={`h-0.5 w-full ${operationType === 'renewal' ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`} />
+                    <div className="flex flex-col items-center text-center gap-2 px-6 py-4">
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-xl shadow-sm ${
+                        operationType === 'renewal'
+                          ? 'bg-gradient-to-br from-green-500 to-emerald-600'
+                          : 'bg-gradient-to-br from-orange-500 to-amber-600'
+                      }`}>
+                        {operationType === 'renewal'
+                          ? <FaArrowsRotate size={17} className="text-white" />
+                          : <FaCircleArrowUp size={17} className="text-white" />
+                        }
                       </div>
-                    </CardContent>
-                  </Card>
+                      <p className={`text-sm font-semibold ${operationType === 'renewal' ? 'text-green-800' : 'text-orange-800'}`}>
+                        {operationType === 'renewal' ? 'Detected as Renewal' : 'Detected as Upgrade'}
+                      </p>
+                      {operationType === 'renewal' ? (
+                        <p className="text-xs text-muted-foreground">
+                          Member is renewing their current plan:{' '}
+                          <span className={`font-medium text-green-700`}>{selectedNewPlan.name}</span>
+                        </p>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="font-medium text-orange-700 px-1.5 py-0.5 bg-orange-100/80 rounded-md">{getMembershipPlan(selectedMemberForRenewal)}</span>
+                          <FaArrowRight size={9} className="text-muted-foreground/60 shrink-0" />
+                          <span className="font-medium text-amber-700 px-1.5 py-0.5 bg-amber-100/80 rounded-md">{selectedNewPlan.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1508,7 +1556,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <div>
                       <Label className="text-xs text-muted-foreground">Operation Type</Label>
                       <Badge className={operationType === 'renewal' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                        {operationType === 'renewal' ? '🔁 Renewal' : '⬆️ Upgrade'}
+                        <span className="flex items-center gap-1">
+                          {operationType === 'renewal'
+                            ? <><FaArrowsRotate size={12} /> Renewal</>
+                            : <><FaArrowUp size={12} /> Upgrade</>}
+                        </span>
                       </Badge>
                     </div>
                     <div>
@@ -1622,7 +1674,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           {/* Empty State */}
           {!selectedMemberForRenewal && (
             <Card className="border-primary/10 shadow-md">
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+              <CardContent className="flex flex-col items-center justify-center pt-20 pb-16 text-center">
                 <div className="bg-primary/5 p-4 rounded-full mb-4">
                   <RefreshCw className="h-6 w-6 text-primary" />
                 </div>
@@ -2124,7 +2176,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
           {/* Empty State */}
           {!reportGenerated && !reportLoading && (
-            <Card>
+            <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <div className="bg-gradient-light p-6 rounded-full mb-4">
                   <BarChart3 className="h-12 w-12 text-primary" />

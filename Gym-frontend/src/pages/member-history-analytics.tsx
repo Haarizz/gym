@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -271,7 +271,7 @@ const communicationHistory = [
     time: '6:30 PM',
     channel: 'whatsapp',
     type: 'campaign',
-    subject: '🔥 New Boxing Classes – Enroll Now!',
+    subject: 'New Boxing Classes – Enroll Now!',
     content: 'Hey Ahmed! Exciting news - we just launched new Boxing classes. Limited spots available. Book now!',
     status: 'read',
     sentBy: 'Admin – Sara',
@@ -307,7 +307,7 @@ const communicationHistory = [
     time: '12:05 PM',
     channel: 'sms',
     type: 'campaign',
-    subject: '💥 Referral Offer',
+    subject: 'Referral Offer',
     content: 'Bring a friend, get 1 week free! Share the love of fitness and earn rewards.',
     status: 'sent',
     sentBy: 'Marketing Bot',
@@ -331,7 +331,7 @@ const communicationHistory = [
     time: '7:30 PM',
     channel: 'whatsapp',
     type: 'campaign',
-    subject: '🎉 Special Offer – Personal Training',
+    subject: 'Special Offer – Personal Training',
     content: 'Get 20% OFF on Personal Training packages this week only!',
     status: 'read',
     sentBy: 'Admin – Mike',
@@ -355,7 +355,7 @@ const COLORS = ['#0047AB', '#00c5cb', '#4CAF50', '#FFC107', '#F44336'];
 
 export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAnalyticsProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMember] = useState(memberData);
+  const [selectedMember, setSelectedMember] = useState(memberData);
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [channelFilter, setChannelFilter] = useState('all');
@@ -395,10 +395,25 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     confirmDeactivation: false,
   });
 
+  useEffect(() => {
+    const stored = localStorage.getItem("selectedMemberAnalytics");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setSelectedMember((prev) => ({
+          ...prev,
+          ...parsed,
+        }));
+      } catch (error) {
+        console.error("Failed to parse selected member analytics data:", error);
+      }
+    }
+  }, []);
+
   const paymentPieData = [
-    { name: 'Card', value: memberData.paymentBreakdown.card },
-    { name: 'Cash', value: memberData.paymentBreakdown.cash },
-    { name: 'Wallet', value: memberData.paymentBreakdown.wallet },
+    { name: 'Card', value: selectedMember.paymentBreakdown.card },
+    { name: 'Cash', value: selectedMember.paymentBreakdown.cash },
+    { name: 'Wallet', value: selectedMember.paymentBreakdown.wallet },
   ];
 
   // Filter communication history
@@ -544,25 +559,51 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'delivered':
-        return <Badge className="bg-green-100 text-green-700">✓ Delivered</Badge>;
+        return (
+          <Badge className="bg-green-100 text-green-700 flex items-center gap-1">
+            <CheckCircle className="h-3.5 w-3.5" />
+            Delivered
+          </Badge>
+        );
       case 'read':
-        return <Badge className="bg-blue-100 text-blue-700">✓ Read</Badge>;
+        return (
+          <Badge className="bg-blue-100 text-blue-700 flex items-center gap-1">
+            <Eye className="h-3.5 w-3.5" />
+            Read
+          </Badge>
+        );
       case 'sent':
-        return <Badge className="bg-yellow-100 text-yellow-700">⏳ Sent</Badge>;
+        return (
+          <Badge className="bg-yellow-100 text-yellow-700 flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5" />
+            Sent
+          </Badge>
+        );
       case 'failed':
-        return <Badge className="bg-red-100 text-red-700">✗ Failed</Badge>;
+        return (
+          <Badge className="bg-red-100 text-red-700 flex items-center gap-1">
+            <XCircle className="h-3.5 w-3.5" />
+            Failed
+          </Badge>
+        );
       case 'pending':
-        return <Badge className="bg-gray-100 text-gray-700">⏳ Pending</Badge>;
+        return (
+          <Badge className="bg-gray-100 text-gray-700 flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5" />
+            Pending
+          </Badge>
+        );
       default:
         return <Badge>{status}</Badge>;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
+      <div className="max-w-[1400px] mx-auto space-y-6">
       {/* Header with Search */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center space-x-3">
             <Button
               variant="ghost"
@@ -574,16 +615,16 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               Back to Members
             </Button>
           </div>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="self-start sm:self-auto">
             <Download className="h-4 w-4 mr-2" />
             Export Analytics
           </Button>
         </div>
 
         {/* Search Bar */}
-        <Card className="border-primary/10">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-4">
+        <Card className="overflow-hidden border-primary/10 shadow-sm">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -599,17 +640,18 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
         {/* Current Member Summary Bar */}
         {selectedMember && (
-          <Card className="mt-4 border-primary/20 bg-gradient-light">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
+          <Card className="overflow-hidden mt-4 border-primary/20 bg-gradient-light shadow-sm">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-center space-x-4">
-                  <Avatar className="h-16 w-16 border-2 border-primary">
+                  <Avatar className="h-16 w-16 border-2 border-primary shadow-sm">
+                    <AvatarImage src={selectedMember.photo} alt={selectedMember.name} />
                     <AvatarFallback className="bg-gradient-primary text-white">
                       {selectedMember.name.split(' ').map(n => n[0]).join('')}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="flex items-center space-x-3 mb-1">
+                    <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-semibold text-lg">{selectedMember.name}</h3>
                       <Badge className="bg-gradient-primary text-white">
                         {selectedMember.status === 'active' ? 'Active' : 'Inactive'}
@@ -618,16 +660,16 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     <p className="text-sm text-gray-600">Member ID: {selectedMember.id}</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-8 text-sm">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
                     <p className="text-gray-600">Current Plan</p>
                     <p className="font-semibold text-primary">{selectedMember.currentPlan}</p>
                   </div>
-                  <div>
+                  <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
                     <p className="text-gray-600">Days Remaining</p>
                     <p className="font-semibold text-orange-600">{selectedMember.daysRemaining} days</p>
                   </div>
-                  <div>
+                  <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
                     <p className="text-gray-600">Joined</p>
                     <p className="font-semibold">{selectedMember.joinDate}</p>
                   </div>
@@ -639,7 +681,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
       </div>
 
       {/* Membership & Add-On Overview Card */}
-      <Card className="border-primary/20 mb-6">
+      <Card className="overflow-hidden border-primary/20 mb-6">
         <CardHeader className="bg-gradient-light border-b border-primary/10">
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -705,7 +747,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <p className="text-sm text-gray-600 mb-1">Status</p>
-              <Badge className="bg-green-100 text-green-700">🟢 Active</Badge>
+              <Badge className="bg-green-100 text-green-700 flex items-center gap-1">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Active
+              </Badge>
             </div>
             <div>
               <p className="text-sm text-gray-600 mb-1">Payment Mode</p>
@@ -717,7 +762,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </div>
             <div>
               <p className="text-sm text-gray-600 mb-1">Transferable</p>
-              <Badge className="bg-blue-100 text-blue-700">✅ Yes (as per policy)</Badge>
+              <Badge className="bg-blue-100 text-blue-700 flex items-center gap-1">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Yes (as per policy)
+              </Badge>
             </div>
           </div>
         </CardContent>
@@ -728,7 +776,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
         {/* Left Sidebar - Member Overview Panel */}
         <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-6 lg:self-start">
           {/* Member Info Card */}
-          <Card className="border-primary/20">
+          <Card className="overflow-hidden border-primary/20">
             <CardHeader className="bg-gradient-light border-b border-primary/10">
               <CardTitle className="flex items-center space-x-2">
                 <User className="h-5 w-5 text-primary" />
@@ -738,6 +786,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             <CardContent className="p-6 space-y-4">
               <div className="flex flex-col items-center mb-4">
                 <Avatar className="h-24 w-24 mb-3 border-4 border-primary/20">
+                  <AvatarImage src={selectedMember.photo} alt={selectedMember.name} />
                   <AvatarFallback className="bg-gradient-primary text-white text-2xl">
                     {selectedMember.name.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
@@ -800,7 +849,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           </Card>
 
           {/* Payment Summary Card */}
-          <Card className="border-primary/20">
+          <Card className="overflow-hidden border-primary/20">
             <CardHeader className="bg-gradient-light border-b border-primary/10">
               <CardTitle className="flex items-center space-x-2">
                 <Wallet className="h-5 w-5 text-primary" />
@@ -857,7 +906,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           </Card>
 
           {/* Quick Actions */}
-          <Card className="border-primary/20">
+          <Card className="overflow-hidden border-primary/20">
             <CardHeader className="bg-gradient-light border-b border-primary/10">
               <CardTitle className="flex items-center space-x-2">
                 <Zap className="h-5 w-5 text-primary" />
@@ -891,44 +940,35 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
         {/* Right Content - Detailed Analytics Tabs */}
         <div className="lg:col-span-8">
-          <Card className="border-primary/20">
+          <Card className="overflow-hidden border-primary/20">
             <Tabs defaultValue="timeline" className="w-full">
               <CardHeader className="bg-gradient-light border-b border-primary/10">
-                <TabsList className="w-full justify-start bg-transparent">
-                  <TabsTrigger value="timeline" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
-                    <Activity className="h-4 w-4 mr-2" />
+                <TabsList className="w-full overflow-x-auto flex flex-nowrap gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-border/70">
+                  <TabsTrigger value="timeline" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Activity Timeline
                   </TabsTrigger>
-                  <TabsTrigger value="financial" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
-                    <DollarSign className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="financial" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Financial History
                   </TabsTrigger>
-                  <TabsTrigger value="usage" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
-                    <BarChart3 className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="usage" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Gym Usage
                   </TabsTrigger>
-                  <TabsTrigger value="performance" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
-                    <TrendingUp className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="performance" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Performance
                   </TabsTrigger>
-                  <TabsTrigger value="promotions" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
-                    <Gift className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="promotions" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Promotions
                   </TabsTrigger>
-                  <TabsTrigger value="feedback" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
-                    <Star className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="feedback" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Workout Feedback
                   </TabsTrigger>
-                  <TabsTrigger value="communication" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
-                    <Send className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="communication" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Communication History
                   </TabsTrigger>
-                  <TabsTrigger value="transactions" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
-                    <Receipt className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="transactions" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Transactions
                   </TabsTrigger>
-                  <TabsTrigger value="notes" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
-                    <FileText className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="notes" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Notes
                   </TabsTrigger>
                 </TabsList>
@@ -1032,7 +1072,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <TabsContent value="usage" className="space-y-6 mt-0">
                   {/* KPI Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Card className="border-primary/20 bg-blue-50">
+                    <Card className="overflow-hidden border-primary/20 bg-blue-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1043,7 +1083,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="border-primary/20 bg-green-50">
+                    <Card className="overflow-hidden border-primary/20 bg-green-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1054,7 +1094,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="border-primary/20 bg-purple-50">
+                    <Card className="overflow-hidden border-primary/20 bg-purple-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1065,7 +1105,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="border-primary/20 bg-orange-50">
+                    <Card className="overflow-hidden border-primary/20 bg-orange-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1111,21 +1151,21 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 {/* Tab 4: Performance & Engagement */}
                 <TabsContent value="performance" className="space-y-6 mt-0">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-6 text-center">
                         <Share2 className="h-12 w-12 mx-auto mb-3 text-orange-600" />
                         <p className="text-3xl font-bold text-orange-600 mb-1">{memberData.referrals}</p>
                         <p className="text-sm text-gray-600">Referrals Made</p>
                       </CardContent>
                     </Card>
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-6 text-center">
                         <Users className="h-12 w-12 mx-auto mb-3 text-purple-600" />
                         <p className="text-3xl font-bold text-purple-600 mb-1">{memberData.ptSessions}</p>
                         <p className="text-sm text-gray-600">PT Sessions</p>
                       </CardContent>
                     </Card>
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-6 text-center">
                         <ShoppingCart className="h-12 w-12 mx-auto mb-3 text-blue-600" />
                         <p className="text-3xl font-bold text-blue-600 mb-1">AED {memberData.posSpend}</p>
@@ -1135,7 +1175,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </div>
 
                   {/* Engagement Score */}
-                  <Card className="border-primary/20 bg-gradient-light">
+                  <Card className="overflow-hidden border-primary/20 bg-gradient-light">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="font-semibold">Overall Engagement Score</h4>
@@ -1151,7 +1191,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
                   {/* Consistency Metrics */}
                   <div className="grid grid-cols-2 gap-4">
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-4">
                         <div className="flex items-center space-x-3">
                           <Flame className="h-8 w-8 text-orange-600" />
@@ -1162,7 +1202,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-4">
                         <div className="flex items-center space-x-3">
                           <Trophy className="h-8 w-8 text-yellow-600" />
@@ -1179,15 +1219,16 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 {/* Tab 5: Promotion & Discount Eligibility */}
                 <TabsContent value="promotions" className="space-y-6 mt-0">
                   {/* AI Insight Card */}
-                  <Card className="border-green-200 bg-green-50">
+                  <Card className="overflow-hidden border-green-200 bg-green-50">
                     <CardContent className="p-6">
                       <div className="flex items-start space-x-4">
                         <div className="flex-shrink-0 w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
                           <Gift className="h-6 w-6 text-white" />
                         </div>
                         <div className="flex-1">
-                          <h4 className="font-semibold text-green-900 mb-2">
-                            🎉 This member is a strong candidate for a Loyalty Discount
+                          <h4 className="font-semibold text-green-900 mb-2 flex items-center gap-2">
+                            <Star className="h-4 w-4" />
+                            <span>This member is a strong candidate for a Loyalty Discount</span>
                           </h4>
                           <ul className="space-y-2 text-sm text-green-800 mb-4">
                             <li className="flex items-center space-x-2">
@@ -1212,7 +1253,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </Card>
 
                   {/* Promotion History */}
-                  <Card className="border-primary/20">
+                  <Card className="overflow-hidden border-primary/20">
                     <CardHeader>
                       <CardTitle className="text-lg">Promotion History</CardTitle>
                     </CardHeader>
@@ -1241,7 +1282,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </Card>
 
                   {/* Suggested Upsell */}
-                  <Card className="border-purple-200 bg-purple-50">
+                  <Card className="overflow-hidden border-purple-200 bg-purple-50">
                     <CardContent className="p-6">
                       <div className="flex items-center space-x-3 mb-3">
                         <TrendingUp className="h-6 w-6 text-purple-600" />
@@ -1271,7 +1312,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </div>
 
                   {/* Average Ratings Summary */}
-                  <Card className="border-primary/20 bg-gradient-light">
+                  <Card className="overflow-hidden border-primary/20 bg-gradient-light">
                     <CardContent className="p-6">
                       <h4 className="font-semibold mb-4">Average Ratings</h4>
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -1509,7 +1550,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <TabsContent value="communication" className="space-y-6 mt-0">
                   {/* Analytics Summary Cards */}
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1521,7 +1562,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       </CardContent>
                     </Card>
 
-                    <Card className="border-blue-200 bg-blue-50">
+                    <Card className="overflow-hidden border-blue-200 bg-blue-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1533,7 +1574,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       </CardContent>
                     </Card>
 
-                    <Card className="border-purple-200 bg-purple-50">
+                    <Card className="overflow-hidden border-purple-200 bg-purple-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1545,7 +1586,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       </CardContent>
                     </Card>
 
-                    <Card className="border-green-200 bg-green-50">
+                    <Card className="overflow-hidden border-green-200 bg-green-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1557,7 +1598,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       </CardContent>
                     </Card>
 
-                    <Card className="border-red-200 bg-red-50">
+                    <Card className="overflow-hidden border-red-200 bg-red-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1572,7 +1613,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
                   {/* Charts Row */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardHeader>
                         <CardTitle className="text-base">Channel Distribution</CardTitle>
                       </CardHeader>
@@ -1614,7 +1655,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       </CardContent>
                     </Card>
 
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardHeader>
                         <CardTitle className="text-base">Message Type Breakdown</CardTitle>
                       </CardHeader>
@@ -1654,7 +1695,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </div>
 
                   {/* Filters Bar */}
-                  <Card className="border-primary/20 bg-gradient-light">
+                  <Card className="overflow-hidden border-primary/20 bg-gradient-light">
                     <CardContent className="p-4">
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
@@ -1713,7 +1754,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </Card>
 
                   {/* Message History Table */}
-                  <Card className="border-primary/20">
+                  <Card className="overflow-hidden border-primary/20">
                     <CardHeader>
                       <CardTitle>Message History</CardTitle>
                       <CardDescription>Complete communication log across all channels</CardDescription>
@@ -1780,7 +1821,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </Card>
 
                   {/* Smart Insights Panel */}
-                  <Card className="border-primary/20 bg-gradient-light">
+                  <Card className="overflow-hidden border-primary/20 bg-gradient-light">
                     <CardHeader>
                       <CardTitle className="flex items-center space-x-2">
                         <Activity className="h-5 w-5 text-primary" />
@@ -1860,13 +1901,14 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </div>
 
                   {/* Filters */}
-                  <Card className="border-primary/20">
+                  <Card className="overflow-hidden border-primary/20">
                     <CardContent className="p-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Date Range Filter */}
                         <div>
-                          <label className="text-sm font-medium text-gray-700 mb-2 block">
-                            📅 From Date
+                          <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-gray-500" />
+                            <span>From Date</span>
                           </label>
                           <Input
                             type="date"
@@ -1876,8 +1918,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           />
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-700 mb-2 block">
-                            📅 To Date
+                          <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-gray-500" />
+                            <span>To Date</span>
                           </label>
                           <Input
                             type="date"
@@ -1889,8 +1932,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
                         {/* Transaction Type Filter */}
                         <div>
-                          <label className="text-sm font-medium text-gray-700 mb-2 block">
-                            📂 Transaction Type
+                          <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-gray-500" />
+                            <span>Transaction Type</span>
                           </label>
                           <Select value={transactionTypeFilter} onValueChange={setTransactionTypeFilter}>
                             <SelectTrigger>
@@ -2101,7 +2145,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </div>
 
                   <div className="space-y-3">
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center space-x-2">
@@ -2122,7 +2166,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       </CardContent>
                     </Card>
 
-                    <Card className="border-primary/20">
+                    <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center space-x-2">
@@ -2176,7 +2220,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
               <div className="mt-6 space-y-6">
                 {/* Message Header */}
-                <Card className="border-primary/20">
+                <Card className="overflow-hidden border-primary/20">
                   <CardContent className="p-4">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
@@ -2224,7 +2268,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 </Card>
 
                 {/* Message Content */}
-                <Card className="border-primary/20">
+                <Card className="overflow-hidden border-primary/20">
                   <CardHeader>
                     <CardTitle className="text-base">Message Content</CardTitle>
                   </CardHeader>
@@ -2242,7 +2286,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 </Card>
 
                 {/* Delivery Report */}
-                <Card className="border-primary/20 bg-gradient-light">
+                <Card className="overflow-hidden border-primary/20 bg-gradient-light">
                   <CardHeader>
                     <CardTitle className="text-base flex items-center">
                       <CheckCircle className="h-4 w-4 mr-2 text-primary" />
@@ -2313,8 +2357,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
             {/* Full Name */}
             <div>
-              <Label htmlFor="fullName" className="text-sm font-medium text-gray-700 mb-2 block">
-                👤 Full Name *
+              <Label htmlFor="fullName" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <User className="h-4 w-4 text-gray-500" />
+                <span>Full Name *</span>
               </Label>
               <Input
                 id="fullName"
@@ -2326,8 +2371,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
             {/* Mobile Number */}
             <div>
-              <Label htmlFor="mobileNumber" className="text-sm font-medium text-gray-700 mb-2 block">
-                📞 Mobile Number *
+              <Label htmlFor="mobileNumber" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <Phone className="h-4 w-4 text-gray-500" />
+                <span>Mobile Number *</span>
               </Label>
               <Input
                 id="mobileNumber"
@@ -2340,8 +2386,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             <div className="grid grid-cols-2 gap-4">
               {/* Email */}
               <div>
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700 mb-2 block">
-                  ✉️ Email (optional)
+                <Label htmlFor="email" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-gray-500" />
+                  <span>Email (optional)</span>
                 </Label>
                 <Input
                   id="email"
@@ -2354,8 +2401,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
               {/* Gender */}
               <div>
-                <Label htmlFor="gender" className="text-sm font-medium text-gray-700 mb-2 block">
-                  🏋️ Gender (optional)
+                <Label htmlFor="gender" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span>Gender (optional)</span>
                 </Label>
                 <Select value={transferForm.gender} onValueChange={(value) => setTransferForm({ ...transferForm, gender: value })}>
                   <SelectTrigger>
@@ -2373,8 +2421,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             <div className="grid grid-cols-2 gap-4">
               {/* Date of Birth */}
               <div>
-                <Label htmlFor="dob" className="text-sm font-medium text-gray-700 mb-2 block">
-                  📅 Date of Birth (optional)
+                <Label htmlFor="dob" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  <span>Date of Birth (optional)</span>
                 </Label>
                 <Input
                   id="dob"
@@ -2386,8 +2435,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
               {/* Transfer Fee */}
               <div>
-                <Label htmlFor="transferFee" className="text-sm font-medium text-gray-700 mb-2 block">
-                  💰 Transfer Fee (AED)
+                <Label htmlFor="transferFee" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-gray-500" />
+                  <span>Transfer Fee (AED)</span>
                 </Label>
                 <Input
                   id="transferFee"
@@ -2400,9 +2450,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </div>
 
             {/* Remaining Days Info */}
-            <Card className="border-primary/20 bg-gradient-light">
+            <Card className="overflow-hidden border-primary/20 bg-gradient-light">
               <CardContent className="p-4">
-                <p className="text-sm font-medium text-gray-700 mb-1">⚙️ Remaining Plan Days</p>
+                <p className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-gray-500" />
+                  Remaining Plan Days
+                </p>
                 <p className="text-lg font-semibold text-primary">118 days will be transferred to the new member</p>
                 <p className="text-xs text-gray-600 mt-1">From: Ahmed Al-Mansoori → To: New Member</p>
               </CardContent>
@@ -2415,8 +2468,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 checked={transferForm.confirmTransfer}
                 onCheckedChange={(checked) => setTransferForm({ ...transferForm, confirmTransfer: checked as boolean })}
               />
-              <Label htmlFor="confirmTransfer" className="text-sm text-blue-900 cursor-pointer">
-                ✅ I confirm to transfer membership to this person. The current member's plan will be deactivated and the new member will receive the remaining 118 days.
+              <Label htmlFor="confirmTransfer" className="text-sm text-blue-900 cursor-pointer flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 mt-0.5" />
+                <span>
+                  I confirm to transfer membership to this person. The current member's plan will be deactivated and the new member will receive the remaining 118 days.
+                </span>
               </Label>
             </div>
           </div>
@@ -2482,9 +2538,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
           <div className="space-y-4 py-4">
             {/* Date Range */}
-            <Card className="border-primary/20 bg-gradient-light">
+            <Card className="overflow-hidden border-primary/20 bg-gradient-light">
               <CardContent className="p-4 space-y-3">
-                <h4 className="font-semibold text-gray-900">📅 Date Range</h4>
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  Date Range
+                </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="mailDateFrom" className="text-sm text-gray-700 mb-2 block">
@@ -2519,9 +2578,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </Card>
 
             {/* Filter Options */}
-            <Card className="border-primary/20">
+            <Card className="overflow-hidden border-primary/20">
               <CardContent className="p-4 space-y-3">
-                <h4 className="font-semibold text-gray-900">📂 Include</h4>
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-gray-500" />
+                  Include
+                </h4>
                 <div className="space-y-2">
                   <div className="flex items-center space-x-3">
                     <Checkbox
@@ -2535,8 +2597,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         })
                       }
                     />
-                    <Label htmlFor="includeAll" className="text-sm cursor-pointer">
-                      ☑️ All Transactions
+                    <Label htmlFor="includeAll" className="text-sm cursor-pointer flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-gray-500" />
+                      <span>All Transactions</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-3">
@@ -2551,8 +2614,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         })
                       }
                     />
-                    <Label htmlFor="includeMembership" className="text-sm cursor-pointer">
-                      🎫 Membership Transactions Only
+                    <Label htmlFor="includeMembership" className="text-sm cursor-pointer flex items-center gap-2">
+                      <Receipt className="h-4 w-4 text-gray-500" />
+                      <span>Membership Transactions Only</span>
                     </Label>
                   </div>
                 </div>
@@ -2560,7 +2624,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </Card>
 
             {/* Attach PDFs Option */}
-            <Card className="border-primary/20 bg-blue-50">
+            <Card className="overflow-hidden border-primary/20 bg-blue-50">
               <CardContent className="p-4">
                 <div className="flex items-start space-x-3">
                   <Checkbox
@@ -2571,8 +2635,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     }
                   />
                   <div>
-                    <Label htmlFor="attachPDFs" className="text-sm font-semibold text-blue-900 cursor-pointer">
-                      📎 Attach All PDFs Automatically
+                    <Label htmlFor="attachPDFs" className="text-sm font-semibold text-blue-900 cursor-pointer flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-700" />
+                      <span>Attach All PDFs Automatically</span>
                     </Label>
                     <p className="text-xs text-blue-700 mt-1">
                       Automatically fetches and attaches all transaction receipts within the selected date range
@@ -2583,9 +2648,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </Card>
 
             {/* Summary Preview */}
-            <Card className="border-primary/20">
+            <Card className="overflow-hidden border-primary/20">
               <CardContent className="p-4">
-                <h4 className="font-semibold text-gray-900 mb-3">📧 Email Preview</h4>
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-gray-500" />
+                  Email Preview
+                </h4>
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2 text-sm">
                   <p>
                     <span className="font-medium">To:</span> corporate@gymbios.com
@@ -2669,8 +2737,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           <div className="space-y-4 py-4">
             {/* Effective Date */}
             <div>
-              <Label htmlFor="effectiveDate" className="text-sm font-medium text-gray-700 mb-2 block">
-                🗓️ Effective Date
+              <Label htmlFor="effectiveDate" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span>Effective Date</span>
               </Label>
               <Input
                 id="effectiveDate"
@@ -2683,8 +2752,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
             {/* Reason */}
             <div>
-              <Label htmlFor="reason" className="text-sm font-medium text-gray-700 mb-2 block">
-                📝 Reason for Deactivation (optional)
+              <Label htmlFor="reason" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-gray-500" />
+                <span>Reason for Deactivation (optional)</span>
               </Label>
               <Textarea
                 id="reason"
@@ -2696,7 +2766,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </div>
 
             {/* Refund Section */}
-            <Card className="border-orange-200 bg-orange-50">
+            <Card className="overflow-hidden border-orange-200 bg-orange-50">
               <CardContent className="p-4 space-y-3">
                 <h4 className="font-semibold text-orange-900 flex items-center">
                   <DollarSign className="h-4 w-4 mr-2" />
@@ -2706,8 +2776,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <div className="grid grid-cols-2 gap-4">
                   {/* Refund Amount */}
                   <div>
-                    <Label htmlFor="refundAmount" className="text-sm font-medium text-orange-800 mb-2 block">
-                      💰 Refund Amount (AED)
+                    <Label htmlFor="refundAmount" className="text-sm font-medium text-orange-800 mb-2 flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-orange-700" />
+                      <span>Refund Amount (AED)</span>
                     </Label>
                     <Input
                       id="refundAmount"
@@ -2721,8 +2792,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
                   {/* Refund Mode */}
                   <div>
-                    <Label htmlFor="refundMode" className="text-sm font-medium text-orange-800 mb-2 block">
-                      🧾 Refund Mode
+                    <Label htmlFor="refundMode" className="text-sm font-medium text-orange-800 mb-2 flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-orange-700" />
+                      <span>Refund Mode</span>
                     </Label>
                     <Select value={deactivateForm.refundMode} onValueChange={(value) => setDeactivateForm({ ...deactivateForm, refundMode: value })}>
                       <SelectTrigger className="bg-white">
@@ -2744,15 +2816,16 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     checked={deactivateForm.returnPlan}
                     onCheckedChange={(checked) => setDeactivateForm({ ...deactivateForm, returnPlan: checked as boolean })}
                   />
-                  <Label htmlFor="returnPlan" className="text-sm text-orange-900 cursor-pointer">
-                    📦 Return purchased plan and process full/partial refund
+                  <Label htmlFor="returnPlan" className="text-sm text-orange-900 cursor-pointer flex items-start gap-2">
+                    <Receipt className="h-4 w-4 mt-0.5" />
+                    <span>Return purchased plan and process full/partial refund</span>
                   </Label>
                 </div>
               </CardContent>
             </Card>
 
             {/* Member Stats Summary */}
-            <Card className="border-primary/20 bg-gradient-light">
+            <Card className="overflow-hidden border-primary/20 bg-gradient-light">
               <CardContent className="p-4">
                 <h4 className="font-semibold text-gray-900 mb-3">Current Membership Summary</h4>
                 <div className="grid grid-cols-3 gap-4 text-sm">
@@ -2779,8 +2852,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 checked={deactivateForm.confirmDeactivation}
                 onCheckedChange={(checked) => setDeactivateForm({ ...deactivateForm, confirmDeactivation: checked as boolean })}
               />
-              <Label htmlFor="confirmDeactivation" className="text-sm text-red-900 cursor-pointer">
-                ✅ Confirm deactivation of this member's plan. This action will mark the membership as inactive{deactivateForm.refundAmount > 0 ? ` and process a refund of AED ${deactivateForm.refundAmount}` : ''}.
+              <Label htmlFor="confirmDeactivation" className="text-sm text-red-900 cursor-pointer flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5" />
+                <span>
+                  Confirm deactivation of this member's plan. This action will mark the membership as inactive{deactivateForm.refundAmount > 0 ? ` and process a refund of AED ${deactivateForm.refundAmount}` : ''}.
+                </span>
               </Label>
             </div>
           </div>
@@ -2844,7 +2920,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
           <div className="space-y-6 py-4">
             {/* Member Info Card */}
-            <Card className="border-[#2B7A78]/20 bg-[#DFF5F4]/30">
+            <Card className="overflow-hidden border-[#2B7A78]/20 bg-[#DFF5F4]/30">
               <CardContent className="p-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -2870,7 +2946,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </Card>
 
             {/* Freeze Limits Info */}
-            <Card className="border-[#2B7A78]/20">
+            <Card className="overflow-hidden border-[#2B7A78]/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Freeze Policy Limits</CardTitle>
               </CardHeader>
@@ -2969,7 +3045,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               </div>
 
               {/* Info Alert */}
-              <Card className="border-blue-200 bg-blue-50">
+              <Card className="overflow-hidden border-blue-200 bg-blue-50">
                 <CardContent className="p-3">
                   <div className="flex items-start space-x-2">
                     <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
@@ -3010,7 +3086,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
+
 

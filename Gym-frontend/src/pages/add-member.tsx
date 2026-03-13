@@ -10,48 +10,48 @@ import { Slider } from "../components/ui/slider";
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { toast } from "sonner";
-import { 
-  Plus, 
-  User, 
-  Users,
-  Mail, 
-  Phone, 
-  MapPin, 
-  Camera, 
-  Upload,
-  ZoomIn,
-  Move,
-  Check,
-  X,
-  ArrowLeft,
-  ArrowRight,
-  ArrowLeftRight,
-  RotateCcw,
-  Video,
-  CreditCard,
-  Dumbbell,
-  Heart,
-  GraduationCap,
-  Banknote,
-  Building2,
-  FileText,
-  Wallet,
-  Calculator,
-  DollarSign,
-  Globe,
-  Calendar,
-  Hash,
-  FileCheck,
-  RefreshCcw,
-  Activity,
-  AlertCircle,
-  Pill,
-  Droplet,
-  Ruler,
-  Weight,
-  PhoneCall,
-  Shield
-} from 'lucide-react';
+import {
+  FaPlus,
+  FaUser,
+  FaUsers,
+  FaEnvelope,
+  FaPhone,
+  FaLocationDot,
+  FaCamera,
+  FaUpload,
+  FaMagnifyingGlassPlus,
+  FaUpDownLeftRight,
+  FaCheck,
+  FaXmark,
+  FaArrowLeft,
+  FaArrowRight,
+  FaArrowsLeftRight,
+  FaRotateLeft,
+  FaVideo,
+  FaCreditCard,
+  FaDumbbell,
+  FaHeart,
+  FaGraduationCap,
+  FaMoneyBillWave,
+  FaBuilding,
+  FaFileLines,
+  FaWallet,
+  FaCalculator,
+  FaDollarSign,
+  FaEarthAmericas,
+  FaCalendarDays,
+  FaHashtag,
+  FaFileCircleCheck,
+  FaArrowsRotate,
+  FaHeartPulse,
+  FaCircleExclamation,
+  FaPills,
+  FaDroplet,
+  FaRuler,
+  FaWeightScale,
+  FaPhoneVolume,
+  FaShield
+} from 'react-icons/fa6';
 
 // ISO Standard Country List - Comprehensive list of all countries
 const COUNTRIES = [
@@ -815,55 +815,50 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       {/* Page Header */}
-      <div className="px-4 sm:px-6 py-4 border-b bg-gradient-to-r from-slate-50 to-blue-50/50">
-        <div className="flex items-center gap-3 max-w-5xl mx-auto">
+      <div className="sticky top-0 z-10 px-4 sm:px-6 py-4 border-b bg-white/90 backdrop-blur-sm shadow-sm">
+        <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="outline" size="sm" onClick={() => onNavigate?.('members')} className="gap-2 shrink-0">
-            <ArrowLeft className="h-4 w-4" />
+            <FaArrowLeft size={14} />
             <span className="hidden sm:inline">Back</span>
           </Button>
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex items-center justify-center w-9 h-9 bg-primary rounded-lg shrink-0">
-              <Users className="h-4 w-4 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-foreground">New Member Registration</h1>
-              <p className="text-xs text-muted-foreground hidden sm:block">Fill in the details to register a new gym member</p>
-            </div>
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold text-foreground">New Member Registration</h1>
+            <p className="text-xs text-muted-foreground hidden sm:block">Fill in the details to register a new gym member</p>
           </div>
         </div>
       </div>
 
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4">
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Top Section - Member Photo */}
             <Card className="border border-blue-100 bg-gradient-to-r from-blue-50/50 to-indigo-50/40 shadow-sm">
               <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+                <div className="flex flex-col items-center gap-4 text-center">
                   {/* Avatar */}
                   <div className="relative shrink-0">
-                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white shadow-md border-4 border-white flex items-center justify-center overflow-hidden">
+                    <div className="w-24 h-24 rounded-full bg-white shadow-md border-4 border-white flex items-center justify-center overflow-hidden">
                       {formData.profilePhoto ? (
                         <img src={formData.profilePhoto} alt="Member" className="w-full h-full object-cover" />
                       ) : (
                         <div className="text-center">
-                          <User className="h-7 w-7 sm:h-9 sm:w-9 text-gray-300 mx-auto mb-0.5" />
+                          <FaUser size={36} className="text-gray-300 mx-auto mb-0.5" />
                           <p className="text-xs text-gray-400">No photo</p>
                         </div>
                       )}
                     </div>
                     {formData.profilePhoto && (
                       <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1.5">
-                        <Check className="h-3 w-3 text-white" />
+                        <FaCheck size={12} className="text-white" />
                       </div>
                     )}
                   </div>
                   {/* Info + Buttons */}
-                  <div className="flex-1 text-center sm:text-left">
+                  <div>
                     <h2 className="text-base font-semibold text-gray-900 mb-0.5">Member Photo</h2>
                     <p className="text-sm text-gray-500 mb-3">Add a profile photo for easy member identification</p>
-                    <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                    <div className="flex flex-wrap gap-2 justify-center">
                       <div className="relative">
                         <Button
                           type="button"
@@ -872,11 +867,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                           disabled={cameraAvailable === false}
                           className={`gap-2 ${cameraAvailable === false ? 'bg-gray-300 cursor-not-allowed opacity-60 text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
                         >
-                          <Camera className="h-4 w-4" />
+                          <FaCamera size={14} />
                           {cameraAvailable === null ? 'Checking...' : cameraAvailable === false ? 'Unavailable' : 'Capture Photo'}
                         </Button>
                         {cameraAvailable === false && cameraError && (
-                          <div className="absolute top-full left-0 mt-1 px-3 py-1 bg-red-100 text-red-700 text-xs rounded-lg whitespace-nowrap z-10">
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-3 py-1 bg-red-100 text-red-700 text-xs rounded-lg whitespace-nowrap z-10">
                             {cameraError}
                           </div>
                         )}
@@ -888,18 +883,18 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         onClick={() => fileInputRef.current?.click()}
                         className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
                       >
-                        <Upload className="h-4 w-4" />
+                        <FaUpload size={14} />
                         Upload Photo
                       </Button>
                     </div>
                     {cameraAvailable === false && (
-                      <p className="text-xs text-amber-600 flex items-center gap-1 mt-2 justify-center sm:justify-start">
-                        <Upload className="h-3 w-3" /> Use Upload Photo instead
+                      <p className="text-xs text-amber-600 flex items-center gap-1 mt-2 justify-center">
+                        <FaUpload size={12} /> Use Upload Photo instead
                       </p>
                     )}
                     {formData.profilePhoto && (
-                      <Badge className="bg-green-100 text-green-800 mt-2 w-fit gap-1">
-                        <Check className="h-3 w-3" /> Photo Added
+                      <Badge className="bg-green-100 text-green-800 mt-2 w-fit gap-1 mx-auto">
+                        <FaCheck size={12} /> Photo Added
                       </Badge>
                     )}
                   </div>
@@ -913,7 +908,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg shrink-0">
-                    <Users className="h-4 w-4 text-white" />
+                    <FaUsers className="h-4 w-4 text-white" />
                   </div>
                   <div>
                     <CardTitle className="text-base">Membership Type</CardTitle>
@@ -925,9 +920,9 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { value: 'individual', label: 'Individual', sub: 'Single person', icon: <User className="h-5 w-5" />, onClick: () => { setFormData({...formData, membershipType: 'individual'}); setFamilyMembers([]); } },
-                  { value: 'family', label: 'Family', sub: 'Multiple members', icon: <Heart className="h-5 w-5" />, onClick: () => setFormData({...formData, membershipType: 'family'}) },
-                  { value: 'corporate', label: 'Corporate', sub: 'Company-sponsored', icon: <Building2 className="h-5 w-5" />, onClick: () => { setFormData({...formData, membershipType: 'corporate'}); setFamilyMembers([]); } },
+                  { value: 'individual', label: 'Individual', sub: 'Single person', icon: <FaUser className="h-5 w-5" />, onClick: () => { setFormData({...formData, membershipType: 'individual'}); setFamilyMembers([]); } },
+                  { value: 'family', label: 'Family', sub: 'Multiple members', icon: <FaHeart className="h-5 w-5" />, onClick: () => setFormData({...formData, membershipType: 'family'}) },
+                  { value: 'corporate', label: 'Corporate', sub: 'Company-sponsored', icon: <FaBuilding className="h-5 w-5" />, onClick: () => { setFormData({...formData, membershipType: 'corporate'}); setFamilyMembers([]); } },
                 ].map((opt) => (
                   <div
                     key={opt.value}
@@ -939,7 +934,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     onClick={opt.onClick}
                   >
                     {formData.membershipType === opt.value && (
-                      <div className="absolute top-2 right-2"><Check className="h-4 w-4 text-primary" /></div>
+                      <div className="absolute top-2 right-2"><FaCheck className="h-4 w-4 text-primary" /></div>
                     )}
                     <div className="flex flex-col items-center text-center gap-2">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${formData.membershipType === opt.value ? 'bg-primary' : 'bg-gray-100'}`}>
@@ -954,12 +949,18 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 ))}
               </div>
               {formData.membershipType && (
-                <div className="mt-3 flex items-center gap-2 p-2.5 bg-primary/5 border border-primary/20 rounded-lg">
-                  <Check className="h-4 w-4 text-primary shrink-0" />
-                  <p className="text-sm text-primary font-medium">
-                    {formData.membershipType.charAt(0).toUpperCase() + formData.membershipType.slice(1)} Membership selected
-                    {formData.membershipType === 'family' && ' — add family members in Personal Info below'}
-                  </p>
+                <div className="mt-3 flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-xl">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 shrink-0">
+                    <FaCheck size={13} className="text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-primary">
+                      {formData.membershipType.charAt(0).toUpperCase() + formData.membershipType.slice(1)} Membership selected
+                    </p>
+                    {formData.membershipType === 'family' && (
+                      <p className="text-xs text-primary/70 mt-0.5">Add family members in Personal Info below</p>
+                    )}
+                  </div>
                 </div>
               )}
               </CardContent>
@@ -970,7 +971,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg shrink-0">
-                    <Hash className="h-4 w-4 text-white" />
+                    <FaHashtag className="h-4 w-4 text-white" />
                   </div>
                   <div>
                     <CardTitle className="text-base">Identity & Registration</CardTitle>
@@ -985,7 +986,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <div>
                   <Label htmlFor="memberId">
                     <div className="flex items-center space-x-2">
-                      <Hash className="h-4 w-4" />
+                      <FaHashtag className="h-4 w-4" />
                       <span>Member ID</span>
                     </div>
                   </Label>
@@ -1005,7 +1006,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       className="absolute right-1 top-1 h-7 w-7 p-0"
                       title="Generate new Member ID"
                     >
-                      <RefreshCcw className="h-3 w-3" />
+                      <FaArrowsRotate className="h-3 w-3" />
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1016,7 +1017,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <div>
                   <Label htmlFor="regDocNumber">
                     <div className="flex items-center space-x-2">
-                      <FileCheck className="h-4 w-4" />
+                      <FaFileCircleCheck className="h-4 w-4" />
                       <span>Reg. Doc. Number</span>
                     </div>
                   </Label>
@@ -1034,7 +1035,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <div>
                   <Label htmlFor="regDocDate">
                     <div className="flex items-center space-x-2">
-                      <Calendar className="h-4 w-4" />
+                      <FaCalendarDays className="h-4 w-4" />
                       <span>Reg. Doc. Date</span>
                     </div>
                   </Label>
@@ -1057,7 +1058,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 bg-green-600 rounded-lg shrink-0">
-                    <User className="h-4 w-4 text-white" />
+                    <FaUser className="h-4 w-4 text-white" />
                   </div>
                   <div>
                     <CardTitle className="text-base">Personal Information</CardTitle>
@@ -1125,7 +1126,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               <div className="space-y-4 p-4 border-2 border-dashed border-primary/30 rounded-xl bg-gradient-light">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Heart className="h-5 w-5 text-primary" />
+                    <FaHeart className="h-5 w-5 text-primary" />
                     <div>
                       <h3 className="font-semibold text-primary">Family Members</h3>
                       <p className="text-xs text-gray-600">Add additional family members to this membership</p>
@@ -1138,14 +1139,14 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     onClick={addFamilyMember}
                     className="btn-primary"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <FaPlus className="h-4 w-4 mr-2" />
                     Add Family Member
                   </Button>
                 </div>
                 
                 {familyMembers.length === 0 ? (
                   <div className="text-center py-6 text-gray-500">
-                    <Users className="h-10 w-10 mx-auto mb-2 text-gray-400" />
+                    <FaUsers className="h-10 w-10 mx-auto mb-2 text-gray-400" />
                     <p className="text-sm">No family members added yet</p>
                     <p className="text-xs">Click "Add Family Member" to get started</p>
                   </div>
@@ -1154,7 +1155,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     {familyMembers.map((member, index) => (
                       <div key={member.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-primary/20">
                         <div className="flex items-center justify-center w-8 h-8 bg-gradient-light rounded-full flex-shrink-0">
-                          <User className="h-4 w-4 text-primary" />
+                          <FaUser className="h-4 w-4 text-primary" />
                         </div>
                         <div className="flex-1">
                           <Label htmlFor={`family-member-${member.id}`} className="text-sm text-gray-600 mb-1 block">
@@ -1175,13 +1176,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                           onClick={() => removeFamilyMember(member.id)}
                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
                         >
-                          <X className="h-4 w-4" />
+                          <FaXmark className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
                     <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                       <div className="flex items-center space-x-2">
-                        <Users className="h-4 w-4 text-blue-600" />
+                        <FaUsers className="h-4 w-4 text-blue-600" />
                         <span className="text-sm font-medium text-blue-800">
                           Total Family Members: {familyMembers.length + 1} (including primary member)
                         </span>
@@ -1193,7 +1194,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         onClick={addFamilyMember}
                         className="border-primary/30 text-primary"
                       >
-                        <Plus className="h-3 w-3 mr-1" />
+                        <FaPlus className="h-3 w-3 mr-1" />
                         Add More
                       </Button>
                     </div>
@@ -1204,12 +1205,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="joiningDate" className="mb-1.5 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />Joining Date</Label>
+                <Label htmlFor="joiningDate" className="mb-1.5 flex items-center gap-1.5"><FaCalendarDays className="h-3.5 w-3.5" />Joining Date</Label>
                 <Input id="joiningDate" type="date" value={formData.joiningDate} onChange={(e) => setFormData({...formData, joiningDate: e.target.value})} />
                 <p className="text-xs text-muted-foreground mt-1">Date member officially joins</p>
               </div>
               <div>
-                <Label htmlFor="startDate" className="mb-1.5 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />Start Date</Label>
+                <Label htmlFor="startDate" className="mb-1.5 flex items-center gap-1.5"><FaCalendarDays className="h-3.5 w-3.5" />Start Date</Label>
                 <Input id="startDate" type="date" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
                 <p className="text-xs text-muted-foreground mt-1">Membership service start date</p>
               </div>
@@ -1221,18 +1222,18 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             <Card className="border-primary/10 shadow-sm">
               <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="flex items-center justify-center w-8 h-8 bg-purple-600 rounded-lg shrink-0">
-                      <CreditCard className="h-4 w-4 text-white" />
+                      <FaCreditCard size={16} className="text-white" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <CardTitle className="text-base">Choose Membership Plan</CardTitle>
                       <p className="text-xs text-muted-foreground mt-0.5">Select the right plan for this member</p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Select value={membershipTypeFilter} onValueChange={setMembershipTypeFilter}>
-                      <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="All Types" /></SelectTrigger>
+                      <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All Types" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
                         <SelectItem value="individual">Individual</SelectItem>
@@ -1241,7 +1242,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </SelectContent>
                     </Select>
                     <Select value={programFilter} onValueChange={setProgramFilter}>
-                      <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="All Programs" /></SelectTrigger>
+                      <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All Programs" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Programs</SelectItem>
                         <SelectItem value="strength">Strength</SelectItem>
@@ -1274,7 +1275,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl">
-                        <CreditCard className="h-6 w-6 text-white" />
+                        <FaCreditCard className="h-6 w-6 text-white" />
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-gray-900">Premium Annual</h3>
@@ -1326,7 +1327,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   >
                     {formData.membershipPlan === 'premium-annual' ? (
                       <>
-                        <Check className="h-4 w-4 mr-2" />
+                        <FaCheck className="h-4 w-4 mr-2" />
                         Selected
                       </>
                     ) : (
@@ -1347,7 +1348,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl">
-                        <Dumbbell className="h-6 w-6 text-white" />
+                        <FaDumbbell className="h-6 w-6 text-white" />
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-gray-900">Standard Monthly</h3>
@@ -1397,7 +1398,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   >
                     {formData.membershipPlan === 'standard-monthly' ? (
                       <>
-                        <Check className="h-4 w-4 mr-2" />
+                        <FaCheck className="h-4 w-4 mr-2" />
                         Selected
                       </>
                     ) : (
@@ -1418,7 +1419,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl">
-                        <Heart className="h-6 w-6 text-white" />
+                        <FaHeart className="h-6 w-6 text-white" />
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-gray-900">Basic Monthly</h3>
@@ -1468,7 +1469,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   >
                     {formData.membershipPlan === 'basic-monthly' ? (
                       <>
-                        <Check className="h-4 w-4 mr-2" />
+                        <FaCheck className="h-4 w-4 mr-2" />
                         Selected
                       </>
                     ) : (
@@ -1496,7 +1497,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-orange-500 to-amber-600 rounded-xl">
-                        <GraduationCap className="h-6 w-6 text-white" />
+                        <FaGraduationCap className="h-6 w-6 text-white" />
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-gray-900">Student Special</h3>
@@ -1547,7 +1548,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   >
                     {formData.membershipPlan === 'student-special' ? (
                       <>
-                        <Check className="h-4 w-4 mr-2" />
+                        <FaCheck className="h-4 w-4 mr-2" />
                         Selected
                       </>
                     ) : (
@@ -1563,7 +1564,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4">
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center justify-center w-8 h-8 bg-green-500 rounded-full">
-                      <Check className="h-4 w-4 text-white" />
+                      <FaCheck className="h-4 w-4 text-white" />
                     </div>
                     <div>
                       <p className="font-semibold text-green-800">Plan Selected</p>
@@ -1585,7 +1586,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 bg-teal-600 rounded-full shrink-0">
-                    <Activity className="h-4 w-4 text-white" />
+                    <FaHeartPulse className="h-4 w-4 text-white" />
                   </div>
                   <div>
                     <CardTitle className="text-base font-semibold">Health Information</CardTitle>
@@ -1601,7 +1602,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Medical Conditions */}
                 <div className="space-y-2">
                   <Label htmlFor="medicalConditions" className="flex items-center space-x-2">
-                    <AlertCircle className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                    <FaCircleExclamation className="h-4 w-4" style={{ color: '#2B7A78' }} />
                     <span>Medical Conditions</span>
                   </Label>
                   <Textarea
@@ -1621,7 +1622,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Allergies */}
                 <div className="space-y-2">
                   <Label htmlFor="allergies" className="flex items-center space-x-2">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    <FaCircleExclamation className="h-4 w-4 text-red-500" />
                     <span>Allergies</span>
                   </Label>
                   <Textarea
@@ -1641,7 +1642,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Current Medications */}
                 <div className="space-y-2">
                   <Label htmlFor="currentMedications" className="flex items-center space-x-2">
-                    <Pill className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                    <FaPills className="h-4 w-4" style={{ color: '#2B7A78' }} />
                     <span>Current Medications</span>
                   </Label>
                   <Textarea
@@ -1661,7 +1662,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Chronic Illnesses */}
                 <div className="space-y-2">
                   <Label htmlFor="chronicIllnesses" className="flex items-center space-x-2">
-                    <Heart className="h-4 w-4 text-red-500" />
+                    <FaHeart className="h-4 w-4 text-red-500" />
                     <span>Chronic Illnesses</span>
                   </Label>
                   <Textarea
@@ -1681,7 +1682,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Blood Type */}
                 <div className="space-y-2">
                   <Label htmlFor="bloodType" className="flex items-center space-x-2">
-                    <Droplet className="h-4 w-4 text-red-600" />
+                    <FaDroplet className="h-4 w-4 text-red-600" />
                     <span>Blood Type</span>
                   </Label>
                   <Select
@@ -1703,7 +1704,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       <SelectItem value="unknown">Unknown</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-2 mb-4">
                     Important for emergency medical care
                   </p>
                 </div>
@@ -1712,7 +1713,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="height" className="flex items-center space-x-2">
-                      <Ruler className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                      <FaRuler className="h-4 w-4" style={{ color: '#2B7A78' }} />
                       <span>Height (cm)</span>
                     </Label>
                     <Input
@@ -1728,7 +1729,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="weight" className="flex items-center space-x-2">
-                      <Weight className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                      <FaWeightScale className="h-4 w-4" style={{ color: '#2B7A78' }} />
                       <span>Weight (kg)</span>
                     </Label>
                     <Input
@@ -1749,7 +1750,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 space-y-4">
                 <div className="flex items-center space-x-3 border-b border-red-200 pb-3">
                   <div className="flex items-center justify-center w-10 h-10 bg-red-500 rounded-full">
-                    <Shield className="h-5 w-5 text-white" />
+                    <FaShield className="h-5 w-5 text-white" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-red-900">Emergency Contact Information</h3>
@@ -1760,7 +1761,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="emergencyContactName" className="flex items-center space-x-2 text-red-900">
-                      <User className="h-4 w-4 text-red-600" />
+                      <FaUser className="h-4 w-4 text-red-600" />
                       <span>Emergency Contact Name *</span>
                     </Label>
                     <Input
@@ -1774,7 +1775,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
                   <div className="space-y-2">
                     <Label htmlFor="emergencyContactPhone" className="flex items-center space-x-2 text-red-900">
-                      <PhoneCall className="h-4 w-4 text-red-600" />
+                      <FaPhoneVolume className="h-4 w-4 text-red-600" />
                       <span>Emergency Contact Number *</span>
                     </Label>
                     <Input
@@ -1789,7 +1790,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
                 <div className="bg-white border border-red-200 rounded-lg p-3">
                   <div className="flex items-start space-x-2">
-                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <FaCircleExclamation className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-red-800">
                       <p className="font-medium mb-1">Why is this important?</p>
                       <p className="text-xs text-red-700">
@@ -1805,7 +1806,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               {(formData.medicalConditions || formData.allergies || formData.currentMedications || formData.chronicIllnesses) && (
                 <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
                   <div className="flex items-start space-x-3">
-                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                    <FaCircleExclamation className="h-5 w-5 text-amber-600 mt-0.5" />
                     <div>
                       <p className="font-semibold text-amber-900 mb-2">Health Information Summary</p>
                       <div className="space-y-1 text-sm text-amber-800">
@@ -1852,7 +1853,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         <DialogContent className="sm:max-w-[600px]" aria-describedby="camera-dialog-description">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
-              <Video className="h-5 w-5 text-blue-600" />
+              <FaVideo className="h-5 w-5 text-blue-600" />
               <span>Take Member Photo</span>
             </DialogTitle>
             <DialogDescription id="camera-dialog-description">
@@ -1880,7 +1881,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                   <div className="w-48 h-48 border-4 border-white border-dashed rounded-full bg-white/10 flex items-center justify-center">
                     <div className="text-center text-white">
-                      <User className="h-12 w-12 mx-auto mb-2 opacity-75" />
+                      <FaUser className="h-12 w-12 mx-auto mb-2 opacity-75" />
                       <p className="text-sm opacity-75">Position face here</p>
                     </div>
                   </div>
@@ -1916,7 +1917,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             
             <div className="flex justify-center space-x-4">
               <Button variant="outline" onClick={stopCamera} size="lg">
-                <X className="h-4 w-4 mr-2" />
+                <FaXmark className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
               <Button 
@@ -1925,7 +1926,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 className="bg-blue-600 hover:bg-blue-700"
                 disabled={!videoRef.current?.srcObject}
               >
-                <Camera className="h-4 w-4 mr-2" />
+                <FaCamera className="h-4 w-4 mr-2" />
                 Capture Photo
               </Button>
               <Button 
@@ -1936,7 +1937,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 }} 
                 size="lg"
               >
-                <Upload className="h-4 w-4 mr-2" />
+                <FaUpload className="h-4 w-4 mr-2" />
                 Upload Instead
               </Button>
             </div>
@@ -1984,7 +1985,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   {/* Zoom Control */}
                   <div className="space-y-2">
                     <Label className="flex items-center space-x-2">
-                      <ZoomIn className="h-4 w-4" />
+                      <FaMagnifyingGlassPlus className="h-4 w-4" />
                       <span>Zoom: {photoZoom[0].toFixed(1)}x</span>
                     </Label>
                     <Slider
@@ -2000,7 +2001,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   {/* Movement Controls */}
                   <div className="space-y-2">
                     <Label className="flex items-center space-x-2">
-                      <Move className="h-4 w-4" />
+                      <FaUpDownLeftRight className="h-4 w-4" />
                       <span>Position Controls</span>
                     </Label>
                     <div className="flex justify-center space-x-4">
@@ -2010,7 +2011,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         onClick={() => movePhoto('left')}
                         className="flex items-center space-x-2"
                       >
-                        <ArrowLeft className="h-4 w-4" />
+                        <FaArrowLeft className="h-4 w-4" />
                         <span>Move Left</span>
                       </Button>
                       <Button
@@ -2019,7 +2020,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         onClick={() => movePhoto('right')}
                         className="flex items-center space-x-2"
                       >
-                        <ArrowRight className="h-4 w-4" />
+                        <FaArrowRight className="h-4 w-4" />
                         <span>Move Right</span>
                       </Button>
                     </div>
@@ -2032,7 +2033,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       size="sm"
                       onClick={resetPhotoPosition}
                     >
-                      <RotateCcw className="h-4 w-4 mr-2" />
+                      <FaRotateLeft className="h-4 w-4 mr-2" />
                       Reset
                     </Button>
                     <Button
@@ -2040,13 +2041,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <Upload className="h-4 w-4 mr-2" />
+                      <FaUpload className="h-4 w-4 mr-2" />
                       Choose Different Photo
                     </Button>
                   </div>
                   
                   <p className="text-sm text-muted-foreground text-center">
-                    <Move className="h-4 w-4 inline mr-1" />
+                    <FaUpDownLeftRight className="h-4 w-4 inline mr-1" />
                     Drag the photo to reposition • Use buttons for precise control
                   </p>
                 </div>
@@ -2056,11 +2057,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
           
           <div className="flex justify-end space-x-3">
             <Button variant="outline" onClick={() => setPhotoDialogOpen(false)}>
-              <X className="h-4 w-4 mr-2" />
+              <FaXmark className="h-4 w-4 mr-2" />
               Cancel
             </Button>
             <Button onClick={handlePhotoSave} disabled={!selectedPhoto}>
-              <Check className="h-4 w-4 mr-2" />
+              <FaCheck className="h-4 w-4 mr-2" />
               Save Photo
             </Button>
           </div>
@@ -2074,7 +2075,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             <div className="flex items-center justify-between">
               <DialogTitle className="text-2xl font-bold flex items-center space-x-3">
                 <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full">
-                  <CreditCard className="h-5 w-5 text-white" />
+                  <FaCreditCard className="h-5 w-5 text-white" />
                 </div>
                 <span>Select Payment Method</span>
               </DialogTitle>
@@ -2087,7 +2088,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 onClick={handlePaymentCancel}
                 className="h-8 w-8"
               >
-                <X className="h-4 w-4" />
+                <FaXmark className="h-4 w-4" />
               </Button>
             </div>
             <DialogDescription>
@@ -2153,7 +2154,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             {/* Discount Selection */}
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
-                <DollarSign className="h-5 w-5 text-green-600" />
+                <FaDollarSign className="h-5 w-5 text-green-600" />
                 <h3 className="font-semibold text-lg">Select Discount (Optional)</h3>
               </div>
               
@@ -2185,7 +2186,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center space-x-2">
-                      <Check className="h-4 w-4 text-green-600" />
+                      <FaCheck className="h-4 w-4 text-green-600" />
                       <span className="text-green-800">
                         {discountList.find(d => d.id === selectedDiscount)?.name} applied
                       </span>
@@ -2214,7 +2215,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 >
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center justify-center w-12 h-12 bg-green-500 rounded-xl">
-                      <Banknote className="h-6 w-6 text-white" />
+                      <FaMoneyBillWave className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <h4 className="font-semibold text-green-900">Cash</h4>
@@ -2223,7 +2224,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   {selectedPaymentMethod === 'cash' && (
                     <div className="mt-3 flex items-center space-x-2 text-green-600">
-                      <Check className="h-4 w-4" />
+                      <FaCheck className="h-4 w-4" />
                       <span className="text-sm font-medium">Selected</span>
                     </div>
                   )}
@@ -2240,7 +2241,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 >
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center justify-center w-12 h-12 bg-blue-500 rounded-xl">
-                      <CreditCard className="h-6 w-6 text-white" />
+                      <FaCreditCard className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <h4 className="font-semibold text-blue-900">Card</h4>
@@ -2249,7 +2250,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   {selectedPaymentMethod === 'card' && (
                     <div className="mt-3 flex items-center space-x-2 text-blue-600">
-                      <Check className="h-4 w-4" />
+                      <FaCheck className="h-4 w-4" />
                       <span className="text-sm font-medium">Selected</span>
                     </div>
                   )}
@@ -2266,7 +2267,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 >
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center justify-center w-12 h-12 bg-orange-500 rounded-xl">
-                      <Wallet className="h-6 w-6 text-white" />
+                      <FaWallet className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <h4 className="font-semibold text-orange-900">Credit</h4>
@@ -2275,7 +2276,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   {selectedPaymentMethod === 'credit' && (
                     <div className="mt-3 flex items-center space-x-2 text-orange-600">
-                      <Check className="h-4 w-4" />
+                      <FaCheck className="h-4 w-4" />
                       <span className="text-sm font-medium">Selected</span>
                     </div>
                   )}
@@ -2292,7 +2293,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 >
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center justify-center w-12 h-12 bg-purple-500 rounded-xl">
-                      <Calculator className="h-6 w-6 text-white" />
+                      <FaCalculator className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <h4 className="font-semibold text-purple-900">Multi Pay</h4>
@@ -2301,7 +2302,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   {selectedPaymentMethod === 'multi-pay' && (
                     <div className="mt-3 flex items-center space-x-2 text-purple-600">
-                      <Check className="h-4 w-4" />
+                      <FaCheck className="h-4 w-4" />
                       <span className="text-sm font-medium">Selected</span>
                     </div>
                   )}
@@ -2318,7 +2319,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 >
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center justify-center w-12 h-12 bg-gray-500 rounded-xl">
-                      <FileText className="h-6 w-6 text-white" />
+                      <FaFileLines className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-900">Check</h4>
@@ -2327,7 +2328,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   {selectedPaymentMethod === 'check' && (
                     <div className="mt-3 flex items-center space-x-2 text-gray-600">
-                      <Check className="h-4 w-4" />
+                      <FaCheck className="h-4 w-4" />
                       <span className="text-sm font-medium">Selected</span>
                     </div>
                   )}
@@ -2344,7 +2345,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 >
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center justify-center w-12 h-12 bg-teal-500 rounded-xl">
-                      <Building2 className="h-6 w-6 text-white" />
+                      <FaBuilding className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <h4 className="font-semibold text-teal-900">Bank Transfer</h4>
@@ -2353,7 +2354,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   {selectedPaymentMethod === 'bank-transfer' && (
                     <div className="mt-3 flex items-center space-x-2 text-teal-600">
-                      <Check className="h-4 w-4" />
+                      <FaCheck className="h-4 w-4" />
                       <span className="text-sm font-medium">Selected</span>
                     </div>
                   )}
@@ -2365,14 +2366,14 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             {showSplitPayment && (
               <div className="space-y-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
                 <h4 className="font-semibold text-purple-900 flex items-center space-x-2">
-                  <Calculator className="h-4 w-4" />
+                  <FaCalculator className="h-4 w-4" />
                   <span>Split Payment Details</span>
                 </h4>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="cashAmount" className="flex items-center space-x-2">
-                      <Banknote className="h-4 w-4 text-green-600" />
+                      <FaMoneyBillWave className="h-4 w-4 text-green-600" />
                       <span>Cash Amount (AED)</span>
                     </Label>
                     <Input
@@ -2393,7 +2394,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   
                   <div>
                     <Label htmlFor="cardAmount" className="flex items-center space-x-2">
-                      <CreditCard className="h-4 w-4 text-blue-600" />
+                      <FaCreditCard className="h-4 w-4 text-blue-600" />
                       <span>Card Amount (AED)</span>
                     </Label>
                     <Input
@@ -2416,7 +2417,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Split Payment Summary */}
                 <div className="flex items-center justify-between p-3 bg-white border border-purple-200 rounded-lg">
                   <div className="flex items-center space-x-2">
-                    <DollarSign className="h-4 w-4 text-purple-600" />
+                    <FaDollarSign className="h-4 w-4 text-purple-600" />
                     <span className="font-medium">Total Split Amount:</span>
                   </div>
                   <div className="flex items-center space-x-3">
@@ -2429,12 +2430,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     </span>
                     {validateSplitPayment() ? (
                       <Badge className="bg-green-100 text-green-800">
-                        <Check className="h-3 w-3 mr-1" />
+                        <FaCheck className="h-3 w-3 mr-1" />
                         Valid
                       </Badge>
                     ) : (
                       <Badge className="bg-red-100 text-red-800">
-                        <X className="h-3 w-3 mr-1" />
+                        <FaXmark className="h-3 w-3 mr-1" />
                         Invalid
                       </Badge>
                     )}
@@ -2443,7 +2444,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 
                 {!validateSplitPayment() && (
                   <p className="text-sm text-red-600 flex items-center space-x-1">
-                    <X className="h-4 w-4" />
+                    <FaXmark className="h-4 w-4" />
                     <span>Split amounts must equal the final amount of {getFinalPrice().toFixed(2)} AED</span>
                   </p>
                 )}
@@ -2454,7 +2455,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             {selectedPaymentMethod === 'cash' && (
               <div className="space-y-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                 <h4 className="font-semibold text-green-900 flex items-center space-x-2">
-                  <Banknote className="h-4 w-4" />
+                  <FaMoneyBillWave className="h-4 w-4" />
                   <span>Cash Payment Details</span>
                 </h4>
                 
@@ -2462,7 +2463,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   {/* Paid Amount Column */}
                   <div>
                     <Label htmlFor="paidAmount" className="flex items-center space-x-2">
-                      <DollarSign className="h-4 w-4 text-green-600" />
+                      <FaDollarSign className="h-4 w-4 text-green-600" />
                       <span>Paid Amount (AED)</span>
                       <span className="text-red-500">*</span>
                     </Label>
@@ -2478,7 +2479,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     />
                     {paymentErrors.paidAmount && (
                       <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
-                        <X className="h-4 w-4" />
+                        <FaXmark className="h-4 w-4" />
                         <span>{paymentErrors.paidAmount}</span>
                       </p>
                     )}
@@ -2490,7 +2491,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   {/* Pay Back Amount Column */}
                   <div>
                     <Label className="flex items-center space-x-2">
-                      <ArrowLeftRight className="h-4 w-4 text-green-600" />
+                      <FaArrowsLeftRight className="h-4 w-4 text-green-600" />
                       <span>Pay Back Amount (AED)</span>
                     </Label>
                     <div className="mt-1 px-3 py-2 bg-green-100 border border-green-300 rounded-md min-h-[40px] flex items-center">
@@ -2565,14 +2566,14 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             {selectedPaymentMethod === 'credit' && (
               <div className="space-y-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
                 <h4 className="font-semibold text-orange-900 flex items-center space-x-2">
-                  <Wallet className="h-4 w-4" />
+                  <FaWallet className="h-4 w-4" />
                   <span>Credit Payment Details</span>
                 </h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="receivedAmount" className="flex items-center space-x-2">
-                      <DollarSign className="h-4 w-4 text-orange-600" />
+                      <FaDollarSign className="h-4 w-4 text-orange-600" />
                       <span>Received Amount (AED)</span>
                     </Label>
                     <Input
@@ -2588,7 +2589,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     />
                     {paymentErrors.receivedAmount && (
                       <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
-                        <X className="h-4 w-4" />
+                        <FaXmark className="h-4 w-4" />
                         <span>{paymentErrors.receivedAmount}</span>
                       </p>
                     )}
@@ -2599,7 +2600,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   
                   <div>
                     <Label htmlFor="paymentDueDate" className="flex items-center space-x-2">
-                      <Calendar className="h-4 w-4 text-orange-600" />
+                      <FaCalendarDays className="h-4 w-4 text-orange-600" />
                       <span>Payment Due Date</span>
                       {paymentData.remainingAmount > 0 && <span className="text-red-500">*</span>}
                     </Label>
@@ -2613,7 +2614,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     />
                     {paymentErrors.paymentDueDate && (
                       <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
-                        <X className="h-4 w-4" />
+                        <FaXmark className="h-4 w-4" />
                         <span>{paymentErrors.paymentDueDate}</span>
                       </p>
                     )}
@@ -2691,7 +2692,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               className="flex-1"
               onClick={handlePaymentCancel}
             >
-              <X className="h-4 w-4 mr-2" />
+              <FaXmark className="h-4 w-4 mr-2" />
               Cancel
             </Button>
             <Button 
@@ -2699,7 +2700,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               onClick={handlePaymentConfirm}
               disabled={!selectedPaymentMethod || (selectedPaymentMethod === 'multi-pay' && !validateSplitPayment())}
             >
-              <Check className="h-4 w-4 mr-2" />
+              <FaCheck className="h-4 w-4 mr-2" />
               Confirm Payment & Create Member
             </Button>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -16,6 +16,21 @@ import {
   Clock,
   FileText,
 } from "lucide-react";
+import { FaCircleCheck, FaStar } from "react-icons/fa6";
+import {
+  HiOutlineBolt,
+  HiOutlineClock,
+  HiOutlineCube,
+  HiOutlineHeart,
+  HiOutlineMagnifyingGlass,
+  HiOutlinePlus,
+  HiOutlineSquares2X2,
+  HiOutlineUserCircle,
+  HiOutlineUserGroup,
+  HiOutlineSparkles,
+  HiMiniCheckCircle,
+  HiMiniExclamationTriangle,
+} from "react-icons/hi2";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -76,8 +91,28 @@ interface Addon {
   price: number;
   validity: number;
   category: "Training" | "Nutrition" | "Spa" | "Classes" | "Other";
-  icon: string;
 }
+
+const getCategoryIcon = (category: string) => {
+  const baseClass = "text-white block shrink-0";
+  switch (category) {
+    case "Training":  return <HiOutlineBolt size={16} className={baseClass} />;
+    case "Nutrition": return <HiOutlineSparkles size={16} className={baseClass} />;
+    case "Classes":   return <HiOutlineUserGroup size={16} className={baseClass} />;
+    case "Spa":       return <HiOutlineHeart size={16} className={baseClass} />;
+    default:          return <HiOutlineCube size={16} className={baseClass} />;
+  }
+};
+
+const getCategoryColor = (category: string) => {
+  switch (category) {
+    case "Training":  return "from-blue-500 to-blue-600";
+    case "Nutrition": return "from-green-500 to-emerald-600";
+    case "Classes":   return "from-purple-500 to-violet-600";
+    case "Spa":       return "from-pink-500 to-rose-600";
+    default:          return "from-gray-500 to-gray-600";
+  }
+};
 
 interface AddonTransaction {
   id: string;
@@ -133,7 +168,6 @@ const availableAddons: Addon[] = [
     price: 450,
     validity: 30,
     category: "Training",
-    icon: "🏋️‍♂️",
   },
   {
     id: "NP-30",
@@ -142,7 +176,6 @@ const availableAddons: Addon[] = [
     price: 200,
     validity: 30,
     category: "Nutrition",
-    icon: "🥗",
   },
   {
     id: "PT-30",
@@ -151,7 +184,6 @@ const availableAddons: Addon[] = [
     price: 850,
     validity: 60,
     category: "Training",
-    icon: "🏋️‍♂️",
   },
   {
     id: "GC-20",
@@ -160,7 +192,6 @@ const availableAddons: Addon[] = [
     price: 300,
     validity: 30,
     category: "Classes",
-    icon: "👥",
   },
   {
     id: "SPA-10",
@@ -169,7 +200,6 @@ const availableAddons: Addon[] = [
     price: 500,
     validity: 45,
     category: "Spa",
-    icon: "💆‍♂️",
   },
   {
     id: "PT-8",
@@ -178,7 +208,6 @@ const availableAddons: Addon[] = [
     price: 280,
     validity: 20,
     category: "Training",
-    icon: "🏋️‍♀️",
   },
   {
     id: "YOGA-20",
@@ -187,7 +216,6 @@ const availableAddons: Addon[] = [
     price: 320,
     validity: 30,
     category: "Classes",
-    icon: "🧘‍♀️",
   },
   {
     id: "SWIM-10",
@@ -196,7 +224,6 @@ const availableAddons: Addon[] = [
     price: 400,
     validity: 30,
     category: "Classes",
-    icon: "🏊‍♂️",
   },
 ];
 
@@ -284,6 +311,15 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardApplied, setRewardApplied] = useState(false);
   const [finalAmountAfterReward, setFinalAmountAfterReward] = useState<number>(0);
+
+  useEffect(() => {
+    if (isPurchaseModalOpen) {
+      document.body.classList.add("overflow-hidden");
+      return () => {
+        document.body.classList.remove("overflow-hidden");
+      };
+    }
+  }, [isPurchaseModalOpen]);
 
   const handleMemberSearch = () => {
     const found = mockMembers.find(
@@ -600,24 +636,36 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
 
       {/* Purchase Add-on Modal */}
       <Dialog open={isPurchaseModalOpen} onOpenChange={setIsPurchaseModalOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Purchase An Add-On</DialogTitle>
-            <DialogDescription>
-              Search for a member and select an add-on to purchase
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="w-[96vw] max-w-[1100px] sm:max-w-[1100px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
+          {/* Modal Header */}
+          <div className="px-6 pt-6 pb-4 border-b bg-white/95 backdrop-blur-sm shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-primary shadow-sm shrink-0">
+                <HiOutlineSquares2X2 size={20} className="text-white block shrink-0" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold tracking-tight">Purchase An Add-On</h2>
+                <p className="text-[11px] text-muted-foreground leading-none mt-0.5">Search a member and select a service to add</p>
+              </div>
+            </div>
+          </div>
 
-          <div className="space-y-6 py-4">
-            <div>
-              <h3 className="text-lg mb-3 flex items-center gap-2">
-                <User className="h-5 w-5 text-[#0047ab]" />
-                Step 1: Search Member
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="space-y-6 px-6 py-7">
+            {/* Step 1 */}
+            <div className="rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="h-0.5 w-full bg-gradient-to-r from-blue-500 to-blue-400" />
+              <div className="px-6 py-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">1</div>
+                  <div>
+                    <p className="text-sm font-semibold">Search Member</p>
+                    <p className="text-[11px] text-muted-foreground">Find by Member ID, name or phone</p>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4 shrink-0" />
                     <Input
                       placeholder="Search by Member ID, Name, or Phone"
                       value={searchQuery}
@@ -626,92 +674,71 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                       className="pl-10"
                     />
                   </div>
-                  <Button 
-                    onClick={handleMemberSearch}
-                    className="bg-gradient-to-r from-[#0047ab] to-[#00c5cb] text-white hover:opacity-90"
-                  >
+                  <Button onClick={handleMemberSearch} className="shrink-0">
                     Search
                   </Button>
                 </div>
               </div>
-            </div>
 
-            {selectedMember && (
-              <Card className="shadow-lg border-2 border-[#0047ab]">
-                <CardHeader className="bg-[#0047ab]/5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-full bg-gradient-to-r from-[#0047ab] to-[#00c5cb]">
-                        <User className="h-6 w-6 text-white" />
+              {selectedMember && (
+                <div className="mx-6 mb-4 rounded-xl border border-blue-200 bg-blue-50/40 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-blue-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm shrink-0">
+                        <HiOutlineUserCircle size={20} className="text-white block shrink-0" />
                       </div>
                       <div>
-                        <CardTitle className="text-xl">{selectedMember.name}</CardTitle>
-                        <CardDescription className="text-base">
-                          Member ID: {selectedMember.membershipId}
-                        </CardDescription>
+                        <p className="text-sm font-semibold">{selectedMember.name}</p>
+                        <p className="text-[11px] text-muted-foreground">ID: {selectedMember.membershipId}</p>
                       </div>
                     </div>
-                    <Badge
-                      className={
-                        selectedMember.status === "Active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }
-                    >
-                      {selectedMember.status} {selectedMember.status === "Active" && "🟢"}
+                    <Badge className={selectedMember.status === "Active" ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700"}>
+                      <span className="flex items-center gap-1.5">
+                        {selectedMember.status === "Active" && <HiMiniCheckCircle size={12} className="text-green-500 block shrink-0" />}
+                        {selectedMember.status}
+                      </span>
                     </Badge>
                   </div>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Current Plan</p>
-                      <p className="text-foreground font-medium">{selectedMember.currentPlan}</p>
+                  <div className="grid grid-cols-3 gap-px bg-blue-100">
+                    <div className="bg-blue-50/60 px-4 py-2.5">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Current Plan</p>
+                      <p className="text-xs font-semibold">{selectedMember.currentPlan}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Valid Till</p>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-[#0047ab]" />
-                        <p
-                          className={
-                            getDaysUntilExpiry(selectedMember.validTill) < 10
-                              ? "text-red-600 font-medium"
-                              : "text-foreground font-medium"
-                          }
-                        >
-                          {selectedMember.validTill.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </p>
-                      </div>
+                    <div className="bg-blue-50/60 px-4 py-2.5">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Valid Till</p>
+                      <p className={`text-xs font-semibold ${getDaysUntilExpiry(selectedMember.validTill) < 10 ? "text-red-600" : ""}`}>
+                        {selectedMember.validTill.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                      </p>
                       {getDaysUntilExpiry(selectedMember.validTill) < 10 && (
-                        <p className="text-xs text-red-600 mt-1">
-                          ⚠️ Expires in {getDaysUntilExpiry(selectedMember.validTill)} days
+                        <p className="text-[10px] text-red-500 mt-0.5 flex items-center gap-1">
+                          <HiMiniExclamationTriangle size={14} className="block shrink-0" /> Expires soon
                         </p>
                       )}
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Contact</p>
-                      <p className="text-sm text-foreground font-medium">{selectedMember.phone}</p>
+                    <div className="bg-blue-50/60 px-4 py-2.5">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Contact</p>
+                      <p className="text-xs font-semibold">{selectedMember.phone}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              )}
+            </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg flex items-center gap-2">
-                  <Package className="h-5 w-5 text-[#0047ab]" />
-                  Step 2: Select Add-on
-                </h3>
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
+            {/* Step 2 */}
+            <div className="rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="h-0.5 w-full bg-gradient-to-r from-purple-500 to-violet-400" />
+              <div className="px-6 py-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold shrink-0">2</div>
+                    <div>
+                      <p className="text-sm font-semibold">Select Add-on</p>
+                      <p className="text-[11px] text-muted-foreground">Choose a service to purchase for the member</p>
+                    </div>
+                  </div>
                   <Select value={filterCategory} onValueChange={setFilterCategory}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Filter by Category" />
+                    <SelectTrigger className="w-[160px] h-8 text-xs">
+                      <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
@@ -723,54 +750,51 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredAddons.map((addon) => (
-                  <Card
-                    key={addon.id}
-                    className="hover:shadow-xl transition-all duration-300 border-l-4 border-l-[#0047ab]"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="text-4xl">{addon.icon}</div>
-                        <Badge variant="secondary">{addon.category}</Badge>
-                      </div>
-                      <CardTitle className="text-base">{addon.name}</CardTitle>
-                      <CardDescription className="text-sm mt-2">
-                        {addon.description}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          <span>{addon.validity} Days</span>
-                        </div>
-                      </div>
-                      <div className="pt-4 border-t">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filteredAddons.map((addon) => (
+                    <div
+                      key={addon.id}
+                      className="rounded-xl border border-border bg-white shadow-sm overflow-hidden hover:shadow-md hover:border-primary/30 transition-all duration-200 flex flex-col h-full"
+                    >
+                      <div className={`h-0.5 w-full bg-gradient-to-r ${getCategoryColor(addon.category)}`} />
+                      <div className="p-4 flex flex-col h-full">
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-xl text-[#0047ab]">
-                            AED {addon.price}
-                          </span>
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center bg-gradient-to-br ${getCategoryColor(addon.category)} shadow-sm shrink-0`}>
+                            <span className="flex items-center justify-center">{getCategoryIcon(addon.category)}</span>
+                          </div>
+                          <Badge variant="secondary" className="text-[10px]">{addon.category}</Badge>
+                        </div>
+                        <p className="text-sm font-semibold leading-snug mb-1">{addon.name}</p>
+                        <p className="text-[11px] text-muted-foreground mb-3">{addon.description}</p>
+                        <div className="mt-auto">
+                          <div className="flex items-center justify-between mb-3 pt-2 border-t">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <HiOutlineClock className="h-4 w-4 shrink-0" />
+                            {addon.validity} days
+                          </div>
+                          <span className="text-sm font-bold text-primary">AED {addon.price}</span>
                         </div>
                         <Button
+                          size="sm"
                           onClick={() => handlePurchaseClick(addon)}
-                          className="w-full bg-gradient-to-r from-[#0047ab] to-[#00c5cb] text-white hover:opacity-90 transition-all"
+                          className="w-full h-8 text-xs gap-1.5"
                           disabled={!selectedMember}
                         >
-                          <Plus className="h-4 w-4 mr-2" />
+                          <HiOutlinePlus className="h-4 w-4 shrink-0" />
                           Add to Member
                         </Button>
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                    </div>
+                  ))}
+                </div>
               </div>
+            </div>
             </div>
           </div>
 
-          <DialogFooter>
+          <div className="px-6 py-4 border-t bg-slate-50/60 flex justify-end shrink-0">
             <Button
               variant="outline"
               onClick={() => {
@@ -781,240 +805,186 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             >
               Close
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Purchase Confirmation Dialog */}
       <Dialog open={isPurchaseDialogOpen} onOpenChange={setIsPurchaseDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">
-              Purchase Add-on for {selectedMember?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Complete the purchase details and payment information
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-lg p-0">
+          {/* Header */}
+          <div className="px-6 py-4 border-b">
+            <div className="flex items-center gap-3">
+              {selectedAddon && (
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br ${getCategoryColor(selectedAddon.category)} shadow-sm shrink-0`}>
+                  {getCategoryIcon(selectedAddon.category)}
+                </div>
+              )}
+              <div>
+                <h2 className="text-sm font-bold">Confirm Purchase</h2>
+                <p className="text-[11px] text-muted-foreground leading-none mt-0.5">for {selectedMember?.name}</p>
+              </div>
+            </div>
+          </div>
 
           {selectedAddon && (
-            <div className="space-y-6 py-4">
-              <Card className="bg-[#0047ab]/5 border-none">
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm text-muted-foreground">Add-on Name</Label>
-                      <p className="mt-1">{selectedAddon.name}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm text-muted-foreground">Category</Label>
-                      <Badge variant="secondary" className="mt-1">
-                        {selectedAddon.category}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4 px-6 py-5">
+              {/* Addon summary */}
+              <div className="rounded-xl border bg-muted/30 px-4 py-3 flex items-center justify-between">
                 <div>
-                  <Label htmlFor="validity">Validity (Days)</Label>
+                  <p className="text-xs text-muted-foreground mb-0.5">Add-on</p>
+                  <p className="text-sm font-semibold">{selectedAddon.name}</p>
+                </div>
+                <Badge variant="secondary" className="text-[11px]">{selectedAddon.category}</Badge>
+              </div>
+
+              {/* Validity + Amount */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="validity" className="text-xs font-medium">Validity (Days)</Label>
                   <Input
                     id="validity"
                     type="number"
                     value={customValidity}
                     onChange={(e) => setCustomValidity(Number(e.target.value))}
-                    className="mt-2"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Valid till:{" "}
-                    {calculateNewExpiry()?.toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                  <p className="text-[11px] text-muted-foreground">
+                    Till: {calculateNewExpiry()?.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                   </p>
                 </div>
-
-                <div>
-                  <Label htmlFor="amount">Amount (AED)</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="amount" className="text-xs font-medium">Amount (AED)</Label>
                   <Input
                     id="amount"
                     type="number"
                     value={customAmount}
                     onChange={(e) => setCustomAmount(Number(e.target.value))}
-                    className="mt-2"
                   />
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="payment">Payment Method</Label>
+              {/* Payment Method */}
+              <div className="space-y-1.5">
+                <Label htmlFor="payment" className="text-xs font-medium">Payment Method</Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger className="mt-2">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Cash">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        Cash
-                      </div>
+                      <div className="flex items-center gap-2"><DollarSign className="h-4 w-4" />Cash</div>
                     </SelectItem>
                     <SelectItem value="Card">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
-                        Card
-                      </div>
+                      <div className="flex items-center gap-2"><CreditCard className="h-4 w-4" />Card</div>
                     </SelectItem>
                     <SelectItem value="UPI">
-                      <div className="flex items-center gap-2">
-                        <Smartphone className="h-4 w-4" />
-                        UPI / QR
-                      </div>
+                      <div className="flex items-center gap-2"><Smartphone className="h-4 w-4" />UPI / QR</div>
                     </SelectItem>
                     <SelectItem value="Bank Transfer">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4" />
-                        Bank Transfer
-                      </div>
+                      <div className="flex items-center gap-2"><Building2 className="h-4 w-4" />Bank Transfer</div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="notes">Notes (Optional)</Label>
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <Label htmlFor="notes" className="text-xs font-medium">Notes <span className="text-muted-foreground font-normal">(Optional)</span></Label>
                 <Textarea
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add any additional notes here..."
-                  rows={3}
-                  className="mt-2"
+                  rows={2}
                 />
               </div>
 
+              {/* Membership update */}
               {selectedMember && calculateNewExpiry() && (
-                <Card className="bg-gradient-to-r from-[#0047ab] to-[#00c5cb] text-white">
-                  <CardContent className="pt-6">
-                    <div className="space-y-2">
-                      <p className="text-sm opacity-90">Membership Update</p>
-                      <div className="flex items-center justify-between">
-                        <span>Current Expiry:</span>
-                        <span>
-                          {selectedMember.validTill.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-lg">
-                        <span>New Expiry:</span>
-                        <span className="font-bold">
-                          {calculateNewExpiry()?.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </span>
-                      </div>
+                <div className="rounded-xl border border-blue-200 bg-blue-50/50 overflow-hidden">
+                  <div className="h-0.5 w-full bg-gradient-to-r from-blue-400 to-blue-600" />
+                  <div className="px-4 py-3">
+                    <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mb-2">Membership Update</p>
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="text-muted-foreground">Current Expiry</span>
+                      <span className="font-medium">{selectedMember.validTill.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground text-xs">New Expiry</span>
+                      <span className="font-bold text-blue-700">{calculateNewExpiry()?.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           )}
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsPurchaseDialogOpen(false)}
-            >
+          <div className="px-6 py-4 border-t bg-slate-50/60 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsPurchaseDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleConfirmPurchase}
-              className="gap-2 bg-[#E63946] text-white hover:bg-[#d32f3c]"
-            >
-              <CheckCircle className="h-4 w-4" />
-              Confirm Purchase & Send Receipt
+            <Button onClick={handleConfirmPurchase} className="gap-2">
+              <span className="inline-flex items-center justify-center w-4 h-4 shrink-0">
+                <FaCircleCheck className="w-4 h-4" />
+              </span>
+              Confirm Purchase
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Success Dialog */}
       <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <div className="mx-auto rounded-full p-3 w-fit mb-4 bg-green-500">
-              <CheckCircle className="h-8 w-8 text-white" />
+        <DialogContent className="max-w-sm p-0">
+          {/* Success header */}
+          <div className="flex flex-col items-center text-center px-8 pt-10 pb-7 border-b">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-md mb-4">
+              <FaCircleCheck size={26} className="text-white" />
             </div>
-            <DialogTitle className="text-center text-2xl">
-              Add-on Successfully Purchased!
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              ✅ Add-on successfully purchased for {selectedMember?.name}
-            </DialogDescription>
-          </DialogHeader>
+            <h2 className="text-base font-bold">Add-on Purchased!</h2>
+            <p className="text-xs text-muted-foreground mt-1">Successfully added for <span className="font-medium text-foreground">{selectedMember?.name}</span></p>
+          </div>
 
-          <div className="space-y-4 py-4">
-            <Card className="bg-[#0047ab]/5 border-none">
-              <CardContent className="pt-6 space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Add-on:</span>
-                  <span className="font-medium">{selectedAddon?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount:</span>
-                  <span className="font-medium">AED {customAmount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Payment:</span>
-                  <span className="font-medium">{paymentMethod}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">New Expiry:</span>
-                  <span className="font-semibold text-green-600">
-                    {calculateNewExpiry()?.toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-900">
-                🎉 <strong>Congratulations {selectedMember?.name}!</strong> You've
-                successfully added {selectedAddon?.name}. Your membership is now valid
-                till{" "}
-                {calculateNewExpiry()?.toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}
-                . Receipt attached.
-              </p>
+          {/* Receipt summary */}
+          <div className="px-8 py-6 space-y-2">
+            {[
+              { label: "Add-on", value: selectedAddon?.name },
+              { label: "Amount", value: `AED ${customAmount}` },
+              { label: "Payment", value: paymentMethod },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="font-medium">{value}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between text-sm pt-2 border-t mt-2">
+              <span className="text-muted-foreground">New Expiry</span>
+              <span className="font-semibold text-green-600">
+                {calculateNewExpiry()?.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+              </span>
             </div>
           </div>
 
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" className="flex-1 gap-2">
-              <Download className="h-4 w-4" />
+          {/* Congrats note */}
+          <div className="mx-8 mb-7 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-2.5">
+            <div className="shrink-0 w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center mt-0.5">
+              <FaStar size={12} className="text-blue-600" />
+            </div>
+            <p className="text-xs text-blue-900">
+              <strong>Congratulations {selectedMember?.name}!</strong> {selectedAddon?.name} has been added. Valid till{" "}
+              {calculateNewExpiry()?.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}.
+            </p>
+          </div>
+
+          <div className="px-8 py-6 border-t bg-slate-50/60 flex gap-2">
+            <Button variant="outline" className="flex-1 gap-2 text-xs h-9">
+              <Download className="h-3.5 w-3.5" />
               Download Receipt
             </Button>
-            <Button 
-              onClick={handleSuccessClose} 
-              className="flex-1 bg-gradient-to-r from-[#0047ab] to-[#00c5cb] text-white hover:opacity-90"
-            >
+            <Button onClick={handleSuccessClose} className="flex-1 h-9 text-xs">
               Done
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
