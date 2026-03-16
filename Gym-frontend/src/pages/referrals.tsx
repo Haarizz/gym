@@ -117,6 +117,8 @@ export function Referrals() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [dateRange, setDateRange] = useState('7d');
 
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+
   // Sample data - in real app this would come from your backend
   const referralStats = {
     totalReferrals: 245,
@@ -249,7 +251,15 @@ export function Referrals() {
     }
   ];
 
+  const [rewardRulesState, setRewardRulesState] = useState<RewardRule[]>(rewardRules);
+
   const topReferrers = memberReferrals.slice().sort((a, b) => b.successfulReferrals - a.successfulReferrals).slice(0, 5);
+
+  const handleToggleRewardRule = useCallback((ruleId: string, nextValue: boolean) => {
+    setRewardRulesState(prev =>
+      prev.map(rule => rule.id === ruleId ? { ...rule, isActive: nextValue } : rule)
+    );
+  }, []);
 
   const handleCopyCode = useCallback((code: string) => {
     navigator.clipboard.writeText(code);
@@ -266,7 +276,7 @@ export function Referrals() {
   }, []);
 
   const handleShareWhatsApp = useCallback((code: string, memberName: string) => {
-    const message = `Join our amazing gym with my referral code: ${code}! Get exclusive benefits and let's achieve our fitness goals together! 💪`;
+    const message = `Join our amazing gym with my referral code: ${code}! Get exclusive benefits and let's achieve our fitness goals together! ??`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
     
@@ -355,96 +365,102 @@ export function Referrals() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Referrals</p>
-                <p className="text-2xl font-bold">{referralStats.totalReferrals}</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Referrals</CardTitle>
+            <div className="bg-gradient-light p-2 rounded-lg">
+              <Users className="h-4 w-4 text-primary" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{referralStats.totalReferrals}</div>
+            <p className="text-xs text-muted-foreground">All referrals recorded</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Successful</p>
-                <p className="text-2xl font-bold text-green-600">{referralStats.successfulReferrals}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Successful</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{referralStats.successfulReferrals}</div>
+            <p className="text-xs text-muted-foreground">Converted referrals</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Conversion</p>
-                <p className="text-2xl font-bold text-purple-600">{referralStats.conversionRate}%</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-purple-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Conversion</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-purple-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{referralStats.conversionRate}%</div>
+            <p className="text-xs text-muted-foreground">Referral success rate</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Rewards</p>
-                <p className="text-2xl font-bold text-orange-600">{referralStats.totalRewards} AED</p>
-              </div>
-              <Gift className="h-8 w-8 text-orange-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Rewards</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <Gift className="h-4 w-4 text-orange-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{referralStats.totalRewards} AED</div>
+            <p className="text-xs text-muted-foreground">Rewards distributed</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Active Programs</p>
-                <p className="text-2xl font-bold text-indigo-600">{referralStats.activePrograms}</p>
-              </div>
-              <Zap className="h-8 w-8 text-indigo-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Active Programs</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Zap className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{referralStats.activePrograms}</div>
+            <p className="text-xs text-muted-foreground">Running referral programs</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Reward</p>
-                <p className="text-2xl font-bold text-teal-600">{referralStats.avgRewardValue} AED</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-teal-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Avg Reward</CardTitle>
+            <div className="bg-teal-50 p-2 rounded-lg">
+              <DollarSign className="h-4 w-4 text-teal-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-teal-600">{referralStats.avgRewardValue} AED</div>
+            <p className="text-xs text-muted-foreground">Average per referral</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="rewards">Rewards</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+          <TabsTrigger value="members" className="flex-1">Members</TabsTrigger>
+          <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
+          <TabsTrigger value="rewards" className="flex-1">Rewards</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
+          <TabsTrigger value="settings" className="flex-1">Settings</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Top Referrers Leaderboard */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Trophy className="h-5 w-5 text-yellow-600" />
@@ -457,7 +473,7 @@ export function Referrals() {
               <CardContent>
                 <div className="space-y-4">
                   {topReferrers.map((member, index) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div key={member.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50/60">
                       <div className="flex items-center space-x-3">
                         <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full font-bold text-sm">
                           {index + 1}
@@ -487,7 +503,7 @@ export function Referrals() {
             </Card>
 
             {/* Recent Activity */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Bell className="h-5 w-5 text-blue-600" />
@@ -500,7 +516,7 @@ export function Referrals() {
               <CardContent>
                 <div className="space-y-4">
                   {recentActivity.slice(0, 5).map((activity) => (
-                    <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50/60">
                       <div className="flex items-center space-x-3">
                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                         <div>
@@ -526,7 +542,7 @@ export function Referrals() {
           </div>
 
           {/* Quick Actions */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Zap className="h-5 w-5 text-purple-600" />
@@ -538,19 +554,19 @@ export function Referrals() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button variant="outline" className="h-20 flex-col space-y-2">
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md">
                   <Send className="h-6 w-6 text-blue-600" />
                   <span>Send Bulk Invite</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex-col space-y-2">
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md">
                   <Gift className="h-6 w-6 text-green-600" />
                   <span>Process Rewards</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex-col space-y-2">
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md">
                   <BarChart3 className="h-6 w-6 text-purple-600" />
                   <span>Generate Report</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex-col space-y-2">
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md">
                   <Settings className="h-6 w-6 text-gray-600" />
                   <span>Program Settings</span>
                 </Button>
@@ -560,9 +576,9 @@ export function Referrals() {
         </TabsContent>
 
         {/* Members Tab */}
-        <TabsContent value="members" className="space-y-6">
+        <TabsContent value="members" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           {/* Filters */}
-          <Card>
+          <Card className={cardShell}>
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex-1 min-w-[200px]">
@@ -612,35 +628,35 @@ export function Referrals() {
           </Card>
 
           {/* Members List */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {memberReferrals.map((member) => (
-              <Card key={member.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
+              <Card key={member.id} className={cardShell}>
+                <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <Avatar className="h-12 w-12">
+                      <Avatar className="h-10 w-10">
                         <AvatarImage src={member.avatar} />
                         <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
                           {member.memberName.split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <h3 className="font-semibold">{member.memberName}</h3>
-                        <p className="text-sm text-muted-foreground">{member.memberEmail}</p>
+                        <h3 className="font-semibold text-sm">{member.memberName}</h3>
+                        <p className="text-xs text-muted-foreground">{member.memberEmail}</p>
                       </div>
                     </div>
-                    <Badge className={getTierColor(member.tier)}>
+                    <Badge className={getTierColor(member.tier)} variant="outline">
                       {getTierIcon(member.tier)}
                       <span className="ml-1">{member.tier}</span>
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   {/* Referral Code */}
                   <div>
-                    <Label>Referral Code</Label>
+                    <Label className="text-xs">Referral Code</Label>
                     <div className="flex items-center space-x-2 mt-1">
-                      <Input value={member.referralCode} readOnly className="flex-1" />
+                      <Input value={member.referralCode} readOnly className="flex-1 h-9 text-xs" />
                       <Button
                         size="sm"
                         variant="outline"
@@ -653,9 +669,9 @@ export function Referrals() {
 
                   {/* Referral Link */}
                   <div>
-                    <Label>Referral Link</Label>
+                    <Label className="text-xs">Referral Link</Label>
                     <div className="flex items-center space-x-2 mt-1">
-                      <Input value={member.referralLink} readOnly className="flex-1 text-xs" />
+                      <Input value={member.referralLink} readOnly className="flex-1 h-9 text-[11px]" />
                       <Button
                         size="sm"
                         variant="outline"
@@ -667,30 +683,30 @@ export function Referrals() {
                   </div>
 
                   {/* Stats */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Successful</p>
-                      <p className="text-xl font-bold text-green-600">{member.successfulReferrals}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center p-2 bg-green-50 rounded-lg">
+                      <p className="text-[11px] text-muted-foreground">Successful</p>
+                      <p className="text-base font-bold text-green-600">{member.successfulReferrals}</p>
                     </div>
-                    <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Pending</p>
-                      <p className="text-xl font-bold text-yellow-600">{member.pendingReferrals}</p>
+                    <div className="text-center p-2 bg-yellow-50 rounded-lg">
+                      <p className="text-[11px] text-muted-foreground">Pending</p>
+                      <p className="text-base font-bold text-yellow-600">{member.pendingReferrals}</p>
                     </div>
                   </div>
 
                   {/* Rewards */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-purple-50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Total Earned</p>
-                      <p className="text-lg font-bold text-purple-600">{member.totalRewardsEarned} AED</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center p-2 bg-purple-50 rounded-lg">
+                      <p className="text-[11px] text-muted-foreground">Total Earned</p>
+                      <p className="text-sm font-bold text-purple-600">{member.totalRewardsEarned} AED</p>
                     </div>
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Balance</p>
-                      <p className="text-lg font-bold text-blue-600">{member.rewardBalance} AED</p>
+                    <div className="text-center p-2 bg-blue-50 rounded-lg">
+                      <p className="text-[11px] text-muted-foreground">Balance</p>
+                      <p className="text-sm font-bold text-blue-600">{member.rewardBalance} AED</p>
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between">
+                <CardFooter className="flex justify-between pt-2">
                   <div className="flex space-x-2">
                     <Button
                       size="sm"
@@ -723,8 +739,8 @@ export function Referrals() {
         </TabsContent>
 
         {/* Activity Tab */}
-        <TabsContent value="activity" className="space-y-6">
-          <Card>
+        <TabsContent value="activity" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Referral Activity Log</CardTitle>
               <CardDescription>
@@ -733,8 +749,8 @@ export function Referrals() {
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Referrer</TableHead>
                     <TableHead>Referee</TableHead>
                     <TableHead>Status</TableHead>
@@ -746,7 +762,7 @@ export function Referrals() {
                 </TableHeader>
                 <TableBody>
                   {recentActivity.map((activity) => (
-                    <TableRow key={activity.id}>
+                    <TableRow key={activity.id} className="hover:bg-slate-50/50 transition-colors">
                       <TableCell>
                         <div>
                           <p className="font-medium">{activity.referrerName}</p>
@@ -794,7 +810,7 @@ export function Referrals() {
         </TabsContent>
 
         {/* Rewards Tab */}
-        <TabsContent value="rewards" className="space-y-6">
+        <TabsContent value="rewards" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold">Reward Rules</h2>
@@ -806,46 +822,52 @@ export function Referrals() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {rewardRules.map((rule) => (
-              <Card key={rule.id} className={rule.isActive ? 'border-green-200 bg-green-50/30' : 'border-gray-200'}>
-                <CardHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {rewardRulesState.map((rule) => (
+              <Card
+                key={rule.id}
+                className={`${rule.isActive ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} shadow-md hover:shadow-lg transition-shadow`}
+              >
+                <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{rule.name}</CardTitle>
-                    <Switch checked={rule.isActive} />
+                    <CardTitle className="text-base">{rule.name}</CardTitle>
+                    <Switch
+                      checked={rule.isActive}
+                      onCheckedChange={(checked) => handleToggleRewardRule(rule.id, checked === true)}
+                    />
                   </div>
-                  <CardDescription>
+                  <CardDescription className="text-xs">
                     {rule.type === 'discount' && 'Percentage discount'}
                     {rule.type === 'credit' && 'Account credit'}
                     {rule.type === 'points' && 'Loyalty points'}
                     {rule.type === 'free_session' && 'Free training session'}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label>Reward Value</Label>
-                      <p className="text-2xl font-bold text-green-600">
+                      <Label className="text-xs">Reward Value</Label>
+                      <p className="text-lg font-bold text-green-600">
                         {rule.value} {rule.unit}
                       </p>
                     </div>
                     <div>
-                      <Label>Eligibility</Label>
+                      <Label className="text-xs">Eligibility</Label>
                       <Badge variant="outline" className="capitalize">
                         {rule.eligibility}
                       </Badge>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label>Condition</Label>
+                      <Label className="text-xs">Condition</Label>
                       <Badge variant="outline" className="capitalize">
                         {rule.condition}
                       </Badge>
                     </div>
                     <div>
-                      <Label>Expires in</Label>
-                      <p className="text-sm font-medium">
+                      <Label className="text-xs">Expires in</Label>
+                      <p className="text-xs font-medium">
                         {rule.expiryDays} days
                       </p>
                     </div>
@@ -867,10 +889,10 @@ export function Referrals() {
         </TabsContent>
 
         {/* Analytics Tab */}
-        <TabsContent value="analytics" className="space-y-6">
+        <TabsContent value="analytics" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Conversion Funnel */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Referral Conversion Funnel</CardTitle>
                 <CardDescription>Track referral progress through the conversion funnel</CardDescription>
@@ -905,7 +927,7 @@ export function Referrals() {
             </Card>
 
             {/* Monthly Trends */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Monthly Performance</CardTitle>
                 <CardDescription>Referral program performance over time</CardDescription>
@@ -942,7 +964,7 @@ export function Referrals() {
           </div>
 
           {/* Performance Insights */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Performance Insights</CardTitle>
               <CardDescription>AI-powered insights and recommendations</CardDescription>
@@ -973,8 +995,8 @@ export function Referrals() {
         </TabsContent>
 
         {/* Settings Tab */}
-        <TabsContent value="settings" className="space-y-6">
-          <Card>
+        <TabsContent value="settings" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Referral Program Settings</CardTitle>
               <CardDescription>Configure global referral program parameters</CardDescription>

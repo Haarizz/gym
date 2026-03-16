@@ -222,6 +222,8 @@ export function Messaging() {
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
   const [activePromotions, setActivePromotions] = useState<Promotion[]>([]);
 
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+
   // Message composer state
   const [composer, setComposer] = useState<MessageComposer>({
     type: 'email',
@@ -774,93 +776,99 @@ export function Messaging() {
       </div>
 
       {/* Analytics KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Sent Today</p>
-                <p className="text-2xl font-bold">{analytics.sentToday}</p>
-              </div>
-              <Send className="h-6 w-6 text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Sent Today</CardTitle>
+            <div className="bg-gradient-light p-2 rounded-lg">
+              <Send className="h-4 w-4 text-primary" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{analytics.sentToday}</div>
+            <p className="text-xs text-muted-foreground">Messages sent today</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Scheduled</p>
-                <p className="text-2xl font-bold text-yellow-600">{analytics.scheduledMessages}</p>
-              </div>
-              <Clock className="h-6 w-6 text-yellow-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Scheduled</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <Clock className="h-4 w-4 text-yellow-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{analytics.scheduledMessages}</div>
+            <p className="text-xs text-muted-foreground">Queued for later</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Recipients</p>
-                <p className="text-2xl font-bold text-purple-600">{analytics.totalRecipients}</p>
-              </div>
-              <Users className="h-6 w-6 text-purple-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Recipients</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <Users className="h-4 w-4 text-purple-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{analytics.totalRecipients}</div>
+            <p className="text-xs text-muted-foreground">Total reach</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Open Rate</p>
-                <p className="text-2xl font-bold text-green-600">{analytics.openRate.toFixed(1)}%</p>
-              </div>
-              <Eye className="h-6 w-6 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Open Rate</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <Eye className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{analytics.openRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Average opens</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Click Rate</p>
-                <p className="text-2xl font-bold text-indigo-600">{analytics.clickRate.toFixed(1)}%</p>
-              </div>
-              <ExternalLink className="h-6 w-6 text-indigo-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Click Rate</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <ExternalLink className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{analytics.clickRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Average clicks</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Cost</p>
-                <p className="text-2xl font-bold text-orange-600">{analytics.totalCost.toFixed(2)} AED</p>
-              </div>
-              <CreditCard className="h-6 w-6 text-orange-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Cost</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <CreditCard className="h-4 w-4 text-orange-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{analytics.totalCost.toFixed(2)} AED</div>
+            <p className="text-xs text-muted-foreground">Total spend</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="compose">Compose</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="compose" className="flex-1">Compose</TabsTrigger>
+          <TabsTrigger value="history" className="flex-1">History</TabsTrigger>
+          <TabsTrigger value="templates" className="flex-1">Templates</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="compose" className="space-y-6">
+        <TabsContent value="compose" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Recipients Panel */}
-            <Card className="lg:col-span-1">
+            <Card className={`lg:col-span-1 ${cardShell}`}>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Recipients ({selectedRecipients.length})</span>
@@ -966,7 +974,7 @@ export function Messaging() {
                   
                   <TabsContent value="groups" className="space-y-2 max-h-96 overflow-y-auto">
                     {messageGroups.map((group) => (
-                      <div key={group.id} className="p-3 rounded-lg border hover:bg-muted cursor-pointer"
+                      <div key={group.id} className="p-3 rounded-lg bg-slate-50/60 hover:bg-slate-100/70 transition-colors cursor-pointer"
                            onClick={() => handleGroupSelection(group)}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
@@ -986,7 +994,7 @@ export function Messaging() {
             </Card>
 
             {/* Message Composer */}
-            <Card className="lg:col-span-2">
+            <Card className={`lg:col-span-2 ${cardShell}`}>
               <CardHeader>
                 <CardTitle>Compose Message</CardTitle>
               </CardHeader>
@@ -1261,15 +1269,15 @@ export function Messaging() {
           </div>
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-6">
-          <Card>
+        <TabsContent value="history" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Message History</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Message</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
@@ -1282,7 +1290,7 @@ export function Messaging() {
                 </TableHeader>
                 <TableBody>
                   {messageHistory.map((message) => (
-                    <TableRow key={message.id}>
+                    <TableRow key={message.id} className="hover:bg-slate-50/50 transition-colors">
                       <TableCell>
                         <div>
                           <p className="font-medium">{message.subject}</p>
@@ -1343,7 +1351,7 @@ export function Messaging() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="templates" className="space-y-6">
+        <TabsContent value="templates" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Message Templates</h2>
             <Button onClick={() => setShowNewTemplate(true)}>
@@ -1354,7 +1362,7 @@ export function Messaging() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {messageTemplates.map((template) => (
-              <Card key={template.id} className="hover:shadow-lg transition-shadow">
+              <Card key={template.id} className={cardShell}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{template.name}</CardTitle>
@@ -1411,9 +1419,9 @@ export function Messaging() {
           </div>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
+        <TabsContent value="analytics" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Messages</CardTitle>
               </CardHeader>
@@ -1423,7 +1431,7 @@ export function Messaging() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Average Open Rate</CardTitle>
               </CardHeader>
@@ -1433,7 +1441,7 @@ export function Messaging() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Average Click Rate</CardTitle>
               </CardHeader>
@@ -1443,7 +1451,7 @@ export function Messaging() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Cost</CardTitle>
               </CardHeader>
@@ -1455,7 +1463,7 @@ export function Messaging() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Message Performance by Type</CardTitle>
               </CardHeader>
@@ -1483,7 +1491,7 @@ export function Messaging() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
               </CardHeader>
