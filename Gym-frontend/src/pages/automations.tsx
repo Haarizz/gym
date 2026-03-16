@@ -1301,11 +1301,12 @@ export function Automations() {
         </TabsContent>
 
         <TabsContent value="workflows" className="space-y-6">
-          {activeView === 'grid' ? (
-            /* Grid View */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredWorkflows.map((workflow) => (
-                <Card key={workflow.id} className="hover:shadow-lg transition-shadow cursor-pointer group">
+          <div key={activeView} className="animate-in fade-in-0 zoom-in-95 duration-200">
+            {activeView === 'grid' ? (
+              /* Grid View */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredWorkflows.map((workflow) => (
+                  <Card key={workflow.id} className="hover:shadow-lg transition-shadow cursor-pointer group">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <Badge className={getStatusColor(workflow.status)}>
@@ -1426,115 +1427,116 @@ export function Automations() {
                     )}
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          ) : (
-            /* Table View */
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Automation Workflows ({filteredWorkflows.length})</span>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                    >
-                      {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Workflow</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Trigger</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Runs</TableHead>
-                      <TableHead>Success Rate</TableHead>
-                      <TableHead>Last Run</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredWorkflows.map((workflow) => (
-                      <TableRow key={workflow.id} className="cursor-pointer hover:bg-muted/50">
-                        <TableCell onClick={() => handleWorkflowClick(workflow)}>
-                          <div>
-                            <p className="font-medium">{workflow.name}</p>
-                            <p className="text-sm text-muted-foreground line-clamp-1">{workflow.description}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(workflow.status)}>
-                            {getStatusIcon(workflow.status)}
-                            <span className="ml-1 capitalize">{workflow.status}</span>
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {getTriggerIcon(workflow.trigger.type)}
-                            <span className="text-sm">
-                              {automationTriggers.find(t => t.id === workflow.trigger.type)?.name || workflow.trigger.type}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {getActionIcon(workflow.action.type)}
-                            <span className="text-sm">
-                              {automationActions.find(a => a.id === workflow.action.type)?.name || workflow.action.type}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <span className="font-medium">{workflow.totalRuns}</span>
-                            <p className="text-xs text-muted-foreground">{workflow.membersEngaged} engaged</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium text-green-600">
-                            {workflow.totalRuns > 0 ? ((workflow.successfulRuns / workflow.totalRuns) * 100).toFixed(1) : 0}%
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">
-                            {workflow.lastRun ? format(workflow.lastRun, 'MMM dd, HH:mm') : 'Never'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-1">
-                            {workflow.status === 'active' ? (
-                              <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'pause')}>
-                                <Pause className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'play')}>
-                                <Play className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'edit')}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => handleWorkflowClick(workflow)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'duplicate')}>
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                ))}
+              </div>
+            ) : (
+              /* Table View */
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Automation Workflows ({filteredWorkflows.length})</span>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                      >
+                        {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Workflow</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Trigger</TableHead>
+                        <TableHead>Action</TableHead>
+                        <TableHead>Runs</TableHead>
+                        <TableHead>Success Rate</TableHead>
+                        <TableHead>Last Run</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
+                    </TableHeader>
+                    <TableBody>
+                      {filteredWorkflows.map((workflow) => (
+                        <TableRow key={workflow.id} className="cursor-pointer hover:bg-muted/50">
+                          <TableCell onClick={() => handleWorkflowClick(workflow)}>
+                            <div>
+                              <p className="font-medium">{workflow.name}</p>
+                              <p className="text-sm text-muted-foreground line-clamp-1">{workflow.description}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(workflow.status)}>
+                              {getStatusIcon(workflow.status)}
+                              <span className="ml-1 capitalize">{workflow.status}</span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              {getTriggerIcon(workflow.trigger.type)}
+                              <span className="text-sm">
+                                {automationTriggers.find(t => t.id === workflow.trigger.type)?.name || workflow.trigger.type}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              {getActionIcon(workflow.action.type)}
+                              <span className="text-sm">
+                                {automationActions.find(a => a.id === workflow.action.type)?.name || workflow.action.type}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <span className="font-medium">{workflow.totalRuns}</span>
+                              <p className="text-xs text-muted-foreground">{workflow.membersEngaged} engaged</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium text-green-600">
+                              {workflow.totalRuns > 0 ? ((workflow.successfulRuns / workflow.totalRuns) * 100).toFixed(1) : 0}%
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">
+                              {workflow.lastRun ? format(workflow.lastRun, 'MMM dd, HH:mm') : 'Never'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-1">
+                              {workflow.status === 'active' ? (
+                                <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'pause')}>
+                                  <Pause className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'play')}>
+                                  <Play className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'edit')}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => handleWorkflowClick(workflow)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'duplicate')}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-6">

@@ -615,10 +615,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               Back to Members
             </Button>
           </div>
-          <Button variant="outline" size="sm" className="self-start sm:self-auto">
-            <Download className="h-4 w-4 mr-2" />
-            Export Analytics
-          </Button>
         </div>
 
         {/* Search Bar */}
@@ -1745,10 +1741,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         <p className="text-sm text-gray-600">
                           Showing <span className="font-semibold text-primary">{filteredCommunications.length}</span> of {communicationHistory.length} messages
                         </p>
-                        <Button variant="outline" size="sm" className="border-primary/20">
-                          <Download className="h-4 w-4 mr-2" />
-                          Export CSV
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -2196,29 +2188,40 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
       {/* Message Details Drawer */}
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto" aria-describedby="message-details-description">
+        <SheetContent
+          className="relative w-full sm:max-w-lg overflow-y-auto border-l border-slate-200/70 bg-gradient-to-b from-white via-white to-slate-50/70 shadow-[0_18px_60px_rgba(15,23,42,0.18)] rounded-l-3xl p-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:duration-500 data-[state=closed]:duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform motion-reduce:animate-none motion-reduce:transition-none"
+          aria-describedby="message-details-description"
+        >
           {selectedMessage ? (
             <>
-              <SheetHeader>
-                <div className="flex items-center justify-between">
-                  <SheetTitle className="flex items-center space-x-2">
-                    {getChannelIcon(selectedMessage.channel)}
-                    <span>Message Details</span>
-                  </SheetTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsDrawerOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+              <div className="sticky top-0 z-10 bg-white/92 backdrop-blur border-b border-slate-200/70">
+                <div className="flex justify-center pt-3">
+                  <span className="h-1.5 w-12 rounded-full bg-slate-200/80" />
                 </div>
-                <SheetDescription id="message-details-description">
-                  Complete message information and delivery status
-                </SheetDescription>
-              </SheetHeader>
+                <SheetHeader className="px-6 pb-4 pt-3">
+                  <div className="flex items-center justify-between">
+                    <SheetTitle className="flex items-center space-x-3 text-base font-semibold text-slate-900">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm">
+                        {getChannelIcon(selectedMessage.channel)}
+                      </span>
+                      <span>Message Details</span>
+                    </SheetTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 rounded-full border border-slate-200/70 bg-white/80 shadow-sm hover:bg-white"
+                      onClick={() => setIsDrawerOpen(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <SheetDescription id="message-details-description" className="text-xs text-slate-500">
+                    Complete message information and delivery status
+                  </SheetDescription>
+                </SheetHeader>
+              </div>
 
-              <div className="mt-6 space-y-6">
+              <div className="px-6 pb-6 pt-4 space-y-6">
                 {/* Message Header */}
                 <Card className="overflow-hidden border-primary/20">
                   <CardContent className="p-4">
