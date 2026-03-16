@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -30,8 +30,6 @@ import {
   Share, 
   Copy, 
   MoreHorizontal, 
-  Download, 
-  Upload, 
   Settings, 
   BarChart3, 
   PieChart, 
@@ -39,6 +37,7 @@ import {
   AlertCircle, 
   CheckCircle, 
   XCircle, 
+  Circle,
   Clock, 
   Users, 
   DollarSign, 
@@ -94,17 +93,19 @@ import {
 import { toast } from "sonner";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, isYesterday, addWeeks, subDays, addMonths } from "date-fns";
 import { cn } from "../components/ui/utils";
+import { promotionsService, PromotionApi, PromotionRequest } from "../utils/supabase/promotions-service";
+import { authService } from "../utils/supabase/auth-service";
 
 interface Promotion {
-  id: string;
+  id: number;
   name: string;
-  type: 'discount' | 'voucher' | 'combo' | 'bogo' | 'seasonal' | 'loyalty';
-  status: 'active' | 'scheduled' | 'expired' | 'paused' | 'draft';
+  type: string;
+  status: string;
   description: string;
   startDate: Date;
   endDate: Date;
   createdDate: Date;
-  discountType: 'percentage' | 'fixed' | 'free';
+  discountType: string;
   discountValue: number;
   minimumPurchase?: number;
   maximumDiscount?: number;
@@ -114,9 +115,9 @@ interface Promotion {
   code?: string; // For voucher codes
   applicablePlans: string[];
   applicableServices: string[];
-  targetAudience: 'all' | 'new-members' | 'existing-members' | 'vip' | 'specific';
+  targetAudience: string;
   specificMembers?: string[];
-  channels: ('website' | 'app' | 'email' | 'sms' | 'in-person')[];
+  channels: string[];
   autoApply: boolean;
   stackable: boolean;
   priority: number;
@@ -132,6 +133,8 @@ interface Promotion {
   image?: string;
   termsAndConditions?: string;
   isPublic: boolean;
+  policyRulesJson?: string;
+  policyConfigJson?: string;
 }
 
 interface PromotionAnalytics {
@@ -151,27 +154,58 @@ interface PromotionAnalytics {
 export function PromotionsCampaign() {
   const [activeTab, setActiveTab] = useState('overview');
   const [activeView, setActiveView] = useState<'grid' | 'table'>('grid');
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
   const [showAddPromotion, setShowAddPromotion] = useState(false);
   const [showPromotionDetail, setShowPromotionDetail] = useState(false);
-  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [isLoadingPromotions, setIsLoadingPromotions] = useState(false);
+  const [isSavingPromotion, setIsSavingPromotion] = useState(false);
+  const [editingPromotionId, setEditingPromotionId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
-  const [selectedPromotions, setSelectedPromotions] = useState<string[]>([]);
+  const [selectedPromotions, setSelectedPromotions] = useState<number[]>([]);
   const [sortField, setSortField] = useState<keyof Promotion>('createdDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showPreview, setShowPreview] = useState(false);
   const [previewPromotion, setPreviewPromotion] = useState<Promotion | null>(null);
   const [showFlyerModal, setShowFlyerModal] = useState(false);
   const [flyerPromotion, setFlyerPromotion] = useState<Promotion | null>(null);
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+  const cardShellSoft = "border-primary/10 shadow-sm";
 
   // Promotional Access Days feature
   const PROMO_ACCESS_DAYS = "promotional-access-days";
   const [promotionType, setPromotionType] = useState("");
   const [discountType, setDiscountType] = useState("");
+  const [promotionForm, setPromotionForm] = useState({
+    name: "",
+    type: "",
+    description: "",
+    startDate: "",
+    endDate: "",
+    category: "",
+    code: "",
+    discountType: "",
+    discountValue: "",
+    minimumPurchase: "",
+    maximumDiscount: "",
+    usageLimit: "",
+    usageLimitPerMember: "",
+    targetAudience: "all",
+    channels: [] as string[],
+    applicablePlans: [] as string[],
+    applicableServices: [] as string[],
+    autoApply: false,
+    stackable: false,
+    isPublic: false,
+    priority: "2",
+    tags: "",
+    termsAndConditions: "",
+    status: ""
+  });
   const [policy, setPolicy] = useState({
     applyRule: "",
     accessDays: 0,
@@ -336,182 +370,284 @@ export function PromotionsCampaign() {
     }
   ], []);
 
-  // Sample data - in real app this would come from your backend
-  const promotions: Promotion[] = [
-    {
-      id: '1',
-      name: 'New Year Fitness Challenge',
-      type: 'seasonal',
-      status: 'active',
-      description: 'Start your fitness journey with 30% off all annual memberships',
-      startDate: new Date('2024-01-01'),
-      endDate: new Date('2024-01-31'),
-      createdDate: new Date('2023-12-15'),
-      discountType: 'percentage',
-      discountValue: 30,
-      minimumPurchase: 1000,
-      maximumDiscount: 500,
-      usageLimit: 100,
-      usageCount: 45,
-      usageLimitPerMember: 1,
-      code: 'NEWYEAR2024',
-      applicablePlans: ['Premium Annual', 'Standard Annual'],
-      applicableServices: [],
-      targetAudience: 'new-members',
-      channels: ['website', 'app', 'email', 'sms'],
-      autoApply: false,
-      stackable: false,
-      priority: 1,
-      category: 'Membership',
-      tags: ['new-year', 'discount', 'annual'],
-      createdBy: 'Sarah Johnson',
-      totalRevenue: 67500,
-      totalSavings: 22500,
-      conversionRate: 15.2,
-      clickCount: 1250,
-      redemptionRate: 45,
-      averageOrderValue: 1500,
-      termsAndConditions: 'Valid for new memberships only. Cannot be combined with other offers.',
-      isPublic: true
-    },
-    {
-      id: '2',
-      name: 'Valentine\'s Couples Package',
-      type: 'combo',
-      status: 'scheduled',
-      description: 'Perfect for couples! Get 2 memberships for the price of 1.5',
-      startDate: new Date('2024-02-10'),
-      endDate: new Date('2024-02-20'),
-      createdDate: new Date('2024-01-20'),
-      discountType: 'fixed',
-      discountValue: 750,
-      minimumPurchase: 2000,
-      usageLimit: 50,
-      usageCount: 0,
-      usageLimitPerMember: 1,
-      code: 'VALENTINE2024',
-      applicablePlans: ['Standard Monthly', 'Premium Monthly'],
-      applicableServices: ['Personal Training'],
-      targetAudience: 'all',
-      channels: ['website', 'app', 'email'],
-      autoApply: false,
-      stackable: false,
-      priority: 2,
-      category: 'Special Events',
-      tags: ['valentine', 'couples', 'combo'],
-      createdBy: 'Ahmed Hassan',
-      totalRevenue: 0,
-      totalSavings: 0,
-      conversionRate: 0,
-      clickCount: 245,
-      redemptionRate: 0,
-      averageOrderValue: 0,
-      termsAndConditions: 'Both members must sign up together. Valid for couples only.',
-      isPublic: true
-    },
-    {
-      id: '3',
-      name: 'Loyalty Rewards Plus',
-      type: 'loyalty',
-      status: 'active',
-      description: 'Exclusive 15% discount for our VIP members',
-      startDate: new Date('2024-01-01'),
-      endDate: new Date('2024-12-31'),
-      createdDate: new Date('2023-12-01'),
-      discountType: 'percentage',
-      discountValue: 15,
-      usageLimit: 1000,
-      usageCount: 128,
-      usageLimitPerMember: 12,
-      applicablePlans: ['Premium Monthly', 'Premium Annual'],
-      applicableServices: ['Personal Training', 'Group Classes', 'Nutrition Counseling'],
-      targetAudience: 'vip',
-      channels: ['app', 'in-person'],
-      autoApply: true,
-      stackable: true,
-      priority: 3,
-      category: 'Loyalty',
-      tags: ['vip', 'loyalty', 'recurring'],
-      createdBy: 'Maria Rodriguez',
-      totalRevenue: 38400,
-      totalSavings: 6720,
-      conversionRate: 85.6,
-      clickCount: 150,
-      redemptionRate: 128,
-      averageOrderValue: 300,
-      termsAndConditions: 'Available to VIP members only. Automatically applied at checkout.',
-      isPublic: false
-    },
-    {
-      id: '4',
-      name: 'Student Discount',
-      type: 'discount',
-      status: 'active',
-      description: 'Special pricing for students with valid ID',
-      startDate: new Date('2023-09-01'),
-      endDate: new Date('2024-06-30'),
-      createdDate: new Date('2023-08-15'),
-      discountType: 'percentage',
-      discountValue: 20,
-      usageLimit: 200,
-      usageCount: 67,
-      usageLimitPerMember: 1,
-      code: 'STUDENT2024',
-      applicablePlans: ['Standard Monthly', 'Standard Annual'],
-      applicableServices: [],
-      targetAudience: 'specific',
-      channels: ['website', 'in-person'],
-      autoApply: false,
-      stackable: false,
-      priority: 4,
-      category: 'Demographics',
-      tags: ['student', 'education', 'verification'],
-      createdBy: 'David Wilson',
-      totalRevenue: 26800,
-      totalSavings: 6700,
-      conversionRate: 33.5,
-      clickCount: 890,
-      redemptionRate: 67,
-      averageOrderValue: 400,
-      termsAndConditions: 'Valid student ID required. One-time use per academic year.',
-      isPublic: true
-    },
-    {
-      id: '5',
-      name: 'Summer BOGO Classes',
-      type: 'bogo',
-      status: 'expired',
-      description: 'Buy one group class, get one free during summer months',
-      startDate: new Date('2023-06-01'),
-      endDate: new Date('2023-08-31'),
-      createdDate: new Date('2023-05-15'),
-      discountType: 'free',
-      discountValue: 100,
-      usageLimit: 300,
-      usageCount: 298,
-      usageLimitPerMember: 10,
-      code: 'SUMMERBOGO',
-      applicablePlans: [],
-      applicableServices: ['Group Classes'],
-      targetAudience: 'all',
-      channels: ['website', 'app', 'email'],
-      autoApply: false,
-      stackable: false,
-      priority: 2,
-      category: 'Services',
-      tags: ['summer', 'bogo', 'classes'],
-      createdBy: 'Sarah Johnson',
-      totalRevenue: 44700,
-      totalSavings: 29800,
-      conversionRate: 99.3,
-      clickCount: 2100,
-      redemptionRate: 298,
-      averageOrderValue: 150,
-      termsAndConditions: 'Valid for group classes only. Limited to 10 uses per member.',
-      isPublic: true
-    }
-  ];
+  const normalizePromotion = (api: PromotionApi): Promotion => ({
+    id: api.id,
+    name: api.name || "",
+    type: api.type || "discount",
+    status: api.status || "draft",
+    description: api.description || "",
+    startDate: api.startDate ? new Date(api.startDate) : new Date(),
+    endDate: api.endDate ? new Date(api.endDate) : new Date(),
+    createdDate: api.createdDate
+      ? new Date(api.createdDate)
+      : api.createdAt
+      ? new Date(api.createdAt)
+      : new Date(),
+    discountType: api.discountType || "percentage",
+    discountValue: Number(api.discountValue ?? 0),
+    minimumPurchase: api.minimumPurchase ?? undefined,
+    maximumDiscount: api.maximumDiscount ?? undefined,
+    usageLimit: api.usageLimit ?? undefined,
+    usageCount: Number(api.usageCount ?? 0),
+    usageLimitPerMember: api.usageLimitPerMember ?? undefined,
+    code: api.code || undefined,
+    applicablePlans: api.applicablePlans ?? [],
+    applicableServices: api.applicableServices ?? [],
+    targetAudience: api.targetAudience || "all",
+    specificMembers: api.specificMembers ?? [],
+    channels: api.channels ?? [],
+    autoApply: Boolean(api.autoApply),
+    stackable: Boolean(api.stackable),
+    priority: api.priority ?? 2,
+    category: api.category || "",
+    tags: api.tags ?? [],
+    createdBy: api.createdBy || "System",
+    totalRevenue: Number(api.totalRevenue ?? 0),
+    totalSavings: Number(api.totalSavings ?? 0),
+    conversionRate: Number(api.conversionRate ?? 0),
+    clickCount: Number(api.clickCount ?? 0),
+    redemptionRate: Number(api.redemptionRate ?? 0),
+    averageOrderValue: Number(api.averageOrderValue ?? 0),
+    image: api.image || undefined,
+    termsAndConditions: api.termsAndConditions || undefined,
+    isPublic: Boolean(api.isPublic),
+    policyRulesJson: api.policyRulesJson || undefined,
+    policyConfigJson: api.policyConfigJson || undefined
+  });
 
+  const resetPromotionForm = useCallback(() => {
+    setPromotionForm({
+      name: "",
+      type: "",
+      description: "",
+      startDate: "",
+      endDate: "",
+      category: "",
+      code: "",
+      discountType: "",
+      discountValue: "",
+      minimumPurchase: "",
+      maximumDiscount: "",
+      usageLimit: "",
+      usageLimitPerMember: "",
+      targetAudience: "all",
+      channels: [],
+      applicablePlans: [],
+      applicableServices: [],
+      autoApply: false,
+      stackable: false,
+      isPublic: false,
+      priority: "2",
+      tags: "",
+      termsAndConditions: "",
+      status: ""
+    });
+    setPromotionType("");
+    setDiscountType("");
+    setPolicyRules([]);
+    setPolicy({
+      applyRule: "",
+      accessDays: 0,
+      validityFrom: "",
+      validityTo: "",
+      expiringInDays: 0,
+      includeGuests: false
+    });
+    setEditingPromotionId(null);
+  }, []);
+
+  const fetchPromotions = useCallback(async () => {
+    setIsLoadingPromotions(true);
+    try {
+      const data = await promotionsService.getPromotions();
+      setPromotions(data.map(normalizePromotion));
+    } catch (e) {
+      toast.error("Failed to load promotions");
+    } finally {
+      setIsLoadingPromotions(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPromotions();
+  }, [fetchPromotions]);
+
+  const openCreatePromotion = useCallback(() => {
+    resetPromotionForm();
+    setShowAddPromotion(true);
+  }, [resetPromotionForm]);
+
+  const openEditPromotion = useCallback((promotion: Promotion) => {
+    const toDateInput = (d: Date) => d.toISOString().slice(0, 10);
+    setEditingPromotionId(promotion.id);
+    setPromotionForm({
+      name: promotion.name || "",
+      type: promotion.type || "",
+      description: promotion.description || "",
+      startDate: toDateInput(promotion.startDate),
+      endDate: toDateInput(promotion.endDate),
+      category: promotion.category || "",
+      code: promotion.code || "",
+      discountType: promotion.discountType || "",
+      discountValue: promotion.discountValue?.toString() ?? "",
+      minimumPurchase: promotion.minimumPurchase?.toString() ?? "",
+      maximumDiscount: promotion.maximumDiscount?.toString() ?? "",
+      usageLimit: promotion.usageLimit?.toString() ?? "",
+      usageLimitPerMember: promotion.usageLimitPerMember?.toString() ?? "",
+      targetAudience: promotion.targetAudience || "all",
+      channels: promotion.channels || [],
+      applicablePlans: promotion.applicablePlans || [],
+      applicableServices: promotion.applicableServices || [],
+      autoApply: Boolean(promotion.autoApply),
+      stackable: Boolean(promotion.stackable),
+      isPublic: Boolean(promotion.isPublic),
+      priority: promotion.priority?.toString() ?? "2",
+      tags: promotion.tags?.join(", ") ?? "",
+      termsAndConditions: promotion.termsAndConditions || "",
+      status: promotion.status || ""
+    });
+    setPromotionType(promotion.type || "");
+    setDiscountType(promotion.discountType || "");
+
+    if (promotion.policyRulesJson) {
+      try {
+        setPolicyRules(JSON.parse(promotion.policyRulesJson));
+      } catch {
+        setPolicyRules([]);
+      }
+    } else {
+      setPolicyRules([]);
+    }
+
+    if (promotion.policyConfigJson) {
+      try {
+        setPolicy(JSON.parse(promotion.policyConfigJson));
+      } catch {
+        setPolicy({
+          applyRule: "",
+          accessDays: 0,
+          validityFrom: "",
+          validityTo: "",
+          expiringInDays: 0,
+          includeGuests: false
+        });
+      }
+    } else {
+      setPolicy({
+        applyRule: "",
+        accessDays: 0,
+        validityFrom: "",
+        validityTo: "",
+        expiringInDays: 0,
+        includeGuests: false
+      });
+    }
+
+    setShowAddPromotion(true);
+  }, []);
+
+  const buildPromotionPayload = (statusOverride?: string): PromotionRequest => {
+    const toNumber = (value: string) => {
+      if (value === "") return undefined;
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? undefined : parsed;
+    };
+
+    const status = statusOverride
+      || promotionForm.status
+      || (promotionForm.startDate && new Date(promotionForm.startDate) > new Date() ? "scheduled" : "active");
+
+    const selectedType = promotionForm.type || promotionType || "discount";
+    const selectedDiscountType = promotionForm.discountType || discountType || "percentage";
+
+    const payload: PromotionRequest = {
+      name: promotionForm.name.trim(),
+      type: selectedType,
+      status,
+      description: promotionForm.description || "",
+      startDate: promotionForm.startDate || undefined,
+      endDate: promotionForm.endDate || undefined,
+      discountType: selectedDiscountType,
+      discountValue: toNumber(promotionForm.discountValue),
+      minimumPurchase: toNumber(promotionForm.minimumPurchase),
+      maximumDiscount: toNumber(promotionForm.maximumDiscount),
+      usageLimit: toNumber(promotionForm.usageLimit),
+      usageLimitPerMember: toNumber(promotionForm.usageLimitPerMember),
+      code: promotionForm.code || undefined,
+      applicablePlans: promotionForm.applicablePlans,
+      applicableServices: promotionForm.applicableServices,
+      targetAudience: promotionForm.targetAudience,
+      channels: promotionForm.channels,
+      autoApply: promotionForm.autoApply,
+      stackable: promotionForm.stackable,
+      priority: promotionForm.priority ? Number(promotionForm.priority) : undefined,
+      category: promotionForm.category || "",
+      tags: promotionForm.tags
+        .split(",")
+        .map(tag => tag.trim())
+        .filter(Boolean),
+      termsAndConditions: promotionForm.termsAndConditions || undefined,
+      isPublic: promotionForm.isPublic
+    };
+
+    if (selectedType === PROMO_ACCESS_DAYS || selectedDiscountType === PROMO_ACCESS_DAYS) {
+      payload.policyRulesJson = JSON.stringify(policyRules || []);
+      payload.policyConfigJson = JSON.stringify(policy || {});
+    }
+
+    if (!editingPromotionId) {
+      const user = authService.getCurrentUser();
+      payload.createdBy = user?.name || "System";
+    }
+
+    return payload;
+  };
+
+  const updateArrayField = (
+    field: "channels" | "applicablePlans" | "applicableServices",
+    value: string,
+    checked: boolean
+  ) => {
+    setPromotionForm(prev => {
+      const current = prev[field] as string[];
+      const next = checked
+        ? Array.from(new Set([...current, value]))
+        : current.filter(v => v !== value);
+      return { ...prev, [field]: next };
+    });
+  };
+
+  const submitPromotion = async (statusOverride?: string) => {
+    if (!promotionForm.name.trim()) {
+      toast.error("Promotion name is required");
+      return;
+    }
+
+    const typeValue = promotionForm.type || promotionType;
+    if (!typeValue) {
+      toast.error("Please select a promotion type");
+      return;
+    }
+
+    setIsSavingPromotion(true);
+    try {
+      const payload = buildPromotionPayload(statusOverride);
+      if (editingPromotionId) {
+        await promotionsService.updatePromotion(editingPromotionId, payload);
+        toast.success("Promotion updated successfully");
+      } else {
+        await promotionsService.createPromotion(payload);
+        toast.success("Promotion created successfully");
+      }
+      setShowAddPromotion(false);
+      resetPromotionForm();
+      await fetchPromotions();
+    } catch (e) {
+      toast.error("Failed to save promotion");
+    } finally {
+      setIsSavingPromotion(false);
+    }
+  };
   // Calculate analytics
   const analytics = useMemo((): PromotionAnalytics => {
     const totalPromotions = promotions.length;
@@ -535,8 +671,8 @@ export function PromotionsCampaign() {
       totalSavings,
       conversionRate: avgConversionRate,
       topPerformingPromotion: topPromotion?.name || 'None',
-      revenueGrowth: 12.5,
-      redemptionGrowth: 8.3
+      revenueGrowth: 0,
+      redemptionGrowth: 0
     };
   }, [promotions]);
 
@@ -649,58 +785,81 @@ export function PromotionsCampaign() {
     setShowPromotionDetail(true);
   }, []);
 
-  const handleQuickAction = useCallback((promotion: Promotion, action: string) => {
-    switch (action) {
-      case 'share':
-        setFlyerPromotion(promotion);
-        setShowFlyerModal(true);
-        break;
-      case 'edit':
-        toast.info('Edit promotion feature coming soon!');
-        break;
-      case 'preview':
-        setPreviewPromotion(promotion);
-        setShowPreview(true);
-        break;
-      case 'duplicate':
-        toast.success(`Created duplicate of ${promotion.name}`);
-        break;
-      case 'pause':
-        toast.success(`Promotion ${promotion.name} paused`);
-        break;
-      case 'activate':
-        toast.success(`Promotion ${promotion.name} activated`);
-        break;
-      default:
-        toast.info(`Action: ${action} for ${promotion.name}`);
+  const handleQuickAction = useCallback(async (promotion: Promotion, action: string) => {
+    try {
+      switch (action) {
+        case 'share':
+          setFlyerPromotion(promotion);
+          setShowFlyerModal(true);
+          break;
+        case 'edit':
+          openEditPromotion(promotion);
+          break;
+        case 'preview':
+          setPreviewPromotion(promotion);
+          setShowPreview(true);
+          break;
+        case 'duplicate':
+          await promotionsService.duplicatePromotion(promotion.id);
+          toast.success(`Created duplicate of ${promotion.name}`);
+          await fetchPromotions();
+          break;
+        case 'pause':
+          await promotionsService.updatePromotion(promotion.id, { status: 'paused' });
+          toast.success(`Promotion ${promotion.name} paused`);
+          await fetchPromotions();
+          break;
+        case 'activate':
+          await promotionsService.updatePromotion(promotion.id, { status: 'active' });
+          toast.success(`Promotion ${promotion.name} activated`);
+          await fetchPromotions();
+          break;
+        case 'delete': {
+          const confirmed = window.confirm(`Delete promotion \"${promotion.name}\"?`);
+          if (!confirmed) return;
+          await promotionsService.deletePromotion(promotion.id);
+          toast.success(`Deleted ${promotion.name}`);
+          setShowPromotionDetail(false);
+          setSelectedPromotion(null);
+          setSelectedPromotions(prev => prev.filter(id => id !== promotion.id));
+          await fetchPromotions();
+          break;
+        }
+        default:
+          toast.info(`Action: ${action} for ${promotion.name}`);
+      }
+    } catch (e) {
+      toast.error("Action failed. Please try again.");
     }
-  }, []);
+  }, [fetchPromotions, openEditPromotion]);
 
-  const handleBulkAction = useCallback((action: string) => {
+  const handleBulkAction = useCallback(async (action: string) => {
     if (selectedPromotions.length === 0) {
       toast.error('Please select promotions first');
       return;
     }
-    
-    switch (action) {
-      case 'activate':
-        toast.success(`Activated ${selectedPromotions.length} promotions`);
-        break;
-      case 'pause':
-        toast.success(`Paused ${selectedPromotions.length} promotions`);
-        break;
-      case 'duplicate':
-        toast.success(`Duplicated ${selectedPromotions.length} promotions`);
-        break;
-      case 'delete':
-        toast.success(`Deleted ${selectedPromotions.length} promotions`);
-        break;
-      default:
-        toast.info(`Action: ${action} for ${selectedPromotions.length} promotions`);
+
+    if (action === 'delete') {
+      const confirmed = window.confirm(`Delete ${selectedPromotions.length} promotion(s)?`);
+      if (!confirmed) return;
     }
-    setSelectedPromotions([]);
-    setShowBulkActions(false);
-  }, [selectedPromotions]);
+
+    try {
+      await promotionsService.bulkAction(action, selectedPromotions);
+      if (action === 'activate') toast.success(`Activated ${selectedPromotions.length} promotions`);
+      else if (action === 'pause' || action === 'deactivate') toast.success(`Paused ${selectedPromotions.length} promotions`);
+      else if (action === 'duplicate') toast.success(`Duplicated ${selectedPromotions.length} promotions`);
+      else if (action === 'delete') toast.success(`Deleted ${selectedPromotions.length} promotions`);
+      else toast.info(`Action: ${action} for ${selectedPromotions.length} promotions`);
+      setSelectedPromotions([]);
+      setShowBulkActions(false);
+      await fetchPromotions();
+    } catch (e) {
+      toast.error("Bulk action failed. Please try again.");
+    }
+  }, [selectedPromotions, fetchPromotions]);
+
+  const isEditing = editingPromotionId !== null;
 
   return (
     <div className="p-6 space-y-6">
@@ -713,15 +872,7 @@ export function PromotionsCampaign() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => setShowBulkActions(true)}>
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-          <Button variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
-          <Button onClick={() => setShowAddPromotion(true)}>
+          <Button onClick={openCreatePromotion}>
             <Plus className="mr-2 h-4 w-4" />
             Create Promotion
           </Button>
@@ -730,7 +881,7 @@ export function PromotionsCampaign() {
 
       {/* Analytics KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-        <Card>
+        <Card className={cardShell}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -742,7 +893,7 @@ export function PromotionsCampaign() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cardShell}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -754,7 +905,7 @@ export function PromotionsCampaign() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cardShell}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -766,7 +917,7 @@ export function PromotionsCampaign() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cardShell}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -778,7 +929,7 @@ export function PromotionsCampaign() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cardShell}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -790,7 +941,7 @@ export function PromotionsCampaign() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cardShell}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -802,7 +953,7 @@ export function PromotionsCampaign() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cardShell}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -814,7 +965,7 @@ export function PromotionsCampaign() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={cardShell}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -828,7 +979,7 @@ export function PromotionsCampaign() {
       </div>
 
       {/* Filters and Search */}
-      <Card>
+      <Card className={cardShell}>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
@@ -928,20 +1079,22 @@ export function PromotionsCampaign() {
       {/* Bulk Actions */}
       {selectedPromotions.length > 0 && (
         <Alert>
-          <AlertCircle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
-            <span>{selectedPromotions.length} promotions selected</span>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <AlertCircle className="h-4 w-4" />
+              <span>{selectedPromotions.length} promotions selected</span>
+            </div>
             <div className="flex space-x-2">
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('activate')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('activate')}>
                 Activate
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('pause')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('pause')}>
                 Pause
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('duplicate')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('duplicate')}>
                 Duplicate
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('delete')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('delete')}>
                 Delete
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setSelectedPromotions([])}>
@@ -953,54 +1106,57 @@ export function PromotionsCampaign() {
       )}
 
       {/* Main Content */}
-      {activeView === 'grid' ? (
-        /* Grid View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredPromotions.map((promotion) => (
-            <Card key={promotion.id} className="hover:shadow-lg transition-shadow cursor-pointer relative group">
-              <div className="absolute top-4 left-4">
-                <Checkbox
-                  checked={selectedPromotions.includes(promotion.id)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedPromotions([...selectedPromotions, promotion.id]);
-                    } else {
-                      setSelectedPromotions(selectedPromotions.filter(id => id !== promotion.id));
-                    }
-                  }}
-                  className="bg-white border-2"
-                />
-              </div>
-              
-              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 bg-white">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-40" align="end">
-                    <div className="space-y-1">
-                      <Button variant="ghost" size="sm" className="w-full justify-start" 
-                             onClick={() => handleQuickAction(promotion, 'preview')}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        Preview
+      <div key={activeView} className="animate-in fade-in-0 zoom-in-95 duration-200">
+        {isLoadingPromotions ? (
+          <div className="py-10 text-center text-muted-foreground">Loading promotions...</div>
+        ) : activeView === 'grid' ? (
+          /* Grid View */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredPromotions.map((promotion) => (
+              <Card key={promotion.id} className={`${cardShell} cursor-pointer relative group`}>
+                <div className="absolute top-4 left-4">
+                  <Checkbox
+                    checked={selectedPromotions.includes(promotion.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedPromotions(prev => Array.from(new Set([...prev, promotion.id])));
+                      } else {
+                        setSelectedPromotions(prev => prev.filter(id => id !== promotion.id));
+                      }
+                    }}
+                    className="bg-white border-2"
+                  />
+                </div>
+
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 bg-white">
+                        <MoreVertical className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="w-full justify-start"
-                             onClick={() => handleQuickAction(promotion, 'edit')}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </Button>
-                      <Button variant="ghost" size="sm" className="w-full justify-start"
-                             onClick={() => handleQuickAction(promotion, 'share')}>
-                        <Share className="mr-2 h-4 w-4" />
-                        Share
-                      </Button>
-                      <Button variant="ghost" size="sm" className="w-full justify-start"
-                             onClick={() => handleQuickAction(promotion, 'duplicate')}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        Duplicate
-                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-40" align="end">
+                      <div className="space-y-1">
+                        <Button variant="ghost" size="sm" className="w-full justify-start" 
+                               onClick={() => handleQuickAction(promotion, 'preview')}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Preview
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full justify-start"
+                               onClick={() => handleQuickAction(promotion, 'edit')}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full justify-start"
+                               onClick={() => handleQuickAction(promotion, 'share')}>
+                          <Share className="mr-2 h-4 w-4" />
+                          Share
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full justify-start"
+                               onClick={() => handleQuickAction(promotion, 'duplicate')}>
+                          <Copy className="mr-2 h-4 w-4" />
+                          Duplicate
+                        </Button>
                       <Separator />
                       {promotion.status === 'active' ? (
                         <Button variant="ghost" size="sm" className="w-full justify-start"
@@ -1015,228 +1171,239 @@ export function PromotionsCampaign() {
                           Activate
                         </Button>
                       )}
+                      <Separator />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-red-600"
+                        onClick={() => handleQuickAction(promotion, 'delete')}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </Button>
                     </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <CardContent className="p-6" onClick={() => handlePromotionClick(promotion)}>
-                <div className="space-y-4">
-                  {/* Header */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Badge className={getTypeColor(promotion.type)}>
-                        {getTypeIcon(promotion.type)}
-                        <span className="ml-1 capitalize">{promotion.type}</span>
-                      </Badge>
-                      <Badge className={getStatusColor(promotion.status)}>
-                        {getStatusIcon(promotion.status)}
-                        <span className="ml-1 capitalize">{promotion.status}</span>
-                      </Badge>
-                    </div>
-                    <h3 className="font-semibold text-lg leading-tight">{promotion.name}</h3>
-                    <p className="text-muted-foreground text-sm line-clamp-2">{promotion.description}</p>
-                  </div>
-
-                  {/* Discount Badge */}
-                  <div className="flex items-center justify-center py-3">
-                    <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full px-4 py-2 font-bold text-lg">
-                      {formatDiscount(promotion)}
-                    </div>
-                  </div>
-
-                  {/* Details */}
-                  <div className="space-y-3">
-                    {promotion.code && (
-                      <div className="flex items-center justify-between p-2 bg-muted rounded-md">
-                        <span className="text-sm font-mono">{promotion.code}</span>
-                        <Button size="sm" variant="ghost" onClick={(e) => {
-                          e.stopPropagation();
-                          handleQuickAction(promotion, 'share');
-                        }}>
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Valid until:</span>
-                      <span className="font-medium">{format(promotion.endDate, 'MMM dd, yyyy')}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Used:</span>
-                      <span className="font-medium">
-                        {promotion.usageCount}{promotion.usageLimit ? `/${promotion.usageLimit}` : ''}
-                      </span>
-                    </div>
-
-                    {promotion.usageLimit && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span>Usage Progress</span>
-                          <span>{getUsageProgress(promotion).toFixed(0)}%</span>
-                        </div>
-                        <Progress value={getUsageProgress(promotion)} className="h-2" />
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Revenue:</span>
-                      <span className="font-medium text-green-600">{promotion.totalRevenue.toLocaleString()} AED</span>
-                    </div>
-                  </div>
-
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-1">
-                    {promotion.tags.slice(0, 3).map(tag => (
-                      <Badge key={tag} variant="outline" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                    {promotion.tags.length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{promotion.tags.length - 3}
-                      </Badge>
-                    )}
-                  </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        /* Table View */
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Promotions List ({filteredPromotions.length})</span>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                >
-                  {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
-                </Button>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectedPromotions.length === filteredPromotions.length}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedPromotions(filteredPromotions.map(p => p.id));
-                        } else {
-                          setSelectedPromotions([]);
-                        }
-                      }}
-                    />
-                  </TableHead>
-                  <TableHead>Promotion</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Discount</TableHead>
-                  <TableHead>Usage</TableHead>
-                  <TableHead>Valid Until</TableHead>
-                  <TableHead>Revenue</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPromotions.map((promotion) => (
-                  <TableRow key={promotion.id} className="cursor-pointer hover:bg-muted/50">
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedPromotions.includes(promotion.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedPromotions([...selectedPromotions, promotion.id]);
-                          } else {
-                            setSelectedPromotions(selectedPromotions.filter(id => id !== promotion.id));
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell onClick={() => handlePromotionClick(promotion)}>
-                      <div>
-                        <p className="font-medium">{promotion.name}</p>
-                        <p className="text-sm text-muted-foreground line-clamp-1">{promotion.description}</p>
-                        {promotion.code && (
-                          <Badge variant="outline" className="text-xs mt-1">
-                            {promotion.code}
-                          </Badge>
-                        )}
+
+                <CardContent className="p-6" onClick={() => handlePromotionClick(promotion)}>
+                  <div className="space-y-4">
+                    {/* Header */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Badge className={getTypeColor(promotion.type)}>
+                          {getTypeIcon(promotion.type)}
+                          <span className="ml-1 capitalize">{promotion.type}</span>
+                        </Badge>
+                        <Badge className={getStatusColor(promotion.status)}>
+                          {getStatusIcon(promotion.status)}
+                          <span className="ml-1 capitalize">{promotion.status}</span>
+                        </Badge>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getTypeColor(promotion.type)}>
-                        {getTypeIcon(promotion.type)}
-                        <span className="ml-1 capitalize">{promotion.type}</span>
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(promotion.status)}>
-                        {getStatusIcon(promotion.status)}
-                        <span className="ml-1 capitalize">{promotion.status}</span>
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium text-purple-600">
+                      <h3 className="font-semibold text-lg leading-tight">{promotion.name}</h3>
+                      <p className="text-muted-foreground text-sm line-clamp-2">{promotion.description}</p>
+                    </div>
+
+                    {/* Discount Badge */}
+                    <div className="flex items-center justify-center py-3">
+                      <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full px-4 py-2 font-bold text-lg">
                         {formatDiscount(promotion)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div>
+                      </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="space-y-3">
+                      {promotion.code && (
+                        <div className="flex items-center justify-between p-2 bg-muted rounded-md">
+                          <span className="text-sm font-mono">{promotion.code}</span>
+                          <Button size="sm" variant="ghost" onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickAction(promotion, 'share');
+                          }}>
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Valid until:</span>
+                        <span className="font-medium">{format(promotion.endDate, 'MMM dd, yyyy')}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Used:</span>
                         <span className="font-medium">
                           {promotion.usageCount}{promotion.usageLimit ? `/${promotion.usageLimit}` : ''}
                         </span>
-                        {promotion.usageLimit && (
-                          <Progress value={getUsageProgress(promotion)} className="w-16 h-1 mt-1" />
-                        )}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className={cn(
-                        "text-sm",
-                        isAfter(promotion.endDate, new Date()) ? "text-green-600" : "text-red-600"
-                      )}>
-                        {format(promotion.endDate, 'MMM dd, yyyy')}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium text-green-600">
-                        {promotion.totalRevenue.toLocaleString()} AED
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-1">
-                        <Button size="sm" variant="ghost" onClick={() => handleQuickAction(promotion, 'preview')}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleQuickAction(promotion, 'edit')}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleQuickAction(promotion, 'share')}>
-                          <Share className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handlePromotionClick(promotion)}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
+
+                      {promotion.usageLimit && (
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span>Usage Progress</span>
+                            <span>{getUsageProgress(promotion).toFixed(0)}%</span>
+                          </div>
+                          <Progress value={getUsageProgress(promotion)} className="h-2" />
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Revenue:</span>
+                        <span className="font-medium text-green-600">{promotion.totalRevenue.toLocaleString()} AED</span>
                       </div>
-                    </TableCell>
+                    </div>
+
+                    {/* Tags */}
+                    <div className="flex flex-wrap gap-1">
+                      {promotion.tags.slice(0, 3).map(tag => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {promotion.tags.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{promotion.tags.length - 3}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          /* Table View */
+          <Card className={cardShell}>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Promotions List ({filteredPromotions.length})</span>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                  >
+                    {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table className="[&_tr]:border-0">
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent border-0">
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={filteredPromotions.length > 0 && selectedPromotions.length === filteredPromotions.length}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedPromotions(filteredPromotions.map(p => p.id));
+                          } else {
+                            setSelectedPromotions([]);
+                          }
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead>Promotion</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Discount</TableHead>
+                    <TableHead>Usage</TableHead>
+                    <TableHead>Valid Until</TableHead>
+                    <TableHead>Revenue</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+                </TableHeader>
+                <TableBody>
+                  {filteredPromotions.map((promotion) => (
+                    <TableRow key={promotion.id} className="cursor-pointer hover:bg-slate-50/50 transition-colors border-0">
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedPromotions.includes(promotion.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedPromotions(prev => Array.from(new Set([...prev, promotion.id])));
+                            } else {
+                              setSelectedPromotions(prev => prev.filter(id => id !== promotion.id));
+                            }
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell onClick={() => handlePromotionClick(promotion)}>
+                        <div>
+                          <p className="font-medium">{promotion.name}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-1">{promotion.description}</p>
+                          {promotion.code && (
+                            <Badge variant="outline" className="text-xs mt-1">
+                              {promotion.code}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getTypeColor(promotion.type)}>
+                          {getTypeIcon(promotion.type)}
+                          <span className="ml-1 capitalize">{promotion.type}</span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(promotion.status)}>
+                          {getStatusIcon(promotion.status)}
+                          <span className="ml-1 capitalize">{promotion.status}</span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium text-purple-600">
+                          {formatDiscount(promotion)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <span className="font-medium">
+                            {promotion.usageCount}{promotion.usageLimit ? `/${promotion.usageLimit}` : ''}
+                          </span>
+                          {promotion.usageLimit && (
+                            <Progress value={getUsageProgress(promotion)} className="w-16 h-1 mt-1" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={cn(
+                          "text-sm",
+                          isAfter(promotion.endDate, new Date()) ? "text-green-600" : "text-red-600"
+                        )}>
+                          {format(promotion.endDate, 'MMM dd, yyyy')}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium text-green-600">
+                          {promotion.totalRevenue.toLocaleString()} AED
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-1">
+                          <Button size="sm" variant="ghost" onClick={() => handleQuickAction(promotion, 'preview')}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleQuickAction(promotion, 'edit')}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleQuickAction(promotion, 'share')}>
+                            <Share className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handlePromotionClick(promotion)}>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Promotion Detail Sheet */}
       <Sheet open={showPromotionDetail} onOpenChange={setShowPromotionDetail}>
@@ -1263,7 +1430,7 @@ export function PromotionsCampaign() {
 
               <div className="space-y-6 mt-6">
                 {/* Promotion Overview */}
-                <Card>
+                <Card className={cardShellSoft}>
                   <CardHeader>
                     <CardTitle className="text-lg">Promotion Details</CardTitle>
                   </CardHeader>
@@ -1323,7 +1490,7 @@ export function PromotionsCampaign() {
                 </Card>
 
                 {/* Usage & Limits */}
-                <Card>
+                <Card className={cardShellSoft}>
                   <CardHeader>
                     <CardTitle className="text-lg">Usage & Limits</CardTitle>
                   </CardHeader>
@@ -1360,7 +1527,7 @@ export function PromotionsCampaign() {
                 </Card>
 
                 {/* Performance Analytics */}
-                <Card>
+                <Card className={cardShellSoft}>
                   <CardHeader>
                     <CardTitle className="text-lg">Performance Analytics</CardTitle>
                   </CardHeader>
@@ -1395,7 +1562,7 @@ export function PromotionsCampaign() {
                 </Card>
 
                 {/* Targeting & Distribution */}
-                <Card>
+                <Card className={cardShellSoft}>
                   <CardHeader>
                     <CardTitle className="text-lg">Targeting & Distribution</CardTitle>
                   </CardHeader>
@@ -1465,7 +1632,7 @@ export function PromotionsCampaign() {
                 </Card>
 
                 {/* Quick Actions */}
-                <Card>
+                <Card className={cardShellSoft}>
                   <CardHeader>
                     <CardTitle className="text-lg">Quick Actions</CardTitle>
                   </CardHeader>
@@ -1487,6 +1654,14 @@ export function PromotionsCampaign() {
                         <Copy className="mr-2 h-4 w-4" />
                         Duplicate
                       </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleQuickAction(selectedPromotion, 'delete')}
+                        className="justify-start"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -1497,12 +1672,18 @@ export function PromotionsCampaign() {
       </Sheet>
 
       {/* Add New Promotion Dialog */}
-      <Dialog open={showAddPromotion} onOpenChange={setShowAddPromotion}>
+      <Dialog
+        open={showAddPromotion}
+        onOpenChange={(open) => {
+          setShowAddPromotion(open);
+          if (!open) resetPromotionForm();
+        }}
+      >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create New Promotion</DialogTitle>
+            <DialogTitle>{isEditing ? "Edit Promotion" : "Create New Promotion"}</DialogTitle>
             <DialogDescription>
-              Design and configure a new promotional campaign
+              {isEditing ? "Update details for this promotion" : "Design and configure a new promotional campaign"}
             </DialogDescription>
           </DialogHeader>
           
@@ -1518,14 +1699,21 @@ export function PromotionsCampaign() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Promotion Name</Label>
-                  <Input id="name" placeholder="Enter promotion name" />
+                  <Input
+                    id="name"
+                    placeholder="Enter promotion name"
+                    value={promotionForm.name}
+                    onChange={(e) => setPromotionForm(prev => ({ ...prev, name: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="type">Promotion Type</Label>
-                  <Select value={promotionType} onValueChange={(val) => {
+                  <Select value={promotionForm.type} onValueChange={(val) => {
                     setPromotionType(val);
+                    setPromotionForm(prev => ({ ...prev, type: val }));
                     if (val === PROMO_ACCESS_DAYS) {
                       setDiscountType(PROMO_ACCESS_DAYS);
+                      setPromotionForm(prev => ({ ...prev, discountType: PROMO_ACCESS_DAYS }));
                     }
                   }}>
                     <SelectTrigger>
@@ -1544,19 +1732,37 @@ export function PromotionsCampaign() {
                 </div>
                 <div className="md:col-span-2">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" placeholder="Describe your promotion" />
+                  <Textarea
+                    id="description"
+                    placeholder="Describe your promotion"
+                    value={promotionForm.description}
+                    onChange={(e) => setPromotionForm(prev => ({ ...prev, description: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="startDate">Start Date</Label>
-                  <Input id="startDate" type="date" />
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={promotionForm.startDate}
+                    onChange={(e) => setPromotionForm(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="endDate">End Date</Label>
-                  <Input id="endDate" type="date" />
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={promotionForm.endDate}
+                    onChange={(e) => setPromotionForm(prev => ({ ...prev, endDate: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="category">Category</Label>
-                  <Select>
+                  <Select
+                    value={promotionForm.category}
+                    onValueChange={(val) => setPromotionForm(prev => ({ ...prev, category: val }))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
@@ -1571,7 +1777,12 @@ export function PromotionsCampaign() {
                 </div>
                 <div>
                   <Label htmlFor="code">Promotion Code (Optional)</Label>
-                  <Input id="code" placeholder="e.g., NEWYEAR2024" />
+                  <Input
+                    id="code"
+                    placeholder="e.g., NEWYEAR2024"
+                    value={promotionForm.code}
+                    onChange={(e) => setPromotionForm(prev => ({ ...prev, code: e.target.value }))}
+                  />
                 </div>
               </div>
             </TabsContent>
@@ -1580,7 +1791,10 @@ export function PromotionsCampaign() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="discountType">Discount Type</Label>
-                  <Select value={discountType} onValueChange={setDiscountType}>
+                  <Select value={promotionForm.discountType} onValueChange={(val) => {
+                    setDiscountType(val);
+                    setPromotionForm(prev => ({ ...prev, discountType: val }));
+                  }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select discount type" />
                     </SelectTrigger>
@@ -1597,25 +1811,55 @@ export function PromotionsCampaign() {
                 {promotionType !== PROMO_ACCESS_DAYS && discountType !== PROMO_ACCESS_DAYS && (
                   <div>
                     <Label htmlFor="discountValue">Discount Value</Label>
-                    <Input id="discountValue" type="number" placeholder="Enter value" />
+                    <Input
+                      id="discountValue"
+                      type="number"
+                      placeholder="Enter value"
+                      value={promotionForm.discountValue}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, discountValue: e.target.value }))}
+                    />
                   </div>
                 )}
                 
                 <div>
                   <Label htmlFor="minimumPurchase">Minimum Purchase (AED)</Label>
-                  <Input id="minimumPurchase" type="number" placeholder="Optional" />
+                  <Input
+                    id="minimumPurchase"
+                    type="number"
+                    placeholder="Optional"
+                    value={promotionForm.minimumPurchase}
+                    onChange={(e) => setPromotionForm(prev => ({ ...prev, minimumPurchase: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="maximumDiscount">Maximum Discount (AED)</Label>
-                  <Input id="maximumDiscount" type="number" placeholder="Optional" />
+                  <Input
+                    id="maximumDiscount"
+                    type="number"
+                    placeholder="Optional"
+                    value={promotionForm.maximumDiscount}
+                    onChange={(e) => setPromotionForm(prev => ({ ...prev, maximumDiscount: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="usageLimit">Total Usage Limit</Label>
-                  <Input id="usageLimit" type="number" placeholder="Leave empty for unlimited" />
+                  <Input
+                    id="usageLimit"
+                    type="number"
+                    placeholder="Leave empty for unlimited"
+                    value={promotionForm.usageLimit}
+                    onChange={(e) => setPromotionForm(prev => ({ ...prev, usageLimit: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="memberLimit">Usage Limit Per Member</Label>
-                  <Input id="memberLimit" type="number" placeholder="Leave empty for unlimited" />
+                  <Input
+                    id="memberLimit"
+                    type="number"
+                    placeholder="Leave empty for unlimited"
+                    value={promotionForm.usageLimitPerMember}
+                    onChange={(e) => setPromotionForm(prev => ({ ...prev, usageLimitPerMember: e.target.value }))}
+                  />
                 </div>
               </div>
 
@@ -1662,7 +1906,10 @@ export function PromotionsCampaign() {
             <TabsContent value="targeting" className="space-y-4">
               <div>
                 <Label htmlFor="targetAudience">Target Audience</Label>
-                <Select>
+                <Select
+                  value={promotionForm.targetAudience}
+                  onValueChange={(val) => setPromotionForm(prev => ({ ...prev, targetAudience: val }))}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select target audience" />
                   </SelectTrigger>
@@ -1680,23 +1927,43 @@ export function PromotionsCampaign() {
                 <Label>Distribution Channels</Label>
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="website" />
+                    <Checkbox
+                      id="website"
+                      checked={promotionForm.channels.includes("website")}
+                      onCheckedChange={(checked) => updateArrayField("channels", "website", checked === true)}
+                    />
                     <Label htmlFor="website">Website</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="app" />
+                    <Checkbox
+                      id="app"
+                      checked={promotionForm.channels.includes("app")}
+                      onCheckedChange={(checked) => updateArrayField("channels", "app", checked === true)}
+                    />
                     <Label htmlFor="app">Mobile App</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="email" />
+                    <Checkbox
+                      id="email"
+                      checked={promotionForm.channels.includes("email")}
+                      onCheckedChange={(checked) => updateArrayField("channels", "email", checked === true)}
+                    />
                     <Label htmlFor="email">Email</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="sms" />
+                    <Checkbox
+                      id="sms"
+                      checked={promotionForm.channels.includes("sms")}
+                      onCheckedChange={(checked) => updateArrayField("channels", "sms", checked === true)}
+                    />
                     <Label htmlFor="sms">SMS</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="in-person" />
+                    <Checkbox
+                      id="in-person"
+                      checked={promotionForm.channels.includes("in-person")}
+                      onCheckedChange={(checked) => updateArrayField("channels", "in-person", checked === true)}
+                    />
                     <Label htmlFor="in-person">In-Person</Label>
                   </div>
                 </div>
@@ -1706,19 +1973,35 @@ export function PromotionsCampaign() {
                 <Label>Applicable Plans</Label>
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="standard-monthly" />
+                    <Checkbox
+                      id="standard-monthly"
+                      checked={promotionForm.applicablePlans.includes("Standard Monthly")}
+                      onCheckedChange={(checked) => updateArrayField("applicablePlans", "Standard Monthly", checked === true)}
+                    />
                     <Label htmlFor="standard-monthly">Standard Monthly</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="standard-annual" />
+                    <Checkbox
+                      id="standard-annual"
+                      checked={promotionForm.applicablePlans.includes("Standard Annual")}
+                      onCheckedChange={(checked) => updateArrayField("applicablePlans", "Standard Annual", checked === true)}
+                    />
                     <Label htmlFor="standard-annual">Standard Annual</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="premium-monthly" />
+                    <Checkbox
+                      id="premium-monthly"
+                      checked={promotionForm.applicablePlans.includes("Premium Monthly")}
+                      onCheckedChange={(checked) => updateArrayField("applicablePlans", "Premium Monthly", checked === true)}
+                    />
                     <Label htmlFor="premium-monthly">Premium Monthly</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="premium-annual" />
+                    <Checkbox
+                      id="premium-annual"
+                      checked={promotionForm.applicablePlans.includes("Premium Annual")}
+                      onCheckedChange={(checked) => updateArrayField("applicablePlans", "Premium Annual", checked === true)}
+                    />
                     <Label htmlFor="premium-annual">Premium Annual</Label>
                   </div>
                 </div>
@@ -1729,7 +2012,10 @@ export function PromotionsCampaign() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="priority">Priority Level</Label>
-                  <Select>
+                  <Select
+                    value={promotionForm.priority}
+                    onValueChange={(val) => setPromotionForm(prev => ({ ...prev, priority: val }))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
@@ -1742,15 +2028,27 @@ export function PromotionsCampaign() {
                 </div>
                 <div className="space-y-4">
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="autoApply" />
+                    <Checkbox
+                      id="autoApply"
+                      checked={promotionForm.autoApply}
+                      onCheckedChange={(checked) => setPromotionForm(prev => ({ ...prev, autoApply: checked === true }))}
+                    />
                     <Label htmlFor="autoApply">Auto-apply at checkout</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="stackable" />
+                    <Checkbox
+                      id="stackable"
+                      checked={promotionForm.stackable}
+                      onCheckedChange={(checked) => setPromotionForm(prev => ({ ...prev, stackable: checked === true }))}
+                    />
                     <Label htmlFor="stackable">Can be combined with other promotions</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="isPublic" />
+                    <Checkbox
+                      id="isPublic"
+                      checked={promotionForm.isPublic}
+                      onCheckedChange={(checked) => setPromotionForm(prev => ({ ...prev, isPublic: checked === true }))}
+                    />
                     <Label htmlFor="isPublic">Publicly visible</Label>
                   </div>
                 </div>
@@ -1758,12 +2056,22 @@ export function PromotionsCampaign() {
               
               <div>
                 <Label htmlFor="terms">Terms & Conditions</Label>
-                <Textarea id="terms" placeholder="Enter terms and conditions..." />
+                <Textarea
+                  id="terms"
+                  placeholder="Enter terms and conditions..."
+                  value={promotionForm.termsAndConditions}
+                  onChange={(e) => setPromotionForm(prev => ({ ...prev, termsAndConditions: e.target.value }))}
+                />
               </div>
               
               <div>
                 <Label htmlFor="tags">Tags (comma-separated)</Label>
-                <Input id="tags" placeholder="e.g., new-year, discount, annual" />
+                <Input
+                  id="tags"
+                  placeholder="e.g., new-year, discount, annual"
+                  value={promotionForm.tags}
+                  onChange={(e) => setPromotionForm(prev => ({ ...prev, tags: e.target.value }))}
+                />
               </div>
             </TabsContent>
           </Tabs>
@@ -1772,14 +2080,11 @@ export function PromotionsCampaign() {
             <Button variant="outline" onClick={() => setShowAddPromotion(false)}>
               Cancel
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => submitPromotion("draft")} disabled={isSavingPromotion}>
               Save as Draft
             </Button>
-            <Button onClick={() => {
-              toast.success('Promotion created successfully');
-              setShowAddPromotion(false);
-            }}>
-              Create Promotion
+            <Button onClick={() => submitPromotion()} disabled={isSavingPromotion}>
+              {isSavingPromotion ? "Saving..." : isEditing ? "Save Changes" : "Create Promotion"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1903,4 +2208,6 @@ export function PromotionsCampaign() {
     </div>
   );
 }
+
+
 

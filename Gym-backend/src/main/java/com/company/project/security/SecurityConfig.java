@@ -65,6 +65,7 @@ public class SecurityConfig {
                     "/api/attendance/**",
                     "/api/products/**",
                     "/api/plans/**",
+                    "/api/promotions/**",
                     "/api/leads/**",
                     "/api/bookings/**",
                     "/api/classes/**",
