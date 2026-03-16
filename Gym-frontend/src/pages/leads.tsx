@@ -47,7 +47,6 @@ import {
   Flag, 
   MoreHorizontal, 
   Download, 
-  Upload, 
   Settings, 
   BarChart3, 
   PieChart, 
@@ -140,6 +139,8 @@ export function Leads() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [sortField, setSortField] = useState<keyof Lead>('createdDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   // Sample data - in real app this would come from your backend
   const staffMembers: Staff[] = [
@@ -472,18 +473,12 @@ export function Leads() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold">Leads Management</h1>
-          <p className="text-muted-foreground mt-2">
-            Track and manage potential member leads through the conversion funnel
-          </p>
+          <p className="text-muted-foreground">Comprehensive member management and operations.</p>
         </div>
         <div className="flex space-x-3">
           <Button variant="outline" onClick={() => setShowBulkActions(true)}>
             <Download className="mr-2 h-4 w-4" />
             Export
-          </Button>
-          <Button variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
-            Import
           </Button>
           <Button onClick={() => setShowAddLead(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -493,82 +488,88 @@ export function Leads() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Leads</p>
-                <p className="text-2xl font-bold">{kpis.totalLeads}</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Leads</CardTitle>
+            <div className="bg-gradient-light p-2 rounded-lg">
+              <Users className="h-4 w-4 text-primary" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{kpis.totalLeads}</div>
+            <p className="text-xs text-muted-foreground">All leads captured</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Converted</p>
-                <p className="text-2xl font-bold text-green-600">{kpis.convertedLeads}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Converted</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{kpis.convertedLeads}</div>
+            <p className="text-xs text-muted-foreground">Successful conversions</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Conversion Rate</p>
-                <p className="text-2xl font-bold text-purple-600">{kpis.conversionRate.toFixed(1)}%</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-purple-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Conversion Rate</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-purple-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{kpis.conversionRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Lead-to-member rate</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Follow-ups Due</p>
-                <p className="text-2xl font-bold text-orange-600">{kpis.pendingFollowUps}</p>
-              </div>
-              <Clock className="h-8 w-8 text-orange-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Follow-ups Due</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <Clock className="h-4 w-4 text-orange-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{kpis.pendingFollowUps}</div>
+            <p className="text-xs text-muted-foreground">Needs action today</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Hot Leads</p>
-                <p className="text-2xl font-bold text-red-600">{kpis.hotLeads}</p>
-              </div>
-              <Flag className="h-8 w-8 text-red-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Hot Leads</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <Flag className="h-4 w-4 text-red-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{kpis.hotLeads}</div>
+            <p className="text-xs text-muted-foreground">High intent leads</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Score</p>
-                <p className="text-2xl font-bold text-indigo-600">{kpis.avgLeadScore.toFixed(0)}</p>
-              </div>
-              <Target className="h-8 w-8 text-indigo-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Avg Score</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Target className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{kpis.avgLeadScore.toFixed(0)}</div>
+            <p className="text-xs text-muted-foreground">Average lead score</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters and Search */}
-      <Card>
+      <Card className={cardShell}>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
@@ -666,17 +667,19 @@ export function Leads() {
       {/* Bulk Actions */}
       {selectedLeads.length > 0 && (
         <Alert>
-          <AlertCircle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
-            <span>{selectedLeads.length} leads selected</span>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <AlertCircle className="h-4 w-4" />
+              <span>{selectedLeads.length} leads selected</span>
+            </div>
             <div className="flex space-x-2">
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('assign')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('assign')}>
                 Assign Staff
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('status')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('status')}>
                 Update Status
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('delete')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('delete')}>
                 Delete
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setSelectedLeads([])}>
@@ -690,7 +693,8 @@ export function Leads() {
       {/* Main Content */}
       {activeView === 'table' ? (
         /* Table View */
-        <Card>
+        <div key="leads-table" className="animate-in fade-in-0 zoom-in-95 duration-200">
+        <Card className={cardShell}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Leads List ({filteredLeads.length})</span>
@@ -707,8 +711,8 @@ export function Leads() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
-                <TableRow>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent">
                   <TableHead className="w-12">
                     <Checkbox
                       checked={selectedLeads.length === filteredLeads.length}
@@ -734,7 +738,7 @@ export function Leads() {
               </TableHeader>
               <TableBody>
                 {filteredLeads.map((lead) => (
-                  <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50">
+                  <TableRow key={lead.id} className="cursor-pointer hover:bg-slate-50/50 transition-colors">
                     <TableCell>
                       <Checkbox
                         checked={selectedLeads.includes(lead.id)}
@@ -836,11 +840,12 @@ export function Leads() {
             </Table>
           </CardContent>
         </Card>
+        </div>
       ) : (
         /* Kanban View */
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div key="leads-kanban" className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-in fade-in-0 zoom-in-95 duration-200">
           {Object.entries(leadsByStatus).map(([status, statusLeads]) => (
-            <Card key={status} className="min-h-[600px]">
+            <Card key={status} className="min-h-[600px] border-0 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -853,7 +858,7 @@ export function Leads() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {statusLeads.map((lead) => (
-                  <Card key={lead.id} className="p-3 hover:shadow-md transition-shadow cursor-pointer"
+                  <Card key={lead.id} className="p-3 border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                         onClick={() => handleLeadClick(lead)}>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">

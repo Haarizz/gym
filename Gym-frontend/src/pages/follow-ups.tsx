@@ -169,6 +169,8 @@ export function FollowUps() {
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [completingFollowUp, setCompletingFollowUp] = useState<FollowUp | null>(null);
 
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+
   // Sample data - in real app this would come from your backend
   const staffMembers: Staff[] = [
     { id: '1', name: 'Sarah Johnson', role: 'Sales Manager', activeFollowUps: 12, completedToday: 8, successRate: 85 },
@@ -550,9 +552,7 @@ export function FollowUps() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold">Follow-ups Management</h1>
-          <p className="text-muted-foreground mt-2">
-            Schedule, track, and manage follow-up communications with members and prospects
-          </p>
+          <p className="text-muted-foreground">Comprehensive member management and operations.</p>
         </div>
         <div className="flex space-x-3">
           <Button variant="outline" onClick={() => setShowBulkActions(true)}>
@@ -571,106 +571,114 @@ export function FollowUps() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total</p>
-                <p className="text-2xl font-bold">{kpis.totalFollowUps}</p>
-              </div>
-              <Users className="h-6 w-6 text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-6">
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total</CardTitle>
+            <div className="bg-gradient-light p-2 rounded-lg">
+              <Users className="h-4 w-4 text-primary" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{kpis.totalFollowUps}</div>
+            <p className="text-xs text-muted-foreground">All follow-ups</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-blue-600">{kpis.pendingFollowUps}</p>
-              </div>
-              <Clock className="h-6 w-6 text-blue-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Pending</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Clock className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{kpis.pendingFollowUps}</div>
+            <p className="text-xs text-muted-foreground">Awaiting action</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">{kpis.overdueFollowUps}</p>
-              </div>
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Overdue</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{kpis.overdueFollowUps}</div>
+            <p className="text-xs text-muted-foreground">Past due date</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Due Today</p>
-                <p className="text-2xl font-bold text-orange-600">{kpis.dueToday}</p>
-              </div>
-              <CalendarCheck className="h-6 w-6 text-orange-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Due Today</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <CalendarCheck className="h-4 w-4 text-orange-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{kpis.dueToday}</div>
+            <p className="text-xs text-muted-foreground">Needs action today</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Completed Today</p>
-                <p className="text-2xl font-bold text-green-600">{kpis.completedToday}</p>
-              </div>
-              <CheckCircle className="h-6 w-6 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Completed Today</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{kpis.completedToday}</div>
+            <p className="text-xs text-muted-foreground">Finished follow-ups</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">This Week</p>
-                <p className="text-2xl font-bold text-purple-600">{kpis.completedThisWeek}</p>
-              </div>
-              <CalendarDays className="h-6 w-6 text-purple-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">This Week</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <CalendarDays className="h-4 w-4 text-purple-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{kpis.completedThisWeek}</div>
+            <p className="text-xs text-muted-foreground">Completed this week</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">High Priority</p>
-                <p className="text-2xl font-bold text-red-600">{kpis.highPriorityPending}</p>
-              </div>
-              <Flag className="h-6 w-6 text-red-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">High Priority</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <Flag className="h-4 w-4 text-red-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{kpis.highPriorityPending}</div>
+            <p className="text-xs text-muted-foreground">Urgent follow-ups</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Success Rate</p>
-                <p className="text-2xl font-bold text-green-600">{kpis.successRate.toFixed(1)}%</p>
-              </div>
-              <TrendingUp className="h-6 w-6 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Success Rate</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{kpis.successRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Completion rate</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters and Search */}
-      <Card>
+      <Card className={cardShell}>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
@@ -782,20 +790,22 @@ export function FollowUps() {
       {/* Bulk Actions */}
       {selectedFollowUps.length > 0 && (
         <Alert>
-          <AlertCircle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
-            <span>{selectedFollowUps.length} follow-ups selected</span>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <AlertCircle className="h-4 w-4" />
+              <span>{selectedFollowUps.length} follow-ups selected</span>
+            </div>
             <div className="flex space-x-2">
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('complete')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('complete')}>
                 Mark Complete
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('reschedule')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('reschedule')}>
                 Reschedule
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('assign')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('assign')}>
                 Reassign
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('delete')}>
+              <Button size="sm" variant="ghost" onClick={() => handleBulkAction('delete')}>
                 Delete
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setSelectedFollowUps([])}>
@@ -809,7 +819,8 @@ export function FollowUps() {
       {/* Main Content */}
       {activeView === 'table' ? (
         /* Table View */
-        <Card>
+        <div key="followups-table" className="animate-in fade-in-0 zoom-in-95 duration-200">
+        <Card className={cardShell}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Follow-ups List ({filteredFollowUps.length})</span>
@@ -826,8 +837,8 @@ export function FollowUps() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
-                <TableRow>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent">
                   <TableHead className="w-12">
                     <Checkbox
                       checked={selectedFollowUps.length === filteredFollowUps.length}
@@ -853,7 +864,7 @@ export function FollowUps() {
               </TableHeader>
               <TableBody>
                 {filteredFollowUps.map((followUp) => (
-                  <TableRow key={followUp.id} className="cursor-pointer hover:bg-muted/50">
+                  <TableRow key={followUp.id} className="cursor-pointer hover:bg-slate-50/50 transition-colors">
                     <TableCell>
                       <Checkbox
                         checked={selectedFollowUps.includes(followUp.id)}
@@ -967,11 +978,12 @@ export function FollowUps() {
             </Table>
           </CardContent>
         </Card>
+        </div>
       ) : (
         /* Kanban View */
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div key="followups-kanban" className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-in fade-in-0 zoom-in-95 duration-200">
           {Object.entries(followUpsByStatus).map(([status, statusFollowUps]) => (
-            <Card key={status} className="min-h-[600px]">
+            <Card key={status} className="min-h-[600px] border-0 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -985,7 +997,7 @@ export function FollowUps() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {statusFollowUps.map((followUp) => (
-                  <Card key={followUp.id} className="p-3 hover:shadow-md transition-shadow cursor-pointer"
+                  <Card key={followUp.id} className="p-3 border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                         onClick={() => handleFollowUpClick(followUp)}>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
