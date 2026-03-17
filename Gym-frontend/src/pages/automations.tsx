@@ -216,6 +216,7 @@ export function Automations() {
   const [selectedWorkflows, setSelectedWorkflows] = useState<string[]>([]);
   const [sortField, setSortField] = useState<keyof AutomationWorkflow>('createdDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   // Workflow builder state
   const [currentStep, setCurrentStep] = useState(1);
@@ -920,7 +921,7 @@ export function Automations() {
               <h3 className="text-lg font-semibold mb-4">Step 4: Review & Save</h3>
               <p className="text-muted-foreground mb-4">Review your automation workflow before saving</p>
               
-              <Card>
+              <Card className={cardShell}>
                 <CardContent className="p-6">
                   <div className="space-y-4">
                     <div>
@@ -1015,105 +1016,113 @@ export function Automations() {
 
       {/* Analytics KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Active</p>
-                <p className="text-2xl font-bold">{analytics.activeWorkflows}</p>
-              </div>
-              <PlayCircle className="h-6 w-6 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Active</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <PlayCircle className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{analytics.activeWorkflows}</div>
+            <p className="text-xs text-muted-foreground">Running workflows</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Members Engaged</p>
-                <p className="text-2xl font-bold text-blue-600">{analytics.totalMembersEngaged}</p>
-              </div>
-              <Users className="h-6 w-6 text-blue-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Members Engaged</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Users className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{analytics.totalMembersEngaged}</div>
+            <p className="text-xs text-muted-foreground">Total engaged</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Runs</p>
-                <p className="text-2xl font-bold text-purple-600">{analytics.totalRuns}</p>
-              </div>
-              <Activity className="h-6 w-6 text-purple-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Runs</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <Activity className="h-4 w-4 text-purple-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{analytics.totalRuns}</div>
+            <p className="text-xs text-muted-foreground">All executions</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Success Rate</p>
-                <p className="text-2xl font-bold text-green-600">{analytics.successRate.toFixed(1)}%</p>
-              </div>
-              <CheckCircle className="h-6 w-6 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Success Rate</CardTitle>
+            <div className="bg-emerald-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-emerald-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600">{analytics.successRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Successful runs</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Open Rate</p>
-                <p className="text-2xl font-bold text-indigo-600">{analytics.avgOpenRate.toFixed(1)}%</p>
-              </div>
-              <Eye className="h-6 w-6 text-indigo-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Open Rate</CardTitle>
+            <div className="bg-indigo-50 p-2 rounded-lg">
+              <Eye className="h-4 w-4 text-indigo-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-indigo-600">{analytics.avgOpenRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Average open</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Conversion</p>
-                <p className="text-2xl font-bold text-orange-600">{analytics.avgConversionRate.toFixed(1)}%</p>
-              </div>
-              <Target className="h-6 w-6 text-orange-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Conversion</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <Target className="h-4 w-4 text-orange-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{analytics.avgConversionRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Average conversion</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{analytics.pendingTasks}</p>
-              </div>
-              <Clock className="h-6 w-6 text-yellow-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Pending</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <Clock className="h-4 w-4 text-yellow-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{analytics.pendingTasks}</div>
+            <p className="text-xs text-muted-foreground">Next 24 hours</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Errors</p>
-                <p className="text-2xl font-bold text-red-600">{analytics.errorCount}</p>
-              </div>
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Errors</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{analytics.errorCount}</div>
+            <p className="text-xs text-muted-foreground">Requires attention</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters and Search */}
-      <Card>
+      <Card className={cardShell}>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
@@ -1198,17 +1207,17 @@ export function Automations() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="workflows">Workflows</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+          <TabsTrigger value="workflows" className="flex-1">Workflows</TabsTrigger>
+          <TabsTrigger value="templates" className="flex-1">Templates</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           {/* Recent Activity */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Recent Workflow Activity</CardTitle>
               </CardHeader>
@@ -1236,7 +1245,7 @@ export function Automations() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Upcoming Scheduled Runs</CardTitle>
               </CardHeader>
@@ -1266,7 +1275,7 @@ export function Automations() {
           </div>
 
           {/* Performance Summary */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Top Performing Automations</CardTitle>
             </CardHeader>
@@ -1277,7 +1286,7 @@ export function Automations() {
                   .sort((a, b) => b.conversionRate - a.conversionRate)
                   .slice(0, 5)
                   .map(workflow => (
-                    <div key={workflow.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div key={workflow.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50/60">
                       <div className="flex items-center space-x-3">
                         <div className="flex space-x-1">
                           {getTriggerIcon(workflow.trigger.type)}
@@ -1300,13 +1309,13 @@ export function Automations() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="workflows" className="space-y-6">
+        <TabsContent value="workflows" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div key={activeView} className="animate-in fade-in-0 zoom-in-95 duration-200">
             {activeView === 'grid' ? (
               /* Grid View */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredWorkflows.map((workflow) => (
-                  <Card key={workflow.id} className="hover:shadow-lg transition-shadow cursor-pointer group">
+                  <Card key={workflow.id} className={`${cardShell} cursor-pointer group`}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <Badge className={getStatusColor(workflow.status)}>
@@ -1431,7 +1440,7 @@ export function Automations() {
               </div>
             ) : (
               /* Table View */
-              <Card>
+              <Card className={cardShell}>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>Automation Workflows ({filteredWorkflows.length})</span>
@@ -1448,7 +1457,7 @@ export function Automations() {
                 </CardHeader>
                 <CardContent>
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-slate-50/50">
                       <TableRow>
                         <TableHead>Workflow</TableHead>
                         <TableHead>Status</TableHead>
@@ -1462,7 +1471,7 @@ export function Automations() {
                     </TableHeader>
                     <TableBody>
                       {filteredWorkflows.map((workflow) => (
-                        <TableRow key={workflow.id} className="cursor-pointer hover:bg-muted/50">
+                        <TableRow key={workflow.id} className="cursor-pointer transition-colors hover:bg-slate-50/50">
                           <TableCell onClick={() => handleWorkflowClick(workflow)}>
                             <div>
                               <p className="font-medium">{workflow.name}</p>
@@ -1539,7 +1548,7 @@ export function Automations() {
           </div>
         </TabsContent>
 
-        <TabsContent value="templates" className="space-y-6">
+        <TabsContent value="templates" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Automation Templates</h2>
             <Button>
@@ -1550,7 +1559,7 @@ export function Automations() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {automationTemplates.map((template) => (
-              <Card key={template.id} className="hover:shadow-lg transition-shadow">
+              <Card key={template.id} className={cardShell}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{template.name}</CardTitle>
@@ -1611,9 +1620,9 @@ export function Automations() {
           </div>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
+        <TabsContent value="analytics" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Workflows</CardTitle>
               </CardHeader>
@@ -1623,7 +1632,7 @@ export function Automations() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Average Success Rate</CardTitle>
               </CardHeader>
@@ -1633,7 +1642,7 @@ export function Automations() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Members Engaged</CardTitle>
               </CardHeader>
@@ -1643,7 +1652,7 @@ export function Automations() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Average Conversion</CardTitle>
               </CardHeader>
@@ -1655,7 +1664,7 @@ export function Automations() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Workflow Performance by Type</CardTitle>
               </CardHeader>
@@ -1683,7 +1692,7 @@ export function Automations() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Recent Workflow Runs</CardTitle>
               </CardHeader>
@@ -1737,7 +1746,7 @@ export function Automations() {
 
               <div className="space-y-6 mt-6">
                 {/* Workflow Flow */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Workflow Flow</CardTitle>
                   </CardHeader>
@@ -1780,7 +1789,7 @@ export function Automations() {
                 </Card>
 
                 {/* Message Content */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Message Content</CardTitle>
                   </CardHeader>
@@ -1800,7 +1809,7 @@ export function Automations() {
                 </Card>
 
                 {/* Performance Metrics */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Performance Metrics</CardTitle>
                   </CardHeader>
@@ -1837,7 +1846,7 @@ export function Automations() {
                 </Card>
 
                 {/* Schedule Information */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Schedule Information</CardTitle>
                   </CardHeader>
@@ -1878,7 +1887,7 @@ export function Automations() {
                 </Card>
 
                 {/* Quick Actions */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Quick Actions</CardTitle>
                   </CardHeader>

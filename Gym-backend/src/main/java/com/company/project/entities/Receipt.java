@@ -62,6 +62,18 @@ public class Receipt extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String remarks;
 
+    // "Individual" | "Family" | "Corporate"
+    @Column(name = "membership_type")
+    private String membershipType;
+
+    // Partial-payment tracking
+    @Column(name = "paid_amount", precision = 10, scale = 2)
+    private BigDecimal paidAmount;
+
+    // When this bill/invoice is due (for pending receipts)
+    @Column(name = "due_date")
+    private LocalDateTime dueDate;
+
     public Receipt() {}
 
     // ── Getters & Setters ────────────────────────────────────────────────────
@@ -113,4 +125,13 @@ public class Receipt extends BaseEntity {
 
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
+
+    public String getMembershipType() { return membershipType; }
+    public void setMembershipType(String membershipType) { this.membershipType = membershipType; }
+
+    public BigDecimal getPaidAmount() { return paidAmount; }
+    public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+
+    public LocalDateTime getDueDate() { return dueDate; }
+    public void setDueDate(LocalDateTime dueDate) { this.dueDate = dueDate; }
 }

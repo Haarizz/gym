@@ -3,8 +3,13 @@ package com.company.project.repositories;
 import com.company.project.entities.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -13,4 +18,23 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
     boolean existsByEmail(String email);
 
     Optional<Member> findByMemberId(String memberId);
+
+    List<Member> findAllByMemberIdIn(List<String> memberIds);
+
+    // Members with overdue payment status
+    @Query("SELECT m FROM Member m WHERE m.paymentStatus = 'overdue' ORDER BY m.nextPaymentDate ASC")
+    List<Member> findOverdueMembers();
+
+    // Members whose next payment is due within 7 days (not already overdue)
+    @Query("SELECT m FROM Member m WHERE m.nextPaymentDate IS NOT NULL AND m.nextPaymentDate >= :now AND m.nextPaymentDate <= :sevenDaysLater AND m.paymentStatus != 'overdue' ORDER BY m.nextPaymentDate ASC")
+    List<Member> findDueSoonMembers(@Param("now") LocalDateTime now, @Param("sevenDaysLater") LocalDateTime sevenDaysLater);
+
+    @Query("SELECT COUNT(m) FROM Member m WHERE m.paymentStatus = 'overdue'")
+    long countOverdueMembers();
+
+    @Query("SELECT COUNT(m) FROM Member m WHERE m.nextPaymentDate IS NOT NULL AND m.nextPaymentDate >= :now AND m.nextPaymentDate <= :sevenDaysLater AND m.paymentStatus != 'overdue'")
+    long countDueSoonMembers(@Param("now") LocalDateTime now, @Param("sevenDaysLater") LocalDateTime sevenDaysLater);
+
+    @Query("SELECT COALESCE(SUM(m.outstandingBalance), 0) FROM Member m WHERE m.paymentStatus = 'overdue'")
+    BigDecimal sumOverdueBalance();
 }
