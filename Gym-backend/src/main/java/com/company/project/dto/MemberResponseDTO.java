@@ -61,6 +61,7 @@ public class MemberResponseDTO {
     // Family plan fields
     private Boolean isFamilyHead;
     private String familyHeadId;
+    private String familyHeadName;
     private String relationshipToHead;
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
@@ -167,5 +168,7 @@ public class MemberResponseDTO {
     public java.math.BigDecimal getDiscountApplied() { return discountApplied; }
     public Boolean getIsFamilyHead() { return isFamilyHead; }
     public String getFamilyHeadId() { return familyHeadId; }
+    public void setFamilyHeadName(String familyHeadName) { this.familyHeadName = familyHeadName; }
+    public String getFamilyHeadName() { return familyHeadName; }
     public String getRelationshipToHead() { return relationshipToHead; }
 }

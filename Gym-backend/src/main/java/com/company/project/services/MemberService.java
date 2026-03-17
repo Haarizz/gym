@@ -8,7 +8,9 @@ import com.company.project.dto.MembersPageResponseDTO;
 import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.RenewalRequestDTO;
 import com.company.project.entities.Member;
+import com.company.project.entities.MembershipPlan;
 import com.company.project.repositories.MemberRepository;
+import com.company.project.repositories.MembershipPlanRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
@@ -19,12 +21,15 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,11 +37,14 @@ import java.util.stream.Collectors;
 public class MemberService {
 
     private final MemberRepository memberRepository;
+    private final MembershipPlanRepository planRepository;
     private final ReceiptService receiptService;
 
     public MemberService(MemberRepository memberRepository,
+                         MembershipPlanRepository planRepository,
                          @Lazy ReceiptService receiptService) {
         this.memberRepository = memberRepository;
+        this.planRepository   = planRepository;
         this.receiptService   = receiptService;
     }
 
@@ -54,6 +62,8 @@ public class MemberService {
                 .map(MemberResponseDTO::fromEntity)
                 .collect(Collectors.toList());
 
+        resolveFamilyHeadNames(dtos);
+
         PaginationDTO pagination = new PaginationDTO(
                 page, limit,
                 memberPage.getTotalElements(),
@@ -67,7 +77,12 @@ public class MemberService {
     public MemberResponseDTO getMemberById(Long id) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
-        return MemberResponseDTO.fromEntity(member);
+        MemberResponseDTO dto = MemberResponseDTO.fromEntity(member);
+        if (member.getFamilyHeadId() != null) {
+            memberRepository.findByMemberId(member.getFamilyHeadId())
+                    .ifPresent(head -> dto.setFamilyHeadName(head.getName()));
+        }
+        return dto;
     }
 
     // ── Write ───────────────────────────────────────────────────────────────
@@ -85,6 +100,25 @@ public class MemberService {
             member.setIsFamilyHead(true);
         } else if (request.getIsFamilyHead() != null) {
             member.setIsFamilyHead(request.getIsFamilyHead());
+        }
+
+        // Calculate expiry date from plan duration (overrides any frontend-sent value)
+        if (member.getMembershipStartDate() != null && member.getMembershipPlan() != null) {
+            planRepository.findByName(member.getMembershipPlan()).ifPresent(plan -> {
+                LocalDateTime expiry = computeExpiry(member.getMembershipStartDate(), plan);
+                member.setMembershipEndDate(expiry);
+                member.setExpiryDate(expiry);
+            });
+        }
+
+        // Recalculate outstanding balance: fee - paid amount
+        if (member.getOutstandingBalance() == null && member.getMembershipFee() != null) {
+            String ps = member.getPaymentStatus();
+            if ("paid".equalsIgnoreCase(ps)) {
+                member.setOutstandingBalance(BigDecimal.ZERO);
+            } else {
+                member.setOutstandingBalance(member.getMembershipFee());
+            }
         }
 
         // First save to get the auto-generated DB id
@@ -162,11 +196,29 @@ public class MemberService {
         if (request.getPaymentStatus()   != null) member.setPaymentStatus(request.getPaymentStatus());
         if (request.getMembershipType()  != null) member.setMembershipType(request.getMembershipType());
         if (request.getMembershipStatus() != null) member.setMembershipStatus(request.getMembershipStatus());
-        if (request.getMembershipEndDate() != null) {
+
+        // Compute new expiry from plan duration, extending from current expiry (or today)
+        if (member.getMembershipPlan() != null) {
+            Optional<MembershipPlan> planOpt = planRepository.findByName(member.getMembershipPlan());
+            if (planOpt.isPresent()) {
+                LocalDateTime base = member.getExpiryDate() != null
+                        ? member.getExpiryDate() : LocalDateTime.now();
+                LocalDateTime newExpiry = computeExpiry(base, planOpt.get());
+                member.setMembershipEndDate(newExpiry);
+                member.setExpiryDate(newExpiry);
+            }
+        } else if (request.getMembershipEndDate() != null) {
+            // Fallback: use frontend-supplied date if no plan name
             LocalDateTime endDate = parseDateTime(request.getMembershipEndDate());
             member.setMembershipEndDate(endDate);
             member.setExpiryDate(endDate);
         }
+
+        // Clear outstanding balance on renewal if payment status is paid
+        if ("paid".equalsIgnoreCase(member.getPaymentStatus())) {
+            member.setOutstandingBalance(BigDecimal.ZERO);
+        }
+
         Member saved = memberRepository.save(member);
 
         // Auto-create a receipt for the renewal
@@ -276,6 +328,46 @@ public class MemberService {
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    // ── Expiry computation ──────────────────────────────────────────────────
+
+    private LocalDateTime computeExpiry(LocalDateTime startDate, MembershipPlan plan) {
+        if (plan.getDurationValue() == null || plan.getDurationType() == null) return startDate;
+        try {
+            long val = Long.parseLong(plan.getDurationValue());
+            switch (plan.getDurationType().toLowerCase()) {
+                case "monthly":
+                case "months":   return startDate.plusMonths(val);
+                case "annual":
+                case "annually":
+                case "years":    return startDate.plusYears(val);
+                case "weekly":
+                case "weeks":    return startDate.plusWeeks(val);
+                case "quarterly": return startDate.plusMonths(val * 3);
+                default:         return startDate.plusDays(val);
+            }
+        } catch (NumberFormatException e) {
+            return startDate;
+        }
+    }
+
+    // ── Family head name resolution ─────────────────────────────────────────
+
+    private void resolveFamilyHeadNames(List<MemberResponseDTO> dtos) {
+        List<String> headIds = dtos.stream()
+                .map(MemberResponseDTO::getFamilyHeadId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+        if (headIds.isEmpty()) return;
+        Map<String, String> idToName = memberRepository.findAllByMemberIdIn(headIds).stream()
+                .collect(Collectors.toMap(Member::getMemberId, Member::getName));
+        dtos.forEach(dto -> {
+            if (dto.getFamilyHeadId() != null) {
+                dto.setFamilyHeadName(idToName.get(dto.getFamilyHeadId()));
+            }
+        });
     }
 
     // ── Date parsers ────────────────────────────────────────────────────────

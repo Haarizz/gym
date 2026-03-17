@@ -27,6 +27,10 @@ public class ReceiptResponseDTO {
     private String validTill;
     private String processedBy;
     private String remarks;
+    private String membershipType;
+    private java.math.BigDecimal paidAmount;
+    private java.math.BigDecimal dueAmount;
+    private String dueDate;
     private String createdAt;
     private String updatedAt;
 
@@ -50,6 +54,11 @@ public class ReceiptResponseDTO {
         dto.validTill       = r.getValidTill() != null ? r.getValidTill().format(ISO) + "Z" : null;
         dto.processedBy     = r.getProcessedBy();
         dto.remarks         = r.getRemarks();
+        dto.membershipType  = r.getMembershipType();
+        java.math.BigDecimal totalAmt = r.getAmount() != null ? r.getAmount() : java.math.BigDecimal.ZERO;
+        dto.paidAmount      = r.getPaidAmount() != null ? r.getPaidAmount() : java.math.BigDecimal.ZERO;
+        dto.dueAmount       = totalAmt.subtract(dto.paidAmount).max(java.math.BigDecimal.ZERO);
+        dto.dueDate         = r.getDueDate() != null ? r.getDueDate().format(ISO) + "Z" : null;
         dto.createdAt       = r.getCreatedAt() != null ? r.getCreatedAt().format(ISO) + "Z" : null;
         dto.updatedAt       = r.getUpdatedAt() != null ? r.getUpdatedAt().format(ISO) + "Z" : null;
         return dto;
@@ -73,6 +82,10 @@ public class ReceiptResponseDTO {
     public String getValidTill() { return validTill; }
     public String getProcessedBy() { return processedBy; }
     public String getRemarks() { return remarks; }
+    public String getMembershipType() { return membershipType; }
+    public java.math.BigDecimal getPaidAmount() { return paidAmount; }
+    public java.math.BigDecimal getDueAmount() { return dueAmount; }
+    public String getDueDate() { return dueDate; }
     public String getCreatedAt() { return createdAt; }
     public String getUpdatedAt() { return updatedAt; }
 }

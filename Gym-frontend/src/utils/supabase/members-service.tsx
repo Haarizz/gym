@@ -50,6 +50,7 @@ export interface Member {
   chronic_illnesses?: string;
   is_family_head?: boolean;
   family_head_id?: string;
+  family_head_name?: string;
   relationship_to_head?: string;
 }
 

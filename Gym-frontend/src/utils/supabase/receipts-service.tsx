@@ -19,6 +19,10 @@ export interface Receipt {
   valid_till?: string;
   processed_by?: string;
   remarks?: string;
+  paid_amount?: number;
+  due_amount?: number;
+  due_date?: string;
+  membership_type?: string;
   created_at: string;
   updated_at: string;
 }
