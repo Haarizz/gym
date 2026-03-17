@@ -69,7 +69,8 @@ public class SecurityConfig {
                     "/api/leads/**",
                     "/api/bookings/**",
                     "/api/classes/**",
-                    "/api/dashboard/**"
+                    "/api/dashboard/**",
+                    "/api/messaging/**"
                 ).authenticated()
 
                 // Any other /api/** endpoint also requires authentication
