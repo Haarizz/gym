@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { purchaseService, Supplier as SupplierType, PurchaseOrder as POType, PurchaseOrderRequest, ReceiveItemRequest } from '../utils/supabase/purchase-service';
+import { productsService, Product as APIProduct } from '../utils/supabase/products-service';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -186,233 +188,44 @@ export function PurchaseOrder() {
   const [showSupplierSelector, setShowSupplierSelector] = useState(false);
   const [showProductSelector, setShowProductSelector] = useState(false);
 
-  // Sample data - in real app this would come from your backend
-  const suppliers: Supplier[] = [
-    {
-      id: '1',
-      name: 'Sports Nutrition Ltd',
-      contactPerson: 'Ahmed Hassan',
-      email: 'ahmed@sportsnutrition.ae',
-      phone: '+971-4-123-4567',
-      address: '123 Business Bay',
-      city: 'Dubai',
-      country: 'UAE',
-      taxId: 'TRN123456789',
-      paymentTerms: 'NET 30',
-      creditLimit: 50000,
-      isActive: true,
-      rating: 4.8,
-      totalOrders: 45,
-      totalSpent: 125000
-    },
-    {
-      id: '2',
-      name: 'Fitness Equipment Co',
-      contactPerson: 'Sarah Johnson',
-      email: 'sarah@fitnessequip.ae',
-      phone: '+971-4-234-5678',
-      address: '456 Industrial Area',
-      city: 'Sharjah',
-      country: 'UAE',
-      taxId: 'TRN234567890',
-      paymentTerms: 'NET 15',
-      creditLimit: 100000,
-      isActive: true,
-      rating: 4.6,
-      totalOrders: 23,
-      totalSpent: 89000
-    },
-    {
-      id: '3',
-      name: 'Beverage Suppliers Inc',
-      contactPerson: 'Mike Chen',
-      email: 'mike@beverages.ae',
-      phone: '+971-4-345-6789',
-      address: '789 Food District',
-      city: 'Abu Dhabi',
-      country: 'UAE',
-      taxId: 'TRN345678901',
-      paymentTerms: 'NET 7',
-      creditLimit: 25000,
-      isActive: true,
-      rating: 4.5,
-      totalOrders: 67,
-      totalSpent: 45000
-    }
-  ];
+  // API-loaded data
+  const [suppliers, setSuppliers] = useState<SupplierType[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<POType[]>([]);
+  const [apiProductList, setApiProductList] = useState<APIProduct[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const products: Product[] = [
-    {
-      id: '1',
-      name: 'Whey Protein Isolate',
-      code: 'SUP001',
-      sku: 'WPI-CHOC-2KG',
-      description: 'Premium whey protein isolate for muscle building',
-      category: 'Supplements',
-      unitOfMeasure: 'kg',
-      currentStock: 23,
-      reorderPoint: 15,
-      averageUnitCost: 85,
-      lastPurchasePrice: 85,
-      preferredSupplier: '1'
-    },
-    {
-      id: '2',
-      name: 'Adjustable Dumbbell Set',
-      code: 'EQP001',
-      sku: 'ADB-SET-50',
-      description: 'Professional adjustable dumbbell set 5-50kg',
-      category: 'Equipment',
-      unitOfMeasure: 'set',
-      currentStock: 3,
-      reorderPoint: 5,
-      averageUnitCost: 450,
-      lastPurchasePrice: 450,
-      preferredSupplier: '2'
-    },
-    {
-      id: '3',
-      name: 'Protein Smoothie Mix',
-      code: 'CAF001',
-      sku: 'PSM-BERRY-500ML',
-      description: 'Ready-to-blend protein smoothie mix',
-      category: 'Café & Bar',
-      unitOfMeasure: 'bottle',
-      currentStock: 45,
-      reorderPoint: 50,
-      averageUnitCost: 3.50,
-      lastPurchasePrice: 3.50,
-      preferredSupplier: '3'
-    }
-  ];
+  // Supplier management state
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierType | null>(null);
+  const [savingSupplier, setSavingSupplier] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({
+    name: '', contactPerson: '', email: '', phone: '',
+    address: '', city: '', country: 'UAE', taxId: '',
+    paymentTerms: 'NET30', creditLimit: 0, isActive: true, notes: ''
+  });
+  const [supplierSearch, setSupplierSearch] = useState('');
 
-  const purchaseOrders: PurchaseOrder[] = [
-    {
-      id: '1',
-      poNumber: 'PO-2024-001',
-      supplier: suppliers[0],
-      orderDate: new Date(),
-      expectedDeliveryDate: addDays(new Date(), 7),
-      status: 'pending_approval',
-      priority: 'high',
-      items: [
-        {
-          id: '1-1',
-          productId: '1',
-          productName: 'Whey Protein Isolate',
-          productCode: 'SUP001',
-          sku: 'WPI-CHOC-2KG',
-          description: 'Premium whey protein isolate',
-          category: 'Supplements',
-          unitOfMeasure: 'kg',
-          quantityOrdered: 50,
-          quantityReceived: 0,
-          unitPrice: 85,
-          discount: 0,
-          taxPercent: 5,
-          totalAmount: 4462.50,
-          notes: 'Chocolate flavor preferred'
-        }
-      ],
-      subtotal: 4250,
-      discountAmount: 0,
-      taxAmount: 212.50,
-      shippingCost: 100,
-      totalAmount: 4562.50,
-      paymentTerms: 'NET 30',
-      deliveryAddress: 'GymBios Main Branch\n123 Fitness Street\nDubai, UAE',
-      notes: 'Urgent restock needed for protein supplements',
-      attachments: [],
-      createdBy: 'John Smith',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      approvalWorkflow: {
-        level: 1,
-        approvers: ['Manager', 'Finance'],
-        currentApprover: 'Manager',
-        approvalHistory: []
+  // Load all data on mount
+  useEffect(() => {
+    const loadAll = async () => {
+      setLoading(true);
+      try {
+        const [suppliersData, ordersData, productsData] = await Promise.all([
+          purchaseService.getAllSuppliers(),
+          purchaseService.getOrders({ size: 100 }),
+          productsService.getProducts({ size: 200 }),
+        ]);
+        setSuppliers(suppliersData);
+        setPurchaseOrders(ordersData.orders);
+        setApiProductList(productsData.products);
+      } catch {
+        toast.error('Failed to load data');
+      } finally {
+        setLoading(false);
       }
-    },
-    {
-      id: '2',
-      poNumber: 'PO-2024-002',
-      supplier: suppliers[1],
-      orderDate: subDays(new Date(), 2),
-      expectedDeliveryDate: addDays(new Date(), 10),
-      status: 'ordered',
-      priority: 'medium',
-      items: [
-        {
-          id: '2-1',
-          productId: '2',
-          productName: 'Adjustable Dumbbell Set',
-          productCode: 'EQP001',
-          sku: 'ADB-SET-50',
-          description: 'Professional adjustable dumbbell set',
-          category: 'Equipment',
-          unitOfMeasure: 'set',
-          quantityOrdered: 5,
-          quantityReceived: 0,
-          unitPrice: 450,
-          discount: 100,
-          taxPercent: 5,
-          totalAmount: 2487.50,
-          notes: 'Include installation manual'
-        }
-      ],
-      subtotal: 2250,
-      discountAmount: 100,
-      taxAmount: 107.50,
-      shippingCost: 200,
-      totalAmount: 2457.50,
-      paymentTerms: 'NET 15',
-      deliveryAddress: 'GymBios Main Branch\n123 Fitness Street\nDubai, UAE',
-      createdBy: 'Sarah Johnson',
-      approvedBy: 'Manager',
-      createdAt: subDays(new Date(), 2),
-      updatedAt: subDays(new Date(), 1)
-    },
-    {
-      id: '3',
-      poNumber: 'PO-2024-003',
-      supplier: suppliers[2],
-      orderDate: subDays(new Date(), 5),
-      expectedDeliveryDate: addDays(new Date(), 2),
-      actualDeliveryDate: subDays(new Date(), 1),
-      status: 'received',
-      priority: 'low',
-      items: [
-        {
-          id: '3-1',
-          productId: '3',
-          productName: 'Protein Smoothie Mix',
-          productCode: 'CAF001',
-          sku: 'PSM-BERRY-500ML',
-          description: 'Ready-to-blend protein smoothie mix',
-          category: 'Café & Bar',
-          unitOfMeasure: 'bottle',
-          quantityOrdered: 100,
-          quantityReceived: 100,
-          unitPrice: 3.50,
-          discount: 0,
-          taxPercent: 5,
-          totalAmount: 367.50,
-          notes: 'Mixed berry flavor'
-        }
-      ],
-      subtotal: 350,
-      discountAmount: 0,
-      taxAmount: 17.50,
-      shippingCost: 50,
-      totalAmount: 417.50,
-      paymentTerms: 'NET 7',
-      deliveryAddress: 'GymBios Main Branch\n123 Fitness Street\nDubai, UAE',
-      createdBy: 'Mike Chen',
-      approvedBy: 'Manager',
-      createdAt: subDays(new Date(), 5),
-      updatedAt: subDays(new Date(), 1)
-    }
-  ];
+    };
+    loadAll();
+  }, []);
 
   // Purchase Order Form State
   const [orderForm, setOrderForm] = useState<Partial<PurchaseOrder & { selectedSupplier: Supplier | null }>>({
@@ -435,27 +248,36 @@ export function PurchaseOrder() {
 
   // Calculate analytics
   const analytics = useMemo(() => {
+    const now = new Date();
     const totalOrders = purchaseOrders.length;
-    const pendingApprovals = purchaseOrders.filter(po => po.status === 'pending_approval').length;
+    const pendingApprovals = purchaseOrders.filter(po =>
+      po.status === 'PENDING_APPROVAL' || po.status === 'pending_approval'
+    ).length;
     const totalSpendThisMonth = purchaseOrders
-      .filter(po => po.orderDate >= startOfMonth(new Date()) && po.orderDate <= endOfMonth(new Date()))
+      .filter(po => {
+        const d = po.orderDate ? new Date(po.orderDate) : null;
+        return d && d >= startOfMonth(now) && d <= endOfMonth(now);
+      })
       .reduce((sum, po) => sum + po.totalAmount, 0);
-    
+
     const supplierCounts = purchaseOrders.reduce((acc, po) => {
-      acc[po.supplier.name] = (acc[po.supplier.name] || 0) + 1;
+      const name = po.supplierName || (po as any).supplier?.name || '';
+      acc[name] = (acc[name] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    
+
     const topSupplier = Object.entries(supplierCounts).sort(([,a], [,b]) => b - a)[0];
-    
-    const urgentOrders = purchaseOrders.filter(po => 
+
+    const urgentOrders = purchaseOrders.filter(po =>
+      po.priority === 'URGENT' || po.priority === 'HIGH' ||
       po.priority === 'urgent' || po.priority === 'high'
     ).length;
-    
-    const overdueOrders = purchaseOrders.filter(po => 
-      po.status !== 'received' && po.status !== 'cancelled' && 
-      po.expectedDeliveryDate < new Date()
-    ).length;
+
+    const overdueOrders = purchaseOrders.filter(po => {
+      const expDate = po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate) : null;
+      const status = po.status?.toLowerCase();
+      return expDate && expDate < now && status !== 'received' && status !== 'cancelled';
+    }).length;
 
     return {
       totalOrders,
@@ -467,52 +289,96 @@ export function PurchaseOrder() {
     };
   }, [purchaseOrders]);
 
+  // Compute live order totals from items (for form review step)
+  const orderTotals = useMemo(() => {
+    const items = orderForm.items || [];
+    const subtotal = items.reduce((sum, item) => sum + (item.quantityOrdered || 0) * (item.unitPrice || 0), 0);
+    const discountAmount = items.reduce((sum, item) => {
+      const line = (item.quantityOrdered || 0) * (item.unitPrice || 0);
+      return sum + line * ((item.discount || 0) / 100);
+    }, 0);
+    const taxAmount = items.reduce((sum, item) => {
+      const line = (item.quantityOrdered || 0) * (item.unitPrice || 0);
+      const afterDiscount = line - line * ((item.discount || 0) / 100);
+      return sum + afterDiscount * ((item.taxPercent || 0) / 100);
+    }, 0);
+    const shippingCost = orderForm.shippingCost || 0;
+    return { subtotal, discountAmount, taxAmount, shippingCost, totalAmount: subtotal - discountAmount + taxAmount + shippingCost };
+  }, [orderForm.items, orderForm.shippingCost]);
+
   // Filter purchase orders
   const filteredOrders = useMemo(() => {
     return purchaseOrders.filter(order => {
-      const matchesSearch = searchTerm === '' || 
+      const supplierName = order.supplierName || (order as any).supplier?.name || '';
+      const supplierId = String(order.supplierId ?? (order as any).supplier?.id ?? '');
+      const matchesSearch = searchTerm === '' ||
         order.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.items.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesStatus = selectedStatus === 'all' || order.status === selectedStatus;
-      const matchesSupplier = selectedSupplier === 'all' || order.supplier.id === selectedSupplier;
-      const matchesPriority = selectedPriority === 'all' || order.priority === selectedPriority;
-      
+
+      const matchesStatus = selectedStatus === 'all' ||
+        order.status?.toLowerCase() === selectedStatus.toLowerCase();
+      const matchesSupplier = selectedSupplier === 'all' || supplierId === selectedSupplier;
+      const matchesPriority = selectedPriority === 'all' ||
+        order.priority?.toLowerCase() === selectedPriority.toLowerCase();
+
       return matchesSearch && matchesStatus && matchesSupplier && matchesPriority;
     });
   }, [purchaseOrders, searchTerm, selectedStatus, selectedSupplier, selectedPriority]);
 
   // Handle order creation/editing
-  const handleSaveOrder = useCallback(() => {
+  const handleSaveOrder = useCallback(async (submitStatus: 'DRAFT' | 'PENDING_APPROVAL' = 'DRAFT') => {
     if (!orderForm.selectedSupplier || !orderForm.items || orderForm.items.length === 0) {
       toast.error('Please select a supplier and add at least one item');
       return;
     }
 
-    // Calculate totals
-    const subtotal = orderForm.items.reduce((sum, item) => sum + (item.quantityOrdered * item.unitPrice - item.discount), 0);
-    const taxAmount = orderForm.items.reduce((sum, item) => sum + ((item.quantityOrdered * item.unitPrice - item.discount) * item.taxPercent / 100), 0);
-    const totalAmount = subtotal + taxAmount + (orderForm.shippingCost || 0);
-
-    const updatedOrder = {
-      ...orderForm,
-      supplier: orderForm.selectedSupplier,
-      subtotal,
-      taxAmount,
-      totalAmount,
-      poNumber: orderForm.poNumber || `PO-${new Date().getFullYear()}-${String(purchaseOrders.length + 1).padStart(3, '0')}`
+    const req: PurchaseOrderRequest = {
+      supplierId: Number(orderForm.selectedSupplier.id),
+      orderDate: orderForm.orderDate ? format(orderForm.orderDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+      expectedDeliveryDate: orderForm.expectedDeliveryDate ? format(orderForm.expectedDeliveryDate, 'yyyy-MM-dd') : undefined,
+      priority: (orderForm.priority || 'medium').toUpperCase(),
+      paymentTerms: orderForm.paymentTerms || orderForm.selectedSupplier.paymentTerms,
+      deliveryAddress: orderForm.deliveryAddress,
+      notes: orderForm.notes,
+      createdBy: 'Admin',
+      shippingCost: orderForm.shippingCost || 0,
+      items: (orderForm.items || []).map(item => ({
+        productId: item.productId ? Number(item.productId) : undefined,
+        productName: item.productName,
+        productSku: item.sku || item.productCode,
+        unitOfMeasure: item.unitOfMeasure,
+        quantityOrdered: item.quantityOrdered,
+        unitPrice: item.unitPrice,
+        discountPercent: item.discount || 0,
+        taxPercent: item.taxPercent || 0,
+        notes: item.notes,
+      })),
     };
 
-    if (editingOrder) {
-      toast.success('Purchase order updated successfully!');
-    } else {
-      toast.success('Purchase order created successfully!');
+    try {
+      let order: POType;
+      if (editingOrder) {
+        order = await purchaseService.updateOrder(Number((editingOrder as any).id), req);
+        setPurchaseOrders(prev => prev.map(o => o.id === order.id ? order : o));
+        toast.success('Purchase order updated successfully!');
+      } else {
+        order = await purchaseService.createOrder(req);
+        // If submitting (not draft), immediately update status to PENDING_APPROVAL
+        if (submitStatus === 'PENDING_APPROVAL') {
+          try {
+            order = await purchaseService.updateStatus(order.id, 'PENDING_APPROVAL');
+          } catch { /* ignore — order saved even if status update fails */ }
+        }
+        setPurchaseOrders(prev => [order, ...prev]);
+        toast.success(submitStatus === 'PENDING_APPROVAL' ? 'Order submitted for approval!' : 'Order saved as draft!');
+      }
+      setShowOrderForm(false);
+      resetForm();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save order');
     }
-
-    setShowOrderForm(false);
-    resetForm();
-  }, [orderForm, editingOrder, purchaseOrders.length]);
+  }, [orderForm, editingOrder]);
 
   // Reset form
   const resetForm = useCallback(() => {
@@ -537,8 +403,66 @@ export function PurchaseOrder() {
     setEditingOrder(null);
   }, []);
 
+  // Supplier handlers
+  const openCreateSupplier = useCallback(() => {
+    setEditingSupplier(null);
+    setSupplierForm({ name: '', contactPerson: '', email: '', phone: '', address: '', city: '', country: 'UAE', taxId: '', paymentTerms: 'NET30', creditLimit: 0, isActive: true, notes: '' });
+    setShowSupplierForm(true);
+  }, []);
+
+  const openEditSupplier = useCallback((supplier: SupplierType) => {
+    setEditingSupplier(supplier);
+    setSupplierForm({
+      name: supplier.name,
+      contactPerson: supplier.contactPerson || '',
+      email: supplier.email || '',
+      phone: supplier.phone || '',
+      address: supplier.address || '',
+      city: supplier.city || '',
+      country: supplier.country || 'UAE',
+      taxId: supplier.taxId || '',
+      paymentTerms: supplier.paymentTerms || 'NET30',
+      creditLimit: supplier.creditLimit || 0,
+      isActive: supplier.isActive,
+      notes: supplier.notes || '',
+    });
+    setShowSupplierForm(true);
+  }, []);
+
+  const handleSaveSupplier = async () => {
+    if (!supplierForm.name.trim()) { toast.error('Supplier name is required'); return; }
+    setSavingSupplier(true);
+    try {
+      if (editingSupplier) {
+        const updated = await purchaseService.updateSupplier(editingSupplier.id, supplierForm);
+        setSuppliers(prev => prev.map(s => s.id === updated.id ? updated : s));
+        toast.success('Supplier updated successfully');
+      } else {
+        const created = await purchaseService.createSupplier(supplierForm);
+        setSuppliers(prev => [created, ...prev]);
+        toast.success('Supplier created successfully');
+      }
+      setShowSupplierForm(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save supplier');
+    } finally {
+      setSavingSupplier(false);
+    }
+  };
+
+  const handleDeleteSupplier = async (id: number) => {
+    if (!confirm('Delete this supplier? This cannot be undone.')) return;
+    try {
+      await purchaseService.deleteSupplier(id);
+      setSuppliers(prev => prev.filter(s => s.id !== id));
+      toast.success('Supplier deleted');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete supplier');
+    }
+  };
+
   // Handle bulk actions
-  const handleBulkAction = useCallback((action: string) => {
+  const handleBulkAction = useCallback(async (action: string) => {
     if (selectedOrders.length === 0) {
       toast.error('Please select orders first');
       return;
@@ -546,17 +470,41 @@ export function PurchaseOrder() {
 
     switch (action) {
       case 'approve':
-        toast.success(`${selectedOrders.length} orders approved`);
+        try {
+          const results = await Promise.allSettled(
+            selectedOrders.map(id => purchaseService.updateStatus(Number(id), 'APPROVED'))
+          );
+          const succeeded = results.filter(r => r.status === 'fulfilled').map(r => (r as PromiseFulfilledResult<any>).value);
+          if (succeeded.length > 0) {
+            setPurchaseOrders(prev => prev.map(o => {
+              const updated = succeeded.find((u: any) => u.id === o.id);
+              return updated || o;
+            }));
+          }
+          toast.success(`${succeeded.length} order(s) approved`);
+        } catch { toast.error('Failed to approve orders'); }
         break;
       case 'cancel':
-        toast.success(`${selectedOrders.length} orders cancelled`);
+        try {
+          const results = await Promise.allSettled(
+            selectedOrders.map(id => purchaseService.updateStatus(Number(id), 'CANCELLED'))
+          );
+          const succeeded = results.filter(r => r.status === 'fulfilled').map(r => (r as PromiseFulfilledResult<any>).value);
+          if (succeeded.length > 0) {
+            setPurchaseOrders(prev => prev.map(o => {
+              const updated = succeeded.find((u: any) => u.id === o.id);
+              return updated || o;
+            }));
+          }
+          toast.success(`${succeeded.length} order(s) cancelled`);
+        } catch { toast.error('Failed to cancel orders'); }
         break;
       case 'export':
         setIsExporting(true);
         setTimeout(() => {
           setIsExporting(false);
           toast.success(`${selectedOrders.length} orders exported`);
-        }, 2000);
+        }, 1500);
         break;
       case 'print':
         toast.success(`${selectedOrders.length} orders sent to printer`);
@@ -565,23 +513,24 @@ export function PurchaseOrder() {
     setSelectedOrders([]);
   }, [selectedOrders]);
 
-  // Add item to order
-  const addItemToOrder = useCallback((product: Product, quantity: number = 1) => {
+  // Add item to order — accepts both local Product and APIProduct shapes
+  const addItemToOrder = useCallback((product: any, quantity: number = 1) => {
+    const price = product.costPrice ?? product.lastPurchasePrice ?? product.sellingPrice ?? 0;
     const newItem: PurchaseOrderItem = {
       id: `item-${Date.now()}`,
-      productId: product.id,
+      productId: String(product.id),
       productName: product.name,
-      productCode: product.code,
-      sku: product.sku,
-      description: product.description,
-      category: product.category,
-      unitOfMeasure: product.unitOfMeasure,
+      productCode: product.sku || product.code || '',
+      sku: product.sku || '',
+      description: product.description || '',
+      category: product.categoryName || product.category || '',
+      unitOfMeasure: product.defaultUnit || product.unitOfMeasure || 'unit',
       quantityOrdered: quantity,
       quantityReceived: 0,
-      unitPrice: product.lastPurchasePrice,
+      unitPrice: price,
       discount: 0,
-      taxPercent: 5,
-      totalAmount: quantity * product.lastPurchasePrice,
+      taxPercent: product.taxRate ?? 5,
+      totalAmount: quantity * price,
       notes: ''
     };
 
@@ -617,9 +566,10 @@ export function PurchaseOrder() {
     }));
   }, []);
 
-  // Get status badge
+  // Get status badge — accepts both UPPER_CASE (API) and lower_case (form)
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
+    const key = status?.toLowerCase() ?? 'draft';
+    const statusConfig: Record<string, { label: string; className: string }> = {
       draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
       pending_approval: { label: 'Pending Approval', className: 'bg-yellow-100 text-yellow-800' },
       approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800' },
@@ -629,26 +579,27 @@ export function PurchaseOrder() {
       cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
+    const config = statusConfig[key] || statusConfig.draft;
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
-  // Get priority badge
+  // Get priority badge — accepts both UPPER_CASE (API) and lower_case (form)
   const getPriorityBadge = (priority: string) => {
-    const priorityConfig = {
+    const key = priority?.toLowerCase() ?? 'medium';
+    const priorityConfig: Record<string, { label: string; className: string }> = {
       low: { label: 'Low', className: 'bg-green-100 text-green-800' },
       medium: { label: 'Medium', className: 'bg-blue-100 text-blue-800' },
       high: { label: 'High', className: 'bg-orange-100 text-orange-800' },
       urgent: { label: 'Urgent', className: 'bg-red-100 text-red-800' }
     };
 
-    const config = priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.medium;
+    const config = priorityConfig[key] || priorityConfig.medium;
     return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
   };
 
   // Get status icon
   const getStatusIcon = (status: string) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'draft':
         return <FileText className="h-4 w-4 text-gray-600" />;
       case 'pending_approval':
@@ -693,6 +644,20 @@ export function PurchaseOrder() {
           </Button>
         </div>
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="orders">
+            <ClipboardList className="h-4 w-4 mr-2" />
+            Purchase Orders
+          </TabsTrigger>
+          <TabsTrigger value="suppliers">
+            <Building className="h-4 w-4 mr-2" />
+            Suppliers
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="orders" className="space-y-6">
 
       {/* Analytics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -815,7 +780,7 @@ export function PurchaseOrder() {
                 <SelectContent>
                   <SelectItem value="all">All Suppliers</SelectItem>
                   {suppliers.map(supplier => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
+                    <SelectItem key={supplier.id} value={String(supplier.id)}>
                       {supplier.name}
                     </SelectItem>
                   ))}
@@ -903,10 +868,10 @@ export function PurchaseOrder() {
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={selectedOrders.length === filteredOrders.length}
+                      checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedOrders(filteredOrders.map(po => po.id));
+                          setSelectedOrders(filteredOrders.map(po => String(po.id)));
                         } else {
                           setSelectedOrders([]);
                         }
@@ -924,23 +889,30 @@ export function PurchaseOrder() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow 
+                {filteredOrders.map((order) => {
+                  const orderDateObj = order.orderDate ? new Date(order.orderDate) : null;
+                  const expDateObj = order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : null;
+                  const orderStatus = order.status?.toLowerCase() ?? '';
+                  const orderPriority = order.priority?.toLowerCase() ?? '';
+                  const isOverdue = expDateObj && expDateObj < new Date() && orderStatus !== 'received' && orderStatus !== 'cancelled';
+                  return (
+                  <TableRow
                     key={order.id}
                     className={cn(
-                      order.priority === 'urgent' && "bg-red-50 dark:bg-red-950/20",
-                      order.status === 'pending_approval' && "bg-yellow-50 dark:bg-yellow-950/20",
-                      order.expectedDeliveryDate < new Date() && order.status !== 'received' && order.status !== 'cancelled' && "bg-orange-50 dark:bg-orange-950/20"
+                      orderPriority === 'urgent' && "bg-red-50 dark:bg-red-950/20",
+                      orderStatus === 'pending_approval' && "bg-yellow-50 dark:bg-yellow-950/20",
+                      isOverdue && "bg-orange-50 dark:bg-orange-950/20"
                     )}
                   >
                     <TableCell>
                       <Checkbox
-                        checked={selectedOrders.includes(order.id)}
+                        checked={selectedOrders.includes(String(order.id))}
                         onCheckedChange={(checked) => {
+                          const sid = String(order.id);
                           if (checked) {
-                            setSelectedOrders([...selectedOrders, order.id]);
+                            setSelectedOrders([...selectedOrders, sid]);
                           } else {
-                            setSelectedOrders(selectedOrders.filter(id => id !== order.id));
+                            setSelectedOrders(selectedOrders.filter(id => id !== sid));
                           }
                         }}
                       />
@@ -958,31 +930,30 @@ export function PurchaseOrder() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{order.supplier.name}</p>
-                        <p className="text-sm text-muted-foreground">{order.supplier.contactPerson}</p>
+                        <p className="font-medium">{order.supplierName}</p>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <p className="font-medium">{format(order.orderDate, 'MMM dd, yyyy')}</p>
+                      <p className="font-medium">{orderDateObj ? format(orderDateObj, 'MMM dd, yyyy') : '-'}</p>
                       <p className="text-sm text-muted-foreground">
-                        {isToday(order.orderDate) ? 'Today' :
-                         isYesterday(order.orderDate) ? 'Yesterday' :
-                         format(order.orderDate, 'EEE')}
+                        {orderDateObj ? (isToday(orderDateObj) ? 'Today' :
+                         isYesterday(orderDateObj) ? 'Yesterday' :
+                         format(orderDateObj, 'EEE')) : ''}
                       </p>
                     </TableCell>
                     <TableCell>
                       <p className={cn(
                         "font-medium",
-                        order.expectedDeliveryDate < new Date() && order.status !== 'received' && order.status !== 'cancelled' ? "text-red-600" : ""
+                        isOverdue ? "text-red-600" : ""
                       )}>
-                        {format(order.expectedDeliveryDate, 'MMM dd, yyyy')}
+                        {expDateObj ? format(expDateObj, 'MMM dd, yyyy') : '-'}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {isTomorrow(order.expectedDeliveryDate) ? 'Tomorrow' :
-                         isToday(order.expectedDeliveryDate) ? 'Today' :
-                         format(order.expectedDeliveryDate, 'EEE')}
+                        {expDateObj ? (isTomorrow(expDateObj) ? 'Tomorrow' :
+                         isToday(expDateObj) ? 'Today' :
+                         format(expDateObj, 'EEE')) : ''}
                       </p>
-                      {order.expectedDeliveryDate < new Date() && order.status !== 'received' && order.status !== 'cancelled' && (
+                      {isOverdue && (
                         <Badge variant="destructive" className="text-xs mt-1">Overdue</Badge>
                       )}
                     </TableCell>
@@ -1008,34 +979,213 @@ export function PurchaseOrder() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {order.status === 'draft' || order.status === 'pending_approval' ? (
+                        {(orderStatus === 'draft' || orderStatus === 'pending_approval') && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingOrder(order as any);
+                                const matchedSupplier = suppliers.find(s => s.id === order.supplierId) || null;
+                                setOrderForm({
+                                  poNumber: order.poNumber,
+                                  selectedSupplier: matchedSupplier,
+                                  orderDate: order.orderDate ? new Date(order.orderDate) : new Date(),
+                                  expectedDeliveryDate: order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : addDays(new Date(), 7),
+                                  status: orderStatus as any,
+                                  priority: orderPriority as any,
+                                  items: (order.items || []).map(i => ({
+                                    id: String(i.id),
+                                    productId: String(i.productId ?? ''),
+                                    productName: i.productName,
+                                    productCode: i.productSku ?? '',
+                                    sku: i.productSku ?? '',
+                                    description: '',
+                                    category: '',
+                                    unitOfMeasure: i.unitOfMeasure ?? 'unit',
+                                    quantityOrdered: i.quantityOrdered,
+                                    quantityReceived: i.quantityReceived,
+                                    unitPrice: i.unitPrice,
+                                    discount: i.discountPercent,
+                                    taxPercent: i.taxPercent,
+                                    totalAmount: i.totalAmount,
+                                    notes: i.notes,
+                                  })),
+                                  subtotal: order.subtotal,
+                                  discountAmount: order.discountAmount,
+                                  taxAmount: order.taxAmount,
+                                  shippingCost: order.shippingCost,
+                                  totalAmount: order.totalAmount,
+                                  paymentTerms: order.paymentTerms,
+                                  deliveryAddress: order.deliveryAddress,
+                                  notes: order.notes,
+                                });
+                                setShowOrderForm(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-500 hover:text-red-700"
+                              onClick={async () => {
+                                if (!confirm('Delete this purchase order?')) return;
+                                try {
+                                  await purchaseService.deleteOrder(Number(order.id));
+                                  setPurchaseOrders(prev => prev.filter(o => o.id !== order.id));
+                                  toast.success('Order deleted');
+                                } catch (err: any) {
+                                  toast.error(err.message || 'Failed to delete order');
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        {orderStatus === 'pending_approval' && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => {
-                              setEditingOrder(order);
-                              setOrderForm({
-                                ...order,
-                                selectedSupplier: order.supplier
-                              });
-                              setShowOrderForm(true);
+                            title="Approve"
+                            onClick={async () => {
+                              try {
+                                const updated = await purchaseService.updateStatus(Number(order.id), 'APPROVED');
+                                setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                                toast.success('Order approved');
+                              } catch (err: any) {
+                                toast.error(err.message || 'Failed to approve');
+                              }
                             }}
                           >
-                            <Edit className="h-4 w-4" />
+                            <CheckCircle className="h-4 w-4" />
                           </Button>
-                        ) : null}
+                        )}
+                        {orderStatus === 'approved' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Mark as Ordered"
+                            onClick={async () => {
+                              try {
+                                const updated = await purchaseService.updateStatus(Number(order.id), 'ORDERED');
+                                setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                                toast.success('Order marked as ordered');
+                              } catch (err: any) {
+                                toast.error(err.message || 'Failed to update status');
+                              }
+                            }}
+                          >
+                            <Truck className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+        </TabsContent>{/* end orders tab */}
+
+        <TabsContent value="suppliers" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Suppliers</h2>
+              <p className="text-sm text-muted-foreground">{suppliers.length} supplier(s) registered</p>
+            </div>
+            <Button onClick={openCreateSupplier}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Supplier
+            </Button>
+          </div>
+
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search suppliers..."
+              value={supplierSearch}
+              onChange={e => setSupplierSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Supplier Name</TableHead>
+                    <TableHead>Contact Person</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Payment Terms</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {suppliers
+                    .filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || (s.contactPerson ?? '').toLowerCase().includes(supplierSearch.toLowerCase()))
+                    .map(supplier => (
+                    <TableRow key={supplier.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{supplier.name}</p>
+                          {supplier.address && <p className="text-xs text-muted-foreground">{supplier.city}, {supplier.country}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell>{supplier.contactPerson || '-'}</TableCell>
+                      <TableCell>{supplier.email || '-'}</TableCell>
+                      <TableCell>{supplier.phone || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{supplier.paymentTerms || '-'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={supplier.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                          {supplier.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button size="sm" variant="ghost" onClick={() => openEditSupplier(supplier)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700"
+                            onClick={() => handleDeleteSupplier(supplier.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {suppliers.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                        <Building className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>No suppliers found</p>
+                        <Button className="mt-3" onClick={openCreateSupplier}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add your first supplier
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>{/* end suppliers tab */}
+
+      </Tabs>
 
       {/* Create/Edit Order Sheet */}
       <Sheet open={showOrderForm} onOpenChange={setShowOrderForm}>
@@ -1238,7 +1388,7 @@ export function PurchaseOrder() {
                         <CommandInput placeholder="Search products..." />
                         <CommandEmpty>No product found.</CommandEmpty>
                         <CommandGroup>
-                          {products.map((product) => (
+                          {apiProductList.map((product) => (
                             <CommandItem
                               key={product.id}
                               onSelect={() => {
@@ -1248,12 +1398,12 @@ export function PurchaseOrder() {
                             >
                               <div className="flex-1">
                                 <p className="font-medium">{product.name}</p>
-                                <p className="text-sm text-muted-foreground">{product.code} - {product.category}</p>
-                                <p className="text-sm font-medium">AED {product.lastPurchasePrice}</p>
+                                <p className="text-sm text-muted-foreground">{product.sku} - {product.categoryName}</p>
+                                <p className="text-sm font-medium">AED {product.costPrice}</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-sm text-muted-foreground">Stock: {product.currentStock}</p>
-                                {product.currentStock <= product.reorderPoint && (
+                                <p className="text-sm text-muted-foreground">Stock: {product.totalStock}</p>
+                                {product.stockStatus === 'LOW_STOCK' && (
                                   <Badge variant="destructive" className="text-xs">Low Stock</Badge>
                                 )}
                               </div>
@@ -1387,32 +1537,32 @@ export function PurchaseOrder() {
                     <CardContent className="space-y-3">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>
-                        <span>AED {orderForm.subtotal?.toFixed(2) || '0.00'}</span>
+                        <span>AED {orderTotals.subtotal.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Discount:</span>
-                        <span>AED {orderForm.discountAmount?.toFixed(2) || '0.00'}</span>
-                      </div>
+                      {orderTotals.discountAmount > 0 && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Discount:</span>
+                          <span>-AED {orderTotals.discountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span>Tax:</span>
-                        <span>AED {orderForm.taxAmount?.toFixed(2) || '0.00'}</span>
+                        <span>AED {orderTotals.taxAmount.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span>Shipping:</span>
-                        <div className="text-right">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={orderForm.shippingCost || 0}
-                            onChange={(e) => setOrderForm(prev => ({ ...prev, shippingCost: parseFloat(e.target.value) || 0 }))}
-                            className="w-24 text-right"
-                          />
-                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={orderForm.shippingCost || 0}
+                          onChange={(e) => setOrderForm(prev => ({ ...prev, shippingCost: parseFloat(e.target.value) || 0 }))}
+                          className="w-28 text-right"
+                        />
                       </div>
                       <Separator />
-                      <div className="flex justify-between font-medium text-lg">
+                      <div className="flex justify-between font-bold text-lg">
                         <span>Total:</span>
-                        <span>AED {orderForm.totalAmount?.toFixed(2) || '0.00'}</span>
+                        <span>AED {orderTotals.totalAmount.toFixed(2)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -1459,11 +1609,11 @@ export function PurchaseOrder() {
                   </Button>
                 ) : (
                   <div className="flex space-x-2">
-                    <Button variant="outline" onClick={handleSaveOrder}>
+                    <Button variant="outline" onClick={() => handleSaveOrder('DRAFT')}>
                       <Save className="mr-2 h-4 w-4" />
                       Save as Draft
                     </Button>
-                    <Button onClick={handleSaveOrder}>
+                    <Button onClick={() => handleSaveOrder('PENDING_APPROVAL')}>
                       <Send className="mr-2 h-4 w-4" />
                       Submit Order
                     </Button>
@@ -1494,8 +1644,17 @@ export function PurchaseOrder() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-6">
+              <div id="po-detail-print" className="space-y-6">
                 {/* Order Information */}
+                {(() => {
+                  const d = selectedOrderForDetail as any;
+                  const detailSupplierName = d.supplierName || d.supplier?.name || '';
+                  const detailSupplierContact = d.supplier?.contactPerson || '';
+                  const detailSupplierEmail = d.supplier?.email || '';
+                  const detailSupplierPhone = d.supplier?.phone || '';
+                  const detailOrderDate = d.orderDate ? new Date(d.orderDate) : null;
+                  const detailExpDate = d.expectedDeliveryDate ? new Date(d.expectedDeliveryDate) : null;
+                  return (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card>
                     <CardHeader>
@@ -1504,22 +1663,30 @@ export function PurchaseOrder() {
                     <CardContent className="space-y-3">
                       <div>
                         <Label className="text-sm text-muted-foreground">Company</Label>
-                        <p className="font-medium">{selectedOrderForDetail.supplier.name}</p>
+                        <p className="font-medium">{detailSupplierName}</p>
                       </div>
-                      <div>
-                        <Label className="text-sm text-muted-foreground">Contact Person</Label>
-                        <p className="font-medium">{selectedOrderForDetail.supplier.contactPerson}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      {detailSupplierContact && (
                         <div>
-                          <Label className="text-sm text-muted-foreground">Email</Label>
-                          <p className="font-medium text-sm">{selectedOrderForDetail.supplier.email}</p>
+                          <Label className="text-sm text-muted-foreground">Contact Person</Label>
+                          <p className="font-medium">{detailSupplierContact}</p>
                         </div>
-                        <div>
-                          <Label className="text-sm text-muted-foreground">Phone</Label>
-                          <p className="font-medium text-sm">{selectedOrderForDetail.supplier.phone}</p>
+                      )}
+                      {(detailSupplierEmail || detailSupplierPhone) && (
+                        <div className="grid grid-cols-2 gap-3">
+                          {detailSupplierEmail && (
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Email</Label>
+                              <p className="font-medium text-sm">{detailSupplierEmail}</p>
+                            </div>
+                          )}
+                          {detailSupplierPhone && (
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Phone</Label>
+                              <p className="font-medium text-sm">{detailSupplierPhone}</p>
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -1531,11 +1698,11 @@ export function PurchaseOrder() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label className="text-sm text-muted-foreground">Order Date</Label>
-                          <p className="font-medium">{format(selectedOrderForDetail.orderDate, 'MMM dd, yyyy')}</p>
+                          <p className="font-medium">{detailOrderDate ? format(detailOrderDate, 'MMM dd, yyyy') : '-'}</p>
                         </div>
                         <div>
                           <Label className="text-sm text-muted-foreground">Expected Delivery</Label>
-                          <p className="font-medium">{format(selectedOrderForDetail.expectedDeliveryDate, 'MMM dd, yyyy')}</p>
+                          <p className="font-medium">{detailExpDate ? format(detailExpDate, 'MMM dd, yyyy') : '-'}</p>
                         </div>
                       </div>
                       <div>
@@ -1555,6 +1722,8 @@ export function PurchaseOrder() {
                     </CardContent>
                   </Card>
                 </div>
+                  );
+                })()}
 
                 {/* Line Items */}
                 <Card>
@@ -1573,12 +1742,14 @@ export function PurchaseOrder() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedOrderForDetail.items.map((item) => (
+                        {selectedOrderForDetail.items.map((item: any) => (
                           <TableRow key={item.id}>
                             <TableCell>
                               <div>
                                 <p className="font-medium">{item.productName}</p>
-                                <p className="text-sm text-muted-foreground">{item.productCode} - {item.sku}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {(item.productSku || item.productCode || item.sku) && `${item.productSku || item.productCode || item.sku}`}
+                                </p>
                                 {item.notes && (
                                   <p className="text-sm text-muted-foreground italic">{item.notes}</p>
                                 )}
@@ -1592,11 +1763,13 @@ export function PurchaseOrder() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell>AED {item.unitPrice.toFixed(2)}</TableCell>
+                            <TableCell>AED {Number(item.unitPrice).toFixed(2)}</TableCell>
                             <TableCell>
-                              {item.discount > 0 ? `AED ${item.discount.toFixed(2)}` : '-'}
+                              {(item.discountPercent || item.discount || 0) > 0
+                                ? `${(item.discountPercent || item.discount || 0)}%`
+                                : '-'}
                             </TableCell>
-                            <TableCell className="font-medium">AED {item.totalAmount.toFixed(2)}</TableCell>
+                            <TableCell className="font-medium">AED {Number(item.totalAmount).toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1653,44 +1826,249 @@ export function PurchaseOrder() {
                 {/* Actions */}
                 <div className="flex justify-between">
                   <div className="flex space-x-2">
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={() => {
+                      const el = document.getElementById('po-detail-print');
+                      if (!el) return;
+                      const w = window.open('', '_blank');
+                      if (!w) return;
+                      w.document.write(`<!DOCTYPE html><html><head><title>PO ${selectedOrderForDetail?.poNumber}</title>
+                        <style>body{font-family:Arial,sans-serif;margin:20px;color:#1E293B}table{width:100%;border-collapse:collapse}th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd}th{background:#f9fafb}.total{font-weight:bold;font-size:16px}@media print{button{display:none}}</style></head>
+                        <body>${el.innerHTML}</body></html>`);
+                      w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+                    }}>
                       <PrinterIcon className="mr-2 h-4 w-4" />
                       Print
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={() => {
+                      const el = document.getElementById('po-detail-print');
+                      if (!el) return;
+                      const w = window.open('', '_blank');
+                      if (!w) return;
+                      w.document.write(`<!DOCTYPE html><html><head><title>PO ${selectedOrderForDetail?.poNumber}</title>
+                        <style>body{font-family:Arial,sans-serif;margin:20px;color:#1E293B}table{width:100%;border-collapse:collapse}th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd}th{background:#f9fafb}.total{font-weight:bold;font-size:16px}</style></head>
+                        <body>${el.innerHTML}</body></html>`);
+                      w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+                    }}>
                       <Download className="mr-2 h-4 w-4" />
                       Export PDF
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={() => {
+                      const po = selectedOrderForDetail;
+                      if (!po) return;
+                      const subject = encodeURIComponent(`Purchase Order ${po.poNumber}`);
+                      const body = encodeURIComponent(`Dear ${po.paymentTerms ? 'Supplier' : 'Team'},\n\nPlease find attached Purchase Order ${po.poNumber} for ${po.items.length} item(s) totalling AED ${po.totalAmount.toFixed(2)}.\n\nDelivery expected by: ${po.expectedDeliveryDate || 'TBD'}\n\nThank you.`);
+                      window.open(`mailto:?subject=${subject}&body=${body}`);
+                    }}>
                       <Mail className="mr-2 h-4 w-4" />
                       Email to Supplier
                     </Button>
                   </div>
                   
                   <div className="flex space-x-2">
-                    {selectedOrderForDetail.status === 'pending_approval' && (
-                      <>
-                        <Button variant="outline">
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Reject
-                        </Button>
-                        <Button>
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                          Approve
-                        </Button>
-                      </>
-                    )}
-                    {selectedOrderForDetail.status === 'ordered' && (
-                      <Button>
-                        <Package className="mr-2 h-4 w-4" />
-                        Mark as Received
-                      </Button>
-                    )}
+                    {(() => {
+                      const detailStatus = (selectedOrderForDetail.status ?? '').toLowerCase();
+                      return (
+                        <>
+                          {detailStatus === 'pending_approval' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    const updated = await purchaseService.updateStatus(Number(selectedOrderForDetail.id), 'CANCELLED');
+                                    setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                                    setSelectedOrderForDetail(updated as any);
+                                    toast.success('Order rejected/cancelled');
+                                  } catch (err: any) { toast.error(err.message); }
+                                }}
+                              >
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Reject
+                              </Button>
+                              <Button
+                                onClick={async () => {
+                                  try {
+                                    const updated = await purchaseService.updateStatus(Number(selectedOrderForDetail.id), 'APPROVED');
+                                    setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                                    setSelectedOrderForDetail(updated as any);
+                                    toast.success('Order approved');
+                                  } catch (err: any) { toast.error(err.message); }
+                                }}
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Approve
+                              </Button>
+                            </>
+                          )}
+                          {(detailStatus === 'ordered' || detailStatus === 'partially_received') && (
+                            <Button
+                              onClick={async () => {
+                                try {
+                                  const updated = await purchaseService.updateStatus(Number(selectedOrderForDetail.id), 'RECEIVED');
+                                  setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                                  setSelectedOrderForDetail(updated as any);
+                                  toast.success('Order marked as received');
+                                } catch (err: any) { toast.error(err.message); }
+                              }}
+                            >
+                              <Package className="mr-2 h-4 w-4" />
+                              Mark as Received
+                            </Button>
+                          )}
+                          {detailStatus === 'draft' && (
+                            <Button
+                              onClick={async () => {
+                                try {
+                                  const updated = await purchaseService.updateStatus(Number(selectedOrderForDetail.id), 'PENDING_APPROVAL');
+                                  setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                                  setSelectedOrderForDetail(updated as any);
+                                  toast.success('Order submitted for approval');
+                                } catch (err: any) { toast.error(err.message); }
+                              }}
+                            >
+                              <Send className="mr-2 h-4 w-4" />
+                              Submit for Approval
+                            </Button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Supplier Create/Edit Dialog */}
+      <Dialog open={showSupplierForm} onOpenChange={setShowSupplierForm}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</DialogTitle>
+            <DialogDescription>
+              {editingSupplier ? 'Update supplier information' : 'Create a new supplier for purchase orders'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Label>Company Name *</Label>
+                <Input
+                  value={supplierForm.name}
+                  onChange={e => setSupplierForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g., Sports Nutrition Ltd"
+                />
+              </div>
+              <div>
+                <Label>Contact Person</Label>
+                <Input
+                  value={supplierForm.contactPerson}
+                  onChange={e => setSupplierForm(f => ({ ...f, contactPerson: e.target.value }))}
+                  placeholder="Contact name"
+                />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={supplierForm.email}
+                  onChange={e => setSupplierForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="supplier@email.com"
+                />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input
+                  value={supplierForm.phone}
+                  onChange={e => setSupplierForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="+971 XX XXX XXXX"
+                />
+              </div>
+              <div>
+                <Label>Tax ID / TRN</Label>
+                <Input
+                  value={supplierForm.taxId}
+                  onChange={e => setSupplierForm(f => ({ ...f, taxId: e.target.value }))}
+                  placeholder="Tax registration number"
+                />
+              </div>
+              <div>
+                <Label>Address</Label>
+                <Input
+                  value={supplierForm.address}
+                  onChange={e => setSupplierForm(f => ({ ...f, address: e.target.value }))}
+                  placeholder="Street address"
+                />
+              </div>
+              <div>
+                <Label>City</Label>
+                <Input
+                  value={supplierForm.city}
+                  onChange={e => setSupplierForm(f => ({ ...f, city: e.target.value }))}
+                  placeholder="City"
+                />
+              </div>
+              <div>
+                <Label>Country</Label>
+                <Input
+                  value={supplierForm.country}
+                  onChange={e => setSupplierForm(f => ({ ...f, country: e.target.value }))}
+                  placeholder="UAE"
+                />
+              </div>
+              <div>
+                <Label>Payment Terms</Label>
+                <Select value={supplierForm.paymentTerms} onValueChange={v => setSupplierForm(f => ({ ...f, paymentTerms: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="COD">COD (Cash on Delivery)</SelectItem>
+                    <SelectItem value="NET15">NET 15</SelectItem>
+                    <SelectItem value="NET30">NET 30</SelectItem>
+                    <SelectItem value="NET45">NET 45</SelectItem>
+                    <SelectItem value="NET60">NET 60</SelectItem>
+                    <SelectItem value="NET90">NET 90</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Credit Limit (AED)</Label>
+                <Input
+                  type="number"
+                  value={supplierForm.creditLimit}
+                  onChange={e => setSupplierForm(f => ({ ...f, creditLimit: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label>Notes</Label>
+                <Textarea
+                  value={supplierForm.notes}
+                  onChange={e => setSupplierForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Additional notes about this supplier..."
+                  rows={2}
+                />
+              </div>
+              <div className="flex items-center space-x-3">
+                <Switch
+                  checked={supplierForm.isActive}
+                  onCheckedChange={v => setSupplierForm(f => ({ ...f, isActive: v }))}
+                />
+                <Label>Active Supplier</Label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 mt-6">
+            <Button variant="outline" onClick={() => setShowSupplierForm(false)}>Cancel</Button>
+            <Button onClick={handleSaveSupplier} disabled={savingSupplier}>
+              <Save className="mr-2 h-4 w-4" />
+              {savingSupplier ? 'Saving...' : (editingSupplier ? 'Update Supplier' : 'Create Supplier')}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

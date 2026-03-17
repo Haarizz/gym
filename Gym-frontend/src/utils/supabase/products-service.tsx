@@ -1,285 +1,412 @@
 import { authService } from './auth-service';
-import { demoService } from './demo-service';
-import { projectId } from './info';
 
-const baseUrl = `https://${projectId}.supabase.co/functions/v1/make-server-0a04502f`;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+// ── Frontend interfaces (camelCase) ──────────────────────────────────────────
+
+export interface Warehouse {
+  id: number;
+  name: string;
+  type: string; // MAIN_WAREHOUSE | BRANCH | ONLINE
+  location?: string;
+  isActive: boolean;
+}
+
+export interface ProductCategory {
+  id: number;
+  name: string;
+  categoryType: string;
+  color: string;
+  iconName: string;
+  productCount: number;
+}
+
+export interface ProductStock {
+  id: number;
+  productId: number;
+  warehouseId: number;
+  warehouseName: string;
+  currentStock: number;
+  openingStock: number;
+  reorderLevel: number;
+  stockStatus: string; // IN_STOCK | LOW_STOCK | OUT_OF_STOCK
+}
 
 export interface Product {
-  id: string;
+  id: number;
   name: string;
-  category: string;
-  price: number;
-  cost: number;
-  stock_quantity: number;
-  min_stock_level: number;
-  supplier?: string;
-  barcode?: string;
+  sku: string;
+  categoryId: number;
+  categoryName: string;
+  brand?: string;
   description?: string;
-  status: 'active' | 'inactive' | 'discontinued';
-  created_at: string;
-  updated_at: string;
+  isActive: boolean;
+  hasVariants: boolean;
+  hasRecipe: boolean;
+  isManufactured: boolean;
+  imageUrls: string[];
+  barcode?: string;
+  barcodeTemplate?: string;
+  defaultUnit?: string;
+  sellingPrice: number;
+  costPrice: number;
+  taxRate: number;
+  supplier?: string;
+  totalStock: number;
+  inventoryValue: number;
+  stockStatus: string; // ACTIVE | LOW_STOCK | OUT_OF_STOCK | INACTIVE
+  stockByWarehouse: ProductStock[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface ProductFilters {
-  search?: string;
-  category?: string;
-  status?: string;
-  low_stock?: boolean;
+export interface ProductRequest {
+  name: string;
+  categoryId: number;
+  brand?: string;
+  description?: string;
+  isActive: boolean;
+  hasVariants: boolean;
+  hasRecipe: boolean;
+  isManufactured: boolean;
+  imageUrls: string[];
+  barcode?: string;
+  barcodeTemplate?: string;
+  defaultUnit?: string;
+  sellingPrice: number;
+  costPrice: number;
+  taxRate: number;
+  supplier?: string;
+  openingStock: number;
+  reorderLevel: number;
+  warehouseId: number;
 }
+
+export interface ProductStats {
+  totalProducts: number;
+  activeProducts: number;
+  lowStockItems: number;
+  outOfStockItems: number;
+  totalInventoryValue: number;
+  categoriesCount: number;
+}
+
+export interface StockAdjustmentRequest {
+  warehouseId: number;
+  adjustmentType: 'ADD' | 'SUBTRACT' | 'SET';
+  quantity: number;
+  reason?: string;
+}
+
+export interface ProductsPage {
+  products: Product[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+// ── Response mappers: snake_case API → camelCase frontend ────────────────────
+
+function mapWarehouse(r: any): Warehouse {
+  return {
+    id: r.id,
+    name: r.name,
+    type: r.type,
+    location: r.location,
+    isActive: r.is_active ?? r.isActive ?? true,
+  };
+}
+
+function mapCategory(r: any): ProductCategory {
+  return {
+    id: r.id,
+    name: r.name,
+    categoryType: r.category_type ?? r.categoryType ?? '',
+    color: r.color ?? 'bg-blue-500',
+    iconName: r.icon_name ?? r.iconName ?? 'package',
+    productCount: r.product_count ?? r.productCount ?? 0,
+  };
+}
+
+function mapProductStock(r: any): ProductStock {
+  return {
+    id: r.id,
+    productId: r.product_id ?? r.productId,
+    warehouseId: r.warehouse_id ?? r.warehouseId,
+    warehouseName: r.warehouse_name ?? r.warehouseName ?? '',
+    currentStock: r.current_stock ?? r.currentStock ?? 0,
+    openingStock: r.opening_stock ?? r.openingStock ?? 0,
+    reorderLevel: r.reorder_level ?? r.reorderLevel ?? 0,
+    stockStatus: r.stock_status ?? r.stockStatus ?? 'IN_STOCK',
+  };
+}
+
+function mapProduct(r: any): Product {
+  const stocks: ProductStock[] = (r.stock_by_warehouse ?? r.stockByWarehouse ?? []).map(mapProductStock);
+  return {
+    id: r.id,
+    name: r.name,
+    sku: r.sku ?? '',
+    categoryId: r.category_id ?? r.categoryId ?? 0,
+    categoryName: r.category_name ?? r.categoryName ?? '',
+    brand: r.brand,
+    description: r.description,
+    isActive: r.is_active ?? r.isActive ?? true,
+    hasVariants: r.has_variants ?? r.hasVariants ?? false,
+    hasRecipe: r.has_recipe ?? r.hasRecipe ?? false,
+    isManufactured: r.is_manufactured ?? r.isManufactured ?? false,
+    imageUrls: r.image_urls ?? r.imageUrls ?? [],
+    barcode: r.barcode,
+    barcodeTemplate: r.barcode_template ?? r.barcodeTemplate,
+    defaultUnit: r.default_unit ?? r.defaultUnit,
+    sellingPrice: Number(r.selling_price ?? r.sellingPrice ?? 0),
+    costPrice: Number(r.cost_price ?? r.costPrice ?? 0),
+    taxRate: Number(r.tax_rate ?? r.taxRate ?? 5),
+    supplier: r.supplier,
+    totalStock: r.total_stock ?? r.totalStock ?? 0,
+    inventoryValue: Number(r.inventory_value ?? r.inventoryValue ?? 0),
+    stockStatus: r.stock_status ?? r.stockStatus ?? 'ACTIVE',
+    stockByWarehouse: stocks,
+    createdAt: r.created_at ?? r.createdAt ?? '',
+    updatedAt: r.updated_at ?? r.updatedAt ?? '',
+  };
+}
+
+function mapStats(r: any): ProductStats {
+  return {
+    totalProducts: r.total_products ?? r.totalProducts ?? 0,
+    activeProducts: r.active_products ?? r.activeProducts ?? 0,
+    lowStockItems: r.low_stock_items ?? r.lowStockItems ?? 0,
+    outOfStockItems: r.out_of_stock_items ?? r.outOfStockItems ?? 0,
+    totalInventoryValue: Number(r.total_inventory_value ?? r.totalInventoryValue ?? 0),
+    categoriesCount: r.categories_count ?? r.categoriesCount ?? 0,
+  };
+}
+
+// Convert camelCase ProductRequest → snake_case body for backend
+function toRequestBody(data: ProductRequest): Record<string, any> {
+  return {
+    name: data.name,
+    category_id: data.categoryId,
+    brand: data.brand,
+    description: data.description,
+    is_active: data.isActive,
+    has_variants: data.hasVariants,
+    has_recipe: data.hasRecipe,
+    is_manufactured: data.isManufactured,
+    image_urls: data.imageUrls,
+    barcode: data.barcode,
+    barcode_template: data.barcodeTemplate,
+    default_unit: data.defaultUnit,
+    selling_price: data.sellingPrice,
+    cost_price: data.costPrice,
+    tax_rate: data.taxRate,
+    supplier: data.supplier,
+    opening_stock: data.openingStock,
+    reorder_level: data.reorderLevel,
+    warehouse_id: data.warehouseId,
+  };
+}
+
+function toAdjustBody(req: StockAdjustmentRequest): Record<string, any> {
+  return {
+    warehouse_id: req.warehouseId,
+    adjustment_type: req.adjustmentType,
+    quantity: req.quantity,
+    reason: req.reason,
+  };
+}
+
+function toWarehouseBody(data: Partial<Warehouse>): Record<string, any> {
+  return {
+    name: data.name,
+    type: data.type,
+    location: data.location,
+    is_active: data.isActive,
+  };
+}
+
+function toCategoryBody(data: Partial<ProductCategory>): Record<string, any> {
+  return {
+    name: data.name,
+    category_type: data.categoryType,
+    color: data.color,
+    icon_name: data.iconName,
+  };
+}
+
+// ── Service class ─────────────────────────────────────────────────────────────
 
 class ProductsService {
-  // Get all products
-  async getProducts(filters: ProductFilters = {}): Promise<Product[]> {
-    try {
-      // If demo mode, return demo data directly
-      if (authService.isDemoMode()) {
-        console.log('Demo mode detected, returning demo products');
-        const demoProducts = demoService.getDemoProducts();
-        
-        // Apply filters to demo data
-        let filteredProducts = demoProducts;
-        
-        if (filters.search) {
-          const searchLower = filters.search.toLowerCase();
-          filteredProducts = filteredProducts.filter(product => 
-            product.name.toLowerCase().includes(searchLower) ||
-            product.category.toLowerCase().includes(searchLower) ||
-            product.description?.toLowerCase().includes(searchLower)
-          );
-        }
-        
-        if (filters.category) {
-          filteredProducts = filteredProducts.filter(product => 
-            product.category === filters.category
-          );
-        }
-        
-        if (filters.status) {
-          filteredProducts = filteredProducts.filter(product => 
-            product.status === filters.status
-          );
-        }
-        
-        if (filters.low_stock) {
-          filteredProducts = filteredProducts.filter(product => 
-            product.stock_quantity <= product.min_stock_level
-          );
-        }
-        
-        return filteredProducts;
-      }
 
-      const queryParams = new URLSearchParams();
-      
-      if (filters.search) queryParams.append('search', filters.search);
-      if (filters.category) queryParams.append('category', filters.category);
-      if (filters.status) queryParams.append('status', filters.status);
-      if (filters.low_stock) queryParams.append('low_stock', 'true');
+  // ── Warehouses ──────────────────────────────────────────────────────────────
 
-      const response = await authService.makeAuthenticatedRequest(
-        `${baseUrl}/products?${queryParams.toString()}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch products');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Get products error:', error);
-      
-      // Fallback to demo data if authenticated and demo mode
-      if (authService.isDemoMode()) {
-        console.log('Backend failed, falling back to demo products');
-        return demoService.getDemoProducts();
-      }
-      
-      throw error;
-    }
+  async getActiveWarehouses(): Promise<Warehouse[]> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/warehouses/active`);
+    if (!res.ok) throw new Error(`Failed to fetch warehouses: ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data.map(mapWarehouse) : [];
   }
 
-  // Get product by ID
-  async getProductById(id: string): Promise<Product> {
-    try {
-      const response = await authService.makeAuthenticatedRequest(`${baseUrl}/products/${id}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch product');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Get product by ID error:', error);
-      throw error;
-    }
+  async getAllWarehouses(): Promise<Warehouse[]> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/warehouses`);
+    if (!res.ok) throw new Error(`Failed to fetch warehouses: ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data.map(mapWarehouse) : [];
   }
 
-  // Create new product
-  async createProduct(productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<Product> {
-    try {
-      const response = await authService.makeAuthenticatedRequest(`${baseUrl}/products`, {
-        method: 'POST',
-        body: JSON.stringify(productData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create product');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Create product error:', error);
-      throw error;
-    }
+  async createWarehouse(data: Partial<Warehouse>): Promise<Warehouse> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/warehouses`, {
+      method: 'POST',
+      body: JSON.stringify(toWarehouseBody(data)),
+    });
+    if (!res.ok) throw new Error(`Failed to create warehouse: ${res.status}`);
+    return mapWarehouse(await res.json());
   }
 
-  // Update product
-  async updateProduct(id: string, updateData: Partial<Product>): Promise<Product> {
-    try {
-      const response = await authService.makeAuthenticatedRequest(`${baseUrl}/products/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updateData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to update product');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Update product error:', error);
-      throw error;
-    }
+  async updateWarehouse(id: number, data: Partial<Warehouse>): Promise<Warehouse> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/warehouses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(toWarehouseBody(data)),
+    });
+    if (!res.ok) throw new Error(`Failed to update warehouse: ${res.status}`);
+    return mapWarehouse(await res.json());
   }
 
-  // Delete product
-  async deleteProduct(id: string): Promise<void> {
-    try {
-      const response = await authService.makeAuthenticatedRequest(`${baseUrl}/products/${id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to delete product');
-      }
-    } catch (error) {
-      console.error('Delete product error:', error);
-      throw error;
-    }
+  async deleteWarehouse(id: number): Promise<void> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/warehouses/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete warehouse: ${res.status}`);
   }
 
-  // Get product categories
-  async getCategories(): Promise<string[]> {
-    try {
-      const products = await this.getProducts();
-      const categories = [...new Set(products.map(p => p.category))];
-      return categories.sort();
-    } catch (error) {
-      console.error('Get categories error:', error);
-      return [];
-    }
+  // ── Categories ──────────────────────────────────────────────────────────────
+
+  async getCategories(): Promise<ProductCategory[]> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/product-categories`);
+    if (!res.ok) throw new Error(`Failed to fetch categories: ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data.map(mapCategory) : [];
   }
 
-  // Get low stock products
+  async createCategory(data: Partial<ProductCategory>): Promise<ProductCategory> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/product-categories`, {
+      method: 'POST',
+      body: JSON.stringify(toCategoryBody(data)),
+    });
+    if (!res.ok) throw new Error(`Failed to create category: ${res.status}`);
+    return mapCategory(await res.json());
+  }
+
+  async updateCategory(id: number, data: Partial<ProductCategory>): Promise<ProductCategory> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/product-categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(toCategoryBody(data)),
+    });
+    if (!res.ok) throw new Error(`Failed to update category: ${res.status}`);
+    return mapCategory(await res.json());
+  }
+
+  async deleteCategory(id: number): Promise<void> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/product-categories/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete category: ${res.status}`);
+  }
+
+  // ── Products ────────────────────────────────────────────────────────────────
+
+  async getProducts(filters?: {
+    search?: string;
+    categoryId?: number;
+    status?: string;
+    page?: number;
+    size?: number;
+  }): Promise<ProductsPage> {
+    const params = new URLSearchParams();
+    if (filters?.search)     params.append('search',     filters.search);
+    if (filters?.categoryId) params.append('categoryId', String(filters.categoryId));
+    if (filters?.status)     params.append('status',     filters.status);
+    if (filters?.page)       params.append('page',       String(filters.page));
+    if (filters?.size)       params.append('size',       String(filters.size));
+
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products?${params.toString()}`);
+    if (!res.ok) throw new Error(`Failed to fetch products: ${res.status}`);
+    const raw = await res.json();
+    return {
+      products: (raw.products ?? []).map(mapProduct),
+      pagination: {
+        page: raw.pagination?.page ?? 1,
+        limit: raw.pagination?.limit ?? 20,
+        total: raw.pagination?.total ?? 0,
+        totalPages: raw.pagination?.total_pages ?? raw.pagination?.totalPages ?? 0,
+      },
+    };
+  }
+
+  async getProductById(id: number): Promise<Product> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/${id}`);
+    if (!res.ok) throw new Error(`Failed to fetch product: ${res.status}`);
+    return mapProduct(await res.json());
+  }
+
+  async createProduct(data: ProductRequest): Promise<Product> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products`, {
+      method: 'POST',
+      body: JSON.stringify(toRequestBody(data)),
+    });
+    if (!res.ok) throw new Error(`Failed to create product: ${res.status}`);
+    return mapProduct(await res.json());
+  }
+
+  async updateProduct(id: number, data: ProductRequest): Promise<Product> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(toRequestBody(data)),
+    });
+    if (!res.ok) throw new Error(`Failed to update product: ${res.status}`);
+    return mapProduct(await res.json());
+  }
+
+  async deleteProduct(id: number): Promise<void> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete product: ${res.status}`);
+  }
+
+  async adjustStock(id: number, req: StockAdjustmentRequest): Promise<Product> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/${id}/stock`, {
+      method: 'PATCH',
+      body: JSON.stringify(toAdjustBody(req)),
+    });
+    if (!res.ok) throw new Error(`Failed to adjust stock: ${res.status}`);
+    return mapProduct(await res.json());
+  }
+
+  async duplicateProduct(id: number): Promise<Product> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/${id}/duplicate`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error(`Failed to duplicate product: ${res.status}`);
+    return mapProduct(await res.json());
+  }
+
+  async getStats(): Promise<ProductStats> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/stats`);
+    if (!res.ok) throw new Error(`Failed to fetch product stats: ${res.status}`);
+    return mapStats(await res.json());
+  }
+
   async getLowStockProducts(): Promise<Product[]> {
-    try {
-      const products = await this.getProducts();
-      return products.filter(product => 
-        product.stock_quantity <= product.min_stock_level && 
-        product.status === 'active'
-      );
-    } catch (error) {
-      console.error('Get low stock products error:', error);
-      return [];
-    }
-  }
-
-  // Get inventory statistics
-  async getInventoryStats(): Promise<{
-    totalProducts: number;
-    totalValue: number;
-    lowStockCount: number;
-    categories: Record<string, number>;
-  }> {
-    try {
-      const products = await this.getProducts({ status: 'active' });
-      
-      const stats = {
-        totalProducts: products.length,
-        totalValue: products.reduce((sum, p) => sum + (p.stock_quantity * p.cost), 0),
-        lowStockCount: products.filter(p => p.stock_quantity <= p.min_stock_level).length,
-        categories: {} as Record<string, number>
-      };
-
-      // Count by category
-      products.forEach(product => {
-        stats.categories[product.category] = (stats.categories[product.category] || 0) + 1;
-      });
-
-      return stats;
-    } catch (error) {
-      console.error('Get inventory stats error:', error);
-      throw error;
-    }
-  }
-
-  // Update stock quantity
-  async updateStock(id: string, quantity: number, type: 'add' | 'subtract' | 'set'): Promise<Product> {
-    try {
-      const product = await this.getProductById(id);
-      let newQuantity: number;
-
-      switch (type) {
-        case 'add':
-          newQuantity = product.stock_quantity + quantity;
-          break;
-        case 'subtract':
-          newQuantity = Math.max(0, product.stock_quantity - quantity);
-          break;
-        case 'set':
-          newQuantity = Math.max(0, quantity);
-          break;
-        default:
-          throw new Error('Invalid stock update type');
-      }
-
-      return await this.updateProduct(id, { stock_quantity: newQuantity });
-    } catch (error) {
-      console.error('Update stock error:', error);
-      throw error;
-    }
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/low-stock`);
+    if (!res.ok) throw new Error(`Failed to fetch low stock products: ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data.map(mapProduct) : [];
   }
 }
 
-// Export singleton instance
 export const productsService = new ProductsService();

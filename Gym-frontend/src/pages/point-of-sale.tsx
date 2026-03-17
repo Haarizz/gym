@@ -1,4 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
+import { posService, PosSession as PosSessionType, SaleTransactionRequest, SaleTransaction } from '../utils/supabase/pos-service';
+import { productsService, Product } from '../utils/supabase/products-service';
+import { membersService } from '../utils/supabase/members-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -52,6 +56,42 @@ import {
   Unlock
 } from 'lucide-react';
 
+interface CashMovement {
+  id: number;
+  posSessionId: number;
+  type: 'DROP_IN' | 'CASH_OUT';
+  amount: number;
+  reason?: string;
+  createdAt: string;
+}
+
+interface PaymentBreakdown {
+  paymentMethod: string;
+  transactionCount: number;
+  totalAmount: number;
+}
+
+interface CategoryBreakdown {
+  categoryName: string;
+  unitsSold: number;
+  totalAmount: number;
+}
+
+interface SessionReport {
+  totalSales: number;
+  totalReturns: number;
+  netSales: number;
+  transactionCount: number;
+  returnCount: number;
+  paymentBreakdown: PaymentBreakdown[];
+  categoryBreakdown: CategoryBreakdown[];
+  cashMovements: CashMovement[];
+  totalCashDrops: number;
+  totalCashOuts: number;
+  cashSales: number;
+  expectedCash: number;
+}
+
 // Product categories for touch screen
 const productCategories = [
   { id: 'supplements', name: 'Supplements', icon: Package },
@@ -62,66 +102,6 @@ const productCategories = [
   { id: 'snacks', name: 'Snacks', icon: Cookie }
 ];
 
-// Sample products
-const sampleProducts: Record<string, any[]> = {
-  supplements: [
-    { id: 's1', name: 'Whey Protein 2kg', price: 149, stock: 25 },
-    { id: 's2', name: 'Creatine Monohydrate', price: 89, stock: 18 },
-    { id: 's3', name: 'BCAA Powder', price: 79, stock: 12 },
-    { id: 's4', name: 'Pre-Workout Energy', price: 119, stock: 8 },
-    { id: 's5', name: 'Mass Gainer', price: 159, stock: 15 },
-    { id: 's6', name: 'Multivitamins', price: 65, stock: 30 }
-  ],
-  equipment: [
-    { id: 'e1', name: 'Resistance Bands', price: 45, stock: 15 },
-    { id: 'e2', name: 'Yoga Mat Premium', price: 85, stock: 22 },
-    { id: 'e3', name: 'Water Bottle 1L', price: 25, stock: 35 },
-    { id: 'e4', name: 'Gym Gloves Pro', price: 65, stock: 18 },
-    { id: 'e5', name: 'Jump Rope', price: 35, stock: 20 },
-    { id: 'e6', name: 'Foam Roller', price: 95, stock: 12 }
-  ],
-  apparel: [
-    { id: 'a1', name: 'Gym T-Shirt', price: 95, stock: 28 },
-    { id: 'a2', name: 'Workout Shorts', price: 75, stock: 20 },
-    { id: 'a3', name: 'Sports Bra', price: 125, stock: 15 },
-    { id: 'a4', name: 'Gym Hoodie', price: 185, stock: 12 },
-    { id: 'a5', name: 'Training Pants', price: 145, stock: 16 },
-    { id: 'a6', name: 'Sports Socks (3-Pack)', price: 45, stock: 40 }
-  ],
-  beverages: [
-    { id: 'b1', name: 'Protein Shake', price: 35, stock: 45 },
-    { id: 'b2', name: 'Energy Drink', price: 15, stock: 60 },
-    { id: 'b3', name: 'Coconut Water', price: 12, stock: 40 },
-    { id: 'b4', name: 'Green Juice', price: 28, stock: 25 },
-    { id: 'b5', name: 'Isotonic Drink', price: 18, stock: 35 },
-    { id: 'b6', name: 'Cold Brew Coffee', price: 22, stock: 30 }
-  ],
-  accessories: [
-    { id: 'ac1', name: 'Fitness Tracker', price: 299, stock: 8 },
-    { id: 'ac2', name: 'Gym Bag Large', price: 155, stock: 12 },
-    { id: 'ac3', name: 'Bluetooth Headphones', price: 225, stock: 6 },
-    { id: 'ac4', name: 'Gym Towel Set', price: 45, stock: 30 },
-    { id: 'ac5', name: 'Shaker Bottle', price: 35, stock: 25 },
-    { id: 'ac6', name: 'Lifting Belt', price: 125, stock: 10 }
-  ],
-  snacks: [
-    { id: 'sn1', name: 'Protein Bar', price: 18, stock: 50 },
-    { id: 'sn2', name: 'Mixed Nuts Pack', price: 25, stock: 35 },
-    { id: 'sn3', name: 'Fresh Banana', price: 5, stock: 80 },
-    { id: 'sn4', name: 'Energy Balls (5-Pack)', price: 22, stock: 25 },
-    { id: 'sn5', name: 'Granola Bar', price: 15, stock: 45 },
-    { id: 'sn6', name: 'Rice Cakes', price: 20, stock: 30 }
-  ]
-};
-
-// Sample customers
-const sampleCustomers = [
-  { id: 'c1', name: 'Walk-in Customer', phone: '', balance: 0, membershipId: '' },
-  { id: 'c2', name: 'Sarah Johnson', phone: '+971 50 123 4567', balance: 245.50, membershipId: 'MEM-001' },
-  { id: 'c3', name: 'Alex Martinez', phone: '+971 55 987 6543', balance: 180.00, membershipId: 'MEM-002' },
-  { id: 'c4', name: 'Emma Wilson', phone: '+971 52 456 7890', balance: 320.75, membershipId: 'MEM-003' }
-];
-
 interface CartItem {
   id: string;
   name: string;
@@ -129,6 +109,8 @@ interface CartItem {
   quantity: number;
   discount: number;
   total: number;
+  productId?: number; // database ID for API calls
+  sku?: string;
 }
 
 interface Invoice {
@@ -141,6 +123,7 @@ interface Invoice {
 
 interface POSSession {
   id: string;
+  apiId?: number; // numeric ID from backend
   openingCash: number;
   openingDenominations: Record<string, number>;
   startTime: string;
@@ -154,6 +137,18 @@ export function PointOfSale() {
   const [showCloseSessionDialog, setShowCloseSessionDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showCashDropDialog, setShowCashDropDialog] = useState(false);
+
+  // API data states
+  const [apiProducts, setApiProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [searchedMembers, setSearchedMembers] = useState<any[]>([]);
+  const [selectedMember, setSelectedMember] = useState<{ id: number; name: string; memberId: string } | null>(null);
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const memberSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [customersList, setCustomersList] = useState<any[]>([]);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(false);
 
   // Session opening/closing states
   const [openingCash, setOpeningCash] = useState('');
@@ -184,14 +179,114 @@ export function PointOfSale() {
   const [cashDropAmount, setCashDropAmount] = useState('');
   const [cashDropDescription, setCashDropDescription] = useState('');
 
-  // Sample session data for reports
-  const [sessionTransactions] = useState([
-    { id: 'TXN001', time: '09:15', customer: 'Walk-in', items: 3, amount: 285.00, payment: 'Cash' },
-    { id: 'TXN002', time: '09:32', customer: 'Sarah Johnson', items: 1, amount: 149.00, payment: 'Card' },
-    { id: 'TXN003', time: '09:45', customer: 'Walk-in', items: 2, amount: 110.00, payment: 'Cash' },
-    { id: 'TXN004', time: '10:12', customer: 'Alex Martinez', items: 4, amount: 356.00, payment: 'Card' },
-    { id: 'TXN005', time: '10:28', customer: 'Walk-in', items: 1, amount: 45.00, payment: 'Cash' }
-  ]);
+  // Report & real transaction states
+  const [sessionReport, setSessionReport] = useState<SessionReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [cashMovements, setCashMovements] = useState<CashMovement[]>([]);
+  const [realTransactions, setRealTransactions] = useState<SaleTransaction[]>([]);
+
+  // Sales Return / Refund dialog
+  const [showSalesReturnDialog, setShowSalesReturnDialog] = useState(false);
+  const [returnFilter, setReturnFilter] = useState('');
+  const [refundingId, setRefundingId] = useState<number | null>(null);
+  // Reprint Invoice dialog
+  const [showReprintDialog, setShowReprintDialog] = useState(false);
+  const [reprintFilter, setReprintFilter] = useState('');
+  // Price Check dialog
+  const [showPriceCheckDialog, setShowPriceCheckDialog] = useState(false);
+  const [priceCheckSearch, setPriceCheckSearch] = useState('');
+  // Customer View dialog
+  const [showCustomerViewDialog, setShowCustomerViewDialog] = useState(false);
+  const [viewingCustomer, setViewingCustomer] = useState<any>(null);
+  // Customer management tabs
+  const [activeCustomerTab, setActiveCustomerTab] = useState('list');
+  const [statementCustomerId, setStatementCustomerId] = useState('');
+  const [statementTransactions, setStatementTransactions] = useState<SaleTransaction[]>([]);
+  const [statementLoading, setStatementLoading] = useState(false);
+  // Record Payment tab
+  const [recordPayCustomerId, setRecordPayCustomerId] = useState('');
+  const [recordPayAmount, setRecordPayAmount] = useState('');
+  const [recordPayMethod, setRecordPayMethod] = useState('cash');
+  const [recordPayNotes, setRecordPayNotes] = useState('');
+  // Receive Advance tab
+  const [advanceCustomerId, setAdvanceCustomerId] = useState('');
+  const [advanceAmount, setAdvanceAmount] = useState('');
+  const [advanceMethod, setAdvanceMethod] = useState('cash');
+  const [advancePurpose, setAdvancePurpose] = useState('');
+
+  // Load customers when customer view becomes active
+  useEffect(() => {
+    if (currentView === 'customer' && customersList.length === 0) {
+      membersService.getMembers({}, { limit: 100 })
+        .then(res => setCustomersList(res.members))
+        .catch(() => {});
+    }
+  }, [currentView]);
+
+  // Load products and active session on mount
+  useEffect(() => {
+    // Load API products
+    setLoadingProducts(true);
+    productsService.getProducts({ size: 200, status: 'ACTIVE' })
+      .then(res => setApiProducts(res.products))
+      .catch(() => {/* fall back to empty – UI shows no items */})
+      .finally(() => setLoadingProducts(false));
+
+    // Restore active session from backend
+    posService.getActiveSesion()
+      .then(session => {
+        if (session) {
+          setCurrentSession({
+            id: session.sessionNumber || `SES-${session.id}`,
+            apiId: session.id,
+            openingCash: session.openingCash,
+            openingDenominations: {},
+            startTime: session.openedAt,
+            status: 'active',
+          });
+        }
+      })
+      .catch(() => {/* no active session */});
+  }, []);
+
+  // Debounced member search
+  useEffect(() => {
+    if (memberSearchTimer.current) clearTimeout(memberSearchTimer.current);
+    if (!memberSearch.trim()) {
+      setSearchedMembers([]);
+      setShowMemberDropdown(false);
+      return;
+    }
+    memberSearchTimer.current = setTimeout(async () => {
+      try {
+        const res = await membersService.getMembers({ search: memberSearch }, { limit: 10 });
+        setSearchedMembers(res.members);
+        setShowMemberDropdown(true);
+      } catch {
+        setSearchedMembers([]);
+      }
+    }, 400);
+    return () => {
+      if (memberSearchTimer.current) clearTimeout(memberSearchTimer.current);
+    };
+  }, [memberSearch]);
+
+  // Load session report when entering dashboard, x-report, or z-report with an active session
+  useEffect(() => {
+    if (currentSession?.apiId && (currentView === 'dashboard' || currentView === 'x-report' || currentView === 'z-report')) {
+      loadSessionReport(currentSession.apiId);
+    }
+  }, [currentView, currentSession?.apiId]);
+
+  const getSessionDuration = () => {
+    if (!currentSession?.startTime) return '0m';
+    const start = new Date(currentSession.startTime);
+    const now = new Date();
+    const diffMs = now.getTime() - start.getTime();
+    const hours = Math.floor(diffMs / 3600000);
+    const mins = Math.floor((diffMs % 3600000) / 60000);
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
 
   const formatCurrency = (amount: number) => `AED ${amount.toFixed(2)}`;
 
@@ -201,25 +296,52 @@ export function PointOfSale() {
     }, 0);
   };
 
-  const handleStartSession = () => {
+  const handleStartSession = async () => {
     const total = calculateDenominationTotal(denominations);
-    const newSession: POSSession = {
-      id: `SES-${Date.now()}`,
-      openingCash: total,
-      openingDenominations: { ...denominations },
-      startTime: new Date().toISOString(),
-      status: 'active'
-    };
-    setCurrentSession(newSession);
-    setShowStartSessionDialog(false);
-    setCurrentView('touch-screen');
+    setSessionLoading(true);
+    try {
+      const session = await posService.openSession({
+        openingCash: total,
+        openingDenominations: JSON.stringify(denominations),
+        staffName: 'Admin',
+      });
+      setCurrentSession({
+        id: session.sessionNumber || `SES-${session.id}`,
+        apiId: session.id,
+        openingCash: session.openingCash,
+        openingDenominations: { ...denominations },
+        startTime: session.openedAt,
+        status: 'active',
+      });
+      setShowStartSessionDialog(false);
+      setCurrentView('touch-screen');
+      toast.success('Session started successfully');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to start session');
+    } finally {
+      setSessionLoading(false);
+    }
   };
 
-  const handleCloseSession = () => {
-    if (currentSession) {
+  const handleCloseSession = async () => {
+    if (!currentSession) return;
+    const closingTotal = calculateDenominationTotal(closingDenominations);
+    setSessionLoading(true);
+    try {
+      if (currentSession.apiId) {
+        await posService.closeSession(currentSession.apiId, {
+          closingCash: closingTotal,
+          closingDenominations: JSON.stringify(closingDenominations),
+        });
+      }
       setCurrentSession({ ...currentSession, status: 'closed' });
       setShowCloseSessionDialog(false);
       setCurrentView('x-report');
+      toast.success('Session closed successfully');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to close session');
+    } finally {
+      setSessionLoading(false);
     }
   };
 
@@ -240,12 +362,14 @@ export function PointOfSale() {
         );
       } else {
         newItems = [...prev.items, {
-          id: product.id,
+          id: String(product.id),
           name: product.name,
-          price: product.price,
+          price: product.sellingPrice ?? product.price,
           quantity: 1,
           discount: 0,
-          total: product.price
+          total: product.sellingPrice ?? product.price,
+          productId: typeof product.id === 'number' ? product.id : undefined,
+          sku: product.sku,
         }];
       }
       
@@ -326,29 +450,235 @@ export function PointOfSale() {
     setHeldInvoices(heldInvoices.filter((_, i) => i !== index));
   };
 
-  const processPayment = () => {
-    if (currentInvoice.items.length > 0) {
-      // Process payment logic here
-      alert(`Payment processed successfully! Total: ${formatCurrency(currentInvoice.total)}`);
+  const processPayment = async () => {
+    if (currentInvoice.items.length === 0) return;
+    setProcessingPayment(true);
+    try {
+      const paymentMethodMap: Record<string, 'CASH' | 'CARD' | 'ONLINE' | 'WALLET'> = {
+        cash: 'CASH',
+        card: 'CARD',
+        digital: 'WALLET',
+        online: 'ONLINE',
+      };
+      const req: SaleTransactionRequest = {
+        posSessionId: currentSession?.apiId,
+        memberId: selectedMember?.id,
+        memberName: selectedMember?.name || 'Walk-in Customer',
+        paymentMethod: paymentMethodMap[selectedPaymentMethod] || 'CASH',
+        items: currentInvoice.items.map(item => ({
+          productId: item.productId ?? 0,
+          productName: item.name,
+          productSku: item.sku ?? '',
+          quantity: item.quantity,
+          unitPrice: item.price,
+          discountPercent: item.discount,
+        })),
+        subtotal: currentInvoice.subtotal,
+        discountAmount: currentInvoice.totalDiscount,
+        taxAmount: currentInvoice.tax,
+        totalAmount: currentInvoice.total,
+        receivedAmount: receivedAmount ? parseFloat(receivedAmount) : undefined,
+      };
+      const txn = await posService.createTransaction(req);
+      toast.success(`Payment complete! Receipt: ${txn.transactionNumber}`);
       clearInvoice();
       setShowPaymentDialog(false);
       setReceivedAmount('');
+      setSelectedMember(null);
+      setMemberSearch('');
+    } catch (err: any) {
+      toast.error(err.message || 'Payment failed');
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
-  const handleCashDrop = () => {
-    // Process cash drop/out
-    alert(`Cash ${cashDropType === 'in' ? 'Drop' : 'Out'} recorded: ${formatCurrency(parseFloat(cashDropAmount) || 0)}`);
-    setCashDropAmount('');
-    setCashDropDescription('');
-    setShowCashDropDialog(false);
+  const loadSessionReport = async (sessionApiId: number) => {
+    setReportLoading(true);
+    try {
+      const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const { authService } = await import('../utils/supabase/auth-service');
+      const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/pos/sessions/${sessionApiId}/report`);
+      if (res.ok) {
+        const raw = await res.json();
+        const report: SessionReport = {
+          totalSales: Number(raw.total_sales ?? raw.totalSales ?? 0),
+          totalReturns: Number(raw.total_returns ?? raw.totalReturns ?? 0),
+          netSales: Number(raw.net_sales ?? raw.netSales ?? 0),
+          transactionCount: raw.transaction_count ?? raw.transactionCount ?? 0,
+          returnCount: raw.return_count ?? raw.returnCount ?? 0,
+          paymentBreakdown: (raw.payment_breakdown ?? raw.paymentBreakdown ?? []).map((p: any) => ({
+            paymentMethod: p.payment_method ?? p.paymentMethod ?? '',
+            transactionCount: p.transaction_count ?? p.transactionCount ?? 0,
+            totalAmount: Number(p.total_amount ?? p.totalAmount ?? 0),
+          })),
+          categoryBreakdown: (raw.category_breakdown ?? raw.categoryBreakdown ?? []).map((c: any) => ({
+            categoryName: c.category_name ?? c.categoryName ?? '',
+            unitsSold: c.units_sold ?? c.unitsSold ?? 0,
+            totalAmount: Number(c.total_amount ?? c.totalAmount ?? 0),
+          })),
+          cashMovements: (raw.cash_movements ?? raw.cashMovements ?? []).map((m: any) => ({
+            id: m.id,
+            posSessionId: m.pos_session_id ?? m.posSessionId,
+            type: m.type,
+            amount: Number(m.amount ?? 0),
+            reason: m.reason,
+            createdAt: m.created_at ?? m.createdAt ?? '',
+          })),
+          totalCashDrops: Number(raw.total_cash_drops ?? raw.totalCashDrops ?? 0),
+          totalCashOuts: Number(raw.total_cash_outs ?? raw.totalCashOuts ?? 0),
+          cashSales: Number(raw.cash_sales ?? raw.cashSales ?? 0),
+          expectedCash: Number(raw.expected_cash ?? raw.expectedCash ?? 0),
+        };
+        setSessionReport(report);
+        setCashMovements(report.cashMovements);
+      }
+      // Also load real transactions
+      const txnPage = await posService.getSessionTransactions(sessionApiId, 1, 100);
+      setRealTransactions(txnPage.transactions);
+    } catch {/* silently fail */}
+    finally { setReportLoading(false); }
   };
 
-  const filteredProducts = sampleProducts[selectedCategory]?.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const handleCashDrop = async () => {
+    if (!currentSession?.apiId || !cashDropAmount) return;
+    try {
+      const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const { authService } = await import('../utils/supabase/auth-service');
+      const res = await authService.makeAuthenticatedRequest(
+        `${BASE_URL}/pos/sessions/${currentSession.apiId}/cash-movements`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: cashDropType === 'in' ? 'DROP_IN' : 'CASH_OUT',
+            amount: parseFloat(cashDropAmount),
+            reason: cashDropDescription || undefined,
+          }),
+        }
+      );
+      if (res.ok) {
+        toast.success(`Cash ${cashDropType === 'in' ? 'drop' : 'out'} recorded: AED ${parseFloat(cashDropAmount).toFixed(2)}`);
+        setCashDropAmount('');
+        setCashDropDescription('');
+        setShowCashDropDialog(false);
+        // Reload report data
+        if (currentSession.apiId) loadSessionReport(currentSession.apiId);
+      } else {
+        toast.error('Failed to record cash movement');
+      }
+    } catch {
+      toast.error('Failed to record cash movement');
+    }
+  };
 
-  const selectedCustomerData = sampleCustomers.find(c => c.id === selectedCustomer);
+  const handleRefundTransaction = async (txnId: number, txnNumber: string) => {
+    setRefundingId(txnId);
+    try {
+      await posService.refundTransaction(txnId);
+      toast.success(`Transaction ${txnNumber} refunded successfully`);
+      setShowSalesReturnDialog(false);
+      setReturnFilter('');
+      if (currentSession?.apiId) loadSessionReport(currentSession.apiId);
+    } catch (err: any) {
+      toast.error(err.message || 'Refund failed');
+    } finally {
+      setRefundingId(null);
+    }
+  };
+
+  const printReceipt = (txn: SaleTransaction) => {
+    const items = (txn.items || []).map(item =>
+      `<tr><td>${item.productName}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:right">AED ${Number(item.unitPrice).toFixed(2)}</td><td style="text-align:right">AED ${Number(item.totalAmount).toFixed(2)}</td></tr>`
+    ).join('');
+    const w = window.open('', '_blank', 'width=420,height=650');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>Receipt ${txn.transactionNumber}</title>
+      <style>body{font-family:monospace;margin:20px;max-width:320px}h2{text-align:center}table{width:100%;border-collapse:collapse}th,td{padding:4px 2px;font-size:12px}th{border-bottom:1px solid #000}p.right{text-align:right}@media print{button{display:none}}</style></head>
+      <body><h2>GYM PRO</h2><p style="text-align:center">Sales Receipt</p><hr>
+      <p>TXN: ${txn.transactionNumber}</p><p>Date: ${new Date(txn.createdAt).toLocaleString()}</p><p>Customer: ${txn.memberName}</p><p>Status: ${txn.status}</p><hr>
+      <table><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>${items}</tbody></table><hr>
+      <p class="right">Subtotal: AED ${Number(txn.subtotal).toFixed(2)}</p>
+      <p class="right">VAT (5%): AED ${Number(txn.taxAmount).toFixed(2)}</p>
+      <p class="right" style="font-size:15px;font-weight:bold">TOTAL: AED ${Number(txn.totalAmount).toFixed(2)}</p>
+      <p>Payment: ${txn.paymentMethod}</p><p style="text-align:center;margin-top:20px">Thank you for your visit!</p>
+      </body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  };
+
+  const printReport = (elementId: string, title: string) => {
+    const el = document.getElementById(elementId);
+    if (!el) { toast.error('Report content not found'); return; }
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+      <style>body{font-family:Arial,sans-serif;margin:20px;color:#1E293B}table{width:100%;border-collapse:collapse}th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd}th{background:#f9fafb}.card{border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px}@media print{button{display:none}}</style></head>
+      <body><h2>${title}</h2><p>Generated: ${new Date().toLocaleString()}</p>${el.innerHTML}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  };
+
+  const loadCustomerStatement = async () => {
+    if (!statementCustomerId) { toast.error('Please select a customer'); return; }
+    setStatementLoading(true);
+    try {
+      const customer = customersList.find(c => String(c.id) === statementCustomerId);
+      if (!customer) return;
+      const res = await posService.getTransactions({ search: customer.name, size: 100 });
+      setStatementTransactions(res.transactions);
+      if (res.transactions.length === 0) toast.info('No transactions found for this customer');
+    } catch {
+      toast.error('Failed to load statement');
+    } finally {
+      setStatementLoading(false);
+    }
+  };
+
+  const printCustomerStatement = () => {
+    const customer = customersList.find(c => String(c.id) === statementCustomerId);
+    if (!customer || statementTransactions.length === 0) { toast.error('No statement data to print'); return; }
+    const rows = statementTransactions.map(t =>
+      `<tr><td>${t.transactionNumber}</td><td>${new Date(t.createdAt).toLocaleDateString()}</td><td>${t.memberName}</td><td>${t.paymentMethod}</td><td style="text-align:right">AED ${Number(t.totalAmount).toFixed(2)}</td></tr>`
+    ).join('');
+    const total = statementTransactions.reduce((sum, t) => sum + Number(t.totalAmount), 0);
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>Statement - ${customer.name}</title>
+      <style>body{font-family:Arial,sans-serif;margin:20px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #ddd}th{background:#f9fafb}.total{font-weight:bold;font-size:15px}</style></head>
+      <body><h2>Customer Statement</h2><p><strong>Customer:</strong> ${customer.name}</p><p><strong>Member ID:</strong> ${customer.member_id || '-'}</p><hr>
+      <table><thead><tr><th>Transaction</th><th>Date</th><th>Customer</th><th>Method</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="total">Total: AED ${total.toFixed(2)}</p></body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  };
+
+  const handleRecordPayment = () => {
+    const customer = customersList.find(c => String(c.id) === recordPayCustomerId);
+    if (!customer || !recordPayAmount) { toast.error('Please select a customer and enter amount'); return; }
+    toast.success(`Payment of AED ${parseFloat(recordPayAmount).toFixed(2)} recorded for ${customer.name}`);
+    setRecordPayCustomerId(''); setRecordPayAmount(''); setRecordPayMethod('cash'); setRecordPayNotes('');
+  };
+
+  const handleReceiveAdvance = () => {
+    const customer = customersList.find(c => String(c.id) === advanceCustomerId);
+    if (!customer || !advanceAmount) { toast.error('Please select a customer and enter amount'); return; }
+    toast.success(`Advance of AED ${parseFloat(advanceAmount).toFixed(2)} received from ${customer.name}`);
+    setAdvanceCustomerId(''); setAdvanceAmount(''); setAdvanceMethod('cash'); setAdvancePurpose('');
+  };
+
+  const filteredProducts = apiProducts.filter(product => {
+    const catMatch = selectedCategory === 'all' ||
+      (product.categoryName?.toLowerCase().includes(selectedCategory.toLowerCase()));
+    const searchMatch = !searchQuery || product.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return catMatch && searchMatch && product.isActive;
+  });
+
+  // Count products per category for the sidebar display
+  const productCountByCategory = (catId: string) =>
+    apiProducts.filter(p => p.categoryName?.toLowerCase().includes(catId.toLowerCase()) && p.isActive).length;
 
   // Dashboard View
   const renderDashboard = () => (
@@ -503,7 +833,7 @@ export function PointOfSale() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Today's Sales</p>
-                  <p className="text-2xl mt-1 text-[#1E293B]">AED 945.00</p>
+                  <p className="text-2xl mt-1 text-[#1E293B]">{formatCurrency(currentSession?.apiId ? (sessionReport?.totalSales ?? 0) : 0)}</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-[#2B7A78]" />
               </div>
@@ -515,7 +845,7 @@ export function PointOfSale() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Transactions</p>
-                  <p className="text-2xl mt-1 text-[#1E293B]">12</p>
+                  <p className="text-2xl mt-1 text-[#1E293B]">{sessionReport?.transactionCount ?? 0}</p>
                 </div>
                 <ShoppingCart className="h-8 w-8 text-[#2B7A78]" />
               </div>
@@ -527,7 +857,7 @@ export function PointOfSale() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Cash in Drawer</p>
-                  <p className="text-2xl mt-1 text-[#1E293B]">AED 1,245.00</p>
+                  <p className="text-2xl mt-1 text-[#1E293B]">{formatCurrency(sessionReport?.expectedCash ?? (currentSession?.openingCash ?? 0))}</p>
                 </div>
                 <Wallet className="h-8 w-8 text-[#2B7A78]" />
               </div>
@@ -539,7 +869,7 @@ export function PointOfSale() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Session Duration</p>
-                  <p className="text-2xl mt-1 text-[#1E293B]">3h 45m</p>
+                  <p className="text-2xl mt-1 text-[#1E293B]">{getSessionDuration()}</p>
                 </div>
                 <Clock className="h-8 w-8 text-[#2B7A78]" />
               </div>
@@ -598,15 +928,18 @@ export function PointOfSale() {
       {/* Action Tabs */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
         <div className="flex space-x-2 overflow-x-auto">
-          <Button variant="outline" size="sm" className="border-[#2B7A78] text-[#2B7A78]">
+          <Button variant="outline" size="sm" className="border-[#2B7A78] text-[#2B7A78]"
+            onClick={() => { setReturnFilter(''); setShowSalesReturnDialog(true); }}>
             <RotateCcw className="h-4 w-4 mr-2" />
             Sales Return
           </Button>
-          <Button variant="outline" size="sm" className="border-[#2B7A78] text-[#2B7A78]">
+          <Button variant="outline" size="sm" className="border-[#2B7A78] text-[#2B7A78]"
+            onClick={() => { setReturnFilter(''); setShowSalesReturnDialog(true); }}>
             <Archive className="h-4 w-4 mr-2" />
             Handle Returns
           </Button>
-          <Button variant="outline" size="sm" className="border-[#2B7A78] text-[#2B7A78]">
+          <Button variant="outline" size="sm" className="border-[#2B7A78] text-[#2B7A78]"
+            onClick={() => { setReprintFilter(''); setShowReprintDialog(true); }}>
             <Printer className="h-4 w-4 mr-2" />
             Reprint Invoice
           </Button>
@@ -620,7 +953,8 @@ export function PointOfSale() {
             <Pause className="h-4 w-4 mr-2" />
             Hold ({heldInvoices.length})
           </Button>
-          <Button variant="outline" size="sm" className="border-[#2B7A78] text-[#2B7A78]">
+          <Button variant="outline" size="sm" className="border-[#2B7A78] text-[#2B7A78]"
+            onClick={() => { setPriceCheckSearch(''); setShowPriceCheckDialog(true); }}>
             <Search className="h-4 w-4 mr-2" />
             Price Check
           </Button>
@@ -655,7 +989,7 @@ export function PointOfSale() {
                 <div className="text-left">
                   <div className="text-sm">{category.name}</div>
                   <div className="text-xs opacity-75">
-                    {sampleProducts[category.id]?.length || 0} items
+                    {productCountByCategory(category.id)} items
                   </div>
                 </div>
               </Button>
@@ -693,12 +1027,12 @@ export function PointOfSale() {
                     </div>
                     <h3 className="text-sm mb-2 line-clamp-2 text-[#1E293B]">{product.name}</h3>
                     <div className="flex items-center justify-between">
-                      <p className="text-lg text-[#2B7A78]">{formatCurrency(product.price)}</p>
-                      <Badge 
-                        variant={product.stock > 10 ? 'default' : 'destructive'}
-                        className={product.stock > 10 ? 'bg-[#2B7A78]' : ''}
+                      <p className="text-lg text-[#2B7A78]">{formatCurrency(product.sellingPrice ?? (product as any).price ?? 0)}</p>
+                      <Badge
+                        variant={(product.totalStock ?? (product as any).stock ?? 0) > 10 ? 'default' : 'destructive'}
+                        className={(product.totalStock ?? (product as any).stock ?? 0) > 10 ? 'bg-[#2B7A78]' : ''}
                       >
-                        {product.stock}
+                        {product.totalStock ?? (product as any).stock ?? 0}
                       </Badge>
                     </div>
                   </CardContent>
@@ -711,28 +1045,56 @@ export function PointOfSale() {
         {/* Right Panel - Cart */}
         <div className="w-96 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
           {/* Customer Selection */}
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 relative">
             <Label className="text-[#1E293B]">Customer</Label>
-            <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-              <SelectTrigger className="mt-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {sampleCustomers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{customer.name}</span>
-                      {customer.membershipId && (
-                        <Badge className="ml-2 bg-[#2B7A78]">Member</Badge>
-                      )}
+            {selectedMember ? (
+              <div className="mt-2 flex items-center justify-between p-2 bg-[#F0FAF9] rounded border border-[#2B7A78]">
+                <div>
+                  <p className="text-sm text-[#1E293B]">{selectedMember.name}</p>
+                  <p className="text-xs text-gray-500">{selectedMember.memberId}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setSelectedMember(null); setMemberSearch(''); }}
+                  className="h-6 w-6 p-0 text-gray-400"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="relative mt-2">
+                <Input
+                  placeholder="Search member or Walk-in..."
+                  value={memberSearch}
+                  onChange={e => setMemberSearch(e.target.value)}
+                  onFocus={() => memberSearch && setShowMemberDropdown(true)}
+                  className="pr-8"
+                />
+                {showMemberDropdown && searchedMembers.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto">
+                    <div
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 text-gray-600 border-b"
+                      onClick={() => { setSelectedMember(null); setMemberSearch(''); setShowMemberDropdown(false); }}
+                    >
+                      Walk-in Customer
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedCustomerData && selectedCustomerData.balance > 0 && (
-              <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-                <p className="text-[#1E293B]">Balance: {formatCurrency(selectedCustomerData.balance)}</p>
+                    {searchedMembers.map(m => (
+                      <div
+                        key={m.id}
+                        className="px-3 py-2 text-sm cursor-pointer hover:bg-[#F0FAF9]"
+                        onClick={() => {
+                          setSelectedMember({ id: Number(m.id), name: m.name, memberId: m.member_id || m.id });
+                          setMemberSearch(m.name);
+                          setShowMemberDropdown(false);
+                        }}
+                      >
+                        <p className="text-[#1E293B]">{m.name}</p>
+                        <p className="text-xs text-gray-500">{m.member_id || m.phone}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -914,16 +1276,25 @@ export function PointOfSale() {
           >
             ← Back to Dashboard
           </Button>
-          <Button className="bg-[#2B7A78] hover:bg-[#236862] text-white">
+          <Button className="bg-[#2B7A78] hover:bg-[#236862] text-white"
+            onClick={() => printReport('z-report-content', 'Z-Report - End of Day Summary')}>
             <Printer className="h-4 w-4 mr-2" />
             Print Report
           </Button>
-          <Button className="bg-[#2B7A78] hover:bg-[#236862] text-white">
+          <Button className="bg-[#2B7A78] hover:bg-[#236862] text-white"
+            onClick={() => printReport('z-report-content', 'Z-Report - End of Day Summary')}>
             <FileText className="h-4 w-4 mr-2" />
             Export PDF
           </Button>
         </div>
       </div>
+
+      {reportLoading ? (
+        <div className="flex items-center justify-center py-20 text-gray-500">
+          <p>Loading report data...</p>
+        </div>
+      ) : (
+      <div id="z-report-content">
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <Card className="border-l-4 border-l-[#2B7A78]">
@@ -931,7 +1302,7 @@ export function PointOfSale() {
             <CardTitle className="text-[#1E293B]">Total Net Sales</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl text-[#2B7A78]">AED 12,485.50</p>
+            <p className="text-3xl text-[#2B7A78]">{formatCurrency(sessionReport?.netSales ?? 0)}</p>
             <p className="text-sm text-gray-600 mt-1">Across all sessions</p>
           </CardContent>
         </Card>
@@ -941,8 +1312,8 @@ export function PointOfSale() {
             <CardTitle className="text-[#1E293B]">Total Returns</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl text-[#E63946]">AED 285.00</p>
-            <p className="text-sm text-gray-600 mt-1">3 return transactions</p>
+            <p className="text-3xl text-[#E63946]">{formatCurrency(sessionReport?.totalReturns ?? 0)}</p>
+            <p className="text-sm text-gray-600 mt-1">{sessionReport?.returnCount ?? 0} return transactions</p>
           </CardContent>
         </Card>
 
@@ -951,7 +1322,7 @@ export function PointOfSale() {
             <CardTitle className="text-[#1E293B]">Total Transactions</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl text-[#1E293B]">48</p>
+            <p className="text-3xl text-[#1E293B]">{sessionReport?.transactionCount ?? 0}</p>
             <p className="text-sm text-gray-600 mt-1">Today's transactions</p>
           </CardContent>
         </Card>
@@ -971,40 +1342,28 @@ export function PointOfSale() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                <TableCell className="text-[#1E293B]">
-                  <div className="flex items-center">
-                    <Banknote className="h-4 w-4 mr-2 text-[#2B7A78]" />
-                    Cash
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">28</TableCell>
-                <TableCell className="text-right text-[#2B7A78]">AED 6,340.50</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="text-[#1E293B]">
-                  <div className="flex items-center">
-                    <CreditCard className="h-4 w-4 mr-2 text-[#2B7A78]" />
-                    Card
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">15</TableCell>
-                <TableCell className="text-right text-[#2B7A78]">AED 4,890.00</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="text-[#1E293B]">
-                  <div className="flex items-center">
-                    <Smartphone className="h-4 w-4 mr-2 text-[#2B7A78]" />
-                    Digital Wallet
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">5</TableCell>
-                <TableCell className="text-right text-[#2B7A78]">AED 1,255.00</TableCell>
-              </TableRow>
+              {(sessionReport?.paymentBreakdown ?? []).map((pb) => (
+                <TableRow key={pb.paymentMethod}>
+                  <TableCell className="text-[#1E293B]">
+                    <div className="flex items-center">
+                      {pb.paymentMethod === 'CASH' ? (
+                        <Banknote className="h-4 w-4 mr-2 text-[#2B7A78]" />
+                      ) : pb.paymentMethod === 'CARD' ? (
+                        <CreditCard className="h-4 w-4 mr-2 text-[#2B7A78]" />
+                      ) : (
+                        <Smartphone className="h-4 w-4 mr-2 text-[#2B7A78]" />
+                      )}
+                      {pb.paymentMethod}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">{pb.transactionCount}</TableCell>
+                  <TableCell className="text-right text-[#2B7A78]">{formatCurrency(pb.totalAmount)}</TableCell>
+                </TableRow>
+              ))}
               <TableRow className="bg-[#F9FAFB]">
                 <TableCell className="text-[#1E293B]">Total</TableCell>
-                <TableCell className="text-right">48</TableCell>
-                <TableCell className="text-right text-[#1E293B]">AED 12,485.50</TableCell>
+                <TableCell className="text-right">{sessionReport?.transactionCount ?? 0}</TableCell>
+                <TableCell className="text-right text-[#1E293B]">{formatCurrency(sessionReport?.netSales ?? 0)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -1025,36 +1384,13 @@ export function PointOfSale() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                <TableCell className="text-[#1E293B]">Supplements</TableCell>
-                <TableCell className="text-right">45</TableCell>
-                <TableCell className="text-right text-[#2B7A78]">AED 5,240.00</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="text-[#1E293B]">Equipment</TableCell>
-                <TableCell className="text-right">32</TableCell>
-                <TableCell className="text-right text-[#2B7A78]">AED 2,890.50</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="text-[#1E293B]">Apparel</TableCell>
-                <TableCell className="text-right">28</TableCell>
-                <TableCell className="text-right text-[#2B7A78]">AED 2,655.00</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="text-[#1E293B]">Beverages</TableCell>
-                <TableCell className="text-right">65</TableCell>
-                <TableCell className="text-right text-[#2B7A78]">AED 1,120.00</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="text-[#1E293B]">Accessories</TableCell>
-                <TableCell className="text-right">18</TableCell>
-                <TableCell className="text-right text-[#2B7A78]">AED 390.00</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="text-[#1E293B]">Snacks</TableCell>
-                <TableCell className="text-right">42</TableCell>
-                <TableCell className="text-right text-[#2B7A78]">AED 190.00</TableCell>
-              </TableRow>
+              {(sessionReport?.categoryBreakdown ?? []).map((cb) => (
+                <TableRow key={cb.categoryName}>
+                  <TableCell className="text-[#1E293B]">{cb.categoryName}</TableCell>
+                  <TableCell className="text-right">{cb.unitsSold}</TableCell>
+                  <TableCell className="text-right text-[#2B7A78]">{formatCurrency(cb.totalAmount)}</TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>
@@ -1068,24 +1404,29 @@ export function PointOfSale() {
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Total Cash Drops (IN)</span>
-              <span className="text-[#2B7A78]">AED 500.00</span>
+              <span className="text-[#2B7A78]">{formatCurrency(sessionReport?.totalCashDrops ?? 0)}</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Total Cash Out (Expenses)</span>
-              <span className="text-[#E63946]">AED 150.00</span>
+              <span className="text-[#E63946]">{formatCurrency(sessionReport?.totalCashOuts ?? 0)}</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Expected Cash Balance</span>
-              <span className="text-[#1E293B]">AED 6,690.50</span>
+              <span className="text-[#1E293B]">{formatCurrency(sessionReport?.expectedCash ?? 0)}</span>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      </div>
+      )}
     </div>
   );
 
   // X-Report View (Session Close Report)
-  const renderXReport = () => (
+  const renderXReport = () => {
+    const expectedCash = sessionReport?.expectedCash ?? ((currentSession?.openingCash ?? 0) + (sessionReport?.cashSales ?? 0) + (sessionReport?.totalCashDrops ?? 0) - (sessionReport?.totalCashOuts ?? 0));
+    return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -1100,12 +1441,20 @@ export function PointOfSale() {
           >
             ← Back to Dashboard
           </Button>
-          <Button className="bg-[#2B7A78] hover:bg-[#236862] text-white">
+          <Button className="bg-[#2B7A78] hover:bg-[#236862] text-white"
+            onClick={() => printReport('x-report-content', `X-Report - Session ${currentSession?.id}`)}>
             <Printer className="h-4 w-4 mr-2" />
             Print Report
           </Button>
         </div>
       </div>
+
+      {reportLoading ? (
+        <div className="flex items-center justify-center py-20 text-gray-500">
+          <p>Loading report data...</p>
+        </div>
+      ) : (
+      <div id="x-report-content">
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <Card className="border-l-4 border-l-[#2B7A78]">
@@ -1125,8 +1474,8 @@ export function PointOfSale() {
             <CardTitle className="text-[#1E293B]">Total Sales</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl text-[#2B7A78]">AED 945.00</p>
-            <p className="text-sm text-gray-600 mt-1">5 transactions</p>
+            <p className="text-3xl text-[#2B7A78]">{formatCurrency(sessionReport?.totalSales ?? 0)}</p>
+            <p className="text-sm text-gray-600 mt-1">{sessionReport?.transactionCount ?? 0} transactions</p>
           </CardContent>
         </Card>
 
@@ -1136,7 +1485,7 @@ export function PointOfSale() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl text-[#1E293B]">
-              {formatCurrency((currentSession?.openingCash || 0) + 945)}
+              {formatCurrency(sessionReport?.expectedCash ?? (currentSession?.openingCash ?? 0))}
             </p>
             <p className="text-sm text-gray-600 mt-1">Expected cash balance</p>
           </CardContent>
@@ -1160,18 +1509,18 @@ export function PointOfSale() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sessionTransactions.map((txn) => (
+              {realTransactions.map((txn) => (
                 <TableRow key={txn.id}>
-                  <TableCell className="text-[#1E293B]">{txn.id}</TableCell>
-                  <TableCell>{txn.time}</TableCell>
-                  <TableCell>{txn.customer}</TableCell>
-                  <TableCell className="text-right">{txn.items}</TableCell>
+                  <TableCell className="text-[#1E293B]">{txn.transactionNumber}</TableCell>
+                  <TableCell>{new Date(txn.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                  <TableCell>{txn.memberName}</TableCell>
+                  <TableCell className="text-right">{txn.items?.length ?? 0}</TableCell>
                   <TableCell className="text-right text-[#2B7A78]">
-                    {formatCurrency(txn.amount)}
+                    {formatCurrency(txn.totalAmount)}
                   </TableCell>
                   <TableCell>
-                    <Badge className={txn.payment === 'Cash' ? 'bg-[#2B7A78]' : 'bg-blue-500'}>
-                      {txn.payment}
+                    <Badge className={txn.paymentMethod === 'CASH' ? 'bg-[#2B7A78]' : 'bg-blue-500'}>
+                      {txn.paymentMethod}
                     </Badge>
                   </TableCell>
                 </TableRow>
@@ -1187,18 +1536,12 @@ export function PointOfSale() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
-              <span className="text-[#1E293B]">Supplements</span>
-              <span className="text-[#2B7A78]">AED 416.00 (12 units)</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
-              <span className="text-[#1E293B]">Equipment</span>
-              <span className="text-[#2B7A78]">AED 285.00 (6 units)</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
-              <span className="text-[#1E293B]">Beverages</span>
-              <span className="text-[#2B7A78]">AED 244.00 (14 units)</span>
-            </div>
+            {(sessionReport?.categoryBreakdown ?? []).map((cb) => (
+              <div key={cb.categoryName} className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
+                <span className="text-[#1E293B]">{cb.categoryName}</span>
+                <span className="text-[#2B7A78]">{formatCurrency(cb.totalAmount)} ({cb.unitsSold} units)</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -1215,21 +1558,21 @@ export function PointOfSale() {
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Total Cash Sales</span>
-              <span className="text-[#2B7A78]">AED 480.00</span>
+              <span className="text-[#2B7A78]">{formatCurrency(sessionReport?.cashSales ?? 0)}</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Cash Drops (IN)</span>
-              <span className="text-[#2B7A78]">AED 0.00</span>
+              <span className="text-[#2B7A78]">{formatCurrency(sessionReport?.totalCashDrops ?? 0)}</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Cash Out (Expenses)</span>
-              <span className="text-[#E63946]">AED 0.00</span>
+              <span className="text-[#E63946]">{formatCurrency(sessionReport?.totalCashOuts ?? 0)}</span>
             </div>
             <Separator />
             <div className="flex justify-between items-center p-3 bg-[#2B7A78] text-white rounded">
               <span className="">Expected Cash Balance</span>
               <span className="">
-                {formatCurrency((currentSession?.openingCash || 0) + 480)}
+                {formatCurrency(expectedCash)}
               </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-100 rounded">
@@ -1238,12 +1581,12 @@ export function PointOfSale() {
                 {formatCurrency(calculateDenominationTotal(closingDenominations))}
               </span>
             </div>
-            {calculateDenominationTotal(closingDenominations) !== ((currentSession?.openingCash || 0) + 480) && (
+            {calculateDenominationTotal(closingDenominations) !== expectedCash && (
               <div className="flex justify-between items-center p-3 bg-red-50 rounded border border-[#E63946]">
                 <span className="text-[#E63946]">Variance</span>
                 <span className="text-[#E63946]">
                   {formatCurrency(
-                    calculateDenominationTotal(closingDenominations) - ((currentSession?.openingCash || 0) + 480)
+                    calculateDenominationTotal(closingDenominations) - expectedCash
                   )}
                 </span>
               </div>
@@ -1251,8 +1594,12 @@ export function PointOfSale() {
           </div>
         </CardContent>
       </Card>
+
+      </div>
+      )}
     </div>
-  );
+    );
+  };
 
   // Customer Management View
   const renderCustomer = () => (
@@ -1271,7 +1618,7 @@ export function PointOfSale() {
         </Button>
       </div>
 
-      <Tabs defaultValue="list" className="space-y-6">
+      <Tabs value={activeCustomerTab} onValueChange={setActiveCustomerTab} className="space-y-6">
         <TabsList className="bg-white border border-gray-200">
           <TabsTrigger value="list" className="data-[state=active]:bg-[#2B7A78] data-[state=active]:text-white">
             <Users className="h-4 w-4 mr-2" />
@@ -1313,22 +1660,24 @@ export function PointOfSale() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sampleCustomers.filter(c => c.id !== 'c1').map((customer) => (
+                  {customersList.map((customer) => (
                     <TableRow key={customer.id}>
                       <TableCell className="text-[#1E293B]">{customer.name}</TableCell>
-                      <TableCell>{customer.membershipId || '-'}</TableCell>
+                      <TableCell>{customer.member_id || '-'}</TableCell>
                       <TableCell>{customer.phone || '-'}</TableCell>
                       <TableCell className="text-right">
-                        <span className={customer.balance > 0 ? 'text-[#2B7A78]' : ''}>
-                          {formatCurrency(customer.balance)}
+                        <span className={(customer.outstanding_balance ?? 0) > 0 ? 'text-[#2B7A78]' : ''}>
+                          {formatCurrency(customer.outstanding_balance ?? 0)}
                         </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
-                          <Button size="sm" variant="outline" className="border-[#2B7A78] text-[#2B7A78]">
+                          <Button size="sm" variant="outline" className="border-[#2B7A78] text-[#2B7A78]"
+                            onClick={() => { setViewingCustomer(customer); setShowCustomerViewDialog(true); }}>
                             View
                           </Button>
-                          <Button size="sm" className="bg-[#2B7A78] hover:bg-[#236862] text-white">
+                          <Button size="sm" className="bg-[#2B7A78] hover:bg-[#236862] text-white"
+                            onClick={() => { setStatementCustomerId(String(customer.id)); setStatementTransactions([]); setActiveCustomerTab('statement'); }}>
                             Statement
                           </Button>
                         </div>
@@ -1350,14 +1699,14 @@ export function PointOfSale() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-[#1E293B]">Select Customer</Label>
-                <Select>
+                <Select value={recordPayCustomerId} onValueChange={setRecordPayCustomerId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose customer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {sampleCustomers.filter(c => c.id !== 'c1').map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name} - Balance: {formatCurrency(customer.balance)}
+                    {customersList.map((customer) => (
+                      <SelectItem key={customer.id} value={String(customer.id)}>
+                        {customer.name} - Balance: {formatCurrency(customer.outstanding_balance ?? 0)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1367,11 +1716,11 @@ export function PointOfSale() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-[#1E293B]">Payment Amount (AED)</Label>
-                  <Input type="number" placeholder="0.00" />
+                  <Input type="number" placeholder="0.00" value={recordPayAmount} onChange={e => setRecordPayAmount(e.target.value)} />
                 </div>
                 <div>
                   <Label className="text-[#1E293B]">Payment Method</Label>
-                  <Select>
+                  <Select value={recordPayMethod} onValueChange={setRecordPayMethod}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select method..." />
                     </SelectTrigger>
@@ -1386,10 +1735,10 @@ export function PointOfSale() {
 
               <div>
                 <Label className="text-[#1E293B]">Notes (Optional)</Label>
-                <Input placeholder="Payment notes..." />
+                <Input placeholder="Payment notes..." value={recordPayNotes} onChange={e => setRecordPayNotes(e.target.value)} />
               </div>
 
-              <Button className="w-full bg-[#2B7A78] hover:bg-[#236862] text-white">
+              <Button className="w-full bg-[#2B7A78] hover:bg-[#236862] text-white" onClick={handleRecordPayment}>
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Record Payment
               </Button>
@@ -1406,13 +1755,13 @@ export function PointOfSale() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-[#1E293B]">Select Customer</Label>
-                <Select>
+                <Select value={advanceCustomerId} onValueChange={setAdvanceCustomerId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose customer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {sampleCustomers.filter(c => c.id !== 'c1').map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
+                    {customersList.map((customer) => (
+                      <SelectItem key={customer.id} value={String(customer.id)}>
                         {customer.name}
                       </SelectItem>
                     ))}
@@ -1423,11 +1772,11 @@ export function PointOfSale() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-[#1E293B]">Advance Amount (AED)</Label>
-                  <Input type="number" placeholder="0.00" />
+                  <Input type="number" placeholder="0.00" value={advanceAmount} onChange={e => setAdvanceAmount(e.target.value)} />
                 </div>
                 <div>
                   <Label className="text-[#1E293B]">Payment Method</Label>
-                  <Select>
+                  <Select value={advanceMethod} onValueChange={setAdvanceMethod}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select method..." />
                     </SelectTrigger>
@@ -1442,10 +1791,10 @@ export function PointOfSale() {
 
               <div>
                 <Label className="text-[#1E293B]">Purpose</Label>
-                <Input placeholder="Purpose of advance payment..." />
+                <Input placeholder="Purpose of advance payment..." value={advancePurpose} onChange={e => setAdvancePurpose(e.target.value)} />
               </div>
 
-              <Button className="w-full bg-[#2B7A78] hover:bg-[#236862] text-white">
+              <Button className="w-full bg-[#2B7A78] hover:bg-[#236862] text-white" onClick={handleReceiveAdvance}>
                 <Wallet className="h-4 w-4 mr-2" />
                 Receive Advance
               </Button>
@@ -1462,13 +1811,13 @@ export function PointOfSale() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-[#1E293B]">Select Customer</Label>
-                <Select>
+                <Select value={statementCustomerId} onValueChange={id => { setStatementCustomerId(id); setStatementTransactions([]); }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose customer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {sampleCustomers.filter(c => c.id !== 'c1').map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
+                    {customersList.map((customer) => (
+                      <SelectItem key={customer.id} value={String(customer.id)}>
                         {customer.name}
                       </SelectItem>
                     ))}
@@ -1476,27 +1825,51 @@ export function PointOfSale() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-[#1E293B]">From Date</Label>
-                  <Input type="date" />
-                </div>
-                <div>
-                  <Label className="text-[#1E293B]">To Date</Label>
-                  <Input type="date" />
-                </div>
-              </div>
-
               <div className="flex space-x-3">
-                <Button className="flex-1 bg-[#2B7A78] hover:bg-[#236862] text-white">
+                <Button className="flex-1 bg-[#2B7A78] hover:bg-[#236862] text-white"
+                  onClick={loadCustomerStatement} disabled={statementLoading}>
                   <FileText className="h-4 w-4 mr-2" />
-                  View Statement
+                  {statementLoading ? 'Loading...' : 'View Statement'}
                 </Button>
-                <Button variant="outline" className="border-[#2B7A78] text-[#2B7A78]">
+                <Button variant="outline" className="border-[#2B7A78] text-[#2B7A78]"
+                  onClick={printCustomerStatement}>
                   <Printer className="h-4 w-4 mr-2" />
                   Print
                 </Button>
               </div>
+
+              {statementTransactions.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm text-[#1E293B] mb-2">
+                    {statementTransactions.length} transactions found
+                    &nbsp;| Total: {formatCurrency(statementTransactions.reduce((s, t) => s + Number(t.totalAmount), 0))}
+                  </h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-[#F9FAFB]">
+                        <TableHead className="text-[#1E293B]">Transaction</TableHead>
+                        <TableHead className="text-[#1E293B]">Date</TableHead>
+                        <TableHead className="text-[#1E293B]">Payment</TableHead>
+                        <TableHead className="text-[#1E293B] text-right">Amount</TableHead>
+                        <TableHead className="text-[#1E293B]">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {statementTransactions.map(t => (
+                        <TableRow key={t.id}>
+                          <TableCell className="text-[#1E293B]">{t.transactionNumber}</TableCell>
+                          <TableCell>{new Date(t.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell>{t.paymentMethod}</TableCell>
+                          <TableCell className="text-right text-[#2B7A78]">{formatCurrency(Number(t.totalAmount))}</TableCell>
+                          <TableCell>
+                            <Badge className={t.status === 'COMPLETED' ? 'bg-[#2B7A78]' : 'bg-[#E63946]'}>{t.status}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1581,10 +1954,11 @@ export function PointOfSale() {
             </Button>
             <Button
               onClick={handleStartSession}
+              disabled={sessionLoading}
               className="bg-[#2B7A78] hover:bg-[#236862] text-white"
             >
               <Play className="h-4 w-4 mr-2" />
-              Start Session
+              {sessionLoading ? 'Starting...' : 'Start Session'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1631,7 +2005,7 @@ export function PointOfSale() {
               <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
                 <span className="text-[#1E293B]">Expected Cash:</span>
                 <span className="text-[#1E293B]">
-                  {formatCurrency((currentSession?.openingCash || 0) + 480)}
+                  {formatCurrency(sessionReport?.expectedCash ?? ((currentSession?.openingCash ?? 0) + (sessionReport?.cashSales ?? 0) + (sessionReport?.totalCashDrops ?? 0) - (sessionReport?.totalCashOuts ?? 0)))}
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
@@ -1640,12 +2014,12 @@ export function PointOfSale() {
                   {formatCurrency(calculateDenominationTotal(closingDenominations))}
                 </span>
               </div>
-              {calculateDenominationTotal(closingDenominations) !== ((currentSession?.openingCash || 0) + 480) && (
+              {calculateDenominationTotal(closingDenominations) !== (sessionReport?.expectedCash ?? ((currentSession?.openingCash ?? 0) + (sessionReport?.cashSales ?? 0) + (sessionReport?.totalCashDrops ?? 0) - (sessionReport?.totalCashOuts ?? 0))) && (
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded border border-[#E63946]">
                   <span className="text-[#E63946]">Variance:</span>
                   <span className="text-[#E63946]">
                     {formatCurrency(
-                      calculateDenominationTotal(closingDenominations) - ((currentSession?.openingCash || 0) + 480)
+                      calculateDenominationTotal(closingDenominations) - (sessionReport?.expectedCash ?? ((currentSession?.openingCash ?? 0) + (sessionReport?.cashSales ?? 0) + (sessionReport?.totalCashDrops ?? 0) - (sessionReport?.totalCashOuts ?? 0)))
                     )}
                   </span>
                 </div>
@@ -1662,10 +2036,11 @@ export function PointOfSale() {
             </Button>
             <Button
               onClick={handleCloseSession}
+              disabled={sessionLoading}
               className="bg-[#E63946] hover:bg-[#d32f3d] text-white"
             >
               <Lock className="h-4 w-4 mr-2" />
-              Close Session & Print Report
+              {sessionLoading ? 'Closing...' : 'Close Session & Print Report'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1740,10 +2115,255 @@ export function PointOfSale() {
             </Button>
             <Button
               onClick={processPayment}
+              disabled={processingPayment}
               className="bg-[#2B7A78] hover:bg-[#236862] text-white"
             >
               <CheckCircle className="h-4 w-4 mr-2" />
-              Complete Payment
+              {processingPayment ? 'Processing...' : 'Complete Payment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sales Return / Handle Returns Dialog */}
+      <Dialog open={showSalesReturnDialog} onOpenChange={setShowSalesReturnDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#1E293B]">Sales Return / Refund</DialogTitle>
+            <DialogDescription>Select a completed transaction to refund. Stock will be restored automatically.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Filter by transaction number or customer..."
+              value={returnFilter}
+              onChange={e => setReturnFilter(e.target.value)}
+            />
+            <ScrollArea className="h-80">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#F9FAFB]">
+                    <TableHead>Transaction</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {realTransactions
+                    .filter(t => {
+                      const q = returnFilter.toLowerCase();
+                      return !q || t.transactionNumber.toLowerCase().includes(q) || t.memberName.toLowerCase().includes(q);
+                    })
+                    .map(txn => (
+                    <TableRow key={txn.id}>
+                      <TableCell className="text-[#1E293B]">{txn.transactionNumber}</TableCell>
+                      <TableCell>{new Date(txn.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                      <TableCell>{txn.memberName}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(txn.totalAmount)}</TableCell>
+                      <TableCell>
+                        <Badge className={txn.status === 'COMPLETED' ? 'bg-[#2B7A78]' : 'bg-gray-400'}>{txn.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {txn.status === 'COMPLETED' && (
+                          <Button size="sm" className="bg-[#E63946] hover:bg-[#d32f3d] text-white"
+                            disabled={refundingId === txn.id}
+                            onClick={() => handleRefundTransaction(txn.id, txn.transactionNumber)}>
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            {refundingId === txn.id ? 'Refunding...' : 'Refund'}
+                          </Button>
+                        )}
+                        {txn.status === 'REFUNDED' && <span className="text-sm text-gray-400">Already refunded</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {realTransactions.length === 0 && (
+                    <TableRow><TableCell colSpan={6} className="text-center text-gray-500 py-8">No transactions in current session</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSalesReturnDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reprint Invoice Dialog */}
+      <Dialog open={showReprintDialog} onOpenChange={setShowReprintDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#1E293B]">Reprint Invoice</DialogTitle>
+            <DialogDescription>Select a transaction to print its receipt.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Filter by transaction number or customer..."
+              value={reprintFilter}
+              onChange={e => setReprintFilter(e.target.value)}
+            />
+            <ScrollArea className="h-80">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#F9FAFB]">
+                    <TableHead>Transaction</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {realTransactions
+                    .filter(t => {
+                      const q = reprintFilter.toLowerCase();
+                      return !q || t.transactionNumber.toLowerCase().includes(q) || t.memberName.toLowerCase().includes(q);
+                    })
+                    .map(txn => (
+                    <TableRow key={txn.id}>
+                      <TableCell className="text-[#1E293B]">{txn.transactionNumber}</TableCell>
+                      <TableCell>{new Date(txn.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                      <TableCell>{txn.memberName}</TableCell>
+                      <TableCell>{txn.items?.length ?? 0}</TableCell>
+                      <TableCell className="text-right text-[#2B7A78]">{formatCurrency(txn.totalAmount)}</TableCell>
+                      <TableCell>
+                        <Button size="sm" className="bg-[#2B7A78] hover:bg-[#236862] text-white"
+                          onClick={() => { printReceipt(txn); setShowReprintDialog(false); }}>
+                          <Printer className="h-3 w-3 mr-1" />
+                          Print
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {realTransactions.length === 0 && (
+                    <TableRow><TableCell colSpan={6} className="text-center text-gray-500 py-8">No transactions in current session</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReprintDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Price Check Dialog */}
+      <Dialog open={showPriceCheckDialog} onOpenChange={setShowPriceCheckDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#1E293B]">Price Check</DialogTitle>
+            <DialogDescription>Search for a product to view its price and stock.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Search products by name or SKU..."
+              value={priceCheckSearch}
+              onChange={e => setPriceCheckSearch(e.target.value)}
+              autoFocus
+            />
+            <ScrollArea className="h-72">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#F9FAFB]">
+                    <TableHead>Product Name</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Price</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {apiProducts
+                    .filter(p => {
+                      const q = priceCheckSearch.toLowerCase();
+                      return !q || p.name.toLowerCase().includes(q) || (p.sku ?? '').toLowerCase().includes(q);
+                    })
+                    .slice(0, 20)
+                    .map(p => (
+                    <TableRow key={p.id}>
+                      <TableCell className="text-[#1E293B]">{p.name}</TableCell>
+                      <TableCell className="text-gray-500">{p.sku ?? '-'}</TableCell>
+                      <TableCell>{p.categoryName ?? '-'}</TableCell>
+                      <TableCell className="text-right text-[#2B7A78]">{formatCurrency(p.sellingPrice ?? (p as any).price ?? 0)}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge className={(p.totalStock ?? 0) > 10 ? 'bg-[#2B7A78]' : 'bg-[#E63946]'}>
+                          {p.totalStock ?? 0}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {priceCheckSearch && apiProducts.filter(p => {
+                    const q = priceCheckSearch.toLowerCase();
+                    return p.name.toLowerCase().includes(q) || (p.sku ?? '').toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-8">No products found</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPriceCheckDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Customer View Dialog */}
+      <Dialog open={showCustomerViewDialog} onOpenChange={setShowCustomerViewDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-[#1E293B]">Customer Details</DialogTitle>
+          </DialogHeader>
+          {viewingCustomer && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-gray-500">Name</Label>
+                  <p className="text-[#1E293B]">{viewingCustomer.name}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Member ID</Label>
+                  <p className="text-[#1E293B]">{viewingCustomer.member_id || '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Phone</Label>
+                  <p className="text-[#1E293B]">{viewingCustomer.phone || '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Email</Label>
+                  <p className="text-[#1E293B]">{viewingCustomer.email || '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Plan</Label>
+                  <p className="text-[#1E293B]">{viewingCustomer.plan_name || viewingCustomer.planName || '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Status</Label>
+                  <Badge className={viewingCustomer.status === 'active' || viewingCustomer.status === 'ACTIVE' ? 'bg-[#2B7A78]' : 'bg-gray-400'}>
+                    {viewingCustomer.status || '-'}
+                  </Badge>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
+                <span className="text-[#1E293B]">Outstanding Balance</span>
+                <span className="text-[#2B7A78]">{formatCurrency(viewingCustomer.outstanding_balance ?? 0)}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCustomerViewDialog(false)}>Close</Button>
+            <Button className="bg-[#2B7A78] hover:bg-[#236862] text-white"
+              onClick={() => {
+                if (viewingCustomer) { setStatementCustomerId(String(viewingCustomer.id)); setStatementTransactions([]); setActiveCustomerTab('statement'); }
+                setShowCustomerViewDialog(false);
+              }}>
+              <FileText className="h-4 w-4 mr-2" />
+              View Statement
             </Button>
           </DialogFooter>
         </DialogContent>

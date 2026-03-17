@@ -6,6 +6,9 @@ import com.company.project.entities.UserRole;
 import com.company.project.repositories.RoleRepository;
 import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
+import com.company.project.services.SupplierService;
+import com.company.project.services.WarehouseService;
+import com.company.project.services.ProductCategoryService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -21,17 +24,26 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final WarehouseService warehouseService;
+    private final ProductCategoryService productCategoryService;
+    private final SupplierService supplierService;
 
     public DataInitializer(
             RoleRepository roleRepository,
             UserRepository userRepository,
             UserRoleRepository userRoleRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            WarehouseService warehouseService,
+            ProductCategoryService productCategoryService,
+            SupplierService supplierService
     ) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.userRoleRepository = userRoleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.warehouseService = warehouseService;
+        this.productCategoryService = productCategoryService;
+        this.supplierService = supplierService;
     }
 
     @Override
@@ -63,5 +75,14 @@ public class DataInitializer implements CommandLineRunner {
             UserRole userRole = new UserRole(null, admin, adminRole);
             userRoleRepository.save(userRole);
         }
+
+        // Seed default Warehouses
+        warehouseService.initDefaultWarehouses();
+
+        // Seed default Product Categories
+        productCategoryService.initDefaultCategories();
+
+        // Seed default Suppliers
+        supplierService.initDefaultSuppliers();
     }
 }

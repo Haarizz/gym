@@ -46,7 +46,42 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/**").permitAll()
 
-                .anyRequest().permitAll()
+                // Admin-only endpoints
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                // Manager + Admin endpoints
+                .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
+
+                // Payroll & HR — restricted to HR and Admin
+                .requestMatchers("/api/payroll/**", "/api/employees/**", "/api/recruitment/**")
+                    .hasAnyRole("ADMIN", "HR")
+
+                // Financial endpoints — Accountant, Manager, Admin
+                .requestMatchers("/api/billing/**", "/api/expenses/**", "/api/ledgers/**", "/api/financials/**")
+                    .hasAnyRole("ADMIN", "MANAGER", "ACCOUNTANT")
+
+                // Core gym operations — any authenticated user
+                .requestMatchers(
+                    "/api/members/**",
+                    "/api/staff/**",
+                    "/api/attendance/**",
+                    "/api/products/**",
+                    "/api/warehouses/**",
+                    "/api/product-categories/**",
+                    "/api/plans/**",
+                    "/api/promotions/**",
+                    "/api/leads/**",
+                    "/api/bookings/**",
+                    "/api/classes/**",
+                    "/api/dashboard/**",
+                    "/api/pos/**",
+                    "/api/suppliers/**",
+                    "/api/purchase-orders/**",
+                    "/api/supplier-bills/**",
+                    "/api/wastage-returns/**",
+                    "/api/recipes/**",
+                    "/api/production-orders/**"
+                ).authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider())
