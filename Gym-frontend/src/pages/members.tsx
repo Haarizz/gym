@@ -463,24 +463,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   // Helper function to get membership category (Individual, Family, Corporate)
   const getMembershipCategory = (member: Member): string => {
-    // Derive from member data or default to Individual
-    const memberId = getMemberId(member);
-    if (memberId.includes('corp') || memberId.includes('COR')) return 'Corporate';
-    if (memberId.includes('fam') || memberId.includes('FAM')) return 'Family';
-    // Random distribution for demo
-    const hash = memberId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const categories = ['Individual', 'Family', 'Corporate'];
-    return categories[hash % 3];
+    return member.membership_type || 'Individual';
   };
 
-  // Helper function to get plan type with addons
+  // Helper function to get plan type
   const getPlanDetails = (member: Member) => {
     const plan = getMembershipPlan(member);
-    // Mock addons - in production, this would come from actual member data
-    const memberId = getMemberId(member);
-    const hasAddons = memberId.charCodeAt(memberId.length - 1) % 3 === 0;
-    const addons = hasAddons ? ['Personal Training', 'Nutrition Plan'] : [];
-    return { plan, addons };
+    return { plan, addons: [] as string[] };
   };
 
   // Helper function to get amount due
@@ -585,17 +574,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // Renewals & Upgrades helper functions
   const handleRenewalSearch = (value: string) => {
     setRenewalSearchTerm(value);
-    
-    if (value.length > 2) {
-      // Filter members based on search term
-      const filtered = members.filter(member => 
-        member.name.toLowerCase().includes(value.toLowerCase()) ||
-        member.phone.includes(value) ||
-        getMemberId(member).toLowerCase().includes(value.toLowerCase()) ||
-        member.email.toLowerCase().includes(value.toLowerCase())
-      );
-      setSearchSuggestions(filtered.slice(0, 5));
-      setShowSuggestions(true);
+
+    if (value.length > 1) {
+      membersService.searchMembers(value)
+        .then(results => {
+          setSearchSuggestions(results.slice(0, 5));
+          setShowSuggestions(results.length > 0);
+        })
+        .catch(() => setSearchSuggestions([]));
     } else {
       setSearchSuggestions([]);
       setShowSuggestions(false);
@@ -1000,8 +986,17 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm">{member.email}</div>
-                            <div className="text-sm text-muted-foreground">{member.phone}</div>
+                            {member.email?.includes('@family.local') ? (
+                              <>
+                                <div className="text-sm">{member.phone || '—'}</div>
+                                <div className="text-xs text-muted-foreground italic">Family member</div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-sm">{member.email}</div>
+                                <div className="text-sm text-muted-foreground">{member.phone}</div>
+                              </>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="font-medium">{getMembershipPlan(member)}</div>
@@ -1020,7 +1015,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Head</span>
                               ) : (
                                 <div className="text-xs">
-                                  <div className="font-medium text-slate-700">{member.family_head_id || '—'}</div>
+                                  <div className="font-medium text-slate-700">
+                                    {(member as any).family_head_name || member.family_head_id || '—'}
+                                  </div>
                                   {member.relationship_to_head && (
                                     <div className="text-slate-500">({member.relationship_to_head})</div>
                                   )}
