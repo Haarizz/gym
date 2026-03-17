@@ -1,8 +1,7 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Separator } from "../components/ui/separator";
 import { Progress } from "../components/ui/progress";
@@ -10,27 +9,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
-import { Checkbox } from "../components/ui/checkbox";
-import { Switch } from "../components/ui/switch";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import {
   ShoppingBag,
   Plus,
   Search,
-  Filter,
-  Download,
-  Upload,
   Edit,
   Trash2,
   Eye,
   CheckCircle,
   XCircle,
   Clock,
-  AlertTriangle,
   Package,
   Truck,
   FileText,
@@ -38,64 +28,35 @@ import {
   Mail,
   Phone,
   MapPin,
-  Calendar,
   User,
   Building,
   DollarSign,
-  Percent,
   Hash,
-  MoreHorizontal,
   X,
   Save,
   RefreshCw,
   PrinterIcon,
-  Copy,
-  ExternalLink,
   Loader2,
   TrendingUp,
-  TrendingDown,
   ShoppingCart,
-  Factory,
   Users,
-  Target,
-  Activity,
-  ArrowRight,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Check,
-  ChevronsUpDown,
-  Calculator,
+  AlertTriangle,
   Star,
-  Info,
-  Bell,
   Settings,
-  Archive,
-  RotateCcw,
-  Zap,
-  Crown,
-  Paperclip,
-  Image,
-  FilePlus,
+  CreditCard,
+  Wallet,
   BarChart3,
   PieChart,
   LineChart,
-  Camera,
-  ScanLine,
-  Sparkles,
-  TrendingUpDown,
-  Layers,
+  Zap,
   Box,
-  Boxes
 } from 'lucide-react';
 import { toast } from "sonner";
-import { format, addDays, subDays, isToday, isYesterday, isTomorrow, addWeeks, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format } from "date-fns";
 import { cn } from "../components/ui/utils";
 import {
   LineChart as RechartsLineChart,
   Line,
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   PieChart as RechartsPieChart,
@@ -106,693 +67,564 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from 'recharts';
+import {
+  supplierBillService,
+  SupplierBill,
+  SupplierBillRequest,
+} from '../utils/supabase/supplier-bill-service';
+import { purchaseService, Supplier } from '../utils/supabase/purchase-service';
+import { productsService, Product } from '../utils/supabase/products-service';
 
-// Types and interfaces
-interface Supplier {
-  id: string;
-  name: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  country: string;
-  taxId: string;
-  paymentTerms: string;
-  creditLimit: number;
-  isActive: boolean;
-  rating: number;
-  totalPurchases: number;
-  totalSpent: number;
-  lastPurchaseDate: Date;
-}
+// ── Default bill form ─────────────────────────────────────────────────────────
 
-interface PurchaseItem {
-  id: string;
-  productId: string;
+type BillFormItem = {
+  productId?: number;
   productName: string;
-  productCode: string;
-  sku: string;
-  description: string;
-  category: string;
+  productSku: string;
   unitOfMeasure: string;
-  quantityPurchased: number;
-  unitCost: number;
-  discount: number;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
   taxPercent: number;
-  totalAmount: number;
-  expiryDate?: Date;
-  batchNumber?: string;
-  notes?: string;
-}
+  notes: string;
+};
 
-interface Purchase {
-  id: string;
-  purchaseNumber: string;
-  supplier: Supplier;
-  purchaseDate: Date;
-  deliveryDate?: Date;
-  status: 'draft' | 'pending_approval' | 'approved' | 'ordered' | 'received' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  items: PurchaseItem[];
-  subtotal: number;
-  discountAmount: number;
-  taxAmount: number;
-  shippingCost: number;
-  totalAmount: number;
-  paymentTerms: string;
-  paymentStatus: 'pending' | 'partial' | 'paid' | 'overdue';
-  invoiceNumber?: string;
-  referenceNumber?: string;
-  notes?: string;
-  attachments: string[];
-  createdBy: string;
-  approvedBy?: string;
-  receivedBy?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+const defaultBillForm = () => ({
+  supplierId: 0,
+  purchaseNumber: '',
+  invoiceNumber: '',
+  referenceNumber: '',
+  billDate: format(new Date(), 'yyyy-MM-dd'),
+  dueDate: '',
+  priority: 'MEDIUM',
+  paymentStatus: 'UNPAID',
+  shippingCost: 0,
+  warehouseId: undefined as number | undefined,
+  notes: '',
+  receivedBy: '',
+  items: [] as BillFormItem[],
+});
 
-interface Product {
-  id: string;
-  name: string;
-  code: string;
-  sku: string;
-  description: string;
-  category: string;
-  unitOfMeasure: string;
-  currentStock: number;
-  reorderPoint: number;
-  averageUnitCost: number;
-  lastPurchasePrice: number;
-  preferredSupplier?: string;
-  isActive: boolean;
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const CHART_COLORS = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'];
+
+const getStatusBadge = (status: string) => {
+  const cfg: Record<string, { label: string; className: string }> = {
+    DRAFT:     { label: 'Draft',     className: 'bg-gray-100 text-gray-800' },
+    CONFIRMED: { label: 'Confirmed', className: 'bg-blue-100 text-blue-800' },
+    CANCELLED: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
+  };
+  const c = cfg[status] ?? cfg.DRAFT;
+  return <Badge className={c.className}>{c.label}</Badge>;
+};
+
+const getPaymentBadge = (status: string) => {
+  const cfg: Record<string, { label: string; className: string }> = {
+    UNPAID:  { label: 'Unpaid',  className: 'bg-orange-100 text-orange-800' },
+    PARTIAL: { label: 'Partial', className: 'bg-yellow-100 text-yellow-800' },
+    PAID:    { label: 'Paid',    className: 'bg-green-100 text-green-800' },
+  };
+  const c = cfg[status] ?? cfg.UNPAID;
+  return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
+};
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-card border rounded-lg p-3 shadow-lg">
+        <p className="font-medium">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {typeof entry.value === 'number'
+              ? `AED ${entry.value.toLocaleString()}`
+              : entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export function Purchase() {
-  const [activeTab, setActiveTab] = useState('purchases');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedSupplier, setSelectedSupplier] = useState('all');
-  const [selectedPriority, setSelectedPriority] = useState('all');
-  const [dateRange, setDateRange] = useState('month');
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [selectedPurchases, setSelectedPurchases] = useState<string[]>([]);
-  const [isCreatingPurchase, setIsCreatingPurchase] = useState(false);
-  const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
-  const [showPurchaseForm, setShowPurchaseForm] = useState(false);
-  const [showPurchaseDetail, setShowPurchaseDetail] = useState(false);
-  const [selectedPurchaseForDetail, setSelectedPurchaseForDetail] = useState<Purchase | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  const [showSupplierSelector, setShowSupplierSelector] = useState(false);
-  const [showProductSelector, setShowProductSelector] = useState(false);
-  const [showBulkUpload, setShowBulkUpload] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  // ── Data state ───────────────────────────────────────────────────────────
+  const [bills, setBills]             = useState<SupplierBill[]>([]);
+  const [suppliers, setSuppliers]     = useState<Supplier[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [saving, setSaving]           = useState(false);
+  const [page, setPage]               = useState(1);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [totalBills, setTotalBills]   = useState(0);
 
-  // Sample data - in real app this would come from your backend
-  const suppliers: Supplier[] = [
-    {
-      id: '1',
-      name: 'Sports Nutrition Ltd',
-      contactPerson: 'Ahmed Hassan',
-      email: 'ahmed@sportsnutrition.ae',
-      phone: '+971-4-123-4567',
-      address: '123 Business Bay',
-      city: 'Dubai',
-      country: 'UAE',
-      taxId: 'TRN123456789',
-      paymentTerms: 'NET 30',
-      creditLimit: 50000,
-      isActive: true,
-      rating: 4.8,
-      totalPurchases: 45,
-      totalSpent: 125000,
-      lastPurchaseDate: subDays(new Date(), 5)
-    },
-    {
-      id: '2',
-      name: 'Fitness Equipment Co',
-      contactPerson: 'Sarah Johnson',
-      email: 'sarah@fitnessequip.ae',
-      phone: '+971-4-234-5678',
-      address: '456 Industrial Area',
-      city: 'Sharjah',
-      country: 'UAE',
-      taxId: 'TRN234567890',
-      paymentTerms: 'NET 15',
-      creditLimit: 100000,
-      isActive: true,
-      rating: 4.6,
-      totalPurchases: 23,
-      totalSpent: 89000,
-      lastPurchaseDate: subDays(new Date(), 10)
-    },
-    {
-      id: '3',
-      name: 'Beverage Suppliers Inc',
-      contactPerson: 'Mike Chen',
-      email: 'mike@beverages.ae',
-      phone: '+971-4-345-6789',
-      address: '789 Food District',
-      city: 'Abu Dhabi',
-      country: 'UAE',
-      taxId: 'TRN345678901',
-      paymentTerms: 'NET 7',
-      creditLimit: 25000,
-      isActive: true,
-      rating: 4.5,
-      totalPurchases: 67,
-      totalSpent: 45000,
-      lastPurchaseDate: subDays(new Date(), 2)
-    }
-  ];
+  // ── Filter state ─────────────────────────────────────────────────────────
+  const [searchTerm, setSearchTerm]         = useState('');
+  const [statusFilter, setStatusFilter]     = useState('');
+  // ── Bill form / dialogs ──────────────────────────────────────────────────
+  const [showBillForm, setShowBillForm]                 = useState(false);
+  const [editingBill, setEditingBill]                   = useState<SupplierBill | null>(null);
+  const [showBillDetail, setShowBillDetail]             = useState(false);
+  const [selectedBill, setSelectedBill]                 = useState<SupplierBill | null>(null);
+  const [showPaymentDialog, setShowPaymentDialog]       = useState(false);
+  const [payingBill, setPayingBill]                     = useState<SupplierBill | null>(null);
+  const [payAmount, setPayAmount]                       = useState('');
+  const [payMethod, setPayMethod]                       = useState('cash');
+  const [payNotes, setPayNotes]                         = useState('');
+  const [confirmingId, setConfirmingId]                 = useState<number | null>(null);
 
-  const products: Product[] = [
-    {
-      id: '1',
-      name: 'Whey Protein Isolate',
-      code: 'SUP001',
-      sku: 'WPI-CHOC-2KG',
-      description: 'Premium whey protein isolate for muscle building',
-      category: 'Supplements',
-      unitOfMeasure: 'kg',
-      currentStock: 23,
-      reorderPoint: 15,
-      averageUnitCost: 85,
-      lastPurchasePrice: 85,
-      preferredSupplier: '1',
-      isActive: true
-    },
-    {
-      id: '2',
-      name: 'Adjustable Dumbbell Set',
-      code: 'EQP001',
-      sku: 'ADB-SET-50',
-      description: 'Professional adjustable dumbbell set 5-50kg',
-      category: 'Equipment',
-      unitOfMeasure: 'set',
-      currentStock: 3,
-      reorderPoint: 5,
-      averageUnitCost: 450,
-      lastPurchasePrice: 450,
-      preferredSupplier: '2',
-      isActive: true
-    },
-    {
-      id: '3',
-      name: 'Protein Smoothie Mix',
-      code: 'CAF001',
-      sku: 'PSM-BERRY-500ML',
-      description: 'Ready-to-blend protein smoothie mix',
-      category: 'Café & Bar',
-      unitOfMeasure: 'bottle',
-      currentStock: 45,
-      reorderPoint: 50,
-      averageUnitCost: 3.50,
-      lastPurchasePrice: 3.50,
-      preferredSupplier: '3',
-      isActive: true
-    }
-  ];
+  // ── Bill form data ───────────────────────────────────────────────────────
+  const [billForm, setBillForm] = useState(defaultBillForm);
 
-  const purchases: Purchase[] = [
-    {
-      id: '1',
-      purchaseNumber: 'PUR-2024-001',
-      supplier: suppliers[0],
-      purchaseDate: new Date(),
-      deliveryDate: addDays(new Date(), 3),
-      status: 'received',
-      priority: 'medium',
-      items: [
-        {
-          id: '1-1',
-          productId: '1',
-          productName: 'Whey Protein Isolate',
-          productCode: 'SUP001',
-          sku: 'WPI-CHOC-2KG',
-          description: 'Premium whey protein isolate',
-          category: 'Supplements',
-          unitOfMeasure: 'kg',
-          quantityPurchased: 20,
-          unitCost: 85,
-          discount: 0,
-          taxPercent: 5,
-          totalAmount: 1785,
-          expiryDate: addDays(new Date(), 365),
-          batchNumber: 'WPI-2024-001',
-          notes: 'Chocolate flavor'
-        }
-      ],
-      subtotal: 1700,
-      discountAmount: 0,
-      taxAmount: 85,
-      shippingCost: 100,
-      totalAmount: 1885,
-      paymentTerms: 'NET 30',
-      paymentStatus: 'paid',
-      invoiceNumber: 'INV-2024-001',
-      referenceNumber: 'REF-001',
-      notes: 'Received in good condition',
-      attachments: ['invoice.pdf', 'delivery_receipt.jpg'],
-      createdBy: 'John Smith',
-      approvedBy: 'Manager',
-      receivedBy: 'Warehouse Team',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: '2',
-      purchaseNumber: 'PUR-2024-002',
-      supplier: suppliers[1],
-      purchaseDate: subDays(new Date(), 2),
-      status: 'pending_approval',
-      priority: 'high',
-      items: [
-        {
-          id: '2-1',
-          productId: '2',
-          productName: 'Adjustable Dumbbell Set',
-          productCode: 'EQP001',
-          sku: 'ADB-SET-50',
-          description: 'Professional adjustable dumbbell set',
-          category: 'Equipment',
-          unitOfMeasure: 'set',
-          quantityPurchased: 3,
-          unitCost: 450,
-          discount: 50,
-          taxPercent: 5,
-          totalAmount: 1417.5,
-          notes: 'Include installation manual'
-        }
-      ],
-      subtotal: 1350,
-      discountAmount: 50,
-      taxAmount: 67.5,
-      shippingCost: 200,
-      totalAmount: 1567.5,
-      paymentTerms: 'NET 15',
-      paymentStatus: 'pending',
-      referenceNumber: 'REF-002',
-      notes: 'Urgent requirement for new branch',
-      attachments: ['quote.pdf'],
-      createdBy: 'Sarah Johnson',
-      createdAt: subDays(new Date(), 2),
-      updatedAt: subDays(new Date(), 1)
-    },
-    {
-      id: '3',
-      purchaseNumber: 'PUR-2024-003',
-      supplier: suppliers[2],
-      purchaseDate: subDays(new Date(), 5),
-      deliveryDate: subDays(new Date(), 1),
-      status: 'ordered',
-      priority: 'low',
-      items: [
-        {
-          id: '3-1',
-          productId: '3',
-          productName: 'Protein Smoothie Mix',
-          productCode: 'CAF001',
-          sku: 'PSM-BERRY-500ML',
-          description: 'Ready-to-blend protein smoothie mix',
-          category: 'Café & Bar',
-          unitOfMeasure: 'bottle',
-          quantityPurchased: 50,
-          unitCost: 3.50,
-          discount: 0,
-          taxPercent: 5,
-          totalAmount: 183.75,
-          expiryDate: addDays(new Date(), 180),
-          batchNumber: 'PSM-2024-003',
-          notes: 'Mixed berry flavor'
-        }
-      ],
-      subtotal: 175,
-      discountAmount: 0,
-      taxAmount: 8.75,
-      shippingCost: 25,
-      totalAmount: 208.75,
-      paymentTerms: 'NET 7',
-      paymentStatus: 'pending',
-      invoiceNumber: 'INV-2024-003',
-      referenceNumber: 'REF-003',
-      notes: 'For café restocking',
-      attachments: ['order_confirmation.pdf'],
-      createdBy: 'Mike Chen',
-      approvedBy: 'Manager',
-      createdAt: subDays(new Date(), 5),
-      updatedAt: subDays(new Date(), 3)
-    }
-  ];
-
-  // Purchase Form State
-  const [purchaseForm, setPurchaseForm] = useState<Partial<Purchase & { selectedSupplier: Supplier | null }>>({
-    purchaseNumber: '',
-    selectedSupplier: null,
-    purchaseDate: new Date(),
-    deliveryDate: undefined,
-    status: 'draft',
-    priority: 'medium',
-    items: [],
-    subtotal: 0,
-    discountAmount: 0,
-    taxAmount: 0,
-    shippingCost: 0,
-    totalAmount: 0,
-    paymentTerms: 'NET 30',
-    paymentStatus: 'pending',
-    invoiceNumber: '',
-    referenceNumber: '',
-    notes: '',
-    attachments: []
+  // ── Supplier form ────────────────────────────────────────────────────────
+  const [showSupplierForm, setShowSupplierForm]     = useState(false);
+  const [editingSupplier, setEditingSupplier]       = useState<Supplier | null>(null);
+  const [savingSupplier, setSavingSupplier]         = useState(false);
+  const [supplierForm, setSupplierForm] = useState<Partial<Supplier>>({
+    name: '', contactPerson: '', email: '', phone: '',
+    address: '', city: '', country: '', taxId: '',
+    paymentTerms: '', creditLimit: 0, isActive: true, notes: '',
   });
 
-  // Analytics data for charts
-  const monthlyPurchaseData = [
-    { month: 'Jul', amount: 15000, items: 45 },
-    { month: 'Aug', amount: 18500, items: 52 },
-    { month: 'Sep', amount: 22000, items: 38 },
-    { month: 'Oct', amount: 25500, items: 67 },
-    { month: 'Nov', amount: 29000, items: 73 },
-    { month: 'Dec', amount: 32000, items: 61 }
-  ];
+  // ── Product search (for bill form line items) ─────────────────────────────
+  const [apiProducts, setApiProducts]       = useState<Product[]>([]);
+  const [productSearch, setProductSearch]   = useState('');
+  const [showProductSearch, setShowProductSearch] = useState(false);
 
-  const supplierDistribution = [
-    { name: 'Sports Nutrition Ltd', value: 45, amount: 125000, color: '#2563eb' },
-    { name: 'Fitness Equipment Co', value: 23, amount: 89000, color: '#059669' },
-    { name: 'Beverage Suppliers Inc', value: 67, amount: 45000, color: '#dc2626' },
-    { name: 'Others', value: 15, amount: 25000, color: '#7c3aed' }
-  ];
+  // ── Load data ────────────────────────────────────────────────────────────
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [billsPage, suppliersData, productsData] = await Promise.all([
+        supplierBillService.getBills({
+          page,
+          size: 20,
+          status: statusFilter || undefined,
+          search: searchTerm || undefined,
+        }),
+        purchaseService.getAllSuppliers(),
+        productsService.getProducts({ size: 200 }),
+      ]);
+      setBills(billsPage.bills);
+      setTotalPages(billsPage.pagination.totalPages);
+      setTotalBills(billsPage.pagination.total);
+      setSuppliers(suppliersData);
+      setApiProducts(productsData.products ?? []);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, statusFilter, searchTerm]);
 
-  const categorySpending = [
-    { category: 'Supplements', amount: 125000, purchases: 45 },
-    { category: 'Equipment', amount: 89000, purchases: 23 },
-    { category: 'Café & Bar', amount: 45000, purchases: 67 },
-    { category: 'Merchandise', amount: 25000, purchases: 15 }
-  ];
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // Calculate analytics
-  const analytics = useMemo(() => {
-    const totalPurchases = purchases.length;
-    const pendingApprovals = purchases.filter(p => p.status === 'pending_approval').length;
-    const totalSpendThisMonth = purchases
-      .filter(p => p.purchaseDate >= startOfMonth(new Date()) && p.purchaseDate <= endOfMonth(new Date()))
-      .reduce((sum, p) => sum + p.totalAmount, 0);
-    
-    const inventoryAdded = purchases
-      .filter(p => p.status === 'received')
-      .reduce((sum, p) => sum + p.items.reduce((itemSum, item) => itemSum + item.quantityPurchased, 0), 0);
-    
-    const supplierCounts = purchases.reduce((acc, p) => {
-      acc[p.supplier.name] = (acc[p.supplier.name] || 0) + p.totalAmount;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    const topSupplier = Object.entries(supplierCounts).sort(([,a], [,b]) => b - a)[0];
-    
-    const urgentPurchases = purchases.filter(p => p.priority === 'urgent' || p.priority === 'high').length;
-    const overduePurchases = purchases.filter(p => p.paymentStatus === 'overdue').length;
+  // ── Bill form helpers ────────────────────────────────────────────────────
+  const addItem = (preset?: Partial<BillFormItem>) => {
+    setBillForm(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          productName: '',
+          productSku: '',
+          unitOfMeasure: 'pcs',
+          quantity: 1,
+          unitPrice: 0,
+          discountPercent: 0,
+          taxPercent: 0,
+          notes: '',
+          ...preset,
+        },
+      ],
+    }));
+  };
 
-    return {
-      totalPurchases,
-      pendingApprovals,
-      totalSpendThisMonth,
-      inventoryAdded,
-      topSupplier: topSupplier ? { name: topSupplier[0], amount: topSupplier[1] } : null,
-      urgentPurchases,
-      overduePurchases
-    };
-  }, [purchases]);
+  const removeItem = (idx: number) => {
+    setBillForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
+  };
 
-  // Filter purchases
-  const filteredPurchases = useMemo(() => {
-    return purchases.filter(purchase => {
-      const matchesSearch = searchTerm === '' || 
-        purchase.purchaseNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        purchase.supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        purchase.items.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesStatus = selectedStatus === 'all' || purchase.status === selectedStatus;
-      const matchesSupplier = selectedSupplier === 'all' || purchase.supplier.id === selectedSupplier;
-      const matchesPriority = selectedPriority === 'all' || purchase.priority === selectedPriority;
-      
-      return matchesSearch && matchesStatus && matchesSupplier && matchesPriority;
-    });
-  }, [purchases, searchTerm, selectedStatus, selectedSupplier, selectedPriority]);
+  const updateItem = (idx: number, updates: Partial<BillFormItem>) => {
+    setBillForm(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => (i === idx ? { ...item, ...updates } : item)),
+    }));
+  };
 
-  // Handle purchase creation/editing
-  const handleSavePurchase = useCallback(() => {
-    if (!purchaseForm.selectedSupplier || !purchaseForm.items || purchaseForm.items.length === 0) {
-      toast.error('Please select a supplier and add at least one item');
+  // ── Live totals ──────────────────────────────────────────────────────────
+  const billTotals = useMemo(() => {
+    const subtotal = billForm.items.reduce((sum, item) => {
+      const lineBase = item.quantity * item.unitPrice;
+      const afterDiscount = lineBase * (1 - item.discountPercent / 100);
+      return sum + afterDiscount;
+    }, 0);
+
+    const discountAmount = billForm.items.reduce((sum, item) => {
+      const lineBase = item.quantity * item.unitPrice;
+      return sum + lineBase * (item.discountPercent / 100);
+    }, 0);
+
+    const taxAmount = billForm.items.reduce((sum, item) => {
+      const lineBase = item.quantity * item.unitPrice;
+      const afterDiscount = lineBase * (1 - item.discountPercent / 100);
+      return sum + afterDiscount * (item.taxPercent / 100);
+    }, 0);
+
+    const total = subtotal + taxAmount + (billForm.shippingCost || 0);
+    return { subtotal, discountAmount, taxAmount, total };
+  }, [billForm.items, billForm.shippingCost]);
+
+  // ── Save bill ────────────────────────────────────────────────────────────
+  const handleSaveBill = async () => {
+    if (!billForm.supplierId) {
+      toast.error('Please select a supplier');
+      return;
+    }
+    if (billForm.items.length === 0) {
+      toast.error('Please add at least one line item');
+      return;
+    }
+    if (billForm.items.some(i => !i.productName.trim())) {
+      toast.error('All items must have a product name');
       return;
     }
 
-    // Calculate totals
-    const subtotal = purchaseForm.items.reduce((sum, item) => sum + (item.quantityPurchased * item.unitCost - item.discount), 0);
-    const taxAmount = purchaseForm.items.reduce((sum, item) => sum + ((item.quantityPurchased * item.unitCost - item.discount) * item.taxPercent / 100), 0);
-    const totalAmount = subtotal + taxAmount + (purchaseForm.shippingCost || 0);
+    setSaving(true);
+    try {
+      const req: SupplierBillRequest = {
+        supplierId: billForm.supplierId,
+        invoiceNumber: billForm.invoiceNumber || undefined,
+        billDate: billForm.billDate,
+        dueDate: billForm.dueDate || undefined,
+        priority: billForm.priority,
+        shippingCost: billForm.shippingCost,
+        warehouseId: billForm.warehouseId,
+        notes: billForm.notes || undefined,
+        receivedBy: billForm.receivedBy || undefined,
+        items: billForm.items.map(i => ({
+          productId: i.productId,
+          productName: i.productName,
+          productSku: i.productSku || undefined,
+          unitOfMeasure: i.unitOfMeasure || undefined,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          discountPercent: i.discountPercent,
+          taxPercent: i.taxPercent,
+          notes: i.notes || undefined,
+        })),
+      };
 
-    const updatedPurchase = {
-      ...purchaseForm,
-      supplier: purchaseForm.selectedSupplier,
-      subtotal,
-      taxAmount,
-      totalAmount,
-      purchaseNumber: purchaseForm.purchaseNumber || `PUR-${new Date().getFullYear()}-${String(purchases.length + 1).padStart(3, '0')}`
-    };
-
-    if (editingPurchase) {
-      toast.success('Purchase updated successfully!');
-    } else {
-      toast.success('Purchase created successfully!');
+      if (editingBill) {
+        await supplierBillService.updateBill(editingBill.id, req);
+        toast.success('Bill updated successfully');
+      } else {
+        await supplierBillService.createBill(req);
+        toast.success('Bill created successfully');
+      }
+      setShowBillForm(false);
+      setEditingBill(null);
+      setBillForm(defaultBillForm());
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save bill');
+    } finally {
+      setSaving(false);
     }
+  };
 
-    setShowPurchaseForm(false);
-    resetForm();
-  }, [purchaseForm, editingPurchase, purchases.length]);
+  // ── Confirm bill ─────────────────────────────────────────────────────────
+  const handleConfirm = async (bill: SupplierBill) => {
+    setConfirmingId(bill.id);
+    try {
+      await supplierBillService.confirmBill(bill.id);
+      toast.success('Bill confirmed — stock updated');
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to confirm bill');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
 
-  // Reset form
-  const resetForm = useCallback(() => {
-    setPurchaseForm({
-      purchaseNumber: '',
-      selectedSupplier: null,
-      purchaseDate: new Date(),
-      deliveryDate: undefined,
-      status: 'draft',
-      priority: 'medium',
-      items: [],
-      subtotal: 0,
-      discountAmount: 0,
-      taxAmount: 0,
-      shippingCost: 0,
-      totalAmount: 0,
-      paymentTerms: 'NET 30',
-      paymentStatus: 'pending',
-      invoiceNumber: '',
-      referenceNumber: '',
-      notes: '',
-      attachments: []
-    });
-    setEditingPurchase(null);
-  }, []);
+  // ── Cancel bill ──────────────────────────────────────────────────────────
+  const handleCancelBill = async (bill: SupplierBill) => {
+    try {
+      await supplierBillService.cancelBill(bill.id);
+      toast.success('Bill cancelled');
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to cancel bill');
+    }
+  };
 
-  // Handle bulk actions
-  const handleBulkAction = useCallback((action: string) => {
-    if (selectedPurchases.length === 0) {
-      toast.error('Please select purchases first');
+  // ── Delete bill ──────────────────────────────────────────────────────────
+  const handleDelete = async (bill: SupplierBill) => {
+    try {
+      await supplierBillService.deleteBill(bill.id);
+      toast.success('Bill deleted');
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete bill');
+    }
+  };
+
+  // ── Record payment ───────────────────────────────────────────────────────
+  const handleRecordPayment = async () => {
+    if (!payingBill) return;
+    const amount = parseFloat(payAmount);
+    if (!amount || amount <= 0) {
+      toast.error('Please enter a valid payment amount');
       return;
     }
-
-    switch (action) {
-      case 'approve':
-        toast.success(`${selectedPurchases.length} purchases approved`);
-        break;
-      case 'cancel':
-        toast.success(`${selectedPurchases.length} purchases cancelled`);
-        break;
-      case 'export':
-        setIsExporting(true);
-        setTimeout(() => {
-          setIsExporting(false);
-          toast.success(`${selectedPurchases.length} purchases exported`);
-        }, 2000);
-        break;
-      case 'print':
-        toast.success(`${selectedPurchases.length} purchases sent to printer`);
-        break;
-      case 'receive':
-        toast.success(`${selectedPurchases.length} purchases marked as received`);
-        break;
+    setSaving(true);
+    try {
+      await supplierBillService.recordPayment(payingBill.id, amount, payMethod, payNotes || undefined);
+      toast.success('Payment recorded successfully');
+      setShowPaymentDialog(false);
+      setPayingBill(null);
+      setPayAmount('');
+      setPayMethod('cash');
+      setPayNotes('');
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to record payment');
+    } finally {
+      setSaving(false);
     }
-    setSelectedPurchases([]);
-  }, [selectedPurchases]);
+  };
 
-  // Add item to purchase
-  const addItemToPurchase = useCallback((product: Product, quantity: number = 1) => {
-    const newItem: PurchaseItem = {
-      id: `item-${Date.now()}`,
-      productId: product.id,
-      productName: product.name,
-      productCode: product.code,
-      sku: product.sku,
-      description: product.description,
-      category: product.category,
-      unitOfMeasure: product.unitOfMeasure,
-      quantityPurchased: quantity,
-      unitCost: product.lastPurchasePrice,
-      discount: 0,
-      taxPercent: 5,
-      totalAmount: quantity * product.lastPurchasePrice,
-      notes: '',
-      expiryDate: undefined,
-      batchNumber: ''
-    };
+  // ── Open edit bill dialog ─────────────────────────────────────────────────
+  const openEditBill = (bill: SupplierBill) => {
+    setEditingBill(bill);
+    setBillForm({
+      supplierId: bill.supplierId,
+      invoiceNumber: bill.invoiceNumber ?? '',
+      billDate: bill.billDate,
+      dueDate: bill.dueDate ?? '',
+      shippingCost: bill.shippingCost,
+      warehouseId: bill.warehouseId,
+      notes: bill.notes ?? '',
+      receivedBy: bill.receivedBy ?? '',
+      items: bill.items.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        productSku: item.productSku ?? '',
+        unitOfMeasure: item.unitOfMeasure ?? '',
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discountPercent: item.discountPercent,
+        taxPercent: item.taxPercent,
+        notes: item.notes ?? '',
+      })),
+    });
+    setShowBillForm(true);
+  };
 
-    setPurchaseForm(prev => ({
-      ...prev,
-      items: [...(prev.items || []), newItem]
-    }));
+  // ── Print bill ────────────────────────────────────────────────────────────
+  const printBill = (bill: SupplierBill) => {
+    const supplier = suppliers.find(s => s.id === bill.supplierId);
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Bill ${bill.billNumber}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 24px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 24px; }
+        .totals { text-align: right; margin-top: 16px; }
+      </style></head><body>
+      <div class="header">
+        <div><h2>Supplier Bill</h2><p>${bill.billNumber}</p></div>
+        <div><p>Date: ${bill.billDate}</p>${bill.dueDate ? `<p>Due: ${bill.dueDate}</p>` : ''}</div>
+      </div>
+      <p><strong>Supplier:</strong> ${bill.supplierName}</p>
+      ${bill.invoiceNumber ? `<p><strong>Invoice #:</strong> ${bill.invoiceNumber}</p>` : ''}
+      <table>
+        <thead><tr><th>Product</th><th>SKU</th><th>Qty</th><th>Unit Price</th><th>Disc%</th><th>Tax%</th><th>Total</th></tr></thead>
+        <tbody>
+          ${bill.items.map(i => `<tr>
+            <td>${i.productName}</td>
+            <td>${i.productSku ?? ''}</td>
+            <td>${i.quantity} ${i.unitOfMeasure ?? ''}</td>
+            <td>AED ${i.unitPrice.toFixed(2)}</td>
+            <td>${i.discountPercent}%</td>
+            <td>${i.taxPercent}%</td>
+            <td>AED ${i.totalAmount.toFixed(2)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="totals">
+        <p>Subtotal: AED ${bill.subtotal.toFixed(2)}</p>
+        ${bill.discountAmount > 0 ? `<p>Discount: -AED ${bill.discountAmount.toFixed(2)}</p>` : ''}
+        <p>Tax: AED ${bill.taxAmount.toFixed(2)}</p>
+        <p>Shipping: AED ${bill.shippingCost.toFixed(2)}</p>
+        <hr/>
+        <p><strong>Total: AED ${bill.totalAmount.toFixed(2)}</strong></p>
+      </div>
+      </body></html>
+    `);
+    win.document.close();
+    win.print();
+  };
 
-    toast.success(`${product.name} added to purchase`);
-  }, []);
+  // ── Supplier management ───────────────────────────────────────────────────
+  const openCreateSupplier = () => {
+    setEditingSupplier(null);
+    setSupplierForm({
+      name: '', contactPerson: '', email: '', phone: '',
+      address: '', city: '', country: '', taxId: '',
+      paymentTerms: '', creditLimit: 0, isActive: true, notes: '',
+    });
+    setShowSupplierForm(true);
+  };
 
-  // Remove item from purchase
-  const removeItemFromPurchase = useCallback((itemId: string) => {
-    setPurchaseForm(prev => ({
-      ...prev,
-      items: prev.items?.filter(item => item.id !== itemId) || []
-    }));
-  }, []);
+  const openEditSupplier = (s: Supplier) => {
+    setEditingSupplier(s);
+    setSupplierForm({ ...s });
+    setShowSupplierForm(true);
+  };
 
-  // Update item in purchase
-  const updatePurchaseItem = useCallback((itemId: string, updates: Partial<PurchaseItem>) => {
-    setPurchaseForm(prev => ({
-      ...prev,
-      items: prev.items?.map(item => 
-        item.id === itemId 
-          ? { 
-              ...item, 
-              ...updates, 
-              totalAmount: (updates.quantityPurchased || item.quantityPurchased) * (updates.unitCost || item.unitCost) - (updates.discount || item.discount)
-            }
-          : item
-      ) || []
-    }));
-  }, []);
-
-  // Handle file upload
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>, type: 'bulk' | 'attachment') => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    if (type === 'bulk') {
-      setIsUploading(true);
-      // Simulate bulk upload process
-      setTimeout(() => {
-        setIsUploading(false);
-        setShowBulkUpload(false);
-        toast.success(`Successfully imported ${Math.floor(Math.random() * 50) + 10} purchases!`);
-      }, 3000);
-    } else {
-      // Handle attachment upload
-      const newAttachments = Array.from(files).map(file => file.name);
-      setPurchaseForm(prev => ({
-        ...prev,
-        attachments: [...(prev.attachments || []), ...newAttachments]
-      }));
-      toast.success(`${files.length} file(s) attached`);
+  const handleSaveSupplier = async () => {
+    if (!supplierForm.name?.trim()) {
+      toast.error('Supplier name is required');
+      return;
     }
-  }, []);
-
-  // Get status badge
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
-      pending_approval: { label: 'Pending Approval', className: 'bg-yellow-100 text-yellow-800' },
-      approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800' },
-      ordered: { label: 'Ordered', className: 'bg-purple-100 text-purple-800' },
-      received: { label: 'Received', className: 'bg-green-100 text-green-800' },
-      cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' }
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-    return <Badge className={config.className}>{config.label}</Badge>;
-  };
-
-  // Get priority badge
-  const getPriorityBadge = (priority: string) => {
-    const priorityConfig = {
-      low: { label: 'Low', className: 'bg-green-100 text-green-800' },
-      medium: { label: 'Medium', className: 'bg-blue-100 text-blue-800' },
-      high: { label: 'High', className: 'bg-orange-100 text-orange-800' },
-      urgent: { label: 'Urgent', className: 'bg-red-100 text-red-800' }
-    };
-
-    const config = priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.medium;
-    return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
-  };
-
-  // Get payment status badge
-  const getPaymentStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
-      partial: { label: 'Partial', className: 'bg-orange-100 text-orange-800' },
-      paid: { label: 'Paid', className: 'bg-green-100 text-green-800' },
-      overdue: { label: 'Overdue', className: 'bg-red-100 text-red-800' }
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
-  };
-
-  // Custom tooltip for charts
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-card border rounded-lg p-3 shadow-lg">
-          <p className="font-medium">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.dataKey}: {typeof entry.value === 'number' && entry.dataKey.includes('amount') 
-                ? `AED ${entry.value.toLocaleString()}` 
-                : entry.value.toLocaleString()
-              }
-            </p>
-          ))}
-        </div>
-      );
+    setSavingSupplier(true);
+    try {
+      if (editingSupplier) {
+        await purchaseService.updateSupplier(editingSupplier.id, supplierForm);
+        toast.success('Supplier updated');
+      } else {
+        await purchaseService.createSupplier(supplierForm);
+        toast.success('Supplier created');
+      }
+      setShowSupplierForm(false);
+      setEditingSupplier(null);
+      const updated = await purchaseService.getAllSuppliers();
+      setSuppliers(updated);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save supplier');
+    } finally {
+      setSavingSupplier(false);
     }
-    return null;
   };
 
+  const handleDeleteSupplier = async (s: Supplier) => {
+    try {
+      await purchaseService.deleteSupplier(s.id);
+      toast.success('Supplier deleted');
+      const updated = await purchaseService.getAllSuppliers();
+      setSuppliers(updated);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete supplier');
+    }
+  };
+
+  // ── Summary cards computed from live bills ────────────────────────────────
+  const summary = useMemo(() => {
+    const totalAmount = bills.reduce((s, b) => s + b.totalAmount, 0);
+    const unpaidAmount = bills
+      .filter(b => b.paymentStatus !== 'PAID')
+      .reduce((s, b) => s + (b.totalAmount - b.amountPaid), 0);
+    const paidAmount = bills.reduce((s, b) => s + b.amountPaid, 0);
+    return { totalAmount, unpaidAmount, paidAmount };
+  }, [bills]);
+
+  // ── Supplier distribution chart data ─────────────────────────────────────
+  const supplierChartData = useMemo(() => {
+    const map: Record<string, number> = {};
+    bills.forEach(b => {
+      map[b.supplierName] = (map[b.supplierName] ?? 0) + b.totalAmount;
+    });
+    return Object.entries(map)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 6)
+      .map(([name, value], i) => ({ name, value, color: CHART_COLORS[i] }));
+  }, [bills]);
+
+  // ── Payment status chart data ─────────────────────────────────────────────
+  const paymentChartData = useMemo(() => {
+    const unpaid  = bills.filter(b => b.paymentStatus === 'UNPAID').length;
+    const partial = bills.filter(b => b.paymentStatus === 'PARTIAL').length;
+    const paid    = bills.filter(b => b.paymentStatus === 'PAID').length;
+    return [
+      { name: 'Unpaid',  value: unpaid,  color: '#f97316' },
+      { name: 'Partial', value: partial, color: '#eab308' },
+      { name: 'Paid',    value: paid,    color: '#22c55e' },
+    ].filter(d => d.value > 0);
+  }, [bills]);
+
+  // ── Status filter bar chart ───────────────────────────────────────────────
+  const statusChartData = useMemo(() => {
+    const draft     = bills.filter(b => b.status === 'DRAFT').length;
+    const confirmed = bills.filter(b => b.status === 'CONFIRMED').length;
+    const cancelled = bills.filter(b => b.status === 'CANCELLED').length;
+    return [
+      { name: 'Draft',     count: draft },
+      { name: 'Confirmed', count: confirmed },
+      { name: 'Cancelled', count: cancelled },
+    ];
+  }, [bills]);
+
+  // ── Extra computed stats ─────────────────────────────────────────────────
+  const extraStats = useMemo(() => {
+    const now = new Date();
+    const monthlyBills = bills.filter(b => {
+      if (!b.billDate) return false;
+      const d = new Date(b.billDate);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+    const monthlySpend = monthlyBills.reduce((s, b) => s + b.totalAmount, 0);
+    const inventoryAdded = bills
+      .filter(b => b.status === 'CONFIRMED')
+      .reduce((s, b) => s + b.items.reduce((si, i) => si + (i.quantity || 0), 0), 0);
+    const supplierTotals: Record<string, number> = {};
+    bills.forEach(b => { supplierTotals[b.supplierName] = (supplierTotals[b.supplierName] ?? 0) + b.totalAmount; });
+    const topEntry = Object.entries(supplierTotals).sort(([, a], [, b]) => b - a)[0];
+    const urgentCount = bills.filter(b => b.priority === 'HIGH' || b.priority === 'URGENT').length;
+    const pendingApprovals = bills.filter(b => b.status === 'DRAFT').length;
+    return { monthlySpend, inventoryAdded, topSupplier: topEntry?.[0] ?? '—', topAmount: topEntry?.[1] ?? 0, urgentCount, pendingApprovals };
+  }, [bills]);
+
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+
+  const filteredBills = useMemo(() => bills.filter(b => {
+    if (supplierFilter && String(b.supplierId) !== supplierFilter) return false;
+    if (priorityFilter && b.priority !== priorityFilter) return false;
+    return true;
+  }), [bills, supplierFilter, priorityFilter]);
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
+
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold">Purchase Management</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl font-bold">Purchase Management</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Track and manage all purchases including supplier transactions and inventory acquisitions
           </p>
         </div>
-        <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
-            <Upload className="mr-2 h-4 w-4" />
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm">
+            <TrendingUp className="mr-2 h-4 w-4" />
             Bulk Upload
           </Button>
-          <Button variant="outline" onClick={() => handleBulkAction('export')}>
-            <Download className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm">
+            <ShoppingCart className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => {
-            setIsCreatingPurchase(true);
-            resetForm();
-            setShowPurchaseForm(true);
+          <Button size="sm" onClick={() => {
+            setEditingBill(null);
+            setBillForm(defaultBillForm());
+            setShowBillForm(true);
           }}>
             <Plus className="mr-2 h-4 w-4" />
             New Purchase
@@ -800,375 +632,455 @@ export function Purchase() {
         </div>
       </div>
 
-      {/* Top KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+      {/* Stats row — 6 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Purchases</p>
-                <p className="text-2xl font-bold">{analytics.totalPurchases}</p>
-                <p className="text-sm text-muted-foreground">This month</p>
+                <p className="text-xs text-muted-foreground font-medium">Total Purchases</p>
+                <p className="text-2xl font-bold mt-1">{totalBills}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">This month</p>
               </div>
-              <ShoppingBag className="h-6 w-6 text-blue-600" />
+              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-blue-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending Approvals</p>
-                <p className="text-2xl font-bold text-yellow-600">{analytics.pendingApprovals}</p>
-                <p className="text-sm text-muted-foreground">Need approval</p>
+                <p className="text-xs text-muted-foreground font-medium">Pending Approvals</p>
+                <p className="text-2xl font-bold mt-1">{extraStats.pendingApprovals}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Need approval</p>
               </div>
-              <Clock className="h-6 w-6 text-yellow-600" />
+              <div className="h-8 w-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                <Clock className="h-4 w-4 text-orange-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Monthly Spend</p>
-                <p className="text-2xl font-bold text-green-600">AED {analytics.totalSpendThisMonth.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">This month</p>
-              </div>
-              <DollarSign className="h-6 w-6 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Inventory Added</p>
-                <p className="text-2xl font-bold text-purple-600">{analytics.inventoryAdded}</p>
-                <p className="text-sm text-muted-foreground">Items received</p>
-              </div>
-              <Package className="h-6 w-6 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Top Supplier</p>
-                <p className="text-lg font-bold text-indigo-600">
-                  {analytics.topSupplier ? analytics.topSupplier.name.split(' ')[0] : 'N/A'}
+                <p className="text-xs text-muted-foreground font-medium">Monthly Spend</p>
+                <p className="text-lg font-bold mt-1 text-green-600">
+                  AED {extraStats.monthlySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  {analytics.topSupplier ? `AED ${analytics.topSupplier.amount.toLocaleString()}` : 'No data'}
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">This month</p>
               </div>
-              <Building className="h-6 w-6 text-indigo-600" />
+              <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-green-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Urgent Purchases</p>
-                <p className="text-2xl font-bold text-red-600">{analytics.urgentPurchases}</p>
-                <p className="text-sm text-muted-foreground">High priority</p>
+                <p className="text-xs text-muted-foreground font-medium">Inventory Added</p>
+                <p className="text-2xl font-bold mt-1 text-purple-600">{extraStats.inventoryAdded}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Items received</p>
               </div>
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+              <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                <Package className="h-4 w-4 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">Top Supplier</p>
+                <p className="text-sm font-bold mt-1 text-blue-600 truncate max-w-[90px]">{extraStats.topSupplier.split(' ')[0]}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">AED {extraStats.topAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <Users className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">Urgent Purchases</p>
+                <p className="text-2xl font-bold mt-1 text-red-600">{extraStats.urgentCount}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">High priority</p>
+              </div>
+              <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-        {/* Left Panel - Purchase List & Filters */}
-        <div className="xl:col-span-3 space-y-6">
-          {/* Filters */}
+      {/* Main content + sidebar */}
+      <div className="flex gap-5">
+
+        {/* ── Main content ─────────────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0 space-y-4">
+
+          {/* Filter bar */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex-1 min-w-[200px] relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by purchase number, supplier, or invoice..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+            <Select value={statusFilter || 'all'} onValueChange={v => setStatusFilter(v === 'all' ? '' : v)}>
+              <SelectTrigger className="w-[130px] h-9">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="DRAFT">Pending Approval</SelectItem>
+                <SelectItem value="CONFIRMED">Received</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={supplierFilter || 'all'} onValueChange={v => setSupplierFilter(v === 'all' ? '' : v)}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="All Suppliers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Suppliers</SelectItem>
+                {suppliers.map(s => (
+                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={priorityFilter || 'all'} onValueChange={v => setPriorityFilter(v === 'all' ? '' : v)}>
+              <SelectTrigger className="w-[120px] h-9">
+                <SelectValue placeholder="All Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priority</SelectItem>
+                <SelectItem value="LOW">Low</SelectItem>
+                <SelectItem value="MEDIUM">Medium</SelectItem>
+                <SelectItem value="HIGH">High</SelectItem>
+                <SelectItem value="URGENT">Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" className="h-9">
+              <Search className="mr-2 h-4 w-4" />
+              Advanced
+            </Button>
+          </div>
+
+          {/* Purchase list table */}
           <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-wrap gap-4 items-center">
-                <div className="flex-1 min-w-[250px]">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by purchase number, supplier, or item..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Purchase List</CardTitle>
+                  <CardDescription>{filteredBills.length} of {totalBills} purchases</CardDescription>
                 </div>
-
-                <div className="flex gap-2 flex-wrap">
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="pending_approval">Pending Approval</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="ordered">Ordered</SelectItem>
-                      <SelectItem value="received">Received</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Suppliers</SelectItem>
-                      {suppliers.map(supplier => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Priority</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                  >
-                    <Filter className="mr-2 h-4 w-4" />
-                    Advanced
+                <Button variant="outline" size="sm">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Columns
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredBills.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
+                  <p className="font-medium">No purchases found</p>
+                  <p className="text-sm mb-4">Create your first purchase to get started</p>
+                  <Button onClick={() => { setEditingBill(null); setBillForm(defaultBillForm()); setShowBillForm(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> New Purchase
                   </Button>
                 </div>
-              </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40">
+                        <TableHead className="w-10 pl-4">
+                          <input type="checkbox" className="rounded" />
+                        </TableHead>
+                        <TableHead>Purchase #</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Priority</TableHead>
+                        <TableHead>Payment</TableHead>
+                        <TableHead>Total Amount</TableHead>
+                        <TableHead className="text-right pr-4">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredBills.map(bill => {
+                        const supplier = suppliers.find(s => s.id === bill.supplierId);
+                        const dateObj = bill.billDate ? new Date(bill.billDate) : null;
+                        const dateStr = dateObj ? format(dateObj, 'MMM dd, yyyy') : '—';
+                        const dayStr  = dateObj ? format(dateObj, 'EEE') : '';
+                        return (
+                          <TableRow key={bill.id} className="hover:bg-muted/30">
+                            <TableCell className="pl-4">
+                              <input type="checkbox" className="rounded" />
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-sm">{bill.billNumber}</p>
+                                {bill.createdBy && (
+                                  <p className="text-xs text-muted-foreground">by {bill.createdBy}</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-sm">{bill.supplierName}</p>
+                                {supplier?.contactPerson && (
+                                  <p className="text-xs text-muted-foreground">{supplier.contactPerson}</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="text-sm">{dateStr}</p>
+                                <p className="text-xs text-muted-foreground">{dayStr}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {bill.status === 'DRAFT' && (
+                                <Badge className="text-xs bg-orange-100 text-orange-800 hover:bg-orange-100">Pending Approval</Badge>
+                              )}
+                              {bill.status === 'CONFIRMED' && (
+                                <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">Received</Badge>
+                              )}
+                              {bill.status === 'CANCELLED' && (
+                                <Badge className="text-xs bg-red-100 text-red-800 hover:bg-red-100">Cancelled</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {bill.priority === 'LOW' && <Badge className="text-xs bg-gray-100 text-gray-700 hover:bg-gray-100">Low</Badge>}
+                              {bill.priority === 'MEDIUM' && <Badge className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-100">Medium</Badge>}
+                              {bill.priority === 'HIGH' && <Badge className="text-xs bg-orange-100 text-orange-700 hover:bg-orange-100">High</Badge>}
+                              {bill.priority === 'URGENT' && <Badge className="text-xs bg-red-100 text-red-700 hover:bg-red-100">Urgent</Badge>}
+                              {!bill.priority && <Badge className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-100">Medium</Badge>}
+                            </TableCell>
+                            <TableCell>
+                              {bill.paymentStatus === 'PAID' && <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">Paid</Badge>}
+                              {bill.paymentStatus === 'PARTIAL' && <Badge className="text-xs bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Partial</Badge>}
+                              {bill.paymentStatus === 'UNPAID' && <Badge className="text-xs bg-gray-100 text-gray-700 hover:bg-gray-100">Pending</Badge>}
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-sm">AED {bill.totalAmount.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground">{bill.items.length} item{bill.items.length !== 1 ? 's' : ''}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right pr-4">
+                              <div className="flex items-center justify-end gap-1">
+                              {/* View */}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                title="View details"
+                                onClick={() => { setSelectedBill(bill); setShowBillDetail(true); }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
 
-              {/* Bulk Actions */}
-              {selectedPurchases.length > 0 && (
-                <>
-                  <Separator className="my-4" />
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      {selectedPurchases.length} purchase(s) selected
-                    </p>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleBulkAction('approve')}>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Approve
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleBulkAction('receive')}>
-                        <Package className="mr-2 h-4 w-4" />
-                        Mark Received
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleBulkAction('print')}>
-                        <PrinterIcon className="mr-2 h-4 w-4" />
-                        Print
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleBulkAction('export')}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Export
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleBulkAction('cancel')}>
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                </>
+                              {/* Edit (DRAFT only) */}
+                              {bill.status === 'DRAFT' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Edit bill"
+                                  onClick={() => openEditBill(bill)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
+
+                              {/* Confirm (DRAFT only) */}
+                              {bill.status === 'DRAFT' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Confirm bill"
+                                  disabled={confirmingId === bill.id}
+                                  onClick={() => handleConfirm(bill)}
+                                  className="text-blue-600 hover:text-blue-700"
+                                >
+                                  {confirmingId === bill.id
+                                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                                    : <CheckCircle className="h-4 w-4" />
+                                  }
+                                </Button>
+                              )}
+
+                              {/* Record Payment (CONFIRMED + not fully paid) */}
+                              {bill.status === 'CONFIRMED' && bill.paymentStatus !== 'PAID' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Record payment"
+                                  className="text-green-600 hover:text-green-700"
+                                  onClick={() => {
+                                    setPayingBill(bill);
+                                    setPayAmount(String(bill.totalAmount - bill.amountPaid));
+                                    setShowPaymentDialog(true);
+                                  }}
+                                >
+                                  <Wallet className="h-4 w-4" />
+                                </Button>
+                              )}
+
+                              {/* Cancel (DRAFT or CONFIRMED) */}
+                              {(bill.status === 'DRAFT' || bill.status === 'CONFIRMED') && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      title="Cancel bill"
+                                      className="text-orange-600 hover:text-orange-700"
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Cancel Bill</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to cancel bill {bill.billNumber}? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Keep Bill</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleCancelBill(bill)}>
+                                        Cancel Bill
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+
+                              {/* Delete (DRAFT only) */}
+                              {bill.status === 'DRAFT' && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      title="Delete bill"
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Bill</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Permanently delete bill {bill.billNumber}? This cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Keep</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        className="bg-red-600 hover:bg-red-700"
+                                        onClick={() => handleDelete(bill)}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+
+                              {/* Print */}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Print bill"
+                                onClick={() => printBill(bill)}
+                              >
+                                <PrinterIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 p-4">
+                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
+                  <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+                  <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
+                </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Purchase List */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Purchase List</CardTitle>
-                  <CardDescription>
-                    {filteredPurchases.length} of {purchases.length} purchases
-                  </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Columns
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={selectedPurchases.length === filteredPurchases.length}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedPurchases(filteredPurchases.map(p => p.id));
-                            } else {
-                              setSelectedPurchases([]);
-                            }
-                          }}
-                        />
-                      </TableHead>
-                      <TableHead>Purchase #</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Payment</TableHead>
-                      <TableHead>Total Amount</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPurchases.map((purchase) => (
-                      <TableRow 
-                        key={purchase.id}
-                        className={cn(
-                          purchase.priority === 'urgent' && "bg-red-50 dark:bg-red-950/20",
-                          purchase.status === 'pending_approval' && "bg-yellow-50 dark:bg-yellow-950/20",
-                          purchase.paymentStatus === 'overdue' && "bg-orange-50 dark:bg-orange-950/20"
-                        )}
-                      >
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedPurchases.includes(purchase.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedPurchases([...selectedPurchases, purchase.id]);
-                              } else {
-                                setSelectedPurchases(selectedPurchases.filter(id => id !== purchase.id));
-                              }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{purchase.purchaseNumber}</p>
-                            <p className="text-sm text-muted-foreground">
-                              by {purchase.createdBy}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{purchase.supplier.name}</p>
-                            <p className="text-sm text-muted-foreground">{purchase.supplier.contactPerson}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <p className="font-medium">{format(purchase.purchaseDate, 'MMM dd, yyyy')}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {isToday(purchase.purchaseDate) ? 'Today' :
-                             isYesterday(purchase.purchaseDate) ? 'Yesterday' :
-                             format(purchase.purchaseDate, 'EEE')}
-                          </p>
-                        </TableCell>
-                        <TableCell>{getStatusBadge(purchase.status)}</TableCell>
-                        <TableCell>{getPriorityBadge(purchase.priority)}</TableCell>
-                        <TableCell>{getPaymentStatusBadge(purchase.paymentStatus)}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">AED {purchase.totalAmount.toLocaleString()}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {purchase.items.length} item{purchase.items.length !== 1 ? 's' : ''}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setSelectedPurchaseForDetail(purchase);
-                                setShowPurchaseDetail(true);
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {purchase.status === 'draft' || purchase.status === 'pending_approval' ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingPurchase(purchase);
-                                  setPurchaseForm({
-                                    ...purchase,
-                                    selectedSupplier: purchase.supplier
-                                  });
-                                  setShowPurchaseForm(true);
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            ) : null}
-                            <Button size="sm" variant="ghost">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        </div>{/* end main content */}
 
-        {/* Right Panel - Quick Actions & Inventory Snapshot */}
-        <div className="space-y-6">
+        {/* ── Right Sidebar ─────────────────────────────────────────────────── */}
+        <div className="w-72 shrink-0 space-y-4">
+
           {/* Quick Actions */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Zap className="mr-2 h-5 w-5" />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Zap className="h-4 w-4 text-yellow-500" />
                 Quick Actions
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <Button 
-                className="w-full justify-start" 
-                onClick={() => {
-                  setIsCreatingPurchase(true);
-                  resetForm();
-                  setShowPurchaseForm(true);
-                }}
+            <CardContent className="space-y-2 p-4 pt-0">
+              <Button
+                className="w-full justify-start bg-emerald-600 hover:bg-emerald-700 text-white"
+                size="sm"
+                onClick={() => { setEditingBill(null); setBillForm(defaultBillForm()); setShowBillForm(true); }}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 New Purchase
               </Button>
-              <Button variant="outline" className="w-full justify-start" onClick={() => setShowBulkUpload(true)}>
-                <Upload className="mr-2 h-4 w-4" />
+              <Button variant="outline" size="sm" className="w-full justify-start">
+                <TrendingUp className="mr-2 h-4 w-4" />
                 Bulk Upload
               </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <ScanLine className="mr-2 h-4 w-4" />
+              <Button variant="outline" size="sm" className="w-full justify-start">
+                <Receipt className="mr-2 h-4 w-4" />
                 Scan Receipt
               </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <Users className="mr-2 h-4 w-4" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                onClick={openCreateSupplier}
+              >
+                <User className="mr-2 h-4 w-4" />
                 Add Supplier
               </Button>
             </CardContent>
@@ -1176,461 +1088,463 @@ export function Purchase() {
 
           {/* Inventory Snapshot */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Box className="mr-2 h-5 w-5" />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Package className="h-4 w-4 text-blue-500" />
                 Inventory Snapshot
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {products.slice(0, 3).map((product) => (
-                <div key={product.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{product.name}</p>
-                    <p className="text-xs text-muted-foreground">{product.category}</p>
+            <CardContent className="p-4 pt-0 space-y-3">
+              {apiProducts.slice(0, 6).map(p => (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{p.categoryName}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-sm">{product.currentStock} {product.unitOfMeasure}</p>
-                    {product.currentStock <= product.reorderPoint && (
-                      <Badge variant="destructive" className="text-xs">Low Stock</Badge>
+                    <p className="text-sm font-medium">{p.totalStock} {p.defaultUnit ?? 'pcs'}</p>
+                    {p.stockStatus === 'LOW_STOCK' && (
+                      <p className="text-xs text-orange-600">Low Stock</p>
+                    )}
+                    {p.stockStatus === 'OUT_OF_STOCK' && (
+                      <p className="text-xs text-red-600">Out of Stock</p>
                     )}
                   </div>
                 </div>
               ))}
-              <Button variant="outline" className="w-full" size="sm">
-                <Eye className="mr-2 h-4 w-4" />
-                View All Inventory
-              </Button>
+              {apiProducts.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4">No products loaded</p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Low Stock Alerts */}
+          {/* Suppliers quick list */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <AlertTriangle className="mr-2 h-5 w-5 text-yellow-600" />
-                Stock Alerts
-              </CardTitle>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Users className="h-4 w-4 text-purple-500" />
+                  Suppliers ({suppliers.length})
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={openCreateSupplier}>
+                  <Plus className="h-3 w-3 mr-1" />Add
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                <div>
-                  <p className="font-medium text-sm">Protein Smoothie Mix</p>
-                  <p className="text-xs text-muted-foreground">45 bottles remaining</p>
+            <CardContent className="p-4 pt-0 space-y-2">
+              {suppliers.slice(0, 5).map(s => (
+                <div key={s.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{s.name}</p>
+                    {s.contactPerson && <p className="text-xs text-muted-foreground">{s.contactPerson}</p>}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => openEditSupplier(s)}>
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
-                <Button size="sm" variant="outline">
-                  <ShoppingCart className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
-                <div>
-                  <p className="font-medium text-sm">Adjustable Dumbbells</p>
-                  <p className="text-xs text-muted-foreground">3 sets remaining</p>
-                </div>
-                <Button size="sm" variant="outline">
-                  <ShoppingCart className="h-4 w-4" />
-                </Button>
-              </div>
-              <Button variant="outline" className="w-full" size="sm">
-                <Bell className="mr-2 h-4 w-4" />
-                View All Alerts
-              </Button>
+              ))}
+              {suppliers.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4">No suppliers yet</p>
+              )}
             </CardContent>
           </Card>
-        </div>
-      </div>
 
-      {/* Bottom Section - Analytics & Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Monthly Purchase Trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <LineChart className="mr-2 h-5 w-5" />
-              Purchase Trends
-            </CardTitle>
-            <CardDescription>Monthly spending over the last 6 months</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <RechartsLineChart data={monthlyPurchaseData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="amount" stroke="#2563eb" strokeWidth={3} name="Amount (AED)" />
-              </RechartsLineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </div>{/* end sidebar */}
 
-        {/* Supplier Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <PieChart className="mr-2 h-5 w-5" />
-              Supplier Distribution
-            </CardTitle>
-            <CardDescription>Purchase distribution by suppliers</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <RechartsPieChart>
-                <Pie
-                  data={supplierDistribution}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={40}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {supplierDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-              </RechartsPieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      </div>{/* end two-column layout */}
 
-        {/* Category Spending */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <BarChart3 className="mr-2 h-5 w-5" />
-              Category Spending
-            </CardTitle>
-            <CardDescription>Purchase amounts by product category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={categorySpending}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" angle={-45} textAnchor="end" height={80} />
-                <YAxis />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="amount" fill="#059669" name="Amount (AED)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Purchase Form Dialog */}
-      <Dialog open={showPurchaseForm} onOpenChange={setShowPurchaseForm}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      {/* ── Create / Edit Bill Dialog ──────────────────────────────────────── */}
+      <Dialog open={showBillForm} onOpenChange={open => {
+        setShowBillForm(open);
+        if (!open) { setEditingBill(null); setBillForm(defaultBillForm()); setProductSearch(''); setShowProductSearch(false); }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingPurchase ? 'Edit Purchase' : 'Create New Purchase'}
-            </DialogTitle>
+            <DialogTitle>{editingBill ? 'Edit Purchase' : 'Create New Purchase'}</DialogTitle>
             <DialogDescription>
-              {editingPurchase ? 'Update purchase details' : 'Create a new purchase record with supplier and product information'}
+              Create a new purchase record with supplier and product information
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
-            {/* Basic Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+
+            {/* Row 1: Purchase Number + Purchase Date */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="purchaseNumber">Purchase Number</Label>
+                <Label className="text-xs text-muted-foreground">Purchase Number</Label>
                 <Input
-                  id="purchaseNumber"
-                  value={purchaseForm.purchaseNumber}
-                  onChange={(e) => setPurchaseForm(prev => ({ ...prev, purchaseNumber: e.target.value }))}
                   placeholder="Auto-generated if empty"
+                  value={billForm.purchaseNumber}
+                  onChange={e => setBillForm(prev => ({ ...prev, purchaseNumber: e.target.value }))}
                 />
               </div>
               <div>
-                <Label htmlFor="purchaseDate">Purchase Date</Label>
+                <Label className="text-xs text-muted-foreground">Purchase Date</Label>
                 <Input
-                  id="purchaseDate"
                   type="date"
-                  value={purchaseForm.purchaseDate ? format(purchaseForm.purchaseDate, 'yyyy-MM-dd') : ''}
-                  onChange={(e) => setPurchaseForm(prev => ({ ...prev, purchaseDate: new Date(e.target.value) }))}
+                  value={billForm.billDate}
+                  onChange={e => setBillForm(prev => ({ ...prev, billDate: e.target.value }))}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Row 2: Priority + Payment Status */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="priority">Priority</Label>
-                <Select value={purchaseForm.priority} onValueChange={(value) => setPurchaseForm(prev => ({ ...prev, priority: value as any }))}>
+                <Label className="text-xs text-muted-foreground">Priority</Label>
+                <Select
+                  value={billForm.priority}
+                  onValueChange={v => setBillForm(prev => ({ ...prev, priority: v }))}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="LOW">Low</SelectItem>
+                    <SelectItem value="MEDIUM">Medium</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="URGENT">Urgent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="paymentStatus">Payment Status</Label>
-                <Select value={purchaseForm.paymentStatus} onValueChange={(value) => setPurchaseForm(prev => ({ ...prev, paymentStatus: value as any }))}>
+                <Label className="text-xs text-muted-foreground">Payment Status</Label>
+                <Select
+                  value={billForm.paymentStatus}
+                  onValueChange={v => setBillForm(prev => ({ ...prev, paymentStatus: v }))}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="partial">Partial</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
+                    <SelectItem value="UNPAID">Pending</SelectItem>
+                    <SelectItem value="PARTIAL">Partial</SelectItem>
+                    <SelectItem value="PAID">Paid</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            {/* Supplier Selection */}
+            {/* Supplier */}
             <div>
-              <Label>Supplier *</Label>
-              <Popover open={showSupplierSelector} onOpenChange={setShowSupplierSelector}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={showSupplierSelector}
-                    className="w-full justify-between"
-                  >
-                    {purchaseForm.selectedSupplier ? purchaseForm.selectedSupplier.name : "Select supplier..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput placeholder="Search suppliers..." />
-                    <CommandEmpty>No supplier found.</CommandEmpty>
-                    <CommandGroup>
-                      {suppliers.map((supplier) => (
-                        <CommandItem
-                          key={supplier.id}
-                          onSelect={() => {
-                            setPurchaseForm(prev => ({ 
-                              ...prev, 
-                              selectedSupplier: supplier, 
-                              paymentTerms: supplier.paymentTerms 
-                            }));
-                            setShowSupplierSelector(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              purchaseForm.selectedSupplier?.id === supplier.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <div>
-                            <p className="font-medium">{supplier.name}</p>
-                            <p className="text-sm text-muted-foreground">{supplier.contactPerson}</p>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Label className="text-xs text-muted-foreground">Supplier *</Label>
+              <Select
+                value={billForm.supplierId ? String(billForm.supplierId) : ''}
+                onValueChange={v => setBillForm(prev => ({ ...prev, supplierId: Number(v) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select supplier..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map(s => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Items Section */}
+            {/* Purchase Items */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <Label>Purchase Items</Label>
-                <Popover open={showProductSelector} onOpenChange={setShowProductSelector}>
-                  <PopoverTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Product
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-96 p-0">
-                    <Command>
-                      <CommandInput placeholder="Search products..." />
-                      <CommandEmpty>No product found.</CommandEmpty>
-                      <CommandGroup>
-                        {products.map((product) => (
-                          <CommandItem
-                            key={product.id}
-                            onSelect={() => {
-                              addItemToPurchase(product);
-                              setShowProductSelector(false);
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs text-muted-foreground font-semibold">Purchase Items</Label>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-8 text-xs"
+                  onClick={() => { setShowProductSearch(true); setProductSearch(''); }}
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add Product
+                </Button>
+              </div>
+
+              {/* Product search dropdown */}
+              {showProductSearch && (
+                <div className="relative mb-3">
+                  <div className="border rounded-lg shadow-lg bg-background z-50">
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          autoFocus
+                          placeholder="Search products..."
+                          value={productSearch}
+                          onChange={e => setProductSearch(e.target.value)}
+                          className="pl-8 h-8 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-52 overflow-y-auto">
+                      {(() => {
+                        const filtered = apiProducts.filter(p =>
+                          p.isActive && (
+                            !productSearch ||
+                            p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                            p.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
+                            (p.categoryName ?? '').toLowerCase().includes(productSearch.toLowerCase())
+                          )
+                        );
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="py-6 text-center text-sm text-muted-foreground">
+                              No products found
+                            </div>
+                          );
+                        }
+                        return filtered.map(p => (
+                          <button
+                            key={p.id}
+                            className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-muted text-left transition-colors"
+                            onClick={() => {
+                              addItem({
+                                productId: p.id,
+                                productName: p.name,
+                                productSku: p.sku ?? '',
+                                unitOfMeasure: p.defaultUnit ?? 'pcs',
+                                unitPrice: p.costPrice ?? 0,
+                                taxPercent: p.taxRate ?? 0,
+                                quantity: 1,
+                              });
+                              setShowProductSearch(false);
+                              setProductSearch('');
                             }}
                           >
-                            <div className="flex-1">
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-sm text-muted-foreground">{product.code} - {product.category}</p>
-                              <p className="text-sm font-medium">AED {product.lastPurchasePrice}</p>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{p.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {p.sku} • {p.categoryName}
+                              </span>
                             </div>
-                            <div className="text-right">
-                              <p className="text-sm text-muted-foreground">Stock: {product.currentStock}</p>
-                              {product.currentStock <= product.reorderPoint && (
-                                <Badge variant="destructive" className="text-xs">Low Stock</Badge>
+                            <div className="flex items-center gap-2 ml-3 shrink-0">
+                              <span className="text-sm font-semibold">AED {(p.costPrice ?? 0).toFixed(0)}</span>
+                              {p.stockStatus === 'OUT_OF_STOCK' && (
+                                <Badge className="text-[10px] px-1 py-0 bg-red-100 text-red-700">Out of Stock</Badge>
+                              )}
+                              {p.stockStatus === 'LOW_STOCK' && (
+                                <Badge className="text-[10px] px-1 py-0 bg-yellow-100 text-yellow-700">Low Stock</Badge>
+                              )}
+                              {p.stockStatus === 'ACTIVE' && (
+                                <Badge className="text-[10px] px-1 py-0 bg-green-100 text-green-700">Stock: {p.totalStock}</Badge>
                               )}
                             </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                    <div className="p-2 border-t">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="w-full text-xs"
+                        onClick={() => {
+                          addItem();
+                          setShowProductSearch(false);
+                          setProductSearch('');
+                        }}
+                      >
+                        + Add custom item manually
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              {purchaseForm.items && purchaseForm.items.length > 0 ? (
-                <div className="space-y-4">
-                  {purchaseForm.items.map((item, index) => (
-                    <Card key={item.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 space-y-3">
-                            <div>
-                              <h4 className="font-medium">{item.productName}</h4>
-                              <p className="text-sm text-muted-foreground">{item.productCode} - {item.sku}</p>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                              <div>
-                                <Label className="text-xs">Quantity</Label>
-                                <Input
-                                  type="number"
-                                  value={item.quantityPurchased || 0}
-                                  onChange={(e) => updatePurchaseItem(item.id, { quantityPurchased: parseInt(e.target.value) || 0 })}
-                                  min="1"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs">Unit Cost (AED)</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={item.unitCost || 0}
-                                  onChange={(e) => updatePurchaseItem(item.id, { unitCost: parseFloat(e.target.value) || 0 })}
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs">Discount (AED)</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={item.discount || 0}
-                                  onChange={(e) => updatePurchaseItem(item.id, { discount: parseFloat(e.target.value) || 0 })}
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs">Total</Label>
-                                <p className="font-medium p-2">AED {item.totalAmount.toFixed(2)}</p>
-                              </div>
-                            </div>
-
-                            <div>
-                              <Label className="text-xs">Notes</Label>
-                              <Input
-                                value={item.notes || ''}
-                                onChange={(e) => updatePurchaseItem(item.id, { notes: e.target.value })}
-                                placeholder="Item-specific notes..."
-                              />
-                            </div>
-                          </div>
-                          
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => removeItemFromPurchase(item.id)}
-                            className="ml-4"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+              {/* Line items list */}
+              {billForm.items.length === 0 && !showProductSearch ? (
+                <div
+                  className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => setShowProductSearch(true)}
+                >
+                  <Package className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">Click "Add Product" to add items</p>
                 </div>
               ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No items added yet</p>
-                  <p className="text-sm">Click "Add Product" to start building your purchase</p>
+                <div className="space-y-2">
+                  {billForm.items.map((item, idx) => (
+                    <div key={idx} className="border rounded-lg p-3 bg-muted/30">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1">
+                          <Input
+                            placeholder="Product name *"
+                            value={item.productName}
+                            onChange={e => updateItem(idx, { productName: e.target.value })}
+                            className="font-medium text-sm h-8"
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
+                          onClick={() => removeItem(idx)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">SKU</Label>
+                          <Input
+                            placeholder="SKU"
+                            value={item.productSku}
+                            onChange={e => updateItem(idx, { productSku: e.target.value })}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Unit</Label>
+                          <Input
+                            placeholder="pcs, kg..."
+                            value={item.unitOfMeasure}
+                            onChange={e => updateItem(idx, { unitOfMeasure: e.target.value })}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Qty *</Label>
+                          <Input
+                            type="number"
+                            min="0.01"
+                            step="any"
+                            value={item.quantity}
+                            onChange={e => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Unit Price (AED) *</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.unitPrice}
+                            onChange={e => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Discount %</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={item.discountPercent}
+                            onChange={e => updateItem(idx, { discountPercent: parseFloat(e.target.value) || 0 })}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Tax %</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={item.taxPercent}
+                            onChange={e => updateItem(idx, { taxPercent: parseFloat(e.target.value) || 0 })}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-2 text-right text-xs font-semibold text-primary">
+                        Line Total: AED {(
+                          item.quantity * item.unitPrice
+                          * (1 - item.discountPercent / 100)
+                          * (1 + item.taxPercent / 100)
+                        ).toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Additional Information */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="invoiceNumber">Invoice Number</Label>
-                  <Input
-                    id="invoiceNumber"
-                    value={purchaseForm.invoiceNumber || ''}
-                    onChange={(e) => setPurchaseForm(prev => ({ ...prev, invoiceNumber: e.target.value }))}
-                    placeholder="Invoice number from supplier"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="referenceNumber">Reference Number</Label>
-                  <Input
-                    id="referenceNumber"
-                    value={purchaseForm.referenceNumber || ''}
-                    onChange={(e) => setPurchaseForm(prev => ({ ...prev, referenceNumber: e.target.value }))}
-                    placeholder="Internal reference number"
-                  />
-                </div>
-              </div>
-
+            {/* Invoice Number + Reference Number */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={purchaseForm.notes || ''}
-                  onChange={(e) => setPurchaseForm(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Additional notes or comments..."
-                  rows={3}
+                <Label className="text-xs text-muted-foreground">Invoice Number</Label>
+                <Input
+                  placeholder="Invoice number from supplier"
+                  value={billForm.invoiceNumber}
+                  onChange={e => setBillForm(prev => ({ ...prev, invoiceNumber: e.target.value }))}
                 />
               </div>
-
               <div>
-                <Label>Attachments</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => attachmentInputRef.current?.click()}
-                  >
-                    <Paperclip className="mr-2 h-4 w-4" />
-                    Attach Files
-                  </Button>
-                  {purchaseForm.attachments && purchaseForm.attachments.length > 0 && (
-                    <span className="text-sm text-muted-foreground">
-                      {purchaseForm.attachments.length} file(s) attached
-                    </span>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  ref={attachmentInputRef}
-                  onChange={(e) => handleFileUpload(e, 'attachment')}
-                  multiple
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                  className="hidden"
+                <Label className="text-xs text-muted-foreground">Reference Number</Label>
+                <Input
+                  placeholder="Internal reference number"
+                  value={billForm.referenceNumber}
+                  onChange={e => setBillForm(prev => ({ ...prev, referenceNumber: e.target.value }))}
                 />
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setShowPurchaseForm(false)}>
+            {/* Notes */}
+            <div>
+              <Label className="text-xs text-muted-foreground">Notes</Label>
+              <Textarea
+                placeholder="Additional notes or comments..."
+                rows={2}
+                value={billForm.notes}
+                onChange={e => setBillForm(prev => ({ ...prev, notes: e.target.value }))}
+              />
+            </div>
+
+            {/* Totals summary */}
+            {billForm.items.length > 0 && (
+              <Card className="bg-muted/30">
+                <CardContent className="p-3">
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span>AED {billTotals.subtotal.toFixed(2)}</span>
+                    </div>
+                    {billTotals.discountAmount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount</span>
+                        <span>-AED {billTotals.discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {billTotals.taxAmount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Tax</span>
+                        <span>AED {billTotals.taxAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between font-semibold">
+                      <span>Total</span>
+                      <span className="text-primary">AED {billTotals.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Form actions */}
+            <div className="flex items-center justify-between pt-2 border-t">
+              <Button
+                variant="ghost"
+                onClick={() => { setShowBillForm(false); setEditingBill(null); setBillForm(defaultBillForm()); }}
+              >
                 Cancel
               </Button>
-              <div className="flex space-x-2">
-                <Button variant="outline" onClick={handleSavePurchase}>
-                  <Save className="mr-2 h-4 w-4" />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleSaveBill}
+                  disabled={saving}
+                >
+                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   Save as Draft
                 </Button>
-                <Button onClick={handleSavePurchase}>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  {editingPurchase ? 'Update Purchase' : 'Create Purchase'}
+                <Button onClick={handleSaveBill} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                  {editingBill ? 'Update Purchase' : 'Create Purchase'}
                 </Button>
               </div>
             </div>
@@ -1638,127 +1552,105 @@ export function Purchase() {
         </DialogContent>
       </Dialog>
 
-      {/* Purchase Detail Dialog */}
-      <Dialog open={showPurchaseDetail} onOpenChange={setShowPurchaseDetail}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          {selectedPurchaseForDetail && (
+      {/* ── Bill Detail Dialog ────────────────────────────────────────────── */}
+      <Dialog open={showBillDetail} onOpenChange={setShowBillDetail}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          {selectedBill && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center justify-between">
-                  <span className="flex items-center space-x-3">
-                    <ShoppingBag className="h-5 w-5" />
-                    <span>{selectedPurchaseForDetail.purchaseNumber}</span>
-                    {getPriorityBadge(selectedPurchaseForDetail.priority)}
-                  </span>
-                  {getStatusBadge(selectedPurchaseForDetail.status)}
+                <DialogTitle className="flex items-center gap-3">
+                  <Receipt className="h-5 w-5" />
+                  {selectedBill.billNumber}
+                  {getStatusBadge(selectedBill.status)}
+                  {getPaymentBadge(selectedBill.paymentStatus)}
                 </DialogTitle>
-                <DialogDescription>
-                  Purchase details and line items
-                </DialogDescription>
+                <DialogDescription>Supplier bill details and line items</DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-6">
-                {/* Purchase Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-5">
+                {/* Info cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Supplier Information</CardTitle>
+                      <CardTitle className="text-sm">Supplier Information</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-2 text-sm">
                       <div>
-                        <Label className="text-sm text-muted-foreground">Company</Label>
-                        <p className="font-medium">{selectedPurchaseForDetail.supplier.name}</p>
+                        <span className="text-muted-foreground">Supplier: </span>
+                        <span className="font-medium">{selectedBill.supplierName}</span>
                       </div>
-                      <div>
-                        <Label className="text-sm text-muted-foreground">Contact Person</Label>
-                        <p className="font-medium">{selectedPurchaseForDetail.supplier.contactPerson}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      {selectedBill.invoiceNumber && (
                         <div>
-                          <Label className="text-sm text-muted-foreground">Email</Label>
-                          <p className="font-medium text-sm">{selectedPurchaseForDetail.supplier.email}</p>
+                          <span className="text-muted-foreground">Invoice #: </span>
+                          <span className="font-medium">{selectedBill.invoiceNumber}</span>
                         </div>
+                      )}
+                      {selectedBill.receivedBy && (
                         <div>
-                          <Label className="text-sm text-muted-foreground">Phone</Label>
-                          <p className="font-medium text-sm">{selectedPurchaseForDetail.supplier.phone}</p>
+                          <span className="text-muted-foreground">Received by: </span>
+                          <span className="font-medium">{selectedBill.receivedBy}</span>
                         </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader>
-                      <CardTitle>Purchase Details</CardTitle>
+                      <CardTitle className="text-sm">Bill Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-sm text-muted-foreground">Purchase Date</Label>
-                          <p className="font-medium">{format(selectedPurchaseForDetail.purchaseDate, 'MMM dd, yyyy')}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm text-muted-foreground">Delivery Date</Label>
-                          <p className="font-medium">
-                            {selectedPurchaseForDetail.deliveryDate 
-                              ? format(selectedPurchaseForDetail.deliveryDate, 'MMM dd, yyyy')
-                              : 'Not specified'
-                            }
-                          </p>
-                        </div>
-                      </div>
+                    <CardContent className="space-y-2 text-sm">
                       <div>
-                        <Label className="text-sm text-muted-foreground">Created By</Label>
-                        <p className="font-medium">{selectedPurchaseForDetail.createdBy}</p>
+                        <span className="text-muted-foreground">Bill Date: </span>
+                        <span className="font-medium">{selectedBill.billDate}</span>
                       </div>
-                      {selectedPurchaseForDetail.approvedBy && (
+                      {selectedBill.dueDate && (
                         <div>
-                          <Label className="text-sm text-muted-foreground">Approved By</Label>
-                          <p className="font-medium">{selectedPurchaseForDetail.approvedBy}</p>
+                          <span className="text-muted-foreground">Due Date: </span>
+                          <span className="font-medium">{selectedBill.dueDate}</span>
                         </div>
                       )}
                       <div>
-                        <Label className="text-sm text-muted-foreground">Payment Status</Label>
-                        {getPaymentStatusBadge(selectedPurchaseForDetail.paymentStatus)}
+                        <span className="text-muted-foreground">Created: </span>
+                        <span className="font-medium">{selectedBill.createdAt}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Amount Paid: </span>
+                        <span className="font-medium text-green-600">AED {selectedBill.amountPaid.toFixed(2)}</span>
                       </div>
                     </CardContent>
                   </Card>
                 </div>
 
-                {/* Purchase Items */}
+                {/* Line items table */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Purchase Items</CardTitle>
+                    <CardTitle className="text-sm">Line Items ({selectedBill.items.length})</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Product</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Unit Cost</TableHead>
-                          <TableHead>Discount</TableHead>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Qty</TableHead>
+                          <TableHead>Unit Price</TableHead>
+                          <TableHead>Disc%</TableHead>
+                          <TableHead>Tax%</TableHead>
                           <TableHead>Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedPurchaseForDetail.items.map((item) => (
+                        {selectedBill.items.map(item => (
                           <TableRow key={item.id}>
                             <TableCell>
-                              <div>
-                                <p className="font-medium">{item.productName}</p>
-                                <p className="text-sm text-muted-foreground">{item.productCode} - {item.sku}</p>
-                                {item.notes && (
-                                  <p className="text-sm text-muted-foreground italic">{item.notes}</p>
-                                )}
-                              </div>
+                              <p className="font-medium">{item.productName}</p>
+                              {item.notes && <p className="text-xs text-muted-foreground italic">{item.notes}</p>}
                             </TableCell>
-                            <TableCell>
-                              <p className="font-medium">{item.quantityPurchased} {item.unitOfMeasure}</p>
-                            </TableCell>
-                            <TableCell>AED {item.unitCost.toFixed(2)}</TableCell>
-                            <TableCell>
-                              {item.discount > 0 ? `AED ${item.discount.toFixed(2)}` : '-'}
-                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{item.productSku ?? '—'}</TableCell>
+                            <TableCell>{item.quantity} {item.unitOfMeasure ?? ''}</TableCell>
+                            <TableCell>AED {item.unitPrice.toFixed(2)}</TableCell>
+                            <TableCell>{item.discountPercent}%</TableCell>
+                            <TableCell>{item.taxPercent}%</TableCell>
                             <TableCell className="font-medium">AED {item.totalAmount.toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
@@ -1767,110 +1659,101 @@ export function Purchase() {
                   </CardContent>
                 </Card>
 
-                {/* Financial Summary */}
+                {/* Financial summary */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Financial Summary</CardTitle>
+                    <CardTitle className="text-sm">Financial Summary</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2">
+                    <div className="space-y-1 text-sm max-w-xs ml-auto">
                       <div className="flex justify-between">
-                        <span>Subtotal:</span>
-                        <span>AED {selectedPurchaseForDetail.subtotal.toFixed(2)}</span>
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span>AED {selectedBill.subtotal.toFixed(2)}</span>
                       </div>
-                      {selectedPurchaseForDetail.discountAmount > 0 && (
+                      {selectedBill.discountAmount > 0 && (
                         <div className="flex justify-between text-green-600">
-                          <span>Discount:</span>
-                          <span>-AED {selectedPurchaseForDetail.discountAmount.toFixed(2)}</span>
+                          <span>Discount</span>
+                          <span>-AED {selectedBill.discountAmount.toFixed(2)}</span>
                         </div>
                       )}
                       <div className="flex justify-between">
-                        <span>Tax:</span>
-                        <span>AED {selectedPurchaseForDetail.taxAmount.toFixed(2)}</span>
+                        <span className="text-muted-foreground">Tax</span>
+                        <span>AED {selectedBill.taxAmount.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Shipping:</span>
-                        <span>AED {selectedPurchaseForDetail.shippingCost.toFixed(2)}</span>
+                        <span className="text-muted-foreground">Shipping</span>
+                        <span>AED {selectedBill.shippingCost.toFixed(2)}</span>
                       </div>
                       <Separator />
-                      <div className="flex justify-between font-medium text-lg">
-                        <span>Total Amount:</span>
-                        <span>AED {selectedPurchaseForDetail.totalAmount.toFixed(2)}</span>
+                      <div className="flex justify-between font-semibold">
+                        <span>Total</span>
+                        <span>AED {selectedBill.totalAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-green-600">
+                        <span>Paid</span>
+                        <span>AED {selectedBill.amountPaid.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-orange-600">
+                        <span>Balance Due</span>
+                        <span>AED {(selectedBill.totalAmount - selectedBill.amountPaid).toFixed(2)}</span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Notes and Attachments */}
-                {(selectedPurchaseForDetail.notes || selectedPurchaseForDetail.attachments.length > 0) && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {selectedPurchaseForDetail.notes && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Notes</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-muted-foreground">{selectedPurchaseForDetail.notes}</p>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {selectedPurchaseForDetail.attachments.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Attachments</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            {selectedPurchaseForDetail.attachments.map((attachment, index) => (
-                              <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                                <span className="text-sm">{attachment}</span>
-                                <Button size="sm" variant="ghost">
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
+                {selectedBill.notes && (
+                  <Card>
+                    <CardHeader><CardTitle className="text-sm">Notes</CardTitle></CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground text-sm">{selectedBill.notes}</p>
+                    </CardContent>
+                  </Card>
                 )}
 
-                {/* Actions */}
+                {/* Dialog actions */}
                 <div className="flex justify-between">
-                  <div className="flex space-x-2">
-                    <Button variant="outline">
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => printBill(selectedBill)}>
                       <PrinterIcon className="mr-2 h-4 w-4" />
                       Print
                     </Button>
-                    <Button variant="outline">
-                      <Download className="mr-2 h-4 w-4" />
-                      Export PDF
-                    </Button>
-                    <Button variant="outline">
-                      <Mail className="mr-2 h-4 w-4" />
-                      Email
-                    </Button>
                   </div>
-                  
-                  <div className="flex space-x-2">
-                    {selectedPurchaseForDetail.status === 'pending_approval' && (
+                  <div className="flex gap-2">
+                    {selectedBill.status === 'DRAFT' && (
                       <>
-                        <Button variant="outline">
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Reject
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowBillDetail(false);
+                            openEditBill(selectedBill);
+                          }}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
                         </Button>
-                        <Button>
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                          Approve
+                        <Button
+                          disabled={confirmingId === selectedBill.id}
+                          onClick={() => handleConfirm(selectedBill)}
+                        >
+                          {confirmingId === selectedBill.id
+                            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            : <CheckCircle className="mr-2 h-4 w-4" />
+                          }
+                          Confirm Bill
                         </Button>
                       </>
                     )}
-                    {selectedPurchaseForDetail.status === 'ordered' && (
-                      <Button>
-                        <Package className="mr-2 h-4 w-4" />
-                        Mark as Received
+                    {selectedBill.status === 'CONFIRMED' && selectedBill.paymentStatus !== 'PAID' && (
+                      <Button
+                        onClick={() => {
+                          setPayingBill(selectedBill);
+                          setPayAmount(String(selectedBill.totalAmount - selectedBill.amountPaid));
+                          setShowBillDetail(false);
+                          setShowPaymentDialog(true);
+                        }}
+                      >
+                        <Wallet className="mr-2 h-4 w-4" />
+                        Record Payment
                       </Button>
                     )}
                   </div>
@@ -1881,119 +1764,233 @@ export function Purchase() {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Upload Dialog */}
-      <Dialog open={showBulkUpload} onOpenChange={setShowBulkUpload}>
+      {/* ── Record Payment Dialog ─────────────────────────────────────────── */}
+      <Dialog open={showPaymentDialog} onOpenChange={open => {
+        setShowPaymentDialog(open);
+        if (!open) { setPayingBill(null); setPayAmount(''); setPayMethod('cash'); setPayNotes(''); }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Upload className="h-5 w-5" />
-              <span>Bulk Upload Purchases</span>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              Record Payment
             </DialogTitle>
             <DialogDescription>
-              Upload multiple purchases using CSV or Excel file
+              {payingBill && `Bill ${payingBill.billNumber} — Balance: AED ${(payingBill.totalAmount - payingBill.amountPaid).toFixed(2)}`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-              <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-sm text-muted-foreground mb-4">
-                Drag and drop your file here, or click to browse
-              </p>
-              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                Choose File
-              </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={(e) => handleFileUpload(e, 'bulk')}
-                accept=".csv,.xlsx,.xls"
-                className="hidden"
+            <div>
+              <Label>Amount (AED) *</Label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="Enter payment amount"
+                value={payAmount}
+                onChange={e => setPayAmount(e.target.value)}
               />
             </div>
 
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium mb-2">Supported formats:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>CSV files (.csv)</li>
-                <li>Excel files (.xlsx, .xls)</li>
-              </ul>
+            <div>
+              <Label>Payment Method</Label>
+              <Select value={payMethod} onValueChange={setPayMethod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="credit_card">Credit Card</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowBulkUpload(false)}>
+            <div>
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Payment reference or notes..."
+                rows={2}
+                value={payNotes}
+                onChange={e => setPayNotes(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
                 Cancel
               </Button>
-              <Button variant="outline">
-                <Download className="mr-2 h-4 w-4" />
-                Download Template
+              <Button onClick={handleRecordPayment} disabled={saving}>
+                {saving
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <CreditCard className="mr-2 h-4 w-4" />
+                }
+                Record Payment
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Upload Progress Dialog */}
-      <Dialog open={isUploading} onOpenChange={setIsUploading}>
-        <DialogContent className="max-w-md">
+      {/* ── Supplier Form Dialog ──────────────────────────────────────────── */}
+      <Dialog open={showSupplierForm} onOpenChange={open => {
+        setShowSupplierForm(open);
+        if (!open) setEditingSupplier(null);
+      }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Uploading Purchases</span>
-            </DialogTitle>
+            <DialogTitle>{editingSupplier ? 'Edit Supplier' : 'Add Supplier'}</DialogTitle>
             <DialogDescription>
-              Processing your purchase data, please wait...
+              {editingSupplier ? 'Update supplier information' : 'Create a new supplier record'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="font-medium">Uploading purchases...</p>
-                <p className="text-sm text-muted-foreground">This may take a few moments</p>
+                <Label>Name *</Label>
+                <Input
+                  placeholder="Company name"
+                  value={supplierForm.name ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Contact Person</Label>
+                <Input
+                  placeholder="Contact name"
+                  value={supplierForm.contactPerson ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, contactPerson: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  placeholder="email@company.com"
+                  value={supplierForm.email ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, email: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input
+                  placeholder="+971-4-xxx-xxxx"
+                  value={supplierForm.phone ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, phone: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>City</Label>
+                <Input
+                  placeholder="City"
+                  value={supplierForm.city ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, city: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Country</Label>
+                <Input
+                  placeholder="Country"
+                  value={supplierForm.country ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, country: e.target.value }))}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label>Address</Label>
+                <Input
+                  placeholder="Street address"
+                  value={supplierForm.address ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, address: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Tax ID / TRN</Label>
+                <Input
+                  placeholder="Tax ID"
+                  value={supplierForm.taxId ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, taxId: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Payment Terms</Label>
+                <Select
+                  value={supplierForm.paymentTerms ?? ''}
+                  onValueChange={v => setSupplierForm(p => ({ ...p, paymentTerms: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select terms" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IMMEDIATE">Immediate</SelectItem>
+                    <SelectItem value="NET 7">NET 7</SelectItem>
+                    <SelectItem value="NET 15">NET 15</SelectItem>
+                    <SelectItem value="NET 30">NET 30</SelectItem>
+                    <SelectItem value="NET 60">NET 60</SelectItem>
+                    <SelectItem value="NET 90">NET 90</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Credit Limit (AED)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={supplierForm.creditLimit ?? 0}
+                  onChange={e => setSupplierForm(p => ({ ...p, creditLimit: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <Label>Rating (0–5)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={supplierForm.rating ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, rating: parseFloat(e.target.value) || undefined }))}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label>Notes</Label>
+                <Textarea
+                  placeholder="Notes about this supplier..."
+                  rows={2}
+                  value={supplierForm.notes ?? ''}
+                  onChange={e => setSupplierForm(p => ({ ...p, notes: e.target.value }))}
+                />
               </div>
             </div>
-            <Progress value={65} className="w-full" />
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowSupplierForm(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveSupplier} disabled={savingSupplier}>
+                {savingSupplier
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <Save className="mr-2 h-4 w-4" />
+                }
+                {editingSupplier ? 'Update Supplier' : 'Create Supplier'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Export Loading Dialog */}
-      <Dialog open={isExporting} onOpenChange={setIsExporting}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Exporting Purchases</span>
-            </DialogTitle>
-            <DialogDescription>
-              Preparing your purchase data for export...
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <div>
-                <p className="font-medium">Processing purchases...</p>
-                <p className="text-sm text-muted-foreground">This may take a few moments</p>
-              </div>
-            </div>
-            <Progress value={75} className="w-full" />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Floating Action Button for Mobile */}
+      {/* Mobile FAB */}
       <div className="fixed bottom-6 right-6 md:hidden">
         <Button
           size="lg"
           className="rounded-full shadow-lg"
           onClick={() => {
-            setIsCreatingPurchase(true);
-            resetForm();
-            setShowPurchaseForm(true);
+            setEditingBill(null);
+            setBillForm(defaultBillForm());
+            setShowBillForm(true);
           }}
         >
           <Plus className="h-6 w-6" />
@@ -2002,4 +1999,3 @@ export function Purchase() {
     </div>
   );
 }
-

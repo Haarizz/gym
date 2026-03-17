@@ -64,6 +64,8 @@ import { FinancialAnalytics } from "./pages/financial-analytics";
 import { AddProduct } from "./pages/add-product";
 import { Products } from "./pages/products";
 import { WastageReturns } from "./pages/wastage-returns";
+import { ProductionRecipe } from "./pages/production-recipe";
+import { Categories } from "./pages/categories";
 import { GymBiosPricing } from "./pages/gymbios-pricing";
 import { CommunityAnalytics } from "./pages/community-analytics";
 import { SetTargets } from "./pages/set-targets";
@@ -880,25 +882,11 @@ export default function App() {
       <Route path="/point-of-sale" element={<PointOfSale />} />
       <Route path="/products" element={<Products onNavigate={handleNavClick} />} />
       <Route path="/add-product" element={<AddProduct onNavigate={handleNavClick} />} />
-      <Route path="/category" element={
-        <div className="p-6">
-          <h1>Category</h1>
-          <p className="text-muted-foreground">
-            Organize products and services into categories for better inventory management and sales tracking.
-          </p>
-        </div>
-      } />
+      <Route path="/category" element={<Categories />} />
       <Route path="/purchase-order" element={<PurchaseOrder />} />
       <Route path="/purchase" element={<Purchase />} />
       <Route path="/wastage-returns" element={<WastageReturns />} />
-      <Route path="/production-recipe" element={
-        <div className="p-6">
-          <h1>Production / Recipe</h1>
-          <p className="text-muted-foreground">
-            Manage recipes for gym cafe items, protein shakes, and track production costs and ingredients.
-          </p>
-        </div>
-      } />
+      <Route path="/production-recipe" element={<ProductionRecipe />} />
       <Route path="/sales-reports" element={
         <div className="p-6">
           <h1>Sales Reports</h1>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -80,6 +80,8 @@ import {
   Gauge,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocation, useNavigate } from "react-router-dom";
+import { productsService, Warehouse as WarehouseType, ProductCategory } from "../utils/supabase/products-service";
 
 // Types
 interface ProductUnit {
@@ -118,13 +120,19 @@ interface ProductAttribute {
 }
 
 interface AddProductProps {
-  onNavigate?: (section: string) => void;
+  onNavigate?: (section: string, params?: Record<string, any>) => void;
 }
 
 export function AddProduct({ onNavigate }: AddProductProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const productId = (location.state as { productId?: number } | null)?.productId;
+  const isEditMode = !!productId;
+
   const [activeTab, setActiveTab] = useState("basic-info");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [isLoadingProduct, setIsLoadingProduct] = useState(false);
+
   // Basic Product Information
   const [productName, setProductName] = useState("");
   const [sku, setSku] = useState("");
@@ -132,59 +140,58 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   const [selectedBrand, setSelectedBrand] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
-  
+
   // Product Images
   const [productImages, setProductImages] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+
   // Barcode Settings
   const [barcodeTemplate, setBarcodeTemplate] = useState("");
   const [generatedBarcode, setGeneratedBarcode] = useState("");
-  
+
   // Pricing & Multi-Unit Setup
   const [defaultUnit, setDefaultUnit] = useState("");
   const [defaultPrice, setDefaultPrice] = useState("");
+  const [costPrice, setCostPrice] = useState("");
+  const [taxRate, setTaxRate] = useState("0");
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
-  
+
   // Recipe / Production Formula
   const [isManufactured, setIsManufactured] = useState(false);
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([]);
   const [totalCost, setTotalCost] = useState(0);
-  
+
   // Item Variants & Attributes
   const [hasVariants, setHasVariants] = useState(false);
   const [productAttributes, setProductAttributes] = useState<ProductAttribute[]>([]);
   const [productVariants, setProductVariants] = useState<ProductVariant[]>([]);
-  
+
   // Inventory & Stock Settings
   const [openingStock, setOpeningStock] = useState("");
   const [reorderLevel, setReorderLevel] = useState("");
-  const [selectedWarehouse, setSelectedWarehouse] = useState("");
-  
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+  const [supplier, setSupplier] = useState("");
+
   // Collapsible states
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-  // Mock data
-  const categories = [
-    "Supplements", "Equipment", "Apparel", "Accessories", "Food & Beverages", "Services"
-  ];
-  
+  // API data
+  const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [isLoadingMeta, setIsLoadingMeta] = useState(true);
+
   const brands = [
     "Optimum Nutrition", "BSN", "MuscleTech", "Dymatize", "Gold Standard", "MyProtein", "House Brand"
   ];
-  
+
   const barcodeTemplates = [
     "Code 128", "Code 39", "EAN-13", "UPC-A", "QR Code"
   ];
-  
+
   const units = [
     "Piece", "Box", "Bottle", "Pack", "Kg", "Gram", "Liter", "ML", "Dozen", "Pair"
-  ];
-  
-  const warehouses = [
-    "Main Warehouse", "Downtown Store", "Mall Branch", "Marina Store", "Online Stock"
   ];
 
   const attributeTypes = [
@@ -195,38 +202,103 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     { id: "weight", name: "Weight", values: ["1kg", "2kg", "5kg", "10kg"] },
   ];
 
+  // Load warehouses and categories on mount
+  useEffect(() => {
+    const loadMeta = async () => {
+      setIsLoadingMeta(true);
+      try {
+        const [warehouseData, categoryData] = await Promise.all([
+          productsService.getActiveWarehouses(),
+          productsService.getCategories(),
+        ]);
+        setWarehouses(warehouseData);
+        setCategories(categoryData);
+      } catch (error) {
+        console.error('Failed to load warehouses/categories:', error);
+        toast.error('Failed to load form data. Please refresh the page.');
+      } finally {
+        setIsLoadingMeta(false);
+      }
+    };
+    loadMeta();
+  }, []);
+
+  // Load product data in edit mode
+  useEffect(() => {
+    if (!isEditMode || !productId) return;
+
+    const loadProduct = async () => {
+      setIsLoadingProduct(true);
+      try {
+        const product = await productsService.getProductById(productId);
+
+        setProductName(product.name || "");
+        setSku(product.sku || "");
+        setSelectedCategory(product.categoryId ? String(product.categoryId) : "");
+        setSelectedBrand(product.brand || "");
+        setDescription(product.description || "");
+        setIsActive(product.isActive ?? true);
+        setProductImages(product.imageUrls || []);
+        setBarcodeTemplate(product.barcodeTemplate || "");
+        setGeneratedBarcode(product.barcode || "");
+        setDefaultUnit(product.defaultUnit || "");
+        setDefaultPrice(product.sellingPrice ? String(product.sellingPrice) : "");
+        setCostPrice(product.costPrice ? String(product.costPrice) : "");
+        setTaxRate(product.taxRate ? String(product.taxRate) : "0");
+        setIsManufactured(product.isManufactured ?? false);
+        setHasVariants(product.hasVariants ?? false);
+        setSupplier(product.supplier || "");
+
+        // Inventory
+        const firstStock = product.stockByWarehouse?.[0];
+        if (firstStock) {
+          setOpeningStock(String(firstStock.openingStock || 0));
+          setReorderLevel(String(firstStock.reorderLevel || 0));
+          setSelectedWarehouseId(String(firstStock.warehouseId));
+        }
+      } catch (error) {
+        console.error('Failed to load product:', error);
+        toast.error('Failed to load product data. Please try again.');
+      } finally {
+        setIsLoadingProduct(false);
+      }
+    };
+
+    loadProduct();
+  }, [isEditMode, productId]);
+
   // Event Handlers
   const handleImageUpload = useCallback(async (files: FileList | null) => {
     if (!files) return;
-    
+
     setIsUploading(true);
     setUploadProgress(0);
-    
+
     const validFiles = Array.from(files).filter(file => {
       const isValidType = file.type.startsWith('image/');
       const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
-      
+
       if (!isValidType) {
         toast.error(`${file.name} is not a valid image file`);
         return false;
       }
-      
+
       if (!isValidSize) {
         toast.error(`${file.name} is too large. Maximum size is 5MB`);
         return false;
       }
-      
+
       return true;
     });
-    
+
     if (validFiles.length === 0) {
       setIsUploading(false);
       return;
     }
-    
+
     const totalFiles = validFiles.length;
     let processedFiles = 0;
-    
+
     for (const file of validFiles) {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -239,10 +311,10 @@ export function AddProduct({ onNavigate }: AddProductProps) {
             }
             return newImages;
           });
-          
+
           processedFiles++;
           setUploadProgress((processedFiles / totalFiles) * 100);
-          
+
           if (processedFiles === totalFiles) {
             setIsUploading(false);
             setUploadProgress(0);
@@ -250,18 +322,18 @@ export function AddProduct({ onNavigate }: AddProductProps) {
           }
         }
       };
-      
+
       reader.onerror = () => {
         toast.error(`Failed to upload ${file.name}`);
         processedFiles++;
         setUploadProgress((processedFiles / totalFiles) * 100);
-        
+
         if (processedFiles === totalFiles) {
           setIsUploading(false);
           setUploadProgress(0);
         }
       };
-      
+
       reader.readAsDataURL(file);
     }
   }, []);
@@ -287,23 +359,22 @@ export function AddProduct({ onNavigate }: AddProductProps) {
       toast.error("Please select a barcode template first");
       return;
     }
-    
+
     let newBarcode = "";
-    
-    // Generate barcode based on template
+
     switch (barcodeTemplate) {
       case "Code 128":
       case "Code 39":
         newBarcode = `${sku || "PRD"}${Date.now().toString().slice(-6)}`;
         break;
-      case "EAN-13":
+      case "EAN-13": {
         newBarcode = `${Math.floor(Math.random() * 1000000000000)}`.padStart(12, '0');
-        // Add check digit (simplified)
         const checkDigit = newBarcode.split('').reduce((sum, digit, index) => {
           return sum + parseInt(digit) * (index % 2 === 0 ? 1 : 3);
         }, 0) % 10;
         newBarcode += (10 - checkDigit) % 10;
         break;
+      }
       case "UPC-A":
         newBarcode = `${Math.floor(Math.random() * 100000000000)}`.padStart(11, '0');
         break;
@@ -313,7 +384,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
       default:
         newBarcode = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
     }
-    
+
     setGeneratedBarcode(newBarcode);
     toast.success(`${barcodeTemplate} barcode generated successfully!`);
   };
@@ -323,17 +394,26 @@ export function AddProduct({ onNavigate }: AddProductProps) {
       toast.error("Please generate a barcode first");
       return;
     }
-    
-    if (!barcodeTemplate) {
-      toast.error("No barcode template selected");
-      return;
+
+    const printWindow = window.open('', '_blank', 'width=400,height=300');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head><title>Barcode - ${productName || 'Product'}</title></head>
+          <body style="text-align:center;font-family:monospace;padding:20px;">
+            <h3>${productName || 'Product'}</h3>
+            <p style="font-size:24px;letter-spacing:4px;border:1px solid #000;padding:10px;display:inline-block;">${generatedBarcode}</p>
+            ${sku ? `<p>SKU: ${sku}</p>` : ''}
+            <p style="font-size:12px;color:#666;">Template: ${barcodeTemplate}</p>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
     }
-    
-    // Simulate printing process
+
     toast.success(`Printing ${barcodeTemplate} barcode: ${generatedBarcode}`);
-    
-    // In a real implementation, you would integrate with a barcode printing service
-    console.log(`Printing barcode: ${generatedBarcode} using template: ${barcodeTemplate}`);
   };
 
   const addProductUnit = () => {
@@ -349,8 +429,8 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   };
 
   const updateProductUnit = (id: string, field: keyof ProductUnit, value: any) => {
-    setProductUnits(prev => 
-      prev.map(unit => 
+    setProductUnits(prev =>
+      prev.map(unit =>
         unit.id === id ? { ...unit, [field]: value } : unit
       )
     );
@@ -373,13 +453,12 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   };
 
   const updateRecipeIngredient = (id: string, field: keyof RecipeIngredient, value: any) => {
-    setRecipeIngredients(prev => 
-      prev.map(ingredient => 
+    setRecipeIngredients(prev =>
+      prev.map(ingredient =>
         ingredient.id === id ? { ...ingredient, [field]: value } : ingredient
       )
     );
-    
-    // Recalculate total cost
+
     const newTotal = recipeIngredients.reduce((sum, ingredient) => sum + ingredient.costImpact, 0);
     setTotalCost(newTotal);
   };
@@ -454,59 +533,126 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     });
   };
 
+  const resetForm = () => {
+    setProductName("");
+    setSku("");
+    setSelectedCategory("");
+    setSelectedBrand("");
+    setDescription("");
+    setIsActive(true);
+    setProductImages([]);
+    setBarcodeTemplate("");
+    setGeneratedBarcode("");
+    setDefaultPrice("");
+    setCostPrice("");
+    setTaxRate("0");
+    setProductUnits([]);
+    setIsManufactured(false);
+    setRecipeIngredients([]);
+    setHasVariants(false);
+    setProductVariants([]);
+    setProductAttributes([]);
+    setOpeningStock("");
+    setReorderLevel("");
+    setSelectedWarehouseId("");
+    setSupplier("");
+    setActiveTab("basic-info");
+  };
+
+  const goBack = () => {
+    if (onNavigate) {
+      onNavigate('products');
+    } else {
+      navigate('/products');
+    }
+  };
+
   const handleSave = async (saveAndNew = false) => {
-    setIsSubmitting(true);
-    
     // Validation
     if (!productName.trim()) {
       toast.error("Product name is required");
-      setIsSubmitting(false);
-      return;
-    }
-    
-    if (!sku.trim()) {
-      toast.error("SKU is required");
-      setIsSubmitting(false);
+      setActiveTab("basic-info");
       return;
     }
 
+    if (!selectedCategory) {
+      toast.error("Category is required");
+      setActiveTab("basic-info");
+      return;
+    }
+
+    if (!defaultPrice || isNaN(parseFloat(defaultPrice))) {
+      toast.error("Selling price is required");
+      setActiveTab("pricing-units");
+      return;
+    }
+
+    if (!selectedWarehouseId) {
+      toast.error("Please select a warehouse");
+      setActiveTab("inventory-stock");
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast.success(`Product "${productName}" saved successfully!`);
-      
-      if (saveAndNew) {
-        // Reset form for new product
-        setProductName("");
-        setSku("");
-        setSelectedCategory("");
-        setSelectedBrand("");
-        setDescription("");
-        setProductImages([]);
-        setGeneratedBarcode("");
-        setDefaultPrice("");
-        setProductUnits([]);
-        setRecipeIngredients([]);
-        setProductVariants([]);
-        setProductAttributes([]);
-        setOpeningStock("");
-        setReorderLevel("");
-        setActiveTab("basic-info");
+      const payload = {
+        name: productName.trim(),
+        categoryId: parseInt(selectedCategory, 10),
+        brand: selectedBrand || undefined,
+        description: description || undefined,
+        isActive,
+        hasVariants,
+        hasRecipe: recipeIngredients.length > 0,
+        isManufactured,
+        imageUrls: productImages,
+        barcode: generatedBarcode || undefined,
+        barcodeTemplate: barcodeTemplate || undefined,
+        defaultUnit: defaultUnit || undefined,
+        sellingPrice: parseFloat(defaultPrice),
+        costPrice: costPrice ? parseFloat(costPrice) : 0,
+        taxRate: taxRate ? parseFloat(taxRate) : 0,
+        supplier: supplier || undefined,
+        openingStock: openingStock ? parseInt(openingStock, 10) : 0,
+        reorderLevel: reorderLevel ? parseInt(reorderLevel, 10) : 0,
+        warehouseId: parseInt(selectedWarehouseId, 10),
+      };
+
+      if (isEditMode && productId) {
+        await productsService.updateProduct(productId, payload);
+        toast.success(`Product "${productName}" updated successfully!`);
       } else {
-        // Navigate back to products list
-        onNavigate?.("products");
+        await productsService.createProduct(payload);
+        toast.success(`Product "${productName}" saved successfully!`);
+      }
+
+      if (saveAndNew) {
+        resetForm();
+      } else {
+        goBack();
       }
     } catch (error) {
-      toast.error("Failed to save product");
+      console.error('Save product error:', error);
+      toast.error(isEditMode ? 'Failed to update product' : 'Failed to save product');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleCancel = () => {
-    onNavigate?.("products");
+    goBack();
   };
+
+  if (isLoadingProduct) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading product data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -518,32 +664,38 @@ export function AddProduct({ onNavigate }: AddProductProps) {
               <Package className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Add New Product</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">
+                {isEditMode ? 'Edit Product' : 'Add New Product'}
+              </h1>
               <p className="text-sm text-gray-600">
-                Create a new product with complete details and variants
+                {isEditMode
+                  ? 'Update product details'
+                  : 'Create a new product with complete details and variants'}
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             <Button variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => handleSave(true)}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4 mr-2" />
-              )}
-              Save & New
-            </Button>
-            <Button 
+            {!isEditMode && (
+              <Button
+                variant="outline"
+                onClick={() => handleSave(true)}
+                disabled={isSubmitting || isLoadingMeta}
+              >
+                {isSubmitting ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
+                Save & New
+              </Button>
+            )}
+            <Button
               onClick={() => handleSave(false)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoadingMeta}
               className="bg-primary hover:bg-primary/90"
             >
               {isSubmitting ? (
@@ -551,7 +703,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
               ) : (
                 <Save className="h-4 w-4 mr-2" />
               )}
-              Save Product
+              {isEditMode ? 'Update Product' : 'Save Product'}
             </Button>
           </div>
         </div>
@@ -589,7 +741,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
           </TabsList>
 
           {/* Tab Content */}
-          
+
           {/* Basic Product Information */}
           <TabsContent value="basic-info">
             <Card>
@@ -611,9 +763,9 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       className="input-focus"
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
-                    <Label htmlFor="sku">SKU / Product Code *</Label>
+                    <Label htmlFor="sku">SKU / Product Code</Label>
                     <Input
                       id="sku"
                       value={sku}
@@ -622,23 +774,23 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       className="input-focus"
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
+                    <Label htmlFor="category">Category *</Label>
                     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
+                        <SelectValue placeholder={isLoadingMeta ? "Loading categories..." : "Select category"} />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
+                          <SelectItem key={category.id} value={String(category.id)}>
+                            {category.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="brand">Brand</Label>
                     <Select value={selectedBrand} onValueChange={setSelectedBrand}>
@@ -655,7 +807,18 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                     </Select>
                   </div>
                 </div>
-                
+
+                <div className="space-y-2">
+                  <Label htmlFor="supplier">Supplier</Label>
+                  <Input
+                    id="supplier"
+                    value={supplier}
+                    onChange={(e) => setSupplier(e.target.value)}
+                    placeholder="Enter supplier name"
+                    className="input-focus"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
                   <Textarea
@@ -667,7 +830,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                     className="input-focus"
                   />
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="status"
@@ -709,8 +872,8 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                         <RefreshCw className="h-8 w-8 text-primary mx-auto animate-spin" />
                         <p className="text-sm text-gray-600">Uploading images...</p>
                         <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full transition-all duration-300" 
+                          <div
+                            className="bg-primary h-2 rounded-full transition-all duration-300"
                             style={{ width: `${uploadProgress}%` }}
                           ></div>
                         </div>
@@ -738,15 +901,15 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       </>
                     )}
                   </div>
-                  
+
                   {/* Image Preview */}
                   {productImages.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-gray-900">Uploaded Images ({productImages.length}/10)</h4>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setProductImages([])}
                           className="text-red-600"
                         >
@@ -769,7 +932,6 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                                   variant="secondary"
                                   className="h-7 w-7 p-0"
                                   onClick={() => {
-                                    // Preview image in full size
                                     const newWindow = window.open();
                                     if (newWindow) {
                                       newWindow.document.write(`<img src="${image}" style="max-width:100%;max-height:100%;"/>`);
@@ -831,26 +993,26 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       Choose the appropriate barcode format for your business needs
                     </p>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      onClick={generateBarcode} 
+                    <Button
+                      onClick={generateBarcode}
                       disabled={!barcodeTemplate}
                       className="bg-primary hover:bg-primary/90"
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Generate
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={printBarcode} 
+                    <Button
+                      variant="outline"
+                      onClick={printBarcode}
                       disabled={!generatedBarcode}
                     >
                       <Printer className="h-4 w-4 mr-2" />
                       Print
                     </Button>
                   </div>
-                  
+
                   {barcodeTemplate && !generatedBarcode && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <div className="flex items-start space-x-2">
@@ -868,7 +1030,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       </div>
                     </div>
                   )}
-                  
+
                   {generatedBarcode && (
                     <div className="space-y-3">
                       <div className="bg-gray-50 border rounded-lg p-4">
@@ -878,7 +1040,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                             {barcodeTemplate}
                           </Badge>
                         </div>
-                        
+
                         {/* Barcode Visual Representation */}
                         <div className="bg-white border rounded p-3 mb-3 text-center">
                           {barcodeTemplate === "QR Code" ? (
@@ -905,12 +1067,12 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                             </div>
                           )}
                         </div>
-                        
+
                         <div className="font-mono text-sm flex items-center justify-between bg-white border rounded p-2">
                           <span className="text-gray-900">{generatedBarcode}</span>
                           <div className="flex space-x-1">
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               className="h-7 px-2"
                               onClick={() => {
@@ -920,8 +1082,8 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                             >
                               <Copy className="h-3 w-3" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               className="h-7 px-2"
                               onClick={generateBarcode}
@@ -931,7 +1093,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded p-2">
                         <CheckCircle className="h-4 w-4" />
                         <span>Barcode ready for printing and scanning</span>
@@ -954,7 +1116,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Default Unit & Price */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="default-unit">Default Unit</Label>
                     <Select value={defaultUnit} onValueChange={setDefaultUnit}>
@@ -970,9 +1132,9 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="space-y-2">
-                    <Label htmlFor="default-price">Default Price (AED)</Label>
+                    <Label htmlFor="default-price">Selling Price (AED) *</Label>
                     <Input
                       id="default-price"
                       type="number"
@@ -983,15 +1145,39 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       className="input-focus"
                     />
                   </div>
-                  
-                  <div className="flex items-end">
-                    <Button onClick={addProductUnit} className="w-full">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Unit
-                    </Button>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cost-price">Cost Price (AED)</Label>
+                    <Input
+                      id="cost-price"
+                      type="number"
+                      step="0.01"
+                      value={costPrice}
+                      onChange={(e) => setCostPrice(e.target.value)}
+                      placeholder="0.00"
+                      className="input-focus"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="tax-rate">Tax Rate (%)</Label>
+                    <Input
+                      id="tax-rate"
+                      type="number"
+                      step="0.01"
+                      value={taxRate}
+                      onChange={(e) => setTaxRate(e.target.value)}
+                      placeholder="0"
+                      className="input-focus"
+                    />
                   </div>
                 </div>
-                
+
+                <Button onClick={addProductUnit} variant="outline">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Additional Unit
+                </Button>
+
                 {/* Multiple Units Table */}
                 {productUnits.length > 0 && (
                   <div>
@@ -1101,13 +1287,13 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   <Checkbox
                     id="is-manufactured"
                     checked={isManufactured}
-                    onCheckedChange={setIsManufactured}
+                    onCheckedChange={(checked) => setIsManufactured(!!checked)}
                   />
                   <Label htmlFor="is-manufactured">
                     This product is manufactured (requires recipe)
                   </Label>
                 </div>
-                
+
                 {isManufactured && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -1117,7 +1303,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                         Add Ingredient
                       </Button>
                     </div>
-                    
+
                     {recipeIngredients.length > 0 && (
                       <div className="border rounded-lg overflow-hidden">
                         <Table>
@@ -1192,7 +1378,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                         </Table>
                       </div>
                     )}
-                    
+
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Total Recipe Cost:</span>
@@ -1221,13 +1407,13 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   <Checkbox
                     id="has-variants"
                     checked={hasVariants}
-                    onCheckedChange={setHasVariants}
+                    onCheckedChange={(checked) => setHasVariants(!!checked)}
                   />
                   <Label htmlFor="has-variants">
                     Item with Variants (sizes, colors, etc.)
                   </Label>
                 </div>
-                
+
                 {hasVariants && (
                   <div className="space-y-6">
                     {/* Attributes Configuration */}
@@ -1239,7 +1425,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                           Add Attribute
                         </Button>
                       </div>
-                      
+
                       {productAttributes.length > 0 && (
                         <div className="space-y-3">
                           {productAttributes.map((attribute) => (
@@ -1269,7 +1455,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                                     </SelectContent>
                                   </Select>
                                 </div>
-                                
+
                                 <div className="space-y-2">
                                   <Label>Values</Label>
                                   <div className="flex flex-wrap gap-2">
@@ -1289,7 +1475,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                                     ))}
                                   </div>
                                 </div>
-                                
+
                                 <div className="flex items-end">
                                   <Button
                                     variant="ghost"
@@ -1307,7 +1493,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Generate Variants */}
                     {productAttributes.length > 0 && (
                       <div>
@@ -1317,7 +1503,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                         </Button>
                       </div>
                     )}
-                    
+
                     {/* Variants Table */}
                     {productVariants.length > 0 && (
                       <div>
@@ -1444,7 +1630,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       className="input-focus"
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="reorder-level">Reorder Level</Label>
                     <Input
@@ -1456,37 +1642,37 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       className="input-focus"
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
-                    <Label htmlFor="warehouse">Warehouse / Location</Label>
-                    <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                    <Label htmlFor="warehouse">Warehouse / Location *</Label>
+                    <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select warehouse" />
+                        <SelectValue placeholder={isLoadingMeta ? "Loading warehouses..." : "Select warehouse"} />
                       </SelectTrigger>
                       <SelectContent>
                         {warehouses.map((warehouse) => (
-                          <SelectItem key={warehouse} value={warehouse}>
-                            {warehouse}
+                          <SelectItem key={warehouse.id} value={String(warehouse.id)}>
+                            {warehouse.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
-                
+
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
                     <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-blue-900">Inventory Management</h4>
                       <p className="text-sm text-blue-700 mt-1">
-                        Opening stock will be automatically added to the selected warehouse. 
+                        Opening stock will be automatically added to the selected warehouse.
                         Reorder level helps trigger low stock alerts when inventory falls below this threshold.
                       </p>
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="space-y-4">
                   <h3 className="font-medium">Stock Summary</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1510,7 +1696,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                     </div>
                     <div className="bg-gray-50 p-3 rounded-lg text-center">
                       <div className="text-2xl font-semibold text-secondary">
-                        {selectedWarehouse ? "1" : "0"}
+                        {selectedWarehouseId ? "1" : "0"}
                       </div>
                       <div className="text-sm text-gray-600">Warehouse</div>
                     </div>
@@ -1524,4 +1710,3 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     </div>
   );
 }
-

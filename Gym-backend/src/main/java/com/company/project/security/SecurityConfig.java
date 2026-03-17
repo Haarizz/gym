@@ -64,12 +64,21 @@ public class SecurityConfig {
                     "/api/staff/**",
                     "/api/attendance/**",
                     "/api/products/**",
+                    "/api/warehouses/**",
+                    "/api/product-categories/**",
                     "/api/plans/**",
                     "/api/promotions/**",
                     "/api/leads/**",
                     "/api/bookings/**",
                     "/api/classes/**",
-                    "/api/dashboard/**"
+                    "/api/dashboard/**",
+                    "/api/pos/**",
+                    "/api/suppliers/**",
+                    "/api/purchase-orders/**",
+                    "/api/supplier-bills/**",
+                    "/api/wastage-returns/**",
+                    "/api/recipes/**",
+                    "/api/production-orders/**"
                 ).authenticated()
 
                 // Any other /api/** endpoint also requires authentication
