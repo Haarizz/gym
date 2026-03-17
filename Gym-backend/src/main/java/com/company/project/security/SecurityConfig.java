@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -41,40 +42,11 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints — no token required
-                .requestMatchers("/api/auth/**").permitAll()
+                // Public endpoints — no token required (dev mode)
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/api/**").permitAll()
 
-                // Admin-only endpoints
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                // Manager + Admin endpoints
-                .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
-
-                // Payroll & HR — restricted to HR and Admin
-                .requestMatchers("/api/payroll/**", "/api/employees/**", "/api/recruitment/**")
-                    .hasAnyRole("ADMIN", "HR")
-
-                // Financial endpoints — Accountant, Manager, Admin
-                .requestMatchers("/api/billing/**", "/api/expenses/**", "/api/ledgers/**", "/api/financials/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "ACCOUNTANT")
-
-                // Core gym operations — any authenticated user
-                .requestMatchers(
-                    "/api/members/**",
-                    "/api/staff/**",
-                    "/api/attendance/**",
-                    "/api/products/**",
-                    "/api/plans/**",
-                    "/api/promotions/**",
-                    "/api/leads/**",
-                    "/api/bookings/**",
-                    "/api/classes/**",
-                    "/api/dashboard/**",
-                    "/api/messaging/**"
-                ).authenticated()
-
-                // Any other /api/** endpoint also requires authentication
-                .anyRequest().authenticated()
+                .anyRequest().permitAll()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider())

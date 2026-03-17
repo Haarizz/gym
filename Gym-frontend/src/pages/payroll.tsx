@@ -310,6 +310,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeePayroll | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
   
   // Generation form
   const [generationMonth, setGenerationMonth] = useState("November");
@@ -513,7 +514,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold flex items-center gap-3">
             <Calculator className="h-8 w-8" style={{ color: '#2B7A78' }} />
             Payroll Management
           </h1>
@@ -531,21 +532,30 @@ export function Payroll({ onNavigate }: PayrollProps) {
       </div>
 
       {/* Main Tabs */}
+      <style>{`
+        @keyframes tabSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: tabSlideIn 0.22s ease-out;
+        }
+      `}</style>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="dashboard">
+        <TabsList className="w-full flex">
+          <TabsTrigger value="dashboard" className="flex-1">
             <BarChart3 className="mr-2 h-4 w-4" />
             Dashboard
           </TabsTrigger>
-          <TabsTrigger value="review">
+          <TabsTrigger value="review" className="flex-1">
             <Eye className="mr-2 h-4 w-4" />
             Review Payroll
           </TabsTrigger>
-          <TabsTrigger value="history">
+          <TabsTrigger value="history" className="flex-1">
             <CalendarIcon className="mr-2 h-4 w-4" />
             Payroll History
           </TabsTrigger>
-          <TabsTrigger value="reports">
+          <TabsTrigger value="reports" className="flex-1">
             <FileText className="mr-2 h-4 w-4" />
             Reports
           </TabsTrigger>
@@ -555,52 +565,60 @@ export function Payroll({ onNavigate }: PayrollProps) {
         <TabsContent value="dashboard" className="space-y-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="border-l-4" style={{ borderLeftColor: '#2B7A78' }}>
+            <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-                <Users className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                <div className="bg-gradient-light p-2 rounded-lg">
+                  <Users className="h-4 w-4 text-primary" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.totalEmployees}</div>
+                <div className="text-2xl font-bold text-primary">{dashboardStats.totalEmployees}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Active staff members
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-yellow-500">
+            <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Pending Payrolls</CardTitle>
-                <Clock className="h-4 w-4 text-yellow-600" />
+                <div className="bg-yellow-50 p-2 rounded-lg">
+                  <Clock className="h-4 w-4 text-yellow-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.pendingPayrolls}</div>
+                <div className="text-2xl font-bold text-yellow-600">{dashboardStats.pendingPayrolls}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Awaiting approval
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-blue-500">
+            <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Approved Payrolls</CardTitle>
-                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <div className="bg-blue-50 p-2 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.approvedPayrolls}</div>
+                <div className="text-2xl font-bold text-blue-600">{dashboardStats.approvedPayrolls}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Ready for disbursement
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-green-500">
+            <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Disbursed Payrolls</CardTitle>
-                <Wallet className="h-4 w-4 text-green-600" />
+                <div className="bg-green-50 p-2 rounded-lg">
+                  <Wallet className="h-4 w-4 text-green-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.disbursedPayrolls}</div>
+                <div className="text-2xl font-bold text-green-600">{dashboardStats.disbursedPayrolls}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Successfully paid
                 </p>
@@ -611,7 +629,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
           {/* Quick Actions & Recent Payrolls */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Quick Actions */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarIcon className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -647,7 +665,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             </Card>
 
             {/* Recent Payroll Cycles */}
-            <Card className="lg:col-span-2">
+            <Card className={`${cardShell} lg:col-span-2`}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -683,7 +701,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
           </div>
 
           {/* Monthly Trend Chart */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -710,7 +728,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
           {selectedCycle ? (
             <>
               {/* Cycle Summary */}
-              <Card>
+              <Card className={cardShell}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -770,7 +788,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               </Card>
 
               {/* Filters */}
-              <Card>
+              <Card className={cardShell}>
                 <CardContent className="pt-6">
                   <div className="flex gap-4 items-center">
                     <div className="relative flex-1 max-w-md">
@@ -798,7 +816,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               </Card>
 
               {/* Employee Payroll Table */}
-              <Card>
+              <Card className={cardShell}>
                 <CardHeader>
                   <CardTitle>Employee Payroll Details</CardTitle>
                   <CardDescription>Auto-calculated from attendance records</CardDescription>
@@ -899,7 +917,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               )}
             </>
           ) : (
-            <Card>
+            <Card className={cardShell}>
               <CardContent className="py-12 text-center">
                 <Calculator className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="font-medium mb-2">No Payroll Generated</h3>
@@ -920,7 +938,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
         {/* Payroll History Tab */}
         <TabsContent value="history" className="space-y-6">
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Payroll History</CardTitle>
               <CardDescription>View all past payroll cycles and their status</CardDescription>
@@ -986,7 +1004,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
         <TabsContent value="reports" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Department-wise Payroll */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <PieChart className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -1024,7 +1042,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             </Card>
 
             {/* Deduction Breakdown */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -1054,7 +1072,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
           {/* Report Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -1072,7 +1090,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -1090,7 +1108,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" style={{ color: '#2B7A78' }} />

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -7,8 +7,12 @@ import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Calendar as CalendarIcon, Clock, Users, MapPin, QrCode, Plus, Search, Filter, CheckCircle, AlertCircle, User, UserPlus, Calendar, Dumbbell, Building, Phone, Mail, MessageSquare, Download, RotateCcw, Eye, Edit3, X, Zap, PieChart } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Users, MapPin, QrCode, Plus, Search, Filter, CheckCircle, AlertCircle, User, UserPlus, Calendar, Dumbbell, Building, Phone, Mail, MessageSquare, Download, RotateCcw, Eye, Edit3, X, Zap, PieChart, ArrowRight } from "lucide-react";
+import QRCode from "react-qr-code";
 import { toast } from "sonner";
+import { membersService } from "../utils/supabase/members-service";
+import { trainingService, TrainingSessionApi } from "../utils/supabase/training-service";
+import { bookingService, BookingApi } from "../utils/supabase/booking-service";
 
 interface BookingsProps {
   onNavigate?: (section: string) => void;
@@ -27,7 +31,9 @@ interface ClassSchedule {
   id: string;
   name: string;
   instructor: string;
-  time: string;
+  date: string;
+  startTime: string;
+  endTime: string;
   duration: number;
   capacity: number;
   booked: number;
@@ -35,13 +41,14 @@ interface ClassSchedule {
   type: 'class' | 'pt' | 'facility';
   description: string;
   location: string;
-  status: 'available' | 'full' | 'cancelled';
+  status: 'active' | 'cancelled';
 }
 
 interface Booking {
   id: string;
   memberId?: string;
   memberName: string;
+  memberAvatar?: string;
   classId: string;
   className: string;
   instructor: string;
@@ -60,226 +67,189 @@ interface Booking {
   createdAt: string;
 }
 
-// Trial Data
-const trialMembers: Member[] = [
-  {
-    id: "M001",
-    name: "Ahmed Al-Mahmoud",
-    email: "ahmed.mahmoud@email.com",
-    phone: "+971-50-123-4567",
-    membershipType: "Premium",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face"
-  },
-  {
-    id: "M002", 
-    name: "Fatima Al-Zahra",
-    email: "fatima.zahra@email.com",
-    phone: "+971-55-987-6543",
-    membershipType: "Standard",
-    avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face"
-  },
-  {
-    id: "M003",
-    name: "Mohammed Hassan",
-    email: "mohammed.hassan@email.com", 
-    phone: "+971-56-456-7890",
-    membershipType: "Basic",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face"
-  },
-  {
-    id: "M004",
-    name: "Sarah Al-Rashid",
-    email: "sarah.rashid@email.com",
-    phone: "+971-52-234-5678", 
-    membershipType: "Premium",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face"
-  }
-];
-
-const trialClasses: ClassSchedule[] = [
-  {
-    id: "C001",
-    name: "Morning Yoga Flow",
-    instructor: "Sarah Johnson",
-    time: "09:00",
-    duration: 60,
-    capacity: 20,
-    booked: 12,
-    price: 50,
-    type: 'class',
-    description: "Gentle morning yoga to energize your day",
-    location: "Studio A",
-    status: 'available'
-  },
-  {
-    id: "C002", 
-    name: "HIIT Bootcamp",
-    instructor: "Mike Chen",
-    time: "10:30",
-    duration: 45,
-    capacity: 15,
-    booked: 8,
-    price: 75,
-    type: 'class',
-    description: "High-intensity interval training for maximum results",
-    location: "Main Gym",
-    status: 'available'
-  },
-  {
-    id: "C003",
-    name: "Strength Training",
-    instructor: "Ahmed Al-Saeed",
-    time: "18:00",
-    duration: 60,
-    capacity: 12,
-    booked: 12,
-    price: 80,
-    type: 'class', 
-    description: "Build muscle and strength with guided workouts",
-    location: "Weight Room",
-    status: 'full'
-  },
-  {
-    id: "PT001",
-    name: "Personal Training Session",
-    instructor: "Lisa Rodriguez",
-    time: "11:00",
-    duration: 60,
-    capacity: 1,
-    booked: 0,
-    price: 200,
-    type: 'pt',
-    description: "One-on-one personal training session",
-    location: "PT Room 1",
-    status: 'available'
-  },
-  {
-    id: "PT002",
-    name: "Nutrition Consultation",
-    instructor: "Dr. Khalid Omar",
-    time: "14:00",
-    duration: 45,
-    capacity: 1,
-    booked: 0,
-    price: 150,
-    type: 'pt',
-    description: "Personalized nutrition plan and consultation",
-    location: "Consultation Room",
-    status: 'available'
-  },
-  {
-    id: "F001",
-    name: "Basketball Court",
-    instructor: "Facility",
-    time: "16:00",
-    duration: 120,
-    capacity: 10,
-    booked: 4,
-    price: 100,
-    type: 'facility',
-    description: "Full basketball court rental",
-    location: "Court 1",
-    status: 'available'
-  },
-  {
-    id: "F002",
-    name: "Swimming Pool",
-    instructor: "Facility", 
-    time: "19:00",
-    duration: 90,
-    capacity: 8,
-    booked: 6,
-    price: 80,
-    type: 'facility',
-    description: "Private pool session",
-    location: "Pool Area",
-    status: 'available'
-  }
-];
-
-const trialBookings: Booking[] = [
-  {
-    id: "B001",
-    memberId: "M001",
-    memberName: "Ahmed Al-Mahmoud",
-    classId: "C001",
-    className: "Morning Yoga Flow",
-    instructor: "Sarah Johnson",
-    date: "2024-10-04",
-    time: "09:00",
-    type: 'class',
-    status: 'confirmed',
-    price: 50,
-    qrCode: "QR-B001-YGF-0900",
-    isGuest: false,
-    createdAt: "2024-10-03T15:30:00Z"
-  },
-  {
-    id: "B002",
-    memberName: "John Smith (Guest)",
-    classId: "C002",
-    className: "HIIT Bootcamp", 
-    instructor: "Mike Chen",
-    date: "2024-10-04",
-    time: "10:30",
-    type: 'class',
-    status: 'confirmed',
-    price: 75,
-    qrCode: "QR-B002-HIT-1030",
-    isGuest: true,
-    guestDetails: {
-      name: "John Smith",
-      email: "john.smith@email.com",
-      phone: "+971-50-999-8888"
-    },
-    createdAt: "2024-10-03T16:45:00Z"
-  },
-  {
-    id: "B003",
-    memberId: "M002",
-    memberName: "Fatima Al-Zahra",
-    classId: "PT001",
-    className: "Personal Training Session",
-    instructor: "Lisa Rodriguez",
-    date: "2024-10-04",
-    time: "11:00",
-    type: 'pt',
-    status: 'confirmed',
-    price: 200,
-    qrCode: "QR-B003-PT-1100",
-    isGuest: false,
-    createdAt: "2024-10-03T14:20:00Z"
-  }
-];
 
 export function Bookings({ onNavigate }: BookingsProps) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sessionSearchTerm, setSessionSearchTerm] = useState("");
+  const [bookingSearchTerm, setBookingSearchTerm] = useState("");
   const [selectedBookingType, setSelectedBookingType] = useState<'all' | 'class' | 'pt' | 'facility'>('all');
+  const [bookingStatusFilter, setBookingStatusFilter] = useState<'all' | 'confirmed' | 'checked-in' | 'no-show' | 'cancelled'>('all');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isGuestBooking, setIsGuestBooking] = useState(false);
   const [guestDetails, setGuestDetails] = useState({ name: "", email: "", phone: "" });
   const [selectedClass, setSelectedClass] = useState<ClassSchedule | null>(null);
   const [bookingStep, setBookingStep] = useState(1);
-  const [bookings, setBookings] = useState<Booking[]>(trialBookings);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [sessions, setSessions] = useState<ClassSchedule[]>([]);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
+  const [showPhotoDialog, setShowPhotoDialog] = useState(false);
+  const [photoToView, setPhotoToView] = useState<{ url: string; name: string } | null>(null);
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+
+  const formatTime = (value?: string | null) => {
+    if (!value) return "";
+    return value.length >= 5 ? value.slice(0, 5) : value;
+  };
+
+  const mapSession = (session: TrainingSessionApi): ClassSchedule => {
+    const startTime = formatTime(session.startTime);
+    const endTime = formatTime(session.endTime);
+    let duration = session.durationMinutes ?? 0;
+    if (!duration && startTime && endTime) {
+      const start = new Date(`1970-01-01T${startTime}:00`);
+      const end = new Date(`1970-01-01T${endTime}:00`);
+      duration = Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
+    }
+
+    return {
+      id: session.id,
+      name: session.name,
+      instructor: session.trainerName || "Trainer",
+      date: session.date,
+      startTime,
+      endTime,
+      duration,
+      capacity: Number(session.capacity ?? 0),
+      booked: Number(session.booked ?? 0),
+      price: Number(session.price ?? 0),
+      type: session.type,
+      description: session.description || "",
+      location: session.location || "",
+      status: (session.status as ClassSchedule["status"]) || "active"
+    };
+  };
+
+  const mapBooking = (booking: BookingApi): Booking => ({
+    id: booking.id,
+    memberId: booking.memberId || undefined,
+    memberName: booking.memberName || booking.guestName || "Guest",
+    memberAvatar: booking.memberId
+      ? members.find((member) => member.id === booking.memberId)?.avatar
+      : undefined,
+    classId: booking.sessionId || "",
+    className: booking.sessionName || "",
+    instructor: booking.trainerName || "Trainer",
+    date: booking.date || "",
+    time: formatTime(booking.startTime),
+    type: (booking.type as Booking["type"]) || "class",
+    status: (booking.status as Booking["status"]) || "confirmed",
+    price: Number(booking.price ?? 0),
+    qrCode: booking.qrCode || "",
+    isGuest: Boolean(booking.guest),
+    guestDetails: booking.guest ? {
+      name: booking.guestName || "",
+      email: booking.guestEmail || "",
+      phone: booking.guestPhone || ""
+    } : undefined,
+    createdAt: booking.createdAt || ""
+  });
+
+  const getAvailability = (session: ClassSchedule) => {
+    if (session.status === "cancelled") return "cancelled";
+    if (session.capacity > 0 && session.booked >= session.capacity) return "full";
+    return "available";
+  };
+
+  const fetchSessions = async () => {
+    const data = await trainingService.getSessions();
+    setSessions(data.map(mapSession));
+  };
+
+  const fetchBookings = async (memberList: Member[]) => {
+    const data = await bookingService.getBookings();
+    const mapped = data.map((booking) => ({
+      ...mapBooking(booking),
+      memberAvatar: booking.memberId
+        ? memberList.find((member) => member.id === booking.memberId)?.avatar
+        : undefined,
+    }));
+    setBookings(mapped);
+  };
+
+  const fetchMembers = async () => {
+    const result = await membersService.getMembers({}, { limit: 200 });
+    const mapped = result.members.map((member: any) => ({
+      id: member.id,
+      name: member.name,
+      email: member.email,
+      phone: member.phone,
+      membershipType: member.membership_plan || member.membership_type || member.membershipType || "Member",
+      avatar: member.photo_url || member.photoUrl || undefined
+    }));
+    setMembers(mapped);
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const result = await membersService.getMembers({}, { limit: 200 });
+        const mappedMembers = result.members.map((member: any) => ({
+          id: member.id,
+          name: member.name,
+          email: member.email,
+          phone: member.phone,
+          membershipType: member.membership_plan || member.membership_type || member.membershipType || "Member",
+          avatar: member.photo_url || member.photoUrl || undefined
+        }));
+        setMembers(mappedMembers);
+        await Promise.all([fetchSessions(), fetchBookings(mappedMembers)]);
+      } catch (error: any) {
+        toast.error(error?.message || "Failed to load bookings data");
+      }
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (members.length) {
+      fetchBookings(members);
+    }
+  }, [members]);
 
   // Filter members based on search
   const filteredMembers = useMemo(() => {
-    return trialMembers.filter(member => 
+    return members.filter(member =>
       member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.phone.includes(searchTerm)
     );
-  }, [searchTerm]);
+  }, [members, searchTerm]);
 
   // Filter classes based on booking type
   const filteredClasses = useMemo(() => {
-    if (selectedBookingType === 'all') return trialClasses;
-    return trialClasses.filter(cls => cls.type === selectedBookingType);
-  }, [selectedBookingType]);
+    const base = selectedBookingType === 'all'
+      ? sessions
+      : sessions.filter(cls => cls.type === selectedBookingType);
+    if (!sessionSearchTerm) return base;
+    const lowered = sessionSearchTerm.toLowerCase();
+    return base.filter(cls =>
+      cls.name.toLowerCase().includes(lowered) ||
+      cls.instructor.toLowerCase().includes(lowered) ||
+      cls.location.toLowerCase().includes(lowered)
+    );
+  }, [selectedBookingType, sessions, sessionSearchTerm]);
+
+  const filteredBookings = useMemo(() => {
+    const base = bookingStatusFilter === 'all'
+      ? bookings
+      : bookings.filter(booking => booking.status === bookingStatusFilter);
+    if (!bookingSearchTerm) return base;
+    const lowered = bookingSearchTerm.toLowerCase();
+    return base.filter(booking =>
+      booking.memberName.toLowerCase().includes(lowered) ||
+      booking.className.toLowerCase().includes(lowered) ||
+      booking.instructor.toLowerCase().includes(lowered) ||
+      booking.type.toLowerCase().includes(lowered) ||
+      booking.status.toLowerCase().includes(lowered) ||
+      booking.date.toLowerCase().includes(lowered)
+    );
+  }, [bookings, bookingSearchTerm, bookingStatusFilter]);
 
   // Today's bookings
   const todaysBookings = useMemo(() => {
@@ -287,7 +257,11 @@ export function Bookings({ onNavigate }: BookingsProps) {
     return bookings.filter(booking => booking.date === today);
   }, [bookings]);
 
-  const handleCreateBooking = () => {
+  const upcomingBookings = bookings.filter(b => b.date > new Date().toISOString().split('T')[0]).length;
+  const guestBookings = bookings.filter(b => b.isGuest).length;
+  const cancelledBookings = bookings.filter(b => b.status === 'cancelled' || b.status === 'no-show').length;
+
+  const handleCreateBooking = async () => {
     if (!selectedClass) {
       toast.error("Please select a class or session");
       return;
@@ -303,39 +277,32 @@ export function Bookings({ onNavigate }: BookingsProps) {
       return;
     }
 
-    const newBooking: Booking = {
-      id: `B${String(bookings.length + 1).padStart(3, '0')}`,
-      memberId: isGuestBooking ? undefined : selectedMember?.id,
-      memberName: isGuestBooking ? `${guestDetails.name} (Guest)` : selectedMember?.name || "",
-      classId: selectedClass.id,
-      className: selectedClass.name,
-      instructor: selectedClass.instructor,
-      date: new Date().toISOString().split('T')[0],
-      time: selectedClass.time,
-      type: selectedClass.type,
-      status: 'confirmed',
-      price: selectedClass.price,
-      qrCode: `QR-${Date.now()}-${selectedClass.id}`,
-      isGuest: isGuestBooking,
-      guestDetails: isGuestBooking ? guestDetails : undefined,
-      createdAt: new Date().toISOString()
-    };
+    try {
+      const created = await bookingService.createBooking({
+        sessionId: Number(selectedClass.id),
+        memberId: isGuestBooking ? undefined : Number(selectedMember?.id),
+        guestName: isGuestBooking ? guestDetails.name : undefined,
+        guestEmail: isGuestBooking ? guestDetails.email : undefined,
+        guestPhone: isGuestBooking ? guestDetails.phone : undefined
+      });
 
-    setBookings(prev => [...prev, newBooking]);
-    
-    // Show QR code immediately
-    setSelectedBooking(newBooking);
-    setShowQRDialog(true);
-    setShowBookingDialog(false);
-    
-    // Reset form
-    setBookingStep(1);
-    setSelectedMember(null);
-    setSelectedClass(null);
-    setIsGuestBooking(false);
-    setGuestDetails({ name: "", email: "", phone: "" });
-    
-    toast.success(`Booking confirmed! QR code generated for ${newBooking.memberName}`);
+      const mapped = mapBooking(created);
+      await Promise.all([fetchSessions(), fetchBookings(members)]);
+
+      setSelectedBooking(mapped);
+      setShowQRDialog(true);
+      setShowBookingDialog(false);
+
+      setBookingStep(1);
+      setSelectedMember(null);
+      setSelectedClass(null);
+      setIsGuestBooking(false);
+      setGuestDetails({ name: "", email: "", phone: "" });
+
+      toast.success(`Booking confirmed! QR code generated for ${mapped.memberName}`);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to create booking");
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -357,28 +324,96 @@ export function Bookings({ onNavigate }: BookingsProps) {
     }
   };
 
-  const handleStatusUpdate = (bookingId: string, newStatus: 'confirmed' | 'checked-in' | 'no-show' | 'cancelled') => {
-    setBookings(prev => prev.map(booking => 
-      booking.id === bookingId ? { ...booking, status: newStatus } : booking
-    ));
-    toast.success(`Booking status updated to ${newStatus}`);
+  const getTypeMeta = (type: string) => {
+    switch (type) {
+      case 'class':
+        return { label: 'Class', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' };
+      case 'pt':
+        return { label: 'PT', icon: Dumbbell, color: 'text-purple-600', bg: 'bg-purple-50' };
+      case 'facility':
+        return { label: 'Facility', icon: Building, color: 'text-emerald-600', bg: 'bg-emerald-50' };
+      default:
+        return { label: 'Session', icon: Calendar, color: 'text-slate-600', bg: 'bg-slate-50' };
+    }
+  };
+
+  const handleStatusUpdate = async (bookingId: string, newStatus: 'confirmed' | 'checked-in' | 'no-show' | 'cancelled') => {
+    try {
+      await bookingService.updateStatus(bookingId, newStatus);
+      await fetchBookings();
+      toast.success(`Booking status updated to ${newStatus}`);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update booking");
+    }
+  };
+
+  const handleDeleteBooking = (booking: Booking) => {
+    setBookingToDelete(booking);
+    setShowDeleteDialog(true);
+  };
+
+  const handleViewBooking = (booking: Booking) => {
+    setSelectedBooking(booking);
+    setShowQRDialog(true);
+  };
+
+  const handleViewPhoto = (url: string, name: string) => {
+    setPhotoToView({ url, name });
+    setShowPhotoDialog(true);
+  };
+
+  const handleConfirmDeleteBooking = async () => {
+    if (!bookingToDelete) return;
+    try {
+      await bookingService.deleteBooking(bookingToDelete.id);
+      await Promise.all([fetchBookings(members), fetchSessions()]);
+      toast.success("Booking deleted");
+      if (selectedBooking?.id === bookingToDelete.id) {
+        setShowQRDialog(false);
+        setSelectedBooking(null);
+      }
+      setShowDeleteDialog(false);
+      setBookingToDelete(null);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to delete booking");
+    }
+  };
+
+  const buildQrPayload = (booking: Booking) => {
+    const lines = [
+      "GYMBIOS_BOOKING",
+      `Booking ID: ${booking.id}`,
+      `Member: ${booking.memberName}`,
+      `Session: ${booking.className}`,
+      `Trainer: ${booking.instructor}`,
+      `Date: ${booking.date}`,
+      `Time: ${booking.time}`,
+      `Type: ${booking.type}`,
+      `Status: ${booking.status}`,
+      `Price: ${booking.price} AED`,
+      `Code: ${booking.qrCode || booking.id}`,
+    ];
+    if (booking.isGuest && booking.guestDetails) {
+      lines.push(`Guest: ${booking.guestDetails.name}`);
+      lines.push(`Guest Email: ${booking.guestDetails.email}`);
+      lines.push(`Guest Phone: ${booking.guestDetails.phone}`);
+    }
+    return lines.join("\n");
   };
 
   return (
-    <div className="p-6 space-y-6 min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: '#2B7A78' }}>
-            Bookings Management
-          </h1>
+          <h1 className="text-3xl font-bold">Bookings Management</h1>
           <p className="text-muted-foreground mt-1">
             Manage member & guest bookings with QR code access control
           </p>
         </div>
         <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
           <DialogTrigger asChild>
-            <Button className="shadow-lg" style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
+            <Button className="shadow-lg">
               <Plus className="h-4 w-4 mr-2" />
               New Booking
             </Button>
@@ -564,17 +599,20 @@ export function Bookings({ onNavigate }: BookingsProps) {
                   </div>
 
                   <div className="max-h-80 overflow-y-auto space-y-3">
-                    {filteredClasses.map((cls) => (
+                    {filteredClasses.map((cls) => {
+                      const availability = getAvailability(cls);
+                      const isFull = availability !== "available";
+                      return (
                       <div
                         key={cls.id}
                         className="p-4 border rounded-lg cursor-pointer transition-all"
                         style={{
-                          borderColor: selectedClass?.id === cls.id ? '#2B7A78' : cls.status === 'full' ? '#e5e7eb' : '#e5e7eb',
-                          backgroundColor: selectedClass?.id === cls.id ? '#2B7A7810' : cls.status === 'full' ? '#f9fafb' : '#ffffff',
-                          opacity: cls.status === 'full' ? 0.5 : 1,
-                          cursor: cls.status === 'full' ? 'not-allowed' : 'pointer'
+                          borderColor: selectedClass?.id === cls.id ? '#2B7A78' : '#e5e7eb',
+                          backgroundColor: selectedClass?.id === cls.id ? '#2B7A7810' : isFull ? '#f9fafb' : '#ffffff',
+                          opacity: isFull ? 0.5 : 1,
+                          cursor: isFull ? 'not-allowed' : 'pointer'
                         }}
-                        onClick={() => cls.status !== 'full' && setSelectedClass(cls)}
+                        onClick={() => !isFull && setSelectedClass(cls)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
@@ -584,13 +622,13 @@ export function Bookings({ onNavigate }: BookingsProps) {
                             <div>
                               <div className="font-medium flex items-center space-x-2">
                                 <span>{cls.name}</span>
-                                {cls.status === 'full' && <Badge variant="destructive">Full</Badge>}
+                                {isFull && <Badge variant="destructive">Full</Badge>}
                               </div>
                               <div className="text-sm text-gray-500">{cls.instructor}</div>
                               <div className="text-xs text-gray-400 flex items-center space-x-3">
                                 <span className="flex items-center">
                                   <Clock className="h-3 w-3 mr-1" />
-                                  {cls.time} ({cls.duration}min)
+                                  {cls.startTime} ({cls.duration}min)
                                 </span>
                                 <span className="flex items-center">
                                   <MapPin className="h-3 w-3 mr-1" />
@@ -608,7 +646,8 @@ export function Bookings({ onNavigate }: BookingsProps) {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div className="flex justify-between">
@@ -650,7 +689,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-gray-600">Date & Time:</span>
-                          <span className="font-medium">Today, {selectedClass.time}</span>
+                          <span className="font-medium">{selectedClass.date} {selectedClass.startTime}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-gray-600">Location:</span>
@@ -695,158 +734,214 @@ export function Bookings({ onNavigate }: BookingsProps) {
       </div>
 
       {/* Main Content */}
+      <style>{`
+        @keyframes tabSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: tabSlideIn 0.22s ease-out;
+        }
+      `}</style>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-white border" style={{ borderColor: '#2B7A7820' }}>
-          <TabsTrigger value="dashboard" className="data-[state=active]:text-white" style={{ '--active-bg': '#2B7A78' } as React.CSSProperties}>
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="classes" className="data-[state=active]:text-white" style={{ '--active-bg': '#2B7A78' } as React.CSSProperties}>
-            Available Sessions
-          </TabsTrigger>
-          <TabsTrigger value="bookings" className="data-[state=active]:text-white" style={{ '--active-bg': '#2B7A78' } as React.CSSProperties}>
-            All Bookings
-          </TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="dashboard" className="flex-1">Dashboard</TabsTrigger>
+          <TabsTrigger value="classes" className="flex-1">Available Sessions</TabsTrigger>
+          <TabsTrigger value="bookings" className="flex-1">All Bookings</TabsTrigger>
         </TabsList>
 
         {/* Dashboard Tab */}
-        <TabsContent value="dashboard" className="space-y-6">
-          {/* Row 1: Top Summary Cards */}
+        <TabsContent value="dashboard" className="space-y-6">          {/* Row 1: Top Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="overflow-hidden relative" style={{ borderColor: '#2B7A7820' }}>
-              <div className="absolute inset-0 opacity-95" style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)' }}></div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-center justify-between text-white">
-                  <div>
-                    <div className="text-3xl font-bold mb-1">
-                      {todaysBookings.length}
-                      <span className="text-lg ml-2 opacity-80">
-                        ↗ +2
-                      </span>
-                    </div>
-                    <div className="text-white/90 font-medium">Today's Bookings</div>
-                  </div>
-                  <Calendar className="h-8 w-8 text-white/80" />
+            <Card className={cardShell}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-primary">Today&apos;s Bookings</CardTitle>
+                <div className="bg-gradient-light p-2 rounded-lg">
+                  <Calendar className="h-4 w-4 text-primary" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-primary">{todaysBookings.length}</div>
+                <p className="text-xs text-muted-foreground">Bookings scheduled today</p>
               </CardContent>
             </Card>
 
-            <Card className="overflow-hidden relative" style={{ borderColor: '#2B7A7820' }}>
-              <div className="absolute inset-0 opacity-95" style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)' }}></div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-center justify-between text-white">
-                  <div>
-                    <div className="text-3xl font-bold mb-1">
-                      {bookings.filter(b => b.date === "2024-10-05").length + 4}
-                      <span className="text-lg ml-2 opacity-80">
-                        ↗ +1
-                      </span>
-                    </div>
-                    <div className="text-white/90 font-medium">Upcoming 24h</div>
-                  </div>
-                  <Clock className="h-8 w-8 text-white/80" />
+            <Card className={cardShell}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-primary">Upcoming</CardTitle>
+                <div className="bg-blue-50 p-2 rounded-lg">
+                  <Clock className="h-4 w-4 text-blue-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">{upcomingBookings}</div>
+                <p className="text-xs text-muted-foreground">Future bookings</p>
               </CardContent>
             </Card>
 
-            <Card className="overflow-hidden relative" style={{ borderColor: '#2B7A7820' }}>
-              <div className="absolute inset-0 opacity-95" style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)' }}></div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-center justify-between text-white">
-                  <div>
-                    <div className="text-3xl font-bold mb-1">
-                      {bookings.filter(b => b.isGuest).length}
-                      <span className="text-lg ml-2 opacity-80">
-                        ↗ +1
-                      </span>
-                    </div>
-                    <div className="text-white/90 font-medium">Guest Bookings</div>
-                  </div>
-                  <UserPlus className="h-8 w-8 text-white/80" />
+            <Card className={cardShell}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-primary">Guest Bookings</CardTitle>
+                <div className="bg-amber-50 p-2 rounded-lg">
+                  <UserPlus className="h-4 w-4 text-amber-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-600">{guestBookings}</div>
+                <p className="text-xs text-muted-foreground">Guests scheduled</p>
               </CardContent>
             </Card>
 
-            <Card className="overflow-hidden relative" style={{ borderColor: '#2B7A7820' }}>
-              <div className="absolute inset-0 opacity-95" style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)' }}></div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-center justify-between text-white">
-                  <div>
-                    <div className="text-3xl font-bold mb-1">
-                      {bookings.filter(b => b.status === 'cancelled' || b.status === 'no-show').length}
-                      <span className="text-lg ml-2 opacity-80">
-                        ↓ -1
-                      </span>
-                    </div>
-                    <div className="text-white/90 font-medium">Cancelled / No-Show</div>
-                  </div>
-                  <AlertCircle className="h-8 w-8 text-white/80" />
+            <Card className={cardShell}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-primary">Cancelled / No-Show</CardTitle>
+                <div className="bg-red-50 p-2 rounded-lg">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{cancelledBookings}</div>
+                <p className="text-xs text-muted-foreground">Issues to review</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Row 2: Quick Actions */}
-          <Card style={{ borderColor: '#2B7A7820' }}>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2" style={{ color: '#2B7A78' }}>
-                <Zap className="h-5 w-5" />
-                <span>Quick Actions</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Button 
-                  className="h-20 flex-col space-y-2"
-                  style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
-                  onClick={() => {
+                    {/* Row 2: Quick Actions */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 text-sm font-medium text-primary">
+              <Zap className="h-5 w-5" />
+              <span>Quick Actions</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card
+                className={`${cardShell} group cursor-pointer border-dashed border-primary/30 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary/30`}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setShowBookingDialog(true);
+                  setBookingStep(1);
+                  setIsGuestBooking(false);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
                     setShowBookingDialog(true);
                     setBookingStep(1);
                     setIsGuestBooking(false);
-                  }}
-                >
-                  <Plus className="h-6 w-6" />
-                  <span>New Booking</span>
-                </Button>
-                
-                <Button 
-                  className="h-20 flex-col space-y-2"
-                  style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
-                  onClick={() => {
+                  }
+                }}
+              >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-primary">New Booking</CardTitle>
+                <div className="bg-gradient-light p-2 rounded-lg">
+                  <Plus className="h-4 w-4 text-primary" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Create a member booking quickly</p>
+                <div className="mt-3 flex items-center text-xs text-primary">
+                  <span>Open action</span>
+                  <ArrowRight className="ml-1 h-3 w-3 transition-transform group-hover:translate-x-1" />
+                </div>
+              </CardContent>
+            </Card>
+
+              <Card
+                className={`${cardShell} group cursor-pointer border-dashed border-primary/30 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary/30`}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setSelectedBookingType('class');
+                  setActiveTab('classes');
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
                     setSelectedBookingType('class');
                     setActiveTab('classes');
-                  }}
-                >
-                  <Users className="h-6 w-6" />
-                  <span>Book Class</span>
-                </Button>
-                
-                <Button 
-                  className="h-20 flex-col space-y-2"
-                  style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
-                  onClick={() => {
+                  }
+                }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-primary">Book Class</CardTitle>
+                  <div className="bg-blue-50 p-2 rounded-lg">
+                    <Users className="h-4 w-4 text-blue-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">Browse available sessions</p>
+                  <div className="mt-3 flex items-center text-xs text-primary">
+                    <span>Open action</span>
+                    <ArrowRight className="ml-1 h-3 w-3 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`${cardShell} group cursor-pointer border-dashed border-primary/30 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary/30`}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setShowBookingDialog(true);
+                  setBookingStep(1);
+                  setIsGuestBooking(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
                     setShowBookingDialog(true);
                     setBookingStep(1);
                     setIsGuestBooking(true);
-                  }}
-                >
-                  <UserPlus className="h-6 w-6" />
-                  <span>Guest Booking</span>
-                </Button>
-                
-                <Button 
-                  className="h-20 flex-col space-y-2"
-                  style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
-                  onClick={() => {
+                  }
+                }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-primary">Guest Booking</CardTitle>
+                  <div className="bg-amber-50 p-2 rounded-lg">
+                    <UserPlus className="h-4 w-4 text-amber-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">Add a guest visit booking</p>
+                  <div className="mt-3 flex items-center text-xs text-primary">
+                    <span>Open action</span>
+                    <ArrowRight className="ml-1 h-3 w-3 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`${cardShell} group cursor-pointer border-dashed border-primary/30 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary/30`}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setSelectedBookingType('facility');
+                  setActiveTab('classes');
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
                     setSelectedBookingType('facility');
                     setActiveTab('classes');
-                  }}
-                >
-                  <Building className="h-6 w-6" />
-                  <span>Facility</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  }
+                }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-primary">Facility</CardTitle>
+                  <div className="bg-green-50 p-2 rounded-lg">
+                    <Building className="h-4 w-4 text-green-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">Reserve courts or facilities</p>
+                  <div className="mt-3 flex items-center text-xs text-primary">
+                    <span>Open action</span>
+                    <ArrowRight className="ml-1 h-3 w-3 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
 
           {/* Row 3: Upcoming Bookings Timeline */}
           <Card style={{ borderColor: '#2B7A7820' }}>
@@ -980,7 +1075,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                           <span className="text-sm font-medium">Group Classes</span>
                         </div>
                         <span className="text-sm text-gray-600">
-                          {bookings.filter(b => b.type === 'class').length} ({Math.round((bookings.filter(b => b.type === 'class').length / bookings.length) * 100)}%)
+                          {bookings.filter(b => b.type === 'class').length} ({bookings.length ? Math.round((bookings.filter(b => b.type === 'class').length / bookings.length) * 100) : 0}%)
                         </span>
                       </div>
                       
@@ -990,7 +1085,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                           <span className="text-sm font-medium">Personal Training</span>
                         </div>
                         <span className="text-sm text-gray-600">
-                          {bookings.filter(b => b.type === 'pt').length} ({Math.round((bookings.filter(b => b.type === 'pt').length / bookings.length) * 100)}%)
+                          {bookings.filter(b => b.type === 'pt').length} ({bookings.length ? Math.round((bookings.filter(b => b.type === 'pt').length / bookings.length) * 100) : 0}%)
                         </span>
                       </div>
                       
@@ -1000,7 +1095,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                           <span className="text-sm font-medium">Facility Bookings</span>
                         </div>
                         <span className="text-sm text-gray-600">
-                          {bookings.filter(b => b.type === 'facility').length} ({Math.round((bookings.filter(b => b.type === 'facility').length / bookings.length) * 100)}%)
+                          {bookings.filter(b => b.type === 'facility').length} ({bookings.length ? Math.round((bookings.filter(b => b.type === 'facility').length / bookings.length) * 100) : 0}%)
                         </span>
                       </div>
                     </div>
@@ -1011,7 +1106,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
           </div>
 
           {/* Bottom Section: Alerts & Notifications */}
-          <Card className="border-primary/10">
+          <Card className="border-primary/10 overflow-hidden">
             <CardHeader>
               <CardTitle className="text-primary flex items-center space-x-2">
                 <AlertCircle className="h-5 w-5" />
@@ -1058,7 +1153,10 @@ export function Bookings({ onNavigate }: BookingsProps) {
 
                 {bookings.length === 0 && (
                   <div className="text-center py-4 text-gray-500">
-                    No alerts at this time. All bookings are running smoothly! ✅
+                    <div className="inline-flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span>No alerts at this time. All bookings are running smoothly.</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1074,9 +1172,11 @@ export function Bookings({ onNavigate }: BookingsProps) {
               <Input
                 placeholder="Search sessions..."
                 className="pl-10"
+                value={sessionSearchTerm}
+                onChange={(e) => setSessionSearchTerm(e.target.value)}
               />
             </div>
-            <Select defaultValue="all">
+            <Select value={selectedBookingType} onValueChange={(value) => setSelectedBookingType(value as 'all' | 'class' | 'pt' | 'facility')}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
@@ -1087,19 +1187,43 @@ export function Bookings({ onNavigate }: BookingsProps) {
                 <SelectItem value="facility">Facility Booking</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (onNavigate) {
+                  onNavigate("trainings-classes");
+                } else {
+                  window.location.href = "/trainings-classes";
+                }
+              }}
+            >
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              View Calendar
+            </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {trialClasses.map((cls) => (
-              <Card key={cls.id} className={`border-primary/10 transition-all hover:shadow-md ${cls.status === 'full' ? 'opacity-50' : ''}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filteredClasses.map((cls) => {
+              const typeMeta = getTypeMeta(cls.type);
+              const TypeIcon = typeMeta.icon;
+              const availability = getAvailability(cls);
+              const isFull = availability !== "available";
+              return (
+              <Card key={cls.id} className={`border-primary/10 transition-all hover:shadow-md ${isFull ? 'opacity-50' : ''}`}>
                 <CardContent className="p-4">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-primary text-white flex items-center justify-center">
-                        {getTypeIcon(cls.type)}
+                      <div className={`w-10 h-10 rounded-lg ${typeMeta.bg} flex items-center justify-center`}>
+                        <TypeIcon className={`h-5 w-5 ${typeMeta.color}`} />
                       </div>
-                      <Badge variant={cls.status === 'available' ? 'default' : 'destructive'}>
-                        {cls.status}
+                      <Badge className={
+                        availability === 'available'
+                          ? 'bg-green-100 text-green-700'
+                          : availability === 'full'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }>
+                        {availability}
                       </Badge>
                     </div>
                     
@@ -1110,15 +1234,15 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     
                     <div className="space-y-2 text-sm text-gray-500">
                       <div className="flex items-center">
-                        <Clock className="h-4 w-4 mr-2" />
-                        {cls.time} ({cls.duration} minutes)
+                        <Clock className="h-4 w-4 mr-2 text-blue-600" />
+                        {cls.startTime} ({cls.duration} minutes)
                       </div>
                       <div className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-2" />
+                        <MapPin className="h-4 w-4 mr-2 text-amber-600" />
                         {cls.location}
                       </div>
                       <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-2" />
+                        <Users className="h-4 w-4 mr-2 text-emerald-600" />
                         {cls.booked}/{cls.capacity} participants
                       </div>
                     </div>
@@ -1128,7 +1252,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                       <Button 
                         size="sm" 
                         className="btn-primary"
-                        disabled={cls.status === 'full'}
+                        disabled={isFull}
                         onClick={() => {
                           setSelectedClass(cls);
                           setShowBookingDialog(true);
@@ -1141,7 +1265,13 @@ export function Bookings({ onNavigate }: BookingsProps) {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
+            {filteredClasses.length === 0 && (
+              <div className="col-span-full text-center text-sm text-gray-500 py-10">
+                No sessions found. Create a new session in Trainings & Classes.
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -1153,9 +1283,11 @@ export function Bookings({ onNavigate }: BookingsProps) {
               <Input
                 placeholder="Search bookings..."
                 className="pl-10"
+                value={bookingSearchTerm}
+                onChange={(e) => setBookingSearchTerm(e.target.value)}
               />
             </div>
-            <Select defaultValue="all">
+            <Select value={bookingStatusFilter} onValueChange={(value) => setBookingStatusFilter(value as 'all' | 'confirmed' | 'checked-in' | 'no-show' | 'cancelled')}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -1169,72 +1301,86 @@ export function Bookings({ onNavigate }: BookingsProps) {
             </Select>
           </div>
 
-          <Card className="border-primary/10">
+          <Card className="border-primary/10 overflow-hidden">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
+              <div className="overflow-hidden rounded-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
                   <thead className="bg-gradient-light">
                     <tr>
-                      <th className="text-left p-4 font-medium text-primary">Member</th>
-                      <th className="text-left p-4 font-medium text-primary">Session</th>
-                      <th className="text-left p-4 font-medium text-primary">Date & Time</th>
-                      <th className="text-left p-4 font-medium text-primary">Type</th>
-                      <th className="text-left p-4 font-medium text-primary">Price</th>
-                      <th className="text-left p-4 font-medium text-primary">Status</th>
-                      <th className="text-left p-4 font-medium text-primary">Actions</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-primary uppercase tracking-wide">Member</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-primary uppercase tracking-wide">Session</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-primary uppercase tracking-wide">Date & Time</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-primary uppercase tracking-wide">Type</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-primary uppercase tracking-wide">Price</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-primary uppercase tracking-wide">Status</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-primary uppercase tracking-wide">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {bookings.map((booking) => (
+                    {filteredBookings.map((booking) => (
                       <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="p-4">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-full bg-gradient-primary text-white flex items-center justify-center text-xs font-medium">
-                              {booking.memberName.split(' ').map(n => n[0]).join('')}
+                        <td className="px-3 py-2">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-7 h-7 rounded-full bg-gradient-primary text-white flex items-center justify-center text-[10px] font-medium overflow-hidden">
+                              {booking.memberAvatar ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewPhoto(booking.memberAvatar!, booking.memberName)}
+                                  className="h-full w-full focus:outline-none"
+                                  title="View photo"
+                                >
+                                  <img
+                                    src={booking.memberAvatar}
+                                    alt={booking.memberName}
+                                    className="h-full w-full object-cover"
+                                  />
+                                </button>
+                              ) : (
+                                booking.memberName.split(' ').map(n => n[0]).join('')
+                              )}
                             </div>
                             <div>
-                              <div className="font-medium">{booking.memberName}</div>
+                              <div className="text-sm font-medium">{booking.memberName}</div>
                               {booking.isGuest && (
-                                <div className="text-xs text-gray-500">Guest Booking</div>
+                                <div className="text-[11px] text-gray-500">Guest Booking</div>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="p-4">
+                        <td className="px-3 py-2">
                           <div>
-                            <div className="font-medium">{booking.className}</div>
-                            <div className="text-sm text-gray-500">{booking.instructor}</div>
+                            <div className="text-sm font-medium">{booking.className}</div>
+                            <div className="text-xs text-gray-500">{booking.instructor}</div>
                           </div>
                         </td>
-                        <td className="p-4">
+                        <td className="px-3 py-2">
                           <div>
-                            <div className="font-medium">{booking.date}</div>
-                            <div className="text-sm text-gray-500">{booking.time}</div>
+                            <div className="text-sm font-medium">{booking.date}</div>
+                            <div className="text-xs text-gray-500">{booking.time}</div>
                           </div>
                         </td>
-                        <td className="p-4">
-                          <div className="flex items-center space-x-1">
+                        <td className="px-3 py-2">
+                          <div className="flex items-center space-x-1 text-sm">
                             {getTypeIcon(booking.type)}
                             <span className="capitalize">{booking.type}</span>
                           </div>
                         </td>
-                        <td className="p-4">
-                          <span className="font-medium text-primary">{booking.price} AED</span>
+                        <td className="px-3 py-2">
+                          <span className="text-sm font-medium text-primary">{booking.price} AED</span>
                         </td>
-                        <td className="p-4">
-                          <Badge className={getStatusColor(booking.status)}>
+                        <td className="px-3 py-2">
+                          <Badge className={`${getStatusColor(booking.status)} text-xs`}>
                             {booking.status}
                           </Badge>
                         </td>
-                        <td className="p-4">
+                        <td className="px-3 py-2">
                           <div className="flex items-center space-x-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => {
-                                setSelectedBooking(booking);
-                                setShowQRDialog(true);
-                              }}
+                              className="h-7 w-7 p-0"
+                              onClick={() => handleViewBooking(booking)}
                             >
                               <QrCode className="h-4 w-4" />
                             </Button>
@@ -1242,17 +1388,34 @@ export function Bookings({ onNavigate }: BookingsProps) {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                className="h-7 w-7 p-0"
                                 onClick={() => handleStatusUpdate(booking.id, 'checked-in')}
                               >
                                 <CheckCircle className="h-4 w-4" />
                               </Button>
                             )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 w-7 p-0"
+                              onClick={() => handleDeleteBooking(booking)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
                     ))}
+                    {filteredBookings.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-3 py-6 text-center text-sm text-gray-500">
+                          No bookings match the current filters.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1263,7 +1426,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
       <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-center bg-gradient-primary bg-clip-text text-transparent">
+            <DialogTitle className="text-center text-primary">
               Booking Confirmation
             </DialogTitle>
             <DialogDescription className="text-center">
@@ -1276,9 +1439,13 @@ export function Bookings({ onNavigate }: BookingsProps) {
               <Card className="border-primary/20">
                 <CardContent className="p-4 text-center">
                   <div className="w-48 h-48 mx-auto bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center mb-4">
-                    <div className="text-6xl">
-                      <QrCode className="h-24 w-24 text-primary" />
-                    </div>
+                    <QRCode
+                      value={buildQrPayload(selectedBooking)}
+                      size={176}
+                      bgColor="#FFFFFF"
+                      fgColor="#1f2937"
+                      level="M"
+                    />
                   </div>
                   <div className="font-mono text-sm bg-gray-100 p-2 rounded">
                     {selectedBooking.qrCode}
@@ -1338,6 +1505,88 @@ export function Bookings({ onNavigate }: BookingsProps) {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Booking Dialog */}
+      <Dialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDialog(open);
+          if (!open) {
+            setBookingToDelete(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-primary">
+              Delete Booking
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              This action cannot be undone. The booking will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {bookingToDelete && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-primary/10 bg-primary/5 p-4 text-sm">
+                <div className="font-medium text-gray-900">{bookingToDelete.memberName}</div>
+                <div className="text-gray-600">{bookingToDelete.className}</div>
+                <div className="text-xs text-gray-500">
+                  {bookingToDelete.date} at {bookingToDelete.time}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowDeleteDialog(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                  onClick={handleConfirmDeleteBooking}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* View Photo Dialog */}
+      <Dialog
+        open={showPhotoDialog}
+        onOpenChange={(open) => {
+          setShowPhotoDialog(open);
+          if (!open) {
+            setPhotoToView(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-primary">
+              Member Photo
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {photoToView?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {photoToView && (
+            <div className="flex justify-center">
+              <img
+                src={photoToView.url}
+                alt={photoToView.name}
+                className="max-h-[420px] w-auto rounded-lg border border-primary/10 object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Floating Action Button */}
       <div className="fixed bottom-6 right-6 z-50">
         <Button 
@@ -1353,4 +1602,9 @@ export function Bookings({ onNavigate }: BookingsProps) {
     </div>
   );
 }
+
+
+
+
+
 
