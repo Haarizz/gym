@@ -410,43 +410,102 @@ export function ProductionRecipe() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ChefHat className="h-6 w-6" /> Production & Recipes
-          </h1>
+          <h1 className="text-3xl font-bold">Production & Recipes</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Manage recipes, ingredients, and production runs
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => { loadRecipes(1); loadOrders(1); loadStats(); }}>
+          <Button variant="outline" size="sm" className="h-9" onClick={() => { loadRecipes(1); loadOrders(1); loadStats(); }}>
             <RefreshCw className="mr-2 h-4 w-4" /> Refresh
           </Button>
-          <Button onClick={openCreateRecipe}>
+          <Button size="sm" className="h-9" onClick={openCreateRecipe}>
             <Plus className="mr-2 h-4 w-4" /> New Recipe
           </Button>
-          <Button variant="secondary" onClick={() => openCreateOrder()}>
+          <Button variant="secondary" size="sm" className="h-9" onClick={() => openCreateOrder()}>
             <ListOrdered className="mr-2 h-4 w-4" /> New Order
           </Button>
         </div>
       </div>
 
+      <style>{`
+        @keyframes prFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: prFadeIn 0.22s ease-out;
+        }
+      `}</style>
+
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         {[
-          { label: 'Total Recipes',    value: stats?.totalRecipes ?? 0,      icon: ChefHat,       color: 'text-purple-500' },
-          { label: 'Active Recipes',   value: stats?.activeRecipes ?? 0,     icon: CheckCircle,   color: 'text-green-500' },
-          { label: 'Total Orders',     value: stats?.totalOrders ?? 0,       icon: ListOrdered,   color: 'text-blue-500' },
-          { label: 'In Progress',      value: stats?.inProgressOrders ?? 0,  icon: Play,          color: 'text-orange-500' },
-          { label: 'Completed',        value: stats?.completedOrders ?? 0,   icon: CheckCircle,   color: 'text-green-600' },
-          { label: 'Draft Orders',     value: stats?.draftOrders ?? 0,       icon: Clock,         color: 'text-gray-500' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label}>
-            <CardContent className="pt-3 pb-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Icon className={`h-3.5 w-3.5 ${color}`} />
-                <p className="text-xs text-muted-foreground">{label}</p>
+          {
+            label: 'Total Recipes',
+            value: stats?.totalRecipes ?? 0,
+            icon: ChefHat,
+            iconBg: 'bg-emerald-50',
+            iconColor: 'text-emerald-600',
+            valueClass: 'text-emerald-700',
+            subtext: 'All recipes',
+          },
+          {
+            label: 'Active Recipes',
+            value: stats?.activeRecipes ?? 0,
+            icon: CheckCircle,
+            iconBg: 'bg-green-50',
+            iconColor: 'text-green-600',
+            valueClass: 'text-green-700',
+            subtext: 'Currently active',
+          },
+          {
+            label: 'Total Orders',
+            value: stats?.totalOrders ?? 0,
+            icon: ListOrdered,
+            iconBg: 'bg-blue-50',
+            iconColor: 'text-blue-600',
+            valueClass: 'text-blue-700',
+            subtext: 'All production runs',
+          },
+          {
+            label: 'In Progress',
+            value: stats?.inProgressOrders ?? 0,
+            icon: Play,
+            iconBg: 'bg-orange-50',
+            iconColor: 'text-orange-600',
+            valueClass: 'text-orange-700',
+            subtext: 'Running now',
+          },
+          {
+            label: 'Completed',
+            value: stats?.completedOrders ?? 0,
+            icon: CheckCircle,
+            iconBg: 'bg-emerald-50',
+            iconColor: 'text-emerald-600',
+            valueClass: 'text-emerald-700',
+            subtext: 'Finished runs',
+          },
+          {
+            label: 'Draft Orders',
+            value: stats?.draftOrders ?? 0,
+            icon: Clock,
+            iconBg: 'bg-slate-100',
+            iconColor: 'text-slate-600',
+            valueClass: 'text-slate-700',
+            subtext: 'Awaiting start',
+          },
+        ].map(({ label, value, icon: Icon, iconBg, iconColor, valueClass, subtext }) => (
+          <Card key={label} className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">{label}</CardTitle>
+              <div className={`p-2 rounded-lg ${iconBg}`}>
+                <Icon className={`h-4 w-4 ${iconColor}`} />
               </div>
-              <p className="text-2xl font-bold">{value}</p>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${valueClass}`}>{value}</div>
+              <p className="text-xs text-muted-foreground mt-1">{subtext}</p>
             </CardContent>
           </Card>
         ))}
@@ -454,43 +513,60 @@ export function ProductionRecipe() {
 
       {/* Tabs */}
       <Tabs defaultValue="recipes">
-        <TabsList>
-          <TabsTrigger value="recipes"><ChefHat className="mr-1.5 h-3.5 w-3.5" />Recipes</TabsTrigger>
-          <TabsTrigger value="orders"><ListOrdered className="mr-1.5 h-3.5 w-3.5" />Production Orders</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="recipes" className="flex-1"><ChefHat className="mr-1.5 h-3.5 w-3.5" />Recipes</TabsTrigger>
+          <TabsTrigger value="orders" className="flex-1"><ListOrdered className="mr-1.5 h-3.5 w-3.5" />Production Orders</TabsTrigger>
         </TabsList>
 
         {/* ── Recipes Tab ─────────────────────────────────────────────────── */}
         <TabsContent value="recipes" className="space-y-4 mt-4">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search recipes..." className="pl-8"
-                value={recipeSearch} onChange={e => setRecipeSearch(e.target.value)} />
-            </div>
-            <Select value={recipeStatus} onValueChange={setRecipeStatus}>
-              <SelectTrigger className="w-[150px]"><SelectValue placeholder="All Status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="INACTIVE">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search recipes..."
+                    className="pl-11 h-10"
+                    value={recipeSearch}
+                    onChange={e => setRecipeSearch(e.target.value)}
+                  />
+                </div>
+                <Select value={recipeStatus} onValueChange={setRecipeStatus}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
           {loading ? (
-            <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">Loading recipes...</div>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                Loading recipes...
+              </CardContent>
+            </Card>
           ) : recipes.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="flex flex-col items-center justify-center py-20 px-6 text-muted-foreground text-center">
                 <ChefHat className="h-10 w-10 mb-3 opacity-30" />
                 <p className="font-medium">No recipes found</p>
-                <Button className="mt-4" onClick={openCreateRecipe}><Plus className="mr-2 h-4 w-4" />New Recipe</Button>
+                <p className="text-sm mt-2">Create your first recipe to start a production run.</p>
+                <Button className="mt-4" onClick={openCreateRecipe}>
+                  <Plus className="mr-2 h-4 w-4" /> New Recipe
+                </Button>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {recipes.map(r => (
-                <Card key={r.id} className="hover:shadow-md transition-shadow">
+                <Card key={r.id} className="border-primary/10 shadow-md hover:shadow-lg transition-all">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -576,40 +652,51 @@ export function ProductionRecipe() {
 
         {/* ── Orders Tab ──────────────────────────────────────────────────── */}
         <TabsContent value="orders" className="space-y-4 mt-4">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search order number, recipe..." className="pl-8"
-                value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
-            </div>
-            <Select value={orderStatus} onValueChange={setOrderStatus}>
-              <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="DRAFT">Draft</SelectItem>
-                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                <SelectItem value="COMPLETED">Completed</SelectItem>
-                <SelectItem value="CANCELLED">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search order number, recipe..."
+                    className="pl-11 h-10"
+                    value={orderSearch}
+                    onChange={e => setOrderSearch(e.target.value)}
+                  />
+                </div>
+                <Select value={orderStatus} onValueChange={setOrderStatus}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             {loading ? (
               <CardContent className="flex items-center justify-center h-40 text-muted-foreground text-sm">
                 Loading orders...
               </CardContent>
             ) : orders.length === 0 ? (
-              <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <CardContent className="flex flex-col items-center justify-center py-20 px-6 text-muted-foreground text-center">
                 <ListOrdered className="h-10 w-10 mb-3 opacity-30" />
                 <p className="font-medium">No production orders found</p>
+                <p className="text-sm mt-2">Create a new order to start production.</p>
                 <Button className="mt-4" onClick={() => openCreateOrder()}>
                   <Plus className="mr-2 h-4 w-4" /> New Order
                 </Button>
               </CardContent>
             ) : (
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50/50">
                   <TableRow>
                     <TableHead>Order #</TableHead>
                     <TableHead>Recipe</TableHead>
@@ -623,7 +710,7 @@ export function ProductionRecipe() {
                 </TableHeader>
                 <TableBody>
                   {orders.map(o => (
-                    <TableRow key={o.id}>
+                    <TableRow key={o.id} className="hover:bg-muted/50">
                       <TableCell className="font-mono text-sm font-medium">{o.orderNumber}</TableCell>
                       <TableCell className="font-medium">{o.recipeName}</TableCell>
                       <TableCell className="text-right text-sm">{o.quantityToProduce} {o.outputUnit}</TableCell>
@@ -870,9 +957,14 @@ export function ProductionRecipe() {
           <DialogHeader><DialogTitle>Select Ingredient</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search by name or SKU..." className="pl-8" autoFocus
-                value={ingSearchQ} onChange={e => setIngSearchQ(e.target.value)} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or SKU..."
+                className="pl-11 h-10"
+                autoFocus
+                value={ingSearchQ}
+                onChange={e => setIngSearchQ(e.target.value)}
+              />
             </div>
             <ScrollArea className="h-52 border rounded-lg">
               {filteredIngProducts.length === 0 ? (

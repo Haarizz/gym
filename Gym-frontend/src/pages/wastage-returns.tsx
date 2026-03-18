@@ -498,68 +498,84 @@ export function WastageReturns() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ArrowLeftRight className="h-6 w-6" /> Wastage & Returns
-          </h1>
+          <h1 className="text-3xl font-bold">Wastage & Returns</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Track damaged goods, expired items and supplier/customer returns
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={exportCsv}>
+          <Button variant="outline" size="sm" className="h-9" onClick={exportCsv}>
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
-          <Button onClick={openCreate}>
+          <Button size="sm" className="h-9" onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" /> New Voucher
           </Button>
         </div>
       </div>
 
+      <style>{`
+        @keyframes wrFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: wrFadeIn 0.22s ease-out;
+        }
+      `}</style>
+
       {/* Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <ClipboardList className="h-4 w-4 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Total Vouchers</p>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Vouchers</CardTitle>
+            <div className="bg-gradient-light p-2 rounded-lg">
+              <ClipboardList className="h-4 w-4 text-primary" />
             </div>
-            <p className="text-2xl font-bold">{stats?.totalVouchers ?? totalVouchers}</p>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{stats?.totalVouchers ?? totalVouchers}</div>
             <p className="text-xs text-muted-foreground mt-1">
               {stats?.pendingApproval ?? 0} pending approval
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingDown className="h-4 w-4 text-orange-500" />
-              <p className="text-xs text-muted-foreground">Wastage Value</p>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Wastage Value</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <TrendingDown className="h-4 w-4 text-orange-600" />
             </div>
-            <p className="text-2xl font-bold">AED {fmt(stats?.totalWastageValue ?? 0)}</p>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">AED {fmt(stats?.totalWastageValue ?? 0)}</div>
             <p className="text-xs text-muted-foreground mt-1">
               This month: AED {fmt(stats?.monthlyWastage ?? 0)}
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-purple-500" />
-              <p className="text-xs text-muted-foreground">Returns Value</p>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Returns Value</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-purple-600" />
             </div>
-            <p className="text-2xl font-bold">AED {fmt(stats?.totalReturnValue ?? 0)}</p>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">AED {fmt(stats?.totalReturnValue ?? 0)}</div>
             <p className="text-xs text-muted-foreground mt-1">
               This month: AED {fmt(stats?.monthlyReturns ?? 0)}
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <p className="text-xs text-muted-foreground">Pending Approval</p>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Pending Approval</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
             </div>
-            <p className="text-2xl font-bold">{stats?.pendingApproval ?? 0}</p>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{stats?.pendingApproval ?? 0}</div>
             <p className="text-xs text-muted-foreground mt-1">Require action</p>
           </CardContent>
         </Card>
@@ -567,72 +583,76 @@ export function WastageReturns() {
 
       {/* Tabs */}
       <Tabs defaultValue="vouchers">
-        <TabsList>
-          <TabsTrigger value="vouchers"><ClipboardList className="mr-1.5 h-3.5 w-3.5" />Vouchers</TabsTrigger>
-          <TabsTrigger value="analytics"><BarChart3 className="mr-1.5 h-3.5 w-3.5" />Analytics</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="vouchers" className="flex-1"><ClipboardList className="mr-1.5 h-3.5 w-3.5" />Vouchers</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1"><BarChart3 className="mr-1.5 h-3.5 w-3.5" />Analytics</TabsTrigger>
         </TabsList>
 
         {/* ── Vouchers Tab ─────────────────────────────────────────────────── */}
         <TabsContent value="vouchers" className="space-y-4 mt-4">
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search voucher number, reason, location..."
-                className="pl-8"
+                className="pl-11 h-10"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
             </div>
-            <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="WASTAGE">Wastage</SelectItem>
-                <SelectItem value="GOODS_RETURN">Goods Return</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="DRAFT">Draft</SelectItem>
-                <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
-                <SelectItem value="APPROVED">Approved</SelectItem>
-                <SelectItem value="COMPLETED">Completed</SelectItem>
-                <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                <SelectItem value="REJECTED">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" onClick={() => loadData(1)} title="Refresh">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </div>
+                <Select value={selectedType} onValueChange={setSelectedType}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="WASTAGE">Wastage</SelectItem>
+                    <SelectItem value="GOODS_RETURN">Goods Return</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
+                    <SelectItem value="APPROVED">Approved</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                    <SelectItem value="REJECTED">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="ghost" size="icon" onClick={() => loadData(1)} title="Refresh">
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Table */}
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             {loading ? (
               <CardContent className="flex items-center justify-center h-40 text-muted-foreground text-sm">
                 Loading vouchers...
               </CardContent>
             ) : vouchers.length === 0 ? (
-              <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <ArrowLeftRight className="h-10 w-10 mb-3 opacity-30" />
+              <CardContent className="flex flex-col items-center justify-center py-20 px-6 text-muted-foreground text-center">
+                <ArrowLeftRight className="h-10 w-10 mb-4 opacity-30" />
                 <p className="font-medium">No vouchers found</p>
-                <p className="text-sm mt-1">Create your first wastage or return voucher</p>
+                <p className="text-sm mt-2">Create your first wastage or return voucher</p>
                 <Button className="mt-4" onClick={openCreate}>
                   <Plus className="mr-2 h-4 w-4" /> New Voucher
                 </Button>
               </CardContent>
             ) : (
               <Table>
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Voucher #</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
@@ -646,7 +666,7 @@ export function WastageReturns() {
                 </TableHeader>
                 <TableBody>
                   {vouchers.map(v => (
-                    <TableRow key={v.id}>
+                    <TableRow key={v.id} className="hover:bg-slate-50/50 transition-colors">
                       <TableCell className="font-mono text-sm font-medium">{v.voucherNumber}</TableCell>
                       <TableCell className="text-sm">{v.date}</TableCell>
                       <TableCell>{typeBadge(v.type)}</TableCell>
@@ -733,7 +753,7 @@ export function WastageReturns() {
         {/* ── Analytics Tab ─────────────────────────────────────────────────── */}
         <TabsContent value="analytics" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <TrendingDown className="h-4 w-4 text-orange-500" /> Top Wasted Products
@@ -761,7 +781,7 @@ export function WastageReturns() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-purple-500" /> Return Reasons Analysis
@@ -1004,10 +1024,10 @@ export function WastageReturns() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name or SKU..."
-                className="pl-8"
+                className="pl-11 h-10"
                 value={productSearchQuery}
                 onChange={e => setProductSearchQuery(e.target.value)}
                 autoFocus

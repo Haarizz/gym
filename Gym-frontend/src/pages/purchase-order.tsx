@@ -15,7 +15,6 @@ import { Textarea } from "../components/ui/textarea";
 import { Checkbox } from "../components/ui/checkbox";
 import { Switch } from "../components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
@@ -75,7 +74,9 @@ import {
   Archive,
   RotateCcw,
   Zap,
-  Crown
+  Crown,
+  Grid3X3,
+  List
 } from 'lucide-react';
 import { toast } from "sonner";
 import { format, addDays, subDays, isToday, isYesterday, isTomorrow, addWeeks, startOfMonth, endOfMonth } from "date-fns";
@@ -187,6 +188,7 @@ export function PurchaseOrder() {
   const [isExporting, setIsExporting] = useState(false);
   const [showSupplierSelector, setShowSupplierSelector] = useState(false);
   const [showProductSelector, setShowProductSelector] = useState(false);
+  const [ordersView, setOrdersView] = useState<'table' | 'grid'>('table');
 
   // API-loaded data
   const [suppliers, setSuppliers] = useState<SupplierType[]>([]);
@@ -402,6 +404,12 @@ export function PurchaseOrder() {
     setCurrentStep(1);
     setEditingOrder(null);
   }, []);
+
+  const openCreateOrder = useCallback(() => {
+    setIsCreatingOrder(true);
+    resetForm();
+    setShowOrderForm(true);
+  }, [resetForm]);
 
   // Supplier handlers
   const openCreateSupplier = useCallback(() => {
@@ -634,114 +642,122 @@ export function PurchaseOrder() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => {
-            setIsCreatingOrder(true);
-            resetForm();
-            setShowOrderForm(true);
-          }}>
+          <Button onClick={openCreateOrder}>
             <Plus className="mr-2 h-4 w-4" />
             Create New PO
           </Button>
         </div>
       </div>
 
+      <style>{`
+        @keyframes poFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: poFadeIn 0.22s ease-out;
+        }
+        .po-panel {
+          animation: poFadeIn 0.22s ease-out;
+        }
+      `}</style>
+
+      {/* Analytics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total POs</CardTitle>
+            <div className="bg-gradient-light p-2 rounded-lg">
+              <ClipboardList className="h-4 w-4 text-primary" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{analytics.totalOrders}</div>
+            <p className="text-xs text-muted-foreground">This month</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Pending Approvals</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <Clock className="h-4 w-4 text-yellow-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{analytics.pendingApprovals}</div>
+            <p className="text-xs text-muted-foreground">Need approval</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Monthly Spend</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <DollarSign className="h-4 w-4 text-green-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">AED {analytics.totalSpendThisMonth.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">This month</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Top Supplier</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <Building className="h-4 w-4 text-purple-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold text-purple-600 truncate">{analytics.topSupplier}</div>
+            <p className="text-xs text-muted-foreground">Most orders</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Urgent Orders</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{analytics.urgentOrders}</div>
+            <p className="text-xs text-muted-foreground">High priority</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Overdue</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <Truck className="h-4 w-4 text-orange-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{analytics.overdueOrders}</div>
+            <p className="text-xs text-muted-foreground">Past due date</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="orders">
+        <TabsList className="w-full flex">
+          <TabsTrigger value="orders" className="flex-1">
             <ClipboardList className="h-4 w-4 mr-2" />
             Purchase Orders
           </TabsTrigger>
-          <TabsTrigger value="suppliers">
+          <TabsTrigger value="suppliers" className="flex-1">
             <Building className="h-4 w-4 mr-2" />
             Suppliers
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="orders" className="space-y-6">
-
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total POs</p>
-                <p className="text-2xl font-bold">{analytics.totalOrders}</p>
-                <p className="text-sm text-muted-foreground">This month</p>
-              </div>
-              <ClipboardList className="h-6 w-6 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending Approvals</p>
-                <p className="text-2xl font-bold text-yellow-600">{analytics.pendingApprovals}</p>
-                <p className="text-sm text-muted-foreground">Need approval</p>
-              </div>
-              <Clock className="h-6 w-6 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Monthly Spend</p>
-                <p className="text-2xl font-bold text-green-600">AED {analytics.totalSpendThisMonth.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">This month</p>
-              </div>
-              <DollarSign className="h-6 w-6 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Top Supplier</p>
-                <p className="text-lg font-bold text-purple-600">{analytics.topSupplier}</p>
-                <p className="text-sm text-muted-foreground">Most orders</p>
-              </div>
-              <Building className="h-6 w-6 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Urgent Orders</p>
-                <p className="text-2xl font-bold text-red-600">{analytics.urgentOrders}</p>
-                <p className="text-sm text-muted-foreground">High priority</p>
-              </div>
-              <AlertTriangle className="h-6 w-6 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Overdue</p>
-                <p className="text-2xl font-bold text-orange-600">{analytics.overdueOrders}</p>
-                <p className="text-sm text-muted-foreground">Past due date</p>
-              </div>
-              <Truck className="h-6 w-6 text-orange-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Filters */}
-      <Card>
+      <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
             <div className="flex-1 min-w-[250px]">
@@ -756,7 +772,7 @@ export function PurchaseOrder() {
               </div>
             </div>
 
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-center">
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Status" />
@@ -801,13 +817,32 @@ export function PurchaseOrder() {
               </Select>
 
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               >
                 <Filter className="mr-2 h-4 w-4" />
                 Advanced
               </Button>
+
+              <div className="flex border rounded-md overflow-hidden">
+                <Button
+                  variant={ordersView === "table" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none h-10 px-3"
+                  onClick={() => setOrdersView("table")}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={ordersView === "grid" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none h-10 px-3"
+                  onClick={() => setOrdersView("grid")}
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -844,7 +879,8 @@ export function PurchaseOrder() {
       </Card>
 
       {/* Purchase Orders Table */}
-      <Card>
+      {ordersView === "table" && (
+      <Card className="po-panel border-primary/10 shadow-md hover:shadow-lg transition-shadow">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -854,7 +890,7 @@ export function PurchaseOrder() {
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="ghost" size="sm">
                 <Settings className="mr-2 h-4 w-4" />
                 Columns
               </Button>
@@ -862,344 +898,591 @@ export function PurchaseOrder() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedOrders(filteredOrders.map(po => String(po.id)));
-                        } else {
-                          setSelectedOrders([]);
-                        }
-                      }}
-                    />
-                  </TableHead>
-                  <TableHead>PO Number</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Order Date</TableHead>
-                  <TableHead>Expected Delivery</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Total Amount</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => {
-                  const orderDateObj = order.orderDate ? new Date(order.orderDate) : null;
-                  const expDateObj = order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : null;
-                  const orderStatus = order.status?.toLowerCase() ?? '';
-                  const orderPriority = order.priority?.toLowerCase() ?? '';
-                  const isOverdue = expDateObj && expDateObj < new Date() && orderStatus !== 'received' && orderStatus !== 'cancelled';
-                  return (
-                  <TableRow
-                    key={order.id}
-                    className={cn(
-                      orderPriority === 'urgent' && "bg-red-50 dark:bg-red-950/20",
-                      orderStatus === 'pending_approval' && "bg-yellow-50 dark:bg-yellow-950/20",
-                      isOverdue && "bg-orange-50 dark:bg-orange-950/20"
-                    )}
-                  >
-                    <TableCell>
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredOrders.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
+              <p className="font-medium">No purchases found</p>
+              <p className="text-sm mb-4">Create your first purchase to get started</p>
+              <Button onClick={openCreateOrder}>
+                <Plus className="mr-2 h-4 w-4" /> New Purchase
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-12">
                       <Checkbox
-                        checked={selectedOrders.includes(String(order.id))}
+                        checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
                         onCheckedChange={(checked) => {
-                          const sid = String(order.id);
                           if (checked) {
-                            setSelectedOrders([...selectedOrders, sid]);
+                            setSelectedOrders(filteredOrders.map(po => String(po.id)));
                           } else {
-                            setSelectedOrders(selectedOrders.filter(id => id !== sid));
+                            setSelectedOrders([]);
                           }
                         }}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        {getStatusIcon(order.status)}
-                        <div>
-                          <p className="font-medium">{order.poNumber}</p>
-                          <p className="text-sm text-muted-foreground">
-                            by {order.createdBy}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{order.supplierName}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <p className="font-medium">{orderDateObj ? format(orderDateObj, 'MMM dd, yyyy') : '-'}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {orderDateObj ? (isToday(orderDateObj) ? 'Today' :
-                         isYesterday(orderDateObj) ? 'Yesterday' :
-                         format(orderDateObj, 'EEE')) : ''}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <p className={cn(
-                        "font-medium",
-                        isOverdue ? "text-red-600" : ""
-                      )}>
-                        {expDateObj ? format(expDateObj, 'MMM dd, yyyy') : '-'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {expDateObj ? (isTomorrow(expDateObj) ? 'Tomorrow' :
-                         isToday(expDateObj) ? 'Today' :
-                         format(expDateObj, 'EEE')) : ''}
-                      </p>
-                      {isOverdue && (
-                        <Badge variant="destructive" className="text-xs mt-1">Overdue</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell>{getPriorityBadge(order.priority)}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">AED {order.totalAmount.toLocaleString()}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedOrderForDetail(order);
-                            setShowOrderDetail(true);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {(orderStatus === 'draft' || orderStatus === 'pending_approval') && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setEditingOrder(order as any);
-                                const matchedSupplier = suppliers.find(s => s.id === order.supplierId) || null;
-                                setOrderForm({
-                                  poNumber: order.poNumber,
-                                  selectedSupplier: matchedSupplier,
-                                  orderDate: order.orderDate ? new Date(order.orderDate) : new Date(),
-                                  expectedDeliveryDate: order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : addDays(new Date(), 7),
-                                  status: orderStatus as any,
-                                  priority: orderPriority as any,
-                                  items: (order.items || []).map(i => ({
-                                    id: String(i.id),
-                                    productId: String(i.productId ?? ''),
-                                    productName: i.productName,
-                                    productCode: i.productSku ?? '',
-                                    sku: i.productSku ?? '',
-                                    description: '',
-                                    category: '',
-                                    unitOfMeasure: i.unitOfMeasure ?? 'unit',
-                                    quantityOrdered: i.quantityOrdered,
-                                    quantityReceived: i.quantityReceived,
-                                    unitPrice: i.unitPrice,
-                                    discount: i.discountPercent,
-                                    taxPercent: i.taxPercent,
-                                    totalAmount: i.totalAmount,
-                                    notes: i.notes,
-                                  })),
-                                  subtotal: order.subtotal,
-                                  discountAmount: order.discountAmount,
-                                  taxAmount: order.taxAmount,
-                                  shippingCost: order.shippingCost,
-                                  totalAmount: order.totalAmount,
-                                  paymentTerms: order.paymentTerms,
-                                  deliveryAddress: order.deliveryAddress,
-                                  notes: order.notes,
-                                });
-                                setShowOrderForm(true);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-500 hover:text-red-700"
-                              onClick={async () => {
-                                if (!confirm('Delete this purchase order?')) return;
-                                try {
-                                  await purchaseService.deleteOrder(Number(order.id));
-                                  setPurchaseOrders(prev => prev.filter(o => o.id !== order.id));
-                                  toast.success('Order deleted');
-                                } catch (err: any) {
-                                  toast.error(err.message || 'Failed to delete order');
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                        {orderStatus === 'pending_approval' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            title="Approve"
-                            onClick={async () => {
-                              try {
-                                const updated = await purchaseService.updateStatus(Number(order.id), 'APPROVED');
-                                setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
-                                toast.success('Order approved');
-                              } catch (err: any) {
-                                toast.error(err.message || 'Failed to approve');
-                              }
-                            }}
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {orderStatus === 'approved' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            title="Mark as Ordered"
-                            onClick={async () => {
-                              try {
-                                const updated = await purchaseService.updateStatus(Number(order.id), 'ORDERED');
-                                setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
-                                toast.success('Order marked as ordered');
-                              } catch (err: any) {
-                                toast.error(err.message || 'Failed to update status');
-                              }
-                            }}
-                          >
-                            <Truck className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button size="sm" variant="ghost">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-        </TabsContent>{/* end orders tab */}
-
-        <TabsContent value="suppliers" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">Suppliers</h2>
-              <p className="text-sm text-muted-foreground">{suppliers.length} supplier(s) registered</p>
-            </div>
-            <Button onClick={openCreateSupplier}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Supplier
-            </Button>
-          </div>
-
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search suppliers..."
-              value={supplierSearch}
-              onChange={e => setSupplierSearch(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Supplier Name</TableHead>
-                    <TableHead>Contact Person</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Payment Terms</TableHead>
+                    </TableHead>
+                    <TableHead>PO Number</TableHead>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead>Order Date</TableHead>
+                    <TableHead>Expected Delivery</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Total Amount</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {suppliers
-                    .filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || (s.contactPerson ?? '').toLowerCase().includes(supplierSearch.toLowerCase()))
-                    .map(supplier => (
-                    <TableRow key={supplier.id}>
+                  {filteredOrders.map((order) => {
+                    const orderDateObj = order.orderDate ? new Date(order.orderDate) : null;
+                    const expDateObj = order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : null;
+                    const orderStatus = order.status?.toLowerCase() ?? '';
+                    const orderPriority = order.priority?.toLowerCase() ?? '';
+                    const isOverdue = expDateObj && expDateObj < new Date() && orderStatus !== 'received' && orderStatus !== 'cancelled';
+                    const supplierName = order.supplierName || (order as any).supplier?.name || '-';
+                    return (
+                    <TableRow
+                      key={order.id}
+                      className={cn(
+                        "hover:bg-slate-50/50 transition-colors",
+                        orderPriority === 'urgent' && "bg-red-50 dark:bg-red-950/20",
+                        orderStatus === 'pending_approval' && "bg-yellow-50 dark:bg-yellow-950/20",
+                        isOverdue && "bg-orange-50 dark:bg-orange-950/20"
+                      )}
+                    >
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{supplier.name}</p>
-                          {supplier.address && <p className="text-xs text-muted-foreground">{supplier.city}, {supplier.country}</p>}
+                        <Checkbox
+                          checked={selectedOrders.includes(String(order.id))}
+                          onCheckedChange={(checked) => {
+                            const sid = String(order.id);
+                            if (checked) {
+                              setSelectedOrders([...selectedOrders, sid]);
+                            } else {
+                              setSelectedOrders(selectedOrders.filter(id => id !== sid));
+                            }
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          {getStatusIcon(order.status)}
+                          <div>
+                            <p className="font-medium">{order.poNumber}</p>
+                            <p className="text-sm text-muted-foreground">
+                              by {order.createdBy}
+                            </p>
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell>{supplier.contactPerson || '-'}</TableCell>
-                      <TableCell>{supplier.email || '-'}</TableCell>
-                      <TableCell>{supplier.phone || '-'}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{supplier.paymentTerms || '-'}</Badge>
+                        <div>
+                          <p className="font-medium">{supplierName}</p>
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={supplier.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                          {supplier.isActive ? 'Active' : 'Inactive'}
-                        </Badge>
+                        <p className="font-medium">{orderDateObj ? format(orderDateObj, 'MMM dd, yyyy') : '-'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {orderDateObj ? (isToday(orderDateObj) ? 'Today' :
+                           isYesterday(orderDateObj) ? 'Yesterday' :
+                           format(orderDateObj, 'EEE')) : ''}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <p className={cn(
+                          "font-medium",
+                          isOverdue ? "text-red-600" : ""
+                        )}>
+                          {expDateObj ? format(expDateObj, 'MMM dd, yyyy') : '-'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {expDateObj ? (isTomorrow(expDateObj) ? 'Tomorrow' :
+                           isToday(expDateObj) ? 'Today' :
+                           format(expDateObj, 'EEE')) : ''}
+                        </p>
+                        {isOverdue && (
+                          <Badge variant="destructive" className="text-xs mt-1">Overdue</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(order.status)}</TableCell>
+                      <TableCell>{getPriorityBadge(order.priority)}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">AED {order.totalAmount.toLocaleString()}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          <Button size="sm" variant="ghost" onClick={() => openEditSupplier(supplier)}>
-                            <Edit className="h-4 w-4" />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedOrderForDetail(order);
+                              setShowOrderDetail(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700"
-                            onClick={() => handleDeleteSupplier(supplier.id)}>
-                            <Trash2 className="h-4 w-4" />
+                          {(orderStatus === 'draft' || orderStatus === 'pending_approval') && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEditingOrder(order as any);
+                                  const matchedSupplier = suppliers.find(s => s.id === order.supplierId) || null;
+                                  setOrderForm({
+                                    poNumber: order.poNumber,
+                                    selectedSupplier: matchedSupplier,
+                                    orderDate: order.orderDate ? new Date(order.orderDate) : new Date(),
+                                    expectedDeliveryDate: order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : addDays(new Date(), 7),
+                                    status: orderStatus as any,
+                                    priority: orderPriority as any,
+                                    items: (order.items || []).map(i => ({
+                                      id: String(i.id),
+                                      productId: String(i.productId ?? ''),
+                                      productName: i.productName,
+                                      productCode: i.productSku ?? '',
+                                      sku: i.productSku ?? '',
+                                      description: '',
+                                      category: '',
+                                      unitOfMeasure: i.unitOfMeasure ?? 'unit',
+                                      quantityOrdered: i.quantityOrdered,
+                                      quantityReceived: i.quantityReceived,
+                                      unitPrice: i.unitPrice,
+                                      discount: i.discountPercent,
+                                      taxPercent: i.taxPercent,
+                                      totalAmount: i.totalAmount,
+                                      notes: i.notes,
+                                    })),
+                                    subtotal: order.subtotal,
+                                    discountAmount: order.discountAmount,
+                                    taxAmount: order.taxAmount,
+                                    shippingCost: order.shippingCost,
+                                    totalAmount: order.totalAmount,
+                                    paymentTerms: order.paymentTerms,
+                                    deliveryAddress: order.deliveryAddress,
+                                    notes: order.notes,
+                                  });
+                                  setShowOrderForm(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-500 hover:text-red-700"
+                                onClick={async () => {
+                                  if (!confirm('Delete this purchase order?')) return;
+                                  try {
+                                    await purchaseService.deleteOrder(Number(order.id));
+                                    setPurchaseOrders(prev => prev.filter(o => o.id !== order.id));
+                                    toast.success('Order deleted');
+                                  } catch (err: any) {
+                                    toast.error(err.message || 'Failed to delete order');
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          {orderStatus === 'pending_approval' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Approve"
+                              onClick={async () => {
+                                try {
+                                  const updated = await purchaseService.updateStatus(Number(order.id), 'APPROVED');
+                                  setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                                  toast.success('Order approved');
+                                } catch (err: any) {
+                                  toast.error(err.message || 'Failed to approve');
+                                }
+                              }}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {orderStatus === 'approved' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Mark as Ordered"
+                              onClick={async () => {
+                                try {
+                                  const updated = await purchaseService.updateStatus(Number(order.id), 'ORDERED');
+                                  setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                                  toast.success('Order marked as ordered');
+                                } catch (err: any) {
+                                  toast.error(err.message || 'Failed to update status');
+                                }
+                              }}
+                            >
+                              <Truck className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button size="sm" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                  {suppliers.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                        <Building className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                        <p>No suppliers found</p>
-                        <Button className="mt-3" onClick={openCreateSupplier}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add your first supplier
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )}
+                    );
+                  })}
                 </TableBody>
               </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      )}
+
+      {ordersView === "grid" && (
+      <div className="po-panel grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filteredOrders.length === 0 ? (
+          <Card className="border-dashed border-2 shadow-none md:col-span-2 xl:col-span-3">
+            <CardContent className="flex flex-col items-center justify-center pt-12 pb-10 px-6 text-center">
+              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
+                <ClipboardList className="h-7 w-7 text-muted-foreground" />
+              </div>
+              <p className="font-medium">No purchases found</p>
+              <p className="text-sm text-muted-foreground max-w-xs mb-4">
+                Create your first purchase to get started
+              </p>
+              <Button onClick={openCreateOrder}>
+                <Plus className="mr-2 h-4 w-4" /> New Purchase
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredOrders.map((order) => {
+            const orderDateObj = order.orderDate ? new Date(order.orderDate) : null;
+            const expDateObj = order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : null;
+            const orderStatus = order.status?.toLowerCase() ?? '';
+            const orderPriority = order.priority?.toLowerCase() ?? '';
+            const isOverdue = expDateObj && expDateObj < new Date() && orderStatus !== 'received' && orderStatus !== 'cancelled';
+            const supplierName = order.supplierName || (order as any).supplier?.name || '-';
+            return (
+              <Card key={order.id} className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center">
+                        {getStatusIcon(order.status)}
+                      </div>
+                      <div>
+                        <p className="font-semibold">{order.poNumber}</p>
+                        <p className="text-xs text-muted-foreground">{supplierName}</p>
+                      </div>
+                    </div>
+                    <Checkbox
+                      checked={selectedOrders.includes(String(order.id))}
+                      onCheckedChange={(checked) => {
+                        const sid = String(order.id);
+                        if (checked) {
+                          setSelectedOrders([...selectedOrders, sid]);
+                        } else {
+                          setSelectedOrders(selectedOrders.filter(id => id !== sid));
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {getStatusBadge(order.status)}
+                    {getPriorityBadge(order.priority)}
+                    {isOverdue && (
+                      <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                    )}
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span>{orderDateObj ? format(orderDateObj, 'MMM dd, yyyy') : '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4 text-muted-foreground" />
+                      <span className={cn(isOverdue && "text-red-600")}>
+                        {expDateObj ? format(expDateObj, 'MMM dd, yyyy') : '-'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                      <span>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-semibold">AED {order.totalAmount.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">by {order.createdBy}</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSelectedOrderForDetail(order);
+                          setShowOrderDetail(true);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {(orderStatus === 'draft' || orderStatus === 'pending_approval') && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingOrder(order as any);
+                              const matchedSupplier = suppliers.find(s => s.id === order.supplierId) || null;
+                              setOrderForm({
+                                poNumber: order.poNumber,
+                                selectedSupplier: matchedSupplier,
+                                orderDate: order.orderDate ? new Date(order.orderDate) : new Date(),
+                                expectedDeliveryDate: order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : addDays(new Date(), 7),
+                                status: orderStatus as any,
+                                priority: orderPriority as any,
+                                items: (order.items || []).map(i => ({
+                                  id: String(i.id),
+                                  productId: String(i.productId ?? ''),
+                                  productName: i.productName,
+                                  productCode: i.productSku ?? '',
+                                  sku: i.productSku ?? '',
+                                  description: '',
+                                  category: '',
+                                  unitOfMeasure: i.unitOfMeasure ?? 'unit',
+                                  quantityOrdered: i.quantityOrdered,
+                                  quantityReceived: i.quantityReceived,
+                                  unitPrice: i.unitPrice,
+                                  discount: i.discountPercent,
+                                  taxPercent: i.taxPercent,
+                                  totalAmount: i.totalAmount,
+                                  notes: i.notes,
+                                })),
+                                subtotal: order.subtotal,
+                                discountAmount: order.discountAmount,
+                                taxAmount: order.taxAmount,
+                                shippingCost: order.shippingCost,
+                                totalAmount: order.totalAmount,
+                                paymentTerms: order.paymentTerms,
+                                deliveryAddress: order.deliveryAddress,
+                                notes: order.notes,
+                              });
+                              setShowOrderForm(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-500 hover:text-red-700"
+                            onClick={async () => {
+                              if (!confirm('Delete this purchase order?')) return;
+                              try {
+                                await purchaseService.deleteOrder(Number(order.id));
+                                setPurchaseOrders(prev => prev.filter(o => o.id !== order.id));
+                                toast.success('Order deleted');
+                              } catch (err: any) {
+                                toast.error(err.message || 'Failed to delete order');
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                      {orderStatus === 'pending_approval' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Approve"
+                          onClick={async () => {
+                            try {
+                              const updated = await purchaseService.updateStatus(Number(order.id), 'APPROVED');
+                              setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                              toast.success('Order approved');
+                            } catch (err: any) {
+                              toast.error(err.message || 'Failed to approve');
+                            }
+                          }}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {orderStatus === 'approved' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Mark as Ordered"
+                          onClick={async () => {
+                            try {
+                              const updated = await purchaseService.updateStatus(Number(order.id), 'ORDERED');
+                              setPurchaseOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                              toast.success('Order marked as ordered');
+                            } catch (err: any) {
+                              toast.error(err.message || 'Failed to update status');
+                            }
+                          }}
+                        >
+                          <Truck className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+      )}
+
+        </TabsContent>{/* end orders tab */}
+
+        <TabsContent value="suppliers" className="space-y-4">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Suppliers</CardTitle>
+                  <CardDescription>
+                    Add and manage suppliers for your inventory
+                  </CardDescription>
+                </div>
+                <Button onClick={openCreateSupplier}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Supplier
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="relative max-w-sm mb-4">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search suppliers..."
+                  value={supplierSearch}
+                  onChange={e => setSupplierSearch(e.target.value)}
+                  className="pl-11 h-10"
+                />
+              </div>
+
+              {(() => {
+                const filtered = suppliers.filter(s =>
+                  !supplierSearch ||
+                  s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+                  (s.contactPerson ?? '').toLowerCase().includes(supplierSearch.toLowerCase())
+                );
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+                      <Building className="h-10 w-10 mb-3 opacity-30" />
+                      <p className="text-sm">No suppliers found</p>
+                      <Button variant="outline" className="mt-3" onClick={openCreateSupplier}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add your first supplier
+                      </Button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Supplier Name</TableHead>
+                        <TableHead>Contact Person</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Payment Terms</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map(supplier => (
+                        <TableRow key={supplier.id} className="hover:bg-slate-50/50 transition-colors">
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{supplier.name}</p>
+                              {supplier.address && (
+                                <p className="text-xs text-muted-foreground">{supplier.city}, {supplier.country}</p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{supplier.contactPerson || '-'}</TableCell>
+                          <TableCell>{supplier.email || '-'}</TableCell>
+                          <TableCell>{supplier.phone || '-'}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{supplier.paymentTerms || '-'}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={supplier.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                              {supplier.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Button size="sm" variant="ghost" onClick={() => openEditSupplier(supplier)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-500 hover:text-red-700"
+                                onClick={() => handleDeleteSupplier(supplier.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>{/* end suppliers tab */}
 
       </Tabs>
 
-      {/* Create/Edit Order Sheet */}
-      <Sheet open={showOrderForm} onOpenChange={setShowOrderForm}>
-        <SheetContent className="w-full sm:max-w-4xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>
-              {editingOrder ? 'Edit Purchase Order' : 'Create New Purchase Order'}
-            </SheetTitle>
-            <SheetDescription>
-              {editingOrder ? 'Update purchase order details' : 'Create a new purchase order with supplier and product information'}
-            </SheetDescription>
-          </SheetHeader>
+      {/* Create/Edit Order Modal */}
+      <Dialog open={showOrderForm} onOpenChange={setShowOrderForm}>
+        <DialogContent className="max-w-4xl p-0">
+          <div className="flex flex-col max-h-[90vh]">
+            <div className="px-6 pt-6 pb-4 border-b">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingOrder ? 'Edit Purchase Order' : 'Create New Purchase Order'}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingOrder ? 'Update purchase order details' : 'Create a new purchase order with supplier and product information'}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
 
-          <div className="space-y-6 mt-6">
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="space-y-6">
             {/* Step Indicator */}
             <div className="flex items-center space-x-4">
               {[1, 2, 3].map((step) => (
@@ -1236,6 +1519,7 @@ export function PurchaseOrder() {
                     <Label htmlFor="poNumber">PO Number</Label>
                     <Input
                       id="poNumber"
+                      className="mt-2"
                       value={orderForm.poNumber || ''}
                       onChange={(e) => setOrderForm(prev => ({ ...prev, poNumber: e.target.value }))}
                       placeholder="Auto-generated if empty"
@@ -1244,7 +1528,7 @@ export function PurchaseOrder() {
                   <div>
                     <Label htmlFor="priority">Priority</Label>
                     <Select value={orderForm.priority} onValueChange={(value) => setOrderForm(prev => ({ ...prev, priority: value as any }))}>
-                      <SelectTrigger>
+                      <SelectTrigger className="mt-2">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1265,7 +1549,7 @@ export function PurchaseOrder() {
                         variant="outline"
                         role="combobox"
                         aria-expanded={showSupplierSelector}
-                        className="w-full justify-between"
+                        className="w-full justify-between mt-2"
                       >
                         {orderForm.selectedSupplier ? orderForm.selectedSupplier.name : "Select supplier..."}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1344,6 +1628,7 @@ export function PurchaseOrder() {
                     <Input
                       id="orderDate"
                       type="date"
+                      className="mt-2"
                       value={orderForm.orderDate ? format(orderForm.orderDate, 'yyyy-MM-dd') : ''}
                       onChange={(e) => setOrderForm(prev => ({ ...prev, orderDate: new Date(e.target.value) }))}
                     />
@@ -1353,6 +1638,7 @@ export function PurchaseOrder() {
                     <Input
                       id="expectedDeliveryDate"
                       type="date"
+                      className="mt-2"
                       value={orderForm.expectedDeliveryDate ? format(orderForm.expectedDeliveryDate, 'yyyy-MM-dd') : ''}
                       onChange={(e) => setOrderForm(prev => ({ ...prev, expectedDeliveryDate: new Date(e.target.value) }))}
                     />
@@ -1363,6 +1649,7 @@ export function PurchaseOrder() {
                   <Label htmlFor="deliveryAddress">Delivery Address</Label>
                   <Textarea
                     id="deliveryAddress"
+                    className="mt-2"
                     value={orderForm.deliveryAddress || ''}
                     onChange={(e) => setOrderForm(prev => ({ ...prev, deliveryAddress: e.target.value }))}
                     rows={3}
@@ -1581,49 +1868,54 @@ export function PurchaseOrder() {
               </div>
             )}
 
-            {/* Navigation */}
-            <div className="flex justify-between">
-              <div>
-                {currentStep > 1 && (
-                  <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)}>
-                    Previous
-                  </Button>
-                )}
               </div>
-              
-              <div className="flex space-x-2">
-                <Button variant="outline" onClick={() => setShowOrderForm(false)}>
-                  Cancel
-                </Button>
+            </div>
+
+            {/* Navigation */}
+            <div className="px-6 py-4 border-t bg-background">
+              <div className="flex justify-between">
+                <div>
+                  {currentStep > 1 && (
+                    <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)}>
+                      Previous
+                    </Button>
+                  )}
+                </div>
                 
-                {currentStep < 3 ? (
-                  <Button 
-                    onClick={() => setCurrentStep(currentStep + 1)}
-                    disabled={
-                      (currentStep === 1 && !orderForm.selectedSupplier) ||
-                      (currentStep === 2 && (!orderForm.items || orderForm.items.length === 0))
-                    }
-                  >
-                    Next
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                <div className="flex space-x-2">
+                  <Button variant="outline" onClick={() => setShowOrderForm(false)}>
+                    Cancel
                   </Button>
-                ) : (
-                  <div className="flex space-x-2">
-                    <Button variant="outline" onClick={() => handleSaveOrder('DRAFT')}>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save as Draft
+                  
+                  {currentStep < 3 ? (
+                    <Button 
+                      onClick={() => setCurrentStep(currentStep + 1)}
+                      disabled={
+                        (currentStep === 1 && !orderForm.selectedSupplier) ||
+                        (currentStep === 2 && (!orderForm.items || orderForm.items.length === 0))
+                      }
+                    >
+                      Next
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
-                    <Button onClick={() => handleSaveOrder('PENDING_APPROVAL')}>
-                      <Send className="mr-2 h-4 w-4" />
-                      Submit Order
-                    </Button>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex space-x-2">
+                      <Button variant="outline" onClick={() => handleSaveOrder('DRAFT')}>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save as Draft
+                      </Button>
+                      <Button onClick={() => handleSaveOrder('PENDING_APPROVAL')}>
+                        <Send className="mr-2 h-4 w-4" />
+                        Submit Order
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* Order Detail Dialog */}
       <Dialog open={showOrderDetail} onOpenChange={setShowOrderDetail}>

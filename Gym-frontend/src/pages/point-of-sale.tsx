@@ -681,17 +681,47 @@ export function PointOfSale() {
     apiProducts.filter(p => p.categoryName?.toLowerCase().includes(catId.toLowerCase()) && p.isActive).length;
 
   // Dashboard View
-  const renderDashboard = () => (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl text-[#1E293B] mb-2">Point of Sale</h1>
-        <p className="text-gray-600">Retail POS dashboard and session management</p>
+  const renderDashboard = () => {
+    const todaysSales = currentSession?.apiId ? (sessionReport?.totalSales ?? 0) : 0;
+    const transactionsCount = currentSession?.apiId ? (sessionReport?.transactionCount ?? 0) : 0;
+    const cashInDrawer = currentSession?.apiId
+      ? (sessionReport?.expectedCash ?? (currentSession?.openingCash ?? 0))
+      : (currentSession?.openingCash ?? 0);
+    const sessionDurationLabel = currentSession?.status === 'active' ? getSessionDuration() : '0m';
+
+    return (
+    <div className="p-8 space-y-8">
+      <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500">Point of Sale</p>
+            <h1 className="text-3xl text-[#1E293B] mt-1">Session Control Center</h1>
+            <p className="text-gray-600">Retail POS dashboard and session management</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <Badge className={currentSession?.status === 'active' ? 'bg-[#2B7A78]' : 'bg-gray-400'}>
+              {currentSession?.status === 'active' ? 'Session Active' : 'Session Closed'}
+            </Badge>
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Session ID</p>
+              <p className="text-sm font-semibold text-[#1E293B]">{currentSession?.id ?? '—'}</p>
+            </div>
+            {currentSession?.status === 'active' && (
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Started</p>
+                <p className="text-sm font-semibold text-[#1E293B]">
+                  {new Date(currentSession.startTime).toLocaleTimeString()}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Start/Continue Session Tile */}
         <Card 
-          className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-[#2B7A78]"
+          className="group cursor-pointer border-2 border-transparent bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#2B7A78] hover:shadow-xl"
           onClick={() => {
             if (currentSession?.status === 'active') {
               setCurrentView('touch-screen');
@@ -734,7 +764,7 @@ export function PointOfSale() {
 
         {/* Z-Report Tile */}
         <Card 
-          className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-[#2B7A78]"
+          className="group cursor-pointer border-2 border-transparent bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#2B7A78] hover:shadow-xl"
           onClick={() => setCurrentView('z-report')}
         >
           <CardHeader>
@@ -755,7 +785,7 @@ export function PointOfSale() {
 
         {/* X-Report / Close Session Tile */}
         <Card 
-          className={`cursor-pointer hover:shadow-lg transition-all border-2 hover:border-[#2B7A78] ${
+          className={`group cursor-pointer border-2 border-transparent bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#2B7A78] hover:shadow-xl ${
             currentSession?.status !== 'active' ? 'opacity-50' : ''
           }`}
           onClick={() => {
@@ -784,7 +814,7 @@ export function PointOfSale() {
 
         {/* Customer Tile */}
         <Card 
-          className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-[#2B7A78]"
+          className="group cursor-pointer border-2 border-transparent bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#2B7A78] hover:shadow-xl"
           onClick={() => setCurrentView('customer')}
         >
           <CardHeader>
@@ -805,7 +835,7 @@ export function PointOfSale() {
 
         {/* Cash Drop / Out Tile */}
         <Card 
-          className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-[#2B7A78]"
+          className="group cursor-pointer border-2 border-transparent bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#2B7A78] hover:shadow-xl"
           onClick={() => setShowCashDropDialog(true)}
         >
           <CardHeader>
@@ -826,65 +856,64 @@ export function PointOfSale() {
       </div>
 
       {/* Quick Stats */}
-      {currentSession?.status === 'active' && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Today's Sales</p>
-                  <p className="text-2xl mt-1 text-[#1E293B]">{formatCurrency(currentSession?.apiId ? (sessionReport?.totalSales ?? 0) : 0)}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-[#2B7A78]" />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
+        <Card className="border-primary/10 shadow-sm hover:shadow-md transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Today's Sales</p>
+                <p className="text-2xl mt-1 text-[#1E293B]">{formatCurrency(todaysSales)}</p>
               </div>
-            </CardContent>
-          </Card>
+              <TrendingUp className="h-8 w-8 text-[#2B7A78]" />
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Transactions</p>
-                  <p className="text-2xl mt-1 text-[#1E293B]">{sessionReport?.transactionCount ?? 0}</p>
-                </div>
-                <ShoppingCart className="h-8 w-8 text-[#2B7A78]" />
+        <Card className="border-primary/10 shadow-sm hover:shadow-md transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Transactions</p>
+                <p className="text-2xl mt-1 text-[#1E293B]">{transactionsCount}</p>
               </div>
-            </CardContent>
-          </Card>
+              <ShoppingCart className="h-8 w-8 text-[#2B7A78]" />
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Cash in Drawer</p>
-                  <p className="text-2xl mt-1 text-[#1E293B]">{formatCurrency(sessionReport?.expectedCash ?? (currentSession?.openingCash ?? 0))}</p>
-                </div>
-                <Wallet className="h-8 w-8 text-[#2B7A78]" />
+        <Card className="border-primary/10 shadow-sm hover:shadow-md transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Cash in Drawer</p>
+                <p className="text-2xl mt-1 text-[#1E293B]">{formatCurrency(cashInDrawer)}</p>
               </div>
-            </CardContent>
-          </Card>
+              <Wallet className="h-8 w-8 text-[#2B7A78]" />
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Session Duration</p>
-                  <p className="text-2xl mt-1 text-[#1E293B]">{getSessionDuration()}</p>
-                </div>
-                <Clock className="h-8 w-8 text-[#2B7A78]" />
+        <Card className="border-primary/10 shadow-sm hover:shadow-md transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Session Duration</p>
+                <p className="text-2xl mt-1 text-[#1E293B]">{sessionDurationLabel}</p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              <Clock className="h-8 w-8 text-[#2B7A78]" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
-  );
+    );
+  };
 
   // Touch Screen POS Interface
   const renderTouchScreen = () => (
     <div className="h-screen flex flex-col bg-[#F9FAFB]">
       {/* Top Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
+      <div className="bg-white/95 backdrop-blur border-b border-gray-200 px-6 py-4 flex-shrink-0 sticky top-0 z-20">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button
@@ -900,6 +929,9 @@ export function PointOfSale() {
                 {new Date().toLocaleDateString()} • {new Date().toLocaleTimeString()}
               </p>
             </div>
+            <Badge className={currentSession?.status === 'active' ? 'bg-[#2B7A78]' : 'bg-gray-400'}>
+              {currentSession?.status === 'active' ? 'Active Session' : 'No Active Session'}
+            </Badge>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -926,7 +958,7 @@ export function PointOfSale() {
       </div>
 
       {/* Action Tabs */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
+      <div className="bg-white/95 backdrop-blur border-b border-gray-200 px-6 py-3 flex-shrink-0 shadow-sm">
         <div className="flex space-x-2 overflow-x-auto">
           <Button variant="outline" size="sm" className="border-[#2B7A78] text-[#2B7A78]"
             onClick={() => { setReturnFilter(''); setShowSalesReturnDialog(true); }}>
@@ -972,17 +1004,43 @@ export function PointOfSale() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Categories */}
-        <div className="w-48 bg-white border-r border-gray-200 flex-shrink-0 overflow-y-auto">
+        <div className="w-56 bg-white border-r border-gray-200 flex-shrink-0 overflow-y-auto">
+          <div className="p-4 border-b">
+            <p className="text-xs uppercase tracking-wide text-gray-500">Categories</p>
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-sm font-semibold text-[#1E293B]">All Products</p>
+              <Badge variant="outline" className="border-[#2B7A78] text-[#2B7A78]">
+                {apiProducts.filter(p => p.isActive).length}
+              </Badge>
+            </div>
+          </div>
           <div className="p-3 space-y-2">
+            <Button
+              onClick={() => setSelectedCategory('all')}
+              variant="ghost"
+              className={`w-full justify-start h-auto py-3 border-l-4 ${
+                selectedCategory === 'all'
+                  ? 'bg-[#2B7A78] text-white border-l-[#1f5f5c]'
+                  : 'border-l-transparent hover:border-l-[#2B7A78]'
+              }`}
+            >
+              <Package className="h-5 w-5 mr-2" />
+              <div className="text-left">
+                <div className="text-sm">All Items</div>
+                <div className="text-xs opacity-75">
+                  {apiProducts.filter(p => p.isActive).length} items
+                </div>
+              </div>
+            </Button>
             {productCategories.map((category) => (
               <Button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.id)}
-                variant={selectedCategory === category.id ? 'default' : 'outline'}
-                className={`w-full justify-start h-auto py-3 ${
+                variant="ghost"
+                className={`w-full justify-start h-auto py-3 border-l-4 ${
                   selectedCategory === category.id 
-                    ? 'bg-[#2B7A78] hover:bg-[#236862] text-white' 
-                    : 'border-gray-200'
+                    ? 'bg-[#2B7A78] hover:bg-[#236862] text-white border-l-[#1f5f5c]' 
+                    : 'border-l-transparent hover:border-l-[#2B7A78]'
                 }`}
               >
                 <category.icon className="h-5 w-5 mr-2" />
@@ -1002,12 +1060,12 @@ export function PointOfSale() {
           {/* Search */}
           <div className="bg-white border-b border-gray-200 p-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="h-11 pl-11 rounded-full bg-[#F8FAFC] border-gray-200"
               />
             </div>
           </div>
@@ -1015,29 +1073,41 @@ export function PointOfSale() {
           {/* Product Grid */}
           <div className="flex-1 p-4 overflow-y-auto">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map((product) => (
-                <Card 
-                  key={product.id}
-                  className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-[#2B7A78]"
-                  onClick={() => addToInvoice(product)}
-                >
-                  <CardContent className="p-4">
-                    <div className="aspect-square bg-gradient-to-br from-[#F9FAFB] to-white rounded-lg mb-3 flex items-center justify-center border-2 border-gray-100">
-                      <Package className="h-12 w-12 text-[#2B7A78] opacity-30" />
-                    </div>
-                    <h3 className="text-sm mb-2 line-clamp-2 text-[#1E293B]">{product.name}</h3>
-                    <div className="flex items-center justify-between">
-                      <p className="text-lg text-[#2B7A78]">{formatCurrency(product.sellingPrice ?? (product as any).price ?? 0)}</p>
-                      <Badge
-                        variant={(product.totalStock ?? (product as any).stock ?? 0) > 10 ? 'default' : 'destructive'}
-                        className={(product.totalStock ?? (product as any).stock ?? 0) > 10 ? 'bg-[#2B7A78]' : ''}
-                      >
-                        {product.totalStock ?? (product as any).stock ?? 0}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {filteredProducts.map((product) => {
+                const imageUrl = product.imageUrls?.[0] || (product as any).imageUrl || (product as any).image_url;
+                return (
+                  <Card 
+                    key={product.id}
+                    className="group cursor-pointer border border-transparent bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#2B7A78] hover:shadow-lg"
+                    onClick={() => addToInvoice(product)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="aspect-square bg-gradient-to-br from-[#F9FAFB] to-white rounded-lg mb-3 flex items-center justify-center border-2 border-gray-100 overflow-hidden">
+                        {imageUrl ? (
+                          <img src={imageUrl} alt={product.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <Package className="h-12 w-12 text-[#2B7A78] opacity-30" />
+                        )}
+                      </div>
+                      <h3 className="text-sm mb-2 line-clamp-2 text-[#1E293B]">{product.name}</h3>
+                      <p className="text-xs text-gray-500 mb-2">
+                        {(product.sku || (product as any).code || 'SKU N/A')} • {product.categoryName || 'General'}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-lg font-semibold text-[#2B7A78]">
+                          {formatCurrency(product.sellingPrice ?? (product as any).price ?? 0)}
+                        </p>
+                        <Badge
+                          variant={(product.totalStock ?? (product as any).stock ?? 0) > 10 ? 'default' : 'destructive'}
+                          className={(product.totalStock ?? (product as any).stock ?? 0) > 10 ? 'bg-[#2B7A78]/10 text-[#2B7A78]' : ''}
+                        >
+                          {product.totalStock ?? (product as any).stock ?? 0}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1102,7 +1172,12 @@ export function PointOfSale() {
           {/* Cart Items */}
           <div className="flex-1 overflow-hidden flex flex-col">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-[#1E293B]">Current Sale</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-[#1E293B]">Current Sale</h3>
+                <Badge variant="outline" className="border-[#2B7A78] text-[#2B7A78]">
+                  {currentInvoice.items.length} items
+                </Badge>
+              </div>
               <Button 
                 variant="ghost" 
                 size="sm"
@@ -1122,7 +1197,7 @@ export function PointOfSale() {
               ) : (
                 <div className="space-y-3">
                   {currentInvoice.items.map((item) => (
-                    <div key={item.id} className="border rounded-lg p-3 bg-[#F9FAFB]">
+                    <div key={item.id} className="border rounded-lg p-3 bg-white shadow-sm">
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="text-sm text-[#1E293B]">{item.name}</h4>
                         <Button
@@ -1183,7 +1258,7 @@ export function PointOfSale() {
           {/* Totals and Payment */}
           {currentInvoice.items.length > 0 && (
             <>
-              <div className="p-4 border-t border-gray-200 space-y-2 bg-[#F9FAFB]">
+              <div className="p-4 border-t border-gray-200 space-y-2 bg-gradient-to-br from-white to-[#F0FAF9]">
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>Subtotal:</span>
                   <span>{formatCurrency(currentInvoice.subtotal)}</span>
@@ -1247,7 +1322,7 @@ export function PointOfSale() {
 
                 <Button 
                   onClick={() => setShowPaymentDialog(true)}
-                  className="w-full h-12 bg-[#2B7A78] hover:bg-[#236862] text-white"
+                  className="w-full h-12 rounded-xl bg-[#2B7A78] hover:bg-[#236862] text-white shadow-md hover:shadow-lg"
                 >
                   <CreditCard className="h-5 w-5 mr-2" />
                   Payment ({formatCurrency(currentInvoice.total)})

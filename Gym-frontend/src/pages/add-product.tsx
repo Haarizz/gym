@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -82,6 +82,8 @@ import {
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
 import { productsService, Warehouse as WarehouseType, ProductCategory } from "../utils/supabase/products-service";
+import QRCode from "react-qr-code";
+import JsBarcode from "jsbarcode";
 
 // Types
 interface ProductUnit {
@@ -146,10 +148,15 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Barcode Settings
   const [barcodeTemplate, setBarcodeTemplate] = useState("");
   const [generatedBarcode, setGeneratedBarcode] = useState("");
+  const barcodeSvgRef = useRef<SVGSVGElement | null>(null);
+  const qrContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Pricing & Multi-Unit Setup
   const [defaultUnit, setDefaultUnit] = useState("");
@@ -181,6 +188,16 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [isLoadingMeta, setIsLoadingMeta] = useState(true);
+
+  const resolveImageUrl = useCallback((url: string) => {
+    if (!url) return "";
+    if (url.startsWith("data:") || url.startsWith("http") || url.startsWith("blob:")) return url;
+    const base = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+    if (!base) return url;
+    const baseNoApi = base.endsWith("/api") ? base.slice(0, -4) : base;
+    const resolvedBase = url.startsWith("/") && base.endsWith("/api") ? baseNoApi : base;
+    return url.startsWith("/") ? `${resolvedBase}${url}` : `${resolvedBase}/${url}`;
+  }, []);
 
   const brands = [
     "Optimum Nutrition", "BSN", "MuscleTech", "Dymatize", "Gold Standard", "MyProtein", "House Brand"
@@ -239,7 +256,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         setDescription(product.description || "");
         setIsActive(product.isActive ?? true);
         setProductImages(product.imageUrls || []);
-        setBarcodeTemplate(product.barcodeTemplate || "");
+        setBarcodeTemplate(product.barcodeTemplate || (product.barcode ? "Code 128" : ""));
         setGeneratedBarcode(product.barcode || "");
         setDefaultUnit(product.defaultUnit || "");
         setDefaultPrice(product.sellingPrice ? String(product.sellingPrice) : "");
@@ -354,6 +371,35 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     handleImageUpload(e.dataTransfer.files);
   };
 
+  useEffect(() => {
+    setImageErrors({});
+  }, [productImages.length]);
+
+  const barcodeFormat = useMemo(() => {
+    switch (barcodeTemplate) {
+      case "Code 128":
+        return "CODE128";
+      case "Code 39":
+        return "CODE39";
+      case "EAN-13":
+        return "EAN13";
+      case "UPC-A":
+        return "UPC";
+      default:
+        return "CODE128";
+    }
+  }, [barcodeTemplate]);
+
+  const qrPayload = useMemo(() => {
+    const payload: Record<string, string> = {};
+    if (productName) payload.name = productName;
+    if (sku) payload.sku = sku;
+    if (generatedBarcode) payload.barcode = generatedBarcode;
+    if (defaultPrice) payload.price = defaultPrice;
+    if (selectedCategory) payload.categoryId = selectedCategory;
+    return JSON.stringify(payload);
+  }, [productName, sku, generatedBarcode, defaultPrice, selectedCategory]);
+
   const generateBarcode = () => {
     if (!barcodeTemplate) {
       toast.error("Please select a barcode template first");
@@ -365,7 +411,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     switch (barcodeTemplate) {
       case "Code 128":
       case "Code 39":
-        newBarcode = `${sku || "PRD"}${Date.now().toString().slice(-6)}`;
+        newBarcode = `${(sku || "PRD").toUpperCase()}${Date.now().toString().slice(-6)}`;
         break;
       case "EAN-13": {
         newBarcode = `${Math.floor(Math.random() * 1000000000000)}`.padStart(12, '0');
@@ -375,11 +421,18 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         newBarcode += (10 - checkDigit) % 10;
         break;
       }
-      case "UPC-A":
-        newBarcode = `${Math.floor(Math.random() * 100000000000)}`.padStart(11, '0');
+      case "UPC-A": {
+        const upcBase = `${Math.floor(Math.random() * 100000000000)}`.padStart(11, '0');
+        const sum = upcBase.split('').reduce((acc, digit, index) => {
+          const n = parseInt(digit, 10);
+          return acc + (index % 2 === 0 ? n * 3 : n);
+        }, 0);
+        const checkDigit = (10 - (sum % 10)) % 10;
+        newBarcode = `${upcBase}${checkDigit}`;
         break;
+      }
       case "QR Code":
-        newBarcode = `QR-${sku || "PRD"}-${Date.now()}`;
+        newBarcode = `${sku || "PRD"}-${Date.now()}`;
         break;
       default:
         newBarcode = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -389,22 +442,57 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     toast.success(`${barcodeTemplate} barcode generated successfully!`);
   };
 
+  useEffect(() => {
+    if (activeTab !== "images-barcode") return;
+    if (!generatedBarcode) return;
+    if (barcodeTemplate === "QR Code") return;
+    if (!barcodeSvgRef.current) return;
+    try {
+      JsBarcode(barcodeSvgRef.current, generatedBarcode, {
+        format: barcodeFormat,
+        displayValue: false,
+        lineColor: "#111827",
+        background: "transparent",
+        height: 64,
+        width: 2,
+        margin: 0,
+      });
+    } catch (error) {
+      console.error("Failed to render barcode:", error);
+      toast.error("Barcode format not supported for this value.");
+    }
+  }, [generatedBarcode, barcodeTemplate, barcodeFormat, activeTab]);
+
   const printBarcode = () => {
     if (!generatedBarcode) {
       toast.error("Please generate a barcode first");
       return;
     }
 
-    const printWindow = window.open('', '_blank', 'width=400,height=300');
+    const isQr = barcodeTemplate === "QR Code";
+    const qrSvg = qrContainerRef.current?.querySelector("svg");
+    const svgMarkup = isQr
+      ? qrSvg?.outerHTML
+      : barcodeSvgRef.current?.outerHTML;
+
+    if (!svgMarkup) {
+      toast.error("Barcode not ready to print yet");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=420,height=360');
     if (printWindow) {
       printWindow.document.write(`
         <html>
           <head><title>Barcode - ${productName || 'Product'}</title></head>
-          <body style="text-align:center;font-family:monospace;padding:20px;">
-            <h3>${productName || 'Product'}</h3>
-            <p style="font-size:24px;letter-spacing:4px;border:1px solid #000;padding:10px;display:inline-block;">${generatedBarcode}</p>
-            ${sku ? `<p>SKU: ${sku}</p>` : ''}
-            <p style="font-size:12px;color:#666;">Template: ${barcodeTemplate}</p>
+          <body style="text-align:center;font-family:system-ui, sans-serif;padding:20px;">
+            <h3 style="margin:0 0 8px;">${productName || 'Product'}</h3>
+            <div style="display:flex;justify-content:center;margin:12px 0;">
+              ${svgMarkup}
+            </div>
+            <p style="font-family:monospace;font-size:14px;margin:6px 0;">${isQr ? qrPayload : generatedBarcode}</p>
+            ${sku ? `<p style="margin:4px 0;">SKU: ${sku}</p>` : ''}
+            <p style="font-size:12px;color:#666;margin:4px 0;">Template: ${barcodeTemplate}</p>
           </body>
         </html>
       `);
@@ -605,9 +693,9 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         hasVariants,
         hasRecipe: recipeIngredients.length > 0,
         isManufactured,
-        imageUrls: productImages,
+        imageUrls: productImages.filter(Boolean),
         barcode: generatedBarcode || undefined,
-        barcodeTemplate: barcodeTemplate || undefined,
+        barcodeTemplate: barcodeTemplate || (generatedBarcode ? "Code 128" : undefined),
         defaultUnit: defaultUnit || undefined,
         sellingPrice: parseFloat(defaultPrice),
         costPrice: costPrice ? parseFloat(costPrice) : 0,
@@ -744,7 +832,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
 
           {/* Basic Product Information */}
           <TabsContent value="basic-info">
-            <Card>
+            <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <FileText className="h-5 w-5 text-primary" />
@@ -850,7 +938,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
           <TabsContent value="images-barcode">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Product Images */}
-              <Card>
+              <Card className="border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <ImageIcon className="h-5 w-5 text-primary" />
@@ -918,13 +1006,23 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                         </Button>
                       </div>
                       <div className="grid grid-cols-3 gap-3">
-                        {productImages.map((image, index) => (
+                        {productImages.map((image, index) => {
+                          const resolvedImage = resolveImageUrl(image);
+                          return (
                           <div key={index} className="relative group">
-                            <img
-                              src={image}
-                              alt={`Product ${index + 1}`}
-                              className="w-full h-20 object-cover rounded-lg border shadow-sm hover:shadow-md transition-shadow"
-                            />
+                            <div className="w-full h-20 rounded-lg border shadow-sm bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden">
+                              {(!resolvedImage || imageErrors[index]) ? (
+                                <ImageIcon className="h-6 w-6" />
+                              ) : (
+                                <img
+                                  src={resolvedImage}
+                                  alt={`Product ${index + 1}`}
+                                  loading="lazy"
+                                  onError={() => setImageErrors(prev => ({ ...prev, [index]: true }))}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all duration-200 flex items-center justify-center">
                               <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button
@@ -932,10 +1030,9 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                                   variant="secondary"
                                   className="h-7 w-7 p-0"
                                   onClick={() => {
-                                    const newWindow = window.open();
-                                    if (newWindow) {
-                                      newWindow.document.write(`<img src="${image}" style="max-width:100%;max-height:100%;"/>`);
-                                    }
+                                    if (!resolvedImage || imageErrors[index]) return;
+                                    setPreviewImage(resolvedImage);
+                                    setIsPreviewOpen(true);
                                   }}
                                 >
                                   <Eye className="h-3 w-3" />
@@ -956,15 +1053,36 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                               </Badge>
                             )}
                           </div>
-                        ))}
+                        );
+                        })}
                       </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
+              <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+                <DialogContent className="max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle>Product Image Preview</DialogTitle>
+                    <DialogDescription>View the full-size image without leaving the page.</DialogDescription>
+                  </DialogHeader>
+                  <div className="bg-slate-50 rounded-lg border p-4 flex items-center justify-center min-h-[320px]">
+                    {previewImage ? (
+                      <img
+                        src={previewImage}
+                        alt="Product preview"
+                        className="max-h-[480px] w-auto object-contain"
+                      />
+                    ) : (
+                      <div className="text-sm text-muted-foreground">No image selected.</div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+
               {/* Barcode Settings */}
-              <Card>
+              <Card className="border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <BarChart3 className="h-5 w-5 text-primary" />
@@ -1044,26 +1162,12 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                         {/* Barcode Visual Representation */}
                         <div className="bg-white border rounded p-3 mb-3 text-center">
                           {barcodeTemplate === "QR Code" ? (
-                            <div className="inline-block bg-gray-900 text-white p-2 rounded">
-                              <div className="text-xs font-mono">QR Code</div>
-                              <div className="text-xs mt-1">Scan Ready</div>
+                            <div ref={qrContainerRef} className="flex justify-center">
+                              <QRCode value={qrPayload} size={140} />
                             </div>
                           ) : (
-                            <div className="space-y-1">
-                              <div className="flex justify-center space-x-1">
-                                {Array.from({ length: 30 }).map((_, i) => (
-                                  <div
-                                    key={i}
-                                    className="w-1 bg-gray-900"
-                                    style={{
-                                      height: `${Math.random() * 20 + 30}px`,
-                                    }}
-                                  />
-                                ))}
-                              </div>
-                              <div className="text-xs font-mono text-gray-600">
-                                Visual Barcode Representation
-                              </div>
+                            <div className="flex justify-center">
+                              <svg ref={barcodeSvgRef} className="h-16 w-full" />
                             </div>
                           )}
                         </div>
@@ -1107,7 +1211,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
 
           {/* Pricing & Multi-Unit Setup */}
           <TabsContent value="pricing-units">
-            <Card>
+            <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <DollarSign className="h-5 w-5 text-primary" />
@@ -1275,7 +1379,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
 
           {/* Recipe / Production Formula */}
           <TabsContent value="recipe-production">
-            <Card>
+            <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <ChefHat className="h-5 w-5 text-primary" />
@@ -1395,7 +1499,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
 
           {/* Item Variants & Attributes */}
           <TabsContent value="variants-attributes">
-            <Card>
+            <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Palette className="h-5 w-5 text-primary" />
@@ -1610,7 +1714,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
 
           {/* Inventory & Stock Settings */}
           <TabsContent value="inventory-stock">
-            <Card>
+            <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Archive className="h-5 w-5 text-primary" />
@@ -1660,7 +1764,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   </div>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="bg-blue-50 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
                     <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
                     <div>
