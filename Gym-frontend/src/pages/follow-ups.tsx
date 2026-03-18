@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { followUpService, type FollowUpResponse } from '../utils/supabase/follow-up-service';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -142,11 +143,6 @@ interface CommunicationRecord {
 interface Staff {
   id: string;
   name: string;
-  role: string;
-  avatar?: string;
-  activeFollowUps: number;
-  completedToday: number;
-  successRate: number;
 }
 
 export function FollowUps() {
@@ -171,193 +167,88 @@ export function FollowUps() {
 
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
+  // API state
+  const [apiFollowUps, setApiFollowUps] = useState<FollowUpResponse[]>([]);
+  const [newFU, setNewFU] = useState({ memberName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '' });
+  const [completeOutcome, setCompleteOutcome] = useState('successful');
+  const [completeNotes, setCompleteNotes] = useState('');
+  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [editingFollowUp, setEditingFollowUp] = useState<FollowUp | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editFU, setEditFU] = useState({ memberName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '', status: 'pending' });
+
+  const loadFollowUps = useCallback(async () => {
+    try {
+      const data = await followUpService.getFollowUps({ size: 200, status: statusFilter !== 'all' ? statusFilter : undefined, type: typeFilter !== 'all' ? typeFilter : undefined, priority: priorityFilter !== 'all' ? priorityFilter : undefined, assignedStaff: staffFilter !== 'all' ? staffFilter : undefined, search: searchTerm || undefined });
+      setApiFollowUps(data.followUps);
+    } catch { /* keep mock data */ }
+  }, [statusFilter, typeFilter, priorityFilter, staffFilter, searchTerm]);
+
+  useEffect(() => { loadFollowUps(); }, [loadFollowUps]);
+
   // Sample data - in real app this would come from your backend
-  const staffMembers: Staff[] = [
-    { id: '1', name: 'Sarah Johnson', role: 'Sales Manager', activeFollowUps: 12, completedToday: 8, successRate: 85 },
-    { id: '2', name: 'Ahmed Hassan', role: 'Membership Consultant', activeFollowUps: 15, completedToday: 6, successRate: 78 },
-    { id: '3', name: 'Maria Rodriguez', role: 'Lead Specialist', activeFollowUps: 18, completedToday: 10, successRate: 92 },
-    { id: '4', name: 'David Wilson', role: 'Customer Success', activeFollowUps: 9, completedToday: 5, successRate: 75 }
+  const staffMembers = [
+    { id: '1', name: 'Sarah Johnson' },
+    { id: '2', name: 'Ahmed Hassan' },
+    { id: '3', name: 'Maria Rodriguez' },
+    { id: '4', name: 'David Wilson' },
   ];
 
-  const followUps: FollowUp[] = [
-    {
-      id: '1',
-      memberName: 'John Smith',
-      memberEmail: 'john.smith@email.com',
-      memberPhone: '+971 50 123 4567',
-      type: 'call',
-      status: 'overdue',
-      priority: 'high',
-      assignedStaff: 'Sarah Johnson',
-      dueDate: subDays(new Date(), 1),
-      scheduledTime: '14:00',
-      createdDate: subDays(new Date(), 3),
-      subject: 'Follow up on membership renewal',
-      notes: 'Member is interested in upgrading to premium plan. Schedule call to discuss pricing.',
-      tags: ['renewal', 'upgrade', 'premium'],
-      membershipStatus: 'active',
-      membershipPlan: 'Standard Monthly',
-      lastVisit: subDays(new Date(), 2),
-      nextBillingDate: addDays(new Date(), 15),
-      followUpReason: 'Membership expiring soon',
-      estimatedDuration: 15,
-      communicationHistory: [
-        {
-          id: '1',
-          type: 'email',
-          date: subDays(new Date(), 5),
-          staffMember: 'Sarah Johnson',
-          outcome: 'successful',
-          notes: 'Sent initial renewal reminder email',
-          nextAction: 'Follow up with phone call'
-        }
-      ]
-    },
-    {
-      id: '2',
-      memberName: 'Lisa Chen',
-      memberEmail: 'lisa.chen@email.com',
-      memberPhone: '+971 55 987 6543',
-      type: 'email',
-      status: 'pending',
-      priority: 'medium',
-      assignedStaff: 'Ahmed Hassan',
-      dueDate: new Date(),
-      scheduledTime: '10:30',
-      createdDate: subDays(new Date(), 1),
-      subject: 'Check in after first week',
-      notes: 'New member - check how first week is going and if they need any help.',
-      tags: ['new-member', 'check-in', 'onboarding'],
-      membershipStatus: 'active',
-      membershipPlan: 'Premium Annual',
-      lastVisit: new Date(),
-      nextBillingDate: addDays(new Date(), 350),
-      followUpReason: 'New member onboarding',
-      estimatedDuration: 10,
-      communicationHistory: []
-    },
-    {
-      id: '3',
-      memberName: 'Michael Johnson',
-      memberEmail: 'michael.j@email.com',
-      memberPhone: '+971 52 456 7890',
-      type: 'meeting',
-      status: 'pending',
-      priority: 'high',
-      assignedStaff: 'Maria Rodriguez',
-      dueDate: addDays(new Date(), 1),
-      scheduledTime: '16:00',
-      createdDate: new Date(),
-      subject: 'Personal training consultation',
-      notes: 'Member interested in personal training. Schedule consultation to discuss goals and packages.',
-      tags: ['personal-training', 'consultation', 'upsell'],
-      membershipStatus: 'active',
-      membershipPlan: 'Standard Monthly',
-      lastVisit: new Date(),
-      nextBillingDate: addDays(new Date(), 28),
-      followUpReason: 'Personal training interest',
-      estimatedDuration: 30,
-      communicationHistory: [
-        {
-          id: '2',
-          type: 'in-app',
-          date: new Date(),
-          staffMember: 'Maria Rodriguez',
-          outcome: 'successful',
-          notes: 'Member expressed interest during gym visit',
-          nextAction: 'Schedule consultation meeting'
-        }
-      ]
-    },
-    {
-      id: '4',
-      memberName: 'Sarah Williams',
-      memberEmail: 'sarah.w@email.com',
-      memberPhone: '+971 56 789 0123',
-      type: 'whatsapp',
-      status: 'completed',
-      priority: 'low',
-      assignedStaff: 'David Wilson',
-      dueDate: subDays(new Date(), 2),
-      scheduledTime: '09:15',
-      completedDate: subDays(new Date(), 2),
-      createdDate: subDays(new Date(), 4),
-      subject: 'Class schedule reminder',
-      notes: 'Send weekly class schedule and remind about upcoming yoga class.',
-      tags: ['class-schedule', 'reminder', 'yoga'],
-      membershipStatus: 'active',
-      membershipPlan: 'Standard Monthly',
-      lastVisit: subDays(new Date(), 1),
-      nextBillingDate: addDays(new Date(), 20),
-      followUpReason: 'Regular engagement',
-      outcome: 'successful',
-      estimatedDuration: 5,
-      communicationHistory: [
-        {
-          id: '3',
-          type: 'whatsapp',
-          date: subDays(new Date(), 2),
-          staffMember: 'David Wilson',
-          duration: 5,
-          outcome: 'successful',
-          notes: 'Sent class schedule, member confirmed attendance'
-        }
-      ]
-    },
-    {
-      id: '5',
-      memberName: 'Ahmed Al-Rashid',
-      memberEmail: 'ahmed.r@email.com',
-      memberPhone: '+971 54 345 6789',
-      type: 'call',
-      status: 'pending',
-      priority: 'medium',
-      assignedStaff: 'Sarah Johnson',
-      dueDate: addDays(new Date(), 2),
-      scheduledTime: '11:00',
-      createdDate: subDays(new Date(), 1),
-      subject: 'Billing inquiry follow-up',
-      notes: 'Member had questions about billing. Follow up to ensure everything is resolved.',
-      tags: ['billing', 'support', 'inquiry'],
-      membershipStatus: 'active',
-      membershipPlan: 'Premium Monthly',
-      lastVisit: subDays(new Date(), 3),
-      nextBillingDate: addDays(new Date(), 25),
-      followUpReason: 'Billing support',
-      estimatedDuration: 10,
-      communicationHistory: [
-        {
-          id: '4',
-          type: 'email',
-          date: subDays(new Date(), 2),
-          staffMember: 'Sarah Johnson',
-          outcome: 'successful',
-          notes: 'Responded to billing inquiry via email',
-          nextAction: 'Follow up to confirm resolution'
-        }
-      ]
-    }
-  ];
+
+  const displayFollowUps: FollowUp[] = apiFollowUps.map(f => ({
+    id: String(f.id),
+    memberName: f.memberName,
+    memberEmail: f.memberEmail || '',
+    memberPhone: f.memberPhone || '',
+    type: (f.type === 'in_app' ? 'in-app' : f.type) as FollowUp['type'],
+    status: f.status as FollowUp['status'],
+    priority: f.priority as FollowUp['priority'],
+    assignedStaff: f.assignedStaff || '',
+    dueDate: new Date(f.dueDate),
+    scheduledTime: f.scheduledTime,
+    completedDate: f.completedDate ? new Date(f.completedDate) : undefined,
+    createdDate: new Date(f.createdAt),
+    subject: f.subject,
+    notes: f.notes || '',
+    tags: f.tags || [],
+    membershipStatus: (f.membershipStatus as FollowUp['membershipStatus']) || 'active',
+    membershipPlan: f.membershipPlan,
+    followUpReason: f.followUpReason || '',
+    estimatedDuration: f.estimatedDuration,
+    outcome: f.outcome as FollowUp['outcome'],
+    communicationHistory: (f.communicationHistory || []).map(r => ({
+      id: String(r.id),
+      type: (r.type === 'in_app' ? 'in-app' : r.type) as CommunicationRecord['type'],
+      date: new Date(r.date),
+      staffMember: r.staffMember,
+      duration: r.duration,
+      outcome: r.outcome as CommunicationRecord['outcome'],
+      notes: r.notes,
+      nextAction: r.nextAction,
+    })),
+  }));
 
   // Calculate KPIs
   const kpis = useMemo(() => {
-    const totalFollowUps = followUps.length;
-    const pendingFollowUps = followUps.filter(f => f.status === 'pending').length;
-    const overdueFollowUps = followUps.filter(f => f.status === 'overdue').length;
-    const completedToday = followUps.filter(f => 
+    const totalFollowUps = displayFollowUps.length;
+    const pendingFollowUps = displayFollowUps.filter(f => f.status === 'pending').length;
+    const overdueFollowUps = displayFollowUps.filter(f => f.status === 'overdue').length;
+    const completedToday = displayFollowUps.filter(f =>
       f.status === 'completed' && f.completedDate && isToday(f.completedDate)
     ).length;
-    const dueToday = followUps.filter(f => 
+    const dueToday = displayFollowUps.filter(f =>
       ['pending', 'overdue'].includes(f.status) && isToday(f.dueDate)
     ).length;
-    const completedThisWeek = followUps.filter(f => 
-      f.status === 'completed' && f.completedDate && 
+    const completedThisWeek = displayFollowUps.filter(f =>
+      f.status === 'completed' && f.completedDate &&
       f.completedDate >= subDays(new Date(), 7)
     ).length;
-    const highPriorityPending = followUps.filter(f => 
+    const highPriorityPending = displayFollowUps.filter(f =>
       f.priority === 'high' && ['pending', 'overdue'].includes(f.status)
     ).length;
-    const successRate = followUps.filter(f => f.status === 'completed').length / totalFollowUps * 100;
+    const successRate = displayFollowUps.filter(f => f.status === 'completed').length / Math.max(totalFollowUps, 1) * 100;
 
     return {
       totalFollowUps,
@@ -369,11 +260,11 @@ export function FollowUps() {
       highPriorityPending,
       successRate
     };
-  }, [followUps]);
+  }, [displayFollowUps]);
 
   // Filter and sort follow-ups
   const filteredFollowUps = useMemo(() => {
-    let filtered = followUps.filter(followUp => {
+    let filtered = displayFollowUps.filter(followUp => {
       const matchesSearch = searchTerm === '' || 
         followUp.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         followUp.memberEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -414,7 +305,7 @@ export function FollowUps() {
     });
 
     return filtered;
-  }, [followUps, searchTerm, statusFilter, typeFilter, staffFilter, priorityFilter, dateFilter, sortField, sortDirection]);
+  }, [displayFollowUps, searchTerm, statusFilter, typeFilter, staffFilter, priorityFilter, dateFilter, sortField, sortDirection]);
 
   // Group follow-ups by status for kanban view
   const followUpsByStatus = useMemo(() => {
@@ -515,36 +406,69 @@ export function FollowUps() {
         handleCompleteFollowUp(followUp);
         break;
       case 'reschedule':
-        toast.info('Reschedule feature coming soon!');
+        setReschedulingId(followUp.id);
+        setRescheduleDate('');
+        setShowRescheduleDialog(true);
+        break;
+      case 'delete':
+        if (window.confirm(`Delete follow-up for ${followUp.memberName}?`)) {
+          followUpService.delete(Number(followUp.id)).then(() => { toast.success('Follow-up deleted'); loadFollowUps(); }).catch(() => toast.error('Failed to delete'));
+        }
         break;
     }
-  }, []);
+  }, [handleCompleteFollowUp, loadFollowUps]);
 
-  const handleBulkAction = useCallback((action: string) => {
+  const handleBulkAction = useCallback(async (action: string) => {
     if (selectedFollowUps.length === 0) {
       toast.error('Please select follow-ups first');
       return;
     }
-    
-    switch (action) {
-      case 'complete':
-        toast.success(`Marked ${selectedFollowUps.length} follow-ups as completed`);
-        break;
-      case 'reschedule':
-        toast.success(`Rescheduled ${selectedFollowUps.length} follow-ups`);
-        break;
-      case 'assign':
-        toast.success(`Reassigned ${selectedFollowUps.length} follow-ups`);
-        break;
-      case 'delete':
+    if (action === 'delete') {
+      try {
+        await Promise.all(selectedFollowUps.map(id => followUpService.delete(Number(id))));
         toast.success(`Deleted ${selectedFollowUps.length} follow-ups`);
-        break;
-      default:
-        toast.info(`Action: ${action} for ${selectedFollowUps.length} follow-ups`);
+        loadFollowUps();
+      } catch { toast.error('Failed to delete some follow-ups'); }
+    } else if (action === 'complete') {
+      try {
+        await Promise.all(selectedFollowUps.map(id => followUpService.complete(Number(id), 'successful')));
+        toast.success(`Marked ${selectedFollowUps.length} follow-ups as completed`);
+        loadFollowUps();
+      } catch { toast.error('Failed to complete some follow-ups'); }
+    } else if (action === 'reschedule') {
+      toast.info('Use the reschedule button on individual follow-ups');
+    } else if (action === 'assign') {
+      toast.info('Use the edit button to reassign individual follow-ups');
     }
     setSelectedFollowUps([]);
     setShowBulkActions(false);
-  }, [selectedFollowUps]);
+  }, [selectedFollowUps, loadFollowUps]);
+
+  const handleDeleteFollowUp = useCallback(async (id: string) => {
+    if (!window.confirm('Delete this follow-up?')) return;
+    try {
+      await followUpService.delete(Number(id));
+      toast.success('Follow-up deleted');
+      loadFollowUps();
+    } catch { toast.error('Failed to delete follow-up'); }
+  }, [loadFollowUps]);
+
+  const handleOpenEdit = useCallback((followUp: FollowUp) => {
+    setEditingFollowUp(followUp);
+    setEditFU({
+      memberName: followUp.memberName,
+      type: followUp.type === 'in-app' ? 'in_app' : followUp.type,
+      subject: followUp.subject,
+      priority: followUp.priority,
+      dueDate: followUp.dueDate.toISOString().split('T')[0],
+      scheduledTime: followUp.scheduledTime || '',
+      assignedStaff: followUp.assignedStaff || '',
+      estimatedDuration: followUp.estimatedDuration ? String(followUp.estimatedDuration) : '',
+      notes: followUp.notes || '',
+      status: followUp.status,
+    });
+    setShowEditDialog(true);
+  }, []);
 
   return (
     <div className="p-6 space-y-6">
@@ -970,6 +894,12 @@ export function FollowUps() {
                         <Button size="sm" variant="ghost" onClick={() => handleFollowUpClick(followUp)}>
                           <Eye className="h-4 w-4" />
                         </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleOpenEdit(followUp)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteFollowUp(followUp.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1313,11 +1243,11 @@ export function FollowUps() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="memberName">Member Name</Label>
-              <Input id="memberName" placeholder="Select or enter member name" />
+              <Input id="memberName" placeholder="Select or enter member name" value={newFU.memberName} onChange={e => setNewFU(p => ({ ...p, memberName: e.target.value }))} />
             </div>
             <div>
               <Label htmlFor="followUpType">Follow-up Type</Label>
-              <Select>
+              <Select value={newFU.type} onValueChange={v => setNewFU(p => ({ ...p, type: v }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -1326,7 +1256,7 @@ export function FollowUps() {
                   <SelectItem value="email">Email</SelectItem>
                   <SelectItem value="sms">SMS</SelectItem>
                   <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="in-app">In-App Message</SelectItem>
+                  <SelectItem value="in_app">In-App Message</SelectItem>
                   <SelectItem value="meeting">Meeting</SelectItem>
                   <SelectItem value="visit">Visit</SelectItem>
                 </SelectContent>
@@ -1334,11 +1264,11 @@ export function FollowUps() {
             </div>
             <div>
               <Label htmlFor="subject">Subject</Label>
-              <Input id="subject" placeholder="Enter follow-up subject" />
+              <Input id="subject" placeholder="Enter follow-up subject" value={newFU.subject} onChange={e => setNewFU(p => ({ ...p, subject: e.target.value }))} />
             </div>
             <div>
               <Label htmlFor="priority">Priority</Label>
-              <Select>
+              <Select value={newFU.priority} onValueChange={v => setNewFU(p => ({ ...p, priority: v }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
@@ -1351,15 +1281,15 @@ export function FollowUps() {
             </div>
             <div>
               <Label htmlFor="dueDate">Due Date</Label>
-              <Input id="dueDate" type="date" />
+              <Input id="dueDate" type="date" value={newFU.dueDate} onChange={e => setNewFU(p => ({ ...p, dueDate: e.target.value }))} />
             </div>
             <div>
               <Label htmlFor="scheduledTime">Scheduled Time</Label>
-              <Input id="scheduledTime" type="time" />
+              <Input id="scheduledTime" type="time" value={newFU.scheduledTime} onChange={e => setNewFU(p => ({ ...p, scheduledTime: e.target.value }))} />
             </div>
             <div>
               <Label htmlFor="assignedStaff">Assigned Staff</Label>
-              <Select>
+              <Select value={newFU.assignedStaff} onValueChange={v => setNewFU(p => ({ ...p, assignedStaff: v }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select staff member" />
                 </SelectTrigger>
@@ -1372,20 +1302,41 @@ export function FollowUps() {
             </div>
             <div>
               <Label htmlFor="duration">Estimated Duration (minutes)</Label>
-              <Input id="duration" type="number" placeholder="15" />
+              <Input id="duration" type="number" placeholder="15" value={newFU.estimatedDuration} onChange={e => setNewFU(p => ({ ...p, estimatedDuration: e.target.value }))} />
             </div>
             <div className="md:col-span-2">
               <Label htmlFor="notes">Notes</Label>
-              <Textarea id="notes" placeholder="Enter any additional notes about this follow-up" />
+              <Textarea id="notes" placeholder="Enter any additional notes about this follow-up" value={newFU.notes} onChange={e => setNewFU(p => ({ ...p, notes: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddFollowUp(false)}>
               Cancel
             </Button>
-            <Button onClick={() => {
-              toast.success('Follow-up scheduled successfully');
-              setShowAddFollowUp(false);
+            <Button onClick={async () => {
+              if (!newFU.memberName || !newFU.subject || !newFU.dueDate) {
+                toast.error('Member name, subject, and due date are required');
+                return;
+              }
+              try {
+                await followUpService.create({
+                  memberName: newFU.memberName,
+                  type: newFU.type,
+                  subject: newFU.subject,
+                  priority: newFU.priority,
+                  dueDate: newFU.dueDate,
+                  scheduledTime: newFU.scheduledTime || undefined,
+                  assignedStaff: newFU.assignedStaff || undefined,
+                  estimatedDuration: newFU.estimatedDuration ? Number(newFU.estimatedDuration) : undefined,
+                  notes: newFU.notes || undefined,
+                });
+                toast.success('Follow-up scheduled successfully');
+                setNewFU({ memberName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '' });
+                setShowAddFollowUp(false);
+                loadFollowUps();
+              } catch {
+                toast.error('Failed to schedule follow-up');
+              }
             }}>
               Schedule Follow-up
             </Button>
@@ -1414,15 +1365,15 @@ export function FollowUps() {
               </div>
               <div>
                 <Label htmlFor="outcome">Outcome</Label>
-                <Select>
+                <Select value={completeOutcome} onValueChange={setCompleteOutcome}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select outcome" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="successful">Successful</SelectItem>
-                    <SelectItem value="no-response">No Response</SelectItem>
-                    <SelectItem value="callback-requested">Callback Requested</SelectItem>
-                    <SelectItem value="not-interested">Not Interested</SelectItem>
+                    <SelectItem value="no_response">No Response</SelectItem>
+                    <SelectItem value="callback_requested">Callback Requested</SelectItem>
+                    <SelectItem value="not_interested">Not Interested</SelectItem>
                     <SelectItem value="converted">Converted</SelectItem>
                     <SelectItem value="rescheduled">Rescheduled</SelectItem>
                   </SelectContent>
@@ -1430,7 +1381,7 @@ export function FollowUps() {
               </div>
               <div>
                 <Label htmlFor="completionNotes">Notes</Label>
-                <Textarea id="completionNotes" placeholder="Add notes about the outcome..." />
+                <Textarea id="completionNotes" placeholder="Add notes about the outcome..." value={completeNotes} onChange={e => setCompleteNotes(e.target.value)} />
               </div>
             </div>
           )}
@@ -1438,13 +1389,157 @@ export function FollowUps() {
             <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={() => {
-              toast.success('Follow-up marked as completed');
-              setShowCompleteDialog(false);
-              setCompletingFollowUp(null);
+            <Button onClick={async () => {
+              if (!completingFollowUp) return;
+              try {
+                await followUpService.complete(Number(completingFollowUp.id), completeOutcome, completeNotes || undefined);
+                toast.success('Follow-up marked as completed');
+                setShowCompleteDialog(false);
+                setCompletingFollowUp(null);
+                setCompleteOutcome('successful');
+                setCompleteNotes('');
+                loadFollowUps();
+              } catch {
+                toast.error('Failed to complete follow-up');
+              }
             }}>
               Complete Follow-up
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule Follow-up Dialog */}
+      <Dialog open={showRescheduleDialog} onOpenChange={setShowRescheduleDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reschedule Follow-up</DialogTitle>
+            <DialogDescription>Select a new due date for this follow-up</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>New Due Date</Label>
+              <Input type="date" value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRescheduleDialog(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              if (!reschedulingId || !rescheduleDate) { toast.error('Please select a date'); return; }
+              try {
+                await followUpService.reschedule(Number(reschedulingId), rescheduleDate);
+                toast.success('Follow-up rescheduled');
+                setShowRescheduleDialog(false);
+                loadFollowUps();
+              } catch { toast.error('Failed to reschedule'); }
+            }}>Reschedule</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Follow-up Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Follow-up</DialogTitle>
+            <DialogDescription>Update follow-up details</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Member Name</Label>
+              <Input value={editFU.memberName} onChange={e => setEditFU(p => ({ ...p, memberName: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Type</Label>
+              <Select value={editFU.type} onValueChange={v => setEditFU(p => ({ ...p, type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call">Call</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="sms">SMS</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="in_app">In-App</SelectItem>
+                  <SelectItem value="meeting">Meeting</SelectItem>
+                  <SelectItem value="visit">Visit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Subject</Label>
+              <Input value={editFU.subject} onChange={e => setEditFU(p => ({ ...p, subject: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={editFU.status} onValueChange={v => setEditFU(p => ({ ...p, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="rescheduled">Rescheduled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Priority</Label>
+              <Select value={editFU.priority} onValueChange={v => setEditFU(p => ({ ...p, priority: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Due Date</Label>
+              <Input type="date" value={editFU.dueDate} onChange={e => setEditFU(p => ({ ...p, dueDate: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Scheduled Time</Label>
+              <Input type="time" value={editFU.scheduledTime} onChange={e => setEditFU(p => ({ ...p, scheduledTime: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Assigned Staff</Label>
+              <Select value={editFU.assignedStaff} onValueChange={v => setEditFU(p => ({ ...p, assignedStaff: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                <SelectContent>
+                  {staffMembers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Estimated Duration (min)</Label>
+              <Input type="number" value={editFU.estimatedDuration} onChange={e => setEditFU(p => ({ ...p, estimatedDuration: e.target.value }))} />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Notes</Label>
+              <Textarea value={editFU.notes} onChange={e => setEditFU(p => ({ ...p, notes: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              if (!editingFollowUp) return;
+              try {
+                await followUpService.update(Number(editingFollowUp.id), {
+                  memberName: editFU.memberName,
+                  type: editFU.type,
+                  subject: editFU.subject,
+                  priority: editFU.priority,
+                  dueDate: editFU.dueDate,
+                  scheduledTime: editFU.scheduledTime || undefined,
+                  assignedStaff: editFU.assignedStaff || undefined,
+                  estimatedDuration: editFU.estimatedDuration ? Number(editFU.estimatedDuration) : undefined,
+                  notes: editFU.notes || undefined,
+                  status: editFU.status,
+                });
+                toast.success('Follow-up updated');
+                setShowEditDialog(false);
+                loadFollowUps();
+              } catch { toast.error('Failed to update follow-up'); }
+            }}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

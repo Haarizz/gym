@@ -80,7 +80,9 @@ public class SecurityConfig {
                     "/api/supplier-bills/**",
                     "/api/wastage-returns/**",
                     "/api/recipes/**",
-                    "/api/production-orders/**"
+                    "/api/production-orders/**",
+                    "/api/referrals/**",
+                    "/api/follow-ups/**"
                 ).authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
