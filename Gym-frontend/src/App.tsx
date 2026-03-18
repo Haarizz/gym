@@ -30,6 +30,8 @@ import { ManagePlans } from "./pages/manage-plans";
 import { Community } from "./pages/community";
 import { PromotionsCampaign } from "./pages/promotions-campaign";
 import { SalesPurchases } from "./pages/sales-purchases";
+import { SalesReports } from "./pages/sales-reports";
+import { SalesAnalytics } from "./pages/sales-analytics";
 import { Financials } from "./pages/financials";
 import { PayrollEmployees } from "./pages/payroll-employees";
 import { Assets } from "./pages/assets";
@@ -887,22 +889,8 @@ export default function App() {
       <Route path="/purchase" element={<Purchase />} />
       <Route path="/wastage-returns" element={<WastageReturns />} />
       <Route path="/production-recipe" element={<ProductionRecipe />} />
-      <Route path="/sales-reports" element={
-        <div className="p-6">
-          <h1>Sales Reports</h1>
-          <p className="text-muted-foreground">
-            Comprehensive sales reporting including revenue tracking, product performance, and transaction analysis.
-          </p>
-        </div>
-      } />
-      <Route path="/sales-analytics" element={
-        <div className="p-6">
-          <h1>Sales Analytics</h1>
-          <p className="text-muted-foreground">
-            Advanced analytics for sales performance, customer purchasing patterns, and revenue optimization insights.
-          </p>
-        </div>
-      } />
+      <Route path="/sales-reports" element={<SalesReports />} />
+      <Route path="/sales-analytics" element={<SalesAnalytics />} />
       <Route path="/sales-settings" element={
         <div className="p-6">
           <h1>Sales Settings</h1>

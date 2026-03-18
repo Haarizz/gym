@@ -26,17 +26,26 @@ import {
   Image as ImageIcon,
   QrCode,
   Printer,
-  Dumbbell,
-  Shirt,
-  Coffee,
   Tag,
   RefreshCw,
   FileText,
   DollarSign,
   Package2,
-  Zap,
   Copy,
 } from "lucide-react";
+import {
+  FaBagShopping,
+  FaBolt,
+  FaBoxOpen,
+  FaDumbbell,
+  FaHeart,
+  FaLayerGroup,
+  FaMugHot,
+  FaPills,
+  FaShirt,
+  FaStar,
+  FaTags,
+} from "react-icons/fa6";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
@@ -57,11 +66,30 @@ interface ProductsProps {
 }
 
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
-  dumbbell: Dumbbell,
-  shirt: Shirt,
-  coffee: Coffee,
-  zap: Zap,
-  package: Package,
+  dumbbell: FaDumbbell,
+  Dumbbell: FaDumbbell,
+  shirt: FaShirt,
+  Shirt: FaShirt,
+  coffee: FaMugHot,
+  Coffee: FaMugHot,
+  zap: FaBolt,
+  Zap: FaBolt,
+  package: FaBoxOpen,
+  Package: FaBoxOpen,
+  pill: FaPills,
+  Pill: FaPills,
+  tag: FaTags,
+  Tag: FaTags,
+  layers: FaLayerGroup,
+  Layers: FaLayerGroup,
+  star: FaStar,
+  Star: FaStar,
+  heart: FaHeart,
+  Heart: FaHeart,
+  shoppingbag: FaBagShopping,
+  ShoppingBag: FaBagShopping,
+  box: FaBoxOpen,
+  Box: FaBoxOpen,
 };
 
 const COLOR_MAP: Record<string, string> = {
@@ -93,7 +121,6 @@ export function Products({ onNavigate }: ProductsProps) {
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [totalProducts, setTotalProducts] = useState(0);
   const [selectedStockWarehouseId, setSelectedStockWarehouseId] = useState<number | null>(null);
-
   // Warehouse management state
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehousesLoading, setWarehousesLoading] = useState(false);
@@ -400,16 +427,15 @@ export function Products({ onNavigate }: ProductsProps) {
   if (loading && products.length === 0) {
     return (
       <div className="p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Package className="h-8 w-8 text-primary" />
+        <div className="flex items-center justify-between">
           <div>
-            <h1>Products</h1>
-            <p className="text-muted-foreground">Loading product inventory...</p>
+            <h1 className="text-3xl font-bold">Products</h1>
+            <p className="text-muted-foreground">Comprehensive product management and operations.</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse">
+            <Card key={i} className="animate-pulse border-primary/10 shadow-md">
               <CardHeader className="pb-3">
                 <div className="h-4 bg-gray-200 rounded w-1/2"></div>
               </CardHeader>
@@ -427,14 +453,9 @@ export function Products({ onNavigate }: ProductsProps) {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Package className="h-8 w-8 text-primary" />
-          <div>
-            <h1>Products</h1>
-            <p className="text-muted-foreground">
-              Manage your gym's complete product inventory including supplements, equipment, merchandise, and café items.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold">Products</h1>
+          <p className="text-muted-foreground">Comprehensive product management and operations.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm">
@@ -451,34 +472,40 @@ export function Products({ onNavigate }: ProductsProps) {
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Products</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-primary">Total Products</CardTitle>
+              <div className="bg-gradient-light p-2 rounded-lg">
+                <Package className="h-4 w-4 text-primary" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalProducts}</div>
+              <div className="text-2xl font-bold text-primary">{stats.totalProducts}</div>
               <p className="text-xs text-muted-foreground">
                 {stats.activeProducts} active, {stats.totalProducts - stats.activeProducts} inactive
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-primary">Inventory Value</CardTitle>
+              <div className="bg-emerald-50 p-2 rounded-lg">
+                <DollarSign className="h-4 w-4 text-emerald-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">AED {stats.totalInventoryValue.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-emerald-600">AED {stats.totalInventoryValue.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">Total stock valuation</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Stock Alerts</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-primary">Stock Alerts</CardTitle>
+              <div className="bg-red-50 p-2 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{stats.lowStockItems + stats.outOfStockItems}</div>
@@ -488,13 +515,15 @@ export function Products({ onNavigate }: ProductsProps) {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Categories</CardTitle>
-              <Package2 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-primary">Categories</CardTitle>
+              <div className="bg-purple-50 p-2 rounded-lg">
+                <Package2 className="h-4 w-4 text-purple-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.categoriesCount}</div>
+              <div className="text-2xl font-bold text-purple-600">{stats.categoriesCount}</div>
               <p className="text-xs text-muted-foreground">Product categories</p>
             </CardContent>
           </Card>
@@ -503,7 +532,7 @@ export function Products({ onNavigate }: ProductsProps) {
 
       {/* Categories Overview */}
       {categories.length > 0 && (
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5" />
@@ -514,11 +543,11 @@ export function Products({ onNavigate }: ProductsProps) {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {categories.map((category) => {
-                const IconComponent = ICON_MAP[category.iconName] || Package;
+                const IconComponent = ICON_MAP[category.iconName] || FaBoxOpen;
                 return (
                   <div
                     key={category.id}
-                    className="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center gap-3 p-4 border border-primary/10 rounded-lg bg-white hover:bg-slate-50/50 shadow-sm transition-colors cursor-pointer"
                     onClick={() => setSelectedCategoryId(String(category.id))}
                   >
                     <div className={`p-2 rounded-lg ${category.color} text-white`}>
@@ -536,18 +565,28 @@ export function Products({ onNavigate }: ProductsProps) {
         </Card>
       )}
 
+      <style>{`
+        @keyframes tabSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: tabSlideIn 0.22s ease-out;
+        }
+      `}</style>
+
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v === 'settings') loadWarehouses(); }} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="inventory" className="flex-1">Inventory</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
+          <TabsTrigger value="reports" className="flex-1">Reports</TabsTrigger>
+          <TabsTrigger value="settings" className="flex-1">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="inventory" className="space-y-6">
           {/* Filters */}
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardContent className="pt-6">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
@@ -594,7 +633,7 @@ export function Products({ onNavigate }: ProductsProps) {
           </Card>
 
           {/* Products Table */}
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Product Inventory</CardTitle>
               <CardDescription>
@@ -619,8 +658,8 @@ export function Products({ onNavigate }: ProductsProps) {
               ) : (
                 <ScrollArea className="h-[600px]">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow className="hover:bg-transparent">
                         <TableHead>Product</TableHead>
                         <TableHead>SKU</TableHead>
                         <TableHead>Category</TableHead>
@@ -633,7 +672,7 @@ export function Products({ onNavigate }: ProductsProps) {
                     </TableHeader>
                     <TableBody>
                       {products.map((product) => (
-                        <TableRow key={product.id}>
+                        <TableRow key={product.id} className="hover:bg-slate-50/50 transition-colors">
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -720,7 +759,7 @@ export function Products({ onNavigate }: ProductsProps) {
 
         <TabsContent value="analytics" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Top Products by Value</CardTitle>
                 <CardDescription>Best performing products by inventory value</CardDescription>
@@ -755,7 +794,7 @@ export function Products({ onNavigate }: ProductsProps) {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Low Stock Alerts</CardTitle>
                 <CardDescription>Products requiring immediate attention</CardDescription>
@@ -801,7 +840,7 @@ export function Products({ onNavigate }: ProductsProps) {
 
         <TabsContent value="reports" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -810,14 +849,14 @@ export function Products({ onNavigate }: ProductsProps) {
                 <CardDescription>Current inventory levels and valuation — exports as CSV</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" className="w-full" onClick={handleStockReportDownload}>
+                <Button variant="outline" className="w-full border-0" onClick={handleStockReportDownload}>
                   <Download className="h-4 w-4 mr-2" />
                   Download CSV
                 </Button>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow opacity-70">
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow opacity-70">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" />
@@ -826,14 +865,14 @@ export function Products({ onNavigate }: ProductsProps) {
                 <CardDescription>Product performance by sales — requires POS module</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" className="w-full" onClick={() => toast.info('Sales Report will be available after the POS module is set up')}>
+                <Button variant="outline" className="w-full border-0" onClick={() => toast.info('Sales Report will be available after the POS module is set up')}>
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Coming Soon
                 </Button>
               </CardContent>
             </Card>
 
-            <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <QrCode className="h-5 w-5" />
@@ -842,7 +881,7 @@ export function Products({ onNavigate }: ProductsProps) {
                 <CardDescription>Print barcodes for all products</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" className="w-full" onClick={handlePrintAllBarcodes}>
+                <Button variant="outline" className="w-full border-0" onClick={handlePrintAllBarcodes}>
                   <Printer className="h-4 w-4 mr-2" />
                   Print Barcodes
                 </Button>
@@ -853,7 +892,7 @@ export function Products({ onNavigate }: ProductsProps) {
 
         <TabsContent value="settings" className="space-y-6">
           {/* Warehouse Management */}
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -885,8 +924,8 @@ export function Products({ onNavigate }: ProductsProps) {
                 </div>
               ) : (
                 <Table>
-                  <TableHeader>
-                    <TableRow>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow className="hover:bg-transparent">
                       <TableHead>Warehouse Name</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Location</TableHead>
@@ -896,7 +935,7 @@ export function Products({ onNavigate }: ProductsProps) {
                   </TableHeader>
                   <TableBody>
                     {warehouses.map((wh) => (
-                      <TableRow key={wh.id}>
+                      <TableRow key={wh.id} className="hover:bg-slate-50/50 transition-colors">
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {wh.type === 'ONLINE' ? (
@@ -951,28 +990,28 @@ export function Products({ onNavigate }: ProductsProps) {
           </Card>
 
           {/* General Settings */}
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Product Settings</CardTitle>
               <CardDescription>Configure product management preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-slate-50/40 p-3">
                   <div>
                     <Label>Auto-generate SKU</Label>
                     <p className="text-sm text-muted-foreground">Automatically generate SKU codes for new products</p>
                   </div>
                   <Switch />
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-slate-50/40 p-3">
                   <div>
                     <Label>Low stock alerts</Label>
                     <p className="text-sm text-muted-foreground">Send notifications when products reach low stock threshold</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-slate-50/40 p-3">
                   <div>
                     <Label>Auto-deduct recipe ingredients</Label>
                     <p className="text-sm text-muted-foreground">Automatically reduce ingredient stock when recipes are used</p>
@@ -981,7 +1020,7 @@ export function Products({ onNavigate }: ProductsProps) {
                 </div>
               </div>
               <Separator />
-              <div className="space-y-4">
+              <div className="space-y-2 rounded-lg border border-primary/10 bg-slate-50/40 p-3">
                 <Label>Default Tax Rate</Label>
                 <Select defaultValue="5">
                   <SelectTrigger>
@@ -1170,3 +1209,4 @@ export function Products({ onNavigate }: ProductsProps) {
     </div>
   );
 }
+

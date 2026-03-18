@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+﻿import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -77,7 +77,7 @@ import {
 import { purchaseService, Supplier } from '../utils/supabase/purchase-service';
 import { productsService, Product } from '../utils/supabase/products-service';
 
-// ── Default bill form ─────────────────────────────────────────────────────────
+// â”€â”€ Default bill form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type BillFormItem = {
   productId?: number;
@@ -107,7 +107,7 @@ const defaultBillForm = () => ({
   items: [] as BillFormItem[],
 });
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const CHART_COLORS = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'];
 
@@ -149,10 +149,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function Purchase() {
-  // ── Data state ───────────────────────────────────────────────────────────
+  // â”€â”€ Data state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [bills, setBills]             = useState<SupplierBill[]>([]);
   const [suppliers, setSuppliers]     = useState<Supplier[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -161,10 +161,10 @@ export function Purchase() {
   const [totalPages, setTotalPages]   = useState(1);
   const [totalBills, setTotalBills]   = useState(0);
 
-  // ── Filter state ─────────────────────────────────────────────────────────
+  // â”€â”€ Filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [searchTerm, setSearchTerm]         = useState('');
   const [statusFilter, setStatusFilter]     = useState('');
-  // ── Bill form / dialogs ──────────────────────────────────────────────────
+  // â”€â”€ Bill form / dialogs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [showBillForm, setShowBillForm]                 = useState(false);
   const [editingBill, setEditingBill]                   = useState<SupplierBill | null>(null);
   const [showBillDetail, setShowBillDetail]             = useState(false);
@@ -176,10 +176,10 @@ export function Purchase() {
   const [payNotes, setPayNotes]                         = useState('');
   const [confirmingId, setConfirmingId]                 = useState<number | null>(null);
 
-  // ── Bill form data ───────────────────────────────────────────────────────
+  // â”€â”€ Bill form data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [billForm, setBillForm] = useState(defaultBillForm);
 
-  // ── Supplier form ────────────────────────────────────────────────────────
+  // â”€â”€ Supplier form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [showSupplierForm, setShowSupplierForm]     = useState(false);
   const [editingSupplier, setEditingSupplier]       = useState<Supplier | null>(null);
   const [savingSupplier, setSavingSupplier]         = useState(false);
@@ -189,12 +189,12 @@ export function Purchase() {
     paymentTerms: '', creditLimit: 0, isActive: true, notes: '',
   });
 
-  // ── Product search (for bill form line items) ─────────────────────────────
+  // â”€â”€ Product search (for bill form line items) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [apiProducts, setApiProducts]       = useState<Product[]>([]);
   const [productSearch, setProductSearch]   = useState('');
   const [showProductSearch, setShowProductSearch] = useState(false);
 
-  // ── Load data ────────────────────────────────────────────────────────────
+  // â”€â”€ Load data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -222,7 +222,7 @@ export function Purchase() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Bill form helpers ────────────────────────────────────────────────────
+  // â”€â”€ Bill form helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const addItem = (preset?: Partial<BillFormItem>) => {
     setBillForm(prev => ({
       ...prev,
@@ -254,7 +254,7 @@ export function Purchase() {
     }));
   };
 
-  // ── Live totals ──────────────────────────────────────────────────────────
+  // â”€â”€ Live totals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const billTotals = useMemo(() => {
     const subtotal = billForm.items.reduce((sum, item) => {
       const lineBase = item.quantity * item.unitPrice;
@@ -277,7 +277,7 @@ export function Purchase() {
     return { subtotal, discountAmount, taxAmount, total };
   }, [billForm.items, billForm.shippingCost]);
 
-  // ── Save bill ────────────────────────────────────────────────────────────
+  // â”€â”€ Save bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleSaveBill = async () => {
     if (!billForm.supplierId) {
       toast.error('Please select a supplier');
@@ -335,12 +335,12 @@ export function Purchase() {
     }
   };
 
-  // ── Confirm bill ─────────────────────────────────────────────────────────
+  // â”€â”€ Confirm bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleConfirm = async (bill: SupplierBill) => {
     setConfirmingId(bill.id);
     try {
       await supplierBillService.confirmBill(bill.id);
-      toast.success('Bill confirmed — stock updated');
+      toast.success('Bill confirmed â€” stock updated');
       await loadData();
     } catch (err: any) {
       toast.error(err.message || 'Failed to confirm bill');
@@ -349,7 +349,7 @@ export function Purchase() {
     }
   };
 
-  // ── Cancel bill ──────────────────────────────────────────────────────────
+  // â”€â”€ Cancel bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleCancelBill = async (bill: SupplierBill) => {
     try {
       await supplierBillService.cancelBill(bill.id);
@@ -360,7 +360,7 @@ export function Purchase() {
     }
   };
 
-  // ── Delete bill ──────────────────────────────────────────────────────────
+  // â”€â”€ Delete bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDelete = async (bill: SupplierBill) => {
     try {
       await supplierBillService.deleteBill(bill.id);
@@ -371,7 +371,7 @@ export function Purchase() {
     }
   };
 
-  // ── Record payment ───────────────────────────────────────────────────────
+  // â”€â”€ Record payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleRecordPayment = async () => {
     if (!payingBill) return;
     const amount = parseFloat(payAmount);
@@ -396,7 +396,7 @@ export function Purchase() {
     }
   };
 
-  // ── Open edit bill dialog ─────────────────────────────────────────────────
+  // â”€â”€ Open edit bill dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const openEditBill = (bill: SupplierBill) => {
     setEditingBill(bill);
     setBillForm({
@@ -423,7 +423,7 @@ export function Purchase() {
     setShowBillForm(true);
   };
 
-  // ── Print bill ────────────────────────────────────────────────────────────
+  // â”€â”€ Print bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const printBill = (bill: SupplierBill) => {
     const supplier = suppliers.find(s => s.id === bill.supplierId);
     const win = window.open('', '_blank');
@@ -472,7 +472,7 @@ export function Purchase() {
     win.print();
   };
 
-  // ── Supplier management ───────────────────────────────────────────────────
+  // â”€â”€ Supplier management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const openCreateSupplier = () => {
     setEditingSupplier(null);
     setSupplierForm({
@@ -525,7 +525,7 @@ export function Purchase() {
     }
   };
 
-  // ── Summary cards computed from live bills ────────────────────────────────
+  // â”€â”€ Summary cards computed from live bills â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const summary = useMemo(() => {
     const totalAmount = bills.reduce((s, b) => s + b.totalAmount, 0);
     const unpaidAmount = bills
@@ -535,7 +535,7 @@ export function Purchase() {
     return { totalAmount, unpaidAmount, paidAmount };
   }, [bills]);
 
-  // ── Supplier distribution chart data ─────────────────────────────────────
+  // â”€â”€ Supplier distribution chart data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const supplierChartData = useMemo(() => {
     const map: Record<string, number> = {};
     bills.forEach(b => {
@@ -547,7 +547,7 @@ export function Purchase() {
       .map(([name, value], i) => ({ name, value, color: CHART_COLORS[i] }));
   }, [bills]);
 
-  // ── Payment status chart data ─────────────────────────────────────────────
+  // â”€â”€ Payment status chart data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const paymentChartData = useMemo(() => {
     const unpaid  = bills.filter(b => b.paymentStatus === 'UNPAID').length;
     const partial = bills.filter(b => b.paymentStatus === 'PARTIAL').length;
@@ -559,7 +559,7 @@ export function Purchase() {
     ].filter(d => d.value > 0);
   }, [bills]);
 
-  // ── Status filter bar chart ───────────────────────────────────────────────
+  // â”€â”€ Status filter bar chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const statusChartData = useMemo(() => {
     const draft     = bills.filter(b => b.status === 'DRAFT').length;
     const confirmed = bills.filter(b => b.status === 'CONFIRMED').length;
@@ -571,7 +571,7 @@ export function Purchase() {
     ];
   }, [bills]);
 
-  // ── Extra computed stats ─────────────────────────────────────────────────
+  // â”€â”€ Extra computed stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const extraStats = useMemo(() => {
     const now = new Date();
     const monthlyBills = bills.filter(b => {
@@ -588,7 +588,7 @@ export function Purchase() {
     const topEntry = Object.entries(supplierTotals).sort(([, a], [, b]) => b - a)[0];
     const urgentCount = bills.filter(b => b.priority === 'HIGH' || b.priority === 'URGENT').length;
     const pendingApprovals = bills.filter(b => b.status === 'DRAFT').length;
-    return { monthlySpend, inventoryAdded, topSupplier: topEntry?.[0] ?? '—', topAmount: topEntry?.[1] ?? 0, urgentCount, pendingApprovals };
+    return { monthlySpend, inventoryAdded, topSupplier: topEntry?.[0] ?? 'â€”', topAmount: topEntry?.[1] ?? 0, urgentCount, pendingApprovals };
   }, [bills]);
 
   const [supplierFilter, setSupplierFilter] = useState('');
@@ -600,14 +600,14 @@ export function Purchase() {
     return true;
   }), [bills, supplierFilter, priorityFilter]);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-6 space-y-6">
 
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold">Purchase Management</h1>
+          <h1 className="text-3xl font-bold">Purchase Management</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Track and manage all purchases including supplier transactions and inventory acquisitions
           </p>
@@ -632,167 +632,170 @@ export function Purchase() {
         </div>
       </div>
 
+      <style>{`
+        @keyframes purchaseFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .purchase-panel {
+          animation: purchaseFadeIn 0.22s ease-out;
+        }
+      `}</style>
       {/* Stats row — 6 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Total Purchases</p>
-                <p className="text-2xl font-bold mt-1">{totalBills}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">This month</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-blue-600" />
-              </div>
+      <div className="purchase-panel grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Purchases</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <FileText className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-700">{totalBills}</div>
+            <p className="text-xs text-muted-foreground mt-1">This month</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Pending Approvals</p>
-                <p className="text-2xl font-bold mt-1">{extraStats.pendingApprovals}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Need approval</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-orange-100 flex items-center justify-center">
-                <Clock className="h-4 w-4 text-orange-600" />
-              </div>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Pending Approvals</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <Clock className="h-4 w-4 text-orange-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-700">{extraStats.pendingApprovals}</div>
+            <p className="text-xs text-muted-foreground mt-1">Need approval</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Monthly Spend</p>
-                <p className="text-lg font-bold mt-1 text-green-600">
-                  AED {extraStats.monthlySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">This month</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
-                <DollarSign className="h-4 w-4 text-green-600" />
-              </div>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Monthly Spend</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <DollarSign className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold text-green-700">
+              AED {extraStats.monthlySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">This month</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Inventory Added</p>
-                <p className="text-2xl font-bold mt-1 text-purple-600">{extraStats.inventoryAdded}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Items received</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                <Package className="h-4 w-4 text-purple-600" />
-              </div>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Inventory Added</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <Package className="h-4 w-4 text-purple-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-700">{extraStats.inventoryAdded}</div>
+            <p className="text-xs text-muted-foreground mt-1">Items received</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Top Supplier</p>
-                <p className="text-sm font-bold mt-1 text-blue-600 truncate max-w-[90px]">{extraStats.topSupplier.split(' ')[0]}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">AED {extraStats.topAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Users className="h-4 w-4 text-blue-600" />
-              </div>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Top Supplier</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Users className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm font-bold text-blue-700 truncate">{extraStats.topSupplier}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              AED {extraStats.topAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Urgent Purchases</p>
-                <p className="text-2xl font-bold mt-1 text-red-600">{extraStats.urgentCount}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">High priority</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-              </div>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Urgent Purchases</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-700">{extraStats.urgentCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">High priority</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main content + sidebar */}
-      <div className="flex gap-5">
+      <div className="flex gap-6">
 
-        {/* ── Main content ─────────────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0 space-y-4">
+        {/* â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        <div className="flex-1 min-w-0 space-y-6">
 
           {/* Filter bar */}
-          <div className="flex flex-wrap gap-2 items-center">
-            <div className="flex-1 min-w-[200px] relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by purchase number, supplier, or invoice..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-9 h-9"
-              />
-            </div>
-            <Select value={statusFilter || 'all'} onValueChange={v => setStatusFilter(v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-[130px] h-9">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="DRAFT">Pending Approval</SelectItem>
-                <SelectItem value="CONFIRMED">Received</SelectItem>
-                <SelectItem value="CANCELLED">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={supplierFilter || 'all'} onValueChange={v => setSupplierFilter(v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-[140px] h-9">
-                <SelectValue placeholder="All Suppliers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Suppliers</SelectItem>
-                {suppliers.map(s => (
-                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter || 'all'} onValueChange={v => setPriorityFilter(v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-[120px] h-9">
-                <SelectValue placeholder="All Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                <SelectItem value="LOW">Low</SelectItem>
-                <SelectItem value="MEDIUM">Medium</SelectItem>
-                <SelectItem value="HIGH">High</SelectItem>
-                <SelectItem value="URGENT">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" className="h-9">
-              <Search className="mr-2 h-4 w-4" />
-              Advanced
-            </Button>
-          </div>
+          <Card className="purchase-panel border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex-1 min-w-[200px] relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by purchase number, supplier, or invoice..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="pl-11 h-10"
+                  />
+                </div>
+                <Select value={statusFilter || 'all'} onValueChange={v => setStatusFilter(v === 'all' ? '' : v)}>
+                  <SelectTrigger className="w-[130px] h-9">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="DRAFT">Pending Approval</SelectItem>
+                    <SelectItem value="CONFIRMED">Received</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={supplierFilter || 'all'} onValueChange={v => setSupplierFilter(v === 'all' ? '' : v)}>
+                  <SelectTrigger className="w-[140px] h-9">
+                    <SelectValue placeholder="All Suppliers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Suppliers</SelectItem>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={priorityFilter || 'all'} onValueChange={v => setPriorityFilter(v === 'all' ? '' : v)}>
+                  <SelectTrigger className="w-[120px] h-9">
+                    <SelectValue placeholder="All Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="LOW">Low</SelectItem>
+                    <SelectItem value="MEDIUM">Medium</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="URGENT">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="ghost" size="sm" className="h-9">
+                  <Search className="mr-2 h-4 w-4" />
+                  Advanced
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Purchase list table */}
-          <Card>
+          <Card className="purchase-panel border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base">Purchase List</CardTitle>
                   <CardDescription>{filteredBills.length} of {totalBills} purchases</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="ghost" size="sm">
                   <Settings className="mr-2 h-4 w-4" />
                   Columns
                 </Button>
@@ -815,8 +818,8 @@ export function Purchase() {
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/40">
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow className="hover:bg-transparent">
                         <TableHead className="w-10 pl-4">
                           <input type="checkbox" className="rounded" />
                         </TableHead>
@@ -834,10 +837,10 @@ export function Purchase() {
                       {filteredBills.map(bill => {
                         const supplier = suppliers.find(s => s.id === bill.supplierId);
                         const dateObj = bill.billDate ? new Date(bill.billDate) : null;
-                        const dateStr = dateObj ? format(dateObj, 'MMM dd, yyyy') : '—';
+                        const dateStr = dateObj ? format(dateObj, 'MMM dd, yyyy') : 'â€”';
                         const dayStr  = dateObj ? format(dateObj, 'EEE') : '';
                         return (
-                          <TableRow key={bill.id} className="hover:bg-muted/30">
+                          <TableRow key={bill.id} className="hover:bg-slate-50/50 transition-colors">
                             <TableCell className="pl-4">
                               <input type="checkbox" className="rounded" />
                             </TableCell>
@@ -1046,11 +1049,11 @@ export function Purchase() {
 
         </div>{/* end main content */}
 
-        {/* ── Right Sidebar ─────────────────────────────────────────────────── */}
-        <div className="w-72 shrink-0 space-y-4">
+        {/* â”€â”€ Right Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        <div className="w-72 shrink-0 space-y-6">
 
           {/* Quick Actions */}
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4 text-yellow-500" />
@@ -1066,16 +1069,16 @@ export function Purchase() {
                 <Plus className="mr-2 h-4 w-4" />
                 New Purchase
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="ghost" size="sm" className="w-full justify-start">
                 <TrendingUp className="mr-2 h-4 w-4" />
                 Bulk Upload
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="ghost" size="sm" className="w-full justify-start">
                 <Receipt className="mr-2 h-4 w-4" />
                 Scan Receipt
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 className="w-full justify-start"
                 onClick={openCreateSupplier}
@@ -1087,7 +1090,7 @@ export function Purchase() {
           </Card>
 
           {/* Inventory Snapshot */}
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Package className="h-4 w-4 text-blue-500" />
@@ -1119,7 +1122,7 @@ export function Purchase() {
           </Card>
 
           {/* Suppliers quick list */}
-          <Card>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -1155,7 +1158,7 @@ export function Purchase() {
 
       </div>{/* end two-column layout */}
 
-      {/* ── Create / Edit Bill Dialog ──────────────────────────────────────── */}
+      {/* â”€â”€ Create / Edit Bill Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={showBillForm} onOpenChange={open => {
         setShowBillForm(open);
         if (!open) { setEditingBill(null); setBillForm(defaultBillForm()); setProductSearch(''); setShowProductSearch(false); }
@@ -1316,7 +1319,7 @@ export function Purchase() {
                             <div className="flex flex-col">
                               <span className="font-medium text-sm">{p.name}</span>
                               <span className="text-xs text-muted-foreground">
-                                {p.sku} • {p.categoryName}
+                                {p.sku} â€¢ {p.categoryName}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 ml-3 shrink-0">
@@ -1552,7 +1555,7 @@ export function Purchase() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Bill Detail Dialog ────────────────────────────────────────────── */}
+      {/* â”€â”€ Bill Detail Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={showBillDetail} onOpenChange={setShowBillDetail}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           {selectedBill && (
@@ -1646,7 +1649,7 @@ export function Purchase() {
                               <p className="font-medium">{item.productName}</p>
                               {item.notes && <p className="text-xs text-muted-foreground italic">{item.notes}</p>}
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{item.productSku ?? '—'}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{item.productSku ?? 'â€”'}</TableCell>
                             <TableCell>{item.quantity} {item.unitOfMeasure ?? ''}</TableCell>
                             <TableCell>AED {item.unitPrice.toFixed(2)}</TableCell>
                             <TableCell>{item.discountPercent}%</TableCell>
@@ -1764,7 +1767,7 @@ export function Purchase() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Record Payment Dialog ─────────────────────────────────────────── */}
+      {/* â”€â”€ Record Payment Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={showPaymentDialog} onOpenChange={open => {
         setShowPaymentDialog(open);
         if (!open) { setPayingBill(null); setPayAmount(''); setPayMethod('cash'); setPayNotes(''); }
@@ -1776,7 +1779,7 @@ export function Purchase() {
               Record Payment
             </DialogTitle>
             <DialogDescription>
-              {payingBill && `Bill ${payingBill.billNumber} — Balance: AED ${(payingBill.totalAmount - payingBill.amountPaid).toFixed(2)}`}
+              {payingBill && `Bill ${payingBill.billNumber} â€” Balance: AED ${(payingBill.totalAmount - payingBill.amountPaid).toFixed(2)}`}
             </DialogDescription>
           </DialogHeader>
 
@@ -1835,7 +1838,7 @@ export function Purchase() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Supplier Form Dialog ──────────────────────────────────────────── */}
+      {/* â”€â”€ Supplier Form Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={showSupplierForm} onOpenChange={open => {
         setShowSupplierForm(open);
         if (!open) setEditingSupplier(null);
@@ -1945,7 +1948,7 @@ export function Purchase() {
                 />
               </div>
               <div>
-                <Label>Rating (0–5)</Label>
+                <Label>Rating (0â€“5)</Label>
                 <Input
                   type="number"
                   min="0"
@@ -1999,3 +2002,14 @@ export function Purchase() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

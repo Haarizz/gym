@@ -145,6 +145,18 @@ function mapProductStock(r: any): ProductStock {
 }
 
 function mapProduct(r: any): Product {
+  const rawImages = r.image_urls ?? r.imageUrls ?? [];
+  let imageUrls: string[] = [];
+  if (Array.isArray(rawImages)) {
+    imageUrls = rawImages;
+  } else if (typeof rawImages === "string") {
+    try {
+      const parsed = JSON.parse(rawImages);
+      imageUrls = Array.isArray(parsed) ? parsed : rawImages.split(",").map((s: string) => s.trim());
+    } catch {
+      imageUrls = rawImages.split(",").map((s: string) => s.trim());
+    }
+  }
   const stocks: ProductStock[] = (r.stock_by_warehouse ?? r.stockByWarehouse ?? []).map(mapProductStock);
   return {
     id: r.id,
@@ -158,7 +170,7 @@ function mapProduct(r: any): Product {
     hasVariants: r.has_variants ?? r.hasVariants ?? false,
     hasRecipe: r.has_recipe ?? r.hasRecipe ?? false,
     isManufactured: r.is_manufactured ?? r.isManufactured ?? false,
-    imageUrls: r.image_urls ?? r.imageUrls ?? [],
+    imageUrls,
     barcode: r.barcode,
     barcodeTemplate: r.barcode_template ?? r.barcodeTemplate,
     defaultUnit: r.default_unit ?? r.defaultUnit,
