@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { leadService, type LeadResponse } from '../utils/supabase/lead-service';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -118,10 +119,6 @@ interface LeadInteraction {
 interface Staff {
   id: string;
   name: string;
-  role: string;
-  avatar?: string;
-  leadsAssigned: number;
-  leadsConverted: number;
 }
 
 export function Leads() {
@@ -142,184 +139,79 @@ export function Leads() {
 
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
+  // API state
+  const [apiLeads, setApiLeads] = useState<LeadResponse[]>([]);
+  const [newLead, setNewLead] = useState({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '' });
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [showEditLead, setShowEditLead] = useState(false);
+  const [editLead, setEditLead] = useState({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', status: 'new', assignedStaff: '', nextFollowUp: '', membershipInterest: '', interestLevel: '5', leadScore: '50' });
+  const [showAddInteraction, setShowAddInteraction] = useState(false);
+  const [interactionLeadId, setInteractionLeadId] = useState<string | null>(null);
+  const [newInteraction, setNewInteraction] = useState({ type: 'call', staffMember: '', notes: '', outcome: 'positive', duration: '' });
+  const [showUpdateStatus, setShowUpdateStatus] = useState(false);
+  const [statusLeadId, setStatusLeadId] = useState<string | null>(null);
+  const [newStatus, setNewStatus] = useState('new');
+
+  const loadLeads = useCallback(async () => {
+    try {
+      const data = await leadService.getLeads({ size: 200, status: statusFilter !== 'all' ? statusFilter : undefined, source: sourceFilter !== 'all' ? sourceFilter : undefined, priority: priorityFilter !== 'all' ? priorityFilter : undefined, search: searchTerm || undefined });
+      setApiLeads(data.leads);
+    } catch { /* keep mock data */ }
+  }, [statusFilter, sourceFilter, priorityFilter, searchTerm]);
+
+  useEffect(() => { loadLeads(); }, [loadLeads]);
+
   // Sample data - in real app this would come from your backend
-  const staffMembers: Staff[] = [
-    { id: '1', name: 'Sarah Johnson', role: 'Sales Manager', leadsAssigned: 45, leadsConverted: 28 },
-    { id: '2', name: 'Ahmed Hassan', role: 'Membership Consultant', leadsAssigned: 38, leadsConverted: 22 },
-    { id: '3', name: 'Maria Rodriguez', role: 'Lead Specialist', leadsAssigned: 42, leadsConverted: 31 },
-    { id: '4', name: 'David Wilson', role: 'Sales Associate', leadsAssigned: 35, leadsConverted: 18 }
+  const staffMembers = [
+    { id: '1', name: 'Sarah Johnson' },
+    { id: '2', name: 'Ahmed Hassan' },
+    { id: '3', name: 'Maria Rodriguez' },
+    { id: '4', name: 'David Wilson' },
   ];
 
-  const leads: Lead[] = [
-    {
-      id: '1',
-      firstName: 'John',
-      lastName: 'Smith',
-      email: 'john.smith@email.com',
-      phone: '+971 50 123 4567',
-      status: 'new',
-      source: 'website',
-      priority: 'high',
-      assignedStaff: 'Sarah Johnson',
-      nextFollowUp: new Date('2024-03-22'),
-      createdDate: new Date('2024-03-20'),
-      interestLevel: 8,
-      notes: 'Interested in premium membership. Looking for personal training options.',
-      tags: ['premium', 'personal-training'],
-      membershipInterest: 'Premium Annual',
-      budget: 2000,
-      preferredContactMethod: 'phone',
-      leadScore: 85,
-      interactions: [
-        {
-          id: '1',
-          type: 'email',
-          date: new Date('2024-03-20'),
-          staffMember: 'Sarah Johnson',
-          notes: 'Initial inquiry about membership options',
-          outcome: 'positive'
-        }
-      ]
-    },
-    {
-      id: '2',
-      firstName: 'Lisa',
-      lastName: 'Chen',
-      email: 'lisa.chen@email.com',
-      phone: '+971 55 987 6543',
-      status: 'contacted',
-      source: 'referral',
-      priority: 'medium',
-      assignedStaff: 'Ahmed Hassan',
-      nextFollowUp: new Date('2024-03-23'),
-      createdDate: new Date('2024-03-18'),
-      lastContactDate: new Date('2024-03-21'),
-      interestLevel: 6,
-      notes: 'Referred by existing member. Interested in group classes.',
-      tags: ['group-classes', 'referral'],
-      membershipInterest: 'Standard Monthly',
-      budget: 500,
-      preferredContactMethod: 'email',
-      leadScore: 72,
-      interactions: [
-        {
-          id: '2',
-          type: 'call',
-          date: new Date('2024-03-21'),
-          staffMember: 'Ahmed Hassan',
-          notes: 'Discussed membership options and class schedules',
-          outcome: 'positive',
-          duration: 15
-        }
-      ]
-    },
-    {
-      id: '3',
-      firstName: 'Michael',
-      lastName: 'Johnson',
-      email: 'michael.j@email.com',
-      phone: '+971 52 456 7890',
-      status: 'follow-up',
-      source: 'walk-in',
-      priority: 'high',
-      assignedStaff: 'Maria Rodriguez',
-      nextFollowUp: new Date('2024-03-21'),
-      createdDate: new Date('2024-03-15'),
-      lastContactDate: new Date('2024-03-19'),
-      interestLevel: 9,
-      notes: 'Very motivated. Recent gym tour. Needs to check schedule.',
-      tags: ['tour-completed', 'motivated'],
-      membershipInterest: 'Premium Monthly',
-      budget: 800,
-      preferredContactMethod: 'whatsapp',
-      leadScore: 92,
-      interactions: [
-        {
-          id: '3',
-          type: 'meeting',
-          date: new Date('2024-03-19'),
-          staffMember: 'Maria Rodriguez',
-          notes: 'Facility tour and membership consultation',
-          outcome: 'positive',
-          duration: 45
-        }
-      ]
-    },
-    {
-      id: '4',
-      firstName: 'Sarah',
-      lastName: 'Williams',
-      email: 'sarah.w@email.com',
-      phone: '+971 56 789 0123',
-      status: 'converted',
-      source: 'social-media',
-      priority: 'medium',
-      assignedStaff: 'David Wilson',
-      createdDate: new Date('2024-03-10'),
-      lastContactDate: new Date('2024-03-20'),
-      interestLevel: 7,
-      notes: 'Signed up for Standard membership. Very happy with the facility.',
-      tags: ['converted', 'social-media'],
-      membershipInterest: 'Standard Annual',
-      budget: 1200,
-      preferredContactMethod: 'email',
-      leadScore: 88,
-      interactions: [
-        {
-          id: '4',
-          type: 'call',
-          date: new Date('2024-03-20'),
-          staffMember: 'David Wilson',
-          notes: 'Completed membership signup process',
-          outcome: 'positive',
-          duration: 20
-        }
-      ]
-    },
-    {
-      id: '5',
-      firstName: 'Ahmed',
-      lastName: 'Al-Rashid',
-      email: 'ahmed.r@email.com',
-      phone: '+971 54 345 6789',
-      status: 'lost',
-      source: 'google-ads',
-      priority: 'low',
-      assignedStaff: 'Sarah Johnson',
-      createdDate: new Date('2024-03-05'),
-      lastContactDate: new Date('2024-03-12'),
-      interestLevel: 3,
-      notes: 'Price-sensitive. Found cheaper alternative.',
-      tags: ['price-sensitive', 'lost'],
-      membershipInterest: 'Basic Monthly',
-      budget: 200,
-      preferredContactMethod: 'phone',
-      leadScore: 25,
-      interactions: [
-        {
-          id: '5',
-          type: 'call',
-          date: new Date('2024-03-12'),
-          staffMember: 'Sarah Johnson',
-          notes: 'Follow-up call - decided not to proceed',
-          outcome: 'negative',
-          duration: 8
-        }
-      ]
-    }
-  ];
+
+  const displayLeads: Lead[] = apiLeads.map(l => ({
+    id: String(l.id),
+    firstName: l.firstName,
+    lastName: l.lastName || '',
+    email: l.email || '',
+    phone: l.phone || '',
+    status: (l.status === 'follow_up' ? 'follow-up' : l.status) as Lead['status'],
+    source: (l.source as Lead['source']) || 'other',
+    priority: (l.priority as Lead['priority']) || 'medium',
+    assignedStaff: l.assignedStaff,
+    nextFollowUp: l.nextFollowUp ? new Date(l.nextFollowUp) : undefined,
+    createdDate: new Date(l.createdAt),
+    lastContactDate: l.lastContactDate ? new Date(l.lastContactDate) : undefined,
+    interestLevel: l.interestLevel || 5,
+    notes: l.notes || '',
+    tags: l.tags || [],
+    membershipInterest: l.membershipInterest,
+    budget: l.budget,
+    preferredContactMethod: (l.preferredContactMethod as Lead['preferredContactMethod']) || 'email',
+    leadScore: l.leadScore || 50,
+    interactions: (l.interactions || []).map(i => ({
+      id: String(i.id),
+      type: i.type as LeadInteraction['type'],
+      date: new Date(i.date),
+      staffMember: i.staffMember,
+      notes: i.notes,
+      outcome: i.outcome as LeadInteraction['outcome'],
+      duration: i.duration,
+    })),
+  }));
 
   // Calculate KPIs
   const kpis = useMemo(() => {
-    const totalLeads = leads.length;
-    const convertedLeads = leads.filter(lead => lead.status === 'converted').length;
-    const pendingFollowUps = leads.filter(lead => 
-      lead.nextFollowUp && lead.nextFollowUp <= new Date() && 
+    const totalLeads = displayLeads.length;
+    const convertedLeads = displayLeads.filter(lead => lead.status === 'converted').length;
+    const pendingFollowUps = displayLeads.filter(lead =>
+      lead.nextFollowUp && lead.nextFollowUp <= new Date() &&
       !['converted', 'lost'].includes(lead.status)
     ).length;
-    const hotLeads = leads.filter(lead => lead.priority === 'high' && !['converted', 'lost'].includes(lead.status)).length;
+    const hotLeads = displayLeads.filter(lead => lead.priority === 'high' && !['converted', 'lost'].includes(lead.status)).length;
     const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
-    const avgLeadScore = leads.length > 0 ? leads.reduce((sum, lead) => sum + lead.leadScore, 0) / leads.length : 0;
+    const avgLeadScore = displayLeads.length > 0 ? displayLeads.reduce((sum, lead) => sum + lead.leadScore, 0) / displayLeads.length : 0;
 
     return {
       totalLeads,
@@ -329,11 +221,11 @@ export function Leads() {
       conversionRate,
       avgLeadScore
     };
-  }, [leads]);
+  }, [displayLeads]);
 
   // Filter and sort leads
   const filteredLeads = useMemo(() => {
-    let filtered = leads.filter(lead => {
+    let filtered = displayLeads.filter(lead => {
       const matchesSearch = searchTerm === '' || 
         `${lead.firstName} ${lead.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
         lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -362,7 +254,7 @@ export function Leads() {
     });
 
     return filtered;
-  }, [leads, searchTerm, statusFilter, sourceFilter, staffFilter, priorityFilter, sortField, sortDirection]);
+  }, [displayLeads, searchTerm, statusFilter, sourceFilter, staffFilter, priorityFilter, sortField, sortDirection]);
 
   // Group leads by status for kanban view
   const leadsByStatus = useMemo(() => {
@@ -414,38 +306,79 @@ export function Leads() {
     setShowLeadDetail(true);
   }, []);
 
-  const handleAddInteraction = useCallback((leadId: string, interaction: Omit<LeadInteraction, 'id'>) => {
-    // In real app, this would update the backend
-    toast.success('Interaction added successfully');
-  }, []);
+  const handleAddInteraction = useCallback(async (leadId: string, interaction: Omit<LeadInteraction, 'id'>) => {
+    try {
+      await leadService.addInteraction(Number(leadId), {
+        type: interaction.type as any,
+        date: new Date().toISOString(),
+        staffMember: interaction.staffMember,
+        notes: interaction.notes,
+        outcome: interaction.outcome as any,
+        duration: interaction.duration,
+      });
+      toast.success('Interaction added successfully');
+      loadLeads();
+    } catch { toast.error('Failed to add interaction'); }
+  }, [loadLeads]);
 
-  const handleUpdateLeadStatus = useCallback((leadId: string, newStatus: Lead['status']) => {
-    // In real app, this would update the backend
-    toast.success(`Lead status updated to ${newStatus}`);
-  }, []);
+  const handleUpdateLeadStatus = useCallback(async (leadId: string, status: Lead['status']) => {
+    try {
+      await leadService.updateStatus(Number(leadId), status === 'follow-up' ? 'follow_up' : status);
+      toast.success(`Lead status updated to ${status}`);
+      loadLeads();
+    } catch { toast.error('Failed to update lead status'); }
+  }, [loadLeads]);
 
-  const handleBulkAction = useCallback((action: string) => {
+  const handleBulkAction = useCallback(async (action: string) => {
     if (selectedLeads.length === 0) {
       toast.error('Please select leads first');
       return;
     }
-    
-    switch (action) {
-      case 'assign':
-        toast.success(`Assigned ${selectedLeads.length} leads`);
-        break;
-      case 'status':
-        toast.success(`Updated status for ${selectedLeads.length} leads`);
-        break;
-      case 'delete':
+    if (action === 'delete') {
+      if (!window.confirm(`Delete ${selectedLeads.length} leads?`)) return;
+      try {
+        await Promise.all(selectedLeads.map(id => leadService.delete(Number(id))));
         toast.success(`Deleted ${selectedLeads.length} leads`);
-        break;
-      default:
-        toast.info(`Action: ${action} for ${selectedLeads.length} leads`);
+        loadLeads();
+      } catch { toast.error('Failed to delete some leads'); }
+    } else if (action === 'status') {
+      setShowUpdateStatus(true);
+      return;
+    } else if (action === 'assign') {
+      toast.info('Use the edit button to assign individual leads');
     }
     setSelectedLeads([]);
     setShowBulkActions(false);
-  }, [selectedLeads]);
+  }, [selectedLeads, loadLeads]);
+
+  const handleDeleteLead = useCallback(async (id: string) => {
+    if (!window.confirm('Delete this lead?')) return;
+    try {
+      await leadService.delete(Number(id));
+      toast.success('Lead deleted');
+      loadLeads();
+    } catch { toast.error('Failed to delete lead'); }
+  }, [loadLeads]);
+
+  const handleOpenEditLead = useCallback((lead: Lead) => {
+    setEditingLead(lead);
+    setEditLead({
+      firstName: lead.firstName,
+      lastName: lead.lastName,
+      email: lead.email,
+      phone: lead.phone,
+      source: lead.source,
+      priority: lead.priority,
+      notes: lead.notes,
+      status: lead.status === 'follow-up' ? 'follow_up' : lead.status,
+      assignedStaff: lead.assignedStaff || '',
+      nextFollowUp: lead.nextFollowUp ? lead.nextFollowUp.toISOString().split('T')[0] : '',
+      membershipInterest: lead.membershipInterest || '',
+      interestLevel: String(lead.interestLevel),
+      leadScore: String(lead.leadScore),
+    });
+    setShowEditLead(true);
+  }, []);
 
   const handleQuickAction = useCallback((lead: Lead, action: string) => {
     switch (action) {
@@ -832,6 +765,12 @@ export function Leads() {
                         <Button size="sm" variant="ghost" onClick={() => handleLeadClick(lead)}>
                           <Eye className="h-4 w-4" />
                         </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleOpenEditLead(lead)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteLead(lead.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1067,9 +1006,13 @@ export function Leads() {
                         <MessageSquare className="mr-2 h-4 w-4" />
                         WhatsApp
                       </Button>
-                      <Button onClick={() => handleQuickAction(selectedLead, 'schedule')} className="justify-start">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        Schedule Follow-up
+                      <Button onClick={() => { setStatusLeadId(selectedLead.id); setNewStatus(selectedLead.status === 'follow-up' ? 'follow_up' : selectedLead.status); setShowUpdateStatus(true); }} className="justify-start">
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Update Status
+                      </Button>
+                      <Button variant="outline" onClick={() => { setInteractionLeadId(selectedLead.id); setNewInteraction({ type: 'call', staffMember: '', notes: '', outcome: 'positive', duration: '' }); setShowAddInteraction(true); }} className="justify-start col-span-2">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Interaction
                       </Button>
                     </div>
                   </CardContent>
@@ -1131,33 +1074,29 @@ export function Leads() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add New Lead</DialogTitle>
-            <DialogDescription>
-              Create a new lead entry in the system
-            </DialogDescription>
+            <DialogDescription>Create a new lead entry in the system</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="firstName">First Name</Label>
-              <Input id="firstName" placeholder="Enter first name" />
+              <Input id="firstName" placeholder="Enter first name" value={newLead.firstName} onChange={e => setNewLead(p => ({ ...p, firstName: e.target.value }))} />
             </div>
             <div>
               <Label htmlFor="lastName">Last Name</Label>
-              <Input id="lastName" placeholder="Enter last name" />
+              <Input id="lastName" placeholder="Enter last name" value={newLead.lastName} onChange={e => setNewLead(p => ({ ...p, lastName: e.target.value }))} />
             </div>
             <div>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="Enter email address" />
+              <Input id="email" type="email" placeholder="Enter email address" value={newLead.email} onChange={e => setNewLead(p => ({ ...p, email: e.target.value }))} />
             </div>
             <div>
               <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" placeholder="Enter phone number" />
+              <Input id="phone" placeholder="Enter phone number" value={newLead.phone} onChange={e => setNewLead(p => ({ ...p, phone: e.target.value }))} />
             </div>
             <div>
               <Label htmlFor="source">Lead Source</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select source" />
-                </SelectTrigger>
+              <Select value={newLead.source} onValueChange={v => setNewLead(p => ({ ...p, source: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="website">Website</SelectItem>
                   <SelectItem value="referral">Referral</SelectItem>
@@ -1170,10 +1109,8 @@ export function Leads() {
             </div>
             <div>
               <Label htmlFor="priority">Priority</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select priority" />
-                </SelectTrigger>
+              <Select value={newLead.priority} onValueChange={v => setNewLead(p => ({ ...p, priority: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select priority" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="high">High</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
@@ -1183,19 +1120,252 @@ export function Leads() {
             </div>
             <div className="md:col-span-2">
               <Label htmlFor="notes">Notes</Label>
-              <Textarea id="notes" placeholder="Enter any additional notes about this lead" />
+              <Textarea id="notes" placeholder="Enter any additional notes about this lead" value={newLead.notes} onChange={e => setNewLead(p => ({ ...p, notes: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddLead(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => {
-              toast.success('Lead added successfully');
-              setShowAddLead(false);
+            <Button variant="outline" onClick={() => setShowAddLead(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              try {
+                await leadService.create({ firstName: newLead.firstName, lastName: newLead.lastName || undefined, email: newLead.email || undefined, phone: newLead.phone || undefined, source: newLead.source, priority: newLead.priority, notes: newLead.notes || undefined, status: 'new' });
+                toast.success('Lead added successfully');
+                setNewLead({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '' });
+                setShowAddLead(false);
+                await loadLeads();
+              } catch { toast.error('Failed to add lead'); }
             }}>
               Add Lead
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Edit Lead Dialog */}
+      <Dialog open={showEditLead} onOpenChange={setShowEditLead}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Lead</DialogTitle>
+            <DialogDescription>Update lead information</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>First Name</Label>
+              <Input value={editLead.firstName} onChange={e => setEditLead(p => ({ ...p, firstName: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Last Name</Label>
+              <Input value={editLead.lastName} onChange={e => setEditLead(p => ({ ...p, lastName: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input type="email" value={editLead.email} onChange={e => setEditLead(p => ({ ...p, email: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Phone</Label>
+              <Input value={editLead.phone} onChange={e => setEditLead(p => ({ ...p, phone: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={editLead.status} onValueChange={v => setEditLead(p => ({ ...p, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="contacted">Contacted</SelectItem>
+                  <SelectItem value="follow_up">Follow-up</SelectItem>
+                  <SelectItem value="converted">Converted</SelectItem>
+                  <SelectItem value="lost">Lost</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Priority</Label>
+              <Select value={editLead.priority} onValueChange={v => setEditLead(p => ({ ...p, priority: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Source</Label>
+              <Select value={editLead.source} onValueChange={v => setEditLead(p => ({ ...p, source: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="website">Website</SelectItem>
+                  <SelectItem value="referral">Referral</SelectItem>
+                  <SelectItem value="walk-in">Walk-in</SelectItem>
+                  <SelectItem value="social-media">Social Media</SelectItem>
+                  <SelectItem value="google-ads">Google Ads</SelectItem>
+                  <SelectItem value="facebook-ads">Facebook Ads</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Assigned Staff</Label>
+              <Select value={editLead.assignedStaff} onValueChange={v => setEditLead(p => ({ ...p, assignedStaff: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                <SelectContent>
+                  {staffMembers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Next Follow-up</Label>
+              <Input type="date" value={editLead.nextFollowUp} onChange={e => setEditLead(p => ({ ...p, nextFollowUp: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Membership Interest</Label>
+              <Input value={editLead.membershipInterest} onChange={e => setEditLead(p => ({ ...p, membershipInterest: e.target.value }))} placeholder="e.g. Premium Annual" />
+            </div>
+            <div>
+              <Label>Interest Level (1-10)</Label>
+              <Input type="number" min="1" max="10" value={editLead.interestLevel} onChange={e => setEditLead(p => ({ ...p, interestLevel: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Lead Score (1-100)</Label>
+              <Input type="number" min="1" max="100" value={editLead.leadScore} onChange={e => setEditLead(p => ({ ...p, leadScore: e.target.value }))} />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Notes</Label>
+              <Textarea value={editLead.notes} onChange={e => setEditLead(p => ({ ...p, notes: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditLead(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              if (!editingLead) return;
+              try {
+                await leadService.update(Number(editingLead.id), {
+                  firstName: editLead.firstName,
+                  lastName: editLead.lastName || undefined,
+                  email: editLead.email || undefined,
+                  phone: editLead.phone || undefined,
+                  status: editLead.status,
+                  source: editLead.source,
+                  priority: editLead.priority,
+                  notes: editLead.notes || undefined,
+                  assignedStaff: editLead.assignedStaff || undefined,
+                  nextFollowUp: editLead.nextFollowUp || undefined,
+                  membershipInterest: editLead.membershipInterest || undefined,
+                  interestLevel: editLead.interestLevel ? Number(editLead.interestLevel) : undefined,
+                  leadScore: editLead.leadScore ? Number(editLead.leadScore) : undefined,
+                });
+                toast.success('Lead updated');
+                setShowEditLead(false);
+                loadLeads();
+              } catch { toast.error('Failed to update lead'); }
+            }}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Interaction Dialog */}
+      <Dialog open={showAddInteraction} onOpenChange={setShowAddInteraction}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Interaction</DialogTitle>
+            <DialogDescription>Record a new interaction with this lead</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Type</Label>
+              <Select value={newInteraction.type} onValueChange={v => setNewInteraction(p => ({ ...p, type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call">Call</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="meeting">Meeting</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="sms">SMS</SelectItem>
+                  <SelectItem value="note">Note</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Staff Member</Label>
+              <Select value={newInteraction.staffMember} onValueChange={v => setNewInteraction(p => ({ ...p, staffMember: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                <SelectContent>
+                  {staffMembers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Outcome</Label>
+              <Select value={newInteraction.outcome} onValueChange={v => setNewInteraction(p => ({ ...p, outcome: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="positive">Positive</SelectItem>
+                  <SelectItem value="neutral">Neutral</SelectItem>
+                  <SelectItem value="negative">Negative</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Duration (min, optional)</Label>
+              <Input type="number" value={newInteraction.duration} onChange={e => setNewInteraction(p => ({ ...p, duration: e.target.value }))} placeholder="e.g. 15" />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea value={newInteraction.notes} onChange={e => setNewInteraction(p => ({ ...p, notes: e.target.value }))} placeholder="What was discussed?" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddInteraction(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              if (!interactionLeadId || !newInteraction.staffMember || !newInteraction.notes) {
+                toast.error('Staff member and notes are required');
+                return;
+              }
+              await handleAddInteraction(interactionLeadId, {
+                type: newInteraction.type as any,
+                date: new Date(),
+                staffMember: newInteraction.staffMember,
+                notes: newInteraction.notes,
+                outcome: newInteraction.outcome as any,
+                duration: newInteraction.duration ? Number(newInteraction.duration) : undefined,
+              });
+              setShowAddInteraction(false);
+            }}>Add Interaction</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Status Dialog */}
+      <Dialog open={showUpdateStatus} onOpenChange={setShowUpdateStatus}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Update Lead Status</DialogTitle>
+            <DialogDescription>Change the status of selected lead(s)</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>New Status</Label>
+            <Select value={newStatus} onValueChange={setNewStatus}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="contacted">Contacted</SelectItem>
+                <SelectItem value="follow_up">Follow-up</SelectItem>
+                <SelectItem value="converted">Converted</SelectItem>
+                <SelectItem value="lost">Lost</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUpdateStatus(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              const ids = statusLeadId ? [statusLeadId] : selectedLeads;
+              try {
+                await Promise.all(ids.map(id => leadService.updateStatus(Number(id), newStatus)));
+                toast.success(`Status updated for ${ids.length} lead(s)`);
+                setShowUpdateStatus(false);
+                setStatusLeadId(null);
+                setSelectedLeads([]);
+                loadLeads();
+              } catch { toast.error('Failed to update status'); }
+            }}>Update Status</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
