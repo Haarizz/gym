@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -273,6 +273,18 @@ export function AddProduct({ onNavigate }: AddProductProps) {
           setReorderLevel(String(firstStock.reorderLevel || 0));
           setSelectedWarehouseId(String(firstStock.warehouseId));
         }
+
+        // Load product units
+        if (product.units && product.units.length > 0) {
+          setProductUnits(product.units.map((u: any) => ({
+            id: String(u.id || Date.now() + Math.random()),
+            unit: u.unit || "",
+            conversionFactor: u.conversionFactor ?? 1,
+            costPrice: u.costPrice ?? 0,
+            sellingPrice: u.sellingPrice ?? 0,
+            barcode: u.barcode || "",
+          })));
+        }
       } catch (error) {
         console.error('Failed to load product:', error);
         toast.error('Failed to load product data. Please try again.');
@@ -442,7 +454,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     toast.success(`${barcodeTemplate} barcode generated successfully!`);
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (activeTab !== "images-barcode") return;
     if (!generatedBarcode) return;
     if (barcodeTemplate === "QR Code") return;
@@ -450,12 +462,13 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     try {
       JsBarcode(barcodeSvgRef.current, generatedBarcode, {
         format: barcodeFormat,
-        displayValue: false,
+        displayValue: true,
         lineColor: "#111827",
-        background: "transparent",
-        height: 64,
+        background: "#ffffff",
+        height: 60,
         width: 2,
-        margin: 0,
+        margin: 8,
+        fontSize: 12,
       });
     } catch (error) {
       console.error("Failed to render barcode:", error);
@@ -704,6 +717,13 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         openingStock: openingStock ? parseInt(openingStock, 10) : 0,
         reorderLevel: reorderLevel ? parseInt(reorderLevel, 10) : 0,
         warehouseId: parseInt(selectedWarehouseId, 10),
+        units: productUnits.map(u => ({
+          unit: u.unit || undefined,
+          conversionFactor: u.conversionFactor || 1,
+          costPrice: u.costPrice || 0,
+          sellingPrice: u.sellingPrice || 0,
+          barcode: u.barcode || undefined,
+        })),
       };
 
       if (isEditMode && productId) {
@@ -1017,7 +1037,6 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                                 <img
                                   src={resolvedImage}
                                   alt={`Product ${index + 1}`}
-                                  loading="lazy"
                                   onError={() => setImageErrors(prev => ({ ...prev, [index]: true }))}
                                   className="w-full h-full object-cover"
                                 />
@@ -1166,8 +1185,8 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                               <QRCode value={qrPayload} size={140} />
                             </div>
                           ) : (
-                            <div className="flex justify-center">
-                              <svg ref={barcodeSvgRef} className="h-16 w-full" />
+                            <div className="flex justify-center overflow-x-auto">
+                              <svg ref={barcodeSvgRef} />
                             </div>
                           )}
                         </div>

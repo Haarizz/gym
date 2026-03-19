@@ -6,14 +6,17 @@ import com.company.project.dto.ProductStatsDTO;
 import com.company.project.dto.ProductsPageResponseDTO;
 import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.StockAdjustmentRequestDTO;
+import com.company.project.dto.ProductUnitDTO;
 import com.company.project.entities.Product;
 import com.company.project.entities.ProductCategory;
 import com.company.project.entities.ProductStock;
+import com.company.project.entities.ProductUnit;
 import com.company.project.entities.StockAdjustment;
 import com.company.project.entities.Warehouse;
 import com.company.project.repositories.ProductCategoryRepository;
 import com.company.project.repositories.ProductRepository;
 import com.company.project.repositories.ProductStockRepository;
+import com.company.project.repositories.ProductUnitRepository;
 import com.company.project.repositories.StockAdjustmentRepository;
 import com.company.project.repositories.WarehouseRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -40,17 +43,20 @@ public class ProductService {
     private final ProductStockRepository stockRepository;
     private final StockAdjustmentRepository adjustmentRepository;
     private final WarehouseRepository warehouseRepository;
+    private final ProductUnitRepository unitRepository;
 
     public ProductService(ProductRepository productRepository,
                           ProductCategoryRepository categoryRepository,
                           ProductStockRepository stockRepository,
                           StockAdjustmentRepository adjustmentRepository,
-                          WarehouseRepository warehouseRepository) {
+                          WarehouseRepository warehouseRepository,
+                          ProductUnitRepository unitRepository) {
         this.productRepository  = productRepository;
         this.categoryRepository = categoryRepository;
         this.stockRepository    = stockRepository;
         this.adjustmentRepository = adjustmentRepository;
         this.warehouseRepository  = warehouseRepository;
+        this.unitRepository       = unitRepository;
     }
 
     // ── Create ──────────────────────────────────────────────────────────────
@@ -64,6 +70,20 @@ public class ProductService {
         String sku = generateSku(product.getId(), product.getCategoryId());
         product.setSku(sku);
         product = productRepository.save(product);
+
+        // Persist product units
+        if (req.getUnits() != null && !req.getUnits().isEmpty()) {
+            for (ProductUnitDTO unitDTO : req.getUnits()) {
+                ProductUnit pu = new ProductUnit();
+                pu.setProductId(product.getId());
+                if (unitDTO.getUnit() != null) pu.setUnit(unitDTO.getUnit());
+                if (unitDTO.getConversionFactor() != null) pu.setConversionFactor(unitDTO.getConversionFactor());
+                if (unitDTO.getCostPrice() != null) pu.setCostPrice(unitDTO.getCostPrice());
+                if (unitDTO.getSellingPrice() != null) pu.setSellingPrice(unitDTO.getSellingPrice());
+                if (unitDTO.getBarcode() != null && !unitDTO.getBarcode().isBlank()) pu.setBarcode(unitDTO.getBarcode());
+                unitRepository.save(pu);
+            }
+        }
 
         // Create opening stock entry
         if (req.getWarehouseId() != null) {
@@ -125,7 +145,24 @@ public class ProductService {
             product.setSku(generateSku(product.getId(), req.getCategoryId()));
         }
 
-        return buildResponseDTO(productRepository.save(product));
+        product = productRepository.save(product);
+
+        // Replace product units
+        unitRepository.deleteByProductId(id);
+        if (req.getUnits() != null) {
+            for (ProductUnitDTO unitDTO : req.getUnits()) {
+                ProductUnit pu = new ProductUnit();
+                pu.setProductId(product.getId());
+                if (unitDTO.getUnit() != null) pu.setUnit(unitDTO.getUnit());
+                if (unitDTO.getConversionFactor() != null) pu.setConversionFactor(unitDTO.getConversionFactor());
+                if (unitDTO.getCostPrice() != null) pu.setCostPrice(unitDTO.getCostPrice());
+                if (unitDTO.getSellingPrice() != null) pu.setSellingPrice(unitDTO.getSellingPrice());
+                if (unitDTO.getBarcode() != null && !unitDTO.getBarcode().isBlank()) pu.setBarcode(unitDTO.getBarcode());
+                unitRepository.save(pu);
+            }
+        }
+
+        return buildResponseDTO(product);
     }
 
     // ── Delete ──────────────────────────────────────────────────────────────
@@ -272,6 +309,19 @@ public class ProductService {
         copy.setSku(generateSku(copy.getId(), copy.getCategoryId()));
         copy = productRepository.save(copy);
 
+        // Copy units
+        List<ProductUnit> originalUnits = unitRepository.findByProductId(id);
+        for (ProductUnit originalUnit : originalUnits) {
+            ProductUnit pu = new ProductUnit();
+            pu.setProductId(copy.getId());
+            pu.setUnit(originalUnit.getUnit());
+            pu.setConversionFactor(originalUnit.getConversionFactor());
+            pu.setCostPrice(originalUnit.getCostPrice());
+            pu.setSellingPrice(originalUnit.getSellingPrice());
+            pu.setBarcode(originalUnit.getBarcode());
+            unitRepository.save(pu);
+        }
+
         return buildResponseDTO(copy);
     }
 
@@ -328,7 +378,8 @@ public class ProductService {
             cat = categoryRepository.findById(product.getCategoryId()).orElse(null);
         }
         List<ProductStock> stocks = stockRepository.findByProductId(product.getId());
-        return ProductResponseDTO.fromEntity(product, cat, stocks, warehouses);
+        List<ProductUnit> units = unitRepository.findByProductId(product.getId());
+        return ProductResponseDTO.fromEntity(product, cat, stocks, warehouses, units);
     }
 
     private boolean isLowStock(Product product) {

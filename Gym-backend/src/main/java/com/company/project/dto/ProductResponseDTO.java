@@ -3,6 +3,7 @@ package com.company.project.dto;
 import com.company.project.entities.Product;
 import com.company.project.entities.ProductCategory;
 import com.company.project.entities.ProductStock;
+import com.company.project.entities.ProductUnit;
 import com.company.project.entities.Warehouse;
 
 import java.math.BigDecimal;
@@ -39,13 +40,15 @@ public class ProductResponseDTO {
     private String stockStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private List<ProductUnitDTO> units;
 
     public ProductResponseDTO() {}
 
     public static ProductResponseDTO fromEntity(Product p,
                                                 ProductCategory cat,
                                                 List<ProductStock> stocks,
-                                                List<Warehouse> warehouses) {
+                                                List<Warehouse> warehouses,
+                                                List<ProductUnit> units) {
         ProductResponseDTO dto = new ProductResponseDTO();
         dto.setId(p.getId());
         dto.setName(p.getName());
@@ -120,6 +123,8 @@ public class ProductResponseDTO {
         } else {
             dto.setStockStatus("IN_STOCK");
         }
+
+        dto.setUnits(units != null ? units.stream().map(ProductUnitDTO::fromEntity).collect(java.util.stream.Collectors.toList()) : new ArrayList<>());
 
         return dto;
     }
@@ -200,4 +205,7 @@ public class ProductResponseDTO {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public List<ProductUnitDTO> getUnits() { return units; }
+    public void setUnits(List<ProductUnitDTO> units) { this.units = units; }
 }
