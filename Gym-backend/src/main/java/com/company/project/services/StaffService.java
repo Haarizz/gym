@@ -110,6 +110,7 @@ public class StaffService {
         if (req.getDepartment() != null)   staff.setDepartment(req.getDepartment());
         if (req.getBranch() != null)       staff.setBranch(req.getBranch());
         if (req.getMonthlyTarget() != null) staff.setMonthlyTarget(req.getMonthlyTarget());
+        if (req.getBaseSalary() != null)   staff.setBaseSalary(req.getBaseSalary());
         if (req.getStatus() != null)       staff.setStatus(req.getStatus());
         if (req.getAddress() != null)      staff.setAddress(req.getAddress());
         if (req.getPhotoUrl() != null)     staff.setPhotoUrl(req.getPhotoUrl());

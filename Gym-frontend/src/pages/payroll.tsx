@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -37,9 +37,10 @@ import {
   Search,
   Filter
 } from "lucide-react";
-import { format, addMonths, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
+import { format, getDaysInMonth } from "date-fns";
 import { BarChart, Bar, PieChart as RechartsPie, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts";
 import { toast } from "sonner";
+import { salaryPaymentsService } from "../utils/supabase/salary-payments-service";
 
 interface PayrollProps {
   onNavigate?: (section: string) => void;
@@ -102,206 +103,26 @@ interface EmployeePayroll {
   paymentDate?: Date;
 }
 
-// Sample employee data with attendance
-const sampleEmployees: Employee[] = [
-  {
-    id: "1",
-    name: "Ahmed Hassan",
-    employeeId: "EMP001",
-    designation: "Senior Trainer",
-    department: "Personal Training",
-    basicSalary: 8000,
-    allowances: 1500,
-    workingDays: 26,
-    presentDays: 24,
-    absentDays: 2,
-    lateArrivals: 3,
-    overtimeHours: 8,
-    paidLeaves: 0,
-    unpaidLeaves: 2,
-    email: "ahmed.hassan@gymbios.com",
-    bankAccount: "ADCB ****1234"
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    employeeId: "EMP002",
-    designation: "Receptionist",
-    department: "Front Desk",
-    basicSalary: 4500,
-    allowances: 800,
-    workingDays: 26,
-    presentDays: 26,
-    absentDays: 0,
-    lateArrivals: 1,
-    overtimeHours: 4,
-    paidLeaves: 0,
-    unpaidLeaves: 0,
-    email: "sarah.johnson@gymbios.com",
-    bankAccount: "ENBD ****5678"
-  },
-  {
-    id: "3",
-    name: "Mohammed Ali",
-    employeeId: "EMP003",
-    designation: "Yoga Instructor",
-    department: "Group Classes",
-    basicSalary: 5500,
-    allowances: 1000,
-    workingDays: 26,
-    presentDays: 25,
-    absentDays: 1,
-    lateArrivals: 2,
-    overtimeHours: 6,
-    paidLeaves: 0,
-    unpaidLeaves: 1,
-    email: "mohammed.ali@gymbios.com",
-    bankAccount: "FAB ****9012"
-  },
-  {
-    id: "4",
-    name: "Fatima Ahmed",
-    employeeId: "EMP004",
-    designation: "Operations Manager",
-    department: "Management",
-    basicSalary: 12000,
-    allowances: 2000,
-    workingDays: 26,
-    presentDays: 26,
-    absentDays: 0,
-    lateArrivals: 0,
-    overtimeHours: 10,
-    paidLeaves: 0,
-    unpaidLeaves: 0,
-    email: "fatima.ahmed@gymbios.com",
-    bankAccount: "ADIB ****3456"
-  },
-  {
-    id: "5",
-    name: "John Smith",
-    employeeId: "EMP005",
-    designation: "Fitness Trainer",
-    department: "Personal Training",
-    basicSalary: 6500,
-    allowances: 1200,
-    workingDays: 26,
-    presentDays: 23,
-    absentDays: 3,
-    lateArrivals: 5,
-    overtimeHours: 5,
-    paidLeaves: 0,
-    unpaidLeaves: 3,
-    email: "john.smith@gymbios.com",
-    bankAccount: "HSBC ****7890"
-  },
-  {
-    id: "6",
-    name: "Aisha Khan",
-    employeeId: "EMP006",
-    designation: "Nutritionist",
-    department: "Nutrition",
-    basicSalary: 7000,
-    allowances: 1300,
-    workingDays: 26,
-    presentDays: 24,
-    absentDays: 2,
-    lateArrivals: 1,
-    overtimeHours: 7,
-    paidLeaves: 0,
-    unpaidLeaves: 2,
-    email: "aisha.khan@gymbios.com",
-    bankAccount: "RAK ****2468"
-  },
-  {
-    id: "7",
-    name: "Omar Rashid",
-    employeeId: "EMP007",
-    designation: "Facility Manager",
-    department: "Maintenance",
-    basicSalary: 5000,
-    allowances: 900,
-    workingDays: 26,
-    presentDays: 26,
-    absentDays: 0,
-    lateArrivals: 0,
-    overtimeHours: 3,
-    paidLeaves: 0,
-    unpaidLeaves: 0,
-    email: "omar.rashid@gymbios.com",
-    bankAccount: "DIB ****1357"
-  },
-  {
-    id: "8",
-    name: "Lisa Williams",
-    employeeId: "EMP008",
-    designation: "Sales Executive",
-    department: "Sales",
-    basicSalary: 7500,
-    allowances: 1400,
-    workingDays: 26,
-    presentDays: 25,
-    absentDays: 1,
-    lateArrivals: 2,
-    overtimeHours: 9,
-    paidLeaves: 0,
-    unpaidLeaves: 1,
-    email: "lisa.williams@gymbios.com",
-    bankAccount: "CBD ****8642"
-  }
-];
-
-// Sample payroll cycles
-const samplePayrollCycles: PayrollCycle[] = [
-  {
-    id: "1",
-    month: "November",
-    year: 2025,
-    period: "November 2025",
-    totalEmployees: 8,
-    totalWorkingDays: 26,
-    status: "Draft",
-    grossSalary: 58500,
-    totalDeductions: 2340,
-    netSalary: 56160,
-    createdAt: new Date(2025, 10, 1)
-  },
-  {
-    id: "2",
-    month: "October",
-    year: 2025,
-    period: "October 2025",
-    totalEmployees: 8,
-    totalWorkingDays: 27,
-    status: "Disbursed",
-    grossSalary: 57800,
-    totalDeductions: 2312,
-    netSalary: 55488,
-    createdAt: new Date(2025, 9, 1),
-    approvedAt: new Date(2025, 9, 28),
-    disbursedAt: new Date(2025, 9, 30),
-    approvedBy: "HR Manager"
-  },
-  {
-    id: "3",
-    month: "September",
-    year: 2025,
-    period: "September 2025",
-    totalEmployees: 8,
-    totalWorkingDays: 26,
-    status: "Disbursed",
-    grossSalary: 58200,
-    totalDeductions: 2328,
-    netSalary: 55872,
-    createdAt: new Date(2025, 8, 1),
-    approvedAt: new Date(2025, 8, 27),
-    disbursedAt: new Date(2025, 8, 30),
-    approvedBy: "HR Manager"
-  }
+const monthNames = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
 ];
 
 export function Payroll({ onNavigate }: PayrollProps) {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [payrollCycles, setPayrollCycles] = useState<PayrollCycle[]>(samplePayrollCycles);
+  const [payrollCycles, setPayrollCycles] = useState<PayrollCycle[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [selectedCycle, setSelectedCycle] = useState<PayrollCycle | null>(null);
   const [generatedPayroll, setGeneratedPayroll] = useState<EmployeePayroll[]>([]);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
@@ -310,11 +131,47 @@ export function Payroll({ onNavigate }: PayrollProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeePayroll | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
-  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-all";
   
   // Generation form
   const [generationMonth, setGenerationMonth] = useState("November");
   const [generationYear, setGenerationYear] = useState("2025");
+
+  const loadEmployees = async () => {
+    setLoadingEmployees(true);
+    try {
+      const data = await salaryPaymentsService.getEmployees();
+      const today = new Date();
+      const workingDays = getDaysInMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+      const mapped: Employee[] = data.map((emp) => ({
+        id: emp.id,
+        name: emp.name,
+        employeeId: emp.employeeId,
+        designation: emp.designation,
+        department: emp.department,
+        basicSalary: emp.baseSalary,
+        allowances: emp.allowances,
+        workingDays,
+        presentDays: workingDays,
+        absentDays: 0,
+        lateArrivals: 0,
+        overtimeHours: 0,
+        paidLeaves: 0,
+        unpaidLeaves: 0,
+        email: emp.email ?? "",
+        bankAccount: emp.bankAccount ?? ""
+      }));
+      setEmployees(mapped);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load employees");
+    } finally {
+      setLoadingEmployees(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEmployees();
+  }, []);
 
   // Calculate salary for an employee
   const calculateSalary = (employee: Employee): EmployeePayroll => {
@@ -357,7 +214,28 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
   // Generate payroll for selected period
   const handleGeneratePayroll = () => {
-    const payrollData = sampleEmployees.map(emp => calculateSalary(emp));
+    if (employees.length === 0) {
+      toast.error("No employees found. Please add employees before generating payroll.");
+      return;
+    }
+
+    const monthIndex = monthNames.indexOf(generationMonth);
+    const yearNumber = parseInt(generationYear);
+    const workingDays = getDaysInMonth(new Date(yearNumber, monthIndex, 1));
+
+    const payrollData = employees.map(emp => {
+      const normalized = {
+        ...emp,
+        workingDays,
+        presentDays: workingDays,
+        absentDays: 0,
+        lateArrivals: 0,
+        overtimeHours: 0,
+        paidLeaves: 0,
+        unpaidLeaves: 0
+      };
+      return calculateSalary(normalized);
+    });
     setGeneratedPayroll(payrollData);
     
     const totalGross = payrollData.reduce((sum, p) => sum + p.grossSalary, 0);
@@ -367,10 +245,10 @@ export function Payroll({ onNavigate }: PayrollProps) {
     const newCycle: PayrollCycle = {
       id: Date.now().toString(),
       month: generationMonth,
-      year: parseInt(generationYear),
+      year: yearNumber,
       period: `${generationMonth} ${generationYear}`,
-      totalEmployees: sampleEmployees.length,
-      totalWorkingDays: 26,
+      totalEmployees: employees.length,
+      totalWorkingDays: workingDays,
       status: "Draft",
       grossSalary: totalGross,
       totalDeductions: totalDed,
@@ -426,7 +304,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
   // Summary stats
   const dashboardStats = useMemo(() => {
-    const totalEmp = sampleEmployees.length;
+    const totalEmp = employees.length;
     const pendingPayrolls = payrollCycles.filter(c => c.status === "Pending").length;
     const approvedPayrolls = payrollCycles.filter(c => c.status === "Approved").length;
     const disbursedPayrolls = payrollCycles.filter(c => c.status === "Disbursed").length;
@@ -449,7 +327,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
     });
   }, [generatedPayroll, searchTerm, departmentFilter]);
 
-  const departments = Array.from(new Set(sampleEmployees.map(e => e.department)));
+  const departments = Array.from(new Set(employees.map(e => e.department).filter(Boolean)));
 
   // Chart data
   const departmentChartData = useMemo(() => {
@@ -469,11 +347,15 @@ export function Payroll({ onNavigate }: PayrollProps) {
     ];
   }, [generatedPayroll]);
 
-  const monthlyTrendData = [
-    { month: "Sep", amount: 55872 },
-    { month: "Oct", amount: 55488 },
-    { month: "Nov", amount: 56160 }
-  ];
+  const monthlyTrendData = useMemo(() => {
+    const monthIndex = (monthName: string) => monthNames.indexOf(monthName);
+    return [...payrollCycles]
+      .sort((a, b) => (a.year - b.year) || (monthIndex(a.month) - monthIndex(b.month)))
+      .map(cycle => ({
+        month: cycle.month.slice(0, 3),
+        amount: cycle.netSalary
+      }));
+  }, [payrollCycles]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -514,16 +396,14 @@ export function Payroll({ onNavigate }: PayrollProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Calculator className="h-8 w-8" style={{ color: '#2B7A78' }} />
-            Payroll Management
-          </h1>
+          <h1 className="text-3xl font-bold">Payroll Management</h1>
           <p className="text-muted-foreground">
             Automated salary processing based on attendance, shifts, and leave records
           </p>
         </div>
         <Button
           onClick={() => setShowGenerateDialog(true)}
+          disabled={loadingEmployees}
           style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -567,7 +447,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+                <CardTitle className="text-sm font-medium text-primary">Total Employees</CardTitle>
                 <div className="bg-gradient-light p-2 rounded-lg">
                   <Users className="h-4 w-4 text-primary" />
                 </div>
@@ -582,7 +462,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
             <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending Payrolls</CardTitle>
+                <CardTitle className="text-sm font-medium text-primary">Pending Payrolls</CardTitle>
                 <div className="bg-yellow-50 p-2 rounded-lg">
                   <Clock className="h-4 w-4 text-yellow-600" />
                 </div>
@@ -597,7 +477,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
             <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Approved Payrolls</CardTitle>
+                <CardTitle className="text-sm font-medium text-primary">Approved Payrolls</CardTitle>
                 <div className="bg-blue-50 p-2 rounded-lg">
                   <CheckCircle className="h-4 w-4 text-blue-600" />
                 </div>
@@ -612,7 +492,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
             <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Disbursed Payrolls</CardTitle>
+                <CardTitle className="text-sm font-medium text-primary">Disbursed Payrolls</CardTitle>
                 <div className="bg-green-50 p-2 rounded-lg">
                   <Wallet className="h-4 w-4 text-green-600" />
                 </div>
@@ -646,7 +526,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   Generate New Payroll
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   className="w-full justify-start"
                   onClick={() => setActiveTab("history")}
                 >
@@ -654,7 +534,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   View History
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   className="w-full justify-start"
                   onClick={() => toast.info("Exporting payroll report...")}
                 >
@@ -675,7 +555,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               <CardContent>
                 <div className="space-y-3">
                   {payrollCycles.slice(0, 3).map((cycle) => (
-                    <div key={cycle.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div key={cycle.id} className="flex items-center justify-between p-4 rounded-lg hover:bg-muted/50 transition-colors">
                       <div className="flex-1">
                         <div className="font-medium">{cycle.period}</div>
                         <div className="text-sm text-muted-foreground">
@@ -688,7 +568,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                           <span className="ml-1">{cycle.status}</span>
                         </Badge>
                         {cycle.status === "Draft" && (
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="ghost">
                             <Eye className="h-4 w-4" />
                           </Button>
                         )}
@@ -984,10 +864,10 @@ export function Payroll({ onNavigate }: PayrollProps) {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
+                          <Button variant="ghost" size="sm">
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="sm">
+                          <Button variant="ghost" size="sm">
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
@@ -1147,7 +1027,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(month => (
+                    {monthNames.map(month => (
                       <SelectItem key={month} value={month}>{month}</SelectItem>
                     ))}
                   </SelectContent>

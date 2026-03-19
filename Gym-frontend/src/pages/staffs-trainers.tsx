@@ -376,10 +376,10 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [roleTargets, setRoleTargets] = useState<Record<string, { revenue: number; sessions: number; newClients: number }>>({});
   const [newEmployeeBasicInfo, setNewEmployeeBasicInfo] = useState<{
     name: string; email: string; phone: string; role: string; department: string;
-    branch: string; monthly_target: number; address: string; photo_url?: string;
+    branch: string; monthly_target: number; base_salary: number; address: string; photo_url?: string;
   }>({
     name: '', email: '', phone: '', role: '', department: '', branch: '',
-    monthly_target: 0, address: ''
+    monthly_target: 0, base_salary: 0, address: ''
   });
   const [showEditEmployee, setShowEditEmployee] = useState(false);
   const [editEmployeeData, setEditEmployeeData] = useState<Staff | null>(null);
@@ -466,7 +466,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         photo_url: newEmployeeBasicInfo.photo_url,
       });
       setShowAddEmployee(false);
-      setNewEmployeeBasicInfo({ name: '', email: '', phone: '', role: '', department: '', branch: '', monthly_target: 0, address: '' });
+      setNewEmployeeBasicInfo({ name: '', email: '', phone: '', role: '', department: '', branch: '', monthly_target: 0, base_salary: 0, address: '' });
       await loadStaff();
     } catch (e) { console.error('Failed to create employee', e); }
   };
@@ -492,6 +492,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         department: statusEmployee.department,
         branch: statusEmployee.branch,
         monthly_target: statusEmployee.monthly_target,
+        base_salary: statusEmployee.base_salary,
         address: statusEmployee.address,
         status: newStatus,
         photo_url: statusEmployee.photo_url,
@@ -515,6 +516,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         department: editEmployeeData.department,
         branch: editEmployeeData.branch,
         monthly_target: editEmployeeData.monthly_target,
+        base_salary: editEmployeeData.base_salary,
         address: editEmployeeData.address,
         status: editEmployeeData.status,
         photo_url: editEmployeeData.photo_url,
@@ -1497,6 +1499,16 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   />
                 </div>
                 <div>
+                  <Label>Base Salary (AED)</Label>
+                  <Input
+                    type="number"
+                    placeholder="8000"
+                    className="mt-1"
+                    value={newEmployeeBasicInfo.base_salary || ''}
+                    onChange={e => setNewEmployeeBasicInfo(p => ({...p, base_salary: Number(e.target.value)}))}
+                  />
+                </div>
+                <div>
                   <Label>Phone Number</Label>
                   <Input
                     placeholder="+971 50 123 4567"
@@ -1691,6 +1703,11 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     <Label>Monthly Target (AED)</Label>
                     <Input type="number" className="mt-1" value={editEmployeeData.monthly_target || ''}
                       onChange={e => setEditEmployeeData(p => p ? {...p, monthly_target: Number(e.target.value)} : p)} />
+                  </div>
+                  <div>
+                    <Label>Base Salary (AED)</Label>
+                    <Input type="number" className="mt-1" value={editEmployeeData.base_salary || ''}
+                      onChange={e => setEditEmployeeData(p => p ? {...p, base_salary: Number(e.target.value)} : p)} />
                   </div>
                   <div>
                     <Label>Phone Number</Label>
