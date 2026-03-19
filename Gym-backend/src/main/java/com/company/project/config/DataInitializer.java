@@ -27,7 +27,6 @@ public class DataInitializer implements CommandLineRunner {
     private final WarehouseService warehouseService;
     private final ProductCategoryService productCategoryService;
     private final SupplierService supplierService;
-
     public DataInitializer(
             RoleRepository roleRepository,
             UserRepository userRepository,
@@ -84,5 +83,7 @@ public class DataInitializer implements CommandLineRunner {
 
         // Seed default Suppliers
         supplierService.initDefaultSuppliers();
+
+        // Salary Payments & Advances are now user-generated only (no seed data).
     }
 }

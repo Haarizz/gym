@@ -13,6 +13,7 @@ public class StaffRequestDTO {
     private String department;
     private String branch;
     private BigDecimal monthlyTarget;
+    private BigDecimal baseSalary;
     private String status;
     private String joinDate;   // ISO date string yyyy-MM-dd
     private String address;
@@ -57,6 +58,8 @@ public class StaffRequestDTO {
     public void setBranch(String branch) { this.branch = branch; }
     public BigDecimal getMonthlyTarget() { return monthlyTarget; }
     public void setMonthlyTarget(BigDecimal monthlyTarget) { this.monthlyTarget = monthlyTarget; }
+    public BigDecimal getBaseSalary() { return baseSalary; }
+    public void setBaseSalary(BigDecimal baseSalary) { this.baseSalary = baseSalary; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getJoinDate() { return joinDate; }
