@@ -32,6 +32,9 @@ public class Staff extends BaseEntity {
     @Column(name = "monthly_target", precision = 12, scale = 2)
     private BigDecimal monthlyTarget;
 
+    @Column(name = "base_salary", precision = 12, scale = 2)
+    private BigDecimal baseSalary;
+
     // active / inactive / on_leave
     private String status;
 
@@ -68,6 +71,8 @@ public class Staff extends BaseEntity {
     public void setBranch(String branch) { this.branch = branch; }
     public BigDecimal getMonthlyTarget() { return monthlyTarget; }
     public void setMonthlyTarget(BigDecimal monthlyTarget) { this.monthlyTarget = monthlyTarget; }
+    public BigDecimal getBaseSalary() { return baseSalary; }
+    public void setBaseSalary(BigDecimal baseSalary) { this.baseSalary = baseSalary; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public LocalDate getJoinDate() { return joinDate; }

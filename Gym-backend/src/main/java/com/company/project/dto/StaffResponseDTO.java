@@ -17,6 +17,7 @@ public class StaffResponseDTO {
     private String department;
     private String branch;
     private BigDecimal monthlyTarget;
+    private BigDecimal baseSalary;
     private String status;
     private String joinDate;
     private String address;
@@ -38,6 +39,7 @@ public class StaffResponseDTO {
         dto.department = s.getDepartment();
         dto.branch = s.getBranch();
         dto.monthlyTarget = s.getMonthlyTarget();
+        dto.baseSalary = s.getBaseSalary();
         dto.status = s.getStatus();
         dto.joinDate = s.getJoinDate() != null ? s.getJoinDate().toString() : null;
         dto.address = s.getAddress();
@@ -80,6 +82,8 @@ public class StaffResponseDTO {
     public void setBranch(String branch) { this.branch = branch; }
     public BigDecimal getMonthlyTarget() { return monthlyTarget; }
     public void setMonthlyTarget(BigDecimal monthlyTarget) { this.monthlyTarget = monthlyTarget; }
+    public BigDecimal getBaseSalary() { return baseSalary; }
+    public void setBaseSalary(BigDecimal baseSalary) { this.baseSalary = baseSalary; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getJoinDate() { return joinDate; }

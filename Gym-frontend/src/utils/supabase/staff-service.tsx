@@ -21,6 +21,7 @@ export interface Staff {
   department: string;
   branch: string;
   monthly_target: number;
+  base_salary?: number;
   status: 'active' | 'inactive' | 'on_leave';
   join_date: string;
   address: string;
@@ -39,6 +40,7 @@ export interface StaffRequestData {
   department: string;
   branch: string;
   monthly_target: number;
+  base_salary?: number;
   status: string;
   join_date: string;
   address: string;
