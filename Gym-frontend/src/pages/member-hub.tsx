@@ -57,7 +57,11 @@ import {
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
-export function MemberHub() {
+interface MemberHubProps {
+  onNavigate?: (section: string) => void;
+}
+
+export function MemberHub({ onNavigate }: MemberHubProps = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFABOpen, setIsFABOpen] = useState(false);
 
@@ -341,10 +345,15 @@ export function MemberHub() {
 
         {/* Quick Actions Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-          {quickActionCards.map((action) => (
-            <Dialog key={action.id}>
-              <DialogTrigger asChild>
-                <div className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200">
+          {quickActionCards.map((action) => {
+            // Book a Session should navigate directly instead of opening a dialog
+            if (action.id === 'book-session') {
+              return (
+                <div 
+                  key={action.id}
+                  className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
+                  onClick={() => onNavigate?.('book-session')}
+                >
                   <Card className="bg-white border-0 shadow-sm h-full">
                     <CardContent className="flex flex-col items-center justify-center p-6 h-40">
                       <div className={`p-4 rounded-xl ${action.color} mb-4`}>
@@ -354,25 +363,121 @@ export function MemberHub() {
                     </CardContent>
                   </Card>
                 </div>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{action.label}</DialogTitle>
-                  <DialogDescription>
-                    {action.id === "book-session" && "Schedule your next training session"}
-                    {action.id === "join-class" && "Find and join group classes"}
-                    {action.id === "add-challenge" && "Create or join fitness challenges"}
-                    {action.id === "create-post" && "Share your fitness journey"}
-                    {action.id === "my-stats" && "View your fitness analytics"}
-                    {action.id === "membership" && "Manage your membership details"}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="p-4 border rounded-lg bg-gray-50">
-                  <p className="text-sm text-muted-foreground">Feature coming soon...</p>
+              );
+            }
+
+            // Join Class should also navigate directly
+            if (action.id === 'join-class') {
+              return (
+                <div 
+                  key={action.id}
+                  className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
+                  onClick={() => onNavigate?.('join-class')}
+                >
+                  <Card className="bg-white border-0 shadow-sm h-full">
+                    <CardContent className="flex flex-col items-center justify-center p-6 h-40">
+                      <div className={`p-4 rounded-xl ${action.color} mb-4`}>
+                        <action.icon className="h-12 w-12 text-white" />
+                      </div>
+                      <p className="text-center font-medium text-sm leading-tight">{action.label}</p>
+                    </CardContent>
+                  </Card>
                 </div>
-              </DialogContent>
-            </Dialog>
-          ))}
+              );
+            }
+
+            // Add Challenge should also navigate directly
+            if (action.id === 'add-challenge') {
+              return (
+                <div 
+                  key={action.id}
+                  className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
+                  onClick={() => onNavigate?.('add-challenge')}
+                >
+                  <Card className="bg-white border-0 shadow-sm h-full">
+                    <CardContent className="flex flex-col items-center justify-center p-6 h-40">
+                      <div className={`p-4 rounded-xl ${action.color} mb-4`}>
+                        <action.icon className="h-12 w-12 text-white" />
+                      </div>
+                      <p className="text-center font-medium text-sm leading-tight">{action.label}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            }
+
+            // Membership should also navigate directly
+            if (action.id === 'membership') {
+              return (
+                <div 
+                  key={action.id}
+                  className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
+                  onClick={() => onNavigate?.('membership-renewal')}
+                >
+                  <Card className="bg-white border-0 shadow-sm h-full">
+                    <CardContent className="flex flex-col items-center justify-center p-6 h-40">
+                      <div className={`p-4 rounded-xl ${action.color} mb-4`}>
+                        <action.icon className="h-12 w-12 text-white" />
+                      </div>
+                      <p className="text-center font-medium text-sm leading-tight">{action.label}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            }
+
+            // My Stats should also navigate directly
+            if (action.id === 'my-stats') {
+              return (
+                <div 
+                  key={action.id}
+                  className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
+                  onClick={() => onNavigate?.('my-stats')}
+                >
+                  <Card className="bg-white border-0 shadow-sm h-full">
+                    <CardContent className="flex flex-col items-center justify-center p-6 h-40">
+                      <div className={`p-4 rounded-xl ${action.color} mb-4`}>
+                        <action.icon className="h-12 w-12 text-white" />
+                      </div>
+                      <p className="text-center font-medium text-sm leading-tight">{action.label}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            }
+
+            // Other actions use Dialog
+            return (
+              <Dialog key={action.id}>
+                <DialogTrigger asChild>
+                  <div className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200">
+                    <Card className="bg-white border-0 shadow-sm h-full">
+                      <CardContent className="flex flex-col items-center justify-center p-6 h-40">
+                        <div className={`p-4 rounded-xl ${action.color} mb-4`}>
+                          <action.icon className="h-12 w-12 text-white" />
+                        </div>
+                        <p className="text-center font-medium text-sm leading-tight">{action.label}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{action.label}</DialogTitle>
+                    <DialogDescription>
+                      {action.id === "add-challenge" && "Create or join fitness challenges"}
+                      {action.id === "create-post" && "Share your fitness journey"}
+                      {action.id === "my-stats" && "View your fitness analytics"}
+                      {action.id === "membership" && "Manage your membership details"}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="p-4 border rounded-lg bg-gray-50">
+                    <p className="text-sm text-muted-foreground">Feature coming soon...</p>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            );
+          })}
         </div>
 
         {/* Community Feed Section */}
@@ -743,4 +848,3 @@ export function MemberHub() {
     </div>
   );
 }
-

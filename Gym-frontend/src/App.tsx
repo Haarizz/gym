@@ -39,6 +39,11 @@ import { GymOS } from "./pages/gymos";
 import { POSMode } from "./pages/pos-mode";
 import { BiOS } from "./pages/bios";
 import { MemberHub } from "./pages/member-hub";
+import { BookSession } from "./pages/book-session";
+import { JoinClass } from "./pages/join-class";
+import { AddChallenge } from "./pages/add-challenge";
+import { MembershipRenewal } from "./pages/membership-renewal";
+import { MyStats } from "./pages/my-stats";
 import { PointOfSale } from "./pages/point-of-sale";
 import { AddMember } from "./pages/add-member";
 import { Referrals } from "./pages/referrals";
@@ -51,6 +56,7 @@ import { PlansServicesCatalog } from "./pages/plans-services-catalog";
 import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
 import { AssetTransactions } from "./pages/asset-transactions";
+import { AssetHistoryPage } from "./pages/asset-history";
 import { Ledgers } from "./pages/ledgers";
 import { ReceiptVoucher } from "./pages/receipt-voucher";
 import { MemberConnectAnalytics } from "./pages/member-connect-analytics";
@@ -974,6 +980,7 @@ export default function App() {
       
       <Route path="/assets" element={<Assets />} />
       <Route path="/manage-assets" element={<ManageAssets />} />
+      <Route path="/asset-history" element={<AssetHistoryPage />} />
       <Route path="/asset-transactions" element={<AssetTransactions />} />
       <Route path="/asset-reports" element={
         <div className="p-6">
@@ -1002,7 +1009,12 @@ export default function App() {
       
       <Route path="/gymos" element={<GymOS onNavigate={handleNavClick} />} />
       <Route path="/bios" element={<BiOS />} />
-      <Route path="/member-hub" element={<MemberHub />} />
+      <Route path="/member-hub" element={<MemberHub onNavigate={handleNavClick} />} />
+      <Route path="/book-session" element={<BookSession onNavigate={handleNavClick} />} />
+      <Route path="/join-class" element={<JoinClass onNavigate={handleNavClick} />} />
+      <Route path="/add-challenge" element={<AddChallenge onNavigate={handleNavClick} />} />
+      <Route path="/membership-renewal" element={<MembershipRenewal onNavigate={handleNavClick} />} />
+      <Route path="/my-stats" element={<MyStats onNavigate={handleNavClick} />} />
       <Route path="/gymbios-pricing" element={<GymBiosPricing />} />
       
       <Route path="*" element={<Dashboard onNavigate={handleNavClick} />} />
