@@ -155,8 +155,12 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   // Barcode Settings
   const [barcodeTemplate, setBarcodeTemplate] = useState("");
   const [generatedBarcode, setGeneratedBarcode] = useState("");
-  const barcodeSvgRef = useRef<SVGSVGElement | null>(null);
+  const [barcodeSvgNode, setBarcodeSvgNode] = useState<SVGSVGElement | null>(null);
+  const barcodeSvgRef = useCallback((node: SVGSVGElement | null) => {
+    setBarcodeSvgNode(node);
+  }, []);
   const qrContainerRef = useRef<HTMLDivElement | null>(null);
+  const blobUrlsRef = useRef<string[]>([]);
 
   // Pricing & Multi-Unit Setup
   const [defaultUnit, setDefaultUnit] = useState("");
@@ -273,6 +277,18 @@ export function AddProduct({ onNavigate }: AddProductProps) {
           setReorderLevel(String(firstStock.reorderLevel || 0));
           setSelectedWarehouseId(String(firstStock.warehouseId));
         }
+
+        // Load product units
+        if (product.units && product.units.length > 0) {
+          setProductUnits(product.units.map((u: any) => ({
+            id: String(u.id || Date.now() + Math.random()),
+            unit: u.unit || "",
+            conversionFactor: u.conversionFactor ?? 1,
+            costPrice: u.costPrice ?? 0,
+            sellingPrice: u.sellingPrice ?? 0,
+            barcode: u.barcode || "",
+          })));
+        }
       } catch (error) {
         console.error('Failed to load product:', error);
         toast.error('Failed to load product data. Please try again.');
@@ -284,75 +300,78 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     loadProduct();
   }, [isEditMode, productId]);
 
+  // Revoke all blob URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
   // Event Handlers
-  const handleImageUpload = useCallback(async (files: FileList | null) => {
+  const handleImageUpload = useCallback((files: FileList | null) => {
     if (!files) return;
 
-    setIsUploading(true);
-    setUploadProgress(0);
-
     const validFiles = Array.from(files).filter(file => {
-      const isValidType = file.type.startsWith('image/');
-      const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
-
-      if (!isValidType) {
+      if (!file.type.startsWith('image/')) {
         toast.error(`${file.name} is not a valid image file`);
         return false;
       }
-
-      if (!isValidSize) {
+      if (file.size > 5 * 1024 * 1024) {
         toast.error(`${file.name} is too large. Maximum size is 5MB`);
         return false;
       }
-
       return true;
     });
 
-    if (validFiles.length === 0) {
-      setIsUploading(false);
-      return;
-    }
+    if (validFiles.length === 0) return;
 
-    const totalFiles = validFiles.length;
-    let processedFiles = 0;
+    // Create blob URLs synchronously for immediate preview
+    const previews = validFiles.map((f) => URL.createObjectURL(f));
 
-    for (const file of validFiles) {
+    setProductImages((prev) => {
+      const available = 10 - prev.length;
+      if (available <= 0) {
+        previews.forEach((url) => URL.revokeObjectURL(url));
+        toast.warning("Maximum 10 images allowed.");
+        return prev;
+      }
+      const toAdd = previews.slice(0, available);
+      // Revoke any excess blob URLs immediately
+      previews.slice(available).forEach((url) => URL.revokeObjectURL(url));
+      if (toAdd.length < validFiles.length) {
+        toast.warning(`Only ${toAdd.length} image(s) added. Maximum 10 allowed.`);
+      } else {
+        toast.success(`${toAdd.length} image(s) added`);
+      }
+      blobUrlsRef.current.push(...toAdd);
+      return [...prev, ...toAdd];
+    });
+
+    // Convert to base64 in background so the backend can persist the image data
+    validFiles.forEach((file, i) => {
+      const blobUrl = previews[i];
       const reader = new FileReader();
       reader.onload = (e) => {
-        if (e.target?.result) {
-          setProductImages(prev => {
-            const newImages = [...prev, e.target.result as string];
-            if (newImages.length > 10) {
-              toast.warning("Maximum 10 images allowed. Some images were not added.");
-              return prev.slice(0, 10);
-            }
-            return newImages;
-          });
-
-          processedFiles++;
-          setUploadProgress((processedFiles / totalFiles) * 100);
-
-          if (processedFiles === totalFiles) {
-            setIsUploading(false);
-            setUploadProgress(0);
-            toast.success(`${totalFiles} image(s) uploaded successfully`);
-          }
-        }
+        const base64 = e.target?.result as string | undefined;
+        if (!base64) return;
+        setProductImages((curr) => {
+          const idx = curr.indexOf(blobUrl);
+          if (idx === -1) return curr; // already removed by user
+          const next = [...curr];
+          next[idx] = base64;
+          return next;
+        });
+        URL.revokeObjectURL(blobUrl);
+        blobUrlsRef.current = blobUrlsRef.current.filter((u) => u !== blobUrl);
       };
-
       reader.onerror = () => {
-        toast.error(`Failed to upload ${file.name}`);
-        processedFiles++;
-        setUploadProgress((processedFiles / totalFiles) * 100);
-
-        if (processedFiles === totalFiles) {
-          setIsUploading(false);
-          setUploadProgress(0);
-        }
+        setProductImages((curr) => curr.filter((u) => u !== blobUrl));
+        URL.revokeObjectURL(blobUrl);
+        blobUrlsRef.current = blobUrlsRef.current.filter((u) => u !== blobUrl);
+        toast.error(`Failed to read ${file.name}`);
       };
-
       reader.readAsDataURL(file);
-    }
+    });
   }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -442,26 +461,27 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     toast.success(`${barcodeTemplate} barcode generated successfully!`);
   };
 
+  // Render barcode whenever the SVG element mounts or barcode value/format changes
   useEffect(() => {
-    if (activeTab !== "images-barcode") return;
+    if (!barcodeSvgNode) return;
     if (!generatedBarcode) return;
     if (barcodeTemplate === "QR Code") return;
-    if (!barcodeSvgRef.current) return;
     try {
-      JsBarcode(barcodeSvgRef.current, generatedBarcode, {
+      JsBarcode(barcodeSvgNode, generatedBarcode, {
         format: barcodeFormat,
-        displayValue: false,
+        displayValue: true,
         lineColor: "#111827",
-        background: "transparent",
-        height: 64,
+        background: "#ffffff",
+        height: 60,
         width: 2,
-        margin: 0,
+        margin: 8,
+        fontSize: 12,
       });
     } catch (error) {
       console.error("Failed to render barcode:", error);
       toast.error("Barcode format not supported for this value.");
     }
-  }, [generatedBarcode, barcodeTemplate, barcodeFormat, activeTab]);
+  }, [barcodeSvgNode, generatedBarcode, barcodeFormat, barcodeTemplate]);
 
   const printBarcode = () => {
     if (!generatedBarcode) {
@@ -473,7 +493,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     const qrSvg = qrContainerRef.current?.querySelector("svg");
     const svgMarkup = isQr
       ? qrSvg?.outerHTML
-      : barcodeSvgRef.current?.outerHTML;
+      : barcodeSvgNode?.outerHTML;
 
     if (!svgMarkup) {
       toast.error("Barcode not ready to print yet");
@@ -704,6 +724,13 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         openingStock: openingStock ? parseInt(openingStock, 10) : 0,
         reorderLevel: reorderLevel ? parseInt(reorderLevel, 10) : 0,
         warehouseId: parseInt(selectedWarehouseId, 10),
+        units: productUnits.map(u => ({
+          unit: u.unit || undefined,
+          conversionFactor: u.conversionFactor || 1,
+          costPrice: u.costPrice || 0,
+          sellingPrice: u.sellingPrice || 0,
+          barcode: u.barcode || undefined,
+        })),
       };
 
       if (isEditMode && productId) {
@@ -1017,7 +1044,6 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                                 <img
                                   src={resolvedImage}
                                   alt={`Product ${index + 1}`}
-                                  loading="lazy"
                                   onError={() => setImageErrors(prev => ({ ...prev, [index]: true }))}
                                   className="w-full h-full object-cover"
                                 />
@@ -1166,8 +1192,8 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                               <QRCode value={qrPayload} size={140} />
                             </div>
                           ) : (
-                            <div className="flex justify-center">
-                              <svg ref={barcodeSvgRef} className="h-16 w-full" />
+                            <div className="flex justify-center overflow-x-auto">
+                              <svg ref={barcodeSvgRef} />
                             </div>
                           )}
                         </div>

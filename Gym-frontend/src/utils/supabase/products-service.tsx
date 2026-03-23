@@ -58,6 +58,16 @@ export interface Product {
   stockByWarehouse: ProductStock[];
   createdAt: string;
   updatedAt: string;
+  units?: ProductUnit[];
+}
+
+export interface ProductUnit {
+  id: number;
+  unit?: string;
+  conversionFactor?: number;
+  costPrice?: number;
+  sellingPrice?: number;
+  barcode?: string;
 }
 
 export interface ProductRequest {

@@ -69,6 +69,8 @@ import { Expenses } from "./pages/expenses";
 import { TaxCompliance } from "./pages/tax-compliance";
 import { FinancialReports } from "./pages/financial-reports";
 import { FinancialAnalytics } from "./pages/financial-analytics";
+import { JournalVoucherPage } from "./pages/journal-voucher";
+import { FinancialSettings } from "./pages/financial-settings";
 import { AddProduct } from "./pages/add-product";
 import { Products } from "./pages/products";
 import { WastageReturns } from "./pages/wastage-returns";
@@ -909,28 +911,14 @@ export default function App() {
       <Route path="/financials" element={<Financials />} />
       <Route path="/ledgers" element={<Ledgers />} />
       <Route path="/receipt-voucher" element={<ReceiptVoucher />} />
-      <Route path="/journal-voucher" element={
-        <div className="p-6">
-          <h1>Journal Voucher</h1>
-          <p className="text-muted-foreground">
-            Create journal entries for adjustments, corrections, and non-cash transactions.
-          </p>
-        </div>
-      } />
+      <Route path="/journal-voucher" element={<JournalVoucherPage />} />
       <Route path="/payment-voucher" element={<PaymentVoucher />} />
       <Route path="/bank-reconciliations" element={<BankReconciliation />} />
       <Route path="/expenses" element={<Expenses />} />
       <Route path="/tax-compliance" element={<TaxCompliance />} />
       <Route path="/financial-reports" element={<FinancialReports />} />
       <Route path="/financial-analytics" element={<FinancialAnalytics />} />
-      <Route path="/financial-settings" element={
-        <div className="p-6">
-          <h1>Financial Settings</h1>
-          <p className="text-muted-foreground">
-            Configure financial system settings including accounting periods, tax rates, and chart of accounts.
-          </p>
-        </div>
-      } />
+      <Route path="/financial-settings" element={<FinancialSettings />} />
       
       <Route path="/payroll-employees" element={<PayrollEmployees />} />
       <Route path="/staffs-trainers" element={<StaffsTrainers onNavigate={handleNavClick} />} />

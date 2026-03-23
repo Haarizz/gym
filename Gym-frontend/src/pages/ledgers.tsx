@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
+import { ledgersService, AccountHead as ApiAccountHead, CostCenter as ApiCostCenter, LedgerTransaction } from '../utils/supabase/ledgers-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -337,213 +339,41 @@ const chartOfAccountsData = [
   }
 ];
 
-// Cost Centers data
-const costCentersData = [
-  {
-    id: 'CC-001',
-    code: 'CC-001',
-    name: 'Administration',
-    branch: 'Dubai Branch',
-    description: 'Administrative and management operations',
-    linkedAccounts: 8,
-    status: 'active',
-    manager: 'Sarah Ahmed',
-    budget: 50000,
-    spent: 32560,
-    utilization: 65
-  },
-  {
-    id: 'CC-002',
-    code: 'CC-002',
-    name: 'Equipment & Assets',
-    branch: 'All Branches',
-    description: 'Gym equipment and facility assets',
-    linkedAccounts: 12,
-    status: 'active',
-    manager: 'Ahmed Hassan',
-    budget: 75000,
-    spent: 45800,
-    utilization: 61
-  },
-  {
-    id: 'CC-003',
-    code: 'CC-003',
-    name: 'Membership Services',
-    branch: 'All Branches',
-    description: 'Member-related revenue and services',
-    linkedAccounts: 6,
-    status: 'active',
-    manager: 'Lisa Wang',
-    budget: 25000,
-    spent: 18900,
-    utilization: 76
-  },
-  {
-    id: 'CC-004',
-    code: 'CC-004',
-    name: 'Personal Training',
-    branch: 'All Branches',
-    description: 'Personal training services and revenue',
-    linkedAccounts: 4,
-    status: 'active',
-    manager: 'Mike Johnson',
-    budget: 30000,
-    spent: 22100,
-    utilization: 74
-  },
-  {
-    id: 'CC-005',
-    code: 'CC-005',
-    name: 'Retail Operations',
-    branch: 'All Branches',
-    description: 'Supplement and merchandise sales',
-    linkedAccounts: 5,
-    status: 'active',
-    manager: 'John Smith',
-    budget: 20000,
-    spent: 12300,
-    utilization: 62
-  },
-  {
-    id: 'CC-006',
-    code: 'CC-006',
-    name: 'Human Resources',
-    branch: 'All Branches',
-    description: 'Staff salaries and HR operations',
-    linkedAccounts: 3,
-    status: 'active',
-    manager: 'Sarah Ahmed',
-    budget: 80000,
-    spent: 67800,
-    utilization: 85
-  }
-];
 
-// General Ledger transactions
-const generalLedgerData = [
-  {
-    id: 'GL-001',
-    date: '2024-01-21',
-    voucherNo: 'RV-2024-001',
-    voucherType: 'Receipt Voucher',
-    accountCode: '4000',
-    accountName: 'Membership Revenue',
-    particulars: 'Monthly membership fees - January 2024',
-    debit: 0,
-    credit: 15600,
-    runningBalance: 141200,
-    balanceType: 'Cr',
-    reference: 'MEM-2024-001',
-    costCenter: 'CC-003',
-    branch: 'Dubai Branch',
-    createdBy: 'Lisa Wang'
-  },
-  {
-    id: 'GL-002',
-    date: '2024-01-21',
-    voucherNo: 'RV-2024-001',
-    voucherType: 'Receipt Voucher',
-    accountCode: '1001',
-    accountName: 'Bank Account - Emirates NBD',
-    particulars: 'Monthly membership fees - January 2024',
-    debit: 15600,
-    credit: 0,
-    runningBalance: 167800,
-    balanceType: 'Dr',
-    reference: 'MEM-2024-001',
-    costCenter: 'CC-001',
-    branch: 'Dubai Branch',
-    createdBy: 'Lisa Wang'
-  },
-  {
-    id: 'GL-003',
-    date: '2024-01-20',
-    voucherNo: 'PV-2024-012',
-    voucherType: 'Payment Voucher',
-    accountCode: '5200',
-    accountName: 'Staff Salaries',
-    particulars: 'Monthly salary payment - January 2024',
-    debit: 22600,
-    credit: 0,
-    runningBalance: 67800,
-    balanceType: 'Dr',
-    reference: 'SAL-2024-001',
-    costCenter: 'CC-006',
-    branch: 'All Branches',
-    createdBy: 'Sarah Ahmed'
-  },
-  {
-    id: 'GL-004',
-    date: '2024-01-20',
-    voucherNo: 'PV-2024-012',
-    voucherType: 'Payment Voucher',
-    accountCode: '1001',
-    accountName: 'Bank Account - Emirates NBD',
-    particulars: 'Monthly salary payment - January 2024',
-    debit: 0,
-    credit: 22600,
-    runningBalance: 152200,
-    balanceType: 'Dr',
-    reference: 'SAL-2024-001',
-    costCenter: 'CC-001',
-    branch: 'Dubai Branch',
-    createdBy: 'Sarah Ahmed'
-  },
-  {
-    id: 'GL-005',
-    date: '2024-01-18',
-    voucherNo: 'JV-2024-003',
-    voucherType: 'Journal Voucher',
-    accountCode: '1500',
-    accountName: 'Gym Equipment',
-    particulars: 'Depreciation on gym equipment - January 2024',
-    debit: 0,
-    credit: 3750,
-    runningBalance: 398000,
-    balanceType: 'Dr',
-    reference: 'DEP-2024-001',
-    costCenter: 'CC-002',
-    branch: 'All Branches',
-    createdBy: 'System'
-  },
-  {
-    id: 'GL-006',
-    date: '2024-01-15',
-    voucherNo: 'PV-2024-011',
-    voucherType: 'Payment Voucher',
-    accountCode: '5100',
-    accountName: 'Utilities Expense',
-    particulars: 'Electricity bill - December 2023',
-    debit: 2840,
-    credit: 0,
-    runningBalance: 8560,
-    balanceType: 'Dr',
-    reference: 'UTIL-2023-012',
-    costCenter: 'CC-001',
-    branch: 'Dubai Branch',
-    createdBy: 'Ahmed Hassan'
-  }
-];
 
 export function Ledgers() {
   const [activeTab, setActiveTab] = useState('chart-of-accounts');
   
   // Chart of Accounts state
-  const [accounts, setAccounts] = useState(chartOfAccountsData);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAccountDetails, setShowAccountDetails] = useState(false);
   
   // Cost Centers state
-  const [costCenters, setCostCenters] = useState(costCentersData);
+  const [costCenters, setCostCenters] = useState<any[]>([]);
   const [selectedCostCenter, setSelectedCostCenter] = useState<any>(null);
   const [showAddCostCenter, setShowAddCostCenter] = useState(false);
+  const [showEditCostCenter, setShowEditCostCenter] = useState(false);
+  const [editingCostCenter, setEditingCostCenter] = useState<any>(null);
+
+  // Transactions state
+  const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
+  const [txDateFrom, setTxDateFrom] = useState('');
+  const [txDateTo, setTxDateTo] = useState('');
+  const [txTypeFilter, setTxTypeFilter] = useState('all');
+  const [txSearch, setTxSearch] = useState('');
+  const [txLoading, setTxLoading] = useState(false);
+
+  // Edit Account state
+  const [showEditAccount, setShowEditAccount] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
   
   // General Ledger state
-  const [ledgerEntries, setLedgerEntries] = useState(generalLedgerData);
+  const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
   const [selectedGLAccount, setSelectedGLAccount] = useState('all');
-  const [glDateFrom, setGlDateFrom] = useState('2024-01-01');
-  const [glDateTo, setGlDateTo] = useState('2024-01-31');
+  const [glDateFrom, setGlDateFrom] = useState('2026-01-01');
+  const [glDateTo, setGlDateTo] = useState('2026-12-31');
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -574,6 +404,122 @@ export function Ledgers() {
     manager: '',
     budget: ''
   });
+
+  const typeToGroup: Record<string, string> = {
+    ASSET: 'Assets',
+    LIABILITY: 'Liabilities',
+    EQUITY: 'Equity',
+    REVENUE: 'Income',
+    EXPENSE: 'Expenses',
+  };
+
+  const mapApiAccount = (a: ApiAccountHead) => ({
+    id: a.id,
+    code: a.code,
+    name: a.name,
+    group: typeToGroup[a.type] ?? a.type,
+    subGroup: a.subGroup ?? 'General',
+    branch: a.branch ?? 'All Branches',
+    costCenter: a.costCenter ?? '',
+    openingBalance: a.openingBalance,
+    balanceType: ['ASSET', 'EXPENSE'].includes(a.type) ? 'Dr' : 'Cr',
+    currentBalance: a.currentBalance,
+    status: a.isActive ? 'active' : 'inactive',
+    isParent: false,
+    parentId: a.parentId,
+    level: a.level ?? 0,
+    transactions: 0,
+    lastTransaction: a.updatedAt?.split('T')[0] ?? '',
+  });
+
+  const loadAccounts = useCallback(async () => {
+    try {
+      const data = await ledgersService.getAccountHeads();
+      setAccounts(data.map(mapApiAccount));
+    } catch {
+      toast.error('Failed to load account heads');
+    }
+  }, []);
+
+  const loadLedgerEntries = useCallback(async (code: string, from: string, to: string) => {
+    try {
+      const data = code === 'all'
+        ? await ledgersService.getAllLedgerEntries(from, to)
+        : await ledgersService.getLedgerEntries(code, from, to);
+      setLedgerEntries(data.map((e, idx) => ({
+        id: `${e.sourceType}-${e.sourceId}-${e.date}-${idx}`,
+        date: e.date,
+        voucherNo: e.reference,
+        voucherType: e.sourceType === 'JOURNAL_VOUCHER' ? 'Journal Voucher' : e.sourceType,
+        accountCode: e.accountCode ?? code,
+        accountName: e.accountName ?? accounts.find(a => a.code === code)?.name ?? code,
+        particulars: e.description,
+        debit: e.debit,
+        credit: e.credit,
+        runningBalance: e.balance,
+        balanceType: e.balance >= 0 ? 'Dr' : 'Cr',
+        reference: e.reference,
+        costCenter: '',
+        branch: '',
+        createdBy: '',
+      })));
+    } catch {
+      toast.error('Failed to load ledger entries');
+    }
+  }, [accounts]);
+
+  const loadCostCenters = useCallback(async () => {
+    try {
+      const data = await ledgersService.getCostCenters();
+      setCostCenters(data.map(c => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        branch: c.branch ?? 'All Branches',
+        description: c.description ?? '',
+        linkedAccounts: c.linkedAccounts,
+        status: c.isActive ? 'active' : 'inactive',
+        manager: c.manager ?? '',
+        budget: c.budget,
+        spent: c.spent,
+        utilization: c.utilization,
+      })));
+    } catch {
+      toast.error('Failed to load cost centers');
+    }
+  }, []);
+
+  const loadTransactions = useCallback(async () => {
+    setTxLoading(true);
+    try {
+      const data = await ledgersService.getTransactions({
+        from: txDateFrom || undefined,
+        to: txDateTo || undefined,
+        type: txTypeFilter !== 'all' ? txTypeFilter : undefined,
+        search: txSearch || undefined,
+      });
+      setTransactions(data);
+    } catch {
+      toast.error('Failed to load transactions');
+    } finally {
+      setTxLoading(false);
+    }
+  }, [txDateFrom, txDateTo, txTypeFilter, txSearch]);
+
+  useEffect(() => { loadAccounts(); }, [loadAccounts]);
+  useEffect(() => { loadCostCenters(); }, [loadCostCenters]);
+
+  useEffect(() => {
+    if (activeTab === 'transactions') {
+      loadTransactions();
+    }
+  }, [activeTab, loadTransactions]);
+
+  useEffect(() => {
+    if (glDateFrom && glDateTo) {
+      loadLedgerEntries(selectedGLAccount, glDateFrom, glDateTo);
+    }
+  }, [selectedGLAccount, glDateFrom, glDateTo, loadLedgerEntries]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-AE', {
@@ -666,85 +612,148 @@ export function Ledgers() {
     return matchesAccount && entryDate >= fromDate && entryDate <= toDate;
   });
 
-  const handleAddAccount = () => {
-    if (!newAccount.name || !newAccount.group) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    const nextCode = newAccount.code || `${Math.floor(Math.random() * 9000) + 1000}`;
-    
-    const account = {
-      id: `ACC-${nextCode}`,
-      code: nextCode,
-      name: newAccount.name,
-      group: newAccount.group,
-      subGroup: newAccount.subGroup || 'General',
-      branch: newAccount.branch || 'All Branches',
-      costCenter: newAccount.costCenter || 'CC-001',
-      openingBalance: parseFloat(newAccount.openingBalance) || 0,
-      balanceType: newAccount.balanceType,
-      currentBalance: parseFloat(newAccount.openingBalance) || 0,
-      status: newAccount.status ? 'active' : 'inactive',
-      isParent: false,
-      parentId: null,
-      level: 0,
-      transactions: 0,
-      lastTransaction: new Date().toISOString().split('T')[0]
-    };
-
-    setAccounts([...accounts, account]);
-    setShowAddAccount(false);
-    
-    // Reset form
-    setNewAccount({
-      name: '',
-      code: '',
-      group: '',
-      subGroup: '',
-      branch: '',
-      costCenter: '',
-      openingBalance: '',
-      balanceType: 'Dr',
-      status: true,
-      description: ''
-    });
+  const groupToType: Record<string, string> = {
+    Assets: 'ASSET',
+    Liabilities: 'LIABILITY',
+    Equity: 'EQUITY',
+    Income: 'REVENUE',
+    Expenses: 'EXPENSE',
   };
 
-  const handleAddCostCenter = () => {
-    if (!newCostCenter.name || !newCostCenter.branch) {
-      alert('Please fill in all required fields');
+  const handleAddAccount = async () => {
+    if (!newAccount.name || !newAccount.group || !newAccount.code) {
+      toast.error('Please fill in name, code, and group');
       return;
     }
+    try {
+      await ledgersService.createAccountHead({
+        code: newAccount.code,
+        name: newAccount.name,
+        type: groupToType[newAccount.group] ?? newAccount.group,
+        subGroup: newAccount.subGroup || undefined,
+        branch: newAccount.branch || undefined,
+        costCenter: newAccount.costCenter || undefined,
+        openingBalance: parseFloat(newAccount.openingBalance) || 0,
+        isActive: newAccount.status,
+        description: newAccount.description || undefined,
+      });
+      toast.success('Account head created');
+      await loadAccounts();
+      setShowAddAccount(false);
+      setNewAccount({ name: '', code: '', group: '', subGroup: '', branch: '', costCenter: '', openingBalance: '', balanceType: 'Dr', status: true, description: '' });
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to create account head');
+    }
+  };
 
-    const nextCode = newCostCenter.code || `CC-${String(costCenters.length + 1).padStart(3, '0')}`;
-    
-    const costCenter = {
-      id: nextCode,
-      code: nextCode,
-      name: newCostCenter.name,
-      branch: newCostCenter.branch,
-      description: newCostCenter.description,
-      linkedAccounts: 0,
-      status: 'active',
-      manager: newCostCenter.manager,
-      budget: parseFloat(newCostCenter.budget) || 0,
-      spent: 0,
-      utilization: 0
-    };
+  const handleAddCostCenter = async () => {
+    if (!newCostCenter.name || !newCostCenter.branch) {
+      toast.error('Please fill in name and branch');
+      return;
+    }
+    try {
+      await ledgersService.createCostCenter({
+        code: newCostCenter.code || undefined,
+        name: newCostCenter.name,
+        branch: newCostCenter.branch,
+        manager: newCostCenter.manager || undefined,
+        description: newCostCenter.description || undefined,
+        budget: parseFloat(newCostCenter.budget) || undefined,
+        isActive: true,
+      });
+      toast.success('Cost center created');
+      await loadCostCenters();
+      setShowAddCostCenter(false);
+      setNewCostCenter({ name: '', code: '', branch: '', description: '', manager: '', budget: '' });
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to create cost center');
+    }
+  };
 
-    setCostCenters([...costCenters, costCenter]);
-    setShowAddCostCenter(false);
-    
-    // Reset form
-    setNewCostCenter({
-      name: '',
-      code: '',
-      branch: '',
-      description: '',
-      manager: '',
-      budget: ''
-    });
+  const handleEditCostCenter = async () => {
+    if (!editingCostCenter) return;
+    try {
+      await ledgersService.updateCostCenter(editingCostCenter.id, {
+        code: editingCostCenter.code,
+        name: editingCostCenter.name,
+        branch: editingCostCenter.branch,
+        manager: editingCostCenter.manager || undefined,
+        description: editingCostCenter.description || undefined,
+        budget: parseFloat(editingCostCenter.budget) || undefined,
+        isActive: editingCostCenter.status === 'active',
+      });
+      toast.success('Cost center updated');
+      await loadCostCenters();
+      setShowEditCostCenter(false);
+      setEditingCostCenter(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update cost center');
+    }
+  };
+
+  const handleToggleCostCenter = async (cc: any) => {
+    try {
+      await ledgersService.toggleCostCenterActive(cc.id);
+      toast.success(`Cost center ${cc.status === 'active' ? 'archived' : 'activated'}`);
+      await loadCostCenters();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to toggle cost center');
+    }
+  };
+
+  const handleDeleteCostCenter = async (cc: any) => {
+    if (!confirm(`Delete cost center "${cc.name}"?`)) return;
+    try {
+      await ledgersService.deleteCostCenter(cc.id);
+      toast.success('Cost center deleted');
+      await loadCostCenters();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to delete cost center');
+    }
+  };
+
+  const handleEditAccount = async () => {
+    if (!editingAccount) return;
+    try {
+      await ledgersService.updateAccountHead(editingAccount.id, {
+        code: editingAccount.code,
+        name: editingAccount.name,
+        type: groupToType[editingAccount.group] ?? editingAccount.group,
+        subGroup: editingAccount.subGroup || undefined,
+        branch: editingAccount.branch || undefined,
+        costCenter: editingAccount.costCenter || undefined,
+        openingBalance: parseFloat(editingAccount.openingBalance) || 0,
+        isActive: editingAccount.status === 'active',
+        description: editingAccount.description || undefined,
+      });
+      toast.success('Account updated');
+      await loadAccounts();
+      setShowEditAccount(false);
+      setEditingAccount(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update account');
+    }
+  };
+
+  const handleArchiveAccount = async (account: any) => {
+    try {
+      await ledgersService.toggleActive(account.id);
+      toast.success(`Account ${account.status === 'active' ? 'archived' : 'activated'}`);
+      await loadAccounts();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to toggle account');
+    }
+  };
+
+  const handleDeleteAccount = async (account: any) => {
+    if (!confirm(`Delete account "${account.name}"?`)) return;
+    try {
+      await ledgersService.deleteAccountHead(account.id);
+      toast.success('Account deleted');
+      await loadAccounts();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to delete account');
+    }
   };
 
   const exportLedger = (format: string) => {
@@ -1020,17 +1029,17 @@ export function Ledgers() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => { setEditingAccount({...account, openingBalance: String(account.openingBalance)}); setShowEditAccount(true); }}>
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit Account
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Copy className="h-4 w-4 mr-2" />
-                                    Duplicate Account
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleArchiveAccount(account)}>
                                     <Archive className="h-4 w-4 mr-2" />
-                                    Archive Account
+                                    {account.status === 'active' ? 'Archive Account' : 'Activate Account'}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDeleteAccount(account)} className="text-red-600">
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Account
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -1265,17 +1274,17 @@ export function Ledgers() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setEditingCostCenter({...costCenter, budget: String(costCenter.budget)}); setShowEditCostCenter(true); }}>
                               <Edit className="h-4 w-4 mr-2" />
                               Edit Cost Center
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleCostCenter(costCenter)}>
                               <Archive className="h-4 w-4 mr-2" />
-                              Archive
+                              {costCenter.status === 'active' ? 'Archive' : 'Activate'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteCostCenter(costCenter)} className="text-red-600">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1289,27 +1298,139 @@ export function Ledgers() {
 
           {/* Transactions Tab */}
           <TabsContent value="transactions" className="space-y-6">
+            {/* Filters */}
             <Card>
               <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
+                <CardTitle className="flex items-center space-x-2">
+                  <Filter className="h-5 w-5" />
+                  <span>Transaction Filters</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="space-y-2">
+                    <Label>Search</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Reference, description..."
+                        value={txSearch}
+                        onChange={(e) => setTxSearch(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select value={txTypeFilter} onValueChange={setTxTypeFilter}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="receipt">Receipt Voucher</SelectItem>
+                        <SelectItem value="payment">Payment Voucher</SelectItem>
+                        <SelectItem value="journal">Journal Voucher</SelectItem>
+                        <SelectItem value="expense">Expense</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>From Date</Label>
+                    <Input type="date" value={txDateFrom} onChange={(e) => setTxDateFrom(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>To Date</Label>
+                    <Input type="date" value={txDateTo} onChange={(e) => setTxDateTo(e.target.value)} />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={loadTransactions} className="w-full">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Transactions Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>All Transactions</CardTitle>
                 <CardDescription>
-                  Latest financial transactions across all accounts
+                  Financial transactions from all vouchers and expenses ({transactions.length} records)
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12">
-                  <div className="bg-gray-100 p-4 rounded-lg inline-block mb-4">
-                    <Activity className="h-12 w-12 text-gray-400" />
+                {txLoading ? (
+                  <div className="text-center py-8 text-gray-500">Loading transactions...</div>
+                ) : transactions.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="bg-gray-100 p-4 rounded-lg inline-block mb-4">
+                      <Activity className="h-12 w-12 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">No Transactions Found</h3>
+                    <p className="text-gray-600">Adjust filters or add vouchers/expenses to see transactions here.</p>
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">Transaction Management</h3>
-                  <p className="text-gray-600 mb-4">
-                    This section will show all financial transactions with filtering and search capabilities.
-                  </p>
-                  <Button variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Transaction
-                  </Button>
-                </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Reference</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-right">Debit</TableHead>
+                          <TableHead className="text-right">Credit</TableHead>
+                          <TableHead>Branch</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions.map((tx) => (
+                          <TableRow key={tx.id} className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{tx.referenceNo}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={
+                                tx.type === 'Receipt Voucher' ? 'border-green-300 text-green-700' :
+                                tx.type === 'Payment Voucher' ? 'border-red-300 text-red-700' :
+                                tx.type === 'Journal Voucher' ? 'border-blue-300 text-blue-700' :
+                                'border-orange-300 text-orange-700'
+                              }>
+                                {tx.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm max-w-xs truncate">{tx.description ?? '-'}</TableCell>
+                            <TableCell className="text-right">
+                              {tx.debit > 0 && (
+                                <span className="font-medium text-red-600">{formatCurrency(tx.debit)}</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {tx.credit > 0 && (
+                                <span className="font-medium text-green-600">{formatCurrency(tx.credit)}</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">{tx.branch ?? '-'}</TableCell>
+                            <TableCell>
+                              <Badge className={
+                                tx.status?.toLowerCase() === 'completed' || tx.status === 'POSTED' || tx.status === 'APPROVED'
+                                  ? 'bg-green-100 text-green-800'
+                                  : tx.status?.toLowerCase() === 'pending' || tx.status === 'DRAFT'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }>
+                                {tx.status ?? '-'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1555,6 +1676,119 @@ export function Ledgers() {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Account Modal */}
+        <Dialog open={showEditAccount} onOpenChange={setShowEditAccount}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Edit className="h-5 w-5" />
+                <span>Edit Account</span>
+              </DialogTitle>
+            </DialogHeader>
+            {editingAccount && (
+              <div className="space-y-6 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label>Account Name *</Label>
+                    <Input value={editingAccount.name} onChange={(e) => setEditingAccount({...editingAccount, name: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Code *</Label>
+                    <Input value={editingAccount.code} onChange={(e) => setEditingAccount({...editingAccount, code: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Group *</Label>
+                    <Select value={editingAccount.group} onValueChange={(v) => setEditingAccount({...editingAccount, group: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Assets">Assets</SelectItem>
+                        <SelectItem value="Liabilities">Liabilities</SelectItem>
+                        <SelectItem value="Income">Income</SelectItem>
+                        <SelectItem value="Expenses">Expenses</SelectItem>
+                        <SelectItem value="Equity">Equity</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Sub Group</Label>
+                    <Input value={editingAccount.subGroup ?? ''} onChange={(e) => setEditingAccount({...editingAccount, subGroup: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Branch</Label>
+                    <Input value={editingAccount.branch ?? ''} onChange={(e) => setEditingAccount({...editingAccount, branch: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Opening Balance</Label>
+                    <Input type="number" value={editingAccount.openingBalance} onChange={(e) => setEditingAccount({...editingAccount, openingBalance: e.target.value})} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea value={editingAccount.description ?? ''} onChange={(e) => setEditingAccount({...editingAccount, description: e.target.value})} rows={3} />
+                </div>
+                <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                  <Button variant="outline" onClick={() => { setShowEditAccount(false); setEditingAccount(null); }}>Cancel</Button>
+                  <Button onClick={handleEditAccount}>Save Changes</Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Cost Center Modal */}
+        <Dialog open={showEditCostCenter} onOpenChange={setShowEditCostCenter}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Edit className="h-5 w-5" />
+                <span>Edit Cost Center</span>
+              </DialogTitle>
+            </DialogHeader>
+            {editingCostCenter && (
+              <div className="space-y-6 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label>Name *</Label>
+                    <Input value={editingCostCenter.name} onChange={(e) => setEditingCostCenter({...editingCostCenter, name: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Code</Label>
+                    <Input value={editingCostCenter.code} onChange={(e) => setEditingCostCenter({...editingCostCenter, code: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Branch *</Label>
+                    <Select value={editingCostCenter.branch} onValueChange={(v) => setEditingCostCenter({...editingCostCenter, branch: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="All Branches">All Branches</SelectItem>
+                        <SelectItem value="Dubai Branch">Dubai Branch</SelectItem>
+                        <SelectItem value="Marina Branch">Marina Branch</SelectItem>
+                        <SelectItem value="Warehouse">Warehouse</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Manager</Label>
+                    <Input value={editingCostCenter.manager ?? ''} onChange={(e) => setEditingCostCenter({...editingCostCenter, manager: e.target.value})} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Budget (AED)</Label>
+                    <Input type="number" value={editingCostCenter.budget} onChange={(e) => setEditingCostCenter({...editingCostCenter, budget: e.target.value})} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea value={editingCostCenter.description ?? ''} onChange={(e) => setEditingCostCenter({...editingCostCenter, description: e.target.value})} rows={3} />
+                </div>
+                <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                  <Button variant="outline" onClick={() => { setShowEditCostCenter(false); setEditingCostCenter(null); }}>Cancel</Button>
+                  <Button onClick={handleEditCostCenter}>Save Changes</Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 

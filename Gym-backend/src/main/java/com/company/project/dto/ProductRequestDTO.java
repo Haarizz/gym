@@ -27,6 +27,8 @@ public class ProductRequestDTO {
     private Integer reorderLevel;
     private Long warehouseId;
 
+    private List<ProductUnitDTO> units;
+
     public ProductRequestDTO() {}
 
     // ── Getters & Setters ──────────────────────────────────────────────────
@@ -87,4 +89,7 @@ public class ProductRequestDTO {
 
     public Long getWarehouseId() { return warehouseId; }
     public void setWarehouseId(Long warehouseId) { this.warehouseId = warehouseId; }
+
+    public List<ProductUnitDTO> getUnits() { return units; }
+    public void setUnits(List<ProductUnitDTO> units) { this.units = units; }
 }

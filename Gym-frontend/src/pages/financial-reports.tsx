@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { financialReportsService, IncomeStatementData, BalanceSheetData, TrialBalanceData, CashFlowData } from "../utils/supabase/financial-reports-service";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -267,22 +269,48 @@ export function FinancialReports() {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState("all");
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [incomeStatement, setIncomeStatement] = useState<IncomeStatementData | null>(null);
+  const [balanceSheet, setBalanceSheet] = useState<BalanceSheetData | null>(null);
+  const [trialBalance, setTrialBalance] = useState<TrialBalanceData | null>(null);
+  const [cashFlow, setCashFlow] = useState<CashFlowData | null>(null);
 
   // Filter reports based on category
-  const filteredReports = reportDefinitions.filter(report => 
+  const filteredReports = reportDefinitions.filter(report =>
     reportCategory === "all" || report.category === reportCategory
   );
 
   const branches = ["All Branches", "Downtown", "Mall Branch", "Marina Branch"];
 
+  const getDateParams = () => {
+    const from = format(dateRange.from, "yyyy-MM-dd");
+    const to = format(dateRange.to, "yyyy-MM-dd");
+    return { from, to };
+  };
+
   const handleGenerateReport = async (reportId: string) => {
     setIsGeneratingReport(true);
     setSelectedReport(reportId);
-    
-    // Simulate report generation
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsGeneratingReport(false);
+    const { from, to } = getDateParams();
+    try {
+      if (reportId === "profit-loss") {
+        const data = await financialReportsService.getIncomeStatement(from, to);
+        setIncomeStatement(data);
+      } else if (reportId === "balance-sheet") {
+        const data = await financialReportsService.getBalanceSheet(to);
+        setBalanceSheet(data);
+      } else if (reportId === "trial-balance") {
+        const data = await financialReportsService.getTrialBalance(to);
+        setTrialBalance(data);
+      } else if (reportId === "cash-flow") {
+        const data = await financialReportsService.getCashFlow(from, to);
+        setCashFlow(data);
+      }
+      toast.success("Report generated successfully");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to generate report");
+    } finally {
+      setIsGeneratingReport(false);
+    }
   };
 
   const handleExportReport = (format: "csv" | "excel" | "pdf") => {
