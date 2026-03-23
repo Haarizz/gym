@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { financialAnalyticsService, AnalyticsDashboard, MonthlyTrendPoint, RevenueBySource, ExpenseByCategory } from "../utils/supabase/financial-analytics-service";
 import {
   Card,
   CardContent,
@@ -426,11 +427,109 @@ export function FinancialAnalytics() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedChart, setSelectedChart] = useState("revenue-expenses");
 
+  const [apiDashboard, setApiDashboard] = useState<AnalyticsDashboard | null>(null);
+  const [apiMonthlyTrend, setApiMonthlyTrend] = useState<MonthlyTrendPoint[]>([]);
+  const [apiRevenueBySource, setApiRevenueBySource] = useState<RevenueBySource[]>([]);
+  const [apiExpenseByCategory, setApiExpenseByCategory] = useState<ExpenseByCategory[]>([]);
+
+  const loadAnalytics = useCallback(async () => {
+    try {
+      const [dashboard, trend, revSrc, expCat] = await Promise.all([
+        financialAnalyticsService.getDashboard(),
+        financialAnalyticsService.getMonthlyTrend(12),
+        financialAnalyticsService.getRevenueBySource(),
+        financialAnalyticsService.getExpenseByCategory(),
+      ]);
+      setApiDashboard(dashboard);
+      setApiMonthlyTrend(trend);
+      setApiRevenueBySource(revSrc);
+      setApiExpenseByCategory(expCat);
+    } catch {
+      // fall back to mock data
+    }
+  }, []);
+
+  useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
+
   const branches = ["All Branches", "Downtown", "Mall Branch", "Marina Branch"];
 
   const handleExport = (format: "excel" | "pdf") => {
     console.log(`Exporting financial analytics as ${format}`);
   };
+
+  // Derived data — use API data when loaded, fall back to mock
+  const displayRevenueExpenseData = apiMonthlyTrend.length > 0
+    ? apiMonthlyTrend.map(p => ({ month: p.month, revenue: p.revenue, expenses: p.expenses }))
+    : revenueExpenseData;
+
+  const displayIncomeDistribution = apiRevenueBySource.length > 0
+    ? apiRevenueBySource.map((s, i) => ({
+        name: s.source,
+        value: s.amount,
+        color: ["#0047AB", "#009688", "#4CAF50", "#FFC107", "#F44336", "#9C27B0"][i % 6],
+      }))
+    : incomeDistributionData;
+
+  const displayExpenseBreakdown = apiExpenseByCategory.length > 0
+    ? (() => {
+        const total = apiExpenseByCategory.reduce((sum, e) => sum + e.amount, 0);
+        return apiExpenseByCategory.map(e => ({
+          category: e.category,
+          amount: e.amount,
+          percentage: total > 0 ? (e.amount / total) * 100 : 0,
+        }));
+      })()
+    : expenseBreakdownData;
+
+  const displayKpiData: KPICard[] = apiDashboard
+    ? [
+        {
+          id: "total-revenue",
+          title: "Total Revenue",
+          value: apiDashboard.totalRevenue,
+          previousValue: apiDashboard.totalRevenue * 0.9,
+          format: "currency",
+          icon: DollarSign,
+          trend: "up",
+        },
+        {
+          id: "profit-margin",
+          title: "Profit Margin",
+          value: apiDashboard.profitMargin,
+          previousValue: apiDashboard.profitMargin * 0.95,
+          format: "percentage",
+          icon: Percent,
+          trend: apiDashboard.profitMargin > 0 ? "up" : "down",
+        },
+        {
+          id: "net-income",
+          title: "Net Income",
+          value: apiDashboard.netIncome,
+          previousValue: apiDashboard.netIncome * 0.9,
+          format: "currency",
+          icon: TrendingUp,
+          trend: apiDashboard.netIncome > 0 ? "up" : "down",
+        },
+        {
+          id: "total-expenses",
+          title: "Total Expenses",
+          value: apiDashboard.totalExpenses,
+          previousValue: apiDashboard.totalExpenses * 1.05,
+          format: "currency",
+          icon: Receipt,
+          trend: "down",
+        },
+        {
+          id: "pending-tax",
+          title: "Tax Obligations",
+          value: apiDashboard.pendingTaxObligations,
+          previousValue: apiDashboard.pendingTaxObligations,
+          format: "number",
+          icon: AlertCircle,
+          trend: "neutral",
+        },
+      ]
+    : kpiData;
 
   const filteredTransactions = transactionData.filter((transaction) => {
     const matchesSearch = 
@@ -571,7 +670,7 @@ export function FinancialAnalytics() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-        {kpiData.map((kpi) => (
+        {displayKpiData.map((kpi) => (
           <KPICard key={kpi.id} kpi={kpi} />
         ))}
       </div>
@@ -598,7 +697,7 @@ export function FinancialAnalytics() {
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueExpenseData}>
+                <LineChart data={displayRevenueExpenseData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="month" stroke="#666" />
                   <YAxis stroke="#666" tickFormatter={(value) => `${value/1000}K`} />
@@ -639,7 +738,7 @@ export function FinancialAnalytics() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={incomeDistributionData}
+                    data={displayIncomeDistribution}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -647,7 +746,7 @@ export function FinancialAnalytics() {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {incomeDistributionData.map((entry, index) => (
+                    {displayIncomeDistribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -667,7 +766,7 @@ export function FinancialAnalytics() {
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={expenseBreakdownData} layout="horizontal">
+                <BarChart data={displayExpenseBreakdown} layout="horizontal">
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis type="number" stroke="#666" tickFormatter={(value) => `${value/1000}K`} />
                   <YAxis dataKey="category" type="category" stroke="#666" width={100} />

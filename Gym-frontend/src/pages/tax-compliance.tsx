@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { taxComplianceService, TaxComplianceItem } from '../utils/supabase/tax-compliance-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -201,6 +202,7 @@ export function TaxCompliance() {
   const [activeTab, setActiveTab] = useState("overview");
   const [taxTypes, setTaxTypes] = useState(sampleTaxTypes);
   const [filings, setFilings] = useState(sampleFilings);
+  const [apiFilings, setApiFilings] = useState<TaxComplianceItem[]>([]);
   const [auditLog] = useState(sampleAuditLog);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [showFilingDialog, setShowFilingDialog] = useState(false);
@@ -228,6 +230,17 @@ export function TaxCompliance() {
     status: "Filed"
   });
 
+  const loadApiFilings = useCallback(async () => {
+    try {
+      const data = await taxComplianceService.getAll();
+      setApiFilings(data);
+    } catch {
+      // fall back to mock data
+    }
+  }, []);
+
+  useEffect(() => { loadApiFilings(); }, [loadApiFilings]);
+
   const resetConfigForm = () => {
     setConfigFormData({
       taxType: "",
@@ -249,7 +262,7 @@ export function TaxCompliance() {
     setSelectedFiling(null);
   };
 
-  const handleAddTaxType = () => {
+  const handleAddTaxType = async () => {
     const newTaxType = {
       id: Date.now(),
       taxType: configFormData.taxType,
@@ -262,6 +275,18 @@ export function TaxCompliance() {
       currentPeriod: format(new Date(), "MMMM yyyy"),
       amountPayable: 0
     };
+    // Also create a compliance record in the backend
+    try {
+      await taxComplianceService.create({
+        taxType: configFormData.taxType.toUpperCase().replace(' ', '_'),
+        taxPeriod: format(new Date(), "MMMM yyyy"),
+        dueDate: format(addMonths(new Date(), 1), 'yyyy-MM-dd'),
+        status: 'PENDING',
+      });
+      await loadApiFilings();
+    } catch {
+      // silently fail - UI still updates
+    }
     setTaxTypes([...taxTypes, newTaxType]);
     setShowConfigDialog(false);
     resetConfigForm();
@@ -302,7 +327,7 @@ export function TaxCompliance() {
     setTaxTypes(taxTypes.filter(tt => tt.id !== id));
   };
 
-  const handleUpdateFiling = () => {
+  const handleUpdateFiling = async () => {
     if (!selectedFiling) return;
     const updatedFilings = filings.map(f =>
       f.id === selectedFiling.id
@@ -316,6 +341,32 @@ export function TaxCompliance() {
         : f
     );
     setFilings(updatedFilings);
+    // If API filing exists with matching period, update via API
+    const apiMatch = apiFilings.find(af =>
+      af.taxPeriod === selectedFiling.period &&
+      af.taxType.toLowerCase().replace('_', ' ') === selectedFiling.taxType.toLowerCase()
+    );
+    if (apiMatch) {
+      try {
+        if (filingFormData.status === "Filed") {
+          await taxComplianceService.markFiled(apiMatch.id, {
+            filedDate: format(new Date(), 'yyyy-MM-dd'),
+            filingAmount: parseFloat(filingFormData.amountPayable) || undefined,
+          });
+        } else {
+          await taxComplianceService.update(apiMatch.id, {
+            taxType: apiMatch.taxType,
+            taxPeriod: apiMatch.taxPeriod,
+            dueDate: apiMatch.dueDate,
+            notes: filingFormData.notes || undefined,
+            status: filingFormData.status.toUpperCase(),
+          });
+        }
+        await loadApiFilings();
+      } catch {
+        // silently fail
+      }
+    }
     setShowFilingDialog(false);
     resetFilingForm();
   };

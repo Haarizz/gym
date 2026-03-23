@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { paymentVoucherService, type PaymentVoucher as PVApiType, type PaymentVoucherCreateRequest } from "../utils/supabase/payment-voucher-service";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -8,19 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Separator } from "../components/ui/separator";
 import { toast } from "sonner";
 import {
   CalendarIcon,
   Plus,
   Search,
-  Filter,
   Download,
   FileText,
-  Printer,
   Eye,
   Edit,
   Trash2,
@@ -33,8 +31,6 @@ import {
   Clock,
   AlertTriangle,
   TrendingUp,
-  TrendingDown,
-  DollarSign,
   FileSpreadsheet,
   X,
   ChevronLeft,
@@ -58,10 +54,8 @@ interface PaymentVoucher {
   paymentMethod: "Cash" | "Bank Transfer" | "Cheque" | "Digital Wallet";
   status: "Paid" | "Pending" | "Overdue" | "Partial";
   description: string;
-  createdBy: string;
   createdAt: string;
   bills?: BillEntry[];
-  paymentHistory?: PaymentHistory[];
   bankAccount?: string;
   chequeNo?: string;
   chequeDate?: string;
@@ -79,155 +73,107 @@ interface BillEntry {
   status: "Paid" | "Pending" | "Overdue" | "Partial";
 }
 
-interface PaymentHistory {
-  id: string;
-  date: string;
-  amount: number;
-  method: string;
-  reference: string;
-  createdBy: string;
+interface PVForm {
+  supplierName: string;
+  supplierType: string;
+  billNo: string;
+  paymentDate: string;
+  amount: string;
+  paymentMethod: string;
+  status: string;
+  description: string;
+  bankAccount: string;
+  chequeNo: string;
+  chequeDate: string;
+  notes: string;
+  bills: BillForm[];
 }
 
-// Sample data
-const samplePaymentVouchers: PaymentVoucher[] = [
-  {
-    id: "PV001",
-    voucherNo: "PV-2025-0001",
-    supplierName: "FitEquip Solutions",
-    supplierType: "Supplier",
-    billNo: "INV-FE-2025-001",
-    paymentDate: "2025-01-28",
-    amount: 7500.00,
-    paymentMethod: "Bank Transfer",
-    status: "Paid",
-    description: "Payment for gym equipment purchase",
-    createdBy: "John Admin",
-    createdAt: "2025-01-28T10:30:00Z",
-    bankAccount: "Emirates NBD Current",
-    bills: [
-      {
-        id: "BILL001",
-        billNo: "INV-FE-2025-001",
-        billDate: "2025-01-15",
-        originalAmount: 12500.00,
-        paidAmount: 7500.00,
-        remainingBalance: 5000.00,
-        dueDate: "2025-02-14",
-        status: "Partial"
-      }
-    ],
-    paymentHistory: [
-      {
-        id: "PAY001",
-        date: "2025-01-28",
-        amount: 7500.00,
-        method: "Bank Transfer",
-        reference: "PV-2025-0001",
-        createdBy: "John Admin"
-      }
-    ]
-  },
-  {
-    id: "PV002",
-    voucherNo: "PV-2025-0002",
-    supplierName: "ProNutrition Wholesale",
-    supplierType: "Supplier",
-    billNo: "INV-PN-2025-045",
-    paymentDate: "2025-01-29",
-    amount: 8750.25,
-    paymentMethod: "Cheque",
-    status: "Pending",
-    description: "Supplement inventory payment",
-    createdBy: "Sarah Manager",
-    createdAt: "2025-01-29T14:20:00Z",
-    chequeNo: "CHQ-001234",
-    chequeDate: "2025-01-30",
-    bills: [
-      {
-        id: "BILL002",
-        billNo: "INV-PN-2025-045",
-        billDate: "2025-01-20",
-        originalAmount: 8750.25,
-        paidAmount: 0,
-        remainingBalance: 8750.25,
-        dueDate: "2025-02-19",
-        status: "Pending"
-      }
-    ]
-  },
-  {
-    id: "PV003",
-    voucherNo: "PV-2025-0003",
-    supplierName: "Emirates Maintenance Co.",
-    supplierType: "Vendor",
-    billNo: "SRV-EM-2025-012",
-    paymentDate: "2025-01-25",
-    amount: 2340.00,
-    paymentMethod: "Cash",
-    status: "Overdue",
-    description: "Monthly maintenance service",
-    createdBy: "Mike Finance",
-    createdAt: "2025-01-25T09:15:00Z",
-    bills: [
-      {
-        id: "BILL003",
-        billNo: "SRV-EM-2025-012",
-        billDate: "2025-01-25",
-        originalAmount: 2340.00,
-        paidAmount: 0,
-        remainingBalance: 2340.00,
-        dueDate: "2025-01-25",
-        status: "Overdue"
-      }
-    ]
-  },
-  {
-    id: "PV004",
-    voucherNo: "PV-2025-0004",
-    supplierName: "CleanPro Services",
-    supplierType: "Vendor",
-    billNo: "CLN-CP-2025-008",
-    paymentDate: "2025-01-30",
-    amount: 1850.75,
-    paymentMethod: "Digital Wallet",
-    status: "Paid",
-    description: "Cleaning services for January",
-    createdBy: "Lisa Admin",
-    createdAt: "2025-01-30T16:45:00Z",
-    bills: [
-      {
-        id: "BILL004",
-        billNo: "CLN-CP-2025-008",
-        billDate: "2025-01-30",
-        originalAmount: 1850.75,
-        paidAmount: 1850.75,
-        remainingBalance: 0,
-        dueDate: "2025-02-28",
-        status: "Paid"
-      }
-    ]
-  },
-  {
-    id: "PV005",
-    voucherNo: "PV-2025-0005",
-    supplierName: "Ahmed Khan",
-    supplierType: "Employee",
-    paymentDate: "2025-01-31",
-    amount: 500.00,
-    paymentMethod: "Bank Transfer",
-    status: "Paid",
-    description: "Travel expense reimbursement",
-    createdBy: "HR Manager",
-    createdAt: "2025-01-31T11:00:00Z",
-    bankAccount: "FAB Operational Account"
-  }
-];
+interface BillForm {
+  billNo: string;
+  billDate: string;
+  originalAmount: string;
+  paidAmount: string;
+  remainingBalance: string;
+  dueDate: string;
+  status: string;
+}
+
+const emptyBill: BillForm = {
+  billNo: "",
+  billDate: new Date().toISOString().split("T")[0],
+  originalAmount: "",
+  paidAmount: "",
+  remainingBalance: "",
+  dueDate: "",
+  status: "Pending",
+};
+
+const emptyForm: PVForm = {
+  supplierName: "",
+  supplierType: "Supplier",
+  billNo: "",
+  paymentDate: new Date().toISOString().split("T")[0],
+  amount: "",
+  paymentMethod: "Cash",
+  status: "Pending",
+  description: "",
+  bankAccount: "",
+  chequeNo: "",
+  chequeDate: "",
+  notes: "",
+  bills: [],
+};
 
 export function PaymentVoucher() {
-  // State management
+  const [allVouchers, setAllVouchers] = useState<PaymentVoucher[]>([]);
+  const [loadingVouchers, setLoadingVouchers] = useState(true);
+
+  const loadVouchers = useCallback(async () => {
+    try {
+      setLoadingVouchers(true);
+      const data = await paymentVoucherService.getPaymentVouchers();
+      const mapped: PaymentVoucher[] = data.map((v: PVApiType) => ({
+        id: v.id,
+        voucherNo: v.voucherNo,
+        supplierName: v.supplierName,
+        supplierType: v.supplierType as "Supplier" | "Vendor" | "Employee",
+        billNo: v.billNo,
+        paymentDate: v.paymentDate,
+        amount: v.amount,
+        paymentMethod: v.paymentMethod as "Cash" | "Bank Transfer" | "Cheque" | "Digital Wallet",
+        status: v.status as "Paid" | "Pending" | "Overdue" | "Partial",
+        description: v.description,
+        createdAt: v.createdAt ?? "",
+        bankAccount: v.bankAccount,
+        chequeNo: v.chequeNo,
+        chequeDate: v.chequeDate,
+        notes: v.notes,
+        bills: v.bills?.map((b) => ({
+          id: b.id ?? String(Math.random()),
+          billNo: b.billNo,
+          billDate: b.billDate,
+          originalAmount: b.originalAmount,
+          paidAmount: b.paidAmount,
+          remainingBalance: b.remainingBalance,
+          dueDate: b.dueDate,
+          status: b.status as "Paid" | "Pending" | "Overdue" | "Partial",
+        })),
+      }));
+      setAllVouchers(mapped);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load payment vouchers");
+    } finally {
+      setLoadingVouchers(false);
+    }
+  }, []);
+
+  useEffect(() => { loadVouchers(); }, [loadVouchers]);
+
+  // Filters & sorting state
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedDateRange, setSelectedDateRange] = useState<{from?: Date; to?: Date}>({});
+  const [selectedDateRange, setSelectedDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("all");
   const [sortField, setSortField] = useState<string>("paymentDate");
@@ -238,115 +184,95 @@ export function PaymentVoucher() {
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  // Quick summary calculations
+  // Dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<PVForm>(emptyForm);
+  const [savingForm, setSavingForm] = useState(false);
+  const [deletingVoucher, setDeletingVoucher] = useState(false);
+
   const summaryData = useMemo(() => {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
-    
-    const thisMonthVouchers = samplePaymentVouchers.filter(voucher => {
-      const voucherDate = new Date(voucher.paymentDate);
-      return voucherDate.getMonth() === currentMonth && voucherDate.getFullYear() === currentYear;
+
+    const thisMonthVouchers = allVouchers.filter(v => {
+      const parts = v.paymentDate.split("-").map(Number);
+      return (parts[1] - 1) === currentMonth && parts[0] === currentYear;
     });
-    
+
     const totalPaidThisMonth = thisMonthVouchers
       .filter(v => v.status === "Paid")
       .reduce((sum, v) => sum + v.amount, 0);
-    
-    const totalPending = samplePaymentVouchers
+
+    const totalPending = allVouchers
       .filter(v => v.status === "Pending" || v.status === "Partial")
       .reduce((sum, v) => sum + v.amount, 0);
-    
-    const overdueCount = samplePaymentVouchers
-      .filter(v => v.status === "Overdue").length;
-    
-    const upcomingPayments = samplePaymentVouchers
-      .filter(v => {
-        const paymentDate = new Date(v.paymentDate);
-        const nextWeek = new Date();
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        return paymentDate <= nextWeek && v.status === "Pending";
-      }).length;
 
-    return {
-      totalPaidThisMonth,
-      totalPending,
-      overdueCount,
-      upcomingPayments
-    };
-  }, []);
+    const overdueCount = allVouchers.filter(v => v.status === "Overdue").length;
 
-  // Filter and sort data
+    const upcomingPayments = allVouchers.filter(v => {
+      const [y, m, d] = v.paymentDate.split("-").map(Number);
+      const paymentDate = new Date(y, m - 1, d);
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      return paymentDate <= nextWeek && v.status === "Pending";
+    }).length;
+
+    return { totalPaidThisMonth, totalPending, overdueCount, upcomingPayments };
+  }, [allVouchers]);
+
   const filteredAndSortedVouchers = useMemo(() => {
-    let filtered = samplePaymentVouchers.filter(voucher => {
-      // Category filter
+    let filtered = allVouchers.filter(voucher => {
       if (selectedCategory !== "all") {
         if (selectedCategory === "pending" && voucher.status !== "Pending" && voucher.status !== "Partial") return false;
         if (selectedCategory === "paid" && voucher.status !== "Paid") return false;
         if (selectedCategory === "overdue" && voucher.status !== "Overdue") return false;
         if (selectedCategory === "supplier" && voucher.supplierType !== "Supplier") return false;
       }
-
-      // Search filter
       if (searchQuery) {
-        const query = searchQuery.toLowerCase();
+        const q = searchQuery.toLowerCase();
         if (
-          !voucher.voucherNo.toLowerCase().includes(query) &&
-          !voucher.supplierName.toLowerCase().includes(query) &&
-          !voucher.billNo?.toLowerCase().includes(query) &&
-          !voucher.description.toLowerCase().includes(query)
+          !voucher.voucherNo.toLowerCase().includes(q) &&
+          !voucher.supplierName.toLowerCase().includes(q) &&
+          !(voucher.billNo?.toLowerCase().includes(q)) &&
+          !voucher.description.toLowerCase().includes(q)
         ) return false;
       }
-
-      // Status filter
       if (selectedStatus !== "all" && voucher.status.toLowerCase() !== selectedStatus) return false;
-
-      // Payment method filter
-      if (selectedPaymentMethod !== "all" && voucher.paymentMethod.toLowerCase().replace(" ", "-") !== selectedPaymentMethod) return false;
-
-      // Date range filter
+      if (selectedPaymentMethod !== "all" && voucher.paymentMethod.toLowerCase().replace(/ /g, "-") !== selectedPaymentMethod) return false;
       if (selectedDateRange.from || selectedDateRange.to) {
-        const voucherDate = new Date(voucher.paymentDate);
-        if (selectedDateRange.from && voucherDate < selectedDateRange.from) return false;
-        if (selectedDateRange.to && voucherDate > selectedDateRange.to) return false;
+        const [y, m, d] = voucher.paymentDate.split("-").map(Number);
+        const vDate = new Date(y, m - 1, d);
+        if (selectedDateRange.from && vDate < selectedDateRange.from) return false;
+        if (selectedDateRange.to && vDate > selectedDateRange.to) return false;
       }
-
       return true;
     });
 
-    // Sort
     filtered.sort((a, b) => {
       let aVal: any = a[sortField as keyof PaymentVoucher];
       let bVal: any = b[sortField as keyof PaymentVoucher];
-
       if (sortField === "amount") {
-        aVal = Number(aVal);
-        bVal = Number(bVal);
+        aVal = Number(aVal); bVal = Number(bVal);
       } else if (sortField === "paymentDate") {
-        aVal = new Date(aVal);
-        bVal = new Date(bVal);
+        aVal = new Date(aVal); bVal = new Date(bVal);
       } else {
-        aVal = String(aVal).toLowerCase();
-        bVal = String(bVal).toLowerCase();
+        aVal = String(aVal ?? "").toLowerCase(); bVal = String(bVal ?? "").toLowerCase();
       }
-
-      if (sortDirection === "asc") {
-        return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
-      }
+      return sortDirection === "asc" ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
     });
 
     return filtered;
-  }, [selectedCategory, searchQuery, selectedStatus, selectedPaymentMethod, selectedDateRange, sortField, sortDirection]);
+  }, [allVouchers, selectedCategory, searchQuery, selectedStatus, selectedPaymentMethod, selectedDateRange, sortField, sortDirection]);
 
-  // Pagination
   const totalPages = Math.ceil(filteredAndSortedVouchers.length / itemsPerPage);
   const paginatedVouchers = filteredAndSortedVouchers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  // Handlers
   const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -361,24 +287,151 @@ export function PaymentVoucher() {
     setIsDetailsOpen(true);
   };
 
-  const handleExport = () => {
-    toast.success("Exporting payment vouchers...");
-    // Export logic here
+  const handleExport = () => toast.success("Exporting payment vouchers...");
+
+  const openCreate = () => {
+    setForm(emptyForm);
+    setShowCreateDialog(true);
+  };
+
+  const openEdit = (voucher: PaymentVoucher) => {
+    setEditingId(voucher.id);
+    setForm({
+      supplierName: voucher.supplierName,
+      supplierType: voucher.supplierType,
+      billNo: voucher.billNo ?? "",
+      paymentDate: voucher.paymentDate.split("T")[0],
+      amount: String(voucher.amount),
+      paymentMethod: voucher.paymentMethod,
+      status: voucher.status,
+      description: voucher.description,
+      bankAccount: voucher.bankAccount ?? "",
+      chequeNo: voucher.chequeNo ?? "",
+      chequeDate: voucher.chequeDate?.split("T")[0] ?? "",
+      notes: voucher.notes ?? "",
+      bills: (voucher.bills ?? []).map(b => ({
+        billNo: b.billNo,
+        billDate: b.billDate.split("T")[0],
+        originalAmount: String(b.originalAmount),
+        paidAmount: String(b.paidAmount),
+        remainingBalance: String(b.remainingBalance),
+        dueDate: b.dueDate.split("T")[0],
+        status: b.status,
+      })),
+    });
+    setShowEditDialog(true);
+  };
+
+  const toRequest = (f: PVForm): PaymentVoucherCreateRequest => ({
+    supplierName: f.supplierName,
+    supplierType: f.supplierType,
+    billNo: f.billNo || undefined,
+    paymentDate: f.paymentDate,
+    amount: parseFloat(f.amount) || 0,
+    paymentMethod: f.paymentMethod,
+    status: f.status || "Pending",
+    description: f.description,
+    bankAccount: f.bankAccount || undefined,
+    chequeNo: f.chequeNo || undefined,
+    chequeDate: f.chequeDate || undefined,
+    notes: f.notes || undefined,
+    bills: f.bills.map(b => ({
+      billNo: b.billNo,
+      billDate: b.billDate,
+      originalAmount: parseFloat(b.originalAmount) || 0,
+      paidAmount: parseFloat(b.paidAmount) || 0,
+      remainingBalance: parseFloat(b.remainingBalance) || 0,
+      dueDate: b.dueDate,
+      status: b.status,
+    })),
+  });
+
+  const handleCreate = async () => {
+    if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
+    if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
+    setSavingForm(true);
+    try {
+      await paymentVoucherService.createPaymentVoucher(toRequest(form));
+      toast.success("Payment voucher created");
+      setShowCreateDialog(false);
+      await loadVouchers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create payment voucher");
+    } finally {
+      setSavingForm(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!editingId) return;
+    if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
+    if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
+    setSavingForm(true);
+    try {
+      await paymentVoucherService.updatePaymentVoucher(editingId, toRequest(form));
+      toast.success("Payment voucher updated");
+      setShowEditDialog(false);
+      if (selectedVoucher?.id === editingId) setIsDetailsOpen(false);
+      await loadVouchers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update payment voucher");
+    } finally {
+      setSavingForm(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirmId) return;
+    setDeletingVoucher(true);
+    try {
+      await paymentVoucherService.deletePaymentVoucher(deleteConfirmId);
+      toast.success("Payment voucher deleted");
+      if (selectedVoucher?.id === deleteConfirmId) setIsDetailsOpen(false);
+      setDeleteConfirmId(null);
+      await loadVouchers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete payment voucher");
+    } finally {
+      setDeletingVoucher(false);
+    }
+  };
+
+  const handleStatusUpdate = async (id: string, status: string) => {
+    try {
+      await paymentVoucherService.updateStatus(id, status);
+      toast.success(`Status updated to ${status}`);
+      if (selectedVoucher?.id === id) {
+        setSelectedVoucher(prev => prev ? { ...prev, status: status as any } : null);
+      }
+      await loadVouchers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update status");
+    }
+  };
+
+  const addBillRow = () => setForm(f => ({ ...f, bills: [...f.bills, { ...emptyBill }] }));
+  const removeBillRow = (idx: number) => setForm(f => ({ ...f, bills: f.bills.filter((_, i) => i !== idx) }));
+  const updateBill = (idx: number, key: keyof BillForm, val: string) =>
+    setForm(f => ({ ...f, bills: f.bills.map((b, i) => i === idx ? { ...b, [key]: val } : b) }));
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const parts = dateStr.split("T")[0].split("-");
+    if (parts.length < 3) return dateStr;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
+    const config: Record<string, { className: string; icon: any }> = {
       "Paid": { className: "bg-gymbios-success text-white", icon: CheckCircle },
       "Pending": { className: "bg-gymbios-warning text-white", icon: Clock },
       "Overdue": { className: "bg-gymbios-error text-white", icon: AlertTriangle },
-      "Partial": { className: "bg-orange-500 text-white", icon: Clock }
+      "Partial": { className: "bg-orange-500 text-white", icon: Clock },
     };
-
-    const config = statusConfig[status as keyof typeof statusConfig];
-    const Icon = config.icon;
-
+    const c = config[status] ?? { className: "bg-muted text-foreground", icon: Clock };
+    const Icon = c.icon;
     return (
-      <Badge className={cn("flex items-center space-x-1", config.className)}>
+      <Badge className={cn("flex items-center space-x-1", c.className)}>
         <Icon className="h-3 w-3" />
         <span>{status}</span>
       </Badge>
@@ -386,14 +439,213 @@ export function PaymentVoucher() {
   };
 
   const getPaymentMethodIcon = (method: string) => {
-    const icons = {
+    const icons: Record<string, any> = {
       "Cash": Banknote,
       "Bank Transfer": Building2,
       "Cheque": FileText,
-      "Digital Wallet": Wallet
+      "Digital Wallet": Wallet,
     };
-    return icons[method as keyof typeof icons] || CreditCard;
+    return icons[method] || CreditCard;
   };
+
+  const renderForm = () => (
+    <div className="space-y-4 py-2">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Supplier / Vendor Name *</Label>
+          <Input
+            value={form.supplierName}
+            onChange={e => setForm(f => ({ ...f, supplierName: e.target.value }))}
+            placeholder="Enter supplier name"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Supplier Type</Label>
+          <Select value={form.supplierType} onValueChange={v => setForm(f => ({ ...f, supplierType: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Supplier">Supplier</SelectItem>
+              <SelectItem value="Vendor">Vendor</SelectItem>
+              <SelectItem value="Employee">Employee</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Payment Date *</Label>
+          <Input
+            type="date"
+            value={form.paymentDate}
+            onChange={e => setForm(f => ({ ...f, paymentDate: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Amount (AED) *</Label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.amount}
+            onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+            placeholder="0.00"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Payment Method</Label>
+          <Select value={form.paymentMethod} onValueChange={v => setForm(f => ({ ...f, paymentMethod: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Cash">Cash</SelectItem>
+              <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+              <SelectItem value="Cheque">Cheque</SelectItem>
+              <SelectItem value="Digital Wallet">Digital Wallet</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Status</Label>
+          <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Pending">Pending</SelectItem>
+              <SelectItem value="Paid">Paid</SelectItem>
+              <SelectItem value="Partial">Partial</SelectItem>
+              <SelectItem value="Overdue">Overdue</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Bill No</Label>
+        <Input
+          value={form.billNo}
+          onChange={e => setForm(f => ({ ...f, billNo: e.target.value }))}
+          placeholder="e.g. INV-2026-001"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Description</Label>
+        <Input
+          value={form.description}
+          onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+          placeholder="Payment description"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Bank Account</Label>
+        <Input
+          value={form.bankAccount}
+          onChange={e => setForm(f => ({ ...f, bankAccount: e.target.value }))}
+          placeholder="e.g. Emirates NBD Current"
+        />
+      </div>
+
+      {form.paymentMethod === "Cheque" && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Cheque Number</Label>
+            <Input
+              value={form.chequeNo}
+              onChange={e => setForm(f => ({ ...f, chequeNo: e.target.value }))}
+              placeholder="CHQ-000001"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Cheque Date</Label>
+            <Input
+              type="date"
+              value={form.chequeDate}
+              onChange={e => setForm(f => ({ ...f, chequeDate: e.target.value }))}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label>Notes</Label>
+        <Input
+          value={form.notes}
+          onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+          placeholder="Additional notes"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-base font-semibold">Bill Entries</Label>
+          <Button type="button" variant="outline" size="sm" onClick={addBillRow}>
+            <Plus className="h-4 w-4 mr-1" /> Add Bill
+          </Button>
+        </div>
+        {form.bills.length > 0 && (
+          <div className="border rounded-lg overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="p-2 text-left">Bill No</th>
+                  <th className="p-2 text-left">Bill Date</th>
+                  <th className="p-2 text-right">Original</th>
+                  <th className="p-2 text-right">Paid</th>
+                  <th className="p-2 text-right">Remaining</th>
+                  <th className="p-2 text-left">Due Date</th>
+                  <th className="p-2 text-left">Status</th>
+                  <th className="p-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {form.bills.map((bill, idx) => (
+                  <tr key={idx} className="border-t">
+                    <td className="p-1">
+                      <Input value={bill.billNo} onChange={e => updateBill(idx, "billNo", e.target.value)} className="h-7 text-xs" />
+                    </td>
+                    <td className="p-1">
+                      <Input type="date" value={bill.billDate} onChange={e => updateBill(idx, "billDate", e.target.value)} className="h-7 text-xs" />
+                    </td>
+                    <td className="p-1">
+                      <Input type="number" value={bill.originalAmount} onChange={e => updateBill(idx, "originalAmount", e.target.value)} className="h-7 text-xs text-right" />
+                    </td>
+                    <td className="p-1">
+                      <Input type="number" value={bill.paidAmount} onChange={e => updateBill(idx, "paidAmount", e.target.value)} className="h-7 text-xs text-right" />
+                    </td>
+                    <td className="p-1">
+                      <Input type="number" value={bill.remainingBalance} onChange={e => updateBill(idx, "remainingBalance", e.target.value)} className="h-7 text-xs text-right" />
+                    </td>
+                    <td className="p-1">
+                      <Input type="date" value={bill.dueDate} onChange={e => updateBill(idx, "dueDate", e.target.value)} className="h-7 text-xs" />
+                    </td>
+                    <td className="p-1">
+                      <Select value={bill.status} onValueChange={v => updateBill(idx, "status", v)}>
+                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Pending">Pending</SelectItem>
+                          <SelectItem value="Paid">Paid</SelectItem>
+                          <SelectItem value="Partial">Partial</SelectItem>
+                          <SelectItem value="Overdue">Overdue</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="p-1">
+                      <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => removeBillRow(idx)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -405,18 +657,13 @@ export function PaymentVoucher() {
               <h1 className="text-2xl font-bold text-gymbios-heading">Payment Voucher / Ledger Management</h1>
               <p className="text-muted-foreground">Manage and track all payment vouchers, supplier ledgers, and financial transactions</p>
             </div>
-            
-            {/* Quick Actions */}
+
             <div className="flex items-center space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-                className="btn-secondary"
-              >
+              <Button variant="outline" onClick={() => setShowAdvancedFilter(!showAdvancedFilter)} className="btn-secondary">
                 <SlidersHorizontal className="h-4 w-4 mr-2" />
                 Filter
               </Button>
-              
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="btn-secondary">
@@ -436,7 +683,7 @@ export function PaymentVoucher() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <Button className="btn-primary">
+              <Button className="btn-primary" onClick={openCreate}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Payment
               </Button>
@@ -454,7 +701,7 @@ export function PaymentVoucher() {
                 className="pl-10 input-focus"
               />
             </div>
-            
+
             <div className="flex space-x-2">
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                 <SelectTrigger className="w-32 input-focus">
@@ -497,12 +744,8 @@ export function PaymentVoucher() {
                         {selectedDateRange.from ? (
                           selectedDateRange.to ? (
                             `${selectedDateRange.from.toLocaleDateString()} - ${selectedDateRange.to.toLocaleDateString()}`
-                          ) : (
-                            selectedDateRange.from.toLocaleDateString()
-                          )
-                        ) : (
-                          "Pick date range"
-                        )}
+                          ) : selectedDateRange.from.toLocaleDateString()
+                        ) : "Pick date range"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -525,21 +768,21 @@ export function PaymentVoucher() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="form-label">Created By</Label>
+                  <Label className="form-label">Supplier Type</Label>
                   <Select>
                     <SelectTrigger className="input-focus">
-                      <SelectValue placeholder="All Users" />
+                      <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Users</SelectItem>
-                      <SelectItem value="john">John Admin</SelectItem>
-                      <SelectItem value="sarah">Sarah Manager</SelectItem>
-                      <SelectItem value="mike">Mike Finance</SelectItem>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="supplier">Supplier</SelectItem>
+                      <SelectItem value="vendor">Vendor</SelectItem>
+                      <SelectItem value="employee">Employee</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-2 mt-4">
                 <Button variant="outline" onClick={() => {
                   setSearchQuery("");
@@ -549,7 +792,7 @@ export function PaymentVoucher() {
                 }}>
                   Clear Filters
                 </Button>
-                <Button className="btn-primary">Apply Filters</Button>
+                <Button className="btn-primary" onClick={() => setShowAdvancedFilter(false)}>Apply Filters</Button>
               </div>
             </div>
           )}
@@ -558,32 +801,27 @@ export function PaymentVoucher() {
 
       <div className="container mx-auto px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          
-          {/* Left Panel - Categories & Summary */}
+
+          {/* Left Panel */}
           <div className="lg:col-span-1 space-y-6">
-            
-            {/* Ledger Categories */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-gymbios-primary">Ledger Categories</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {[
-                  { id: "all", label: "All Payments", icon: Receipt, count: samplePaymentVouchers.length },
-                  { id: "pending", label: "Pending Payments", icon: Clock, count: samplePaymentVouchers.filter(v => v.status === "Pending" || v.status === "Partial").length },
-                  { id: "paid", label: "Paid", icon: CheckCircle, count: samplePaymentVouchers.filter(v => v.status === "Paid").length },
-                  { id: "overdue", label: "Overdue", icon: AlertTriangle, count: samplePaymentVouchers.filter(v => v.status === "Overdue").length },
-                  { id: "supplier", label: "Supplier-wise Ledger", icon: Building2, count: samplePaymentVouchers.filter(v => v.supplierType === "Supplier").length }
+                  { id: "all", label: "All Payments", icon: Receipt, count: allVouchers.length },
+                  { id: "pending", label: "Pending Payments", icon: Clock, count: allVouchers.filter(v => v.status === "Pending" || v.status === "Partial").length },
+                  { id: "paid", label: "Paid", icon: CheckCircle, count: allVouchers.filter(v => v.status === "Paid").length },
+                  { id: "overdue", label: "Overdue", icon: AlertTriangle, count: allVouchers.filter(v => v.status === "Overdue").length },
+                  { id: "supplier", label: "Supplier-wise Ledger", icon: Building2, count: allVouchers.filter(v => v.supplierType === "Supplier").length },
                 ].map((category) => {
                   const Icon = category.icon;
                   return (
                     <Button
                       key={category.id}
                       variant={selectedCategory === category.id ? "default" : "ghost"}
-                      className={cn(
-                        "w-full justify-start",
-                        selectedCategory === category.id ? "btn-primary" : "hover:bg-muted"
-                      )}
+                      className={cn("w-full justify-start", selectedCategory === category.id ? "btn-primary" : "hover:bg-muted")}
                       onClick={() => setSelectedCategory(category.id)}
                     >
                       <Icon className="h-4 w-4 mr-3" />
@@ -595,7 +833,6 @@ export function PaymentVoucher() {
               </CardContent>
             </Card>
 
-            {/* Quick Summary Tiles */}
             <div className="grid grid-cols-1 gap-4">
               <Card>
                 <CardContent className="p-4">
@@ -655,7 +892,7 @@ export function PaymentVoucher() {
             </div>
           </div>
 
-          {/* Main Content - Table */}
+          {/* Main Table */}
           <div className="lg:col-span-3">
             <Card>
               <CardHeader>
@@ -663,13 +900,11 @@ export function PaymentVoucher() {
                   <CardTitle className="text-gymbios-primary">
                     Payment Vouchers ({filteredAndSortedVouchers.length})
                   </CardTitle>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Label className="text-sm text-muted-foreground">Show:</Label>
-                    <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(parseInt(value))}>
-                      <SelectTrigger className="w-20 input-focus">
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Select value={itemsPerPage.toString()} onValueChange={(v) => setItemsPerPage(parseInt(v))}>
+                      <SelectTrigger className="w-20 input-focus"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="10">10</SelectItem>
                         <SelectItem value="25">25</SelectItem>
@@ -680,48 +915,24 @@ export function PaymentVoucher() {
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead 
-                          className="table-header cursor-pointer hover:bg-muted" 
-                          onClick={() => handleSort("voucherNo")}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <span>Voucher No</span>
-                            <ArrowUpDown className="h-4 w-4" />
-                          </div>
+                        <TableHead className="table-header cursor-pointer hover:bg-muted" onClick={() => handleSort("voucherNo")}>
+                          <div className="flex items-center space-x-2"><span>Voucher No</span><ArrowUpDown className="h-4 w-4" /></div>
                         </TableHead>
-                        <TableHead 
-                          className="table-header cursor-pointer hover:bg-muted"
-                          onClick={() => handleSort("supplierName")}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <span>Supplier/Vendor</span>
-                            <ArrowUpDown className="h-4 w-4" />
-                          </div>
+                        <TableHead className="table-header cursor-pointer hover:bg-muted" onClick={() => handleSort("supplierName")}>
+                          <div className="flex items-center space-x-2"><span>Supplier/Vendor</span><ArrowUpDown className="h-4 w-4" /></div>
                         </TableHead>
                         <TableHead className="table-header">Bill No</TableHead>
-                        <TableHead 
-                          className="table-header cursor-pointer hover:bg-muted"
-                          onClick={() => handleSort("paymentDate")}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <span>Payment Date</span>
-                            <ArrowUpDown className="h-4 w-4" />
-                          </div>
+                        <TableHead className="table-header cursor-pointer hover:bg-muted" onClick={() => handleSort("paymentDate")}>
+                          <div className="flex items-center space-x-2"><span>Payment Date</span><ArrowUpDown className="h-4 w-4" /></div>
                         </TableHead>
-                        <TableHead 
-                          className="table-header text-right cursor-pointer hover:bg-muted"
-                          onClick={() => handleSort("amount")}
-                        >
-                          <div className="flex items-center justify-end space-x-2">
-                            <span>Amount</span>
-                            <ArrowUpDown className="h-4 w-4" />
-                          </div>
+                        <TableHead className="table-header text-right cursor-pointer hover:bg-muted" onClick={() => handleSort("amount")}>
+                          <div className="flex items-center justify-end space-x-2"><span>Amount</span><ArrowUpDown className="h-4 w-4" /></div>
                         </TableHead>
                         <TableHead className="table-header">Payment Method</TableHead>
                         <TableHead className="table-header">Status</TableHead>
@@ -729,104 +940,103 @@ export function PaymentVoucher() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedVouchers.map((voucher) => {
-                        const PaymentIcon = getPaymentMethodIcon(voucher.paymentMethod);
-                        return (
-                          <TableRow 
-                            key={voucher.id} 
-                            className="hover:bg-muted/30 cursor-pointer"
-                            onClick={() => handleViewDetails(voucher)}
-                          >
-                            <TableCell className="font-medium">
-                              <Button variant="link" className="p-0 h-auto font-medium text-gymbios-primary">
-                                {voucher.voucherNo}
-                              </Button>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="bg-muted p-2 rounded">
-                                  <Users className="h-4 w-4" />
-                                </div>
-                                <div>
-                                  <p className="font-medium">{voucher.supplierName}</p>
-                                  <p className="text-sm text-muted-foreground">{voucher.supplierType}</p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {voucher.billNo ? (
-                                <Button variant="link" className="p-0 h-auto text-gymbios-secondary">
-                                  {voucher.billNo}
+                      {loadingVouchers ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            Loading payment vouchers...
+                          </TableCell>
+                        </TableRow>
+                      ) : paginatedVouchers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            No payment vouchers found.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        paginatedVouchers.map((voucher) => {
+                          const PaymentIcon = getPaymentMethodIcon(voucher.paymentMethod);
+                          return (
+                            <TableRow
+                              key={voucher.id}
+                              className="hover:bg-muted/30 cursor-pointer"
+                              onClick={() => handleViewDetails(voucher)}
+                            >
+                              <TableCell className="font-medium">
+                                <Button variant="link" className="p-0 h-auto font-medium text-gymbios-primary">
+                                  {voucher.voucherNo}
                                 </Button>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {new Date(voucher.paymentDate).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="text-right font-mono font-bold">
-                              AED {voucher.amount.toFixed(2)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <PaymentIcon className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">{voucher.paymentMethod}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {getStatusBadge(voucher.status)}
-                            </TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewDetails(voucher);
-                                  }}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                                    <Printer className="h-4 w-4 mr-2" />
-                                    Print PDF
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <div className="bg-muted p-2 rounded">
+                                    <Users className="h-4 w-4" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{voucher.supplierName}</p>
+                                    <p className="text-sm text-muted-foreground">{voucher.supplierType}</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {voucher.billNo ? (
+                                  <Button variant="link" className="p-0 h-auto text-gymbios-secondary">{voucher.billNo}</Button>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>{formatDate(voucher.paymentDate)}</TableCell>
+                              <TableCell className="text-right font-mono font-bold">
+                                AED {voucher.amount.toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <PaymentIcon className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm">{voucher.paymentMethod}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{getStatusBadge(voucher.status)}</TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={e => e.stopPropagation()}>
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewDetails(voucher); }}>
+                                      <Eye className="h-4 w-4 mr-2" /> View Details
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(voucher); }}>
+                                      <Edit className="h-4 w-4 mr-2" /> Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusUpdate(voucher.id, "Paid"); }}>
+                                      <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(voucher.id); }}
+                                      className="text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </div>
 
                 {/* Pagination */}
                 <div className="flex items-center justify-between mt-6">
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm text-muted-foreground">
-                      Showing {((currentPage - 1) * itemsPerPage) + 1} to{' '}
-                      {Math.min(currentPage * itemsPerPage, filteredAndSortedVouchers.length)} of{' '}
-                      {filteredAndSortedVouchers.length} results
-                    </p>
-                  </div>
-                  
+                  <p className="text-sm text-muted-foreground">
+                    {filteredAndSortedVouchers.length === 0
+                      ? "No results"
+                      : `Showing ${((currentPage - 1) * itemsPerPage) + 1} to ${Math.min(currentPage * itemsPerPage, filteredAndSortedVouchers.length)} of ${filteredAndSortedVouchers.length} results`}
+                  </p>
+
                   <div className="flex items-center space-x-2">
                     <Button
                       variant="outline"
@@ -837,7 +1047,7 @@ export function PaymentVoucher() {
                       <ChevronLeft className="h-4 w-4" />
                       Previous
                     </Button>
-                    
+
                     <div className="flex items-center space-x-1">
                       {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                         const page = i + 1;
@@ -854,12 +1064,12 @@ export function PaymentVoucher() {
                         );
                       })}
                     </div>
-                    
+
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
+                      disabled={currentPage === totalPages || totalPages === 0}
                     >
                       Next
                       <ChevronRight className="h-4 w-4" />
@@ -872,7 +1082,7 @@ export function PaymentVoucher() {
         </div>
       </div>
 
-      {/* Right Panel - Details Drawer */}
+      {/* Details Sheet */}
       <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <SheetContent className="w-full sm:w-[600px] overflow-y-auto">
           {selectedVoucher && (
@@ -888,16 +1098,13 @@ export function PaymentVoucher() {
               </SheetHeader>
 
               <div className="mt-6 space-y-6">
-                {/* Voucher Details */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Voucher Details</CardTitle>
-                  </CardHeader>
+                  <CardHeader><CardTitle className="text-lg">Voucher Details</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label className="form-label">Payment Date</Label>
-                        <p className="font-medium">{new Date(selectedVoucher.paymentDate).toLocaleDateString()}</p>
+                        <p className="font-medium">{formatDate(selectedVoucher.paymentDate)}</p>
                       </div>
                       <div>
                         <Label className="form-label">Amount</Label>
@@ -914,18 +1121,18 @@ export function PaymentVoucher() {
                         </div>
                       </div>
                       <div>
-                        <Label className="form-label">Created By</Label>
-                        <p>{selectedVoucher.createdBy}</p>
+                        <Label className="form-label">Supplier Type</Label>
+                        <p>{selectedVoucher.supplierType}</p>
                       </div>
                     </div>
-                    
+
                     {selectedVoucher.bankAccount && (
                       <div>
                         <Label className="form-label">Bank Account</Label>
                         <p>{selectedVoucher.bankAccount}</p>
                       </div>
                     )}
-                    
+
                     {selectedVoucher.chequeNo && (
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -934,24 +1141,28 @@ export function PaymentVoucher() {
                         </div>
                         <div>
                           <Label className="form-label">Cheque Date</Label>
-                          <p>{selectedVoucher.chequeDate ? new Date(selectedVoucher.chequeDate).toLocaleDateString() : '-'}</p>
+                          <p>{formatDate(selectedVoucher.chequeDate)}</p>
                         </div>
                       </div>
                     )}
-                    
+
                     <div>
                       <Label className="form-label">Description</Label>
-                      <p>{selectedVoucher.description}</p>
+                      <p>{selectedVoucher.description || "-"}</p>
                     </div>
+
+                    {selectedVoucher.notes && (
+                      <div>
+                        <Label className="form-label">Notes</Label>
+                        <p>{selectedVoucher.notes}</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
-                {/* Bill Breakdown */}
                 {selectedVoucher.bills && selectedVoucher.bills.length > 0 && (
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Bill Breakdown</CardTitle>
-                    </CardHeader>
+                    <CardHeader><CardTitle className="text-lg">Bill Breakdown</CardTitle></CardHeader>
                     <CardContent>
                       <div className="space-y-4">
                         {selectedVoucher.bills.map((bill) => (
@@ -959,13 +1170,10 @@ export function PaymentVoucher() {
                             <div className="flex items-center justify-between mb-3">
                               <div>
                                 <p className="font-medium text-gymbios-primary">{bill.billNo}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Due: {new Date(bill.dueDate).toLocaleDateString()}
-                                </p>
+                                <p className="text-sm text-muted-foreground">Due: {formatDate(bill.dueDate)}</p>
                               </div>
                               {getStatusBadge(bill.status)}
                             </div>
-                            
                             <div className="grid grid-cols-3 gap-4 text-sm">
                               <div>
                                 <Label className="text-xs text-muted-foreground">Original Amount</Label>
@@ -987,52 +1195,27 @@ export function PaymentVoucher() {
                   </Card>
                 )}
 
-                {/* Payment History */}
-                {selectedVoucher.paymentHistory && selectedVoucher.paymentHistory.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Payment History</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {selectedVoucher.paymentHistory.map((payment) => (
-                          <div key={payment.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                            <div>
-                              <p className="font-medium">{payment.reference}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Date(payment.date).toLocaleDateString()} • {payment.method} • by {payment.createdBy}
-                              </p>
-                            </div>
-                            <p className="font-bold">AED {payment.amount.toFixed(2)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Actions */}
                 <div className="flex flex-col space-y-3">
-                  <Button className="btn-primary w-full">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Payment
-                  </Button>
-                  
                   <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" className="btn-secondary">
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Voucher
+                    <Button className="btn-primary" onClick={() => { setIsDetailsOpen(false); openEdit(selectedVoucher); }}>
+                      <Edit className="h-4 w-4 mr-2" /> Edit Voucher
                     </Button>
-                    <Button variant="outline" className="btn-secondary">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Export PDF
+                    <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Paid")}>
+                      <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
                     </Button>
                   </div>
-                  
-                  <Button variant="outline" className="btn-secondary">
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print Voucher
-                  </Button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Partial")}>
+                      <Clock className="h-4 w-4 mr-2" /> Mark Partial
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="text-destructive border-destructive hover:bg-destructive/10"
+                      onClick={() => { setIsDetailsOpen(false); setDeleteConfirmId(selectedVoucher.id); }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </Button>
+                  </div>
                 </div>
               </div>
             </>
@@ -1048,7 +1231,7 @@ export function PaymentVoucher() {
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Total Paid</p>
                 <p className="font-bold text-gymbios-success">
-                  AED {samplePaymentVouchers.filter(v => v.status === "Paid").reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
+                  AED {allVouchers.filter(v => v.status === "Paid").reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
                 </p>
               </div>
               <div className="text-center">
@@ -1060,18 +1243,70 @@ export function PaymentVoucher() {
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Total Amount</p>
                 <p className="font-bold text-gymbios-primary">
-                  AED {samplePaymentVouchers.reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
+                  AED {allVouchers.reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
                 </p>
               </div>
             </div>
-            
-            <p className="text-sm text-muted-foreground">
-              Last updated: {new Date().toLocaleString()}
-            </p>
+            <p className="text-sm text-muted-foreground">Last updated: {new Date().toLocaleString()}</p>
           </div>
         </div>
       </div>
+
+      {/* Create Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New Payment Voucher</DialogTitle>
+          </DialogHeader>
+          {renderForm()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={savingForm}>
+              Cancel
+            </Button>
+            <Button className="btn-primary" onClick={handleCreate} disabled={savingForm}>
+              {savingForm ? "Saving..." : "Create Voucher"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Payment Voucher</DialogTitle>
+          </DialogHeader>
+          {renderForm()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={savingForm}>
+              Cancel
+            </Button>
+            <Button className="btn-primary" onClick={handleEdit} disabled={savingForm}>
+              {savingForm ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Payment Voucher</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Are you sure you want to delete this payment voucher? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} disabled={deletingVoucher}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deletingVoucher}>
+              {deletingVoucher ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
