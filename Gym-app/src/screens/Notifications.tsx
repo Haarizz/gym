@@ -1,11 +1,14 @@
-﻿import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Animated,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { GlassCard } from "../components/GlassCard";
+import { GlassScreen } from "../components/GlassScreen";
 import { useNotifications } from "../context/NotificationsContext";
 import { useSettings } from "../context/SettingsContext";
 
@@ -23,36 +26,52 @@ export function Notifications() {
   }, [fadeAnim]);
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Notifications</Text>
-        <TouchableOpacity onPress={markAllRead}>
-          <Text style={[styles.markAll, { color: colors.textMuted }]}>Mark all as read</Text>
-        </TouchableOpacity>
-      </View>
-      {notifications.map((item) => (
-        <TouchableOpacity
-          key={item.id}
-          style={[
-            styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            !item.read && styles.cardUnread,
-          ]}
-          onPress={() => markRead(item.id)}
-        >
-          <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
-          <Text style={[styles.cardMessage, { color: colors.textMuted }]}>{item.message}</Text>
-          <Text style={[styles.cardTime, { color: colors.textMuted }]}>{item.time}</Text>
-        </TouchableOpacity>
-      ))}
-    </Animated.View>
+    <GlassScreen>
+      <Animated.ScrollView
+        style={[styles.container, { opacity: fadeAnim }]}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>Notifications</Text>
+          <TouchableOpacity onPress={markAllRead}>
+            <Text style={[styles.markAll, { color: colors.textMuted }]}>Mark all as read</Text>
+          </TouchableOpacity>
+        </View>
+
+        {notifications.map((item) => (
+          <TouchableOpacity key={item.id} onPress={() => markRead(item.id)} activeOpacity={0.88}>
+            <GlassCard
+              style={[
+                styles.card,
+                !item.read && {
+                  borderColor: "rgba(96, 165, 250, 0.45)",
+                },
+              ]}
+            >
+              <View style={styles.cardInner}>
+                <View style={styles.cardTop}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
+                  {!item.read && <View style={styles.unreadDot} />}
+                </View>
+                <Text style={[styles.cardMessage, { color: colors.textMuted }]}>{item.message}</Text>
+                <Text style={[styles.cardTime, { color: colors.textMuted }]}>{item.time}</Text>
+              </View>
+            </GlassCard>
+          </TouchableOpacity>
+        ))}
+      </Animated.ScrollView>
+    </GlassScreen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  content: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: "row",
@@ -61,36 +80,41 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
   },
   markAll: {
     fontWeight: "600",
   },
   card: {
-    borderRadius: 16,
-    padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
-    borderWidth: 1,
+    borderRadius: 22,
   },
-  cardUnread: {
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-    backgroundColor: "#EFF6FF",
+  cardInner: {
+    padding: 18,
+  },
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#EF4444",
   },
   cardTitle: {
     fontWeight: "700",
+    flex: 1,
   },
   cardMessage: {
-    marginTop: 4,
+    marginTop: 6,
+    lineHeight: 20,
   },
   cardTime: {
-    marginTop: 6,
+    marginTop: 10,
     fontSize: 12,
   },
 });

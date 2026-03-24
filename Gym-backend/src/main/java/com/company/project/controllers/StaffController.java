@@ -52,4 +52,45 @@ public class StaffController {
         staffService.deleteStaff(id);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * POST /api/staff/{id}/set-credentials
+     * Body: { "appUsername": "...", "appPassword": "..." }
+     * Creates app login if none exists, or updates password if one does.
+     */
+    @PostMapping("/{id}/set-credentials")
+    public ResponseEntity<?> setStaffCredentials(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body) {
+        try {
+            String appUsername = body.get("appUsername");
+            String appPassword = body.get("appPassword");
+            if (appPassword == null || appPassword.isBlank()) {
+                return ResponseEntity.badRequest().body("Password is required");
+            }
+            return ResponseEntity.ok(staffService.setStaffCredentials(id, appUsername, appPassword));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * PATCH /api/staff/{id}/toggle-access
+     * Body: { "enabled": true/false }
+     * Enables or disables the staff member's mobile app login account.
+     */
+    @PatchMapping("/{id}/toggle-access")
+    public ResponseEntity<?> toggleStaffAccess(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, Boolean> body) {
+        try {
+            Boolean enabled = body.get("enabled");
+            if (enabled == null) {
+                return ResponseEntity.badRequest().body("Missing 'enabled' field");
+            }
+            return ResponseEntity.ok(staffService.toggleStaffAccess(id, enabled));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

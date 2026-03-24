@@ -30,6 +30,10 @@ export interface Staff {
   schedule: Record<string, string[]>;
   created_at: string;
   updated_at: string;
+  // App authentication fields
+  user_id?: number;
+  app_username?: string;
+  app_access_enabled?: boolean;
 }
 
 export interface StaffRequestData {
@@ -53,6 +57,8 @@ export interface StaffRequestData {
     document_url?: string;
   }>;
   schedule: Record<string, string[]>;
+  app_username?: string;
+  app_password?: string;
 }
 
 export interface StaffFilters {
@@ -154,6 +160,27 @@ class StaffService {
       { method: 'DELETE' }
     );
     if (!response.ok) throw new Error(`Failed to delete staff member: ${response.status}`);
+  }
+
+  async setStaffCredentials(id: string, appUsername: string, appPassword: string): Promise<Staff> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff/${id}/set-credentials`,
+      { method: 'POST', body: JSON.stringify({ appUsername, appPassword }) }
+    );
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any) || `Failed to set credentials: ${response.status}`);
+    }
+    return response.json();
+  }
+
+  async toggleStaffAccess(id: string, enabled: boolean): Promise<Staff> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff/${id}/toggle-access`,
+      { method: 'PATCH', body: JSON.stringify({ enabled }) }
+    );
+    if (!response.ok) throw new Error(`Failed to toggle staff access: ${response.status}`);
+    return response.json();
   }
 
   // ── Staff Targets ────────────────────────────────────────────────────────

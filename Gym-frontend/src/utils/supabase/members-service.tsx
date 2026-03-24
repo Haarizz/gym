@@ -52,6 +52,10 @@ export interface Member {
   family_head_id?: string;
   family_head_name?: string;
   relationship_to_head?: string;
+  // App authentication fields
+  user_id?: number;
+  app_username?: string;
+  app_access_enabled?: boolean;
 }
 
 export interface MemberFilters {
@@ -127,6 +131,27 @@ class MembersService {
       { method: 'DELETE' }
     );
     if (!response.ok) throw new Error(`Failed to delete member: ${response.status}`);
+  }
+
+  async setMemberCredentials(id: string, appUsername: string, appPassword: string): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/set-credentials`,
+      { method: 'POST', body: JSON.stringify({ appUsername, appPassword }) }
+    );
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any) || `Failed to set credentials: ${response.status}`);
+    }
+    return response.json();
+  }
+
+  async toggleMemberAccess(id: string, enabled: boolean): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/toggle-access`,
+      { method: 'PATCH', body: JSON.stringify({ enabled }) }
+    );
+    if (!response.ok) throw new Error(`Failed to toggle member access: ${response.status}`);
+    return response.json();
   }
 
   async renewMember(id: string, data: {
