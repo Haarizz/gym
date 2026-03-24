@@ -15,7 +15,6 @@ import { Switch } from "../components/ui/switch";
 import { Progress } from "../components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
-import { Separator } from "../components/ui/separator";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Checkbox } from "../components/ui/checkbox";
@@ -113,7 +112,7 @@ const incomeSourcesConfig = [
   {
     id: 'events',
     name: 'Events & Workshops',
-    icon: Calendar,
+    icon: CalendarDays,
     color: 'bg-orange-100 text-orange-800 border-orange-200',
     iconColor: 'text-orange-600'
   },
@@ -200,6 +199,7 @@ export function ReceiptVoucher() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [selectedReceipts, setSelectedReceipts] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [calendarDate, setCalendarDate] = useState<Date | undefined>(undefined);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -297,6 +297,7 @@ export function ReceiptVoucher() {
     }
   };
 
+  const calendarDateStr = calendarDate ? calendarDate.toISOString().split('T')[0] : '';
   const filteredReceipts = receipts.filter(receipt => {
     const matchesSearch = 
       receipt.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -308,8 +309,9 @@ export function ReceiptVoucher() {
     const matchesStatus = statusFilter === 'all' || receipt.status === statusFilter;
     const matchesPaymentMode = paymentModeFilter === 'all' || receipt.paymentMode === paymentModeFilter;
     const matchesBranch = branchFilter === 'all' || receipt.branch.toLowerCase().includes(branchFilter.toLowerCase());
+    const matchesCalendar = !calendarDateStr || receipt.date === calendarDateStr;
     
-    return matchesSearch && matchesSource && matchesStatus && matchesPaymentMode && matchesBranch;
+    return matchesSearch && matchesSource && matchesStatus && matchesPaymentMode && matchesBranch && matchesCalendar;
   });
 
   // Calculate dashboard metrics
@@ -331,6 +333,13 @@ export function ReceiptVoucher() {
   const completedToday = receipts
     .filter(r => r.date === today && r.status === 'completed')
     .length;
+
+  const printDate = selectedReceipt?.date
+    ? new Date(selectedReceipt.date).toLocaleDateString()
+    : '-';
+  const printCreatedAt = selectedReceipt?.createdAt
+    ? new Date(selectedReceipt.createdAt).toLocaleString()
+    : '-';
 
   const applyFilters = () => {
     loadReceipts({
@@ -481,6 +490,175 @@ export function ReceiptVoucher() {
 
   return (
     <TooltipProvider>
+      <style>{`
+        @media print {
+          body { background: #fff; }
+          body * { visibility: hidden; }
+          .print-receipt, .print-receipt * { visibility: visible !important; }
+          .print-receipt {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 24px;
+            display: block !important;
+          }
+        }
+        .print-receipt { display: none; color: #0f172a; font-family: Arial, sans-serif; }
+        .print-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 2px solid #e2e8f0;
+          padding-bottom: 12px;
+          margin-bottom: 16px;
+        }
+        .print-brand h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .print-brand p { margin: 4px 0 0; font-size: 12px; color: #64748b; }
+        .print-badge {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.4px;
+          text-transform: uppercase;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid #e2e8f0;
+          background: #f8fafc;
+          color: #0f172a;
+        }
+        .print-meta {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          margin: 16px 0;
+        }
+        .print-meta .label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .print-meta .value { font-size: 14px; font-weight: 600; margin-top: 4px; }
+        .print-card {
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          padding: 12px;
+          background: #fff;
+        }
+        .print-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .print-amount {
+          border: 2px solid #0f172a;
+          border-radius: 10px;
+          padding: 14px;
+          text-align: right;
+          font-size: 20px;
+          font-weight: 800;
+          margin-bottom: 16px;
+        }
+        .print-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 8px;
+        }
+        .print-table th {
+          text-align: left;
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #64748b;
+          padding: 8px 6px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .print-table td {
+          padding: 10px 6px;
+          font-size: 13px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .print-footer {
+          margin-top: 16px;
+          font-size: 11px;
+          color: #64748b;
+          text-align: center;
+        }
+      `}</style>
+
+      <div className="print-receipt">
+        <div className="print-header">
+          <div className="print-brand">
+            <h1>GymBios</h1>
+            <p>Receipt Voucher</p>
+          </div>
+          <div className="print-badge">{selectedReceipt?.status ?? 'N/A'}</div>
+        </div>
+
+        <div className="print-meta">
+          <div>
+            <div className="label">Voucher ID</div>
+            <div className="value">{selectedReceipt?.id ?? '-'}</div>
+          </div>
+          <div>
+            <div className="label">Date</div>
+            <div className="value">{printDate}</div>
+          </div>
+          <div>
+            <div className="label">Branch</div>
+            <div className="value">{selectedReceipt?.branch ?? '-'}</div>
+          </div>
+        </div>
+
+        <div className="print-grid">
+          <div className="print-card">
+            <div className="label">Member</div>
+            <div className="value">{selectedReceipt?.member ?? '-'}</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+              ID: {selectedReceipt?.memberId ?? '-'}
+            </div>
+          </div>
+          <div className="print-card">
+            <div className="label">Payment</div>
+            <div className="value">{selectedReceipt?.paymentMode ?? '-'}</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+              Reference: {selectedReceipt?.reference ?? '-'}
+            </div>
+          </div>
+        </div>
+
+        <div className="print-amount">
+          {selectedReceipt ? formatCurrency(selectedReceipt.amount) : 'AED 0'}
+        </div>
+
+        <div className="print-card">
+          <div className="label">Receipt Details</div>
+          <table className="print-table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Category</th>
+                <th>Transaction</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{selectedReceipt?.source ?? '-'}</td>
+                <td>{selectedReceipt?.sourceCategory ?? '-'}</td>
+                <td>{selectedReceipt?.transactionId ?? '-'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="print-card" style={{ marginTop: '12px' }}>
+          <div className="label">Notes</div>
+          <div style={{ fontSize: '12px', marginTop: '6px' }}>
+            {selectedReceipt?.notes ?? '—'}
+          </div>
+        </div>
+
+        <div className="print-footer">
+          Created at: {printCreatedAt}
+        </div>
+      </div>
+
       <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -525,7 +703,7 @@ export function ReceiptVoucher() {
               <Printer className="h-4 w-4 mr-2" />
               Export PDF
             </Button>
-            <Button onClick={() => setShowAddReceipt(true)}>
+            <Button size="sm" onClick={() => setShowAddReceipt(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Receipt
             </Button>
@@ -534,76 +712,70 @@ export function ReceiptVoucher() {
 
         {/* Dashboard Preview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-700">Today's Receipts</p>
-                  <p className="text-2xl font-bold text-blue-800">{formatCurrency(todayTotal)}</p>
-                  <p className="text-xs text-blue-600">{completedToday} transactions</p>
-                </div>
-                <div className="bg-blue-200 p-2 rounded-lg">
-                  <DollarSign className="h-6 w-6 text-blue-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Today's Receipts</CardTitle>
+              <div className="bg-blue-50 p-2 rounded-lg">
+                <DollarSign className="h-4 w-4 text-blue-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-700">{formatCurrency(todayTotal)}</div>
+              <p className="text-xs text-muted-foreground mt-1">{completedToday} transactions</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-green-700">This Month</p>
-                  <p className="text-2xl font-bold text-green-800">{formatCurrency(thisMonthTotal)}</p>
-                  <p className="text-xs text-green-600">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
-                </div>
-                <div className="bg-green-200 p-2 rounded-lg">
-                  <TrendingUp className="h-6 w-6 text-green-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">This Month</CardTitle>
+              <div className="bg-green-50 p-2 rounded-lg">
+                <TrendingUp className="h-4 w-4 text-green-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-700">{formatCurrency(thisMonthTotal)}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+              </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-amber-50 to-amber-100 border-amber-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-amber-700">Pending Amount</p>
-                  <p className="text-2xl font-bold text-amber-800">{formatCurrency(pendingAmount)}</p>
-                  <p className="text-xs text-amber-600">Awaiting payment</p>
-                </div>
-                <div className="bg-amber-200 p-2 rounded-lg">
-                  <Timer className="h-6 w-6 text-amber-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Pending Amount</CardTitle>
+              <div className="bg-amber-50 p-2 rounded-lg">
+                <Timer className="h-4 w-4 text-amber-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-700">{formatCurrency(pendingAmount)}</div>
+              <p className="text-xs text-muted-foreground mt-1">Awaiting payment</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-purple-700">Total Receipts</p>
-                  <p className="text-2xl font-bold text-purple-800">{filteredReceipts.length}</p>
-                  <p className="text-xs text-purple-600">This period</p>
-                </div>
-                <div className="bg-purple-200 p-2 rounded-lg">
-                  <Receipt className="h-6 w-6 text-purple-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Total Receipts</CardTitle>
+              <div className="bg-purple-50 p-2 rounded-lg">
+                <Receipt className="h-4 w-4 text-purple-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-700">{filteredReceipts.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">This period</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Income Sources Chart */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2 bg-white border-0 shadow-sm">
             <CardHeader>
               <CardTitle>Income Source Distribution</CardTitle>
               <CardDescription>Revenue breakdown by source category</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 {incomeSourcesConfig.map((source) => {
                   const sourceReceipts = receipts.filter(r => r.sourceCategory === source.id && r.status === 'completed');
                   const sourceTotal = sourceReceipts.reduce((sum, r) => sum + r.amount, 0);
@@ -624,7 +796,7 @@ export function ReceiptVoucher() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white border-0 shadow-sm self-start">
             <CardHeader>
               <CardTitle>Quick Stats</CardTitle>
               <CardDescription>Recent receipt overview</CardDescription>
@@ -652,12 +824,34 @@ export function ReceiptVoucher() {
                 <span className="text-sm text-gray-600">Most Used Payment</span>
                 <Badge variant="outline">Card</Badge>
               </div>
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Sort by Date</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setCalendarDate(undefined)}
+                    disabled={!calendarDate}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                <div className="w-full rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
+                  <Calendar
+                    mode="single"
+                    selected={calendarDate}
+                    onSelect={setCalendarDate}
+                    className="w-full [&_table]:w-full [&_table]:table-fixed [&_caption]:w-full"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Filters */}
-        <Card>
+        <Card className="bg-white border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Filter className="h-5 w-5" />
@@ -775,7 +969,7 @@ export function ReceiptVoucher() {
         </Card>
 
         {/* Receipt Vouchers Table */}
-        <Card>
+        <Card className="bg-white border-0 shadow-sm">
           <CardHeader>
             <CardTitle>Receipt Vouchers</CardTitle>
             <CardDescription>
@@ -783,9 +977,9 @@ export function ReceiptVoucher() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+            <div className="overflow-x-auto rounded-lg bg-white">
+              <Table className="min-w-full">
+                <TableHeader className="bg-slate-50">
                   <TableRow>
                     <TableHead className="w-12">
                       <Checkbox
@@ -823,8 +1017,8 @@ export function ReceiptVoucher() {
                         No receipt vouchers found.
                       </TableCell>
                     </TableRow>
-                  ) : filteredReceipts.map((receipt) => (
-                    <TableRow key={receipt.id} className="hover:bg-gray-50">
+                  ) : filteredReceipts.map((receipt, index) => (
+                    <TableRow key={receipt.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-slate-50/80 transition-colors`}>
                       <TableCell>
                         <Checkbox
                           checked={selectedReceipts.includes(receipt.id)}
@@ -1284,30 +1478,34 @@ export function ReceiptVoucher() {
 
         {/* Receipt Details Sheet */}
         <Sheet open={showReceiptDetails} onOpenChange={setShowReceiptDetails}>
-          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto bg-gray-50 p-0">
             {selectedReceipt && (
-              <>
-                <SheetHeader>
-                  <SheetTitle className="flex items-center space-x-2">
-                    <Receipt className="h-5 w-5" />
-                    <span>Receipt Details</span>
-                  </SheetTitle>
-                  <SheetDescription>
-                    {selectedReceipt.id} - {selectedReceipt.source}
-                  </SheetDescription>
-                </SheetHeader>
+              <div className="min-h-full">
+                <div className="px-6 py-5 bg-white border-b">
+                  <SheetHeader>
+                    <SheetTitle className="flex items-center space-x-2">
+                      <div className="p-2 rounded-lg bg-purple-50">
+                        <Receipt className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <span>Receipt Details</span>
+                    </SheetTitle>
+                    <SheetDescription>
+                      {selectedReceipt.id} - {selectedReceipt.source}
+                    </SheetDescription>
+                  </SheetHeader>
+                </div>
 
-                <div className="space-y-6 mt-6">
+                <div className="px-6 py-6 space-y-6">
                   {/* Receipt Overview */}
                   <div className="grid grid-cols-2 gap-4">
-                    <Card>
+                    <Card className="border-primary/10 shadow-sm">
                       <CardContent className="p-4 text-center">
                         <div className="text-2xl font-bold text-green-600">{formatCurrency(selectedReceipt.amount)}</div>
                         <div className="text-sm text-gray-600">Receipt Amount</div>
                       </CardContent>
                     </Card>
 
-                    <Card>
+                    <Card className="border-primary/10 shadow-sm">
                       <CardContent className="p-4 text-center">
                         <Badge className={getStatusColor(selectedReceipt.status)}>
                           <div className="flex items-center space-x-1">
@@ -1321,7 +1519,7 @@ export function ReceiptVoucher() {
                   </div>
 
                   {/* Receipt Information */}
-                  <div className="space-y-4">
+                  <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-4">
                     <h3 className="font-semibold">Receipt Information</h3>
                     
                     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1356,7 +1554,7 @@ export function ReceiptVoucher() {
                   </div>
 
                   {/* Income Source */}
-                  <div className="space-y-2">
+                  <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-2">
                     <h3 className="font-semibold">Income Source</h3>
                     <div className="flex items-center space-x-2">
                       {React.createElement(getSourceIcon(selectedReceipt.sourceCategory), {
@@ -1371,7 +1569,7 @@ export function ReceiptVoucher() {
 
                   {/* Notes */}
                   {selectedReceipt.notes && (
-                    <div className="space-y-2">
+                    <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-2">
                       <h3 className="font-semibold">Notes</h3>
                       <div className="p-3 bg-gray-50 rounded-lg text-sm">
                         {selectedReceipt.notes}
@@ -1380,7 +1578,7 @@ export function ReceiptVoucher() {
                   )}
 
                   {/* Audit Information */}
-                  <div className="space-y-2">
+                  <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-2">
                     <h3 className="font-semibold">Audit Trail</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
@@ -1404,7 +1602,7 @@ export function ReceiptVoucher() {
 
                   {/* Attachments */}
                   {selectedReceipt.attachments && selectedReceipt.attachments.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-2">
                       <h3 className="font-semibold">Attachments</h3>
                       <div className="space-y-2">
                         {selectedReceipt.attachments.map((attachment: string, index: number) => (
@@ -1424,39 +1622,43 @@ export function ReceiptVoucher() {
 
                   {/* Status Actions */}
                   {(selectedReceipt.status === 'draft' || selectedReceipt.status === 'pending') && (
-                    <div className="flex space-x-2">
-                      <Button
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                        onClick={() => handleStatusUpdate(selectedReceipt, 'completed')}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Mark Completed
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
-                        onClick={() => handleStatusUpdate(selectedReceipt, 'cancelled')}
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Cancel Receipt
-                      </Button>
+                    <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4">
+                      <div className="flex space-x-2">
+                        <Button
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          onClick={() => handleStatusUpdate(selectedReceipt, 'completed')}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Mark Completed
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
+                          onClick={() => handleStatusUpdate(selectedReceipt, 'cancelled')}
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Cancel Receipt
+                        </Button>
+                      </div>
                     </div>
                   )}
                   {selectedReceipt.status === 'completed' && (
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
-                        onClick={() => handleStatusUpdate(selectedReceipt, 'cancelled')}
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Cancel Receipt
-                      </Button>
+                    <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4">
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
+                          onClick={() => handleStatusUpdate(selectedReceipt, 'cancelled')}
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Cancel Receipt
+                        </Button>
+                      </div>
                     </div>
                   )}
 
                   {/* Main Actions */}
-                  <div className="flex space-x-2 pt-2 border-t">
+                  <div className="flex space-x-2 pt-2 border-t border-gray-200">
                     <Button
                       className="flex-1"
                       onClick={() => { setShowReceiptDetails(false); openEditReceipt(selectedReceipt); }}
@@ -1478,7 +1680,7 @@ export function ReceiptVoucher() {
                     </Button>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </SheetContent>
         </Sheet>

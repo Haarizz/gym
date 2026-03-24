@@ -54,7 +54,6 @@ import {
   Edit,
   Trash2,
   Calendar as CalendarIcon,
-  TrendingDown,
   Building2,
   Target,
   DollarSign,
@@ -369,33 +368,28 @@ export function Expenses() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center space-x-3">
-          <div className="bg-primary rounded-lg p-2">
-            <TrendingDown className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Expenses / Ledgers</h1>
-            <p className="text-sm text-gray-600">
-              Track and categorize all business expenses with tax management
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold">Expenses / Ledgers</h1>
+          <p className="text-gray-600 mt-1">
+            Track and categorize all business expenses with tax management
+          </p>
         </div>
 
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={loadData} disabled={loading}>
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
           <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90">
+              <Button size="sm" className="bg-primary hover:bg-primary/90 shadow-sm hover:shadow-md transition-all">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Expense
               </Button>
@@ -419,71 +413,71 @@ export function Expenses() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Expenses</CardTitle>
-              <DollarSign className="h-4 w-4 text-gray-400" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Total Expenses</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <DollarSign className="h-4 w-4 text-orange-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold text-gray-900">
+            <div className="text-2xl font-bold text-orange-700">
               {totalExpenses.toFixed(2)} AED
             </div>
-            <p className="text-xs text-gray-600 mt-1">{filteredExpenses.length} transactions</p>
+            <p className="text-xs text-muted-foreground mt-1">{filteredExpenses.length} transactions</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Tax Paid</CardTitle>
-              <Receipt className="h-4 w-4 text-gray-400" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Total Tax Paid</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Receipt className="h-4 w-4 text-blue-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold text-gray-900">
+            <div className="text-2xl font-bold text-blue-700">
               {totalTax.toFixed(2)} AED
             </div>
-            <p className="text-xs text-gray-600 mt-1">VAT & other taxes</p>
+            <p className="text-xs text-muted-foreground mt-1">VAT & other taxes</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-gray-600">Top Category</CardTitle>
-              <Target className="h-4 w-4 text-gray-400" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Top Category</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <Target className="h-4 w-4 text-purple-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold text-gray-900">
+            <div className="text-2xl font-bold text-purple-700">
               {topCategory?.[0] || "N/A"}
             </div>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {topCategory ? `${topCategory[1].toFixed(2)} AED` : "No data"}
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-gray-600">Locations</CardTitle>
-              <Building2 className="h-4 w-4 text-gray-400" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Locations</CardTitle>
+            <div className="bg-emerald-50 p-2 rounded-lg">
+              <Building2 className="h-4 w-4 text-emerald-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold text-gray-900">
+            <div className="text-2xl font-bold text-emerald-700">
               {new Set(filteredExpenses.map((e) => e.location).filter(Boolean)).size}
             </div>
-            <p className="text-xs text-gray-600 mt-1">Active locations</p>
+            <p className="text-xs text-muted-foreground mt-1">Active locations</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="bg-white border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg">Filters & Search</CardTitle>
         </CardHeader>
@@ -550,7 +544,7 @@ export function Expenses() {
       </Dialog>
 
       {/* Expenses Table */}
-      <Card>
+      <Card className="bg-white border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg">
             Expense Ledger
@@ -558,9 +552,9 @@ export function Expenses() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
+          <div className="rounded-lg bg-white overflow-x-auto">
+            <Table className="min-w-full">
+              <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead className="font-semibold text-primary">Date</TableHead>
                   <TableHead className="font-semibold text-primary">Vendor / Payee</TableHead>
@@ -576,8 +570,11 @@ export function Expenses() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredExpenses.map((expense) => (
-                  <TableRow key={expense.id} className="hover:bg-gray-50">
+                {filteredExpenses.map((expense, index) => (
+                  <TableRow
+                    key={expense.id}
+                    className={`${index % 2 === 0 ? "bg-white" : "bg-slate-50/40"} hover:bg-slate-50/80 transition-colors`}
+                  >
                     <TableCell>
                       {expense.date ? format(new Date(expense.date), "dd/MM/yyyy") : "-"}
                     </TableCell>
