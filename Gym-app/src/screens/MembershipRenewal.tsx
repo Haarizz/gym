@@ -1,12 +1,8 @@
-﻿import React from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { GlassCard } from "../components/GlassCard";
+import { GlassScreen } from "../components/GlassScreen";
 import { useSettings } from "../context/SettingsContext";
 
 const plans = [
@@ -19,42 +15,48 @@ export function MembershipRenewal() {
   const { colors } = useSettings();
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      <LinearGradient
-        colors={["#0F172A", "#6366F1"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <Text style={styles.heroTitle}>Membership Renewal</Text>
-        <Text style={styles.heroSubtitle}>Your plan is active until Nov 30, 2026.</Text>
-      </LinearGradient>
-
-      <View style={[styles.statusCard, { backgroundColor: colors.card }]}
-      >
-        <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Current Plan</Text>
-        <Text style={[styles.statusValue, { color: colors.text }]}>Premium · AED 199 / month</Text>
-        <Text style={styles.statusMeta}>Auto-renew enabled</Text>
-      </View>
-
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Upgrade Options</Text>
-      <View style={styles.planList}>
-        {plans.map((plan) => (
-          <View key={plan.id} style={[styles.planCard, { backgroundColor: colors.card }]}
+    <GlassScreen>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <GlassCard style={styles.heroShell} intensity={35}>
+          <LinearGradient
+            colors={["#0F172A", "#6366F1", "#818CF8"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
           >
-            <Text style={[styles.planLabel, { color: colors.text }]}>{plan.label}</Text>
-            <Text style={[styles.planPrice, { color: colors.textMuted }]}>{plan.price}</Text>
-            <TouchableOpacity style={styles.planButton}>
-              <Text style={styles.planButtonText}>Choose Plan</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
+            <Text style={styles.heroTitle}>Membership Renewal</Text>
+            <Text style={styles.heroSubtitle}>Your plan is active until Nov 30, 2026.</Text>
+          </LinearGradient>
+        </GlassCard>
 
-      <TouchableOpacity style={styles.primaryButton}>
-        <Text style={styles.primaryButtonText}>Renew Membership</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <GlassCard style={styles.statusCard}>
+          <View style={styles.statusCardInner}>
+            <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Current Plan</Text>
+            <Text style={[styles.statusValue, { color: colors.text }]}>Premium - AED 199 / month</Text>
+            <Text style={styles.statusMeta}>Auto-renew enabled</Text>
+          </View>
+        </GlassCard>
+
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Upgrade Options</Text>
+        <View style={styles.planList}>
+          {plans.map((plan) => (
+            <GlassCard key={plan.id} style={styles.planCard}>
+              <View style={styles.planCardInner}>
+                <Text style={[styles.planLabel, { color: colors.text }]}>{plan.label}</Text>
+                <Text style={[styles.planPrice, { color: colors.textMuted }]}>{plan.price}</Text>
+                <TouchableOpacity style={[styles.planButton, { backgroundColor: colors.glass }]}>
+                  <Text style={styles.planButtonText}>Choose Plan</Text>
+                </TouchableOpacity>
+              </View>
+            </GlassCard>
+          ))}
+        </View>
+
+        <TouchableOpacity style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Renew Membership</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </GlassScreen>
   );
 }
 
@@ -66,10 +68,12 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  hero: {
-    borderRadius: 20,
-    padding: 20,
+  heroShell: {
     marginBottom: 20,
+  },
+  hero: {
+    borderRadius: 24,
+    padding: 20,
   },
   heroTitle: {
     fontSize: 22,
@@ -81,14 +85,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   statusCard: {
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 24,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
+  },
+  statusCardInner: {
+    padding: 18,
   },
   statusLabel: {
     fontSize: 12,
@@ -115,13 +116,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   planCard: {
-    borderRadius: 18,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
+    borderRadius: 24,
+  },
+  planCardInner: {
+    padding: 18,
   },
   planLabel: {
     fontSize: 14,
@@ -132,8 +130,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   planButton: {
-    backgroundColor: "#EEF2FF",
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 12,
     alignItems: "center",
   },
@@ -144,7 +141,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: "#111827",
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: "center",
   },
   primaryButtonText: {

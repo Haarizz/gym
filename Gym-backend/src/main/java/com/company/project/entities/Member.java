@@ -158,6 +158,16 @@ public class Member extends BaseEntity {
     @Column(name = "relationship_to_head")
     private String relationshipToHead;
 
+    // App authentication fields
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(name = "app_username")
+    private String appUsername;
+
+    @Column(name = "app_access_enabled")
+    private Boolean appAccessEnabled;
+
     public Member() {}
 
     // ── Getters & Setters ───────────────────────────────────────────────────
@@ -299,4 +309,13 @@ public class Member extends BaseEntity {
 
     public String getRelationshipToHead() { return relationshipToHead; }
     public void setRelationshipToHead(String relationshipToHead) { this.relationshipToHead = relationshipToHead; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getAppUsername() { return appUsername; }
+    public void setAppUsername(String appUsername) { this.appUsername = appUsername; }
+
+    public Boolean getAppAccessEnabled() { return appAccessEnabled; }
+    public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
 }

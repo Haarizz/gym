@@ -49,7 +49,7 @@ public class DataInitializer implements CommandLineRunner {
     @Transactional
     public void run(String... args) throws Exception {
         // Seed Roles
-        List<String> rolesToSeed = List.of("ADMIN", "MANAGER", "USER", "ACCOUNTANT", "HR");
+        List<String> rolesToSeed = List.of("ADMIN", "MANAGER", "USER", "ACCOUNTANT", "HR", "MEMBER", "STAFF");
         for (String roleName : rolesToSeed) {
             if (roleRepository.findByRoleName(roleName).isEmpty()) {
                 Role role = new Role();

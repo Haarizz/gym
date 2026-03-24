@@ -101,6 +101,30 @@ public class AuthService {
                 .token(jwt)
                 .username(userDetails.getUsername())
                 .roles(roles)
+                .userId(userDetails.getId())
+                .enabled(userDetails.isEnabled())
+                .build();
+    }
+
+    public boolean usernameExists(String username) {
+        return userRepository.existsByUsername(username);
+    }
+
+    public AuthResponseDTO getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication.getPrincipal().equals("anonymousUser")) {
+            throw new RuntimeException("Not authenticated");
+        }
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(item -> item.getAuthority().replace("ROLE_", ""))
+                .collect(Collectors.toList());
+        return AuthResponseDTO.builder()
+                .username(userDetails.getUsername())
+                .roles(roles)
+                .userId(userDetails.getId())
+                .enabled(userDetails.isEnabled())
                 .build();
     }
 }

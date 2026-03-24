@@ -61,6 +61,10 @@ public class MemberRequestDTO {
     private String relationshipToHead;
     private List<FamilyMemberDTO> familyMembers;
 
+    // App access credentials (optional — leave blank to not create app login)
+    private String appUsername;
+    private String appPassword;
+
     // ── Getters & Setters ───────────────────────────────────────────────────
 
     public String getName() { return name; }
@@ -188,4 +192,10 @@ public class MemberRequestDTO {
 
     public List<FamilyMemberDTO> getFamilyMembers() { return familyMembers; }
     public void setFamilyMembers(List<FamilyMemberDTO> familyMembers) { this.familyMembers = familyMembers; }
+
+    public String getAppUsername() { return appUsername; }
+    public void setAppUsername(String appUsername) { this.appUsername = appUsername; }
+
+    public String getAppPassword() { return appPassword; }
+    public void setAppPassword(String appPassword) { this.appPassword = appPassword; }
 }

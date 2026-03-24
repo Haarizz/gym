@@ -20,8 +20,11 @@ import {
   QrCode,
   Download,
   Printer,
+  Smartphone,
+  ShieldCheck,
+  ShieldOff,
 } from 'lucide-react';
-import { Member } from '../../utils/supabase/members-service';
+import { Member, membersService } from '../../utils/supabase/members-service';
 import { calculateHealthRisk, getRiskBadgeConfig, formatEmergencyData } from '../../utils/health-risk';
 import QRCode from 'react-qr-code';
 
@@ -34,6 +37,24 @@ interface MemberDetailProps {
 export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps) {
   const [activeTab, setActiveTab] = useState('profile');
   const [showQRModal, setShowQRModal] = useState(false);
+  const [appAccessEnabled, setAppAccessEnabled] = useState<boolean | null>(
+    member.app_access_enabled ?? null
+  );
+  const [isTogglingAccess, setIsTogglingAccess] = useState(false);
+
+  const handleToggleAccess = async () => {
+    if (!member.user_id) return;
+    const newState = !appAccessEnabled;
+    setIsTogglingAccess(true);
+    try {
+      await membersService.toggleMemberAccess(member.id, newState);
+      setAppAccessEnabled(newState);
+    } catch (err) {
+      console.error('Failed to toggle app access', err);
+    } finally {
+      setIsTogglingAccess(false);
+    }
+  };
 
   // Calculate health risk level
   const healthRisk = calculateHealthRisk({
@@ -173,7 +194,7 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
           </TabsList>
 
           {/* Profile Tab */}
-          <TabsContent value="profile">
+          <TabsContent value="profile" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -194,6 +215,53 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
                   <InfoRow label="Age" value={getAge().toString()} icon={<User className="h-4 w-4" />} />
                   <InfoRow label="Blood Type" value={member.blood_type} icon={<Activity className="h-4 w-4" />} />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* App Access Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Smartphone className="h-5 w-5 text-[#2B7A78]" />
+                  <span>App Access</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {member.user_id ? (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Username: <span className="font-mono">{member.app_username}</span></p>
+                      <div className="flex items-center space-x-2">
+                        {appAccessEnabled ? (
+                          <Badge className="bg-emerald-100 text-emerald-700">
+                            <ShieldCheck className="h-3 w-3 mr-1" /> Enabled
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-rose-100 text-rose-700">
+                            <ShieldOff className="h-3 w-3 mr-1" /> Disabled
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {appAccessEnabled ? 'Member can log into the app.' : 'Member is blocked from the app.'}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleToggleAccess}
+                      disabled={isTogglingAccess}
+                      className={appAccessEnabled
+                        ? 'border-rose-300 text-rose-600 hover:bg-rose-50'
+                        : 'border-emerald-300 text-emerald-600 hover:bg-emerald-50'
+                      }
+                    >
+                      {isTogglingAccess ? 'Updating...' : (appAccessEnabled ? 'Disable Access' : 'Enable Access')}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No app account created for this member.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

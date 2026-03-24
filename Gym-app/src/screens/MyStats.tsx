@@ -1,11 +1,8 @@
-﻿import React from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { GlassCard } from "../components/GlassCard";
+import { GlassScreen } from "../components/GlassScreen";
 import { useSettings } from "../context/SettingsContext";
 
 const weekly = [
@@ -22,56 +19,65 @@ export function MyStats() {
   const { colors } = useSettings();
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      <LinearGradient
-        colors={["#111827", "#4F46E5"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <Text style={styles.heroTitle}>My Stats</Text>
-        <Text style={styles.heroSubtitle}>Track your progress and stay motivated.</Text>
-      </LinearGradient>
+    <GlassScreen>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <GlassCard style={styles.heroShell} intensity={35}>
+          <LinearGradient
+            colors={["#111827", "#4F46E5", "#60A5FA"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
+          >
+            <Text style={styles.heroTitle}>My Stats</Text>
+            <Text style={styles.heroSubtitle}>Track your progress and stay motivated.</Text>
+          </LinearGradient>
+        </GlassCard>
 
-      <View style={styles.statsRow}>
-        <View style={[styles.statCard, { backgroundColor: colors.card }]}
-        >
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Sessions</Text>
-          <Text style={[styles.statValue, { color: colors.text }]}>18</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: colors.card }]}
-        >
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Calories</Text>
-          <Text style={[styles.statValue, { color: colors.text }]}>3,240</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: colors.card }]}
-        >
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Streak</Text>
-          <Text style={[styles.statValue, { color: colors.text }]}>12</Text>
-        </View>
-      </View>
-
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Weekly Activity</Text>
-      <View style={[styles.chartCard, { backgroundColor: colors.card }]}
-      >
-        <View style={styles.chartRow}>
-          {weekly.map((item) => (
-            <View key={item.day} style={styles.chartBarWrap}>
-              <View style={[styles.chartBar, { height: item.value * 14 }]} />
-              <Text style={[styles.chartLabel, { color: colors.textMuted }]}>{item.day}</Text>
+        <View style={styles.statsRow}>
+          <GlassCard style={styles.statCard}>
+            <View style={styles.statCardInner}>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Sessions</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>18</Text>
             </View>
-          ))}
+          </GlassCard>
+          <GlassCard style={styles.statCard}>
+            <View style={styles.statCardInner}>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Calories</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>3,240</Text>
+            </View>
+          </GlassCard>
+          <GlassCard style={styles.statCard}>
+            <View style={styles.statCardInner}>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Streak</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>12</Text>
+            </View>
+          </GlassCard>
         </View>
-      </View>
 
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Highlights</Text>
-      <View style={[styles.highlightCard, { backgroundColor: colors.card }]}
-      >
-        <Text style={[styles.highlightTitle, { color: colors.textMuted }]}>Consistency Score</Text>
-        <Text style={[styles.highlightValue, { color: colors.text }]}>86%</Text>
-        <Text style={[styles.highlightMeta, { color: "#10B981" }]}>Up 12% from last month</Text>
-      </View>
-    </ScrollView>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Weekly Activity</Text>
+        <GlassCard style={styles.chartCard}>
+          <View style={styles.chartCardInner}>
+            <View style={styles.chartRow}>
+              {weekly.map((item) => (
+                <View key={item.day} style={styles.chartBarWrap}>
+                  <View style={[styles.chartBar, { height: item.value * 14 }]} />
+                  <Text style={[styles.chartLabel, { color: colors.textMuted }]}>{item.day}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </GlassCard>
+
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Highlights</Text>
+        <GlassCard style={styles.highlightCard}>
+          <View style={styles.highlightCardInner}>
+            <Text style={[styles.highlightTitle, { color: colors.textMuted }]}>Consistency Score</Text>
+            <Text style={[styles.highlightValue, { color: colors.text }]}>86%</Text>
+            <Text style={styles.highlightMeta}>Up 12% from last month</Text>
+          </View>
+        </GlassCard>
+      </ScrollView>
+    </GlassScreen>
   );
 }
 
@@ -83,10 +89,12 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  hero: {
-    borderRadius: 20,
-    padding: 20,
+  heroShell: {
     marginBottom: 20,
+  },
+  hero: {
+    borderRadius: 24,
+    padding: 20,
   },
   heroTitle: {
     fontSize: 22,
@@ -104,14 +112,11 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 22,
+  },
+  statCardInner: {
     padding: 16,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
   },
   statLabel: {
     fontSize: 12,
@@ -127,14 +132,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   chartCard: {
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 24,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
+  },
+  chartCardInner: {
+    padding: 18,
   },
   chartRow: {
     flexDirection: "row",
@@ -155,13 +157,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   highlightCard: {
-    borderRadius: 18,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
+    borderRadius: 24,
+  },
+  highlightCardInner: {
+    padding: 18,
   },
   highlightTitle: {
     fontSize: 14,
@@ -175,5 +174,6 @@ const styles = StyleSheet.create({
   highlightMeta: {
     marginTop: 4,
     fontWeight: "600",
+    color: "#10B981",
   },
 });

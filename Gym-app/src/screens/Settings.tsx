@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, Switch, Text, View, TouchableOpacity } from "react-native";
+import { Animated, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { GlassCard } from "../components/GlassCard";
+import { GlassScreen } from "../components/GlassScreen";
 import { useSettings } from "../context/SettingsContext";
 
 export function Settings() {
@@ -26,91 +28,140 @@ export function Settings() {
   };
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+    <GlassScreen>
+      <Animated.ScrollView
+        style={[styles.container, { opacity: fadeAnim }]}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
 
-      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Notifications</Text>
-      <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        <Text style={[styles.label, { color: colors.text }]}>Push Notifications</Text>
-        <Switch value={draft.notifications} onValueChange={(value) => setDraft({ ...draft, notifications: value })} />
-      </View>
-      <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        <Text style={[styles.label, { color: colors.text }]}>Class Reminders</Text>
-        <Switch value={draft.classReminders} onValueChange={(value) => setDraft({ ...draft, classReminders: value })} />
-      </View>
-      <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        <Text style={[styles.label, { color: colors.text }]}>Email Updates</Text>
-        <Switch value={draft.emailUpdates} onValueChange={(value) => setDraft({ ...draft, emailUpdates: value })} />
-      </View>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Notifications</Text>
+        <GlassCard style={styles.groupCard}>
+          <View style={styles.groupInner}>
+            <SettingRow
+              label="Push Notifications"
+              value={draft.notifications}
+              onChange={(value) => setDraft({ ...draft, notifications: value })}
+            />
+            <SettingRow
+              label="Class Reminders"
+              value={draft.classReminders}
+              onChange={(value) => setDraft({ ...draft, classReminders: value })}
+              withDivider
+            />
+            <SettingRow
+              label="Email Updates"
+              value={draft.emailUpdates}
+              onChange={(value) => setDraft({ ...draft, emailUpdates: value })}
+              withDivider
+            />
+          </View>
+        </GlassCard>
 
-      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>App Preferences</Text>
-      <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        <Text style={[styles.label, { color: colors.text }]}>Sound Effects</Text>
-        <Switch value={draft.sound} onValueChange={(value) => setDraft({ ...draft, sound: value })} />
-      </View>
-      <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        <Text style={[styles.label, { color: colors.text }]}>Dark Mode</Text>
-        <Switch value={draft.darkMode} onValueChange={(value) => setDraft({ ...draft, darkMode: value })} />
-      </View>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>App Preferences</Text>
+        <GlassCard style={styles.groupCard}>
+          <View style={styles.groupInner}>
+            <SettingRow
+              label="Sound Effects"
+              value={draft.sound}
+              onChange={(value) => setDraft({ ...draft, sound: value })}
+            />
+            <SettingRow
+              label="Dark Mode"
+              value={draft.darkMode}
+              onChange={(value) => setDraft({ ...draft, darkMode: value })}
+              withDivider
+            />
+          </View>
+        </GlassCard>
 
-      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Privacy</Text>
-      <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        <Text style={[styles.label, { color: colors.text }]}>Private Profile</Text>
-        <Switch value={draft.privateProfile} onValueChange={(value) => setDraft({ ...draft, privateProfile: value })} />
-      </View>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Privacy</Text>
+        <GlassCard style={styles.groupCard}>
+          <View style={styles.groupInner}>
+            <SettingRow
+              label="Private Profile"
+              value={draft.privateProfile}
+              onChange={(value) => setDraft({ ...draft, privateProfile: value })}
+            />
+          </View>
+        </GlassCard>
 
-      <TouchableOpacity
-        style={[styles.saveButton, { backgroundColor: dirty ? "#111827" : "#94A3B8" }]}
-        onPress={handleSave}
-        disabled={!dirty}
-      >
-        <Text style={styles.saveButtonText}>Save Changes</Text>
-      </TouchableOpacity>
-    </Animated.View>
+        <TouchableOpacity
+          style={[styles.saveButton, { backgroundColor: dirty ? "#111827" : "#94A3B8" }]}
+          onPress={handleSave}
+          disabled={!dirty}
+        >
+          <Text style={styles.saveButtonText}>Save Changes</Text>
+        </TouchableOpacity>
+      </Animated.ScrollView>
+    </GlassScreen>
+  );
+}
+
+function SettingRow({
+  label,
+  value,
+  onChange,
+  withDivider,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  withDivider?: boolean;
+}) {
+  const { colors } = useSettings();
+
+  return (
+    <View style={[styles.row, withDivider && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+      <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+      <Switch value={value} onValueChange={onChange} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  content: {
     padding: 20,
+    paddingBottom: 40,
   },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     marginTop: 8,
     marginBottom: 10,
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
+  },
+  groupCard: {
+    borderRadius: 24,
+    marginBottom: 14,
+  },
+  groupInner: {
+    paddingHorizontal: 16,
   },
   row: {
-    borderRadius: 16,
-    padding: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
-    borderWidth: 1,
+    paddingVertical: 16,
   },
   label: {
     fontWeight: "600",
   },
   saveButton: {
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 14,
   },
   saveButtonText: {
     color: "#fff",

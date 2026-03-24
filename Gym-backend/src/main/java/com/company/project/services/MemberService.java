@@ -9,10 +9,17 @@ import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.RenewalRequestDTO;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
+import com.company.project.entities.Role;
+import com.company.project.entities.User;
+import com.company.project.entities.UserRole;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipPlanRepository;
+import com.company.project.repositories.RoleRepository;
+import com.company.project.repositories.UserRepository;
+import com.company.project.repositories.UserRoleRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -39,13 +46,25 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final MembershipPlanRepository planRepository;
     private final ReceiptService receiptService;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
-                         @Lazy ReceiptService receiptService) {
-        this.memberRepository = memberRepository;
-        this.planRepository   = planRepository;
-        this.receiptService   = receiptService;
+                         @Lazy ReceiptService receiptService,
+                         UserRepository userRepository,
+                         RoleRepository roleRepository,
+                         UserRoleRepository userRoleRepository,
+                         PasswordEncoder passwordEncoder) {
+        this.memberRepository    = memberRepository;
+        this.planRepository      = planRepository;
+        this.receiptService      = receiptService;
+        this.userRepository      = userRepository;
+        this.roleRepository      = roleRepository;
+        this.userRoleRepository  = userRoleRepository;
+        this.passwordEncoder     = passwordEncoder;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -139,7 +158,81 @@ public class MemberService {
             }
         }
 
+        // Auto-create app login account if credentials were provided
+        if (request.getAppUsername() != null && !request.getAppUsername().isBlank()
+                && request.getAppPassword() != null && !request.getAppPassword().isBlank()) {
+            if (userRepository.existsByUsername(request.getAppUsername())) {
+                throw new RuntimeException("Username already taken: " + request.getAppUsername());
+            }
+            User user = new User();
+            user.setUsername(request.getAppUsername());
+            user.setEmail(saved.getEmail());
+            user.setPasswordHash(passwordEncoder.encode(request.getAppPassword()));
+            user.setEnabled(true);
+            user.setUserRoles(new java.util.HashSet<>());
+            user = userRepository.save(user);
+
+            Role memberRole = roleRepository.findByRoleName("MEMBER")
+                    .orElseThrow(() -> new RuntimeException("MEMBER role not found"));
+            userRoleRepository.save(new UserRole(null, user, memberRole));
+
+            saved.setUserId(user.getId());
+            saved.setAppUsername(request.getAppUsername());
+            saved.setAppAccessEnabled(true);
+            saved = memberRepository.save(saved);
+        }
+
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    public MemberResponseDTO setMemberCredentials(Long id, String appUsername, String appPassword) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Member not found: " + id));
+
+        if (member.getUserId() != null) {
+            // Already has an account — just update the password
+            User user = userRepository.findById(member.getUserId())
+                    .orElseThrow(() -> new RuntimeException("Linked user account not found"));
+            user.setPasswordHash(passwordEncoder.encode(appPassword));
+            userRepository.save(user);
+        } else {
+            // No account yet — create one
+            if (userRepository.existsByUsername(appUsername)) {
+                throw new RuntimeException("Username already taken: " + appUsername);
+            }
+            User user = new User();
+            user.setUsername(appUsername);
+            user.setEmail(member.getEmail());
+            user.setPasswordHash(passwordEncoder.encode(appPassword));
+            user.setEnabled(true);
+            user.setUserRoles(new java.util.HashSet<>());
+            user = userRepository.save(user);
+
+            Role memberRole = roleRepository.findByRoleName("MEMBER")
+                    .orElseThrow(() -> new RuntimeException("MEMBER role not found"));
+            userRoleRepository.save(new UserRole(null, user, memberRole));
+
+            member.setUserId(user.getId());
+            member.setAppUsername(appUsername);
+            member.setAppAccessEnabled(true);
+            memberRepository.save(member);
+        }
+
+        return MemberResponseDTO.fromEntity(memberRepository.findById(id).orElseThrow());
+    }
+
+    public MemberResponseDTO toggleMemberAccess(Long id, boolean enabled) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Member not found: " + id));
+        if (member.getUserId() == null) {
+            throw new RuntimeException("This member has no linked app account");
+        }
+        User user = userRepository.findById(member.getUserId())
+                .orElseThrow(() -> new RuntimeException("Linked user account not found"));
+        user.setEnabled(enabled);
+        userRepository.save(user);
+        member.setAppAccessEnabled(enabled);
+        return MemberResponseDTO.fromEntity(memberRepository.save(member));
     }
 
     /**
