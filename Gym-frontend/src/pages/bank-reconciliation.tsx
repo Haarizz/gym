@@ -475,7 +475,7 @@ export function BankReconciliation() {
         <div className="space-y-2">
           <Label>Bank Account Name *</Label>
           <Select value={form.bankAccountName} onValueChange={v => setForm(f => ({ ...f, bankAccountName: v }))}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20"><SelectValue /></SelectTrigger>
             <SelectContent>
               {PREDEFINED_ACCOUNTS.map(a => (
                 <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
@@ -485,28 +485,28 @@ export function BankReconciliation() {
         </div>
         <div className="space-y-2">
           <Label>Statement Date *</Label>
-          <Input type="date" value={form.statementDate} onChange={e => setForm(f => ({ ...f, statementDate: e.target.value }))} />
+          <Input type="date" value={form.statementDate} onChange={e => setForm(f => ({ ...f, statementDate: e.target.value }))} className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div className="space-y-2">
           <Label>Opening Balance</Label>
-          <Input type="number" step="0.01" value={form.openingBalance} onChange={e => setForm(f => ({ ...f, openingBalance: e.target.value }))} placeholder="0.00" />
+          <Input type="number" step="0.01" value={form.openingBalance} onChange={e => setForm(f => ({ ...f, openingBalance: e.target.value }))} placeholder="0.00" className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
         </div>
         <div className="space-y-2">
           <Label>Closing Balance (Bank)</Label>
-          <Input type="number" step="0.01" value={form.closingBalance} onChange={e => setForm(f => ({ ...f, closingBalance: e.target.value }))} placeholder="0.00" />
+          <Input type="number" step="0.01" value={form.closingBalance} onChange={e => setForm(f => ({ ...f, closingBalance: e.target.value }))} placeholder="0.00" className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
         </div>
         <div className="space-y-2">
           <Label>System / Ledger Balance</Label>
-          <Input type="number" step="0.01" value={form.systemBalance} onChange={e => setForm(f => ({ ...f, systemBalance: e.target.value }))} placeholder="0.00" />
+          <Input type="number" step="0.01" value={form.systemBalance} onChange={e => setForm(f => ({ ...f, systemBalance: e.target.value }))} placeholder="0.00" className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label>Notes</Label>
-        <Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes" />
+        <Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes" className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
       </div>
 
       <div className="space-y-2">
@@ -517,7 +517,7 @@ export function BankReconciliation() {
           </Button>
         </div>
         {form.lines.length > 0 && (
-          <div className="border rounded-lg overflow-x-auto">
+          <div className="rounded-lg overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr>
@@ -531,19 +531,19 @@ export function BankReconciliation() {
               </thead>
               <tbody>
                 {form.lines.map((line, idx) => (
-                  <tr key={idx} className="border-t">
+                  <tr key={idx} className="border-t border-gray-100">
                     <td className="p-1">
-                      <Input type="date" value={line.transactionDate} onChange={e => updateLine(idx, "transactionDate", e.target.value)} className="h-7 text-xs" />
+                      <Input type="date" value={line.transactionDate} onChange={e => updateLine(idx, "transactionDate", e.target.value)} className="h-7 text-xs border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20" />
                     </td>
                     <td className="p-1">
-                      <Input value={line.description} onChange={e => updateLine(idx, "description", e.target.value)} className="h-7 text-xs" placeholder="Description" />
+                      <Input value={line.description} onChange={e => updateLine(idx, "description", e.target.value)} className="h-7 text-xs border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20" placeholder="Description" />
                     </td>
                     <td className="p-1">
-                      <Input type="number" step="0.01" value={line.amount} onChange={e => updateLine(idx, "amount", e.target.value)} className="h-7 text-xs text-right" />
+                      <Input type="number" step="0.01" value={line.amount} onChange={e => updateLine(idx, "amount", e.target.value)} className="h-7 text-xs text-right border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20" />
                     </td>
                     <td className="p-1">
                       <Select value={line.type} onValueChange={v => updateLine(idx, "type", v)}>
-                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-7 text-xs border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="DEBIT">DEBIT</SelectItem>
                           <SelectItem value="CREDIT">CREDIT</SelectItem>
@@ -551,7 +551,7 @@ export function BankReconciliation() {
                       </Select>
                     </td>
                     <td className="p-1">
-                      <Input value={line.reference} onChange={e => updateLine(idx, "reference", e.target.value)} className="h-7 text-xs" placeholder="Ref no." />
+                      <Input value={line.reference} onChange={e => updateLine(idx, "reference", e.target.value)} className="h-7 text-xs border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20" placeholder="Ref no." />
                     </td>
                     <td className="p-1">
                       <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => removeLine(idx)}>
@@ -574,14 +574,14 @@ export function BankReconciliation() {
   );
 
   return (
-    <div className="min-h-screen bg-gymbios-main-bg">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="border-b bg-white shadow-sm">
-        <div className="container mx-auto px-6 py-4">
+        <div className="w-full px-6 py-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gymbios-primary">Bank Reconciliation</h1>
-              <p className="text-gymbios-body">Match bank statements with accounting ledger entries for accurate financial records</p>
+              <h1 className="text-3xl font-bold text-gray-900">Bank Reconciliation</h1>
+              <p className="text-gray-600 mt-1">Match bank statements with accounting ledger entries for accurate financial records</p>
             </div>
 
             <div className="flex items-center space-x-3">
@@ -623,7 +623,7 @@ export function BankReconciliation() {
               <Label className="text-sm font-medium text-gymbios-primary">Date Filter</Label>
               <div className="flex items-center space-x-2">
                 <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger className="flex-1 border-gray-300 focus:border-gymbios-primary">
+                  <SelectTrigger className="flex-1 border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -661,7 +661,7 @@ export function BankReconciliation() {
                 const account = PREDEFINED_ACCOUNTS.find(acc => acc.id === value);
                 if (account) setSelectedAccount(account);
               }}>
-                <SelectTrigger className="border-gray-300 focus:border-gymbios-primary">
+                <SelectTrigger className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -682,7 +682,7 @@ export function BankReconciliation() {
                   placeholder="Search transactions..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 border-gray-300 focus:border-gymbios-primary"
+                  className="pl-10 border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20"
                 />
               </div>
             </div>
@@ -690,7 +690,7 @@ export function BankReconciliation() {
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gymbios-primary">Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="border-gray-300 focus:border-gymbios-primary">
+                <SelectTrigger className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -761,113 +761,107 @@ export function BankReconciliation() {
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-6">
+      <div className="w-full px-6 py-6">
         {/* Top Summary Panel */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <Landmark className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Closing Balance</p>
-                  <p className="text-xl font-bold text-gray-900">
-                    AED {currentReconciliation ? currentReconciliation.closingBalance.toFixed(2) : "0.00"}
-                  </p>
-                  <p className="text-xs text-gray-500">Bank statement</p>
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium text-primary">Bank Balance</CardTitle>
+              <div className="bg-blue-50 p-2 rounded-lg">
+                <Landmark className="h-4 w-4 text-blue-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                AED {currentReconciliation ? currentReconciliation.closingBalance.toFixed(2) : "0.00"}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Bank statement</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <div className="bg-green-50 p-3 rounded-lg">
-                  <Calculator className="h-6 w-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">System Balance</p>
-                  <p className="text-xl font-bold text-gray-900">
-                    AED {currentReconciliation ? currentReconciliation.systemBalance.toFixed(2) : "0.00"}
-                  </p>
-                  <p className="text-xs text-gray-500">Accounting records</p>
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium text-primary">Ledger Balance</CardTitle>
+              <div className="bg-green-50 p-2 rounded-lg">
+                <Calculator className="h-4 w-4 text-green-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                AED {currentReconciliation ? currentReconciliation.systemBalance.toFixed(2) : "0.00"}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Accounting records</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <div className={cn(
-                  "p-3 rounded-lg",
-                  !currentReconciliation || Math.abs(currentReconciliation.difference) < 0.01
-                    ? "bg-green-50" : "bg-red-50"
-                )}>
-                  {(!currentReconciliation || Math.abs(currentReconciliation.difference) < 0.01) ? (
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  ) : (
-                    <AlertTriangle className="h-6 w-6 text-red-600" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Difference</p>
-                  <p className={cn(
-                    "text-xl font-bold",
-                    !currentReconciliation || Math.abs(currentReconciliation.difference) < 0.01
-                      ? "text-green-600" : "text-red-600"
-                  )}>
-                    {!currentReconciliation
-                      ? "—"
-                      : Math.abs(currentReconciliation.difference) < 0.01
-                        ? "Balanced ✓"
-                        : `AED ${Math.abs(currentReconciliation.difference).toFixed(2)}`}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {!currentReconciliation ? "No reconciliation" :
-                      Math.abs(currentReconciliation.difference) < 0.01 ? "No discrepancy" : "Requires attention"}
-                  </p>
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium text-primary">Difference</CardTitle>
+              <div className={cn(
+                "p-2 rounded-lg",
+                !currentReconciliation || Math.abs(currentReconciliation.difference) < 0.01
+                  ? "bg-green-50" : "bg-red-50"
+              )}>
+                {(!currentReconciliation || Math.abs(currentReconciliation.difference) < 0.01) ? (
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                )}
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className={cn(
+                "text-2xl font-bold",
+                !currentReconciliation || Math.abs(currentReconciliation.difference) < 0.01
+                  ? "text-green-600" : "text-red-600"
+              )}>
+                {!currentReconciliation
+                  ? "—"
+                  : Math.abs(currentReconciliation.difference) < 0.01
+                    ? "Balanced ✓"
+                    : `AED ${Math.abs(currentReconciliation.difference).toFixed(2)}`}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {!currentReconciliation ? "No reconciliation" :
+                  Math.abs(currentReconciliation.difference) < 0.01 ? "No discrepancy" : "Requires attention"}
+              </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <div className="bg-orange-50 p-3 rounded-lg">
-                  <AlertTriangle className="h-6 w-6 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Unmatched</p>
-                  <p className="text-xl font-bold text-gray-900">
-                    {currentReconciliation ? currentReconciliation.unmatchedCount : 0}
-                  </p>
-                  <p className="text-xs text-gray-500">Transactions</p>
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium text-primary">Unmatched</CardTitle>
+              <div className="bg-orange-50 p-2 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {currentReconciliation ? currentReconciliation.unmatchedCount : 0}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Transactions</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-gymbios-secondary to-gymbios-secondary/80 shadow-sm border-0">
+          <Card className="border-0 shadow-md hover:shadow-lg transition-all">
             <CardContent className="p-4 h-full flex items-center justify-center">
               <Button
                 onClick={openCreate}
-                className="w-full h-full bg-transparent hover:bg-white/10 text-white border-white/30 flex flex-col items-center justify-center space-y-1"
+                className="w-full h-full bg-white hover:bg-gray-50 text-gray-900 border-0 flex flex-col items-center justify-center gap-1"
                 variant="outline"
               >
-                <Plus className="h-6 w-6" />
+                <div className="bg-indigo-50 p-3 rounded-lg">
+                  <Plus className="h-6 w-6 text-indigo-600" />
+                </div>
                 <span className="text-sm font-medium">New</span>
-                <span className="text-xs opacity-90">Reconciliation</span>
+                <span className="text-xs text-gray-500">Reconciliation</span>
               </Button>
             </CardContent>
           </Card>
         </div>
 
         {/* Main Transaction Table */}
-        <Card className="bg-white shadow-sm border border-gray-200">
+        <Card className="bg-white shadow-sm border-0">
           <CardHeader className="border-b border-gray-100 bg-gray-50/50">
             <CardTitle className="text-gymbios-primary font-semibold">
               Bank Statement Lines ({filteredAndSortedTransactions.length})
@@ -1048,7 +1042,7 @@ export function BankReconciliation() {
         </Card>
 
         {/* Reconciliation Summary */}
-        <Card className="mt-6 bg-white shadow-sm border border-gray-200">
+        <Card className="mt-6 bg-white shadow-sm border-0">
           <CardHeader className="border-b border-gray-100 bg-gray-50/50">
             <CardTitle className="text-gymbios-primary font-semibold">Reconciliation Summary</CardTitle>
           </CardHeader>
@@ -1134,7 +1128,7 @@ export function BankReconciliation() {
               </SheetHeader>
 
               <div className="mt-6 space-y-6">
-                <Card className="shadow-sm border border-gray-200">
+                <Card className="shadow-sm border-0">
                   <CardHeader className="bg-gray-50/50 border-b border-gray-200">
                     <CardTitle className="text-lg text-gymbios-primary">Transaction Details</CardTitle>
                   </CardHeader>
@@ -1185,7 +1179,7 @@ export function BankReconciliation() {
                 </Card>
 
                 {/* Quick Reconciliation Actions */}
-                <Card className="shadow-sm border border-gray-200">
+                <Card className="shadow-sm border-0">
                   <CardHeader className="bg-gymbios-secondary/10 border-b border-gray-200">
                     <CardTitle className="text-lg text-gymbios-primary">Quick Reconciliation</CardTitle>
                   </CardHeader>
@@ -1250,7 +1244,7 @@ export function BankReconciliation() {
                 </Card>
 
                 {/* Notes */}
-                <Card className="shadow-sm border border-gray-200">
+                <Card className="shadow-sm border-0">
                   <CardHeader className="bg-gray-50/50 border-b border-gray-200">
                     <CardTitle className="text-lg text-gymbios-primary">Notes & Remarks</CardTitle>
                   </CardHeader>
@@ -1309,12 +1303,12 @@ export function BankReconciliation() {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>New Bank Reconciliation</DialogTitle>
+        <DialogContent className="w-[96vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-xl font-semibold text-gray-900">New Bank Reconciliation</DialogTitle>
           </DialogHeader>
           {renderFormContent()}
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={savingForm}>Cancel</Button>
             <Button className="btn-primary" onClick={handleCreate} disabled={savingForm}>
               {savingForm ? "Creating..." : "Create Reconciliation"}
@@ -1325,12 +1319,12 @@ export function BankReconciliation() {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Reconciliation</DialogTitle>
+        <DialogContent className="w-[96vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-xl font-semibold text-gray-900">Edit Reconciliation</DialogTitle>
           </DialogHeader>
           {renderFormContent()}
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={savingForm}>Cancel</Button>
             <Button className="btn-primary" onClick={handleEdit} disabled={savingForm}>
               {savingForm ? "Saving..." : "Save Changes"}

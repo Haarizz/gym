@@ -142,7 +142,7 @@ export function PaymentVoucher() {
         paymentDate: v.paymentDate,
         amount: v.amount,
         paymentMethod: v.paymentMethod as "Cash" | "Bank Transfer" | "Cheque" | "Digital Wallet",
-        status: v.status as "Paid" | "Pending" | "Overdue" | "Partial",
+        status: normalizeStatus(v.status) as any,
         description: v.description,
         createdAt: v.createdAt ?? "",
         bankAccount: v.bankAccount,
@@ -157,7 +157,7 @@ export function PaymentVoucher() {
           paidAmount: b.paidAmount,
           remainingBalance: b.remainingBalance,
           dueDate: b.dueDate,
-          status: b.status as "Paid" | "Pending" | "Overdue" | "Partial",
+          status: normalizeStatus(b.status) as any,
         })),
       }));
       setAllVouchers(mapped);
@@ -421,19 +421,29 @@ export function PaymentVoucher() {
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
 
+  const normalizeStatus = (status?: string) => {
+    if (!status) return "Pending";
+    const s = status.toLowerCase();
+    if (s === "paid") return "Paid";
+    if (s === "pending") return "Pending";
+    if (s === "overdue") return "Overdue";
+    if (s === "partial" || s === "partially paid" || s === "partially-paid") return "Partial";
+    return status;
+  };
   const getStatusBadge = (status: string) => {
+    const normalized = normalizeStatus(status);
     const config: Record<string, { className: string; icon: any }> = {
       "Paid": { className: "bg-gymbios-success text-white", icon: CheckCircle },
       "Pending": { className: "bg-gymbios-warning text-white", icon: Clock },
       "Overdue": { className: "bg-gymbios-error text-white", icon: AlertTriangle },
       "Partial": { className: "bg-orange-500 text-white", icon: Clock },
     };
-    const c = config[status] ?? { className: "bg-muted text-foreground", icon: Clock };
+    const c = config[normalized] ?? { className: "bg-muted text-foreground", icon: Clock };
     const Icon = c.icon;
     return (
       <Badge className={cn("flex items-center space-x-1", c.className)}>
         <Icon className="h-3 w-3" />
-        <span>{status}</span>
+        <span>{normalized}</span>
       </Badge>
     );
   };
@@ -588,7 +598,7 @@ export function PaymentVoucher() {
         {form.bills.length > 0 && (
           <div className="border rounded-lg overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-muted/50">
+              <thead className="">
                 <tr>
                   <th className="p-2 text-left">Bill No</th>
                   <th className="p-2 text-left">Bill Date</th>
@@ -648,25 +658,25 @@ export function PaymentVoucher() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4">
+        <div className="w-full px-6 py-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gymbios-heading">Payment Voucher / Ledger Management</h1>
-              <p className="text-muted-foreground">Manage and track all payment vouchers, supplier ledgers, and financial transactions</p>
+              <h1 className="text-3xl font-bold">Payment Vouchers</h1>
+              <p className="text-gray-600 mt-1">Create and manage supplier payments and voucher entries</p>
             </div>
 
             <div className="flex items-center space-x-3">
-              <Button variant="outline" onClick={() => setShowAdvancedFilter(!showAdvancedFilter)} className="btn-secondary">
+              <Button variant="outline" size="sm" onClick={() => setShowAdvancedFilter(!showAdvancedFilter)} className="btn-secondary shadow-sm hover:shadow-md transition-all">
                 <SlidersHorizontal className="h-4 w-4 mr-2" />
                 Filter
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="btn-secondary">
+                  <Button variant="outline" size="sm" className="btn-secondary shadow-sm hover:shadow-md transition-all">
                     <Download className="h-4 w-4 mr-2" />
                     Export
                   </Button>
@@ -683,7 +693,7 @@ export function PaymentVoucher() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <Button className="btn-primary" onClick={openCreate}>
+              <Button size="sm" className="btn-primary shadow-sm hover:shadow-md transition-all" onClick={openCreate}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Payment
               </Button>
@@ -792,19 +802,19 @@ export function PaymentVoucher() {
                 }}>
                   Clear Filters
                 </Button>
-                <Button className="btn-primary" onClick={() => setShowAdvancedFilter(false)}>Apply Filters</Button>
+                <Button className="btn-primary shadow-sm hover:shadow-md transition-all" onClick={() => setShowAdvancedFilter(false)}>Apply Filters</Button>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="w-full px-6 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
 
           {/* Left Panel */}
           <div className="lg:col-span-1 space-y-6">
-            <Card>
+            <Card className="bg-white border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-gymbios-primary">Ledger Categories</CardTitle>
               </CardHeader>
@@ -834,56 +844,56 @@ export function PaymentVoucher() {
             </Card>
 
             <div className="grid grid-cols-1 gap-4">
-              <Card>
+              <Card className="bg-white border-0 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-3">
                     <div className="bg-gymbios-success/10 p-3 rounded-lg">
                       <TrendingUp className="h-5 w-5 text-gymbios-success" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Paid This Month</p>
+                      <p className="text-sm text-muted-foreground whitespace-nowrap">Paid This Month</p>
                       <p className="font-bold text-lg">AED {summaryData.totalPaidThisMonth.toFixed(2)}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-white border-0 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-3">
                     <div className="bg-gymbios-warning/10 p-3 rounded-lg">
                       <Clock className="h-5 w-5 text-gymbios-warning" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Total Pending</p>
+                      <p className="text-xs uppercase tracking-wide text-amber-700">Total Pending</p>
                       <p className="font-bold text-lg">AED {summaryData.totalPending.toFixed(2)}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-white border-0 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-3">
                     <div className="bg-gymbios-error/10 p-3 rounded-lg">
                       <AlertTriangle className="h-5 w-5 text-gymbios-error" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Overdue Payments</p>
+                      <p className="text-sm text-muted-foreground whitespace-nowrap">Overdue Payments</p>
                       <p className="font-bold text-lg">{summaryData.overdueCount}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-white border-0 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-3">
                     <div className="bg-blue-100 p-3 rounded-lg">
                       <CalendarBig className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Upcoming (7 days)</p>
+                      <p className="text-sm text-muted-foreground whitespace-nowrap">Upcoming (7 days)</p>
                       <p className="font-bold text-lg">{summaryData.upcomingPayments}</p>
                     </div>
                   </div>
@@ -894,7 +904,7 @@ export function PaymentVoucher() {
 
           {/* Main Table */}
           <div className="lg:col-span-3">
-            <Card>
+            <Card className="bg-white border-0 shadow-sm">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-gymbios-primary">
@@ -902,7 +912,7 @@ export function PaymentVoucher() {
                   </CardTitle>
 
                   <div className="flex items-center space-x-2">
-                    <Label className="text-sm text-muted-foreground">Show:</Label>
+                    <Label className="text-sm text-muted-foreground whitespace-nowrap">Show:</Label>
                     <Select value={itemsPerPage.toString()} onValueChange={(v) => setItemsPerPage(parseInt(v))}>
                       <SelectTrigger className="w-20 input-focus"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -917,21 +927,21 @@ export function PaymentVoucher() {
               </CardHeader>
 
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="table-header cursor-pointer hover:bg-muted" onClick={() => handleSort("voucherNo")}>
+                <div className="overflow-x-auto rounded-lg bg-white">
+                  <Table className="min-w-full">
+                    <TableHeader className="bg-slate-50">
+                      <TableRow className="">
+                        <TableHead className="table-header cursor-pointer hover:bg-slate-100" onClick={() => handleSort("voucherNo")}>
                           <div className="flex items-center space-x-2"><span>Voucher No</span><ArrowUpDown className="h-4 w-4" /></div>
                         </TableHead>
-                        <TableHead className="table-header cursor-pointer hover:bg-muted" onClick={() => handleSort("supplierName")}>
+                        <TableHead className="table-header cursor-pointer hover:bg-slate-100" onClick={() => handleSort("supplierName")}>
                           <div className="flex items-center space-x-2"><span>Supplier/Vendor</span><ArrowUpDown className="h-4 w-4" /></div>
                         </TableHead>
                         <TableHead className="table-header">Bill No</TableHead>
-                        <TableHead className="table-header cursor-pointer hover:bg-muted" onClick={() => handleSort("paymentDate")}>
+                        <TableHead className="table-header cursor-pointer hover:bg-slate-100" onClick={() => handleSort("paymentDate")}>
                           <div className="flex items-center space-x-2"><span>Payment Date</span><ArrowUpDown className="h-4 w-4" /></div>
                         </TableHead>
-                        <TableHead className="table-header text-right cursor-pointer hover:bg-muted" onClick={() => handleSort("amount")}>
+                        <TableHead className="table-header text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort("amount")}>
                           <div className="flex items-center justify-end space-x-2"><span>Amount</span><ArrowUpDown className="h-4 w-4" /></div>
                         </TableHead>
                         <TableHead className="table-header">Payment Method</TableHead>
@@ -953,12 +963,12 @@ export function PaymentVoucher() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        paginatedVouchers.map((voucher) => {
+                        paginatedVouchers.map((voucher, index) => {
                           const PaymentIcon = getPaymentMethodIcon(voucher.paymentMethod);
                           return (
                             <TableRow
                               key={voucher.id}
-                              className="hover:bg-muted/30 cursor-pointer"
+                              className="hover:bg-slate-50/80 transition-colors cursor-pointer"
                               onClick={() => handleViewDetails(voucher)}
                             >
                               <TableCell className="font-medium">
@@ -973,7 +983,7 @@ export function PaymentVoucher() {
                                   </div>
                                   <div>
                                     <p className="font-medium">{voucher.supplierName}</p>
-                                    <p className="text-sm text-muted-foreground">{voucher.supplierType}</p>
+                                    <p className="text-sm text-muted-foreground whitespace-nowrap">{voucher.supplierType}</p>
                                   </div>
                                 </div>
                               </TableCell>
@@ -981,11 +991,11 @@ export function PaymentVoucher() {
                                 {voucher.billNo ? (
                                   <Button variant="link" className="p-0 h-auto text-gymbios-secondary">{voucher.billNo}</Button>
                                 ) : (
-                                  <span className="text-muted-foreground">-</span>
+                                  <span className="text-gray-600 mt-1">-</span>
                                 )}
                               </TableCell>
                               <TableCell>{formatDate(voucher.paymentDate)}</TableCell>
-                              <TableCell className="text-right font-mono font-bold">
+                              <TableCell className="text-right font-semibold text-gymbios-primary">
                                 AED {voucher.amount.toFixed(2)}
                               </TableCell>
                               <TableCell>
@@ -1031,7 +1041,7 @@ export function PaymentVoucher() {
 
                 {/* Pagination */}
                 <div className="flex items-center justify-between mt-6">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground whitespace-nowrap">
                     {filteredAndSortedVouchers.length === 0
                       ? "No results"
                       : `Showing ${((currentPage - 1) * itemsPerPage) + 1} to ${Math.min(currentPage * itemsPerPage, filteredAndSortedVouchers.length)} of ${filteredAndSortedVouchers.length} results`}
@@ -1084,21 +1094,28 @@ export function PaymentVoucher() {
 
       {/* Details Sheet */}
       <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <SheetContent className="w-full sm:w-[600px] overflow-y-auto">
+        <SheetContent className="w-full sm:w-[680px] overflow-y-auto bg-gray-50 p-0">
           {selectedVoucher && (
             <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center justify-between">
-                  <div>
-                    <span className="text-gymbios-primary">{selectedVoucher.voucherNo}</span>
-                    <span className="text-muted-foreground ml-2">• {selectedVoucher.supplierName}</span>
-                  </div>
-                  {getStatusBadge(selectedVoucher.status)}
-                </SheetTitle>
-              </SheetHeader>
+              <div className="px-6 py-5 bg-white border-b">
+                <SheetHeader>
+                  <SheetTitle className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-emerald-50 p-2 rounded-lg">
+                        <FileText className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="text-lg font-semibold text-gray-900">{selectedVoucher.voucherNo}</div>
+                        <div className="text-sm text-gray-500">{selectedVoucher.supplierName}</div>
+                      </div>
+                    </div>
+                    {getStatusBadge(selectedVoucher.status)}
+                  </SheetTitle>
+                </SheetHeader>
+              </div>
 
-              <div className="mt-6 space-y-6">
-                <Card>
+              <div className="px-6 py-6 space-y-6">
+                <Card className="bg-white border-0 shadow-sm">
                   <CardHeader><CardTitle className="text-lg">Voucher Details</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -1161,7 +1178,7 @@ export function PaymentVoucher() {
                 </Card>
 
                 {selectedVoucher.bills && selectedVoucher.bills.length > 0 && (
-                  <Card>
+                  <Card className="bg-white border-0 shadow-sm">
                     <CardHeader><CardTitle className="text-lg">Bill Breakdown</CardTitle></CardHeader>
                     <CardContent>
                       <div className="space-y-4">
@@ -1170,7 +1187,7 @@ export function PaymentVoucher() {
                             <div className="flex items-center justify-between mb-3">
                               <div>
                                 <p className="font-medium text-gymbios-primary">{bill.billNo}</p>
-                                <p className="text-sm text-muted-foreground">Due: {formatDate(bill.dueDate)}</p>
+                                <p className="text-sm text-muted-foreground whitespace-nowrap">Due: {formatDate(bill.dueDate)}</p>
                               </div>
                               {getStatusBadge(bill.status)}
                             </div>
@@ -1224,30 +1241,30 @@ export function PaymentVoucher() {
       </Sheet>
 
       {/* Footer Summary */}
-      <div className="border-t bg-card mt-6">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-6">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Total Paid</p>
-                <p className="font-bold text-gymbios-success">
+      <div className="mt-6">
+        <div className="w-full px-6 py-4">
+          <div className="flex items-center justify-between rounded-2xl bg-white/20 backdrop-blur-md shadow-lg px-6 py-4 gap-6">
+            <div className="flex items-center gap-12 flex-wrap">
+              <div className="text-center space-y-2 min-w-[150px]">
+                <p className="text-xs uppercase tracking-wide text-emerald-700">Total Paid</p>
+                <p className="font-bold text-emerald-700 text-lg">
                   AED {allVouchers.filter(v => v.status === "Paid").reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
                 </p>
               </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Total Pending</p>
-                <p className="font-bold text-gymbios-warning">
+              <div className="text-center space-y-2 min-w-[150px]">
+                <p className="text-xs uppercase tracking-wide text-amber-700">Total Pending</p>
+                <p className="font-bold text-amber-700 text-lg">
                   AED {summaryData.totalPending.toFixed(2)}
                 </p>
               </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Total Amount</p>
-                <p className="font-bold text-gymbios-primary">
+              <div className="text-center space-y-2 min-w-[150px]">
+                <p className="text-xs uppercase tracking-wide text-blue-700">Total Amount</p>
+                <p className="font-bold text-blue-700 text-lg">
                   AED {allVouchers.reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
                 </p>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">Last updated: {new Date().toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground whitespace-nowrap">Last updated: {new Date().toLocaleString()}</p>
           </div>
         </div>
       </div>
@@ -1263,7 +1280,7 @@ export function PaymentVoucher() {
             <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={savingForm}>
               Cancel
             </Button>
-            <Button className="btn-primary" onClick={handleCreate} disabled={savingForm}>
+            <Button className="btn-primary shadow-sm hover:shadow-md transition-all" onClick={handleCreate} disabled={savingForm}>
               {savingForm ? "Saving..." : "Create Voucher"}
             </Button>
           </DialogFooter>
@@ -1281,7 +1298,7 @@ export function PaymentVoucher() {
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={savingForm}>
               Cancel
             </Button>
-            <Button className="btn-primary" onClick={handleEdit} disabled={savingForm}>
+            <Button className="btn-primary shadow-sm hover:shadow-md transition-all" onClick={handleEdit} disabled={savingForm}>
               {savingForm ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
@@ -1294,7 +1311,7 @@ export function PaymentVoucher() {
           <DialogHeader>
             <DialogTitle>Delete Payment Voucher</DialogTitle>
           </DialogHeader>
-          <p className="text-muted-foreground">
+          <p className="text-gray-600 mt-1">
             Are you sure you want to delete this payment voucher? This action cannot be undone.
           </p>
           <DialogFooter>
