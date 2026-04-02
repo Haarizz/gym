@@ -27,7 +27,7 @@ import { Attendance } from "./pages/attendance";
 import { CheckIn } from "./pages/check-in";
 import { ReportsAnalytics } from "./pages/reports-analytics";
 import { ManagePlans } from "./pages/manage-plans";
-import { Community } from "./pages/community";
+import { Community } from "./pages/community-redesign";
 import { PromotionsCampaign } from "./pages/promotions-campaign";
 import { SalesPurchases } from "./pages/sales-purchases";
 import { SalesReports } from "./pages/sales-reports";
@@ -57,6 +57,8 @@ import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
 import { AssetTransactions } from "./pages/asset-transactions";
 import { AssetHistoryPage } from "./pages/asset-history";
+import { AssetReports } from "./pages/asset-reports";
+import { AssetAnalytics } from "./pages/asset-analytics";
 import { Ledgers } from "./pages/ledgers";
 import { ReceiptVoucher } from "./pages/receipt-voucher";
 import { MemberConnectAnalytics } from "./pages/member-connect-analytics";
@@ -970,22 +972,8 @@ export default function App() {
       <Route path="/manage-assets" element={<ManageAssets />} />
       <Route path="/asset-history" element={<AssetHistoryPage />} />
       <Route path="/asset-transactions" element={<AssetTransactions />} />
-      <Route path="/asset-reports" element={
-        <div className="p-6">
-          <h1>Asset Reports</h1>
-          <p className="text-muted-foreground">
-            Generate detailed asset reports including depreciation schedules, asset registers, and valuation summaries.
-          </p>
-        </div>
-      } />
-      <Route path="/asset-analytics" element={
-        <div className="p-6">
-          <h1>Asset Analytics</h1>
-          <p className="text-muted-foreground">
-            Advanced analytics for asset utilization, ROI tracking, maintenance costs, and performance optimization insights.
-          </p>
-        </div>
-      } />
+      <Route path="/asset-reports" element={<AssetReports />} />
+      <Route path="/asset-analytics" element={<AssetAnalytics />} />
       <Route path="/asset-settings" element={
         <div className="p-6">
           <h1>Asset Settings</h1>
