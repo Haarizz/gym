@@ -12,7 +12,7 @@ type GlassCardProps = {
 
 export function GlassCard({ children, style, intensity = 45 }: GlassCardProps) {
   const { colors } = useSettings();
-  const sheen = colors.isDark
+  const sheen: [string, string] = colors.isDark
     ? ["rgba(255,255,255,0.08)", "rgba(255,255,255,0.02)"]
     : ["rgba(255,255,255,0.38)", "rgba(255,255,255,0.08)"];
 

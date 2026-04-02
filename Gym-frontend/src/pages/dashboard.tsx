@@ -141,6 +141,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today');
   const [showMemberResults, setShowMemberResults] = useState(false);
+  const dashboardCardShell = "border-0 shadow-md hover:shadow-lg transition-shadow";
+  const dashboardSurfaceShell = "bg-card rounded-xl shadow-md";
+  const dashboardHeaderActionButton =
+    "border-0 bg-white text-slate-700 shadow-sm hover:bg-red-50 hover:text-red-600";
   
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
@@ -603,15 +607,20 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 <SelectItem value="lastMonth">Last Month</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={refreshData} disabled={isRefreshing}>
+            <Button
+              variant="outline"
+              className={dashboardHeaderActionButton}
+              onClick={refreshData}
+              disabled={isRefreshing}
+            >
               <RefreshCw className={cn("mr-2 h-4 w-4", isRefreshing && "animate-spin")} />
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" className={dashboardHeaderActionButton}>
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" className={dashboardHeaderActionButton}>
               <Filter className="mr-2 h-4 w-4" />
               Filter
             </Button>
@@ -687,7 +696,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       </div>
 
       {/* Quick Action Tabs */}
-      <div className="bg-card border rounded-lg p-6">
+      <div className={cn(dashboardSurfaceShell, "p-6")}>
         <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {quickActions.map((action) => (
@@ -711,7 +720,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
 
       {/* KPI Summary Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">
@@ -753,7 +762,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">
@@ -791,7 +800,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">
@@ -833,7 +842,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">
@@ -867,7 +876,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       {/* Middle Section - Data Visualizations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Side - Revenue Overview */}
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Revenue Overview</span>
@@ -914,7 +923,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         </Card>
 
         {/* Right Side - Membership Distribution */}
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardHeader>
             <CardTitle>Membership Distribution</CardTitle>
             <CardDescription>Breakdown by membership tier and revenue contribution</CardDescription>
@@ -979,7 +988,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       {/* Class Attendance Visualizations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Class Attendance Rates */}
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardHeader>
             <CardTitle>Class Attendance Rates</CardTitle>
             <CardDescription>Attendance percentage by class type</CardDescription>
@@ -1016,7 +1025,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         </Card>
 
         {/* Attendance by Time */}
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardHeader>
             <CardTitle>Attendance by Time Slot</CardTitle>
             <CardDescription>Member distribution throughout the day</CardDescription>
@@ -1042,7 +1051,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       {/* Bottom Section - Activity & Engagement */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Members */}
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Recent Members</span>
@@ -1122,7 +1131,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         </Card>
 
         {/* Notifications Panel */}
-        <Card>
+        <Card className={dashboardCardShell}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Notifications</span>
@@ -1214,7 +1223,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       </div>
 
       {/* Staff Status Panel */}
-      <Card>
+      <Card className={dashboardCardShell}>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Staff Status (Live)</span>
@@ -1237,7 +1246,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-3 p-3 border rounded-lg">
+                <div key={i} className="flex items-center space-x-3 rounded-lg bg-card p-3 shadow-sm">
                   <Skeleton className="h-10 w-10 rounded-full" />
                   <div className="flex-1 space-y-2">
                     <Skeleton className="h-4 w-20" />
@@ -1256,7 +1265,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 }
                 
                 return (
-                <div key={staff.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                <div key={staff.id} className="flex items-center space-x-3 rounded-lg bg-card p-3 shadow-sm">
                   <div className="relative">
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={staff.avatar} />
