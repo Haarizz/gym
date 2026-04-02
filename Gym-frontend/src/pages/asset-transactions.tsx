@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from "sonner";
+import { Alert, AlertDescription } from "../components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -259,12 +261,86 @@ const vendorData = [
   { id: 'VEN-005', name: 'Tech Solutions UAE', type: 'IT Equipment' }
 ];
 
+type AssetTransactionRecord = (typeof assetTransactionsData)[number];
+
+type TransactionFormState = {
+  type: string;
+  assetId: string;
+  transactionDate: string;
+  value: string;
+  location: string;
+  assignedTo: string;
+  vendor: string;
+  invoiceNumber: string;
+  description: string;
+  notes: string;
+  approvalRequired: boolean;
+  status: string;
+  approvedBy: string;
+};
+
+type DocumentAttachmentFormState = {
+  name: string;
+  category: string;
+};
+
+const transactionTypeOptions = [
+  { value: 'purchase', label: 'Asset Purchase' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'transfer', label: 'Asset Transfer' },
+  { value: 'assignment', label: 'Assign to Staff' },
+  { value: 'depreciation', label: 'Depreciation Entry' },
+  { value: 'disposal', label: 'Asset Disposal' },
+  { value: 'sale', label: 'Asset Sale' },
+  { value: 'insurance', label: 'Insurance Claim' },
+  { value: 'return', label: 'Asset Return' },
+  { value: 'revaluation', label: 'Revaluation' }
+];
+
+const transactionLocationOptions = Array.from(
+  new Set([
+    ...assetTransactionsData.map((transaction) => transaction.location),
+    ...assetsData.map((asset) => asset.location),
+  ])
+);
+
+const createTransactionFormState = (transaction?: AssetTransactionRecord | null): TransactionFormState => ({
+  type: transaction?.type ?? '',
+  assetId: transaction?.assetId ?? '',
+  transactionDate: transaction?.transactionDate ?? new Date().toISOString().split('T')[0],
+  value: transaction ? String(transaction.value) : '',
+  location: transaction?.location ?? '',
+  assignedTo: transaction?.assignedTo ?? '',
+  vendor: transaction?.vendor ?? '',
+  invoiceNumber: transaction?.invoiceNumber ?? '',
+  description: transaction?.description ?? '',
+  notes: transaction?.notes ?? '',
+  approvalRequired: transaction ? transaction.status === 'pending' || transaction.status === 'in-review' : false,
+  status: transaction?.status ?? 'completed',
+  approvedBy: transaction?.approvedBy ?? 'System'
+});
+
+const createDocumentAttachmentForm = (): DocumentAttachmentFormState => ({
+  name: '',
+  category: 'supporting'
+});
+
 export function AssetTransactions() {
-  const [transactions, setTransactions] = useState(assetTransactionsData);
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+  const [transactions, setTransactions] = useState<AssetTransactionRecord[]>(assetTransactionsData);
+  const [selectedTransaction, setSelectedTransaction] = useState<AssetTransactionRecord | null>(null);
+  const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [showEditTransaction, setShowEditTransaction] = useState(false);
   const [showTransactionDetails, setShowTransactionDetails] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [showAttachDocuments, setShowAttachDocuments] = useState(false);
   const [selectedTransactionType, setSelectedTransactionType] = useState('');
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [reportTransaction, setReportTransaction] = useState<AssetTransactionRecord | null>(null);
+  const [attachmentTransaction, setAttachmentTransaction] = useState<AssetTransactionRecord | null>(null);
+  const [reportFormat, setReportFormat] = useState('pdf');
+  const [reportDetailLevel, setReportDetailLevel] = useState('full');
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -274,19 +350,9 @@ export function AssetTransactions() {
   const [dateRange, setDateRange] = useState('all');
 
   // New transaction form state
-  const [newTransaction, setNewTransaction] = useState({
-    type: '',
-    assetId: '',
-    transactionDate: new Date().toISOString().split('T')[0],
-    value: '',
-    location: '',
-    assignedTo: '',
-    vendor: '',
-    invoiceNumber: '',
-    description: '',
-    notes: '',
-    approvalRequired: false
-  });
+  const [newTransaction, setNewTransaction] = useState<TransactionFormState>(createTransactionFormState());
+  const [editTransactionForm, setEditTransactionForm] = useState<TransactionFormState>(createTransactionFormState());
+  const [documentForm, setDocumentForm] = useState<DocumentAttachmentFormState>(createDocumentAttachmentForm());
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-AE', {
@@ -377,23 +443,131 @@ export function AssetTransactions() {
     }
   };
 
-  const filteredTransactions = transactions.filter(transaction => {
+  const formatTransactionType = (type: string) => {
+    if (!type) return 'Unknown';
+    return type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ');
+  };
+
+  const locationOptions = Array.from(new Set(transactions.map((transaction) => transaction.location)));
+
+  const matchesDateRange = (transactionDate: string) => {
+    if (dateRange === 'all') return true;
+
+    const current = new Date(transactionDate);
+    const today = new Date();
+    const start = new Date(today);
+
+    switch (dateRange) {
+      case 'today':
+        start.setHours(0, 0, 0, 0);
+        break;
+      case 'week':
+        start.setDate(today.getDate() - 7);
+        break;
+      case 'month':
+        start.setMonth(today.getMonth() - 1);
+        break;
+      case 'quarter':
+        start.setMonth(today.getMonth() - 3);
+        break;
+      case 'year':
+        start.setFullYear(today.getFullYear() - 1);
+        break;
+      default:
+        return true;
+    }
+
+    return current >= start;
+  };
+
+  const filteredTransactions = transactions
+    .filter(transaction => {
     const matchesSearch = 
       transaction.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.assetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.description.toLowerCase().includes(searchTerm.toLowerCase());
+      transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (transaction.assignedTo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (transaction.vendor || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
     const matchesType = typeFilter === 'all' || transaction.type === typeFilter;
-    const matchesLocation = locationFilter === 'all' || 
-      transaction.location.toLowerCase().includes(locationFilter.toLowerCase());
+    const matchesLocation = locationFilter === 'all' || transaction.location === locationFilter;
+    const matchesDate = matchesDateRange(transaction.transactionDate);
     
-    return matchesSearch && matchesStatus && matchesType && matchesLocation;
-  });
+    return matchesSearch && matchesStatus && matchesType && matchesLocation && matchesDate;
+  })
+    .sort((a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime());
+
+  const visibleSelectedTransactions = selectedTransactions.filter((id) =>
+    filteredTransactions.some((transaction) => transaction.id === id)
+  );
+
+  const allVisibleTransactionsSelected =
+    filteredTransactions.length > 0 &&
+    visibleSelectedTransactions.length === filteredTransactions.length;
+
+  const syncTransactionState = (updatedTransaction: AssetTransactionRecord) => {
+    setTransactions((currentTransactions) =>
+      currentTransactions.map((transaction) =>
+        transaction.id === updatedTransaction.id ? updatedTransaction : transaction
+      )
+    );
+    setSelectedTransaction((currentTransaction) =>
+      currentTransaction?.id === updatedTransaction.id ? updatedTransaction : currentTransaction
+    );
+    setReportTransaction((currentTransaction) =>
+      currentTransaction?.id === updatedTransaction.id ? updatedTransaction : currentTransaction
+    );
+    setAttachmentTransaction((currentTransaction) =>
+      currentTransaction?.id === updatedTransaction.id ? updatedTransaction : currentTransaction
+    );
+  };
+
+  const closeAddTransactionDialog = (open: boolean) => {
+    setShowAddTransaction(open);
+    if (!open) {
+      setSelectedTransactionType('');
+      setNewTransaction(createTransactionFormState());
+    }
+  };
+
+  const closeEditTransactionDialog = (open: boolean) => {
+    setShowEditTransaction(open);
+    if (!open) {
+      setEditingTransactionId(null);
+      setEditTransactionForm(createTransactionFormState());
+    }
+  };
+
+  const closeReportDialog = (open: boolean) => {
+    setShowReportDialog(open);
+    if (!open) {
+      setReportTransaction(null);
+      setReportFormat('pdf');
+      setReportDetailLevel('full');
+    }
+  };
+
+  const closeAttachDocumentsDialog = (open: boolean) => {
+    setShowAttachDocuments(open);
+    if (!open) {
+      setAttachmentTransaction(null);
+      setDocumentForm(createDocumentAttachmentForm());
+    }
+  };
+
+  const openAddTransactionDialog = (type: string) => {
+    setSelectedTransactionType(type);
+    setNewTransaction({
+      ...createTransactionFormState(),
+      type
+    });
+    setShowAddTransaction(true);
+  };
 
   const handleAddTransaction = () => {
     if (!newTransaction.type || !newTransaction.assetId || !newTransaction.description) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in the required transaction fields.');
       return;
     }
 
@@ -416,34 +590,122 @@ export function AssetTransactions() {
       linkedDocuments: []
     };
 
-    setTransactions([...transactions, transaction]);
-    setShowAddTransaction(false);
-    
-    // Reset form
-    setNewTransaction({
-      type: '',
-      assetId: '',
-      transactionDate: new Date().toISOString().split('T')[0],
-      value: '',
-      location: '',
-      assignedTo: '',
-      vendor: '',
-      invoiceNumber: '',
-      description: '',
-      notes: '',
-      approvalRequired: false
+    setTransactions((currentTransactions) => [...currentTransactions, transaction]);
+    toast.success('Mock transaction created successfully.', {
+      description: `${transaction.id} is now visible in the ledger.`
     });
+    closeAddTransactionDialog(false);
   };
 
   const exportTransactionLedger = () => {
-    // Mock export functionality
     console.log('Exporting Asset Transaction Ledger...', filteredTransactions);
-    alert('Asset Transaction Ledger will be downloaded shortly.');
+    toast.success('Ledger export prepared.', {
+      description: `${filteredTransactions.length} transaction(s) included in the current view.`
+    });
   };
 
-  const openTransactionDetails = (transaction: any) => {
+  const openTransactionDetails = (transaction: AssetTransactionRecord) => {
     setSelectedTransaction(transaction);
     setShowTransactionDetails(true);
+  };
+
+  const openEditTransactionDialog = (transaction: AssetTransactionRecord) => {
+    setEditingTransactionId(transaction.id);
+    setEditTransactionForm(createTransactionFormState(transaction));
+    setShowEditTransaction(true);
+  };
+
+  const handleSaveEditedTransaction = () => {
+    if (!editingTransactionId) {
+      return;
+    }
+
+    if (!editTransactionForm.type || !editTransactionForm.assetId || !editTransactionForm.description) {
+      toast.error('Please complete the key transaction details before saving.');
+      return;
+    }
+
+    const existingTransaction = transactions.find((transaction) => transaction.id === editingTransactionId);
+    if (!existingTransaction) {
+      return;
+    }
+
+    const updatedTransaction: AssetTransactionRecord = {
+      ...existingTransaction,
+      type: editTransactionForm.type,
+      assetId: editTransactionForm.assetId,
+      assetName: assetsData.find((asset) => asset.id === editTransactionForm.assetId)?.name || existingTransaction.assetName,
+      transactionDate: editTransactionForm.transactionDate,
+      value: parseFloat(editTransactionForm.value) || 0,
+      status: editTransactionForm.status,
+      location: editTransactionForm.location,
+      assignedTo: editTransactionForm.assignedTo || null,
+      vendor: editTransactionForm.vendor || null,
+      invoiceNumber: editTransactionForm.invoiceNumber || null,
+      description: editTransactionForm.description,
+      approvedBy: editTransactionForm.approvedBy || existingTransaction.approvedBy,
+      notes: editTransactionForm.notes,
+    };
+
+    syncTransactionState(updatedTransaction);
+    toast.success('Transaction updated.', {
+      description: `${updatedTransaction.id} now reflects the latest mock changes.`
+    });
+    closeEditTransactionDialog(false);
+  };
+
+  const openReportDialog = (transaction: AssetTransactionRecord) => {
+    setReportTransaction(transaction);
+    setShowReportDialog(true);
+  };
+
+  const handleGenerateTransactionReport = () => {
+    if (!reportTransaction) {
+      return;
+    }
+
+    toast.success('Mock report generated.', {
+      description: `${reportTransaction.id} prepared as a ${reportFormat.toUpperCase()} ${reportDetailLevel} report.`
+    });
+    closeReportDialog(false);
+  };
+
+  const openAttachDocumentsDialog = (transaction: AssetTransactionRecord) => {
+    setAttachmentTransaction(transaction);
+    setDocumentForm(createDocumentAttachmentForm());
+    setShowAttachDocuments(true);
+  };
+
+  const handleAttachDocument = () => {
+    if (!attachmentTransaction) {
+      return;
+    }
+
+    const trimmedName = documentForm.name.trim();
+    if (!trimmedName) {
+      toast.error('Enter a document name to attach.');
+      return;
+    }
+
+    const normalizedDocumentName = trimmedName.includes('.')
+      ? trimmedName
+      : `${trimmedName.toLowerCase().replace(/\s+/g, '_')}.${documentForm.category === 'image' ? 'png' : 'pdf'}`;
+
+    if (attachmentTransaction.linkedDocuments.includes(normalizedDocumentName)) {
+      toast.error('That document is already linked to this transaction.');
+      return;
+    }
+
+    const updatedTransaction: AssetTransactionRecord = {
+      ...attachmentTransaction,
+      linkedDocuments: [...attachmentTransaction.linkedDocuments, normalizedDocumentName]
+    };
+
+    syncTransactionState(updatedTransaction);
+    toast.success('Mock document attached.', {
+      description: `${normalizedDocumentName} was added to ${attachmentTransaction.id}.`
+    });
+    closeAttachDocumentsDialog(false);
   };
 
   return (
@@ -471,35 +733,35 @@ export function AssetTransactions() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => { setSelectedTransactionType('purchase'); setShowAddTransaction(true); }}>
+                <DropdownMenuItem onClick={() => openAddTransactionDialog('purchase')}>
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Asset Purchase
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setSelectedTransactionType('maintenance'); setShowAddTransaction(true); }}>
+                <DropdownMenuItem onClick={() => openAddTransactionDialog('maintenance')}>
                   <Wrench className="h-4 w-4 mr-2" />
                   Schedule Maintenance
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setSelectedTransactionType('transfer'); setShowAddTransaction(true); }}>
+                <DropdownMenuItem onClick={() => openAddTransactionDialog('transfer')}>
                   <ArrowUpDown className="h-4 w-4 mr-2" />
                   Asset Transfer
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setSelectedTransactionType('assignment'); setShowAddTransaction(true); }}>
+                <DropdownMenuItem onClick={() => openAddTransactionDialog('assignment')}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   Assign to Staff
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setSelectedTransactionType('depreciation'); setShowAddTransaction(true); }}>
+                <DropdownMenuItem onClick={() => openAddTransactionDialog('depreciation')}>
                   <TrendingDown className="h-4 w-4 mr-2" />
                   Depreciation Entry
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setSelectedTransactionType('disposal'); setShowAddTransaction(true); }}>
+                <DropdownMenuItem onClick={() => openAddTransactionDialog('disposal')}>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Asset Disposal
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setSelectedTransactionType('sale'); setShowAddTransaction(true); }}>
+                <DropdownMenuItem onClick={() => openAddTransactionDialog('sale')}>
                   <DollarSign className="h-4 w-4 mr-2" />
                   Asset Sale
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setSelectedTransactionType('insurance'); setShowAddTransaction(true); }}>
+                <DropdownMenuItem onClick={() => openAddTransactionDialog('insurance')}>
                   <Shield className="h-4 w-4 mr-2" />
                   Insurance Claim
                 </DropdownMenuItem>
@@ -509,96 +771,85 @@ export function AssetTransactions() {
         </div>
 
         {/* KPI Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-green-700">Total Purchases</p>
-                  <p className="text-2xl font-bold text-green-800">
-                    {formatCurrency(
-                      transactions
-                        .filter(t => t.type === 'purchase' && t.status === 'completed')
-                        .reduce((sum, t) => sum + t.value, 0)
-                    )}
-                  </p>
-                </div>
-                <div className="bg-green-200 p-2 rounded-lg">
-                  <ShoppingCart className="h-6 w-6 text-green-700" />
-                </div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Total Purchases</CardTitle>
+              <div className="bg-green-50 p-2 rounded-lg">
+                <ShoppingCart className="h-4 w-4 text-green-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(
+                  transactions
+                    .filter(t => t.type === 'purchase' && t.status === 'completed')
+                    .reduce((sum, t) => sum + t.value, 0)
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Completed acquisition value</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-orange-700">Maintenance Costs</p>
-                  <p className="text-2xl font-bold text-orange-800">
-                    {formatCurrency(
-                      transactions
-                        .filter(t => t.type === 'maintenance' && t.status === 'completed')
-                        .reduce((sum, t) => sum + t.value, 0)
-                    )}
-                  </p>
-                </div>
-                <div className="bg-orange-200 p-2 rounded-lg">
-                  <Wrench className="h-6 w-6 text-orange-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Maintenance Costs</CardTitle>
+              <div className="bg-amber-50 p-2 rounded-lg">
+                <Wrench className="h-4 w-4 text-amber-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-600">
+                {formatCurrency(
+                  transactions
+                    .filter(t => t.type === 'maintenance' && t.status === 'completed')
+                    .reduce((sum, t) => sum + t.value, 0)
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Closed service transactions</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-700">Active Assignments</p>
-                  <p className="text-2xl font-bold text-blue-800">
-                    {transactions.filter(t => t.type === 'assignment' && t.status === 'active').length}
-                  </p>
-                </div>
-                <div className="bg-blue-200 p-2 rounded-lg">
-                  <UserPlus className="h-6 w-6 text-blue-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Active Assignments</CardTitle>
+              <div className="bg-blue-50 p-2 rounded-lg">
+                <UserPlus className="h-4 w-4 text-blue-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {transactions.filter(t => t.type === 'assignment' && t.status === 'active').length}
+              </div>
+              <p className="text-xs text-muted-foreground">Assets currently with staff</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-purple-700">Pending Reviews</p>
-                  <p className="text-2xl font-bold text-purple-800">
-                    {transactions.filter(t => t.status === 'pending' || t.status === 'in-review').length}
-                  </p>
-                </div>
-                <div className="bg-purple-200 p-2 rounded-lg">
-                  <Timer className="h-6 w-6 text-purple-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Pending Reviews</CardTitle>
+              <div className="bg-purple-50 p-2 rounded-lg">
+                <Timer className="h-4 w-4 text-purple-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">
+                {transactions.filter(t => t.status === 'pending' || t.status === 'in-review').length}
+              </div>
+              <p className="text-xs text-muted-foreground">Awaiting approval or review</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Filter className="h-5 w-5" />
-              <span>Transaction Filters</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div className="space-y-2">
-                <Label>Search</Label>
+        <Card className={cardShell}>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex-1 min-w-[250px]">
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Search transactions..."
+                    placeholder="Search transactions by ID, asset, vendor, or staff..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -606,11 +857,10 @@ export function AssetTransactions() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Transaction Type</Label>
+              <div className="flex gap-2 flex-wrap">
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
@@ -624,13 +874,10 @@ export function AssetTransactions() {
                     <SelectItem value="insurance">Insurance</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Status</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
@@ -641,71 +888,140 @@ export function AssetTransactions() {
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Location</Label>
                 <Select value={locationFilter} onValueChange={setLocationFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="w-[190px]">
+                    <SelectValue placeholder="Location" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Locations</SelectItem>
-                    <SelectItem value="dubai">Dubai Branch</SelectItem>
-                    <SelectItem value="marina">Marina Branch</SelectItem>
-                    <SelectItem value="warehouse">Warehouse</SelectItem>
-                    <SelectItem value="admin">Admin Office</SelectItem>
+                    {locationOptions.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Date Range</Label>
                 <Select value={dateRange} onValueChange={setDateRange}>
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="w-[145px]">
+                    <SelectValue placeholder="Date Range" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Time</SelectItem>
                     <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="week">This Week</SelectItem>
-                    <SelectItem value="month">This Month</SelectItem>
-                    <SelectItem value="quarter">This Quarter</SelectItem>
-                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="week">Last 7 Days</SelectItem>
+                    <SelectItem value="month">Last 30 Days</SelectItem>
+                    <SelectItem value="quarter">Last Quarter</SelectItem>
+                    <SelectItem value="year">Last Year</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('all');
+                    setTypeFilter('all');
+                    setLocationFilter('all');
+                    setDateRange('all');
+                    setSelectedTransactions([]);
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Reset
+                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {visibleSelectedTransactions.length > 0 && (
+          <Alert className="border-primary/10 shadow-sm">
+            <AlertDescription className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4" />
+                <span>{visibleSelectedTransactions.length} transactions selected</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="ghost" onClick={exportTransactionLedger}>
+                  Export Selected
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    toast.success('Bulk review mocked.', {
+                      description: `${visibleSelectedTransactions.length} selected transaction(s) flagged for review.`
+                    })
+                  }
+                >
+                  Mark Reviewed
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelectedTransactions([])}>
+                  Clear
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Transactions Table */}
-        <Card>
+        <Card className={cardShell}>
           <CardHeader>
-            <CardTitle>Asset Transaction Ledger</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              <span>Asset Transaction Ledger ({filteredTransactions.length})</span>
+              <Badge variant="outline" className="text-xs font-normal">
+                Complete lifecycle activity
+              </Badge>
+            </CardTitle>
             <CardDescription>
-              Complete audit trail of all asset lifecycle transactions ({filteredTransactions.length} records)
+              Complete audit trail of purchases, transfers, assignments, and financial asset events.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Transaction ID</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Asset</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={allVisibleTransactionsSelected}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedTransactions(filteredTransactions.map((transaction) => transaction.id));
+                          } else {
+                            setSelectedTransactions([]);
+                          }
+                        }}
+                      />
+                    </TableHead>
+                  <TableHead>Transaction ID</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Asset</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Value</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Assigned To</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
                 <TableBody>
                   {filteredTransactions.map((transaction) => (
-                    <TableRow key={transaction.id} className="hover:bg-gray-50">
+                    <TableRow key={transaction.id} className="cursor-pointer hover:bg-slate-50/50 transition-colors">
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedTransactions.includes(transaction.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedTransactions([...selectedTransactions, transaction.id]);
+                            } else {
+                              setSelectedTransactions(selectedTransactions.filter((id) => id !== transaction.id));
+                            }
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center space-x-2">
                           <div className="bg-teal-100 p-1 rounded">
@@ -782,15 +1098,15 @@ export function AssetTransactions() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditTransactionDialog(transaction)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Transaction
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openReportDialog(transaction)}>
                                 <FileText className="h-4 w-4 mr-2" />
                                 Generate Report
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openAttachDocumentsDialog(transaction)}>
                                 <Paperclip className="h-4 w-4 mr-2" />
                                 Attach Documents
                               </DropdownMenuItem>
@@ -802,22 +1118,21 @@ export function AssetTransactions() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           </CardContent>
         </Card>
 
         {/* Add Transaction Modal */}
-        <Dialog open={showAddTransaction} onOpenChange={setShowAddTransaction}>
+        <Dialog open={showAddTransaction} onOpenChange={closeAddTransactionDialog}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center space-x-3">
                 <div className="bg-teal-100 p-2 rounded-lg">
-                  {selectedTransactionType && getTransactionIcon(selectedTransactionType)}
+                  {(newTransaction.type || selectedTransactionType) && getTransactionIcon(newTransaction.type || selectedTransactionType)}
                 </div>
                 <div>
                   <div>New Asset Transaction</div>
                   <div className="text-sm text-gray-600 font-normal">
-                    {selectedTransactionType && `Type: ${selectedTransactionType.charAt(0).toUpperCase() + selectedTransactionType.slice(1).replace('-', ' ')}`}
+                    {(newTransaction.type || selectedTransactionType) && `Type: ${formatTransactionType(newTransaction.type || selectedTransactionType)}`}
                   </div>
                 </div>
               </DialogTitle>
@@ -831,30 +1146,35 @@ export function AssetTransactions() {
                 <div className="space-y-2">
                   <Label>Transaction Type *</Label>
                   <Select 
-                    value={newTransaction.type || selectedTransactionType} 
+                    value={newTransaction.type}
                     onValueChange={(value) => setNewTransaction({...newTransaction, type: value})}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select transaction type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="purchase">Asset Purchase</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="transfer">Asset Transfer</SelectItem>
-                      <SelectItem value="assignment">Assign to Staff</SelectItem>
-                      <SelectItem value="depreciation">Depreciation Entry</SelectItem>
-                      <SelectItem value="disposal">Asset Disposal</SelectItem>
-                      <SelectItem value="sale">Asset Sale</SelectItem>
-                      <SelectItem value="insurance">Insurance Claim</SelectItem>
-                      <SelectItem value="return">Asset Return</SelectItem>
-                      <SelectItem value="revaluation">Revaluation</SelectItem>
+                      {transactionTypeOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label>Asset *</Label>
-                  <Select value={newTransaction.assetId} onValueChange={(value) => setNewTransaction({...newTransaction, assetId: value})}>
+                  <Select
+                    value={newTransaction.assetId}
+                    onValueChange={(value) => {
+                      const asset = assetsData.find((entry) => entry.id === value);
+                      setNewTransaction({
+                        ...newTransaction,
+                        assetId: value,
+                        location: newTransaction.location || asset?.location || ''
+                      });
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select asset" />
                     </SelectTrigger>
@@ -987,7 +1307,7 @@ export function AssetTransactions() {
               </div>
 
               <div className="flex items-center justify-end space-x-3 pt-4 border-t">
-                <Button variant="outline" onClick={() => setShowAddTransaction(false)}>
+                <Button variant="outline" onClick={() => closeAddTransactionDialog(false)}>
                   Cancel
                 </Button>
                 <Button onClick={handleAddTransaction}>
@@ -995,6 +1315,603 @@ export function AssetTransactions() {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showEditTransaction} onOpenChange={closeEditTransactionDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-3">
+                <div className="bg-blue-100 p-2 rounded-lg">
+                  {getTransactionIcon(editTransactionForm.type || 'purchase')}
+                </div>
+                <div>
+                  <div>Edit Transaction</div>
+                  <div className="text-sm text-gray-600 font-normal">
+                    {editingTransactionId ? `${editingTransactionId} - ${formatTransactionType(editTransactionForm.type)}` : 'Update mock transaction details'}
+                  </div>
+                </div>
+              </DialogTitle>
+              <DialogDescription>
+                Adjust this transaction in the UI and immediately reflect the change in the mock ledger.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-slate-50 border-primary/10">
+                  <CardContent className="p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Transaction</p>
+                    <p className="mt-2 text-lg font-semibold">{editingTransactionId || 'Draft edit'}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-slate-50 border-primary/10">
+                  <CardContent className="p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Current Status</p>
+                    <p className="mt-2 text-lg font-semibold capitalize">{editTransactionForm.status || 'completed'}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-slate-50 border-primary/10">
+                  <CardContent className="p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Attached Docs</p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {transactions.find((transaction) => transaction.id === editingTransactionId)?.linkedDocuments.length || 0}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label>Transaction Type *</Label>
+                  <Select
+                    value={editTransactionForm.type}
+                    onValueChange={(value) => setEditTransactionForm({ ...editTransactionForm, type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select transaction type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {transactionTypeOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Asset *</Label>
+                  <Select
+                    value={editTransactionForm.assetId}
+                    onValueChange={(value) => {
+                      const asset = assetsData.find((entry) => entry.id === value);
+                      setEditTransactionForm({
+                        ...editTransactionForm,
+                        assetId: value,
+                        location: editTransactionForm.location || asset?.location || ''
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select asset" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assetsData.map((asset) => (
+                        <SelectItem key={asset.id} value={asset.id}>
+                          <div className="flex items-center space-x-2">
+                            {getCategoryIcon(asset.category)}
+                            <span>{asset.name} ({asset.id})</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select
+                    value={editTransactionForm.status}
+                    onValueChange={(value) => setEditTransactionForm({ ...editTransactionForm, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in-review">In Review</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Transaction Date *</Label>
+                  <Input
+                    type="date"
+                    value={editTransactionForm.transactionDate}
+                    onChange={(e) => setEditTransactionForm({ ...editTransactionForm, transactionDate: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Value (AED)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={editTransactionForm.value}
+                    onChange={(e) => setEditTransactionForm({ ...editTransactionForm, value: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Approved By</Label>
+                  <Input
+                    placeholder="Approver name"
+                    value={editTransactionForm.approvedBy}
+                    onChange={(e) => setEditTransactionForm({ ...editTransactionForm, approvedBy: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Location</Label>
+                  <Select
+                    value={editTransactionForm.location}
+                    onValueChange={(value) => setEditTransactionForm({ ...editTransactionForm, location: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {transactionLocationOptions.map((location) => (
+                        <SelectItem key={location} value={location}>
+                          {location}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Assigned To / Staff Member</Label>
+                  <Select
+                    value={editTransactionForm.assignedTo}
+                    onValueChange={(value) => setEditTransactionForm({ ...editTransactionForm, assignedTo: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select staff member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {staffData.map((staff) => (
+                        <SelectItem key={staff.id} value={staff.name}>
+                          <div className="flex items-center space-x-2">
+                            <User className="h-4 w-4" />
+                            <span>{staff.name} - {staff.role}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Vendor / Service Provider</Label>
+                  <Select
+                    value={editTransactionForm.vendor}
+                    onValueChange={(value) => setEditTransactionForm({ ...editTransactionForm, vendor: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendorData.map((vendor) => (
+                        <SelectItem key={vendor.id} value={vendor.name}>
+                          <div className="flex items-center space-x-2">
+                            <Building2 className="h-4 w-4" />
+                            <span>{vendor.name} - {vendor.type}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Invoice / Reference Number</Label>
+                  <Input
+                    placeholder="INV-2024-001"
+                    value={editTransactionForm.invoiceNumber}
+                    onChange={(e) => setEditTransactionForm({ ...editTransactionForm, invoiceNumber: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Description *</Label>
+                <Textarea
+                  placeholder="Describe the transaction details..."
+                  value={editTransactionForm.description}
+                  onChange={(e) => setEditTransactionForm({ ...editTransactionForm, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Additional Notes</Label>
+                <Textarea
+                  placeholder="Any additional notes or comments..."
+                  value={editTransactionForm.notes}
+                  onChange={(e) => setEditTransactionForm({ ...editTransactionForm, notes: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => closeEditTransactionDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEditedTransaction}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showReportDialog} onOpenChange={closeReportDialog}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            {reportTransaction && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-3">
+                    <div className="bg-emerald-100 p-2 rounded-lg">
+                      <FileText className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <div>Generate Transaction Report</div>
+                      <div className="text-sm text-gray-600 font-normal">
+                        {reportTransaction.id} - {reportTransaction.assetName}
+                      </div>
+                    </div>
+                  </DialogTitle>
+                  <DialogDescription>
+                    Review the mock report output before exporting a shareable transaction summary.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-6 mt-6">
+                  <Alert className="border-primary/10 bg-primary/5">
+                    <AlertDescription>
+                      This report flow is UI-only for now. Format choices and previews are mocked, but they reflect the transaction's live in-page data.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card className="border-primary/10 bg-slate-50">
+                      <CardContent className="p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Transaction Value</p>
+                        <p className="mt-2 text-lg font-semibold">
+                          {reportTransaction.value === 0 ? 'No financial impact' : formatCurrency(Math.abs(reportTransaction.value))}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-primary/10 bg-slate-50">
+                      <CardContent className="p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Linked Files</p>
+                        <p className="mt-2 text-lg font-semibold">{reportTransaction.linkedDocuments.length}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-primary/10 bg-slate-50">
+                      <CardContent className="p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Approval Owner</p>
+                        <p className="mt-2 text-lg font-semibold">{reportTransaction.approvedBy}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-primary/10 bg-slate-50">
+                      <CardContent className="p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Report Date</p>
+                        <p className="mt-2 text-lg font-semibold">{new Date().toLocaleDateString()}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>Report Format</Label>
+                      <Select value={reportFormat} onValueChange={setReportFormat}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select format" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pdf">PDF Summary</SelectItem>
+                          <SelectItem value="xlsx">Spreadsheet Pack</SelectItem>
+                          <SelectItem value="csv">CSV Audit Extract</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Detail Level</Label>
+                      <Select value={reportDetailLevel} onValueChange={setReportDetailLevel}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select detail level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="summary">Summary</SelectItem>
+                          <SelectItem value="full">Full Report</SelectItem>
+                          <SelectItem value="audit">Audit Pack</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Tabs defaultValue="overview" className="space-y-4">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="overview">Overview</TabsTrigger>
+                      <TabsTrigger value="documents">Documents</TabsTrigger>
+                      <TabsTrigger value="audit">Audit Trail</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="overview" className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card className="border-primary/10">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base">Transaction Snapshot</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3 text-sm">
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Type</span>
+                              <span className="font-medium">{formatTransactionType(reportTransaction.type)}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Status</span>
+                              <Badge className={getStatusColor(reportTransaction.status)}>
+                                {formatTransactionType(reportTransaction.status)}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Location</span>
+                              <span className="font-medium text-right">{reportTransaction.location}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Created By</span>
+                              <span className="font-medium">{reportTransaction.createdBy}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="border-primary/10">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base">Narrative</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                              {reportTransaction.description}
+                            </div>
+                            <div className="rounded-lg border border-dashed border-primary/10 p-3 text-sm text-muted-foreground">
+                              {reportTransaction.notes || 'No additional notes have been recorded for this transaction.'}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="documents" className="space-y-4">
+                      <Card className="border-primary/10">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Included Documents</CardTitle>
+                          <CardDescription>Supporting files that would be listed in the exported report.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {reportTransaction.linkedDocuments.length > 0 ? (
+                            reportTransaction.linkedDocuments.map((doc, index) => (
+                              <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                <div className="flex items-center gap-3">
+                                  <Paperclip className="h-4 w-4 text-slate-500" />
+                                  <span className="text-sm font-medium">{doc}</span>
+                                </div>
+                                <Badge variant="outline">Included</Badge>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-muted-foreground">
+                              No documents linked yet. Attach files first to enrich the mock report pack.
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="audit" className="space-y-4">
+                      <Card className="border-primary/10">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Mock Audit Timeline</CardTitle>
+                          <CardDescription>Key report events derived from the transaction state in this UI.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="rounded-lg border border-slate-200 p-3">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="font-medium">Transaction logged</p>
+                                <p className="text-sm text-muted-foreground">{reportTransaction.createdBy} created this entry for {reportTransaction.assetName}.</p>
+                              </div>
+                              <span className="text-xs text-muted-foreground">{new Date(reportTransaction.transactionDate).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 p-3">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="font-medium">Approval checkpoint</p>
+                                <p className="text-sm text-muted-foreground">Current approver on record: {reportTransaction.approvedBy}.</p>
+                              </div>
+                              <Badge className={getStatusColor(reportTransaction.status)}>{formatTransactionType(reportTransaction.status)}</Badge>
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 p-3">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="font-medium">Report package ready</p>
+                                <p className="text-sm text-muted-foreground">
+                                  The UI will generate a mock {reportFormat.toUpperCase()} package with {reportDetailLevel} detail.
+                                </p>
+                              </div>
+                              <Clock className="h-4 w-4 text-slate-500" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
+
+                  <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                    <Button variant="outline" onClick={() => closeReportDialog(false)}>
+                      Close
+                    </Button>
+                    <Button onClick={handleGenerateTransactionReport}>
+                      Generate Mock Report
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showAttachDocuments} onOpenChange={closeAttachDocumentsDialog}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            {attachmentTransaction && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-3">
+                    <div className="bg-amber-100 p-2 rounded-lg">
+                      <Paperclip className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <div>Attach Documents</div>
+                      <div className="text-sm text-gray-600 font-normal">
+                        {attachmentTransaction.id} - {attachmentTransaction.assetName}
+                      </div>
+                    </div>
+                  </DialogTitle>
+                  <DialogDescription>
+                    Add mock supporting files to this transaction so the details modal and reports reflect them.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-6 mt-6">
+                  <Alert className="border-primary/10 bg-primary/5">
+                    <AlertDescription>
+                      Attachments are mocked in the UI only. Saving here appends document names to the transaction's local state.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="border-primary/10 bg-slate-50">
+                      <CardContent className="p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Current Documents</p>
+                        <p className="mt-2 text-lg font-semibold">{attachmentTransaction.linkedDocuments.length}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-primary/10 bg-slate-50">
+                      <CardContent className="p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
+                        <p className="mt-2 text-lg font-semibold capitalize">{attachmentTransaction.status}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-primary/10 bg-slate-50">
+                      <CardContent className="p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Reference</p>
+                        <p className="mt-2 text-lg font-semibold">{attachmentTransaction.invoiceNumber || 'No invoice'}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>Document Name *</Label>
+                      <Input
+                        placeholder="inspection_report"
+                        value={documentForm.name}
+                        onChange={(e) => setDocumentForm({ ...documentForm, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Document Category</Label>
+                      <Select
+                        value={documentForm.category}
+                        onValueChange={(value) => setDocumentForm({ ...documentForm, category: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="supporting">Supporting PDF</SelectItem>
+                          <SelectItem value="invoice">Invoice</SelectItem>
+                          <SelectItem value="report">Service Report</SelectItem>
+                          <SelectItem value="approval">Approval Note</SelectItem>
+                          <SelectItem value="image">Image Evidence</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>Suggested File Names</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {['inspection_report', 'approval_note', 'service_invoice', 'handover_form'].map((suggestion) => (
+                        <Button
+                          key={suggestion}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDocumentForm({ ...documentForm, name: suggestion })}
+                        >
+                          {suggestion}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Card className="border-primary/10">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Linked Documents</CardTitle>
+                      <CardDescription>Existing files already attached to this mock transaction.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {attachmentTransaction.linkedDocuments.length > 0 ? (
+                        attachmentTransaction.linkedDocuments.map((doc, index) => (
+                          <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <div className="flex items-center gap-3">
+                              <Paperclip className="h-4 w-4 text-slate-500" />
+                              <span className="text-sm font-medium">{doc}</span>
+                            </div>
+                            <Badge variant="outline">Linked</Badge>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-muted-foreground">
+                          No mock documents attached yet.
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                    <Button variant="outline" onClick={() => closeAttachDocumentsDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleAttachDocument}>
+                      Attach Mock Document
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </DialogContent>
         </Dialog>
 
