@@ -27,6 +27,9 @@ public class StaffResponseDTO {
     private Map<String, List<String>> schedule;
     private String createdAt;
     private String updatedAt;
+    private Long userId;
+    private String appUsername;
+    private Boolean appAccessEnabled;
 
     public static StaffResponseDTO fromEntity(Staff s) {
         StaffResponseDTO dto = new StaffResponseDTO();
@@ -60,6 +63,9 @@ public class StaffResponseDTO {
             }
         }
         dto.schedule = schedMap;
+        dto.userId = s.getUserId();
+        dto.appUsername = s.getAppUsername();
+        dto.appAccessEnabled = s.getAppAccessEnabled();
 
         return dto;
     }
@@ -100,4 +106,10 @@ public class StaffResponseDTO {
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public String getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+    public String getAppUsername() { return appUsername; }
+    public void setAppUsername(String appUsername) { this.appUsername = appUsername; }
+    public Boolean getAppAccessEnabled() { return appAccessEnabled; }
+    public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
 }

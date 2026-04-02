@@ -98,4 +98,45 @@ public class MemberController {
     public ResponseEntity<MemberResponseDTO> unfreezeMember(@PathVariable Long id) {
         return ResponseEntity.ok(memberService.unfreezeMember(id));
     }
+
+    /**
+     * POST /api/members/{id}/set-credentials
+     * Body: { "appUsername": "...", "appPassword": "..." }
+     * Creates app login if none exists, or updates password if one does.
+     */
+    @PostMapping("/{id}/set-credentials")
+    public ResponseEntity<?> setMemberCredentials(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body) {
+        try {
+            String appUsername = body.get("appUsername");
+            String appPassword = body.get("appPassword");
+            if (appPassword == null || appPassword.isBlank()) {
+                return ResponseEntity.badRequest().body("Password is required");
+            }
+            return ResponseEntity.ok(memberService.setMemberCredentials(id, appUsername, appPassword));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * PATCH /api/members/{id}/toggle-access
+     * Body: { "enabled": true/false }
+     * Enables or disables the member's mobile app login account.
+     */
+    @PatchMapping("/{id}/toggle-access")
+    public ResponseEntity<?> toggleMemberAccess(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, Boolean> body) {
+        try {
+            Boolean enabled = body.get("enabled");
+            if (enabled == null) {
+                return ResponseEntity.badRequest().body("Missing 'enabled' field");
+            }
+            return ResponseEntity.ok(memberService.toggleMemberAccess(id, enabled));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

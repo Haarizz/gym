@@ -1,13 +1,9 @@
-﻿import React, { useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React, { useState } from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { GlassCard } from "../components/GlassCard";
+import { GlassScreen } from "../components/GlassScreen";
 import { useSettings } from "../context/SettingsContext";
 
 const sessionTypes = [
@@ -24,83 +20,85 @@ export function BookSession() {
   const [selectedTime, setSelectedTime] = useState("6:30 PM");
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      <LinearGradient
-        colors={["#2563EB", "#38BDF8"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <Text style={styles.heroTitle}>Book a Session</Text>
-        <Text style={styles.heroSubtitle}>Reserve your next workout in seconds.</Text>
-      </LinearGradient>
-
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Choose a session type</Text>
-      <View style={styles.rowWrap}>
-        {sessionTypes.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={[
-              styles.typeCard,
-              { backgroundColor: colors.card },
-              selectedType === item.id && styles.typeCardActive,
-            ]}
-            onPress={() => setSelectedType(item.id)}
+    <GlassScreen>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <GlassCard style={styles.heroShell} intensity={35}>
+          <LinearGradient
+            colors={["#2563EB", "#38BDF8", "#7DD3FC"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
           >
-            <View style={[styles.typeIcon, { backgroundColor: item.color }]}>
-              <Ionicons name={item.icon as any} size={22} color="#fff" />
-            </View>
-            <Text style={[styles.typeLabel, { color: colors.text }]}>{item.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+            <Text style={styles.heroTitle}>Book a Session</Text>
+            <Text style={styles.heroSubtitle}>Reserve your next workout in seconds.</Text>
+          </LinearGradient>
+        </GlassCard>
 
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Pick a time</Text>
-      <View style={styles.rowWrap}>
-        {timeSlots.map((slot) => (
-          <TouchableOpacity
-            key={slot}
-            style={[
-              styles.timeChip,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              selectedTime === slot && styles.timeChipActive,
-            ]}
-            onPress={() => setSelectedTime(slot)}
-          >
-            <Text
-              style={
-                selectedTime === slot
-                  ? styles.timeChipTextActive
-                  : [styles.timeChipText, { color: colors.text }]
-              }
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Choose a session type</Text>
+        <View style={styles.rowWrap}>
+          {sessionTypes.map((item) => (
+            <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => setSelectedType(item.id)}>
+              <GlassCard
+                style={[
+                  styles.typeCard,
+                  selectedType === item.id && { borderColor: item.color },
+                ]}
+              >
+                <View style={styles.typeCardInner}>
+                  <View style={[styles.typeIcon, { backgroundColor: item.color }]}>
+                    <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={22} color="#fff" />
+                  </View>
+                  <Text style={[styles.typeLabel, { color: colors.text }]}>{item.label}</Text>
+                </View>
+              </GlassCard>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Pick a time</Text>
+        <View style={styles.rowWrap}>
+          {timeSlots.map((slot) => (
+            <TouchableOpacity
+              key={slot}
+              style={[
+                styles.timeChip,
+                {
+                  backgroundColor: selectedTime === slot ? "#2563EB" : colors.glassStrong,
+                  borderColor: selectedTime === slot ? "#2563EB" : colors.border,
+                },
+              ]}
+              onPress={() => setSelectedTime(slot)}
             >
-              {slot}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <Text style={selectedTime === slot ? styles.timeChipTextActive : [styles.timeChipText, { color: colors.text }]}>
+                {slot}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      <View style={[styles.summaryCard, { backgroundColor: colors.card }]}
-      >
-        <Text style={[styles.summaryTitle, { color: colors.text }]}>Booking Summary</Text>
-        <View style={styles.summaryRow}>
-          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Session</Text>
-          <Text style={[styles.summaryValue, { color: colors.text }]}>Group Class</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Coach</Text>
-          <Text style={[styles.summaryValue, { color: colors.text }]}>Coach Mike</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Time</Text>
-          <Text style={[styles.summaryValue, { color: colors.text }]}>{selectedTime}</Text>
-        </View>
-      </View>
+        <GlassCard style={styles.summaryCard}>
+          <View style={styles.summaryCardInner}>
+            <Text style={[styles.summaryTitle, { color: colors.text }]}>Booking Summary</Text>
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Session</Text>
+              <Text style={[styles.summaryValue, { color: colors.text }]}>Group Class</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Coach</Text>
+              <Text style={[styles.summaryValue, { color: colors.text }]}>Coach Mike</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Time</Text>
+              <Text style={[styles.summaryValue, { color: colors.text }]}>{selectedTime}</Text>
+            </View>
+          </View>
+        </GlassCard>
 
-      <TouchableOpacity style={styles.primaryButton}>
-        <Text style={styles.primaryButtonText}>Confirm Booking</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Confirm Booking</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </GlassScreen>
   );
 }
 
@@ -112,10 +110,12 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  hero: {
-    borderRadius: 20,
-    padding: 20,
+  heroShell: {
     marginBottom: 20,
+  },
+  hero: {
+    borderRadius: 24,
+    padding: 20,
   },
   heroTitle: {
     fontSize: 22,
@@ -137,20 +137,14 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20,
   },
-  typeCard: {
+  gridItem: {
     width: "48%",
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "transparent",
   },
-  typeCardActive: {
-    borderColor: "#2563EB",
+  typeCard: {
+    borderRadius: 22,
+  },
+  typeCardInner: {
+    padding: 16,
   },
   typeIcon: {
     width: 44,
@@ -170,10 +164,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
-  timeChipActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
-  },
   timeChipText: {
     fontWeight: "600",
   },
@@ -182,14 +172,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   summaryCard: {
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 24,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
+  },
+  summaryCardInner: {
+    padding: 18,
   },
   summaryTitle: {
     fontWeight: "700",
@@ -210,7 +197,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: "#111827",
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: "center",
   },
   primaryButtonText: {

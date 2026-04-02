@@ -224,30 +224,25 @@ export function JournalVoucherPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center space-x-3">
-          <div className="bg-primary rounded-lg p-2">
-            <BookOpen className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Journal Vouchers</h1>
-            <p className="text-sm text-gray-600">
-              Create and manage double-entry journal entries for financial adjustments
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold">Journal Vouchers</h1>
+          <p className="text-gray-600 mt-1">
+            Create and manage double-entry journal entries for financial adjustments
+          </p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={load} disabled={loading}>
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button className="bg-primary hover:bg-primary/90" onClick={openCreate}>
+          <Button size="sm" className="bg-primary hover:bg-primary/90 shadow-sm hover:shadow-md transition-all" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />
             New Journal Voucher
           </Button>
@@ -256,61 +251,60 @@ export function JournalVoucherPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Vouchers</CardTitle>
-              <FileText className="h-4 w-4 text-gray-400" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Total Vouchers</CardTitle>
+            <div className="bg-indigo-50 p-2 rounded-lg">
+              <FileText className="h-4 w-4 text-indigo-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{vouchers.length}</div>
-            <p className="text-xs text-gray-600 mt-1">{draftCount} draft · {postedCount} posted</p>
+            <div className="text-2xl font-bold text-indigo-700">{vouchers.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">{draftCount} draft / {postedCount} posted</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Debit</CardTitle>
-              <ArrowUpDown className="h-4 w-4 text-gray-400" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Total Debit</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <ArrowUpDown className="h-4 w-4 text-blue-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{totalDebit.toFixed(2)} AED</div>
-            <p className="text-xs text-gray-600 mt-1">All vouchers</p>
+            <div className="text-2xl font-bold text-blue-700">{totalDebit.toFixed(2)} AED</div>
+            <p className="text-xs text-muted-foreground mt-1">All vouchers</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Credit</CardTitle>
-              <DollarSign className="h-4 w-4 text-gray-400" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Total Credit</CardTitle>
+            <div className="bg-emerald-50 p-2 rounded-lg">
+              <DollarSign className="h-4 w-4 text-emerald-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{totalCredit.toFixed(2)} AED</div>
-            <p className="text-xs text-gray-600 mt-1">All vouchers</p>
+            <div className="text-2xl font-bold text-emerald-700">{totalCredit.toFixed(2)} AED</div>
+            <p className="text-xs text-muted-foreground mt-1">All vouchers</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-gray-600">Posted</CardTitle>
-              <CheckCircle className="h-4 w-4 text-gray-400" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Posted</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold text-green-600">{postedCount}</div>
-            <p className="text-xs text-gray-600 mt-1">{draftCount} pending</p>
+            <div className="text-2xl font-bold text-green-700">{postedCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">{draftCount} pending</p>
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
-      <Card>
+      <Card className="bg-white border-0 shadow-sm">
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -338,7 +332,7 @@ export function JournalVoucherPage() {
       </Card>
 
       {/* Table */}
-      <Card>
+      <Card className="bg-white border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg">
             Journal Vouchers
@@ -346,9 +340,9 @@ export function JournalVoucherPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
+          <div className="rounded-lg bg-white overflow-x-auto">
+            <Table className="min-w-full">
+              <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead className="font-semibold text-primary">Voucher No</TableHead>
                   <TableHead className="font-semibold text-primary">Date</TableHead>
@@ -361,8 +355,8 @@ export function JournalVoucherPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {vouchers.map((v) => (
-                  <TableRow key={v.id} className="hover:bg-gray-50">
+                {vouchers.map((v, index) => (
+                  <TableRow key={v.id} className={`${index % 2 === 0 ? "bg-white" : "bg-slate-50/40"} hover:bg-slate-50/80 transition-colors`}>
                     <TableCell className="font-mono text-sm font-medium">{v.voucherNo}</TableCell>
                     <TableCell>{v.date ? v.date.split("T")[0].split("-").reverse().join("/") : "-"}</TableCell>
                     <TableCell className="max-w-[250px] truncate" title={v.narration}>
@@ -447,7 +441,7 @@ export function JournalVoucherPage() {
 
       {/* Create / Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) resetForm(); }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Journal Voucher" : "New Journal Voucher"}</DialogTitle>
             <DialogDescription>
@@ -455,7 +449,7 @@ export function JournalVoucherPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-2">
+          <div className="space-y-4 py-1">
             {/* Header Fields */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -504,7 +498,7 @@ export function JournalVoucherPage() {
                   value={form.narration}
                   onChange={(e) => setForm({ ...form, narration: e.target.value })}
                   placeholder="Describe the purpose of this journal entry..."
-                  rows={2}
+                  rows={1}
                 />
               </div>
             </div>
@@ -521,9 +515,9 @@ export function JournalVoucherPage() {
                 </Button>
               </div>
 
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
+              <div className="rounded-lg bg-white overflow-x-auto shadow-sm border border-gray-100">
+                <Table className="min-w-full">
+                  <TableHeader className="bg-slate-50">
                     <TableRow>
                       <TableHead>Account Code</TableHead>
                       <TableHead>Account Name</TableHead>
@@ -644,7 +638,7 @@ export function JournalVoucherPage() {
               </div>
 
               {/* Balance indicator */}
-              <div className="flex items-center justify-between p-3 rounded-md bg-gray-50 border">
+              <div className="flex items-center justify-between p-3 rounded-md bg-white border border-gray-100 shadow-sm">
                 <div className="flex items-center gap-6 text-sm">
                   <span>Total Debit: <strong>{formTotalDebit.toFixed(2)} AED</strong></span>
                   <span>Total Credit: <strong>{formTotalCredit.toFixed(2)} AED</strong></span>
@@ -667,7 +661,7 @@ export function JournalVoucherPage() {
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-2">
+          <div className="flex justify-end space-x-3 pt-3 sticky bottom-0 bg-white border-t px-6 py-3 -mx-6">
             <Button variant="outline" onClick={() => { setIsFormOpen(false); resetForm(); }}>Cancel</Button>
             <Button
               onClick={handleSubmit}
@@ -683,7 +677,7 @@ export function JournalVoucherPage() {
       {/* View Details Dialog */}
       {viewingVoucher && (
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 <BookOpen className="h-5 w-5 text-primary" />
@@ -711,8 +705,8 @@ export function JournalVoucherPage() {
 
               <Separator />
 
-              <Table>
-                <TableHeader>
+              <Table className="min-w-full">
+                <TableHeader className="bg-slate-50">
                   <TableRow>
                     <TableHead>Account Code</TableHead>
                     <TableHead>Account Name</TableHead>
@@ -788,3 +782,6 @@ export function JournalVoucherPage() {
     </div>
   );
 }
+
+
+

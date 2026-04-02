@@ -64,6 +64,11 @@ public class MemberResponseDTO {
     private String familyHeadName;
     private String relationshipToHead;
 
+    // App authentication fields
+    private Long userId;
+    private String appUsername;
+    private Boolean appAccessEnabled;
+
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public static MemberResponseDTO fromEntity(Member m) {
@@ -116,6 +121,9 @@ public class MemberResponseDTO {
         dto.isFamilyHead        = m.getIsFamilyHead();
         dto.familyHeadId        = m.getFamilyHeadId();
         dto.relationshipToHead  = m.getRelationshipToHead();
+        dto.userId              = m.getUserId();
+        dto.appUsername         = m.getAppUsername();
+        dto.appAccessEnabled    = m.getAppAccessEnabled();
         return dto;
     }
 
@@ -171,4 +179,10 @@ public class MemberResponseDTO {
     public void setFamilyHeadName(String familyHeadName) { this.familyHeadName = familyHeadName; }
     public String getFamilyHeadName() { return familyHeadName; }
     public String getRelationshipToHead() { return relationshipToHead; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+    public String getAppUsername() { return appUsername; }
+    public void setAppUsername(String appUsername) { this.appUsername = appUsername; }
+    public Boolean getAppAccessEnabled() { return appAccessEnabled; }
+    public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
 }

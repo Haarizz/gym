@@ -72,4 +72,14 @@ public class StaffRequestDTO {
     public void setCertifications(List<CertificationInput> certifications) { this.certifications = certifications; }
     public Map<String, List<String>> getSchedule() { return schedule; }
     public void setSchedule(Map<String, List<String>> schedule) { this.schedule = schedule; }
+
+    // App access credentials (optional — leave blank to not create app login)
+    private String appUsername;
+    private String appPassword;
+
+    public String getAppUsername() { return appUsername; }
+    public void setAppUsername(String appUsername) { this.appUsername = appUsername; }
+
+    public String getAppPassword() { return appPassword; }
+    public void setAppPassword(String appPassword) { this.appPassword = appPassword; }
 }

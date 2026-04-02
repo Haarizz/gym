@@ -31,4 +31,28 @@ public class AuthController {
     public ResponseEntity<AuthResponseDTO> login(@RequestBody AuthRequestDTO request) {
         return ResponseEntity.ok(authService.login(request));
     }
+
+    /**
+     * GET /api/auth/me
+     * Returns the current authenticated user's profile (role, userId, enabled).
+     * Used by the mobile app after login to fetch and store the session profile.
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser() {
+        try {
+            return ResponseEntity.ok(authService.getCurrentUser());
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(e.getMessage());
+        }
+    }
+
+    /**
+     * GET /api/auth/check-username?username=xxx
+     * Returns { "available": true/false } — used by the admin frontend before creating credentials.
+     */
+    @GetMapping("/check-username")
+    public ResponseEntity<java.util.Map<String, Boolean>> checkUsername(@RequestParam String username) {
+        boolean available = !authService.usernameExists(username);
+        return ResponseEntity.ok(java.util.Map.of("available", available));
+    }
 }

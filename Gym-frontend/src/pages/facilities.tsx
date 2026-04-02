@@ -10,6 +10,11 @@ import { Separator } from "../components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { 
   Building2,
+  Activity,
+  Snowflake,
+  Target,
+  Dumbbell,
+  Trophy,
   Plus,
   Pencil,
   Trash2,
@@ -30,7 +35,7 @@ const mockFacilities = [
   {
     id: "FAC-001",
     name: "Basketball Court",
-    icon: "🏀",
+    icon: Activity,
     occupancyLimit: 10,
     rateTypes: ["Per Hour", "Per Half Day", "Per Full Day"],
     rates: {
@@ -45,7 +50,7 @@ const mockFacilities = [
   {
     id: "FAC-002",
     name: "Swimming Pool",
-    icon: "🏊",
+    icon: Snowflake,
     occupancyLimit: 20,
     rateTypes: ["Per Hour", "Per Month"],
     rates: {
@@ -59,7 +64,7 @@ const mockFacilities = [
   {
     id: "FAC-003",
     name: "Padel Court",
-    icon: "🎾",
+    icon: Target,
     occupancyLimit: 4,
     rateTypes: ["Per Hour"],
     rates: {
@@ -72,7 +77,7 @@ const mockFacilities = [
   {
     id: "FAC-004",
     name: "Football Ground",
-    icon: "⚽",
+    icon: Users,
     occupancyLimit: 22,
     rateTypes: ["Per Hour", "Per Half Day", "Per Full Day"],
     rates: {
@@ -87,7 +92,7 @@ const mockFacilities = [
   {
     id: "FAC-005",
     name: "Cricket Ground",
-    icon: "🏏",
+    icon: Trophy,
     occupancyLimit: 22,
     rateTypes: ["Per Hour", "Per Half Day"],
     rates: {
@@ -103,15 +108,15 @@ const mockFacilities = [
 const rateTypeOptions = ["Per Hour", "Per Half Day", "Per Full Day", "Per Month"];
 
 const facilityIcons = [
-  { emoji: "🏀", label: "Basketball" },
-  { emoji: "🏊", label: "Swimming" },
-  { emoji: "🎾", label: "Tennis/Padel" },
-  { emoji: "⚽", label: "Football" },
-  { emoji: "🏏", label: "Cricket" },
-  { emoji: "🏋️", label: "Gym" },
-  { emoji: "🧘", label: "Yoga" },
-  { emoji: "🥊", label: "Boxing" },
-  { emoji: "🎯", label: "Other" }
+  { icon: Activity, label: "Basketball" },
+  { icon: Snowflake, label: "Swimming" },
+  { icon: Target, label: "Tennis/Padel" },
+  { icon: Users, label: "Football" },
+  { icon: Trophy, label: "Cricket" },
+  { icon: Dumbbell, label: "Gym" },
+  { icon: Activity, label: "Yoga" },
+  { icon: Trophy, label: "Boxing" },
+  { icon: Building2, label: "Other" }
 ];
 
 interface FacilitiesProps {
@@ -129,7 +134,7 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
   // Form state
   const [formData, setFormData] = useState({
     name: "",
-    icon: "🏋️",
+    icon: Dumbbell,
     occupancyLimit: "",
     selectedRateTypes: [] as string[],
     rates: {} as Record<string, string>,
@@ -140,7 +145,7 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
   const resetForm = () => {
     setFormData({
       name: "",
-      icon: "🏋️",
+      icon: Dumbbell,
       occupancyLimit: "",
       selectedRateTypes: [],
       rates: {},
@@ -284,37 +289,31 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
   const avgOccupancy = Math.round(facilities.reduce((sum, f) => sum + f.occupancyLimit, 0) / facilities.length);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="border-b bg-white">
+      <div className="border-b bg-white shadow-sm">
         <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-[#2B7A78] to-[#00c5cb]">
-                  <Building2 className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl text-foreground">Facilities Management</h1>
-                  <p className="text-muted-foreground">
-                    Define and manage all physical facilities with rates and availability
-                  </p>
-                </div>
-              </div>
+              <h1 className="text-3xl font-bold">Facilities Management</h1>
+              <p className="text-gray-600 mt-1">
+                Define and manage all physical facilities with rates and availability
+              </p>
             </div>
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 onClick={() => onNavigate && onNavigate("training-streams")}
-                className="gap-2"
+                size="sm"
+                className="gap-2 shadow-sm hover:shadow-md transition-all"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Training Streams
               </Button>
               <Button
                 onClick={handleAddFacility}
-                className="gap-2 text-white"
-                style={{ backgroundColor: '#2B7A78' }}
+                size="sm"
+                className="gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all"
               >
                 <Plus className="h-4 w-4" />
                 Add Facility
@@ -324,111 +323,103 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Facilities</p>
-                    <p className="text-2xl mt-1" style={{ color: '#2B7A78' }}>
-                      {facilities.length}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: '#DFF5F4' }}>
-                    <Building2 className="h-6 w-6" style={{ color: '#2B7A78' }} />
-                  </div>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Total Facilities</CardTitle>
+                <div className="bg-emerald-50 p-2 rounded-lg">
+                  <Building2 className="h-4 w-4 text-emerald-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-emerald-700">{facilities.length}</div>
+                <p className="text-xs text-muted-foreground mt-1">All facilities</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Active Facilities</p>
-                    <p className="text-2xl mt-1" style={{ color: '#2B7A78' }}>
-                      {activeFacilitiesCount}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-green-100">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Active Facilities</CardTitle>
+                <div className="bg-green-50 p-2 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-700">{activeFacilitiesCount}</div>
+                <p className="text-xs text-muted-foreground mt-1">Currently available</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Bookings This Month</p>
-                    <p className="text-2xl mt-1" style={{ color: '#2B7A78' }}>
-                      {totalBookings}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-blue-100">
-                    <Calendar className="h-6 w-6 text-blue-600" />
-                  </div>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Bookings This Month</CardTitle>
+                <div className="bg-blue-50 p-2 rounded-lg">
+                  <Calendar className="h-4 w-4 text-blue-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-700">{totalBookings}</div>
+                <p className="text-xs text-muted-foreground mt-1">Monthly activity</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Avg. Occupancy Limit</p>
-                    <p className="text-2xl mt-1" style={{ color: '#2B7A78' }}>
-                      {avgOccupancy}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-purple-100">
-                    <Users className="h-6 w-6 text-purple-600" />
-                  </div>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Avg. Occupancy Limit</CardTitle>
+                <div className="bg-purple-50 p-2 rounded-lg">
+                  <Users className="h-4 w-4 text-purple-600" />
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-700">{avgOccupancy}</div>
+                <p className="text-xs text-muted-foreground mt-1">Across facilities</p>
               </CardContent>
             </Card>
           </div>
 
           {/* Search & Filters */}
-          <div className="mt-6 flex gap-4">
-            <Input
-              placeholder="Search facilities by name or ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-            />
-            <div className="flex gap-2">
-              <Button
-                variant={statusFilter === "all" ? "default" : "outline"}
-                onClick={() => setStatusFilter("all")}
-                size="sm"
-              >
-                All
-              </Button>
-              <Button
-                variant={statusFilter === "active" ? "default" : "outline"}
-                onClick={() => setStatusFilter("active")}
-                size="sm"
-                style={statusFilter === "active" ? { backgroundColor: '#2B7A78' } : {}}
-              >
-                Active
-              </Button>
-              <Button
-                variant={statusFilter === "inactive" ? "default" : "outline"}
-                onClick={() => setStatusFilter("inactive")}
-                size="sm"
-              >
-                Inactive
-              </Button>
-            </div>
-          </div>
+          <Card className="mt-6 bg-white border-0 shadow-sm">
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <Input
+                  placeholder="Search facilities by name or ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant={statusFilter === "all" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("all")}
+                    size="sm"
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={statusFilter === "active" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("active")}
+                    size="sm"
+                    className={statusFilter === "active" ? "bg-primary hover:bg-primary/90 text-white" : ""}
+                  >
+                    Active
+                  </Button>
+                  <Button
+                    variant={statusFilter === "inactive" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("inactive")}
+                    size="sm"
+                  >
+                    Inactive
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
       {/* Facilities Grid */}
       <div className="p-6">
         {filteredFacilities.length === 0 ? (
-          <Card>
+          <Card className="bg-white border-0 shadow-sm">
             <CardContent className="py-12">
               <div className="text-center">
                 <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
@@ -450,13 +441,19 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
             {filteredFacilities.map((facility) => (
               <Card 
                 key={facility.id} 
-                className="hover:shadow-lg transition-shadow"
-                style={{ borderLeft: facility.status === "Active" ? "4px solid #2B7A78" : "4px solid #E63946" }}
+                className={`bg-white border-0 shadow-sm hover:shadow-lg transition-shadow ${facility.status === "Active" ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-red-500"}`}
               >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="text-4xl">{facility.icon}</div>
+                      {(() => {
+                        const Icon = facility.icon;
+                        return (
+                          <div className="p-3 rounded-lg bg-slate-50">
+                            <Icon className="h-6 w-6 text-slate-600" />
+                          </div>
+                        );
+                      })()}
                       <div>
                         <CardTitle>{facility.name}</CardTitle>
                         <CardDescription>{facility.id}</CardDescription>
@@ -510,7 +507,7 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
                     {/* Rates */}
                     <div>
                       <p className="text-sm font-medium mb-2 flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                        <DollarSign className="h-4 w-4 text-primary" />
                         Pricing
                       </p>
                       <div className="space-y-1">
@@ -531,8 +528,7 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditFacility(facility)}
-                        className="flex-1 gap-2"
-                        style={{ borderColor: '#2B7A78', color: '#2B7A78' }}
+                        className="flex-1 gap-2 shadow-sm hover:shadow-md transition-all"
                       >
                         <Pencil className="h-4 w-4" />
                         Edit
@@ -541,8 +537,7 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
                         variant="outline"
                         size="sm"
                         onClick={() => handleDeleteFacility(facility.id)}
-                        className="gap-2"
-                        style={{ borderColor: '#E63946', color: '#E63946' }}
+                        className="gap-2 shadow-sm hover:shadow-md transition-all text-red-600 border-red-200 hover:bg-red-50"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -591,21 +586,24 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
               <div className="col-span-2">
                 <Label>Select Icon</Label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 mt-2">
-                  {facilityIcons.map((icon) => (
-                    <button
-                      key={icon.emoji}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, icon: icon.emoji })}
-                      className={`p-3 text-2xl rounded-lg border-2 transition-all hover:scale-110 ${
-                        formData.icon === icon.emoji
-                          ? "border-[#2B7A78] bg-[#DFF5F4]"
-                          : "border-gray-200 hover:border-[#2B7A78]"
-                      }`}
-                      title={icon.label}
-                    >
-                      {icon.emoji}
-                    </button>
-                  ))}
+                  {facilityIcons.map((icon) => {
+                    const Icon = icon.icon;
+                    return (
+                      <button
+                        key={icon.label}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, icon: icon.icon })}
+                        className={`p-3 rounded-lg border-2 transition-all hover:scale-105 flex items-center justify-center ${
+                          formData.icon === icon.icon
+                            ? "border-[#2B7A78] bg-[#DFF5F4]"
+                            : "border-gray-200 hover:border-[#2B7A78]"
+                        }`}
+                        title={icon.label}
+                      >
+                        <Icon className="h-5 w-5 text-gray-700" />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -742,4 +740,6 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
     </div>
   );
 }
+
+
 

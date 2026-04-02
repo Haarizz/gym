@@ -52,6 +52,16 @@ public class Staff extends BaseEntity {
     @OneToMany(mappedBy = "staff", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<StaffScheduleSlot> scheduleSlots = new ArrayList<>();
 
+    // App authentication fields
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(name = "app_username")
+    private String appUsername;
+
+    @Column(name = "app_access_enabled")
+    private Boolean appAccessEnabled;
+
     // getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -85,4 +95,13 @@ public class Staff extends BaseEntity {
     public void setCertifications(List<StaffCertification> certifications) { this.certifications = certifications; }
     public List<StaffScheduleSlot> getScheduleSlots() { return scheduleSlots; }
     public void setScheduleSlots(List<StaffScheduleSlot> scheduleSlots) { this.scheduleSlots = scheduleSlots; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getAppUsername() { return appUsername; }
+    public void setAppUsername(String appUsername) { this.appUsername = appUsername; }
+
+    public Boolean getAppAccessEnabled() { return appAccessEnabled; }
+    public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
 }

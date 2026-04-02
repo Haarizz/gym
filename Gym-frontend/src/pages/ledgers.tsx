@@ -778,17 +778,17 @@ export function Ledgers() {
             </p>
           </div>
           <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" onClick={() => exportLedger('excel')}>
+            <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={() => exportLedger('excel')}>
               <Download className="h-4 w-4 mr-2" />
               Export Excel
             </Button>
-            <Button variant="outline" size="sm" onClick={() => exportLedger('pdf')}>
+            <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={() => exportLedger('pdf')}>
               <Printer className="h-4 w-4 mr-2" />
               Export PDF
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button>
+                <Button size="sm" className="shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
                   <Plus className="h-4 w-4 mr-2" />
                   Quick Add
                   <ChevronDown className="h-4 w-4 ml-2" />
@@ -810,6 +810,47 @@ export function Ledgers() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        </div>
+
+        {/* Ledger Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {['Assets', 'Liabilities', 'Income', 'Expenses', 'Equity'].map((group) => {
+            const groupAccounts = accounts.filter(acc => acc.group === group);
+            const totalBalance = groupAccounts.reduce((sum, acc) => {
+              return acc.balanceType === 'Dr' ? sum + acc.currentBalance : sum - acc.currentBalance;
+            }, 0);
+            const groupTint =
+              group === 'Assets' ? 'bg-blue-50' :
+              group === 'Liabilities' ? 'bg-red-50' :
+              group === 'Income' ? 'bg-green-50' :
+              group === 'Expenses' ? 'bg-orange-50' :
+              'bg-purple-50';
+            const groupText =
+              group === 'Assets' ? 'text-blue-700' :
+              group === 'Liabilities' ? 'text-red-700' :
+              group === 'Income' ? 'text-green-700' :
+              group === 'Expenses' ? 'text-orange-700' :
+              'text-purple-700';
+
+            return (
+              <Card key={group} className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-primary">{group}</CardTitle>
+                  <div className={`${groupTint} p-2 rounded-lg`}>
+                    {getGroupIcon(group)}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${groupText}`}>
+                    {formatCurrency(Math.abs(totalBalance))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {groupAccounts.filter(acc => acc.status === 'active').length} active accounts
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Main Tabs Navigation */}
@@ -834,9 +875,9 @@ export function Ledgers() {
           </TabsList>
 
           {/* Chart of Accounts Tab */}
-          <TabsContent value="chart-of-accounts" className="space-y-6">
+          <TabsContent value="chart-of-accounts" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
             {/* Filters */}
-            <Card>
+            <Card className="bg-white border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Filter className="h-5 w-5" />
@@ -914,38 +955,8 @@ export function Ledgers() {
               </CardContent>
             </Card>
 
-            {/* Accounts Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              {['Assets', 'Liabilities', 'Income', 'Expenses', 'Equity'].map((group) => {
-                const groupAccounts = accounts.filter(acc => acc.group === group);
-                const totalBalance = groupAccounts.reduce((sum, acc) => {
-                  return acc.balanceType === 'Dr' ? sum + acc.currentBalance : sum - acc.currentBalance;
-                }, 0);
-                
-                return (
-                  <Card key={group} className={`border-2 ${group === 'Assets' ? 'border-blue-200' : group === 'Liabilities' ? 'border-red-200' : group === 'Income' ? 'border-green-200' : group === 'Expenses' ? 'border-orange-200' : 'border-purple-200'}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          {getGroupIcon(group)}
-                          <span className="font-medium">{group}</span>
-                        </div>
-                        <Badge variant="secondary">{groupAccounts.length}</Badge>
-                      </div>
-                      <div className="text-2xl font-bold">
-                        {formatCurrency(Math.abs(totalBalance))}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {groupAccounts.filter(acc => acc.status === 'active').length} active accounts
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-
             {/* Accounts Table */}
-            <Card>
+            <Card className="bg-white border-0 shadow-sm">
               <CardHeader>
                 <CardTitle>Chart of Accounts</CardTitle>
                 <CardDescription>
@@ -953,9 +964,9 @@ export function Ledgers() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
+                <div className="overflow-x-auto rounded-lg bg-white">
+                  <Table className="min-w-full">
+                    <TableHeader className="bg-slate-50">
                       <TableRow>
                         <TableHead>Account Code</TableHead>
                         <TableHead>Account Name</TableHead>
@@ -968,8 +979,8 @@ export function Ledgers() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredAccounts.map((account) => (
-                        <TableRow key={account.id} className="hover:bg-gray-50">
+                      {filteredAccounts.map((account, index) => (
+                        <TableRow key={account.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-slate-50/80 transition-colors`}>
                           <TableCell className="font-mono font-medium">
                             {account.code}
                           </TableCell>
@@ -1055,9 +1066,9 @@ export function Ledgers() {
           </TabsContent>
 
           {/* General Ledger Tab */}
-          <TabsContent value="general-ledger" className="space-y-6">
+          <TabsContent value="general-ledger" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
             {/* GL Filters */}
-            <Card>
+            <Card className="bg-white border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Filter className="h-5 w-5" />
@@ -1112,7 +1123,7 @@ export function Ledgers() {
             </Card>
 
             {/* General Ledger Table */}
-            <Card>
+            <Card className="bg-white border-0 shadow-sm">
               <CardHeader>
                 <CardTitle>General Ledger Entries</CardTitle>
                 <CardDescription>
@@ -1120,9 +1131,9 @@ export function Ledgers() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
+                <div className="overflow-x-auto rounded-lg bg-white">
+                  <Table className="min-w-full">
+                    <TableHeader className="bg-slate-50">
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Voucher No.</TableHead>
@@ -1134,8 +1145,8 @@ export function Ledgers() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredGLEntries.map((entry) => (
-                        <TableRow key={entry.id} className="hover:bg-gray-50">
+                      {filteredGLEntries.map((entry, index) => (
+                        <TableRow key={entry.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-slate-50/80 transition-colors`}>
                           <TableCell className="font-medium">
                             {new Date(entry.date).toLocaleDateString()}
                           </TableCell>
@@ -1194,14 +1205,14 @@ export function Ledgers() {
           </TabsContent>
 
           {/* Cost Centers Tab */}
-          <TabsContent value="cost-centers" className="space-y-6">
+          <TabsContent value="cost-centers" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
             {/* Cost Centers Header */}
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">Cost Centers</h2>
                 <p className="text-gray-600">Manage departmental cost allocation and budgeting</p>
               </div>
-              <Button onClick={() => setShowAddCostCenter(true)}>
+              <Button onClick={() => setShowAddCostCenter(true)} className="shadow-sm hover:shadow-md transition-all">
                 <Plus className="h-4 w-4 mr-2" />
                 New Cost Center
               </Button>
@@ -1210,7 +1221,7 @@ export function Ledgers() {
             {/* Cost Centers Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCostCenters.map((costCenter) => (
-                <Card key={costCenter.id} className="border-2 hover:border-teal-200 transition-colors">
+                <Card key={costCenter.id} className="border-0 bg-white shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
@@ -1297,9 +1308,9 @@ export function Ledgers() {
           </TabsContent>
 
           {/* Transactions Tab */}
-          <TabsContent value="transactions" className="space-y-6">
+          <TabsContent value="transactions" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
             {/* Filters */}
-            <Card>
+            <Card className="bg-white border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Filter className="h-5 w-5" />
@@ -1352,7 +1363,7 @@ export function Ledgers() {
             </Card>
 
             {/* Transactions Table */}
-            <Card>
+            <Card className="bg-white border-0 shadow-sm">
               <CardHeader>
                 <CardTitle>All Transactions</CardTitle>
                 <CardDescription>
@@ -1371,9 +1382,9 @@ export function Ledgers() {
                     <p className="text-gray-600">Adjust filters or add vouchers/expenses to see transactions here.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
+                  <div className="overflow-x-auto rounded-lg bg-white">
+                    <Table className="min-w-full">
+                      <TableHeader className="bg-slate-50">
                         <TableRow>
                           <TableHead>Date</TableHead>
                           <TableHead>Reference</TableHead>
@@ -1386,8 +1397,8 @@ export function Ledgers() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {transactions.map((tx) => (
-                          <TableRow key={tx.id} className="hover:bg-gray-50">
+                        {transactions.map((tx, index) => (
+                          <TableRow key={tx.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-slate-50/80 transition-colors`}>
                             <TableCell className="font-medium">
                               {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
                             </TableCell>
@@ -1810,19 +1821,19 @@ export function Ledgers() {
                 <div className="space-y-6 mt-6">
                   {/* Account Summary */}
                   <div className="grid grid-cols-3 gap-4">
-                    <Card>
+                    <Card className="bg-white border-0 shadow-sm">
                       <CardContent className="p-4 text-center">
                         <div className="text-2xl font-bold">{selectedAccount.transactions}</div>
                         <div className="text-sm text-gray-600">Total Transactions</div>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="bg-white border-0 shadow-sm">
                       <CardContent className="p-4 text-center">
                         <div className="text-2xl font-bold">{formatCurrency(selectedAccount.currentBalance)}</div>
                         <div className="text-sm text-gray-600">Current Balance</div>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="bg-white border-0 shadow-sm">
                       <CardContent className="p-4 text-center">
                         <div className="text-2xl font-bold">{selectedAccount.lastTransaction}</div>
                         <div className="text-sm text-gray-600">Last Transaction</div>

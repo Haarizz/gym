@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { staffService, Staff, CommissionRule, StaffCertification } from '../utils/supabase/staff-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -27,6 +28,7 @@ import {
   Plus,
   MoreVertical,
   Eye,
+  EyeOff,
   Edit,
   Calendar as CalendarIcon,
   Target,
@@ -377,10 +379,17 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [newEmployeeBasicInfo, setNewEmployeeBasicInfo] = useState<{
     name: string; email: string; phone: string; role: string; department: string;
     branch: string; monthly_target: number; base_salary: number; address: string; photo_url?: string;
+    appUsername?: string; appPassword?: string;
   }>({
     name: '', email: '', phone: '', role: '', department: '', branch: '',
-    monthly_target: 0, base_salary: 0, address: ''
+    monthly_target: 0, base_salary: 0, address: '', appUsername: '', appPassword: ''
   });
+  const [showNewEmpPassword, setShowNewEmpPassword] = useState(false);
+  const [isTogglingStaffAccess, setIsTogglingStaffAccess] = useState(false);
+  const [editAppUsername, setEditAppUsername] = useState('');
+  const [editAppPassword, setEditAppPassword] = useState('');
+  const [showEditAppPassword, setShowEditAppPassword] = useState(false);
+  const [isSavingStaffCredentials, setIsSavingStaffCredentials] = useState(false);
   const [showEditEmployee, setShowEditEmployee] = useState(false);
   const [editEmployeeData, setEditEmployeeData] = useState<Staff | null>(null);
   const [showViewSchedule, setShowViewSchedule] = useState(false);
@@ -464,9 +473,13 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         certifications: [],
         schedule: {},
         photo_url: newEmployeeBasicInfo.photo_url,
+        ...(newEmployeeBasicInfo.appUsername && newEmployeeBasicInfo.appPassword ? {
+          app_username: newEmployeeBasicInfo.appUsername,
+          app_password: newEmployeeBasicInfo.appPassword,
+        } : {}),
       });
       setShowAddEmployee(false);
-      setNewEmployeeBasicInfo({ name: '', email: '', phone: '', role: '', department: '', branch: '', monthly_target: 0, base_salary: 0, address: '' });
+      setNewEmployeeBasicInfo({ name: '', email: '', phone: '', role: '', department: '', branch: '', monthly_target: 0, base_salary: 0, address: '', appUsername: '', appPassword: '' });
       await loadStaff();
     } catch (e) { console.error('Failed to create employee', e); }
   };
@@ -1132,7 +1145,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Profile
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setEditEmployeeData({...employee}); setShowEditEmployee(true); }}>
+                              <DropdownMenuItem onClick={() => { setEditEmployeeData({...employee}); setEditAppUsername(''); setEditAppPassword(''); setShowEditAppPassword(false); setShowEditEmployee(true); }}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Details
                               </DropdownMenuItem>
@@ -1528,6 +1541,43 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   onChange={e => setNewEmployeeBasicInfo(p => ({...p, address: e.target.value}))}
                 />
               </div>
+
+              {/* App Access Section */}
+              <div className="pt-2 border-t">
+                <p className="text-sm font-medium mb-3">App Access <span className="text-muted-foreground font-normal">(Optional — leave blank to skip)</span></p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>App Username</Label>
+                    <Input
+                      placeholder="e.g. john.trainer"
+                      className="mt-1"
+                      value={newEmployeeBasicInfo.appUsername || ''}
+                      onChange={e => setNewEmployeeBasicInfo(p => ({...p, appUsername: e.target.value}))}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label>App Password</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        type={showNewEmpPassword ? 'text' : 'password'}
+                        placeholder="Min 6 characters"
+                        className="pr-10"
+                        value={newEmployeeBasicInfo.appPassword || ''}
+                        onChange={e => setNewEmployeeBasicInfo(p => ({...p, appPassword: e.target.value}))}
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewEmpPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showNewEmpPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </TabsContent>
 
             {/* Certifications Tab */}
@@ -1571,6 +1621,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           </DialogHeader>
           <Separator className="my-3" />
           {editEmployeeData && (
+            <>
             <Tabs defaultValue="basic" className="space-y-4">
               <TabsList className="bg-muted/50 p-1 w-full">
                 <TabsTrigger value="basic" className="flex-1 flex items-center gap-2">
@@ -1736,8 +1787,138 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                 />
               </TabsContent>
             </Tabs>
+
+            {/* App Access Section */}
+            <div className="pt-3 mt-2 border-t space-y-3">
+              <p className="text-sm font-medium">App Access</p>
+
+              {editEmployeeData.user_id ? (
+                <>
+                  {/* Toggle row */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Username: <span className="font-mono">{editEmployeeData.app_username}</span>
+                    </p>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-muted-foreground">
+                        {editEmployeeData.app_access_enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                      <Switch
+                        checked={editEmployeeData.app_access_enabled ?? false}
+                        disabled={isTogglingStaffAccess}
+                        onCheckedChange={async (checked) => {
+                          setIsTogglingStaffAccess(true);
+                          try {
+                            const updated = await staffService.toggleStaffAccess(editEmployeeData.id, checked);
+                            setEditEmployeeData(p => p ? { ...p, app_access_enabled: updated.app_access_enabled } : p);
+                          } catch (e) { console.error('Failed to toggle staff access', e); }
+                          finally { setIsTogglingStaffAccess(false); }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {/* Change password */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Change Password</Label>
+                    <div className="flex gap-2 mt-1">
+                      <div className="relative flex-1">
+                        <Input
+                          type={showEditAppPassword ? 'text' : 'password'}
+                          placeholder="New password"
+                          className="pr-9"
+                          value={editAppPassword}
+                          onChange={e => setEditAppPassword(e.target.value)}
+                          autoComplete="new-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowEditAppPassword(v => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showEditAppPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!editAppPassword || isSavingStaffCredentials}
+                        onClick={async () => {
+                          setIsSavingStaffCredentials(true);
+                          try {
+                            await staffService.setStaffCredentials(editEmployeeData.id, editEmployeeData.app_username!, editAppPassword);
+                            setEditAppPassword('');
+                            toast.success('Password updated');
+                          } catch (e: any) {
+                            toast.error(e.message || 'Failed to update password');
+                          } finally { setIsSavingStaffCredentials(false); }
+                        }}
+                      >
+                        Update
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* No credentials yet — set new ones */
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">This staff member has no app login. Set credentials below.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Username</Label>
+                      <Input
+                        placeholder="e.g. john.trainer"
+                        className="mt-1"
+                        value={editAppUsername}
+                        onChange={e => setEditAppUsername(e.target.value)}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Password</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          type={showEditAppPassword ? 'text' : 'password'}
+                          placeholder="Min 6 characters"
+                          className="pr-9"
+                          value={editAppPassword}
+                          onChange={e => setEditAppPassword(e.target.value)}
+                          autoComplete="new-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowEditAppPassword(v => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showEditAppPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={!editAppUsername || !editAppPassword || isSavingStaffCredentials}
+                    onClick={async () => {
+                      setIsSavingStaffCredentials(true);
+                      try {
+                        const updated = await staffService.setStaffCredentials(editEmployeeData.id, editAppUsername, editAppPassword);
+                        setEditEmployeeData(p => p ? { ...p, user_id: updated.user_id, app_username: updated.app_username, app_access_enabled: updated.app_access_enabled } : p);
+                        setEditAppUsername('');
+                        setEditAppPassword('');
+                        toast.success('App access created');
+                      } catch (e: any) {
+                        toast.error(e.message || 'Failed to set credentials');
+                      } finally { setIsSavingStaffCredentials(false); }
+                    }}
+                  >
+                    Set App Access
+                  </Button>
+                </div>
+              )}
+            </div>
+            </>
           )}
           <Separator className="my-3" />
+
           <div className="flex justify-end space-x-2">
             <Button variant="outline" onClick={() => setShowEditEmployee(false)}>Cancel</Button>
             <Button onClick={handleUpdateEmployee} disabled={!editEmployeeData?.name || !editEmployeeData?.email}>

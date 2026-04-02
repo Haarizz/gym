@@ -53,7 +53,11 @@ import {
   FaRuler,
   FaWeightScale,
   FaPhoneVolume,
-  FaShield
+  FaShield,
+  FaMobileScreen,
+  FaKey,
+  FaEye,
+  FaEyeSlash,
 } from 'react-icons/fa6';
 
 // ISO Standard Country List - Comprehensive list of all countries
@@ -108,6 +112,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     card: 0
   });
   const [showSplitPayment, setShowSplitPayment] = useState(false);
+  const [showAppPassword, setShowAppPassword] = useState(false);
+  const [existingUserId, setExistingUserId] = useState<number | undefined>();
+  const [existingAppUsername, setExistingAppUsername] = useState('');
+  const [editNewAppUsername, setEditNewAppUsername] = useState('');
+  const [editNewAppPassword, setEditNewAppPassword] = useState('');
+  const [showEditNewAppPassword, setShowEditNewAppPassword] = useState(false);
+  const [isSavingMemberCredentials, setIsSavingMemberCredentials] = useState(false);
   
   // New payment method state
   const [paymentData, setPaymentData] = useState({
@@ -223,6 +234,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             healthNotes: member.health_notes || ''
           }));
           setInternalId(member.id);
+          setExistingUserId(member.user_id);
+          setExistingAppUsername(member.app_username || '');
         }
       }).catch((err: any) => {
         console.error("Failed to load member for edit", err);
@@ -344,7 +357,10 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     height: '',
     weight: '',
     chronicIllnesses: '',
-    healthNotes: ''
+    healthNotes: '',
+    // App access credentials
+    appUsername: '',
+    appPassword: '',
   });
   
   // Family members state
@@ -856,6 +872,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       family_members: (!isEditMode && formData.membershipType === 'family' && familyMembers.length > 0)
         ? familyMembers.map(fm => ({ name: fm.name, relationship: fm.relationship }))
         : undefined,
+      // App access credentials (only included on create if both are provided)
+      ...((!isEditMode && formData.appUsername && formData.appPassword) ? {
+        app_username: formData.appUsername,
+        app_password: formData.appPassword,
+      } : {}),
     };
 
     try {
@@ -1701,6 +1722,202 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               )}
               </CardContent>
             </Card>
+
+            {/* App Access Section — only on create mode */}
+            {!isEditMode && (
+              <Card className="border-primary/10 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 bg-indigo-600 rounded-full shrink-0">
+                      <FaMobileScreen className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-semibold">App Access (Optional)</CardTitle>
+                      <p className="text-sm text-muted-foreground">Create login credentials so this member can access the GymBios mobile app. Leave blank to skip.</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="appUsername" className="flex items-center space-x-2">
+                        <FaKey className="h-4 w-4 text-indigo-600" />
+                        <span>Username</span>
+                      </Label>
+                      <Input
+                        id="appUsername"
+                        value={formData.appUsername}
+                        onChange={(e) => setFormData({ ...formData, appUsername: e.target.value })}
+                        placeholder="e.g. john.doe"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="appPassword" className="flex items-center space-x-2">
+                        <FaKey className="h-4 w-4 text-indigo-600" />
+                        <span>Password</span>
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="appPassword"
+                          type={showAppPassword ? 'text' : 'password'}
+                          value={formData.appPassword}
+                          onChange={(e) => setFormData({ ...formData, appPassword: e.target.value })}
+                          placeholder="Min 6 characters"
+                          autoComplete="new-password"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAppPassword(v => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showAppPassword ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {formData.appUsername && !formData.appPassword && (
+                    <p className="text-sm text-amber-600 mt-3">Both username and password are required to create app access.</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* App Access Section — edit mode */}
+            {isEditMode && (
+              <Card className="border-primary/10 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 bg-indigo-600 rounded-full shrink-0">
+                      <FaMobileScreen className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-semibold">App Access</CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {existingUserId
+                          ? 'Manage this member\'s mobile app login credentials.'
+                          : 'No app login set up yet. Create credentials to give access to the mobile app.'}
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-4">
+                  {existingUserId ? (
+                    <>
+                      <div className="flex items-center gap-2 text-sm">
+                        <FaKey className="h-4 w-4 text-indigo-600 shrink-0" />
+                        <span className="text-muted-foreground">Username:</span>
+                        <span className="font-mono font-medium">{existingAppUsername}</span>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Change Password</Label>
+                        <div className="flex gap-2 mt-1">
+                          <div className="relative flex-1">
+                            <Input
+                              type={showEditNewAppPassword ? 'text' : 'password'}
+                              placeholder="New password"
+                              className="pr-10"
+                              value={editNewAppPassword}
+                              onChange={e => setEditNewAppPassword(e.target.value)}
+                              autoComplete="new-password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowEditNewAppPassword(v => !v)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                              {showEditNewAppPassword ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={!editNewAppPassword || isSavingMemberCredentials}
+                            onClick={async () => {
+                              if (!internalId) return;
+                              setIsSavingMemberCredentials(true);
+                              try {
+                                await membersService.setMemberCredentials(internalId, existingAppUsername, editNewAppPassword);
+                                setEditNewAppPassword('');
+                                toast.success('Password updated successfully');
+                              } catch (e: any) {
+                                toast.error(e.message || 'Failed to update password');
+                              } finally { setIsSavingMemberCredentials(false); }
+                            }}
+                          >
+                            Update
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <FaKey className="h-4 w-4 text-indigo-600" />
+                            Username
+                          </Label>
+                          <Input
+                            placeholder="e.g. john.doe"
+                            value={editNewAppUsername}
+                            onChange={e => setEditNewAppUsername(e.target.value)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <FaKey className="h-4 w-4 text-indigo-600" />
+                            Password
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              type={showEditNewAppPassword ? 'text' : 'password'}
+                              placeholder="Min 6 characters"
+                              className="pr-10"
+                              value={editNewAppPassword}
+                              onChange={e => setEditNewAppPassword(e.target.value)}
+                              autoComplete="new-password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowEditNewAppPassword(v => !v)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                              {showEditNewAppPassword ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      {editNewAppUsername && !editNewAppPassword && (
+                        <p className="text-sm text-amber-600">Both username and password are required.</p>
+                      )}
+                      <Button
+                        type="button"
+                        disabled={!editNewAppUsername || !editNewAppPassword || isSavingMemberCredentials}
+                        onClick={async () => {
+                          if (!internalId) return;
+                          setIsSavingMemberCredentials(true);
+                          try {
+                            const updated = await membersService.setMemberCredentials(internalId, editNewAppUsername, editNewAppPassword);
+                            setExistingUserId(updated.user_id);
+                            setExistingAppUsername(updated.app_username || editNewAppUsername);
+                            setEditNewAppUsername('');
+                            setEditNewAppPassword('');
+                            toast.success('App access created');
+                          } catch (e: any) {
+                            toast.error(e.message || 'Failed to create app access');
+                          } finally { setIsSavingMemberCredentials(false); }
+                        }}
+                      >
+                        Set App Access
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <div className="flex items-center justify-between gap-3 py-4 border-t bg-slate-50/60 rounded-xl px-4">
               <p className="text-sm text-muted-foreground">All required fields must be filled before submitting.</p>

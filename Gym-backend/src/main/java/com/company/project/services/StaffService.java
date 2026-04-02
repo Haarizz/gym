@@ -4,11 +4,18 @@ import com.company.project.dto.StaffPageResponseDTO;
 import com.company.project.dto.StaffRequestDTO;
 import com.company.project.dto.StaffResponseDTO;
 import com.company.project.dto.PaginationDTO;
+import com.company.project.entities.Role;
 import com.company.project.entities.Staff;
 import com.company.project.entities.StaffCertification;
 import com.company.project.entities.StaffScheduleSlot;
+import com.company.project.entities.User;
+import com.company.project.entities.UserRole;
+import com.company.project.repositories.RoleRepository;
 import com.company.project.repositories.StaffRepository;
+import com.company.project.repositories.UserRepository;
+import com.company.project.repositories.UserRoleRepository;
 import jakarta.persistence.criteria.Predicate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,9 +35,21 @@ import java.util.stream.Collectors;
 public class StaffService {
 
     private final StaffRepository staffRepository;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public StaffService(StaffRepository staffRepository) {
-        this.staffRepository = staffRepository;
+    public StaffService(StaffRepository staffRepository,
+                        UserRepository userRepository,
+                        RoleRepository roleRepository,
+                        UserRoleRepository userRoleRepository,
+                        PasswordEncoder passwordEncoder) {
+        this.staffRepository    = staffRepository;
+        this.userRepository     = userRepository;
+        this.roleRepository     = roleRepository;
+        this.userRoleRepository = userRoleRepository;
+        this.passwordEncoder    = passwordEncoder;
     }
 
     @Transactional(readOnly = true)
@@ -82,7 +101,82 @@ public class StaffService {
         // Generate EMP-XXXXXXXXXX id
         saved.setStaffId("EMP-" + String.format("%010d", saved.getId()));
         saved = staffRepository.save(saved);
+
+        // Auto-create app login account if credentials were provided
+        if (req.getAppUsername() != null && !req.getAppUsername().isBlank()
+                && req.getAppPassword() != null && !req.getAppPassword().isBlank()) {
+            if (userRepository.existsByUsername(req.getAppUsername())) {
+                throw new RuntimeException("Username already taken: " + req.getAppUsername());
+            }
+            User user = new User();
+            user.setUsername(req.getAppUsername());
+            user.setEmail(saved.getEmail());
+            user.setPasswordHash(passwordEncoder.encode(req.getAppPassword()));
+            user.setEnabled(true);
+            user.setUserRoles(new java.util.HashSet<>());
+            user = userRepository.save(user);
+
+            Role staffRole = roleRepository.findByRoleName("STAFF")
+                    .orElseThrow(() -> new RuntimeException("STAFF role not found"));
+            userRoleRepository.save(new UserRole(null, user, staffRole));
+
+            saved.setUserId(user.getId());
+            saved.setAppUsername(req.getAppUsername());
+            saved.setAppAccessEnabled(true);
+            saved = staffRepository.save(saved);
+        }
+
         return StaffResponseDTO.fromEntity(saved);
+    }
+
+    public StaffResponseDTO setStaffCredentials(Long id, String appUsername, String appPassword) {
+        Staff staff = staffRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Staff not found: " + id));
+
+        if (staff.getUserId() != null) {
+            // Already has an account — just update the password
+            User user = userRepository.findById(staff.getUserId())
+                    .orElseThrow(() -> new RuntimeException("Linked user account not found"));
+            user.setPasswordHash(passwordEncoder.encode(appPassword));
+            userRepository.save(user);
+        } else {
+            // No account yet — create one
+            if (userRepository.existsByUsername(appUsername)) {
+                throw new RuntimeException("Username already taken: " + appUsername);
+            }
+            User user = new User();
+            user.setUsername(appUsername);
+            user.setEmail(staff.getEmail());
+            user.setPasswordHash(passwordEncoder.encode(appPassword));
+            user.setEnabled(true);
+            user.setUserRoles(new java.util.HashSet<>());
+            user = userRepository.save(user);
+
+            Role staffRole = roleRepository.findByRoleName("STAFF")
+                    .orElseThrow(() -> new RuntimeException("STAFF role not found"));
+            userRoleRepository.save(new UserRole(null, user, staffRole));
+
+            staff.setUserId(user.getId());
+            staff.setAppUsername(appUsername);
+            staff.setAppAccessEnabled(true);
+            staffRepository.save(staff);
+        }
+
+        return StaffResponseDTO.fromEntity(staffRepository.findById(id).orElseThrow());
+    }
+
+    public StaffResponseDTO toggleStaffAccess(Long id, boolean enabled) {
+        Staff staff = staffRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Staff not found: " + id));
+        if (staff.getUserId() == null) {
+            throw new RuntimeException("This staff member has no linked app account");
+        }
+        User user = userRepository.findById(staff.getUserId())
+                .orElseThrow(() -> new RuntimeException("Linked user account not found"));
+        user.setEnabled(enabled);
+        userRepository.save(user);
+        staff.setAppAccessEnabled(enabled);
+        return StaffResponseDTO.fromEntity(staffRepository.save(staff));
     }
 
     public StaffResponseDTO updateStaff(Long id, StaffRequestDTO req) {
