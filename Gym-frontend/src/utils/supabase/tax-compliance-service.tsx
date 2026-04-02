@@ -46,7 +46,7 @@ function mapItem(r: any): TaxComplianceItem {
     notes: r.notes ?? null,
     filingReference: r.filing_reference ?? null,
     documentUrl: r.document_url ?? null,
-    isOverdue: r.is_overdue ?? false,
+    isOverdue: r.overdue ?? false,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

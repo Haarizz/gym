@@ -96,6 +96,26 @@ public class FinancialReportService {
     public Map<String, Object> getBalanceSheet(LocalDate asOf) {
         List<AccountHead> accounts = accountHeadRepository.findAllByOrderByCodeAsc();
 
+        // Build a set of POSTED JV IDs with date <= asOf
+        Set<Long> postedJvIds = journalVoucherRepository.findByStatusOrderByDateDesc("POSTED")
+                .stream()
+                .filter(jv -> jv.getDate() != null && !jv.getDate().isAfter(asOf))
+                .map(jv -> jv.getId())
+                .collect(Collectors.toSet());
+
+        // Sum debit and credit per account code from those JV lines
+        Map<String, BigDecimal> debitByCode = new HashMap<>();
+        Map<String, BigDecimal> creditByCode = new HashMap<>();
+        if (!postedJvIds.isEmpty()) {
+            for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+                if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
+                String code = line.getAccountCode();
+                if (code == null) continue;
+                debitByCode.merge(code, line.getDebit() != null ? line.getDebit() : BigDecimal.ZERO, BigDecimal::add);
+                creditByCode.merge(code, line.getCredit() != null ? line.getCredit() : BigDecimal.ZERO, BigDecimal::add);
+            }
+        }
+
         Map<String, List<Map<String, Object>>> grouped = new LinkedHashMap<>();
         grouped.put("ASSET", new ArrayList<>());
         grouped.put("LIABILITY", new ArrayList<>());
@@ -109,19 +129,23 @@ public class FinancialReportService {
 
         for (AccountHead a : accounts) {
             if (!Boolean.TRUE.equals(a.getIsActive())) continue;
+            BigDecimal opening = a.getOpeningBalance() != null ? a.getOpeningBalance() : BigDecimal.ZERO;
+            BigDecimal debit = debitByCode.getOrDefault(a.getCode(), BigDecimal.ZERO);
+            BigDecimal credit = creditByCode.getOrDefault(a.getCode(), BigDecimal.ZERO);
+            BigDecimal balance = opening.add(debit).subtract(credit);
+
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("code", a.getCode());
             line.put("name", a.getName());
             line.put("sub_group", a.getSubGroup());
-            line.put("balance", a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO);
+            line.put("balance", balance);
             String type = a.getType() != null ? a.getType().toUpperCase() : "ASSET";
             if (grouped.containsKey(type)) {
                 grouped.get(type).add(line);
             }
-            BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
-            if ("ASSET".equals(type)) totalAssets = totalAssets.add(bal);
-            else if ("LIABILITY".equals(type)) totalLiabilities = totalLiabilities.add(bal);
-            else if ("EQUITY".equals(type)) totalEquity = totalEquity.add(bal);
+            if ("ASSET".equals(type)) totalAssets = totalAssets.add(balance);
+            else if ("LIABILITY".equals(type)) totalLiabilities = totalLiabilities.add(balance);
+            else if ("EQUITY".equals(type)) totalEquity = totalEquity.add(balance);
         }
 
         Map<String, Object> result = new LinkedHashMap<>();

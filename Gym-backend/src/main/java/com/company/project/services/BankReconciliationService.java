@@ -66,6 +66,9 @@ public class BankReconciliationService {
     public BankReconciliationResponseDTO update(Long id, BankReconciliationRequestDTO req) {
         BankReconciliation r = reconciliationRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Reconciliation not found: " + id));
+        if ("COMPLETED".equals(r.getStatus())) {
+            throw new IllegalStateException("Completed reconciliations cannot be modified");
+        }
         mapFromRequest(r, req);
         r = reconciliationRepository.save(r);
         lineRepository.deleteByReconciliationId(id);
@@ -76,6 +79,9 @@ public class BankReconciliationService {
     public BankReconciliationResponseDTO matchLine(Long reconciliationId, Long lineId, String voucherNo) {
         BankStatementLine line = lineRepository.findById(lineId)
                 .orElseThrow(() -> new IllegalArgumentException("Line not found: " + lineId));
+        if (!reconciliationId.equals(line.getReconciliationId())) {
+            throw new IllegalArgumentException("Line " + lineId + " does not belong to reconciliation " + reconciliationId);
+        }
         line.setIsMatched(true);
         line.setMatchedVoucherNo(voucherNo);
         lineRepository.save(line);
@@ -86,6 +92,9 @@ public class BankReconciliationService {
     public BankReconciliationResponseDTO unmatchLine(Long reconciliationId, Long lineId) {
         BankStatementLine line = lineRepository.findById(lineId)
                 .orElseThrow(() -> new IllegalArgumentException("Line not found: " + lineId));
+        if (!reconciliationId.equals(line.getReconciliationId())) {
+            throw new IllegalArgumentException("Line " + lineId + " does not belong to reconciliation " + reconciliationId);
+        }
         line.setIsMatched(false);
         line.setMatchedVoucherNo(null);
         lineRepository.save(line);
@@ -141,10 +150,9 @@ public class BankReconciliationService {
     }
 
     private void updateStatus(Long reconciliationId) {
-        long unmatched = lineRepository.countByReconciliationIdAndIsMatchedFalse(reconciliationId);
         BankReconciliation r = reconciliationRepository.findById(reconciliationId).orElseThrow();
         if (!"COMPLETED".equals(r.getStatus())) {
-            r.setStatus(unmatched == 0 ? "OPEN" : "IN_PROGRESS");
+            r.setStatus("IN_PROGRESS");
             reconciliationRepository.save(r);
         }
     }
