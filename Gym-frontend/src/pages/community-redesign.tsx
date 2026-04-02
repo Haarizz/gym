@@ -1,5 +1,6 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -12,6 +13,8 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { AspectRatio } from "../components/ui/aspect-ratio";
 import { Slider } from "../components/ui/slider";
+import { cn } from "../components/ui/utils";
+import api from "../api/axiosConfig";
 import {
   Calendar,
   ChevronRight,
@@ -47,15 +50,28 @@ type CommunityPostImage = {
 
 type CommunityPost = {
   id: number;
-  author: string;
-  avatar: string;
-  timestamp: string;
+  authorUserId: number;
+  authorUsername: string;
+  authorRoles: string[];
+  avatar?: string;
+  createdAt: string;
   content: string;
   likes: number;
   comments: number;
+  likedByMe?: boolean;
   type: "achievement" | "question" | "tip";
   topic: string;
   image?: CommunityPostImage;
+};
+
+type CommunityComment = {
+  id: number;
+  postId: number;
+  content: string;
+  authorUserId: number;
+  authorUsername: string;
+  authorRoles: string[];
+  createdAt: string;
 };
 
 type CommunityEvent = {
@@ -180,52 +196,12 @@ const createEmptyPostDraft = (): CommunityPostDraft => ({
   cropZoom: 100,
 });
 
-const initialCommunityPosts: CommunityPost[] = [
-  {
-    id: 5,
-    author: "Ava Patel",
-    avatar: "/avatars/ava.jpg",
-    timestamp: "45 mins ago",
-    content: "Wrapped up today's lower-body session and grabbed a workout photo before cleanup. Sharing the barbell floor energy here because the whole room was locked in.",
-    likes: 18,
-    comments: 4,
-    type: "achievement",
-    topic: "Strength Session",
-    image: {
-      src: createWorkoutFeedPhoto(1200, 1500, "#ef4444", "Barbell Session", "Strength floor wrap-up after leg day", "barbell"),
-      alt: "Mock workout photo showing a member finishing a barbell session on the strength floor.",
-      label: "Barbell Session",
-      description: "Workout photo mock: strength floor recap cropped to a 4:5 feed frame.",
-      aspectRatio: "4:5",
-      cropPosition: 48,
-      cropZoom: 104,
-    },
-  },
-  {
-    id: 6,
-    author: "Coach Nina",
-    avatar: "/avatars/emily.jpg",
-    timestamp: "1 hour ago",
-    content: "Sprint finisher group was flying today. Posting the treadmill lane snapshot because this is exactly the kind of effort we want to keep celebrating in the feed.",
-    likes: 21,
-    comments: 7,
-    type: "tip",
-    topic: "Workout Highlights",
-    image: {
-      src: createWorkoutFeedPhoto(1080, 1080, "#0ea5e9", "Sprint Lane", "Intervals and recovery laps from tonight's cardio block", "treadmill"),
-      alt: "Mock workout photo showing a treadmill sprint lane in the gym.",
-      label: "Sprint Lane",
-      description: "Workout photo mock: cardio interval recap cropped to a square frame.",
-      aspectRatio: "1:1",
-      cropPosition: 50,
-      cropZoom: 100,
-    },
-  },
-  { id: 1, author: "Sarah Johnson", avatar: "/avatars/sarah.jpg", timestamp: "2 hours ago", content: "Just hit a new personal record on deadlifts: 185 lbs. Huge thanks to everyone who kept pushing me through the last set.", likes: 24, comments: 8, type: "achievement", topic: "Strength Club" },
-  { id: 2, author: "Mike Chen", avatar: "/avatars/mike.jpg", timestamp: "4 hours ago", content: "Looking for a workout partner for early morning sessions at 6 AM. Anyone up for a structured strength split three times a week?", likes: 12, comments: 15, type: "question", topic: "Workout Buddy" },
-  { id: 3, author: "Emily Rodriguez", avatar: "/avatars/emily.jpg", timestamp: "1 day ago", content: "Quick nutrition tip: Greek yogurt, berries, and chia seeds make a strong post-workout snack when you want something light but high in protein.", likes: 31, comments: 6, type: "tip", topic: "Nutrition" },
-  { id: 4, author: "David Thompson", avatar: "/avatars/david.jpg", timestamp: "1 day ago", content: "Week four of consistency is done. The community accountability check-ins have made a bigger difference than I expected.", likes: 19, comments: 11, type: "achievement", topic: "Consistency" },
-];
+const safeFormatTime = (isoString?: string) => {
+  if (!isoString) return "Just now";
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "Just now";
+  return formatDistanceToNow(date, { addSuffix: true });
+};
 
 const upcomingEvents: CommunityEvent[] = [
   { id: 1, title: "HIIT Challenge Week", date: "Oct 1-7, 2024", participants: 45, description: "A seven-day high-intensity challenge with daily scoreboards and recovery guidance.", location: "Studio A", host: "Coach Riya" },
@@ -280,7 +256,8 @@ const createUploadedPhotoLabel = (fileName: string) =>
   fileName.replace(/\.[^/.]+$/, "").replace(/[-_]+/g, " ").trim() || "Workout Upload";
 
 export function Community() {
-  const [feedPosts, setFeedPosts] = useState(initialCommunityPosts);
+  const [feedPosts, setFeedPosts] = useState<CommunityPost[]>([]);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [feedFilter, setFeedFilter] = useState<"all" | CommunityPost["type"]>("all");
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
@@ -289,20 +266,75 @@ export function Community() {
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
   const softButton = "border-0 bg-white text-slate-700 shadow-sm hover:bg-red-50 hover:text-red-600";
 
-  const filteredPosts = useMemo(() => {
-    return feedPosts.filter((post) => {
-      const matchesSearch =
-        post.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        post.topic.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesType = feedFilter === "all" || post.type === feedFilter;
-      return matchesSearch && matchesType;
-    });
-  }, [feedFilter, feedPosts, searchTerm]);
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [activePost, setActivePost] = useState<CommunityPost | null>(null);
+  const [comments, setComments] = useState<CommunityComment[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+
+  const filteredPosts = feedPosts;
+
+  const fetchFeed = async (q: string, type: string) => {
+    setIsLoadingFeed(true);
+    try {
+      const response = await api.get("/community/posts", {
+        params: {
+          q: q.trim() ? q.trim() : undefined,
+          type: type === "all" ? undefined : type,
+          page: 1,
+          limit: 30,
+        },
+      });
+
+      const postsFromApi = (response.data?.posts ?? []).map((post: any): CommunityPost => ({
+        id: post.id,
+        authorUserId: post.authorUserId ?? post.author_user_id ?? 0,
+        authorUsername: post.authorUsername ?? post.author_username ?? "Unknown",
+        authorRoles: post.authorRoles ?? post.author_roles ?? [],
+        avatar: undefined,
+        createdAt: post.createdAt ?? post.created_at ?? new Date().toISOString(),
+        content: post.content,
+        likes: post.likeCount ?? post.like_count ?? 0,
+        comments: post.commentCount ?? post.comment_count ?? 0,
+        likedByMe: post.likedByMe ?? post.liked_by_me ?? false,
+        type: (post.type ?? "achievement") as CommunityPost["type"],
+        topic: post.topic ?? "",
+        image: post.image
+          ? {
+            src: post.image.dataUrl ?? post.image.data_url,
+            alt: `${post.topic ?? "Workout"} photo`,
+            label: "Workout photo",
+            description: `Cropped to ${(post.image.aspectRatio ?? post.image.aspect_ratio ?? "4:5") as string}.`,
+            aspectRatio: (post.image.aspectRatio ?? post.image.aspect_ratio ?? "4:5") as CropRatioOption,
+            cropPosition: post.image.cropPosition ?? post.image.crop_position ?? 50,
+            cropZoom: post.image.cropZoom ?? post.image.crop_zoom ?? 100,
+          }
+          : undefined,
+      }));
+
+      setFeedPosts(postsFromApi);
+    } catch (error: any) {
+      console.error(error);
+      toast.error("Unable to load community feed.", {
+        description: "Check the backend is running on :8080 and you are logged in.",
+      });
+    } finally {
+      setIsLoadingFeed(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchFeed(searchTerm, feedFilter);
+    }, 250);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, feedFilter]);
 
   const stats = useMemo(() => ({
     activeMembers: 410,
-    postsToday: 18 + feedPosts.length,
+    postsToday: feedPosts.length,
     openChallenges: 3,
     eventRsvps: upcomingEvents.reduce((sum, event) => sum + event.participants, 0),
   }), [feedPosts.length]);
@@ -384,43 +416,138 @@ export function Community() {
       return;
     }
 
-    const uploadedPhoto = postDraft.uploadedPhoto
-      ? {
-        src: postDraft.uploadedPhoto.src,
-        alt: `${topic} workout photo`,
-        label: createUploadedPhotoLabel(postDraft.uploadedPhoto.fileName),
-        description: `Uploaded from a computer or phone and cropped to ${postDraft.aspectRatio}.`,
-        aspectRatio: postDraft.aspectRatio,
-        cropPosition: postDraft.cropPosition,
-        cropZoom: postDraft.cropZoom,
-      }
-      : undefined;
+    const payload: any = {
+      topic,
+      content,
+      type: postDraft.type,
+    };
 
-    setFeedPosts((currentPosts) => [
-      {
-        id: Date.now(),
-        author: "You",
-        avatar: "",
-        timestamp: "Just now",
-        content,
-        likes: 0,
-        comments: 0,
-        type: postDraft.type,
-        topic,
-        image: uploadedPhoto,
-      },
-      ...currentPosts,
-    ]);
-    setSearchTerm("");
-    setFeedFilter("all");
-    setIsCreatePostOpen(false);
-    resetPostDraft();
+    if (postDraft.uploadedPhoto) {
+      // Backend uses SNAKE_CASE naming strategy, so send snake_case to ensure it deserializes.
+      payload.image_data_url = postDraft.uploadedPhoto.src;
+      payload.image_aspect_ratio = postDraft.aspectRatio;
+      payload.image_crop_position = postDraft.cropPosition;
+      payload.image_crop_zoom = postDraft.cropZoom;
+    }
 
-    toast.success("Community post published.", {
-      description: uploadedPhoto
-        ? "Your workout photo was attached, cropped, and added to the feed."
-        : "Your update is now visible in the community feed.",
-    });
+    api.post("/community/posts", payload)
+      .then((response) => {
+        const post = response.data;
+        const normalized: CommunityPost = {
+          id: post.id,
+          authorUserId: post.authorUserId ?? post.author_user_id ?? 0,
+          authorUsername: post.authorUsername ?? post.author_username ?? "Unknown",
+          authorRoles: post.authorRoles ?? post.author_roles ?? [],
+          avatar: undefined,
+          createdAt: post.createdAt ?? post.created_at ?? new Date().toISOString(),
+          content: post.content,
+          likes: post.likeCount ?? post.like_count ?? 0,
+          comments: post.commentCount ?? post.comment_count ?? 0,
+          likedByMe: post.likedByMe ?? post.liked_by_me ?? false,
+          type: (post.type ?? "achievement") as CommunityPost["type"],
+          topic: post.topic ?? "",
+          image: post.image
+            ? {
+              src: post.image.dataUrl ?? post.image.data_url,
+              alt: `${post.topic ?? "Workout"} photo`,
+              label: createUploadedPhotoLabel(postDraft.uploadedPhoto?.fileName ?? "Workout upload"),
+              description: `Uploaded and cropped to ${(post.image.aspectRatio ?? post.image.aspect_ratio ?? "4:5") as string}.`,
+              aspectRatio: (post.image.aspectRatio ?? post.image.aspect_ratio ?? "4:5") as CropRatioOption,
+              cropPosition: post.image.cropPosition ?? post.image.crop_position ?? 50,
+              cropZoom: post.image.cropZoom ?? post.image.crop_zoom ?? 100,
+            }
+            : undefined,
+        };
+
+        setFeedPosts((currentPosts) => [normalized, ...currentPosts]);
+        setSearchTerm("");
+        setFeedFilter("all");
+        setIsCreatePostOpen(false);
+        resetPostDraft();
+
+        toast.success("Community post published.", {
+          description: normalized.image
+            ? "Your workout photo was attached and added to the feed."
+            : "Your update is now visible in the community feed.",
+        });
+      })
+      .catch((error) => {
+        console.error(error);
+        toast.error("Unable to publish community post.", {
+          description: "Make sure you are logged in.",
+        });
+      });
+  };
+
+  const openComments = async (post: CommunityPost) => {
+    setActivePost(post);
+    setIsCommentsOpen(true);
+    setIsLoadingComments(true);
+    setComments([]);
+    setNewComment("");
+    try {
+      const response = await api.get(`/community/posts/${post.id}/comments`);
+      const normalized = (response.data ?? []).map((comment: any): CommunityComment => ({
+        id: comment.id,
+        postId: comment.postId ?? comment.post_id ?? post.id,
+        content: comment.content ?? "",
+        authorUserId: comment.authorUserId ?? comment.author_user_id ?? 0,
+        authorUsername: comment.authorUsername ?? comment.author_username ?? "Unknown",
+        authorRoles: comment.authorRoles ?? comment.author_roles ?? [],
+        createdAt: comment.createdAt ?? comment.created_at ?? new Date().toISOString(),
+      }));
+      setComments(normalized);
+    } catch (error) {
+      console.error(error);
+      toast.error("Unable to load comments.");
+    } finally {
+      setIsLoadingComments(false);
+    }
+  };
+
+  const submitComment = async () => {
+    if (!activePost) return;
+    const content = newComment.trim();
+    if (!content) {
+      toast.error("Write a comment first.");
+      return;
+    }
+
+    try {
+      const response = await api.post(`/community/posts/${activePost.id}/comments`, { content });
+      const raw = response.data;
+      const saved: CommunityComment = {
+        id: raw.id,
+        postId: raw.postId ?? raw.post_id ?? activePost.id,
+        content: raw.content ?? "",
+        authorUserId: raw.authorUserId ?? raw.author_user_id ?? 0,
+        authorUsername: raw.authorUsername ?? raw.author_username ?? "Unknown",
+        authorRoles: raw.authorRoles ?? raw.author_roles ?? [],
+        createdAt: raw.createdAt ?? raw.created_at ?? new Date().toISOString(),
+      };
+      setComments((prev) => [...prev, saved]);
+      setNewComment("");
+      setFeedPosts((prev) =>
+        prev.map((p) => (p.id === activePost.id ? { ...p, comments: (p.comments ?? 0) + 1 } : p))
+      );
+    } catch (error) {
+      console.error(error);
+      toast.error("Unable to add comment.", { description: "Make sure you are logged in." });
+    }
+  };
+
+  const toggleLike = async (post: CommunityPost) => {
+    try {
+      const response = await api.post(`/community/posts/${post.id}/like`);
+      const likeCount = response.data?.likeCount ?? response.data?.like_count ?? post.likes;
+      const liked = response.data?.liked ?? response.data?.liked_by_me ?? response.data?.likedByMe ?? post.likedByMe ?? false;
+      setFeedPosts((prev) =>
+        prev.map((p) => (p.id === post.id ? { ...p, likes: likeCount, likedByMe: liked } : p))
+      );
+    } catch (error) {
+      console.error(error);
+      toast.error("Unable to like post.", { description: "Make sure you are logged in." });
+    }
   };
 
   const getPostTypeColor = (type: CommunityPost["type"]) => {
@@ -613,17 +740,32 @@ export function Community() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {filteredPosts.map((post) => (
+                {isLoadingFeed ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 text-sm text-muted-foreground">
+                    Loading community posts...
+                  </div>
+                ) : filteredPosts.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 text-sm text-muted-foreground">
+                    No posts yet. Create the first community update.
+                  </div>
+                ) : filteredPosts.map((post) => (
                   <div key={post.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-5">
                     <div className="flex items-start gap-4">
                       <Avatar className="h-11 w-11 shadow-sm">
-                        <AvatarImage src={post.avatar} />
-                        <AvatarFallback>{post.author.split(" ").map((name) => name[0]).join("")}</AvatarFallback>
+                        <AvatarImage src={post.avatar ?? ""} />
+                        <AvatarFallback>
+                          {post.authorUsername
+                            .split(" ")
+                            .map((name) => name[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 space-y-4">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-slate-900">{post.author}</span>
-                          <span className="text-sm text-muted-foreground">{post.timestamp}</span>
+                          <span className="font-medium text-slate-900">{post.authorUsername}</span>
+                          <span className="text-sm text-muted-foreground">{safeFormatTime(post.createdAt)}</span>
                           <Badge className={getPostTypeColor(post.type)}>{post.type}</Badge>
                           <Badge variant="outline">{post.topic}</Badge>
                           {post.image ? (
@@ -649,11 +791,24 @@ export function Community() {
                           </div>
                         ) : null}
                         <div className="flex flex-wrap items-center gap-2">
-                          <Button variant="ghost" size="sm" className="bg-white text-muted-foreground shadow-sm hover:bg-red-50 hover:text-red-600" onClick={() => toast.success(`You liked ${post.author}'s post.`)}>
-                            <Heart className="mr-1 h-4 w-4" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "bg-white text-muted-foreground shadow-sm hover:bg-red-50 hover:text-red-600",
+                              post.likedByMe ? "text-red-600" : null,
+                            )}
+                            onClick={() => toggleLike(post)}
+                          >
+                            <Heart className={cn("mr-1 h-4 w-4", post.likedByMe ? "fill-red-500 text-red-500" : null)} />
                             {post.likes}
                           </Button>
-                          <Button variant="ghost" size="sm" className="bg-white text-muted-foreground shadow-sm hover:bg-red-50 hover:text-red-600" onClick={() => toast.success(`Comments opened for ${post.author}.`)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="bg-white text-muted-foreground shadow-sm hover:bg-red-50 hover:text-red-600"
+                            onClick={() => openComments(post)}
+                          >
                             <MessageCircle className="mr-1 h-4 w-4" />
                             {post.comments}
                           </Button>
@@ -1102,6 +1257,68 @@ export function Community() {
                   Post to Feed
                 </Button>
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isCommentsOpen}
+        onOpenChange={(open) => {
+          setIsCommentsOpen(open);
+          if (!open) {
+            setActivePost(null);
+            setComments([]);
+            setNewComment("");
+            setIsLoadingComments(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Comments</DialogTitle>
+            <DialogDescription>
+              {activePost ? `Reply to ${activePost.authorUsername}'s post.` : "View community replies."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="max-h-[320px] space-y-3 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
+              {isLoadingComments ? (
+                <p className="text-sm text-muted-foreground">Loading comments...</p>
+              ) : comments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No comments yet. Be the first to reply.</p>
+              ) : (
+                comments.map((comment) => (
+                  <div key={comment.id} className="rounded-xl bg-white p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-slate-900">{comment.authorUsername}</span>
+                      <span className="text-xs text-muted-foreground">{safeFormatTime(comment.createdAt)}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-700">{comment.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="community-comment">Add a comment</Label>
+              <Textarea
+                id="community-comment"
+                rows={3}
+                value={newComment}
+                onChange={(event) => setNewComment(event.target.value)}
+                placeholder="Write a quick reply..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" className={softButton} onClick={() => setIsCommentsOpen(false)}>
+                Close
+              </Button>
+              <Button onClick={submitComment} disabled={!activePost}>
+                Post Comment
+              </Button>
             </div>
           </div>
         </DialogContent>
