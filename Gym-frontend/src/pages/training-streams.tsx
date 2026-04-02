@@ -161,27 +161,29 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
   const averageViews = Math.round(trainingStreams.reduce((sum, s) => sum + s.views, 0) / trainingStreams.length);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Training Streams</h1>
-          <p className="text-muted-foreground">Manage live and on-demand fitness streaming content.</p>
+          <p className="text-gray-600 mt-1">Manage live and on-demand fitness streaming content.</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex items-center space-x-2">
           <Button 
             variant="outline"
+            size="sm"
+            className="shadow-sm hover:shadow-md transition-all"
             onClick={() => onNavigate && onNavigate("facilities")}
           >
             <Building2 className="mr-2 h-4 w-4" />
             Manage Facilities
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <Upload className="mr-2 h-4 w-4" />
             Upload Recording
           </Button>
           <Dialog>
             <DialogTrigger asChild>
-              <Button>
+              <Button size="sm" className="bg-primary hover:bg-primary/90 shadow-sm hover:shadow-md transition-all">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Stream
               </Button>
@@ -296,61 +298,61 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Live Streams</CardTitle>
-            <Video className="h-4 w-4 text-red-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Live Streams</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <Video className="h-4 w-4 text-red-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{liveStreams}</div>
-            <p className="text-xs text-muted-foreground">
-              Currently broadcasting
-            </p>
+            <div className="text-2xl font-bold text-red-700">{liveStreams}</div>
+            <p className="text-xs text-muted-foreground mt-1">Currently broadcasting</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Scheduled Streams</CardTitle>
-            <Calendar className="h-4 w-4 text-blue-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Scheduled Streams</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Calendar className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{scheduledStreams}</div>
-            <p className="text-xs text-muted-foreground">
-              Upcoming sessions
-            </p>
+            <div className="text-2xl font-bold text-blue-700">{scheduledStreams}</div>
+            <p className="text-xs text-muted-foreground mt-1">Upcoming sessions</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Viewers</CardTitle>
-            <Users className="h-4 w-4 text-green-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Active Viewers</CardTitle>
+            <div className="bg-emerald-50 p-2 rounded-lg">
+              <Users className="h-4 w-4 text-emerald-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{totalViewers}</div>
-            <p className="text-xs text-muted-foreground">
-              Currently watching
-            </p>
+            <div className="text-2xl font-bold text-emerald-700">{totalViewers}</div>
+            <p className="text-xs text-muted-foreground mt-1">Currently watching</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Views</CardTitle>
-            <Eye className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Avg. Views</CardTitle>
+            <div className="bg-slate-50 p-2 rounded-lg">
+              <Eye className="h-4 w-4 text-slate-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{averageViews}</div>
-            <p className="text-xs text-muted-foreground">
-              Per stream
-            </p>
+            <div className="text-2xl font-bold text-slate-700">{averageViews}</div>
+            <p className="text-xs text-muted-foreground mt-1">Per stream</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="streams" className="space-y-6">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="streams">All Streams</TabsTrigger>
           <TabsTrigger value="live">Live Streams</TabsTrigger>
           <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
@@ -358,8 +360,8 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="streams" className="space-y-6">
-          <Card>
+        <TabsContent value="streams" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="bg-white border-0 shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -384,7 +386,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
             <CardContent>
               <div className="grid gap-6">
                 {filteredStreams.map((stream) => (
-                  <Card key={stream.id} className="overflow-hidden">
+                  <Card key={stream.id} className="overflow-hidden bg-white border-0 shadow-sm">
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex space-x-4">
@@ -439,22 +441,22 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                         </div>
                         <div className="flex flex-col space-y-2">
                           {stream.status === "Live" && (
-                            <Button size="sm">
+                            <Button size="sm" className="shadow-sm hover:shadow-md transition-all">
                               <Monitor className="mr-2 h-4 w-4" />
                               View Stream
                             </Button>
                           )}
                           {stream.status === "Scheduled" && (
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
                               <Play className="mr-2 h-4 w-4" />
                               Start Stream
                             </Button>
                           )}
-                          <Button size="sm" variant="outline" onClick={() => setSelectedStream(stream)}>
+                          <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all" onClick={() => setSelectedStream(stream)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </Button>
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
                             <Settings className="mr-2 h-4 w-4" />
                             Settings
                           </Button>
@@ -468,8 +470,8 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="live" className="space-y-6">
-          <Card>
+        <TabsContent value="live" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="bg-white border-0 shadow-sm">
             <CardHeader>
               <CardTitle>Live Streams Control Center</CardTitle>
               <CardDescription>Monitor and control active live streams</CardDescription>
@@ -478,7 +480,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
               {liveStreams > 0 ? (
                 <div className="space-y-4">
                   {trainingStreams.filter(s => s.status === "Live").map((stream) => (
-                    <div key={stream.id} className="flex items-center justify-between p-4 border rounded-lg bg-red-50">
+                    <div key={stream.id} className="flex items-center justify-between p-4 border border-red-100 rounded-lg bg-red-50">
                       <div className="flex items-center space-x-4">
                         <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
                         <div>
@@ -489,11 +491,11 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
                           <Monitor className="mr-2 h-4 w-4" />
                           Monitor
                         </Button>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
                           <Pause className="mr-2 h-4 w-4" />
                           End Stream
                         </Button>
@@ -512,8 +514,8 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="scheduled" className="space-y-6">
-          <Card>
+        <TabsContent value="scheduled" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="bg-white border-0 shadow-sm">
             <CardHeader>
               <CardTitle>Scheduled Streams</CardTitle>
               <CardDescription>Upcoming training sessions and streams</CardDescription>
@@ -521,7 +523,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
             <CardContent>
               <div className="space-y-4">
                 {trainingStreams.filter(s => s.status === "Scheduled").map((stream) => (
-                  <div key={stream.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div key={stream.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg">
                     <div className="flex items-center space-x-4">
                       <Avatar>
                         <AvatarImage src={stream.instructorAvatar} />
@@ -535,11 +537,11 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                       </div>
                     </div>
                     <div className="flex space-x-2">
-                      <Button size="sm">
+                      <Button size="sm" className="shadow-sm hover:shadow-md transition-all">
                         <Play className="mr-2 h-4 w-4" />
                         Start Now
                       </Button>
-                      <Button size="sm" variant="outline">
+                      <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
                         <Edit className="mr-2 h-4 w-4" />
                         Edit
                       </Button>
@@ -551,8 +553,8 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="library" className="space-y-6">
-          <Card>
+        <TabsContent value="library" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="bg-white border-0 shadow-sm">
             <CardHeader>
               <CardTitle>Stream Library</CardTitle>
               <CardDescription>Browse recorded sessions and on-demand content</CardDescription>
@@ -560,7 +562,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                 {streamCategories.map((category) => (
-                  <Card key={category.name}>
+                  <Card key={category.name} className="bg-white border-0 shadow-sm">
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-lg">{category.name}</CardTitle>
@@ -570,7 +572,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <Button className="w-full" variant="outline">
+                      <Button className="w-full shadow-sm hover:shadow-md transition-all" variant="outline">
                         Browse {category.name}
                       </Button>
                     </CardContent>
@@ -582,7 +584,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                 <h3 className="text-lg font-medium mb-4">Recent Recordings</h3>
                 <div className="space-y-3">
                   {trainingStreams.filter(s => s.status === "Ended").map((stream) => (
-                    <div key={stream.id} className="flex items-center justify-between p-3 border rounded">
+                    <div key={stream.id} className="flex items-center justify-between p-3 border border-gray-100 rounded">
                       <div className="flex items-center space-x-3">
                         <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
                           <Play className="h-5 w-5" />
@@ -595,11 +597,11 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
                           <Play className="mr-2 h-4 w-4" />
                           Watch
                         </Button>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
                           <Download className="mr-2 h-4 w-4" />
                           Download
                         </Button>
@@ -612,15 +614,15 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
-          <Card>
+        <TabsContent value="analytics" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="bg-white border-0 shadow-sm">
             <CardHeader>
               <CardTitle>Stream Analytics</CardTitle>
               <CardDescription>Performance metrics and viewership data</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <Card>
+                <Card className="bg-white border-0 shadow-sm">
                   <CardHeader>
                     <CardTitle className="text-lg">Total Streams</CardTitle>
                   </CardHeader>
@@ -630,7 +632,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                   </CardContent>
                 </Card>
                 
-                <Card>
+                <Card className="bg-white border-0 shadow-sm">
                   <CardHeader>
                     <CardTitle className="text-lg">Total Views</CardTitle>
                   </CardHeader>
@@ -642,7 +644,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                   </CardContent>
                 </Card>
                 
-                <Card>
+                <Card className="bg-white border-0 shadow-sm">
                   <CardHeader>
                     <CardTitle className="text-lg">Engagement Rate</CardTitle>
                   </CardHeader>
