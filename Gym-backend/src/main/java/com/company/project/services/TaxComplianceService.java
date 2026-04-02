@@ -22,7 +22,6 @@ public class TaxComplianceService {
         this.taxComplianceRepository = taxComplianceRepository;
     }
 
-    @Transactional(readOnly = true)
     public List<TaxComplianceResponseDTO> getAll(String taxType, String status) {
         List<TaxCompliance> all;
         if (taxType != null && !taxType.isBlank()) {
