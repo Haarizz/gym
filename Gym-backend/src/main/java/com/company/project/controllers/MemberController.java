@@ -3,9 +3,11 @@ package com.company.project.controllers;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
 import com.company.project.dto.MembersPageResponseDTO;
+import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.MemberService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -34,6 +36,31 @@ public class MemberController {
         return ResponseEntity.ok(
                 memberService.getMembers(search, status, membershipType, paymentStatus, page, limit)
         );
+    }
+
+    /**
+     * GET /api/members/me
+     * Returns the member record for the currently authenticated user (extracted from JWT).
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> getMyMembership(@AuthenticationPrincipal UserDetailsImpl principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body("Not authenticated");
+        }
+        try {
+            return ResponseEntity.ok(memberService.getMemberByUserId(principal.getId()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body("No membership record found for this account.");
+        }
+    }
+
+    /**
+     * GET /api/members/by-user/{userId}
+     * Returns the member record linked to the given app user account.
+     */
+    @GetMapping("/by-user/{userId}")
+    public ResponseEntity<MemberResponseDTO> getMemberByUserId(@PathVariable Long userId) {
+        return ResponseEntity.ok(memberService.getMemberByUserId(userId));
     }
 
     /**

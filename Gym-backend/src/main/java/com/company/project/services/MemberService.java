@@ -97,6 +97,13 @@ public class MemberService {
     }
 
     @Transactional(readOnly = true)
+    public MemberResponseDTO getMemberByUserId(Long userId) {
+        Member member = memberRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Member not found for userId: " + userId));
+        return MemberResponseDTO.fromEntity(member);
+    }
+
+    @Transactional(readOnly = true)
     public MemberResponseDTO getMemberById(Long id) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
