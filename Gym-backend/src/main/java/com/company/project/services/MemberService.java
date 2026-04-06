@@ -7,6 +7,7 @@ import com.company.project.dto.MemberResponseDTO;
 import com.company.project.dto.MembersPageResponseDTO;
 import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.RenewalRequestDTO;
+import com.company.project.services.NotificationService;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.entities.Role;
@@ -50,6 +51,7 @@ public class MemberService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
@@ -57,7 +59,8 @@ public class MemberService {
                          UserRepository userRepository,
                          RoleRepository roleRepository,
                          UserRoleRepository userRoleRepository,
-                         PasswordEncoder passwordEncoder) {
+                         PasswordEncoder passwordEncoder,
+                         NotificationService notificationService) {
         this.memberRepository    = memberRepository;
         this.planRepository      = planRepository;
         this.receiptService      = receiptService;
@@ -65,6 +68,7 @@ public class MemberService {
         this.roleRepository      = roleRepository;
         this.userRoleRepository  = userRoleRepository;
         this.passwordEncoder     = passwordEncoder;
+        this.notificationService = notificationService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -181,6 +185,15 @@ public class MemberService {
             saved.setAppAccessEnabled(true);
             saved = memberRepository.save(saved);
         }
+
+        notificationService.notifyRoles(
+                List.of("ADMIN", "MANAGER"),
+                "New Member Joined",
+                saved.getName() + " has joined as a new member.",
+                "SUCCESS", "MEDIUM", "MEMBERS",
+                saved.getId(), "/members",
+                "MEMBER_CREATED_" + saved.getId()
+        );
 
         return MemberResponseDTO.fromEntity(saved);
     }
@@ -328,7 +341,28 @@ public class MemberService {
         member.setFreezeStartDate(LocalDateTime.now());
         member.setFreezeEndDate(freezeUntil);
         if (request.getReason() != null) member.setFreezeReason(request.getReason());
-        return MemberResponseDTO.fromEntity(memberRepository.save(member));
+        Member saved = memberRepository.save(member);
+
+        notificationService.notifyRoles(
+                List.of("ADMIN", "MANAGER"),
+                "Membership Frozen",
+                saved.getName() + "'s membership has been frozen.",
+                "WARNING", "MEDIUM", "MEMBERS",
+                saved.getId(), "/members",
+                "MEMBER_FROZEN_" + saved.getId()
+        );
+        if (saved.getUserId() != null) {
+            notificationService.notifyUser(
+                    saved.getUserId(),
+                    "Your Membership is Frozen",
+                    "Your membership has been temporarily frozen" +
+                    (request.getReason() != null ? ": " + request.getReason() : "."),
+                    "WARNING", "MEDIUM", "MEMBERS",
+                    saved.getId(), "/member-hub",
+                    "MEMBER_FROZEN_USER_" + saved.getId()
+            );
+        }
+        return MemberResponseDTO.fromEntity(saved);
     }
 
     public MemberResponseDTO unfreezeMember(Long id) {
@@ -338,7 +372,27 @@ public class MemberService {
         member.setFreezeStartDate(null);
         member.setFreezeEndDate(null);
         member.setFreezeReason(null);
-        return MemberResponseDTO.fromEntity(memberRepository.save(member));
+        Member saved = memberRepository.save(member);
+
+        notificationService.notifyRoles(
+                List.of("ADMIN", "MANAGER"),
+                "Membership Unfrozen",
+                saved.getName() + "'s membership has been reactivated.",
+                "SUCCESS", "LOW", "MEMBERS",
+                saved.getId(), "/members",
+                "MEMBER_UNFROZEN_" + saved.getId()
+        );
+        if (saved.getUserId() != null) {
+            notificationService.notifyUser(
+                    saved.getUserId(),
+                    "Your Membership is Active",
+                    "Your membership has been reactivated. Welcome back!",
+                    "SUCCESS", "MEDIUM", "MEMBERS",
+                    saved.getId(), "/member-hub",
+                    "MEMBER_UNFROZEN_USER_" + saved.getId()
+            );
+        }
+        return MemberResponseDTO.fromEntity(saved);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

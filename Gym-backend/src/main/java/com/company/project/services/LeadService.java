@@ -32,10 +32,13 @@ public class LeadService {
 
     private final LeadRepository leadRepository;
     private final LeadInteractionRepository interactionRepository;
+    private final NotificationService notificationService;
 
-    public LeadService(LeadRepository leadRepository, LeadInteractionRepository interactionRepository) {
+    public LeadService(LeadRepository leadRepository, LeadInteractionRepository interactionRepository,
+                       NotificationService notificationService) {
         this.leadRepository = leadRepository;
         this.interactionRepository = interactionRepository;
+        this.notificationService = notificationService;
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -51,6 +54,15 @@ public class LeadService {
         String leadId = "LEAD-" + String.format("%010d", saved.getId());
         saved.setLeadId(leadId);
         saved = leadRepository.save(saved);
+
+        notificationService.notifyRoles(
+                List.of("ADMIN", "MANAGER"),
+                "New Lead",
+                saved.getFirstName() + " " + saved.getLastName() + " added as a new lead.",
+                "INFO", "MEDIUM", "LEADS",
+                saved.getId(), "/leads",
+                "LEAD_CREATED_" + saved.getId()
+        );
 
         return toDTO(saved);
     }

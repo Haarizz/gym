@@ -34,15 +34,18 @@ public class SalaryPaymentService {
     private final SalaryPaymentRepository paymentRepository;
     private final StaffRepository staffRepository;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     public SalaryPaymentService(SalaryPaymentEmployeeRepository employeeRepository,
                                 SalaryPaymentRepository paymentRepository,
                                 StaffRepository staffRepository,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                NotificationService notificationService) {
         this.employeeRepository = employeeRepository;
         this.paymentRepository = paymentRepository;
         this.staffRepository = staffRepository;
         this.objectMapper = objectMapper;
+        this.notificationService = notificationService;
     }
 
     public List<SalaryPaymentEmployeeResponseDTO> getEmployees(String search, String department, String status) {
@@ -173,6 +176,16 @@ public class SalaryPaymentService {
         employee.setPaymentStatus("Paid");
         employee.setLastPaymentDate(payment.getPaymentDate());
         employeeRepository.save(employee);
+
+        notificationService.notifyRoles(
+                List.of("ADMIN", "HR"),
+                "Salary Payment Processed",
+                "Salary for " + payment.getEmployeeName() + " (" + payment.getMonth() + "/" + payment.getYear() +
+                ") of AED " + payment.getNetSalary() + " has been processed.",
+                "SUCCESS", "HIGH", "PAYROLL",
+                payment.getId(), "/salary-payments",
+                "PAYROLL_" + payment.getEmployeeId() + "_" + payment.getMonth() + "_" + payment.getYear()
+        );
 
         return SalaryPaymentResponseDTO.fromEntity(payment, parseSplitPayments(payment.getSplitPaymentsJson()));
     }

@@ -21,9 +21,12 @@ import java.util.stream.Collectors;
 public class SalaryAdvanceService {
 
     private final SalaryAdvanceRepository advanceRepository;
+    private final NotificationService notificationService;
 
-    public SalaryAdvanceService(SalaryAdvanceRepository advanceRepository) {
+    public SalaryAdvanceService(SalaryAdvanceRepository advanceRepository,
+                                 NotificationService notificationService) {
         this.advanceRepository = advanceRepository;
+        this.notificationService = notificationService;
     }
 
     public List<SalaryAdvanceResponseDTO> getAdvances(String search, String status, String department) {
@@ -66,7 +69,18 @@ public class SalaryAdvanceService {
         advance.setApprovedBy(null);
         advance.setApprovedDate(null);
         advance.setAttachment(req.getAttachment());
-        return SalaryAdvanceResponseDTO.fromEntity(advanceRepository.save(advance));
+        SalaryAdvance saved = advanceRepository.save(advance);
+        notificationService.notifyRoles(
+                List.of("ADMIN", "HR"),
+                "Salary Advance Requested",
+                (saved.getEmployeeName() != null ? saved.getEmployeeName() : "An employee") +
+                " requested a salary advance" +
+                (saved.getRequestedAmount() != null ? " of AED " + saved.getRequestedAmount() : "") + ".",
+                "WARNING", "HIGH", "PAYROLL",
+                saved.getId(), "/salary-advances",
+                "SALARY_ADV_CREATED_" + saved.getId()
+        );
+        return SalaryAdvanceResponseDTO.fromEntity(saved);
     }
 
     public SalaryAdvanceResponseDTO updateAdvance(Long id, SalaryAdvanceRequestDTO req) {
