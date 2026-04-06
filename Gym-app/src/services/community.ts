@@ -132,18 +132,25 @@ export async function createCommunityPost(params: {
   content: string;
   type?: CommunityPostType;
   token: string;
+  imageDataUrl?: string;
+  imageAspectRatio?: string;
 }): Promise<CommunityPost> {
+  const body: Record<string, unknown> = {
+    topic: params.topic,
+    content: params.content,
+    type: params.type ?? 'achievement',
+  };
+  if (params.imageDataUrl) {
+    body.imageDataUrl = params.imageDataUrl;
+    body.imageAspectRatio = params.imageAspectRatio ?? null;
+  }
   const response = await fetch(`${API_BASE_URL}/community/posts`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...withAuth(params.token),
     },
-    body: JSON.stringify({
-      topic: params.topic,
-      content: params.content,
-      type: params.type ?? 'achievement',
-    }),
+    body: JSON.stringify(body),
   });
   await ensureOk(response);
   const raw = await response.json();

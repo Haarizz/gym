@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { CreatePostModal } from "./community";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -61,9 +62,148 @@ interface MemberHubProps {
   onNavigate?: (section: string) => void;
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+
+interface CommunityPost {
+  id: number;
+  topic: string;
+  content: string;
+  type: string;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+  authorUsername: string;
+  authorUserId: number;
+  createdAt: string;
+  image?: { dataUrl: string; aspectRatio?: string | null } | null;
+}
+
+const normalizePost = (raw: any): CommunityPost => ({
+  id: Number(raw.id),
+  topic: raw.topic ?? "",
+  content: raw.content ?? "",
+  type: raw.type ?? "update",
+  likeCount: raw.like_count ?? raw.likeCount ?? 0,
+  commentCount: raw.comment_count ?? raw.commentCount ?? 0,
+  likedByMe: raw.liked_by_me ?? raw.likedByMe ?? false,
+  authorUsername: raw.author_username ?? raw.authorUsername ?? "Unknown",
+  authorUserId: Number(raw.author_user_id ?? raw.authorUserId ?? 0),
+  createdAt: raw.created_at ?? raw.createdAt ?? new Date().toISOString(),
+  image: raw.image
+    ? { dataUrl: raw.image.data_url ?? raw.image.dataUrl ?? "", aspectRatio: raw.image.aspect_ratio ?? raw.image.aspectRatio ?? null }
+    : null,
+});
+
+const formatRelativeTime = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Just now";
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${Math.floor(diffHours / 24)}d ago`;
+};
+
+/** Converts stored aspectRatio ("9:16", "4:5", "0.5625" …) to a CSS aspect-ratio string. */
+const toCssAspectRatio = (value?: string | null): string | undefined => {
+  if (!value) return undefined;
+  if (value.includes(":")) {
+    const [w, h] = value.split(":").map(Number);
+    if (w > 0 && h > 0) return `${w}/${h}`;
+  }
+  const num = Number(value);
+  if (Number.isFinite(num) && num > 0) return String(num);
+  return undefined;
+};
+
+const getTypeStyle = (type: string) => {
+  switch (type) {
+    case "achievement": return "bg-emerald-100 text-emerald-700";
+    case "question": return "bg-blue-100 text-blue-700";
+    case "tip": return "bg-purple-100 text-purple-700";
+    default: return "bg-gray-100 text-gray-600";
+  }
+};
+
 export function MemberHub({ onNavigate }: MemberHubProps = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFABOpen, setIsFABOpen] = useState(false);
+
+  // Community feed state
+  const [feedPosts, setFeedPosts] = useState<CommunityPost[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [feedError, setFeedError] = useState<string | null>(null);
+  const [likingId, setLikingId] = useState<number | null>(null);
+  const feedLoadedRef = useRef(false);
+
+  const loadFeed = useCallback(async () => {
+    setFeedLoading(true);
+    setFeedError(null);
+    try {
+      const token = sessionStorage.getItem("token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE}/community/posts?page=1&limit=10`, { headers });
+      if (!res.ok) throw new Error(`Failed to load feed (${res.status})`);
+      const data = await res.json();
+      const posts: CommunityPost[] = (data?.posts ?? []).map(normalizePost);
+      setFeedPosts(posts);
+    } catch (e: any) {
+      setFeedError(e?.message || "Could not load community feed.");
+    } finally {
+      setFeedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!feedLoadedRef.current) {
+      feedLoadedRef.current = true;
+      loadFeed();
+    }
+  }, [loadFeed]);
+
+  const handleLike = async (post: CommunityPost) => {
+    const token = sessionStorage.getItem("token");
+    if (!token || likingId != null) return;
+    setLikingId(post.id);
+    // Optimistic update
+    setFeedPosts((prev) =>
+      prev.map((p) =>
+        p.id === post.id
+          ? { ...p, likedByMe: !p.likedByMe, likeCount: p.likedByMe ? p.likeCount - 1 : p.likeCount + 1 }
+          : p
+      )
+    );
+    try {
+      const res = await fetch(`${API_BASE}/community/posts/${post.id}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const raw = await res.json();
+        setFeedPosts((prev) =>
+          prev.map((p) =>
+            p.id === post.id
+              ? { ...p, likedByMe: raw.liked ?? raw.like ?? !post.likedByMe, likeCount: raw.like_count ?? raw.likeCount ?? p.likeCount }
+              : p
+          )
+        );
+      }
+    } catch {
+      // revert on failure
+      setFeedPosts((prev) =>
+        prev.map((p) =>
+          p.id === post.id
+            ? { ...p, likedByMe: post.likedByMe, likeCount: post.likeCount }
+            : p
+        )
+      );
+    } finally {
+      setLikingId(null);
+    }
+  };
 
   // Mock data
   const memberData = {
@@ -132,42 +272,6 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
       daysLeft: 15,
       participants: 89,
       type: "cardio"
-    }
-  ];
-
-  const communityPosts = [
-    {
-      id: 1,
-      author: "Alex Martinez",
-      avatar: null,
-      time: "2h ago",
-      content: "Just completed my first 5K! Thanks to everyone for the motivation 🏃‍♂️",
-      likes: 23,
-      comments: 5,
-      image: null,
-      type: "achievement"
-    },
-    {
-      id: 2,
-      author: "Emma Wilson",
-      avatar: null,
-      time: "4h ago",
-      content: "Who's joining the morning yoga class tomorrow? Looking for a workout buddy!",
-      likes: 8,
-      comments: 12,
-      image: null,
-      type: "social"
-    },
-    {
-      id: 3,
-      author: "GymBios Fitness",
-      avatar: null,
-      time: "6h ago",
-      content: "New high-intensity circuit training class starting next week! Limited spots available.",
-      likes: 45,
-      comments: 18,
-      image: null,
-      type: "announcement"
     }
   ];
 
@@ -446,7 +550,29 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
               );
             }
 
-            // Other actions use Dialog
+            // create-post uses the real CreatePostModal
+            if (action.id === "create-post") {
+              return (
+                <CreatePostModal
+                  key={action.id}
+                  onPostCreated={loadFeed}
+                  trigger={
+                    <div className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200">
+                      <Card className="bg-white border-0 shadow-sm h-full">
+                        <CardContent className="flex flex-col items-center justify-center p-6 h-40">
+                          <div className={`p-4 rounded-xl ${action.color} mb-4`}>
+                            <action.icon className="h-12 w-12 text-white" />
+                          </div>
+                          <p className="text-center font-medium text-sm leading-tight">{action.label}</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  }
+                />
+              );
+            }
+
+            // Other unimplemented actions — placeholder dialog
             return (
               <Dialog key={action.id}>
                 <DialogTrigger asChild>
@@ -466,7 +592,6 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                     <DialogTitle>{action.label}</DialogTitle>
                     <DialogDescription>
                       {action.id === "add-challenge" && "Create or join fitness challenges"}
-                      {action.id === "create-post" && "Share your fitness journey"}
                       {action.id === "my-stats" && "View your fitness analytics"}
                       {action.id === "membership" && "Manage your membership details"}
                     </DialogDescription>
@@ -484,54 +609,129 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Community Feed (Left Column - 2/3 width) */}
           <div className="lg:col-span-2">
-            <Card className="bg-white border-0 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
+            <Card className="bg-white border-0 shadow-sm flex flex-col" style={{ height: 700 }}>
+              <CardHeader className="flex flex-row items-center justify-between flex-shrink-0 border-b pb-3">
                 <CardTitle className="flex items-center">
                   <Users className="h-5 w-5 mr-2" />
                   Community Feed
                 </CardTitle>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Post
-                </Button>
+                <CreatePostModal
+                  onPostCreated={loadFeed}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Post
+                    </Button>
+                  }
+                />
               </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-96">
-                  <div className="space-y-6">
-                    {communityPosts.map((post) => (
-                      <div key={post.id} className="space-y-3">
-                        <div className="flex items-start space-x-3">
-                          <Avatar>
-                            <AvatarImage src={post.avatar} />
-                            <AvatarFallback>{post.author.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                          </Avatar>
+              <CardContent className="flex-1 min-h-0 p-0">
+                <ScrollArea className="h-full px-6 py-2">
+                  {feedLoading ? (
+                    <div className="flex flex-col gap-4 py-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-start gap-3 animate-pulse">
+                          <div className="w-10 h-10 rounded-full bg-gray-200 shrink-0" />
                           <div className="flex-1 space-y-2">
-                            <div className="flex items-center space-x-2">
-                              <p className="font-medium">{post.author}</p>
-                              <span className="text-sm text-muted-foreground">{post.time}</span>
-                              {post.type === 'achievement' && <Award className="h-4 w-4 text-yellow-500" />}
+                            <div className="h-3 bg-gray-200 rounded w-1/3" />
+                            <div className="h-3 bg-gray-200 rounded w-full" />
+                            <div className="h-3 bg-gray-200 rounded w-2/3" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : feedError ? (
+                    <div className="py-8 text-center space-y-3">
+                      <p className="text-sm text-red-500">{feedError}</p>
+                      <Button variant="outline" size="sm" onClick={loadFeed}>Retry</Button>
+                    </div>
+                  ) : feedPosts.length === 0 ? (
+                    <div className="py-12 text-center space-y-2">
+                      <Users className="h-10 w-10 mx-auto text-gray-300" />
+                      <p className="text-sm text-muted-foreground">No posts yet. Be the first to share!</p>
+                      <CreatePostModal
+                        onPostCreated={loadFeed}
+                        trigger={
+                          <Button size="sm" variant="outline">Create the first post</Button>
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {feedPosts.map((post, idx) => (
+                        <div key={post.id}>
+                          <div className="py-4 space-y-3">
+                            {/* Author row */}
+                            <div className="flex items-start gap-3">
+                              <Avatar className="h-9 w-9 shrink-0">
+                                <AvatarFallback className="text-xs font-semibold bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700">
+                                  {post.authorUsername.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center flex-wrap gap-2">
+                                  <span className="font-semibold text-sm">{post.authorUsername}</span>
+                                  <span className="text-xs text-muted-foreground">{formatRelativeTime(post.createdAt)}</span>
+                                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getTypeStyle(post.type)}`}>
+                                    {post.type}
+                                  </span>
+                                </div>
+                                {post.topic && (
+                                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{post.topic}</p>
+                                )}
+                              </div>
                             </div>
-                            <p className="text-sm">{post.content}</p>
-                            <div className="flex items-center space-x-6 pt-2">
-                              <Button variant="ghost" size="sm" className="text-muted-foreground h-8">
-                                <Heart className="h-4 w-4 mr-1" />
-                                {post.likes}
+
+                            {/* Content */}
+                            <p className="text-sm leading-relaxed text-gray-800 pl-12">{post.content}</p>
+
+                            {/* Image */}
+                            {post.image?.dataUrl && (
+                              <div className="pl-12">
+                                <img
+                                  src={post.image.dataUrl}
+                                  alt="Post photo"
+                                  style={{
+                                    display: "block",
+                                    aspectRatio: toCssAspectRatio(post.image.aspectRatio) ?? "auto",
+                                    maxHeight: 380,
+                                    maxWidth: "100%",
+                                    width: toCssAspectRatio(post.image.aspectRatio) ? "auto" : "100%",
+                                    objectFit: "cover",
+                                    borderRadius: 12,
+                                    border: "1px solid #e5e7eb",
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1 pl-11">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={`h-8 gap-1.5 text-xs font-medium rounded-lg ${post.likedByMe ? "text-red-500 hover:text-red-600" : "text-muted-foreground"}`}
+                                onClick={() => handleLike(post)}
+                                disabled={likingId === post.id}
+                              >
+                                <Heart className={`h-4 w-4 ${post.likedByMe ? "fill-red-500" : ""}`} />
+                                {post.likeCount > 0 && post.likeCount}
                               </Button>
-                              <Button variant="ghost" size="sm" className="text-muted-foreground h-8">
-                                <MessageCircle className="h-4 w-4 mr-1" />
-                                {post.comments}
+                              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs font-medium text-muted-foreground rounded-lg">
+                                <MessageCircle className="h-4 w-4" />
+                                {post.commentCount > 0 && post.commentCount}
                               </Button>
-                              <Button variant="ghost" size="sm" className="text-muted-foreground h-8">
-                                <Share2 className="h-4 w-4 mr-1" />
+                              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs font-medium text-muted-foreground rounded-lg">
+                                <Share2 className="h-4 w-4" />
                                 Share
                               </Button>
                             </div>
                           </div>
+                          {idx < feedPosts.length - 1 && <Separator />}
                         </div>
-                        <Separator />
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </ScrollArea>
               </CardContent>
             </Card>
@@ -826,14 +1026,18 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                 <Trophy className="h-4 w-4 mr-2" />
                 Add Challenge
               </Button>
-              <Button
-                size="sm"
-                className="bg-white text-gray-700 shadow-lg hover:bg-gray-50 rounded-full h-12 px-4"
-                onClick={() => setIsFABOpen(false)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Post
-              </Button>
+              <CreatePostModal
+                onPostCreated={() => { setIsFABOpen(false); loadFeed(); }}
+                trigger={
+                  <Button
+                    size="sm"
+                    className="bg-white text-gray-700 shadow-lg hover:bg-gray-50 rounded-full h-12 px-4"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Post
+                  </Button>
+                }
+              />
             </div>
           )}
         </div>

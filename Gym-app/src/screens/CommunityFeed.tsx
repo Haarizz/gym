@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { GlassCard } from "../components/GlassCard";
 import { GlassScreen } from "../components/GlassScreen";
 import { useSettings } from "../context/SettingsContext";
@@ -67,6 +68,9 @@ const normalizeImageUri = (value: string) => {
 export function CommunityFeed() {
   const [postText, setPostText] = useState("");
   const [postTopic, setPostTopic] = useState("");
+  const [postImageUri, setPostImageUri] = useState<string | null>(null);
+  const [postImageRatio, setPostImageRatio] = useState<string | null>(null);
+  const postImageDataUrlRef = useRef<string | null>(null);
   const [feedMode, setFeedMode] = useState<"feed" | "archived">("feed");
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
@@ -120,6 +124,33 @@ export function CommunityFeed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedMode]);
 
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Allow photo library access to attach a workout photo.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.8,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType ?? "image/jpeg";
+      const dataUrl = `data:${mimeType};base64,${asset.base64}`;
+      const ratio = asset.width > 0 && asset.height > 0
+        ? String((asset.width / asset.height).toFixed(4))
+        : null;
+      setPostImageUri(asset.uri);
+      setPostImageRatio(ratio);
+      postImageDataUrlRef.current = dataUrl;
+    }
+  };
+
   const handlePost = async () => {
     if (!user?.token) return;
     const topic = postTopic.trim() || "Community Update";
@@ -133,10 +164,15 @@ export function CommunityFeed() {
         topic,
         content,
         type: "achievement",
+        imageDataUrl: postImageDataUrlRef.current ?? undefined,
+        imageAspectRatio: postImageRatio ?? undefined,
       });
       setPosts((prev) => [created, ...prev]);
       setPostText("");
       setPostTopic("");
+      setPostImageUri(null);
+      setPostImageRatio(null);
+      postImageDataUrlRef.current = null;
     } catch (e: any) {
       console.warn(e);
     } finally {
@@ -380,8 +416,20 @@ export function CommunityFeed() {
                 multiline
               />
 
+              {postImageUri ? (
+                <View style={styles.postImagePreviewWrap}>
+                  <Image source={{ uri: postImageUri }} style={styles.postImagePreview} resizeMode="cover" />
+                  <TouchableOpacity
+                    style={styles.postImageRemove}
+                    onPress={() => { setPostImageUri(null); setPostImageRatio(null); postImageDataUrlRef.current = null; }}
+                  >
+                    <Ionicons name="close-circle" size={22} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
               <View style={styles.postActions}>
-                <TouchableOpacity style={[styles.postActionChip, { backgroundColor: colors.glass }]} disabled>
+                <TouchableOpacity style={[styles.postActionChip, { backgroundColor: colors.glass }]} onPress={pickPhoto}>
                   <Ionicons name="image" size={16} color="#2563EB" />
                   <Text style={styles.postActionText}>Photo</Text>
                 </TouchableOpacity>
@@ -707,6 +755,27 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     marginBottom: 10,
+  },
+  postImagePreviewWrap: {
+    position: "relative",
+    width: "100%",
+    height: 180,
+    borderRadius: 16,
+    overflow: "hidden",
+    marginTop: 10,
+    marginBottom: 2,
+    backgroundColor: "#111",
+  },
+  postImagePreview: {
+    width: "100%",
+    height: "100%",
+  },
+  postImageRemove: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 12,
   },
   postActions: {
     flexDirection: "row",

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -54,104 +54,112 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 
-// Mock membership data
-const membershipData = {
-  memberId: "GYM-2024-1234",
-  memberName: "Sarah Johnson",
-  memberPhoto: null,
-  status: "Active",
-  currentPlan: {
-    name: "Gold Monthly",
-    type: "Monthly",
-    duration: 30,
-    startDate: "2026-01-12",
-    endDate: "2026-02-12",
-    branch: "Downtown Branch",
-    price: 500,
-    benefits: [
-      "Unlimited gym access",
-      "All group classes included",
-      "2 PT sessions per month",
-      "Access: 5 AM - 11 PM",
-      "1 guest pass per month",
-      "Locker facility"
-    ]
-  },
-  daysLeft: 22,
-  timeUsedPercentage: 27,
-  activeAddons: [
-    {
-      id: 1,
-      name: "Nutrition Consultation Package",
-      validFrom: "2026-01-15",
-      validTo: "2026-03-15",
-      creditsRemaining: 3,
-      totalCredits: 5
-    },
-    {
-      id: 2,
-      name: "Sauna Access",
-      validFrom: "2026-01-12",
-      validTo: "2026-02-12",
-      unlimited: true
-    }
-  ],
-  dues: [
-    {
-      id: 1,
-      type: "Pending Renewal",
-      description: "Gold Monthly - Feb 2026",
-      amount: 500,
-      dueDate: "2026-02-12",
-      status: "Pending"
-    }
-  ],
-  totalDue: 500,
-  accessDeviceStatus: {
-    enabled: true,
-    validUntil: "2026-02-12"
-  }
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+
+const calcDaysLeft = (endDate: string | null | undefined): number => {
+  if (!endDate) return 0;
+  const end = new Date(endDate);
+  if (Number.isNaN(end.getTime())) return 0;
+  return Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000));
 };
 
-// Mock renewal plans
-const renewalPlans = [
-  {
-    id: 1,
-    name: "Gold Monthly",
-    type: "Recommended",
-    duration: "1 Month",
-    price: 500,
-    discount: 0,
-    finalPrice: 500,
-    savings: 0,
-    newExpiryDate: "2026-03-12",
-    features: ["Same plan", "No commitment", "Monthly billing"]
-  },
-  {
-    id: 2,
-    name: "Gold+ Premium",
-    type: "Upgrade",
-    duration: "1 Month",
-    price: 750,
-    discount: 50,
-    finalPrice: 700,
-    savings: 50,
-    newExpiryDate: "2026-03-12",
-    features: ["Unlimited PT sessions", "Premium classes", "Spa access", "Priority booking"]
-  },
-  {
-    id: 3,
-    name: "Gold Annual",
-    type: "Best Value",
-    duration: "12 Months",
-    price: 6000,
-    discount: 600,
-    finalPrice: 5400,
-    savings: 600,
-    newExpiryDate: "2027-02-12",
-    features: ["Save 10%", "Price lock guarantee", "1 month free", "Priority support"]
-  }
-];
+const calcUsedPct = (startDate: string | null | undefined, endDate: string | null | undefined): number => {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate).getTime();
+  const end = new Date(endDate).getTime();
+  const now = Date.now();
+  if (end <= start) return 0;
+  return Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)));
+};
+
+interface RawMember {
+  id: string;
+  member_id?: string; memberId?: string;
+  name?: string;
+  membership_status?: string; membershipStatus?: string;
+  membership_plan?: string; membershipPlan?: string;
+  membership_type?: string; membershipType?: string;
+  membership_start_date?: string; membershipStartDate?: string;
+  membership_end_date?: string; membershipEndDate?: string;
+  membership_fee?: number; membershipFee?: number;
+  monthly_fee?: number; monthlyFee?: number;
+  outstanding_balance?: number; outstandingBalance?: number;
+  total_visits?: number; totalVisits?: number;
+  app_access_enabled?: boolean; appAccessEnabled?: boolean;
+  payment_status?: string; paymentStatus?: string;
+}
+
+interface RawPlan {
+  id: number; name: string; type?: string; planType?: string;
+  price?: number; discount?: number; description?: string;
+  duration_type?: string; durationType?: string;
+  duration_value?: string; durationValue?: string;
+}
+
+const buildMembershipData = (raw: RawMember) => {
+  const memberId = raw.member_id ?? raw.memberId ?? "—";
+  const memberName = raw.name ?? "Member";
+  const status = raw.membership_status ?? raw.membershipStatus ?? "Active";
+  const planName = raw.membership_plan ?? raw.membershipPlan ?? "—";
+  const planType = raw.membership_type ?? raw.membershipType ?? "Individual";
+  const startDate = raw.membership_start_date ?? raw.membershipStartDate ?? null;
+  const endDate = raw.membership_end_date ?? raw.membershipEndDate ?? null;
+  const fee = Number(raw.membership_fee ?? raw.membershipFee ?? raw.monthly_fee ?? raw.monthlyFee ?? 0);
+  const outstanding = Number(raw.outstanding_balance ?? raw.outstandingBalance ?? 0);
+  const appEnabled = raw.app_access_enabled ?? raw.appAccessEnabled ?? false;
+  const paymentStatus = raw.payment_status ?? raw.paymentStatus ?? "pending";
+  const daysLeft = calcDaysLeft(endDate);
+  const usedPct = calcUsedPct(startDate, endDate);
+
+  return {
+    memberId,
+    memberName,
+    memberPhoto: null as null,
+    status: status.charAt(0).toUpperCase() + status.slice(1).toLowerCase(),
+    currentPlan: {
+      name: planName,
+      type: planType,
+      duration: 30,
+      startDate: startDate ?? "",
+      endDate: endDate ?? "",
+      branch: "Main Branch",
+      price: fee,
+      benefits: [] as string[],
+    },
+    daysLeft,
+    timeUsedPercentage: usedPct,
+    activeAddons: [] as any[],
+    dues: outstanding > 0
+      ? [{ id: 1, type: "Outstanding Balance", description: `Balance due`, amount: outstanding, dueDate: endDate ?? "", status: paymentStatus }]
+      : [] as any[],
+    totalDue: outstanding,
+    accessDeviceStatus: { enabled: appEnabled, validUntil: endDate ?? "" },
+  };
+};
+
+const buildRenewalPlans = (raw: RawPlan[], currentPlanName: string) => {
+  return raw.map((p, idx) => {
+    const price = Number(p.price ?? 0);
+    const discount = Number(p.discount ?? 0);
+    const finalPrice = price - discount;
+    const newExpiry = new Date();
+    newExpiry.setMonth(newExpiry.getMonth() + 1);
+    const type = p.name === currentPlanName ? "Recommended" : idx === 0 ? "Recommended" : "Upgrade";
+    return {
+      id: p.id,
+      name: p.name,
+      type,
+      duration: p.duration_type ?? p.durationType ?? "Monthly",
+      price,
+      discount,
+      finalPrice,
+      savings: discount,
+      newExpiryDate: newExpiry.toISOString().slice(0, 10),
+      features: p.description ? [p.description] : ["Gym access included"],
+    };
+  });
+};
+
 
 // Mock history timeline
 const membershipHistory = [
@@ -229,6 +237,44 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
     reason: ''
   });
 
+  // Real data state
+  const [membershipData, setMembershipData] = useState<ReturnType<typeof buildMembershipData> | null>(null);
+  const [renewalPlans, setRenewalPlans] = useState<ReturnType<typeof buildRenewalPlans>>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [memberId, setMemberId] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) { setDataLoading(false); setDataError("Please log in to view your membership."); return; }
+    try {
+      setDataLoading(true);
+      setDataError(null);
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      const [mRes, pRes] = await Promise.all([
+        fetch(`${API_BASE}/members/me`, { headers }),
+        fetch(`${API_BASE}/plans?status=Active`, { headers }),
+      ]);
+      if (mRes.status === 404) {
+        const msg = await mRes.text().catch(() => "");
+        throw new Error(msg || "No membership record found for your account.");
+      }
+      if (!mRes.ok) { const b = await mRes.json().catch(() => ({})); throw new Error((b as any)?.message ?? `Error ${mRes.status}`); }
+      if (!pRes.ok) throw new Error(`Plans error ${pRes.status}`);
+      const [rawMember, rawPlans]: [RawMember, RawPlan[]] = await Promise.all([mRes.json(), pRes.json()]);
+      const built = buildMembershipData(rawMember);
+      setMemberId(rawMember.id);
+      setMembershipData(built);
+      setRenewalPlans(buildRenewalPlans(rawPlans, built.currentPlan.name));
+    } catch (e: any) {
+      setDataError(e.message ?? "Failed to load membership data.");
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Active':
@@ -285,15 +331,38 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
     setShowRenewalSheet(true);
   };
 
-  const handleConfirmRenewal = () => {
-    setShowRenewalSheet(false);
-    setSuccessType('renewal');
-    setSuccessVoucherId(`V-2026-${Math.floor(Math.random() * 1000)}`);
-    setShowSuccessDialog(true);
-    toast.success('Membership Renewed!', {
-      description: `Your ${selectedPlan.name} has been renewed successfully`,
-      duration: 5000,
-    });
+  const handleConfirmRenewal = async () => {
+    if (!memberId || !selectedPlan) return;
+    try {
+      const token = sessionStorage.getItem("token") ?? "";
+      const newEnd = new Date();
+      newEnd.setMonth(newEnd.getMonth() + 1);
+      const body = {
+        planName: selectedPlan.name,
+        membershipEndDate: newEnd.toISOString(),
+        membershipFee: selectedPlan.finalPrice,
+        paymentStatus: "pending",
+        membershipType: membershipData?.currentPlan.type ?? "Individual",
+        membershipStatus: "active",
+      };
+      const res = await fetch(`${API_BASE}/members/${memberId}/renew`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error((b as any)?.message ?? "Renewal failed"); }
+      setShowRenewalSheet(false);
+      setSuccessType('renewal');
+      setSuccessVoucherId(`V-${Date.now().toString().slice(-6)}`);
+      setShowSuccessDialog(true);
+      toast.success('Membership Renewed!', {
+        description: `Your ${selectedPlan.name} has been renewed successfully`,
+        duration: 5000,
+      });
+      loadData();
+    } catch (e: any) {
+      toast.error('Renewal Failed', { description: e.message });
+    }
   };
 
   const handlePayDue = () => {
@@ -312,19 +381,28 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
     setSelectedDues([]);
   };
 
-  const handleRequestFreeze = () => {
-    if (!freezeForm.startDate || !freezeForm.endDate) {
-      toast.error('Please select freeze period');
+  const handleRequestFreeze = async () => {
+    if (!memberId || !freezeForm.endDate) {
+      toast.error('Please select a freeze end date');
       return;
     }
-    setShowFreezeSheet(false);
-    setSuccessType('freeze');
-    setShowSuccessDialog(true);
-    toast.success('Freeze Request Submitted!', {
-      description: 'Your freeze request is pending admin approval',
-      duration: 3000,
-    });
-    setFreezeForm({ startDate: '', endDate: '', reason: '' });
+    try {
+      const token = sessionStorage.getItem("token") ?? "";
+      const res = await fetch(`${API_BASE}/members/${memberId}/freeze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ freezeUntil: freezeForm.endDate, reason: freezeForm.reason || "Member request" }),
+      });
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error((b as any)?.message ?? "Freeze failed"); }
+      setShowFreezeSheet(false);
+      setSuccessType('freeze');
+      setShowSuccessDialog(true);
+      toast.success('Membership Frozen!', { description: `Frozen until ${freezeForm.endDate}`, duration: 3000 });
+      setFreezeForm({ startDate: '', endDate: '', reason: '' });
+      loadData();
+    } catch (e: any) {
+      toast.error('Freeze Failed', { description: e.message });
+    }
   };
 
   const handleDownloadVoucher = (voucherId: string) => {
@@ -348,13 +426,37 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
     });
   };
 
-  const filteredHistory = historyFilter === 'all' 
-    ? membershipHistory 
+  const filteredHistory = historyFilter === 'all'
+    ? membershipHistory
     : membershipHistory.filter(item => item.type === historyFilter);
 
-  const totalSelectedDueAmount = membershipData.dues
+  const data = membershipData;
+
+  const totalSelectedDueAmount = (data?.dues ?? [])
     .filter(due => selectedDues.includes(due.id))
     .reduce((sum, due) => sum + due.amount, 0);
+
+  if (dataLoading) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#327F74] mx-auto mb-4" />
+          <p className="text-gray-600">Loading membership data…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dataError || !data) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-red-600">{dataError ?? "Membership data not found."}</p>
+          <button onClick={loadData} className="px-4 py-2 bg-[#327F74] text-white rounded-lg">Retry</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] p-4 md:p-6">
@@ -374,17 +476,17 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
               {/* Left: Member Info */}
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20 border-4" style={{ borderColor: '#327F74' }}>
-                  <AvatarImage src={membershipData.memberPhoto} />
+                  <AvatarImage src={data.memberPhoto} />
                   <AvatarFallback className="text-xl bg-[#327F74] text-white">
-                    {membershipData.memberName.split(' ').map(n => n[0]).join('')}
+                    {data.memberName.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h2 className="text-xl font-bold">{membershipData.memberName}</h2>
-                  <p className="text-sm text-gray-600">ID: {membershipData.memberId}</p>
-                  <Badge className={`mt-2 ${getStatusColor(membershipData.status)}`}>
-                    {getStatusIcon(membershipData.status)}
-                    <span className="ml-1">{membershipData.status}</span>
+                  <h2 className="text-xl font-bold">{data.memberName}</h2>
+                  <p className="text-sm text-gray-600">ID: {data.memberId}</p>
+                  <Badge className={`mt-2 ${getStatusColor(data.status)}`}>
+                    {getStatusIcon(data.status)}
+                    <span className="ml-1">{data.status}</span>
                   </Badge>
                 </div>
               </div>
@@ -394,13 +496,13 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Current Plan</p>
-                    <p className="text-lg font-bold text-[#327F74]">{membershipData.currentPlan.name}</p>
+                    <p className="text-lg font-bold text-[#327F74]">{data.currentPlan.name}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-gray-600">Branch</p>
                     <p className="font-semibold flex items-center gap-1">
                       <Building2 className="h-4 w-4" />
-                      {membershipData.currentPlan.branch}
+                      {data.currentPlan.branch}
                     </p>
                   </div>
                 </div>
@@ -410,14 +512,14 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                     <p className="text-xs text-gray-600">Start Date</p>
                     <p className="font-semibold flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {new Date(membershipData.currentPlan.startDate).toLocaleDateString()}
+                      {new Date(data.currentPlan.startDate).toLocaleDateString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">End Date</p>
                     <p className="font-semibold flex items-center gap-1 text-orange-600">
                       <AlertCircle className="h-3 w-3" />
-                      {new Date(membershipData.currentPlan.endDate).toLocaleDateString()}
+                      {new Date(data.currentPlan.endDate).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
@@ -426,9 +528,9 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                 <div className="space-y-2 mt-4">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Time Used</span>
-                    <span className="font-semibold text-[#327F74]">{membershipData.daysLeft} days left</span>
+                    <span className="font-semibold text-[#327F74]">{data.daysLeft} days left</span>
                   </div>
-                  <Progress value={membershipData.timeUsedPercentage} className="h-2" />
+                  <Progress value={data.timeUsedPercentage} className="h-2" />
                 </div>
               </div>
 
@@ -466,14 +568,14 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
             </div>
 
             {/* Access Status Banner */}
-            {membershipData.accessDeviceStatus.enabled && (
+            {data.accessDeviceStatus.enabled && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                   <div>
                     <p className="font-semibold text-green-900">Access Enabled</p>
                     <p className="text-sm text-green-700">
-                      Valid until: {new Date(membershipData.accessDeviceStatus.validUntil).toLocaleDateString()}
+                      Valid until: {new Date(data.accessDeviceStatus.validUntil).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
@@ -498,11 +600,11 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
             <Card>
               <CardHeader>
                 <CardTitle>Plan Benefits</CardTitle>
-                <CardDescription>What's included in your {membershipData.currentPlan.name}</CardDescription>
+                <CardDescription>What's included in your {data.currentPlan.name}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3">
-                  {membershipData.currentPlan.benefits.map((benefit, idx) => (
+                  {data.currentPlan.benefits.map((benefit, idx) => (
                     <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                       <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
                       <span className="text-sm">{benefit}</span>
@@ -525,14 +627,14 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                 <CardDescription>Additional services you've purchased</CardDescription>
               </CardHeader>
               <CardContent>
-                {membershipData.activeAddons.length === 0 ? (
+                {data.activeAddons.length === 0 ? (
                   <div className="text-center py-8">
                     <Gift className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No active add-ons</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {membershipData.activeAddons.map(addon => (
+                    {data.activeAddons.map(addon => (
                       <Card key={addon.id} className="bg-gradient-to-r from-blue-50 to-purple-50">
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between mb-3">
@@ -679,14 +781,14 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                 <CardDescription>Pending payments and invoices</CardDescription>
               </CardHeader>
               <CardContent>
-                {membershipData.totalDue > 0 ? (
+                {data.totalDue > 0 ? (
                   <>
                     <div className="p-6 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg mb-6">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm text-orange-900 mb-1">Total Due Amount</p>
                           <p className="text-3xl font-bold text-orange-600">
-                            AED {membershipData.totalDue.toFixed(2)}
+                            AED {data.totalDue.toFixed(2)}
                           </p>
                         </div>
                         <AlertCircle className="h-12 w-12 text-orange-600 opacity-20" />
@@ -694,7 +796,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                     </div>
 
                     <div className="space-y-3 mb-6">
-                      {membershipData.dues.map(due => (
+                      {data.dues.map(due => (
                         <Card key={due.id} className="border-l-4 border-orange-500">
                           <CardContent className="p-4">
                             <div className="flex items-center gap-3">
@@ -973,13 +1075,13 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Current Expiry</span>
                     <span className="font-semibold">
-                      {new Date(membershipData.currentPlan.endDate).toLocaleDateString()}
+                      {new Date(data.currentPlan.endDate).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Renewal Start</span>
                     <span className="font-semibold">
-                      {new Date(membershipData.currentPlan.endDate).toLocaleDateString()}
+                      {new Date(data.currentPlan.endDate).toLocaleDateString()}
                     </span>
                   </div>
                   <Separator />
