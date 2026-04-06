@@ -29,6 +29,7 @@ api.interceptors.response.use(
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('username');
       sessionStorage.removeItem('roles');
+      sessionStorage.removeItem('userId');
       // Redirect to login if not already there
       if (window.location.pathname !== '/login') {
          window.location.href = '/login';

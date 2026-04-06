@@ -42,6 +42,9 @@ public class CommunityPost extends BaseEntity {
     @Column(name = "comment_count", nullable = false)
     private int commentCount = 0;
 
+    @Column(name = "archived", nullable = false, columnDefinition = "boolean default false")
+    private boolean archived = false;
+
     public CommunityPost() {}
 
     public Long getId() { return id; }
@@ -76,5 +79,7 @@ public class CommunityPost extends BaseEntity {
 
     public int getCommentCount() { return commentCount; }
     public void setCommentCount(int commentCount) { this.commentCount = commentCount; }
-}
 
+    public boolean isArchived() { return archived; }
+    public void setArchived(boolean archived) { this.archived = archived; }
+}

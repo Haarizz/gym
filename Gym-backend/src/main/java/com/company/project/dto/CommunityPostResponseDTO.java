@@ -17,6 +17,7 @@ public class CommunityPostResponseDTO {
     private String authorUsername;
     private List<String> authorRoles;
     private LocalDateTime createdAt;
+    private boolean archived;
 
     public CommunityPostResponseDTO() {}
 
@@ -55,4 +56,7 @@ public class CommunityPostResponseDTO {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public boolean isArchived() { return archived; }
+    public void setArchived(boolean archived) { this.archived = archived; }
 }
