@@ -13,6 +13,12 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { AspectRatio } from "../components/ui/aspect-ratio";
 import { Slider } from "../components/ui/slider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { cn } from "../components/ui/utils";
 import api from "../api/axiosConfig";
 import {
@@ -32,6 +38,9 @@ import {
   Star,
   Target,
   Trophy,
+  Archive,
+  MoreVertical,
+  Trash2,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -62,6 +71,7 @@ type CommunityPost = {
   type: "achievement" | "question" | "tip";
   topic: string;
   image?: CommunityPostImage;
+  archived?: boolean;
 };
 
 type CommunityComment = {
@@ -260,6 +270,7 @@ export function Community() {
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [feedFilter, setFeedFilter] = useState<"all" | CommunityPost["type"]>("all");
+  const [feedView, setFeedView] = useState<"feed" | "archived">("feed");
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [postDraft, setPostDraft] = useState<CommunityPostDraft>(createEmptyPostDraft);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -271,16 +282,104 @@ export function Community() {
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [isDeletingPostId, setIsDeletingPostId] = useState<number | null>(null);
+  const [isDeletingCommentId, setIsDeletingCommentId] = useState<number | null>(null);
+
+  const currentUserId = useMemo(() => Number(sessionStorage.getItem("userId") ?? NaN), []);
+  const currentRoles = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem("roles");
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+      return [];
+    }
+  }, []);
+  const isAdmin = currentRoles.some((role) => {
+    const normalized = String(role).toUpperCase();
+    return normalized === "ADMIN" || normalized === "ROLE_ADMIN";
+  });
+  const canDeletePost = (post: CommunityPost) =>
+    isAdmin || (Number.isFinite(currentUserId) && Number(post.authorUserId) === Number(currentUserId));
+
+  const canDeleteComment = (comment: CommunityComment) =>
+    isAdmin || (Number.isFinite(currentUserId) && Number(comment.authorUserId) === Number(currentUserId));
 
   const filteredPosts = feedPosts;
 
-  const fetchFeed = async (q: string, type: string) => {
+  const deletePost = async (post: CommunityPost) => {
+    if (isDeletingPostId != null) return;
+    if (!canDeletePost(post)) return;
+    const ok = window.confirm("Delete this post?");
+    if (!ok) return;
+
+    setIsDeletingPostId(post.id);
+    try {
+      await api.delete(`/community/posts/${post.id}`);
+      setFeedPosts((prev) => prev.filter((p) => p.id !== post.id));
+      if (activePost?.id === post.id) {
+        setIsCommentsOpen(false);
+      }
+      toast.success("Post deleted");
+    } catch (error: any) {
+      toast.error("Couldn't delete post", { description: error?.response?.data?.message || error?.message });
+    } finally {
+      setIsDeletingPostId(null);
+    }
+  };
+
+  const toggleArchivePost = async (post: CommunityPost, archived: boolean) => {
+    if (isDeletingPostId != null) return;
+    if (!canDeletePost(post)) return;
+    const ok = window.confirm(
+      archived
+        ? "Archive this post? It will be hidden from everyone."
+        : "Unarchive this post? It will be visible to everyone.",
+    );
+    if (!ok) return;
+
+    setIsDeletingPostId(post.id);
+    try {
+      await api.post(`/community/posts/${post.id}/${archived ? "archive" : "unarchive"}`);
+      setFeedPosts((prev) => prev.filter((p) => p.id !== post.id));
+      toast.success(archived ? "Post archived" : "Post restored");
+    } catch (error: any) {
+      toast.error("Couldn't update post", { description: error?.response?.data?.message || error?.message });
+    } finally {
+      setIsDeletingPostId(null);
+    }
+  };
+
+  const deleteComment = async (comment: CommunityComment) => {
+    if (!activePost) return;
+    if (isDeletingCommentId != null) return;
+    if (!canDeleteComment(comment)) return;
+    const ok = window.confirm("Delete this comment?");
+    if (!ok) return;
+
+    setIsDeletingCommentId(comment.id);
+    try {
+      await api.delete(`/community/posts/${activePost.id}/comments/${comment.id}`);
+      setComments((prev) => prev.filter((c) => c.id !== comment.id));
+      setFeedPosts((prev) =>
+        prev.map((p) => (p.id === activePost.id ? { ...p, comments: Math.max(0, (p.comments ?? 0) - 1) } : p))
+      );
+      setActivePost((prev) => (prev ? { ...prev, comments: Math.max(0, (prev.comments ?? 0) - 1) } : prev));
+      toast.success("Comment deleted");
+    } catch (error: any) {
+      toast.error("Couldn't delete comment", { description: error?.response?.data?.message || error?.message });
+    } finally {
+      setIsDeletingCommentId(null);
+    }
+  };
+
+  const fetchFeed = async (q: string, type: string, view: "feed" | "archived") => {
     setIsLoadingFeed(true);
     try {
       const response = await api.get("/community/posts", {
         params: {
           q: q.trim() ? q.trim() : undefined,
           type: type === "all" ? undefined : type,
+          archived: view === "archived" ? true : undefined,
           page: 1,
           limit: 30,
         },
@@ -299,6 +398,7 @@ export function Community() {
         likedByMe: post.likedByMe ?? post.liked_by_me ?? false,
         type: (post.type ?? "achievement") as CommunityPost["type"],
         topic: post.topic ?? "",
+        archived: post.archived ?? false,
         image: post.image
           ? {
             src: post.image.dataUrl ?? post.image.data_url,
@@ -325,12 +425,12 @@ export function Community() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchFeed(searchTerm, feedFilter);
+      fetchFeed(searchTerm, feedFilter, feedView);
     }, 250);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, feedFilter]);
+  }, [searchTerm, feedFilter, feedView]);
 
   const stats = useMemo(() => ({
     activeMembers: 410,
@@ -719,6 +819,26 @@ export function Community() {
                     <CardDescription>Motivation, questions, coaching moments, and photo updates from active members.</CardDescription>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={feedView === "feed" ? "default" : "ghost"}
+                        className="h-9 rounded-2xl px-3"
+                        onClick={() => setFeedView("feed")}
+                      >
+                        Feed
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={feedView === "archived" ? "default" : "ghost"}
+                        className="h-9 rounded-2xl px-3"
+                        onClick={() => setFeedView("archived")}
+                      >
+                        Archived
+                      </Button>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -732,7 +852,13 @@ export function Community() {
                       <Filter className="mr-2 h-4 w-4" />
                       Refine Feed
                     </Button>
-                    <Button size="sm" className="h-10 rounded-2xl px-3 shadow-sm" onClick={() => setIsCreatePostOpen(true)}>
+                    <Button
+                      size="sm"
+                      className="h-10 rounded-2xl px-3 shadow-sm"
+                      onClick={() => setIsCreatePostOpen(true)}
+                      disabled={feedView === "archived"}
+                      title={feedView === "archived" ? "Switch to Feed to create a post" : undefined}
+                    >
                       <Plus className="mr-2 h-4 w-4" />
                       Create Post
                     </Button>
@@ -773,6 +899,37 @@ export function Community() {
                               <ImageIcon className="mr-1 h-3 w-3" />
                               {post.image.aspectRatio}
                             </Badge>
+                          ) : null}
+                          {canDeletePost(post) ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="ml-auto h-8 w-8 rounded-full text-slate-500 hover:bg-slate-100"
+                                  disabled={isDeletingPostId === post.id}
+                                  title="Post options"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onSelect={() => toggleArchivePost(post, !(post.archived ?? false))}
+                                >
+                                  <Archive className="h-4 w-4" />
+                                  {(post.archived ?? false) ? "Unarchive post" : "Archive post"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={() => deletePost(post)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete post
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           ) : null}
                         </div>
                         <p className="text-sm leading-6 text-slate-700">{post.content}</p>
@@ -1291,9 +1448,24 @@ export function Community() {
               ) : (
                 comments.map((comment) => (
                   <div key={comment.id} className="rounded-xl bg-white p-3 shadow-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-slate-900">{comment.authorUsername}</span>
-                      <span className="text-xs text-muted-foreground">{safeFormatTime(comment.createdAt)}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-1 flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-slate-900">{comment.authorUsername}</span>
+                        <span className="text-xs text-muted-foreground">{safeFormatTime(comment.createdAt)}</span>
+                      </div>
+                      {canDeleteComment(comment) ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full text-slate-500 hover:bg-red-50 hover:text-red-600"
+                          onClick={() => deleteComment(comment)}
+                          disabled={isDeletingCommentId === comment.id}
+                          title="Delete comment"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : null}
                     </div>
                     <p className="mt-2 text-sm text-slate-700">{comment.content}</p>
                   </div>

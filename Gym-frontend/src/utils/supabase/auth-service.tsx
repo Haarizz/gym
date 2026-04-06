@@ -10,6 +10,7 @@ export interface User {
   email: string;
   name: string;
   role: string;
+  backendUserId?: number;
 }
 
 export interface AuthSession {
@@ -49,6 +50,7 @@ class AuthService {
         email,
         name:  username,
         role:  roles[0]?.toLowerCase() || "user",
+        backendUserId: Number(sessionStorage.getItem("userId") ?? NaN) || undefined,
       };
     }
 
@@ -79,12 +81,17 @@ class AuthService {
           email,
           name: username,
           role: roles[0]?.toLowerCase() || "user",
+          backendUserId:
+            typeof (result.userId ?? result.user_id) === "number"
+              ? (result.userId ?? result.user_id)
+              : Number(result.userId ?? result.user_id) || undefined,
         };
         this.accessToken = result.token;
 
         sessionStorage.setItem("token",              result.token);
         sessionStorage.setItem("username",           username);
         sessionStorage.setItem("roles",              JSON.stringify(roles));
+        if (result.userId != null || result.user_id != null) sessionStorage.setItem("userId", String(result.userId ?? result.user_id));
         sessionStorage.setItem("gymbios_email",      email);
         sessionStorage.setItem("gymbios_user",       JSON.stringify(this.user));
         sessionStorage.setItem("gymbios_auth",       "true");
@@ -131,6 +138,7 @@ class AuthService {
     sessionStorage.removeItem("token");
     sessionStorage.removeItem("username");
     sessionStorage.removeItem("roles");
+    sessionStorage.removeItem("userId");
     sessionStorage.removeItem("gymbios_email");
     sessionStorage.removeItem("gymbios_user");
     sessionStorage.removeItem("gymbios_auth");

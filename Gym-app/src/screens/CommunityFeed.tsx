@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Alert,
+  Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,8 +20,11 @@ import { useAuth } from "../context/AuthContext";
 import {
   addCommunityComment,
   createCommunityPost,
+  deleteCommunityPost,
+  deleteCommunityComment,
   fetchCommunityComments,
   fetchCommunityPosts,
+  setCommunityPostArchived,
   toggleCommunityLike,
   type CommunityComment,
   type CommunityPost,
@@ -37,12 +43,39 @@ const formatRelativeTime = (iso: string) => {
   return `${diffDays}d ago`;
 };
 
+const parseAspectRatio = (value?: string | null) => {
+  if (!value) return null;
+  if (value.includes(":")) {
+    const [w, h] = value.split(":").map((part) => Number(part));
+    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) return w / h;
+    return null;
+  }
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  return null;
+};
+
+const normalizeImageUri = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.startsWith("data:")) return trimmed;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  // Best-effort for legacy rows that stored only the base64 payload
+  return `data:image/jpeg;base64,${trimmed}`;
+};
+
 export function CommunityFeed() {
   const [postText, setPostText] = useState("");
   const [postTopic, setPostTopic] = useState("");
+  const [feedMode, setFeedMode] = useState<"feed" | "archived">("feed");
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
+  const [mutatingPostId, setMutatingPostId] = useState<number | null>(null);
+  const [isPostMenuOpen, setIsPostMenuOpen] = useState(false);
+  const [menuPost, setMenuPost] = useState<CommunityPost | null>(null);
+  const [isDeletePostConfirmOpen, setIsDeletePostConfirmOpen] = useState(false);
+  const [pendingDeletePost, setPendingDeletePost] = useState<CommunityPost | null>(null);
 
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [activePost, setActivePost] = useState<CommunityPost | null>(null);
@@ -50,6 +83,7 @@ export function CommunityFeed() {
   const [commentText, setCommentText] = useState("");
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isSendingComment, setIsSendingComment] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
 
   const { colors } = useSettings();
   const { user } = useAuth();
@@ -66,7 +100,13 @@ export function CommunityFeed() {
   const loadPosts = async () => {
     setIsLoadingPosts(true);
     try {
-      const page = await fetchCommunityPosts({ token: user?.token ?? null, page: 1, limit: 25, type: "all" });
+      const page = await fetchCommunityPosts({
+        token: user?.token ?? null,
+        page: 1,
+        limit: 25,
+        type: "all",
+        archived: feedMode === "archived",
+      });
       setPosts(page.posts ?? []);
     } catch (e: any) {
       console.warn(e);
@@ -78,7 +118,7 @@ export function CommunityFeed() {
   useEffect(() => {
     loadPosts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [feedMode]);
 
   const handlePost = async () => {
     if (!user?.token) return;
@@ -154,6 +194,124 @@ export function CommunityFeed() {
     }
   };
 
+  const canDeletePost = (post: CommunityPost) => {
+    if (!user) return false;
+    return Number(post.authorUserId) === Number(user.userId);
+  };
+
+  const canDeleteComment = (comment: CommunityComment) => {
+    if (!user) return false;
+    const roles = (user.roles ?? []).map((r) => String(r).toUpperCase());
+    const isAdmin = roles.includes("ADMIN") || roles.includes("ROLE_ADMIN");
+    return Number(comment.authorUserId) === Number(user.userId) || isAdmin;
+  };
+
+  const canManagePost = (post: CommunityPost) => canDeletePost(post);
+
+  const openPostMenu = (post: CommunityPost) => {
+    setMenuPost(post);
+    setIsPostMenuOpen(true);
+  };
+
+  const closePostMenu = () => {
+    setIsPostMenuOpen(false);
+    setMenuPost(null);
+  };
+
+  const confirmDeletePost = (post: CommunityPost) => {
+    setPendingDeletePost(post);
+    setIsDeletePostConfirmOpen(true);
+  };
+
+  const closeDeletePostConfirm = () => {
+    setIsDeletePostConfirmOpen(false);
+    setPendingDeletePost(null);
+  };
+
+  const handleDeletePost = async () => {
+    const post = pendingDeletePost;
+    if (!user?.token) return;
+    if (!post) return;
+    if (mutatingPostId != null) return;
+    setMutatingPostId(post.id);
+    try {
+      await deleteCommunityPost({ postId: post.id, token: user.token });
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      if (activePost?.id === post.id) {
+        setIsCommentsOpen(false);
+        setActivePost(null);
+      }
+      setIsDeletePostConfirmOpen(false);
+      setPendingDeletePost(null);
+      closePostMenu();
+      Alert.alert("Post deleted", "Your post has been removed.");
+    } catch (e: any) {
+      console.warn(e);
+      setIsDeletePostConfirmOpen(false);
+      setPendingDeletePost(null);
+      Alert.alert("Couldn't delete", e?.message || "Please try again.");
+    } finally {
+      setMutatingPostId(null);
+    }
+  };
+
+  const handleToggleArchivePost = async (post: CommunityPost, archived: boolean) => {
+    if (!user?.token) return;
+    if (mutatingPostId != null) return;
+    setMutatingPostId(post.id);
+    try {
+      await setCommunityPostArchived({ postId: post.id, archived, token: user.token });
+
+      // Archived posts are hidden from feed for everyone, including the author.
+      // So we remove it from the current list view on success.
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      closePostMenu();
+      Alert.alert(archived ? "Post archived" : "Post restored", archived ? "This post is now hidden from everyone." : "This post is visible to everyone again.");
+    } catch (e: any) {
+      console.warn(e);
+      Alert.alert("Couldn't update", e?.message || "Please try again.");
+    } finally {
+      setMutatingPostId(null);
+    }
+  };
+
+  const confirmDeleteComment = (comment: CommunityComment) => {
+    if (!activePost) return;
+
+    if (Platform.OS === "web" && typeof globalThis.confirm === "function") {
+      if (globalThis.confirm("Delete comment?\n\nThis will remove your comment.")) {
+        handleDeleteComment(comment);
+      }
+      return;
+    }
+
+    Alert.alert("Delete comment?", "This will remove your comment.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => handleDeleteComment(comment) },
+    ]);
+  };
+
+  const handleDeleteComment = async (comment: CommunityComment) => {
+    if (!activePost || !user?.token) return;
+    if (deletingCommentId != null) return;
+    setDeletingCommentId(comment.id);
+    try {
+      await deleteCommunityComment({ postId: activePost.id, commentId: comment.id, token: user.token });
+      setComments((prev) => prev.filter((c) => c.id !== comment.id));
+      setPosts((prev) =>
+        prev.map((p) => (p.id === activePost.id ? { ...p, commentCount: Math.max(0, (p.commentCount ?? 0) - 1) } : p))
+      );
+      setActivePost((prev) =>
+        prev ? { ...prev, commentCount: Math.max(0, (prev.commentCount ?? 0) - 1) } : prev
+      );
+    } catch (e: any) {
+      console.warn(e);
+      Alert.alert("Couldn't delete", e?.message || "Please try again.");
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
   return (
     <GlassScreen>
       <Animated.ScrollView
@@ -161,66 +319,84 @@ export function CommunityFeed() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.title, { color: colors.text }]}>Community Feed</Text>
-
-        <GlassCard style={styles.postComposer}>
-          <View style={styles.postComposerInner}>
-            <View style={styles.postHeader}>
-              <View style={[styles.postAvatar, { backgroundColor: colors.glass }]}>
-                <Text style={[styles.postAvatarText, { color: colors.textMuted }]}>SJ</Text>
-              </View>
-              <Text style={[styles.postPrompt, { color: colors.textMuted }]}>
-                Share an update with your gym community
-              </Text>
-            </View>
-
-            <TextInput
-              value={postTopic}
-              onChangeText={setPostTopic}
-              placeholder="Topic (optional)"
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.postTopic,
-                {
-                  color: colors.text,
-                  borderColor: colors.border,
-                  backgroundColor: colors.input,
-                },
-              ]}
-            />
-
-            <TextInput
-              value={postText}
-              onChangeText={setPostText}
-              placeholder="Write something..."
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.postInput,
-                {
-                  color: colors.text,
-                  borderColor: colors.border,
-                  backgroundColor: colors.input,
-                },
-              ]}
-              multiline
-            />
-
-            <View style={styles.postActions}>
-              <TouchableOpacity style={[styles.postActionChip, { backgroundColor: colors.glass }]} disabled>
-                <Ionicons name="image" size={16} color="#2563EB" />
-                <Text style={styles.postActionText}>Photo</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.postButton, (!postText.trim() || isPosting) && styles.postButtonDisabled]}
-                onPress={handlePost}
-                disabled={!postText.trim() || isPosting}
-              >
-                <Text style={styles.postButtonText}>{isPosting ? "Posting..." : "Post"}</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={styles.headerRow}>
+          <Text style={[styles.title, { color: colors.text }]}>{feedMode === "archived" ? "Archived Posts" : "Community Feed"}</Text>
+          <View style={styles.modeRow}>
+            <TouchableOpacity
+              style={[styles.modeChip, feedMode === "feed" && styles.modeChipActive, { backgroundColor: colors.glass }]}
+              onPress={() => setFeedMode("feed")}
+            >
+              <Text style={[styles.modeChipText, { color: colors.textMuted }]}>Feed</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeChip, feedMode === "archived" && styles.modeChipActive, { backgroundColor: colors.glass }]}
+              onPress={() => setFeedMode("archived")}
+            >
+              <Text style={[styles.modeChipText, { color: colors.textMuted }]}>Archived</Text>
+            </TouchableOpacity>
           </View>
-        </GlassCard>
+        </View>
+
+        {feedMode === "feed" ? (
+          <GlassCard style={styles.postComposer}>
+            <View style={styles.postComposerInner}>
+              <View style={styles.postHeader}>
+                <View style={[styles.postAvatar, { backgroundColor: colors.glass }]}>
+                  <Text style={[styles.postAvatarText, { color: colors.textMuted }]}>SJ</Text>
+                </View>
+                <Text style={[styles.postPrompt, { color: colors.textMuted }]}>
+                  Share an update with your gym community
+                </Text>
+              </View>
+
+              <TextInput
+                value={postTopic}
+                onChangeText={setPostTopic}
+                placeholder="Topic (optional)"
+                placeholderTextColor={colors.textMuted}
+                style={[
+                  styles.postTopic,
+                  {
+                    color: colors.text,
+                    borderColor: colors.border,
+                    backgroundColor: colors.input,
+                  },
+                ]}
+              />
+
+              <TextInput
+                value={postText}
+                onChangeText={setPostText}
+                placeholder="Write something..."
+                placeholderTextColor={colors.textMuted}
+                style={[
+                  styles.postInput,
+                  {
+                    color: colors.text,
+                    borderColor: colors.border,
+                    backgroundColor: colors.input,
+                  },
+                ]}
+                multiline
+              />
+
+              <View style={styles.postActions}>
+                <TouchableOpacity style={[styles.postActionChip, { backgroundColor: colors.glass }]} disabled>
+                  <Ionicons name="image" size={16} color="#2563EB" />
+                  <Text style={styles.postActionText}>Photo</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.postButton, (!postText.trim() || isPosting) && styles.postButtonDisabled]}
+                  onPress={handlePost}
+                  disabled={!postText.trim() || isPosting}
+                >
+                  <Text style={styles.postButtonText}>{isPosting ? "Posting..." : "Post"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </GlassCard>
+        ) : null}
 
         <View style={styles.cardList}>
           {isLoadingPosts ? (
@@ -256,9 +432,38 @@ export function CommunityFeed() {
                     <Text style={[styles.feedAuthor, { color: colors.text }]}>{post.authorUsername || "Unknown"}</Text>
                     <Text style={[styles.feedTime, { color: colors.textMuted }]}>{formatRelativeTime(post.createdAt)}</Text>
                   </View>
+
+                  {canManagePost(post) ? (
+                    <TouchableOpacity
+                      style={styles.feedMenu}
+                      onPress={() => openPostMenu(post)}
+                      disabled={mutatingPostId === post.id}
+                    >
+                      <Ionicons
+                        name={mutatingPostId === post.id ? "time-outline" : "ellipsis-vertical"}
+                        size={18}
+                        color={colors.textMuted}
+                      />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
 
                 <Text style={[styles.feedContent, { color: colors.text }]}>{post.content}</Text>
+
+                {post.image?.dataUrl ? (
+                  <View
+                    style={[
+                      styles.feedImageWrap,
+                      { backgroundColor: colors.glass, aspectRatio: parseAspectRatio(post.image.aspectRatio) ?? 4 / 5 },
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: normalizeImageUri(post.image.dataUrl) }}
+                      style={styles.feedImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                ) : null}
 
                 <View style={styles.feedActions}>
                   <TouchableOpacity style={styles.feedAction} onPress={() => likePost(post)}>
@@ -302,8 +507,25 @@ export function CommunityFeed() {
               ) : (
                 comments.map((c) => (
                   <View key={String(c.id)} style={[styles.commentBubble, { backgroundColor: colors.glass }]}>
-                    <Text style={[styles.commentAuthor, { color: colors.text }]}>{c.authorUsername}</Text>
-                    <Text style={[styles.commentTime, { color: colors.textMuted }]}>{formatRelativeTime(c.createdAt)}</Text>
+                    <View style={styles.commentHeaderRow}>
+                      <View style={styles.commentHeaderLeft}>
+                        <Text style={[styles.commentAuthor, { color: colors.text }]}>{c.authorUsername}</Text>
+                        <Text style={[styles.commentTime, { color: colors.textMuted }]}>{formatRelativeTime(c.createdAt)}</Text>
+                      </View>
+                      {canDeleteComment(c) ? (
+                        <TouchableOpacity
+                          style={styles.commentDelete}
+                          onPress={() => confirmDeleteComment(c)}
+                          disabled={deletingCommentId === c.id}
+                        >
+                          <Ionicons
+                            name={deletingCommentId === c.id ? "time-outline" : "trash-outline"}
+                            size={16}
+                            color={colors.textMuted}
+                          />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
                     <Text style={[styles.commentText, { color: colors.text }]}>{c.content}</Text>
                   </View>
                 ))
@@ -330,6 +552,83 @@ export function CommunityFeed() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={isPostMenuOpen} transparent animationType="fade" onRequestClose={closePostMenu}>
+        <View style={styles.postMenuBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closePostMenu} />
+          <View style={[styles.postMenuSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.postMenuTitleRow}>
+              <Text style={[styles.postMenuTitle, { color: colors.text }]} numberOfLines={1}>
+                {menuPost?.topic || "Post options"}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.postMenuItem}
+              onPress={() => (menuPost ? handleToggleArchivePost(menuPost, !(menuPost.archived ?? false)) : null)}
+              disabled={!menuPost || mutatingPostId === menuPost?.id}
+            >
+              <Ionicons name={(menuPost?.archived ?? false) ? "arrow-undo-outline" : "archive-outline"} size={18} color={colors.text} />
+              <Text style={[styles.postMenuItemText, { color: colors.text }]}>
+                {(menuPost?.archived ?? false) ? "Unarchive post" : "Archive post"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.postMenuItem}
+              onPress={() => {
+                if (!menuPost) return;
+                closePostMenu();
+                confirmDeletePost(menuPost);
+              }}
+              disabled={!menuPost || mutatingPostId === menuPost?.id}
+            >
+              <Ionicons name="trash-outline" size={18} color="#ef4444" />
+              <Text style={[styles.postMenuItemText, { color: "#ef4444" }]}>Delete post</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.postMenuItem, styles.postMenuCancel]} onPress={closePostMenu}>
+              <Text style={[styles.postMenuItemText, { color: colors.textMuted }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isDeletePostConfirmOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (mutatingPostId == null) closeDeletePostConfirm();
+        }}
+      >
+        <View style={styles.confirmBackdrop}>
+          <View style={[styles.confirmSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.confirmTitle, { color: colors.text }]}>Delete post?</Text>
+            <Text style={[styles.confirmMessage, { color: colors.textMuted }]}>
+              Are you sure you want to delete this post? It can't be undone.
+            </Text>
+
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={[styles.confirmButton, styles.confirmCancelButton, { borderColor: colors.border, backgroundColor: colors.glass }]}
+                onPress={closeDeletePostConfirm}
+                disabled={mutatingPostId != null}
+              >
+                <Text style={[styles.confirmCancelText, { color: colors.textMuted }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmButton, styles.confirmDeleteButton, mutatingPostId != null && styles.postButtonDisabled]}
+                onPress={handleDeletePost}
+                disabled={mutatingPostId != null}
+              >
+                <Text style={styles.confirmDeleteText}>{mutatingPostId != null ? "Deleting..." : "Delete post"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </GlassScreen>
   );
 }
@@ -342,10 +641,31 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 120,
   },
+  headerRow: {
+    marginBottom: 16,
+    gap: 10,
+  },
   title: {
     fontSize: 22,
     fontWeight: "700",
-    marginBottom: 16,
+  },
+  modeRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  modeChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  modeChipActive: {
+    borderColor: "#2563EB",
+  },
+  modeChipText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   postComposer: {
     marginBottom: 16,
@@ -459,6 +779,19 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginBottom: 14,
   },
+  feedMenu: {
+    padding: 6,
+  },
+  feedImageWrap: {
+    width: "100%",
+    borderRadius: 18,
+    overflow: "hidden",
+    marginBottom: 14,
+  },
+  feedImage: {
+    width: "100%",
+    height: "100%",
+  },
   feedActions: {
     flexDirection: "row",
     gap: 18,
@@ -476,6 +809,88 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     padding: 20,
+  },
+  postMenuBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "flex-end",
+    padding: 16,
+  },
+  postMenuSheet: {
+    borderRadius: 22,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  postMenuTitleRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.06)",
+  },
+  postMenuTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  postMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  postMenuItemText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  postMenuCancel: {
+    justifyContent: "center",
+  },
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  confirmSheet: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+    gap: 14,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  confirmMessage: {
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 4,
+  },
+  confirmButton: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmCancelButton: {
+    borderWidth: 1,
+  },
+  confirmDeleteButton: {
+    backgroundColor: "#ef4444",
+  },
+  confirmCancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  confirmDeleteText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
   },
   modalSheet: {
     borderRadius: 24,
@@ -509,6 +924,19 @@ const styles = StyleSheet.create({
   commentBubble: {
     borderRadius: 18,
     padding: 12,
+  },
+  commentHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  commentHeaderLeft: {
+    flex: 1,
+  },
+  commentDelete: {
+    padding: 4,
+    marginTop: -2,
   },
   commentAuthor: {
     fontWeight: "700",

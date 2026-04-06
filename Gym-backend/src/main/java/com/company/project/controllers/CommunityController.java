@@ -23,10 +23,15 @@ public class CommunityController {
     public ResponseEntity<CommunityPostsPageResponseDTO> getFeed(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String type,
+            @RequestParam(required = false) Boolean archived,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit
     ) {
-        return ResponseEntity.ok(communityService.getFeed(q, type, page, limit));
+        try {
+            return ResponseEntity.ok(communityService.getFeed(q, type, page, limit, archived));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(401).build();
+        }
     }
 
     @PostMapping("/posts")
@@ -43,7 +48,11 @@ public class CommunityController {
 
     @GetMapping("/posts/{postId}/comments")
     public ResponseEntity<List<CommunityPostCommentResponseDTO>> getComments(@PathVariable Long postId) {
-        return ResponseEntity.ok(communityService.getComments(postId));
+        try {
+            return ResponseEntity.ok(communityService.getComments(postId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/posts/{postId}/comments")
@@ -72,5 +81,68 @@ public class CommunityController {
             return ResponseEntity.status(401).body(Map.of("message", e.getMessage()));
         }
     }
-}
 
+    @DeleteMapping("/posts/{postId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> deletePost(@PathVariable Long postId) {
+        try {
+            communityService.deletePost(postId);
+            return ResponseEntity.ok(Map.of("success", true));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    // Some client environments/proxies can block HTTP DELETE; offer a POST alias for reliability.
+    @PostMapping("/posts/{postId}/delete")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> deletePostViaPost(@PathVariable Long postId) {
+        return deletePost(postId);
+    }
+
+    @DeleteMapping("/posts/{postId}/comments/{commentId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> deleteComment(@PathVariable Long postId, @PathVariable Long commentId) {
+        try {
+            communityService.deleteComment(postId, commentId);
+            return ResponseEntity.ok(Map.of("success", true));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    // Some client environments/proxies can block HTTP DELETE; offer a POST alias for reliability.
+    @PostMapping("/posts/{postId}/comments/{commentId}/delete")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> deleteCommentViaPost(@PathVariable Long postId, @PathVariable Long commentId) {
+        return deleteComment(postId, commentId);
+    }
+
+    @PostMapping("/posts/{postId}/archive")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> archivePost(@PathVariable Long postId) {
+        try {
+            return ResponseEntity.ok(communityService.archivePost(postId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/posts/{postId}/unarchive")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> unarchivePost(@PathVariable Long postId) {
+        try {
+            return ResponseEntity.ok(communityService.unarchivePost(postId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+    }
+}

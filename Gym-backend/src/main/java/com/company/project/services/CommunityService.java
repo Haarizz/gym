@@ -45,7 +45,7 @@ public class CommunityService {
         this.userRepository = userRepository;
     }
 
-    public CommunityPostsPageResponseDTO getFeed(String q, String type, int page, int limit) {
+    public CommunityPostsPageResponseDTO getFeed(String q, String type, int page, int limit, Boolean archived) {
         int safeLimit = Math.min(Math.max(limit, 1), 50);
         int safePage = Math.max(page, 1);
         Pageable pageable = PageRequest.of(safePage - 1, safeLimit, Sort.by(Sort.Direction.DESC, "createdAt"));
@@ -53,11 +53,31 @@ public class CommunityService {
         String normalizedType = (type == null || type.trim().isEmpty() || type.equalsIgnoreCase("all"))
                 ? null
                 : type.trim();
+        boolean archivedOnly = Boolean.TRUE.equals(archived);
 
         Specification<CommunityPost> spec = null;
+
+        if (archivedOnly) {
+            // Archived posts are never public. Allow only the owner (or admin) to view archived items.
+            User currentUser = getCurrentUserOrThrow();
+            boolean admin = isAdmin(currentUser);
+
+            spec = Specification.where((root, query, cb) -> cb.isTrue(root.get("archived")));
+            if (!admin) {
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("authorUser").get("id"), currentUser.getId()));
+            }
+        } else {
+            // Treat NULL as false for rows created before this flag existed.
+            spec = Specification.where((root, query, cb) -> cb.or(
+                    cb.isFalse(root.get("archived")),
+                    cb.isNull(root.get("archived"))
+            ));
+        }
+
         if (normalizedType != null) {
             String match = normalizedType.toLowerCase(Locale.ROOT);
-            spec = Specification.where((root, query, cb) -> cb.equal(cb.lower(root.get("type")), match));
+            Specification<CommunityPost> typeSpec = (root, query, cb) -> cb.equal(cb.lower(root.get("type")), match);
+            spec = (spec == null) ? Specification.where(typeSpec) : spec.and(typeSpec);
         }
         if (normalizedQ != null) {
             String like = "%" + normalizedQ.toLowerCase(Locale.ROOT) + "%";
@@ -68,9 +88,7 @@ public class CommunityService {
             spec = (spec == null) ? Specification.where(qSpec) : spec.and(qSpec);
         }
 
-        Page<CommunityPost> result = (spec == null)
-                ? communityPostRepository.findAll(pageable)
-                : communityPostRepository.findAll(spec, pageable);
+        Page<CommunityPost> result = communityPostRepository.findAll(spec, pageable);
 
         Long currentUserId = getCurrentUserIdOrNull();
         final Set<Long> likedByMeSet;
@@ -175,6 +193,58 @@ public class CommunityService {
         return new ToggleCommunityLikeResponseDTO(true, post.getLikeCount());
     }
 
+    @Transactional
+    public void deletePost(Long postId) {
+        User user = getCurrentUserOrThrow();
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        boolean isOwner = post.getAuthorUser() != null && post.getAuthorUser().getId().equals(user.getId());
+        if (!isOwner && !isAdmin(user)) {
+            throw new SecurityException("Not allowed to delete this post");
+        }
+
+        communityPostLikeRepository.deleteByPostId(postId);
+        communityPostLikeRepository.flush();
+
+        communityPostCommentRepository.deleteByPostId(postId);
+        communityPostCommentRepository.flush();
+
+        communityPostRepository.delete(post);
+        communityPostRepository.flush();
+    }
+
+    @Transactional
+    public void deleteComment(Long postId, Long commentId) {
+        User user = getCurrentUserOrThrow();
+        CommunityPostComment comment = communityPostCommentRepository.findById(commentId)
+                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+
+        if (comment.getPost() == null || comment.getPost().getId() == null || !comment.getPost().getId().equals(postId)) {
+            throw new IllegalArgumentException("Comment not found");
+        }
+
+        boolean isOwner = comment.getAuthorUser() != null && comment.getAuthorUser().getId().equals(user.getId());
+        if (!isOwner && !isAdmin(user)) {
+            throw new SecurityException("Not allowed to delete this comment");
+        }
+
+        CommunityPost post = comment.getPost();
+        communityPostCommentRepository.delete(comment);
+
+        post.setCommentCount(Math.max(0, post.getCommentCount() - 1));
+        communityPostRepository.save(post);
+    }
+
+    private boolean isAdmin(User user) {
+        if (user == null || user.getUserRoles() == null) return false;
+        return user.getUserRoles().stream().anyMatch(userRole -> {
+            if (userRole == null || userRole.getRole() == null) return false;
+            String roleName = userRole.getRole().getRoleName();
+            return roleName != null && roleName.equalsIgnoreCase("ADMIN");
+        });
+    }
+
     private User getCurrentUserOrThrow() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
@@ -238,7 +308,33 @@ public class CommunityService {
         dto.setAuthorUsername(author.getUsername());
         dto.setAuthorRoles(roles);
         dto.setCreatedAt(post.getCreatedAt());
+        dto.setArchived(post.isArchived());
         return dto;
+    }
+
+    @Transactional
+    public CommunityPostResponseDTO archivePost(Long postId) {
+        return setArchived(postId, true);
+    }
+
+    @Transactional
+    public CommunityPostResponseDTO unarchivePost(Long postId) {
+        return setArchived(postId, false);
+    }
+
+    private CommunityPostResponseDTO setArchived(Long postId, boolean archived) {
+        User user = getCurrentUserOrThrow();
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        boolean isOwner = post.getAuthorUser() != null && post.getAuthorUser().getId().equals(user.getId());
+        if (!isOwner && !isAdmin(user)) {
+            throw new SecurityException("Not allowed to update this post");
+        }
+
+        post.setArchived(archived);
+        CommunityPost saved = communityPostRepository.save(post);
+        return toPostResponse(saved, false);
     }
 
     private CommunityPostCommentResponseDTO toCommentResponse(CommunityPostComment comment) {

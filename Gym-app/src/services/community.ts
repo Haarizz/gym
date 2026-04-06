@@ -22,6 +22,7 @@ export interface CommunityPost {
   authorUsername: string;
   authorRoles: string[];
   createdAt: string;
+  archived?: boolean;
 }
 
 export interface CommunityComment {
@@ -50,7 +51,7 @@ const withAuth = (token?: string | null): Record<string, string> =>
 const normalizeImage = (raw: any): CommunityPostImage | null => {
   if (!raw) return null;
   return {
-    dataUrl: raw.dataUrl ?? raw.data_url ?? raw.data_url ?? raw.data_url,
+    dataUrl: raw.dataUrl ?? raw.data_url ?? null,
     aspectRatio: raw.aspectRatio ?? raw.aspect_ratio ?? null,
     cropPosition: raw.cropPosition ?? raw.crop_position ?? null,
     cropZoom: raw.cropZoom ?? raw.crop_zoom ?? null,
@@ -58,7 +59,7 @@ const normalizeImage = (raw: any): CommunityPostImage | null => {
 };
 
 const normalizePost = (raw: any): CommunityPost => ({
-  id: raw.id,
+  id: Number(raw.id),
   topic: raw.topic ?? '',
   content: raw.content ?? '',
   type: (raw.type ?? 'achievement') as CommunityPostType,
@@ -66,17 +67,18 @@ const normalizePost = (raw: any): CommunityPost => ({
   commentCount: raw.commentCount ?? raw.comment_count ?? 0,
   likedByMe: raw.likedByMe ?? raw.liked_by_me ?? false,
   image: normalizeImage(raw.image),
-  authorUserId: raw.authorUserId ?? raw.author_user_id ?? 0,
+  authorUserId: Number(raw.authorUserId ?? raw.author_user_id ?? 0),
   authorUsername: raw.authorUsername ?? raw.author_username ?? 'Unknown',
   authorRoles: raw.authorRoles ?? raw.author_roles ?? [],
   createdAt: raw.createdAt ?? raw.created_at ?? new Date().toISOString(),
+  archived: raw.archived ?? false,
 });
 
 const normalizeComment = (raw: any): CommunityComment => ({
-  id: raw.id,
-  postId: raw.postId ?? raw.post_id ?? 0,
+  id: Number(raw.id),
+  postId: Number(raw.postId ?? raw.post_id ?? 0),
   content: raw.content ?? '',
-  authorUserId: raw.authorUserId ?? raw.author_user_id ?? 0,
+  authorUserId: Number(raw.authorUserId ?? raw.author_user_id ?? 0),
   authorUsername: raw.authorUsername ?? raw.author_username ?? 'Unknown',
   authorRoles: raw.authorRoles ?? raw.author_roles ?? [],
   createdAt: raw.createdAt ?? raw.created_at ?? new Date().toISOString(),
@@ -101,11 +103,13 @@ export async function fetchCommunityPosts(params: {
   type?: 'all' | CommunityPostType;
   page?: number;
   limit?: number;
+  archived?: boolean;
   token?: string | null;
 }): Promise<CommunityPostsPage> {
   const query = new URLSearchParams();
   if (params.q) query.set('q', params.q);
   if (params.type && params.type !== 'all') query.set('type', params.type);
+  if (params.archived) query.set('archived', 'true');
   query.set('page', String(params.page ?? 1));
   query.set('limit', String(params.limit ?? 20));
 
@@ -196,4 +200,85 @@ export async function toggleCommunityLike(params: {
     liked: raw?.liked ?? false,
     likeCount: raw?.likeCount ?? raw?.like_count ?? 0,
   };
+}
+
+export async function deleteCommunityPost(params: { postId: number; token: string }): Promise<void> {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...withAuth(params.token),
+  };
+
+  // Prefer POST alias for reliability (some environments block HTTP DELETE).
+  try {
+    const postResponse = await fetch(`${API_BASE_URL}/community/posts/${params.postId}/delete`, {
+      method: 'POST',
+      headers,
+    });
+    if (postResponse.ok) return;
+
+    if (postResponse.status !== 404 && postResponse.status !== 405) {
+      await ensureOk(postResponse);
+    }
+  } catch {
+    // Network/proxy failure on POST. We'll fallback to DELETE below.
+  }
+
+  const delResponse = await fetch(`${API_BASE_URL}/community/posts/${params.postId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  await ensureOk(delResponse);
+}
+
+export async function setCommunityPostArchived(params: {
+  postId: number;
+  archived: boolean;
+  token: string;
+}): Promise<CommunityPost> {
+  const action = params.archived ? 'archive' : 'unarchive';
+  const response = await fetch(`${API_BASE_URL}/community/posts/${params.postId}/${action}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...withAuth(params.token),
+    },
+  });
+  await ensureOk(response);
+  const raw = await response.json().catch(() => ({}));
+  return normalizePost(raw);
+}
+
+export async function deleteCommunityComment(params: {
+  postId: number;
+  commentId: number;
+  token: string;
+}): Promise<void> {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...withAuth(params.token),
+  };
+
+  // Prefer POST alias for reliability (some environments block HTTP DELETE).
+  try {
+    const postResponse = await fetch(
+      `${API_BASE_URL}/community/posts/${params.postId}/comments/${params.commentId}/delete`,
+      {
+        method: 'POST',
+        headers,
+      }
+    );
+    if (postResponse.ok) return;
+
+    if (postResponse.status !== 404 && postResponse.status !== 405) {
+      await ensureOk(postResponse);
+    }
+  } catch {
+    // Network/proxy failure on POST. We'll fallback to DELETE below.
+  }
+
+  const response = await fetch(`${API_BASE_URL}/community/posts/${params.postId}/comments/${params.commentId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  await ensureOk(response);
 }

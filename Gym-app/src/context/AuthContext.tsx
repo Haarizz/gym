@@ -50,11 +50,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Your account has been disabled. Contact your gym admin.');
     }
 
+    const resolvedUserId = data.userId ?? data.user_id;
+    if (resolvedUserId == null) {
+      throw new Error('Login succeeded but user id is missing from the response.');
+    }
+
     const authUser: AuthUser = {
       token: data.token,
       username: data.username,
       roles: data.roles ?? [],
-      userId: data.userId,
+      userId: Number(resolvedUserId),
     };
 
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
