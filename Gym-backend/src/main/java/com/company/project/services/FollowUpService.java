@@ -33,11 +33,14 @@ public class FollowUpService {
 
     private final FollowUpRepository followUpRepository;
     private final CommunicationRecordRepository communicationRecordRepository;
+    private final NotificationService notificationService;
 
     public FollowUpService(FollowUpRepository followUpRepository,
-                           CommunicationRecordRepository communicationRecordRepository) {
+                           CommunicationRecordRepository communicationRecordRepository,
+                           NotificationService notificationService) {
         this.followUpRepository = followUpRepository;
         this.communicationRecordRepository = communicationRecordRepository;
+        this.notificationService = notificationService;
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -53,6 +56,16 @@ public class FollowUpService {
         String fuId = "FU-" + String.format("%010d", saved.getId());
         saved.setFollowUpId(fuId);
         saved = followUpRepository.save(saved);
+
+        notificationService.notifyRoles(
+                List.of("ADMIN", "MANAGER"),
+                "New Follow-Up Scheduled",
+                "Follow-up for " + (saved.getMemberName() != null ? saved.getMemberName() : "a contact") +
+                " is due on " + (saved.getDueDate() != null ? saved.getDueDate().toLocalDate().toString() : "N/A") + ".",
+                "INFO", "MEDIUM", "FOLLOW_UPS",
+                saved.getId(), "/follow-ups",
+                "FOLLOWUP_CREATED_" + saved.getId()
+        );
 
         return toDTO(saved);
     }

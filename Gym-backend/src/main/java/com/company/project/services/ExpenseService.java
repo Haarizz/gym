@@ -19,9 +19,11 @@ import java.util.stream.Collectors;
 public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
+    private final NotificationService notificationService;
 
-    public ExpenseService(ExpenseRepository expenseRepository) {
+    public ExpenseService(ExpenseRepository expenseRepository, NotificationService notificationService) {
         this.expenseRepository = expenseRepository;
+        this.notificationService = notificationService;
     }
 
     public List<ExpenseResponseDTO> getExpenses(String search, String status, String category,
@@ -76,7 +78,17 @@ public class ExpenseService {
         Expense expense = new Expense();
         applyRequest(expense, req);
         expense.setStatus(req.getStatus() != null && !req.getStatus().isBlank() ? req.getStatus() : "pending");
-        return ExpenseResponseDTO.fromEntity(expenseRepository.save(expense));
+        Expense saved = expenseRepository.save(expense);
+        notificationService.notifyRoles(
+                List.of("ADMIN", "ACCOUNTANT"),
+                "New Expense Submitted",
+                "Expense of " + (saved.getTotalAmount() != null ? "AED " + saved.getTotalAmount() : "") +
+                " from " + (saved.getVendorName() != null ? saved.getVendorName() : "vendor") + " is pending review.",
+                "INFO", "LOW", "FINANCIALS",
+                saved.getId(), "/expenses",
+                "EXPENSE_CREATED_" + saved.getId()
+        );
+        return ExpenseResponseDTO.fromEntity(saved);
     }
 
     public ExpenseResponseDTO updateExpense(Long id, ExpenseRequestDTO req) {

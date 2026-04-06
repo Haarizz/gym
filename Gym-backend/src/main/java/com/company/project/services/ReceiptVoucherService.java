@@ -19,9 +19,12 @@ import java.util.stream.Collectors;
 public class ReceiptVoucherService {
 
     private final ReceiptVoucherRepository receiptVoucherRepository;
+    private final NotificationService notificationService;
 
-    public ReceiptVoucherService(ReceiptVoucherRepository receiptVoucherRepository) {
+    public ReceiptVoucherService(ReceiptVoucherRepository receiptVoucherRepository,
+                                  NotificationService notificationService) {
         this.receiptVoucherRepository = receiptVoucherRepository;
+        this.notificationService = notificationService;
     }
 
     private synchronized String generateVoucherNo() {
@@ -75,7 +78,17 @@ public class ReceiptVoucherService {
         rv.setVoucherNo(generateVoucherNo());
         applyRequest(rv, req);
         rv.setStatus(req.getStatus() != null && !req.getStatus().isBlank() ? req.getStatus() : "draft");
-        return ReceiptVoucherResponseDTO.fromEntity(receiptVoucherRepository.save(rv));
+        ReceiptVoucher saved = receiptVoucherRepository.save(rv);
+        notificationService.notifyRoles(
+                List.of("ADMIN", "MANAGER", "ACCOUNTANT"),
+                "Payment Received",
+                "Receipt " + saved.getVoucherNo() + " created" +
+                (saved.getAmount() != null ? " for AED " + saved.getAmount() : "") + ".",
+                "SUCCESS", "MEDIUM", "BILLING",
+                saved.getId(), "/receipt-voucher",
+                "RECEIPT_CREATED_" + saved.getId()
+        );
+        return ReceiptVoucherResponseDTO.fromEntity(saved);
     }
 
     public ReceiptVoucherResponseDTO updateReceiptVoucher(Long id, ReceiptVoucherRequestDTO req) {

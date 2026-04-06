@@ -41,15 +41,18 @@ public class PurchaseOrderService {
     private final PurchaseOrderItemRepository purchaseOrderItemRepository;
     private final SupplierRepository supplierRepository;
     private final ProductStockRepository productStockRepository;
+    private final NotificationService notificationService;
 
     public PurchaseOrderService(PurchaseOrderRepository purchaseOrderRepository,
                                 PurchaseOrderItemRepository purchaseOrderItemRepository,
                                 SupplierRepository supplierRepository,
-                                ProductStockRepository productStockRepository) {
+                                ProductStockRepository productStockRepository,
+                                NotificationService notificationService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.purchaseOrderItemRepository = purchaseOrderItemRepository;
         this.supplierRepository = supplierRepository;
         this.productStockRepository = productStockRepository;
+        this.notificationService = notificationService;
     }
 
     // ── Write ────────────────────────────────────────────────────────────────
@@ -151,6 +154,18 @@ public class PurchaseOrderService {
 
         po.setStatus(newStatus);
         po = purchaseOrderRepository.save(po);
+
+        if ("CONFIRMED".equalsIgnoreCase(newStatus) || "RECEIVED".equalsIgnoreCase(newStatus)) {
+            String label = "CONFIRMED".equalsIgnoreCase(newStatus) ? "Confirmed" : "Received";
+            notificationService.notifyRoles(
+                    List.of("ADMIN", "MANAGER"),
+                    "Purchase Order " + label,
+                    "PO " + po.getPoNumber() + " has been " + label.toLowerCase() + ".",
+                    "SUCCESS", "MEDIUM", "INVENTORY",
+                    po.getId(), "/purchase-order",
+                    "PO_" + newStatus.toUpperCase() + "_" + po.getId()
+            );
+        }
 
         Supplier supplier = supplierRepository.findById(po.getSupplierId()).orElse(null);
         List<PurchaseOrderItem> items = purchaseOrderItemRepository.findByPurchaseOrderId(po.getId());

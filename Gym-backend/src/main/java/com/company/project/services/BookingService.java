@@ -17,6 +17,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Service
 public class BookingService {
@@ -24,13 +26,16 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final TrainingSessionRepository sessionRepository;
     private final MemberRepository memberRepository;
+    private final NotificationService notificationService;
 
     public BookingService(BookingRepository bookingRepository,
                           TrainingSessionRepository sessionRepository,
-                          MemberRepository memberRepository) {
+                          MemberRepository memberRepository,
+                          NotificationService notificationService) {
         this.bookingRepository = bookingRepository;
         this.sessionRepository = sessionRepository;
         this.memberRepository = memberRepository;
+        this.notificationService = notificationService;
     }
 
     public List<BookingResponseDTO> getBookings(String status,
@@ -125,6 +130,28 @@ public class BookingService {
         booking.setQrCode("QR-" + System.currentTimeMillis() + "-" + session.getId());
 
         bookingRepository.save(booking);
+
+        String sessionName = session.getName() != null ? session.getName() : "session";
+        String today = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        notificationService.notifyRoleAggregated(
+                "ADMIN",
+                "New Booking",
+                "A new booking was made for: " + sessionName,
+                "INFO", "LOW", "BOOKINGS",
+                "/bookings",
+                "BOOKING_CREATED_ADMIN_" + today, 1
+        );
+        if (member != null && member.getUserId() != null) {
+            notificationService.notifyUser(
+                    member.getUserId(),
+                    "Booking Confirmed",
+                    "Your booking for " + sessionName + " is confirmed.",
+                    "SUCCESS", "MEDIUM", "BOOKINGS",
+                    booking.getId(), "/book-session",
+                    "BOOKING_CREATED_" + booking.getId()
+            );
+        }
+
         return toResponse(booking);
     }
 
@@ -136,6 +163,30 @@ public class BookingService {
             booking.setStatus(request.getStatus());
         }
         bookingRepository.save(booking);
+
+        if ("cancelled".equalsIgnoreCase(request.getStatus())) {
+            String sName = booking.getSession() != null && booking.getSession().getName() != null
+                    ? booking.getSession().getName() : "session";
+            notificationService.notifyRole(
+                    "ADMIN",
+                    "Booking Cancelled",
+                    "Booking for " + sName + " was cancelled.",
+                    "WARNING", "MEDIUM", "BOOKINGS",
+                    booking.getId(), "/bookings",
+                    "BOOKING_CANCELLED_" + booking.getId()
+            );
+            if (booking.getMember() != null && booking.getMember().getUserId() != null) {
+                notificationService.notifyUser(
+                        booking.getMember().getUserId(),
+                        "Booking Cancelled",
+                        "Your booking for " + sName + " has been cancelled.",
+                        "WARNING", "MEDIUM", "BOOKINGS",
+                        booking.getId(), "/book-session",
+                        "BOOKING_CANCELLED_USER_" + booking.getId()
+                );
+            }
+        }
+
         return toResponse(booking);
     }
 

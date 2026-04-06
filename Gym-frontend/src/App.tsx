@@ -6,6 +6,7 @@ import React, {
 } from "react";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/shared/ProtectedRoute";
+import { NotificationBell } from "./components/shared/NotificationBell";
 import { authService, User } from "./utils/supabase/auth-service";
 import {
   Sidebar,
@@ -1048,16 +1049,19 @@ export default function App() {
       <div className="flex w-full" style={{ minHeight: 'calc(100vh / 0.9)' }}>
         <Sidebar className="hidden md:flex bg-gradient-primary">
           <SidebarHeader className="border-b border-sidebar-border p-4">
-            <div className="flex items-center space-x-3">
-              <div className="bg-white/20 backdrop-blur-sm text-white rounded-xl p-3 shadow-lg">
-                <Dumbbell className="h-6 w-6" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="bg-white/20 backdrop-blur-sm text-white rounded-xl p-3 shadow-lg">
+                  <Dumbbell className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-lg text-white">GymBios</h2>
+                  <p className="text-sm text-white/80">
+                    Business Operating System
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-bold text-lg text-white">GymBios</h2>
-                <p className="text-sm text-white/80">
-                  Business Operating System
-                </p>
-              </div>
+              <NotificationBell className="text-white/80 hover:text-white hover:bg-white/10" />
             </div>
           </SidebarHeader>
 
@@ -1171,6 +1175,7 @@ export default function App() {
                 </div>
               </div>
               <div className="flex-1" />
+              <NotificationBell className="mr-2" />
               <div className="relative">
                 <Avatar className="h-8 w-8 border-2 border-primary/20">
                   <AvatarFallback className="bg-gradient-primary text-white">
