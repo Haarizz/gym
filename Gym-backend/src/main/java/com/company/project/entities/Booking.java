@@ -41,6 +41,10 @@ public class Booking extends BaseEntity {
     @Column(name = "is_guest")
     private boolean guest;
 
+    // null = free/not applicable  |  "paid" = paid  |  "pay_later" = pay at gym
+    @Column(name = "payment_status")
+    private String paymentStatus;
+
     public Booking() {}
 
     public Long getId() { return id; }
@@ -72,4 +76,7 @@ public class Booking extends BaseEntity {
 
     public boolean isGuest() { return guest; }
     public void setGuest(boolean guest) { this.guest = guest; }
+
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
 }

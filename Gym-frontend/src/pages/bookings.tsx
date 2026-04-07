@@ -56,6 +56,7 @@ interface Booking {
   time: string;
   type: 'class' | 'pt' | 'facility';
   status: 'confirmed' | 'checked-in' | 'no-show' | 'cancelled';
+  paymentStatus?: 'paid' | 'pay_later' | null;
   price: number;
   qrCode: string;
   isGuest: boolean;
@@ -139,6 +140,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
     time: formatTime(booking.startTime),
     type: (booking.type as Booking["type"]) || "class",
     status: (booking.status as Booking["status"]) || "confirmed",
+    paymentStatus: booking.paymentStatus ?? null,
     price: Number(booking.price ?? 0),
     qrCode: booking.qrCode || "",
     isGuest: Boolean(booking.guest),
@@ -340,10 +342,20 @@ export function Bookings({ onNavigate }: BookingsProps) {
   const handleStatusUpdate = async (bookingId: string, newStatus: 'confirmed' | 'checked-in' | 'no-show' | 'cancelled') => {
     try {
       await bookingService.updateStatus(bookingId, newStatus);
-      await fetchBookings();
+      await fetchBookings(members);
       toast.success(`Booking status updated to ${newStatus}`);
     } catch (error: any) {
       toast.error(error?.message || "Failed to update booking");
+    }
+  };
+
+  const handleMarkAsPaid = async (bookingId: string) => {
+    try {
+      await bookingService.markAsPaid(bookingId);
+      await fetchBookings(members);
+      toast.success("Booking marked as paid");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to mark as paid");
     }
   };
 
@@ -1370,9 +1382,21 @@ export function Bookings({ onNavigate }: BookingsProps) {
                           <span className="text-sm font-medium text-primary">{booking.price} AED</span>
                         </td>
                         <td className="px-3 py-2">
-                          <Badge className={`${getStatusColor(booking.status)} text-xs`}>
-                            {booking.status}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge className={`${getStatusColor(booking.status)} text-xs w-fit`}>
+                              {booking.status}
+                            </Badge>
+                            {booking.paymentStatus === 'pay_later' && (
+                              <Badge className="bg-amber-100 text-amber-800 text-xs w-fit">
+                                Pay Later
+                              </Badge>
+                            )}
+                            {booking.paymentStatus === 'paid' && (
+                              <Badge className="bg-green-100 text-green-800 text-xs w-fit">
+                                Paid
+                              </Badge>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex items-center space-x-2">
@@ -1392,6 +1416,16 @@ export function Bookings({ onNavigate }: BookingsProps) {
                                 onClick={() => handleStatusUpdate(booking.id, 'checked-in')}
                               >
                                 <CheckCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {booking.paymentStatus === 'pay_later' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs text-amber-700 border-amber-400 hover:bg-amber-50"
+                                onClick={() => handleMarkAsPaid(booking.id)}
+                              >
+                                Mark Paid
                               </Button>
                             )}
                             <Button

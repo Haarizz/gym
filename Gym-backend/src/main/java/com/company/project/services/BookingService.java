@@ -42,7 +42,8 @@ public class BookingService {
                                                 String type,
                                                 LocalDate startDate,
                                                 LocalDate endDate,
-                                                String search) {
+                                                String search,
+                                                Long memberId) {
         List<Booking> bookings = bookingRepository.findAll();
 
         if (StringUtils.hasText(status)) {
@@ -77,6 +78,11 @@ public class BookingService {
                             || (b.getSession() != null && b.getSession().getName() != null
                                     && b.getSession().getName().toLowerCase().contains(lowered))
                     )
+                    .collect(Collectors.toList());
+        }
+        if (memberId != null) {
+            bookings = bookings.stream()
+                    .filter(b -> b.getMember() != null && memberId.equals(b.getMember().getId()))
                     .collect(Collectors.toList());
         }
 
@@ -126,6 +132,7 @@ public class BookingService {
         booking.setGuestEmail(request.getGuestEmail());
         booking.setGuestPhone(request.getGuestPhone());
         booking.setStatus(StringUtils.hasText(request.getStatus()) ? request.getStatus() : "confirmed");
+        booking.setPaymentStatus(request.getPaymentStatus());
         booking.setPrice(session.getPrice());
         booking.setQrCode("QR-" + System.currentTimeMillis() + "-" + session.getId());
 
@@ -161,6 +168,9 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
         if (StringUtils.hasText(request.getStatus())) {
             booking.setStatus(request.getStatus());
+        }
+        if (request.getPaymentStatus() != null) {
+            booking.setPaymentStatus(request.getPaymentStatus());
         }
         bookingRepository.save(booking);
 
@@ -216,6 +226,7 @@ public class BookingService {
         dto.setGuestEmail(booking.getGuestEmail());
         dto.setGuestPhone(booking.getGuestPhone());
         dto.setCreatedAt(booking.getCreatedAt());
+        dto.setPaymentStatus(booking.getPaymentStatus());
         return dto;
     }
 }
