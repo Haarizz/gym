@@ -141,8 +141,8 @@ export async function createCommunityPost(params: {
     type: params.type ?? 'achievement',
   };
   if (params.imageDataUrl) {
-    body.imageDataUrl = params.imageDataUrl;
-    body.imageAspectRatio = params.imageAspectRatio ?? null;
+    body.image_data_url = params.imageDataUrl;
+    body.image_aspect_ratio = params.imageAspectRatio ?? null;
   }
   const response = await fetch(`${API_BASE_URL}/community/posts`, {
     method: 'POST',
