@@ -29,10 +29,14 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final DeviceAuthFilter deviceAuthFilter;
     private final UserDetailsService userDetailsService;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, UserDetailsService userDetailsService) {
-        this.jwtAuthFilter = jwtAuthFilter;
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
+                          DeviceAuthFilter deviceAuthFilter,
+                          UserDetailsService userDetailsService) {
+        this.jwtAuthFilter    = jwtAuthFilter;
+        this.deviceAuthFilter = deviceAuthFilter;
         this.userDetailsService = userDetailsService;
     }
 
@@ -87,7 +91,9 @@ public class SecurityConfig {
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            // Device key filter runs first so hardware devices are identified before JWT check
+            .addFilterBefore(deviceAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(jwtAuthFilter, DeviceAuthFilter.class);
 
         return http.build();
     }
