@@ -138,7 +138,13 @@ public class MemberService {
                 LocalDateTime expiry = computeExpiry(member.getMembershipStartDate(), plan);
                 member.setMembershipEndDate(expiry);
                 member.setExpiryDate(expiry);
+                member.setNextPaymentDate(expiry);
             });
+        }
+
+        // Set last payment date when payment is made at registration
+        if (member.getLastPaymentDate() == null && "paid".equalsIgnoreCase(member.getPaymentStatus())) {
+            member.setLastPaymentDate(LocalDateTime.now());
         }
 
         // Recalculate outstanding balance: fee - paid amount
@@ -319,13 +325,18 @@ public class MemberService {
                 LocalDateTime newExpiry = computeExpiry(base, planOpt.get());
                 member.setMembershipEndDate(newExpiry);
                 member.setExpiryDate(newExpiry);
+                member.setNextPaymentDate(newExpiry);
             }
         } else if (request.getMembershipEndDate() != null) {
             // Fallback: use frontend-supplied date if no plan name
             LocalDateTime endDate = parseDateTime(request.getMembershipEndDate());
             member.setMembershipEndDate(endDate);
             member.setExpiryDate(endDate);
+            member.setNextPaymentDate(endDate);
         }
+
+        // Record payment date on renewal
+        member.setLastPaymentDate(LocalDateTime.now());
 
         // Clear outstanding balance on renewal if payment status is paid
         if ("paid".equalsIgnoreCase(member.getPaymentStatus())) {

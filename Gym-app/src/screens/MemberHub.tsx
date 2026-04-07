@@ -24,6 +24,7 @@ import { useNotifications } from "../context/NotificationsContext";
 import { useSettings } from "../context/SettingsContext";
 import type { RootStackParamList } from "../navigation/types";
 import { BRAND_COLOR } from "../theme";
+import { API_BASE_URL } from "../services/api";
 
 const quickActions = [
   {
@@ -93,6 +94,20 @@ const upcoming = [
   },
 ];
 
+interface MembershipInfo {
+  membershipPlan: string;
+  membershipStatus: string;
+  membershipEndDate: string | null;
+  nextPaymentDate: string | null;
+}
+
+const fmtDue = (iso: string | null | undefined): string => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+};
+
 export function MemberHub() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, logout } = useAuth();
@@ -101,6 +116,7 @@ export function MemberHub() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [profileImageError, setProfileImageError] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [membershipInfo, setMembershipInfo] = useState<MembershipInfo | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const menuAnim = useRef(new Animated.Value(0)).current;
 
@@ -108,6 +124,25 @@ export function MemberHub() {
   const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
   const profileImageUri = "";
   const hasProfileImage = Boolean(profileImageUri) && !profileImageError;
+
+  // Fetch live membership info for payment due date
+  useEffect(() => {
+    if (!user?.token) return;
+    fetch(`${API_BASE_URL}/members/me`, {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return;
+        setMembershipInfo({
+          membershipPlan: data.membership_plan ?? data.membershipPlan ?? "",
+          membershipStatus: data.membership_status ?? data.membershipStatus ?? "",
+          membershipEndDate: data.membership_end_date ?? data.membershipEndDate ?? null,
+          nextPaymentDate: data.next_payment_date ?? data.nextPaymentDate ?? null,
+        });
+      })
+      .catch(() => {/* silently ignore */});
+  }, [user?.token]);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -293,7 +328,15 @@ export function MemberHub() {
               </View>
               <View style={styles.heroPill}>
                 <Ionicons name="card" size={16} color="#fff" />
-                <Text style={styles.heroPillText}>Valid till Nov 30</Text>
+                <Text style={styles.heroPillText}>
+                  Valid till {fmtDue(membershipInfo?.membershipEndDate)}
+                </Text>
+              </View>
+              <View style={styles.heroPill}>
+                <Ionicons name="time-outline" size={16} color="#fff" />
+                <Text style={styles.heroPillText}>
+                  Due {fmtDue(membershipInfo?.nextPaymentDate ?? membershipInfo?.membershipEndDate)}
+                </Text>
               </View>
             </View>
           </LinearGradient>
