@@ -27,15 +27,18 @@ public class BookingService {
     private final TrainingSessionRepository sessionRepository;
     private final MemberRepository memberRepository;
     private final NotificationService notificationService;
+    private final QrCodeService qrCodeService;
 
     public BookingService(BookingRepository bookingRepository,
                           TrainingSessionRepository sessionRepository,
                           MemberRepository memberRepository,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          QrCodeService qrCodeService) {
         this.bookingRepository = bookingRepository;
         this.sessionRepository = sessionRepository;
         this.memberRepository = memberRepository;
         this.notificationService = notificationService;
+        this.qrCodeService = qrCodeService;
     }
 
     public List<BookingResponseDTO> getBookings(String status,
@@ -134,8 +137,10 @@ public class BookingService {
         booking.setStatus(StringUtils.hasText(request.getStatus()) ? request.getStatus() : "confirmed");
         booking.setPaymentStatus(request.getPaymentStatus());
         booking.setPrice(session.getPrice());
-        booking.setQrCode("QR-" + System.currentTimeMillis() + "-" + session.getId());
 
+        // Save first to obtain the booking ID, then generate the HMAC-signed QR
+        bookingRepository.save(booking);
+        booking.setQrCode(qrCodeService.generateBookingQr(booking.getId()));
         bookingRepository.save(booking);
 
         String sessionName = session.getName() != null ? session.getName() : "session";

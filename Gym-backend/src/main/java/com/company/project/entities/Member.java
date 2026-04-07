@@ -158,6 +158,10 @@ public class Member extends BaseEntity {
     @Column(name = "relationship_to_head")
     private String relationshipToHead;
 
+    // Face recognition device enrollment
+    @Column(name = "face_id")
+    private String faceId;  // null until face recognition device is enrolled
+
     // App authentication fields
     @Column(name = "user_id")
     private Long userId;
@@ -309,6 +313,9 @@ public class Member extends BaseEntity {
 
     public String getRelationshipToHead() { return relationshipToHead; }
     public void setRelationshipToHead(String relationshipToHead) { this.relationshipToHead = relationshipToHead; }
+
+    public String getFaceId() { return faceId; }
+    public void setFaceId(String faceId) { this.faceId = faceId; }
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }

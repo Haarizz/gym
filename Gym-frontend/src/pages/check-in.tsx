@@ -1,264 +1,352 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
-import { Switch } from "../components/ui/switch";
 import { Separator } from "../components/ui/separator";
-import { 
-  LogIn, 
-  LogOut, 
-  Search, 
-  QrCode, 
-  UserCheck, 
-  Clock, 
+import {
+  LogIn,
+  LogOut,
+  Search,
+  QrCode,
+  UserCheck,
   Users,
-  Smartphone,
   Camera,
   CheckCircle,
   AlertCircle,
   UserPlus,
-  ChevronDown,
   Upload,
   CreditCard,
-  Wallet,
-  DollarSign,
   X,
   CalendarClock,
+  RefreshCw,
+  Briefcase,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { membersService, type Member } from '../utils/supabase/members-service';
+import { staffService, type Staff } from '../utils/supabase/staff-service';
+import { checkInService, type TodayAttendanceRecord, type WalkInCheckInRequest } from '../utils/supabase/checkin-service';
+import { staffAttendanceService } from '../utils/supabase/staff-attendance-service';
 
-const recentCheckIns = [
-  {
-    id: 1,
-    memberName: "Sarah Johnson",
-    memberId: "MEM-0001",
-    avatar: "/avatars/sarah.jpg",
-    checkInTime: "08:30 AM",
-    status: "Active",
-    membership: "Premium",
-    type: "member"
-  },
-  {
-    id: 2,
-    memberName: "Mike Chen",
-    memberId: "MEM-0002", 
-    avatar: "/avatars/mike.jpg",
-    checkInTime: "08:15 AM",
-    status: "Active",
-    membership: "Standard",
-    type: "member"
-  },
-  {
-    id: 3,
-    memberName: "Emily Rodriguez",
-    memberId: "MEM-0003",
-    avatar: "/avatars/emily.jpg",
-    checkInTime: "07:45 AM",
-    status: "Checked Out",
-    membership: "Basic",
-    checkOutTime: "09:30 AM",
-    type: "member"
-  }
-];
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-const quickAccessMembers = [
-  {
-    id: 1,
-    name: "Sarah Johnson",
-    memberId: "MEM-0001",
-    avatar: "/avatars/sarah.jpg",
-    membership: "Premium",
-    status: "Active",
-    lastVisit: "Today"
-  },
-  {
-    id: 2,
-    name: "Mike Chen", 
-    memberId: "MEM-0002",
-    avatar: "/avatars/mike.jpg",
-    membership: "Standard",
-    status: "Active",
-    lastVisit: "Yesterday"
-  },
-  {
-    id: 3,
-    name: "Emily Rodriguez",
-    memberId: "MEM-0003",
-    avatar: "/avatars/emily.jpg",
-    membership: "Basic",
-    status: "Active",
-    lastVisit: "2 days ago"
-  }
-];
+type PersonKind = 'member' | 'staff';
+interface PersonEntry {
+  kind: PersonKind;
+  id: number;
+  name: string;
+  bizId: string;       // MBR-... or EMP-...
+  role: string;        // membership type for members, role for staff
+  status: string;
+  photoUrl?: string;
+}
+
+// ── Daily pass plans (static config) ─────────────────────────────────────────
 
 const dailyPlans = [
-  { id: 1, name: "Gym Only", price: 50, duration: "1 Day" },
-  { id: 2, name: "Gym + Pool", price: 75, duration: "1 Day" },
-  { id: 3, name: "Class Access", price: 60, duration: "1 Day" },
-  { id: 4, name: "Full Access", price: 100, duration: "1 Day" },
-  { id: 5, name: "3-Hour Pass", price: 35, duration: "3 Hours" },
-  { id: 6, name: "Half Day (6hrs)", price: 65, duration: "6 Hours" },
+  { id: 1, name: "Gym Only",       price: 50,  duration: "1 Day" },
+  { id: 2, name: "Gym + Pool",     price: 75,  duration: "1 Day" },
+  { id: 3, name: "Class Access",   price: 60,  duration: "1 Day" },
+  { id: 4, name: "Full Access",    price: 100, duration: "1 Day" },
+  { id: 5, name: "3-Hour Pass",    price: 35,  duration: "3 Hours" },
+  { id: 6, name: "Half Day (6hrs)",price: 65,  duration: "6 Hours" },
 ];
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function initials(name: string) {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function memberToPerson(m: Member): PersonEntry {
+  return {
+    kind: 'member',
+    id: Number(m.id),
+    name: m.name,
+    bizId: m.member_id || String(m.id),
+    role: m.membership_type || 'Member',
+    status: m.membership_status,
+    photoUrl: m.photo_url,
+  };
+}
+
+function staffToPerson(s: Staff): PersonEntry {
+  return {
+    kind: 'staff',
+    id: Number(s.id),
+    name: s.name,
+    bizId: s.staff_id || String(s.id),
+    role: s.role || 'Staff',
+    status: s.status,
+    photoUrl: s.photo_url,
+  };
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export function CheckIn() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMember, setSelectedMember] = useState<any>(null);
-  const [scannerActive, setScannerActive] = useState(false);
-  const [activeTab, setActiveTab] = useState("registered");
+  // ── Data state ──────────────────────────────────────────────────────────────
+  const [people, setPeople]               = useState<PersonEntry[]>([]);
+  const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceRecord[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [checkingInId, setCheckingInId]   = useState<number | null>(null);
+  const [checkingOutId, setCheckingOutId] = useState<number | null>(null); // attendance record id being checked out
+  const [staffActiveMap, setStaffActiveMap] = useState<Record<number, number>>({}); // staffDbId → attendanceRecordId
+
+  // ── UI state ─────────────────────────────────────────────────────────────────
+  const [searchTerm, setSearchTerm]       = useState('');
+  const [activeTab, setActiveTab]         = useState('registered');
+  const [selectedPerson, setSelectedPerson] = useState<PersonEntry | null>(null);
+
+  // ── Daily visitor form ───────────────────────────────────────────────────────
+  const [visitorName, setVisitorName]     = useState('');
+  const [visitorMobile, setVisitorMobile] = useState('');
+  const [visitorPhoto, setVisitorPhoto]   = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan]   = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentDone, setPaymentDone]     = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
   const [dailyCheckIns, setDailyCheckIns] = useState<any[]>([]);
-  
-  // Daily visitor form state
-  const [visitorName, setVisitorName] = useState("");
-  const [visitorMobile, setVisitorMobile] = useState("");
-  const [visitorPhoto, setVisitorPhoto] = useState<string | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [paymentStatus, setPaymentStatus] = useState(false);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef     = useRef<HTMLVideoElement>(null);
 
-  const filteredMembers = quickAccessMembers.filter(member =>
-    member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.memberId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // ── Load data ────────────────────────────────────────────────────────────────
 
-  const todayCheckIns = recentCheckIns.length + dailyCheckIns.length;
-  const activeNow = recentCheckIns.filter(m => m.status === "Active").length + dailyCheckIns.filter(d => d.status === "Active").length;
-  const totalCapacity = 150;
-  const occupancyRate = Math.round((activeNow / totalCapacity) * 100);
+  const loadPeople = useCallback(async () => {
+    try {
+      const [membersRes, staffRes] = await Promise.all([
+        membersService.getMembers({}, { page: 0, limit: 500 }),
+        staffService.getStaff({}, 1, 500),
+      ]);
+      const combined: PersonEntry[] = [
+        ...membersRes.members.map(memberToPerson),
+        ...staffRes.items.map(staffToPerson),
+      ];
+      setPeople(combined);
+    } catch (err) {
+      toast.error('Failed to load people list');
+    }
+  }, []);
+
+  const loadTodayAttendance = useCallback(async () => {
+    try {
+      const records = await checkInService.getTodayAttendance();
+      setTodayAttendance(records);
+    } catch {
+      // non-fatal — show empty list
+    }
+  }, []);
+
+  const loadStaffActiveMap = useCallback(async () => {
+    try {
+      const records = await staffAttendanceService.getTodayStaffAttendance();
+      const map: Record<number, number> = {};
+      records.filter(r => r.status === 'working').forEach(r => {
+        map[r.staff_db_id] = r.id;
+      });
+      setStaffActiveMap(map);
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
+  useEffect(() => {
+    Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap()]).finally(() => setLoading(false));
+  }, [loadPeople, loadTodayAttendance, loadStaffActiveMap]);
+
+  // ── Derived values ───────────────────────────────────────────────────────────
+
+  const filtered = people.filter(p => {
+    const q = searchTerm.toLowerCase();
+    return p.name.toLowerCase().includes(q) || p.bizId.toLowerCase().includes(q);
+  });
+
+  const todayCount  = todayAttendance.length + dailyCheckIns.length;
+  const activeCount = todayAttendance.length + dailyCheckIns.filter(d => d.status === 'Active').length;
+  const occupancy   = Math.round((activeCount / 150) * 100);
 
   const selectedPlanDetails = dailyPlans.find(p => p.id.toString() === selectedPlan);
-  const totalCharge = selectedPlanDetails ? selectedPlanDetails.price : 0;
 
-  const handleCheckIn = (member: any) => {
-    setSelectedMember(member);
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  const handleCheckOut = async (attendanceId: number, memberName: string) => {
+    setCheckingOutId(attendanceId);
+    try {
+      const res = await checkInService.checkout(attendanceId);
+      toast.success(`${memberName} checked out — ${res.formatted_duration}`);
+      await loadTodayAttendance();
+    } catch (err: any) {
+      toast.error(err.message || 'Checkout failed');
+    } finally {
+      setCheckingOutId(null);
+    }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setVisitorPhoto(reader.result as string);
-        toast.success("Photo uploaded successfully");
-      };
-      reader.readAsDataURL(file);
+  const handleStaffClockIn = async (person: PersonEntry) => {
+    setCheckingInId(person.id);
+    try {
+      const rec = await staffAttendanceService.clockIn(person.id, 'WEB');
+      setStaffActiveMap(prev => ({ ...prev, [person.id]: rec.id }));
+      toast.success(`${person.name} clocked in`);
+    } catch (err: any) {
+      toast.error(err.message || 'Clock-in failed');
+    } finally {
+      setCheckingInId(null);
     }
+  };
+
+  const handleStaffClockOut = async (person: PersonEntry) => {
+    setCheckingOutId(person.id);
+    try {
+      const rec = await staffAttendanceService.clockOut(person.id);
+      setStaffActiveMap(prev => { const n = { ...prev }; delete n[person.id]; return n; });
+      toast.success(`${person.name} clocked out — ${rec.formatted_duration || ''}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Clock-out failed');
+    } finally {
+      setCheckingOutId(null);
+    }
+  };
+
+  const handleCheckIn = async (person: PersonEntry) => {
+    if (person.kind === 'staff') {
+      toast.info('Staff clock-in is managed through the Attendance module');
+      return;
+    }
+    if (person.status !== 'active') {
+      toast.error(`Cannot check in — membership is ${person.status}`);
+      return;
+    }
+    setSelectedPerson(person);
+  };
+
+  const confirmCheckIn = async () => {
+    if (!selectedPerson) return;
+    setCheckingInId(selectedPerson.id);
+    try {
+      const res = await checkInService.checkIn({
+        method: 'manual',
+        member_id: selectedPerson.id,
+        device_id: 'WEB',
+      });
+      toast.success(res.message);
+      setSelectedPerson(null);
+      await loadTodayAttendance();
+    } catch (err: any) {
+      toast.error(err.message || 'Check-in failed');
+    } finally {
+      setCheckingInId(null);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setVisitorPhoto(reader.result as string);
+      toast.success('Photo uploaded');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleCapturePhoto = async () => {
     if (!isCameraActive) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          setIsCameraActive(true);
-        }
-      } catch (error) {
-        toast.error("Unable to access camera");
-      }
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+        setIsCameraActive(true);
+      } catch { toast.error('Unable to access camera'); }
     } else {
-      // Capture photo from video
       if (videoRef.current) {
         const canvas = document.createElement('canvas');
-        canvas.width = videoRef.current.videoWidth;
+        canvas.width  = videoRef.current.videoWidth;
         canvas.height = videoRef.current.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(videoRef.current, 0, 0);
-          const photoData = canvas.toDataURL('image/png');
-          setVisitorPhoto(photoData);
-          
-          // Stop camera
-          const stream = videoRef.current.srcObject as MediaStream;
-          stream.getTracks().forEach(track => track.stop());
-          setIsCameraActive(false);
-          toast.success("Photo captured successfully");
-        }
+        canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+        setVisitorPhoto(canvas.toDataURL('image/png'));
+        (videoRef.current.srcObject as MediaStream)?.getTracks().forEach(t => t.stop());
+        setIsCameraActive(false);
+        toast.success('Photo captured');
       }
     }
   };
 
   const handleCollectPayment = () => {
     if (!visitorName || !visitorMobile || !selectedPlan || !paymentMethod) {
-      toast.error("Please fill in all required fields");
+      toast.error('Please fill in all required fields');
       return;
     }
-
-    setIsProcessingPayment(true);
-    
-    // Simulate payment processing
+    setProcessingPayment(true);
     setTimeout(() => {
-      setPaymentStatus(true);
-      setIsProcessingPayment(false);
-      toast.success(`Payment of AED ${totalCharge} collected successfully via ${paymentMethod}`);
-    }, 1500);
+      setPaymentDone(true);
+      setProcessingPayment(false);
+      toast.success(`Payment of AED ${selectedPlanDetails?.price} collected via ${paymentMethod}`);
+    }, 1200);
   };
 
-  const handleGrantAccess = () => {
-    if (!paymentStatus) {
-      toast.error("Please complete payment before granting access");
-      return;
+  const handleGrantAccess = async () => {
+    if (!paymentDone) { toast.error('Complete payment first'); return; }
+    try {
+      const req: WalkInCheckInRequest = {
+        name: visitorName,
+        phone: visitorMobile,
+        session_type: selectedPlanDetails?.name || 'gym',
+        payment_status: 'paid',
+        device_id: 'WEB',
+        notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${paymentMethod}, Amount: AED ${selectedPlanDetails?.price}`,
+      };
+      await checkInService.walkInCheckIn(req);
+
+      const visitor = {
+        id: Date.now(),
+        memberName: visitorName,
+        memberId: `DAILY-${Date.now().toString().slice(-4)}`,
+        avatar: visitorPhoto,
+        checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        status: 'Active',
+        membership: selectedPlanDetails?.name || 'Daily Pass',
+        type: 'daily',
+        mobile: visitorMobile,
+        plan: selectedPlanDetails,
+        paymentMethod,
+        amount: selectedPlanDetails?.price,
+      };
+      setDailyCheckIns(prev => [visitor, ...prev]);
+      toast.success(`Access granted to ${visitorName}`, {
+        description: `${selectedPlanDetails?.name} — Valid for ${selectedPlanDetails?.duration}`,
+      });
+      resetDailyForm();
+    } catch (err: any) {
+      toast.error(err.message || 'Walk-in check-in failed');
     }
-
-    const newVisitor = {
-      id: Date.now(),
-      memberName: visitorName,
-      memberId: `DAILY-${Date.now().toString().slice(-4)}`,
-      avatar: visitorPhoto || undefined,
-      checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      status: "Active",
-      membership: selectedPlanDetails?.name || "Daily Pass",
-      type: "daily",
-      mobile: visitorMobile,
-      plan: selectedPlanDetails,
-      paymentMethod: paymentMethod,
-      amount: totalCharge,
-    };
-
-    setDailyCheckIns([newVisitor, ...dailyCheckIns]);
-    
-    toast.success(`Access granted to ${visitorName}`, {
-      description: `${selectedPlanDetails?.name} - Valid for ${selectedPlanDetails?.duration}`,
-    });
-
-    // Reset form
-    resetDailyVisitorForm();
   };
 
-  const resetDailyVisitorForm = () => {
-    setVisitorName("");
-    setVisitorMobile("");
-    setVisitorPhoto(null);
-    setSelectedPlan("");
-    setPaymentMethod("");
-    setPaymentStatus(false);
-    setIsProcessingPayment(false);
+  const resetDailyForm = () => {
+    setVisitorName(''); setVisitorMobile(''); setVisitorPhoto(null);
+    setSelectedPlan(''); setPaymentMethod(''); setPaymentDone(false);
+    setProcessingPayment(false);
+    if (isCameraActive && videoRef.current) {
+      (videoRef.current.srcObject as MediaStream)?.getTracks().forEach(t => t.stop());
+      setIsCameraActive(false);
+    }
   };
 
-  const allCheckIns = [
-    ...recentCheckIns.map(c => ({ ...c, type: "member" })),
-    ...dailyCheckIns.map(c => ({ ...c, type: "daily" }))
-  ].sort((a, b) => {
-    const timeA = new Date(`01/01/2000 ${a.checkInTime}`).getTime();
-    const timeB = new Date(`01/01/2000 ${b.checkInTime}`).getTime();
-    return timeB - timeA;
-  });
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="p-6 space-y-6 bg-gymbios-main-bg">
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -266,341 +354,274 @@ export function CheckIn() {
           <p className="text-muted-foreground">Manage access for registered members or daily visitors</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => setScannerActive(!scannerActive)} className="border-primary/30">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setLoading(true); Promise.all([loadPeople(), loadTodayAttendance()]).finally(() => setLoading(false)); }}
+            className="border-primary/30"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" className="border-primary/30 opacity-60 cursor-not-allowed" disabled title="Hardware device required">
             <QrCode className="mr-2 h-4 w-4" />
             QR Scanner
+            <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">Soon</span>
           </Button>
-          <Button variant="outline" className="border-primary/30">
+          <Button variant="outline" className="border-primary/30 opacity-60 cursor-not-allowed" disabled title="Face recognition device required">
             <Camera className="mr-2 h-4 w-4" />
             Face Recognition
+            <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">Soon</span>
           </Button>
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card className="border-primary/10 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Today's Check-ins</CardTitle>
-            <div className="bg-gradient-light p-2 rounded-lg">
-              <LogIn className="h-4 w-4 text-primary" />
-            </div>
+            <div className="bg-gradient-light p-2 rounded-lg"><LogIn className="h-4 w-4 text-primary" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{todayCheckIns}</div>
-            <p className="text-xs text-muted-foreground">
-              Total visits today
-            </p>
+            <div className="text-2xl font-bold text-primary">{todayCount}</div>
+            <p className="text-xs text-muted-foreground">Total visits today</p>
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card className="border-primary/10 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Currently Active</CardTitle>
-            <div className="bg-green-50 p-2 rounded-lg">
-              <UserCheck className="h-4 w-4 text-green-600" />
-            </div>
+            <div className="bg-green-50 p-2 rounded-lg"><UserCheck className="h-4 w-4 text-green-600" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeNow}</div>
-            <p className="text-xs text-muted-foreground">
-              Members in gym
-            </p>
+            <div className="text-2xl font-bold text-green-600">{activeCount}</div>
+            <p className="text-xs text-muted-foreground">Members in gym</p>
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card className="border-primary/10 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Occupancy Rate</CardTitle>
-            <div className="bg-gradient-light p-2 rounded-lg">
-              <Users className="h-4 w-4 text-primary" />
-            </div>
+            <div className="bg-gradient-light p-2 rounded-lg"><Users className="h-4 w-4 text-primary" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{occupancyRate}%</div>
-            <p className="text-xs text-muted-foreground">
-              of {totalCapacity} capacity
-            </p>
+            <div className="text-2xl font-bold text-primary">{occupancy}%</div>
+            <p className="text-xs text-muted-foreground">of 150 capacity</p>
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card className="border-primary/10 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Daily Visitors</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg">
-              <UserPlus className="h-4 w-4 text-blue-600" />
-            </div>
+            <div className="bg-blue-50 p-2 rounded-lg"><UserPlus className="h-4 w-4 text-blue-600" /></div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{dailyCheckIns.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Walk-in passes today
-            </p>
+            <p className="text-xs text-muted-foreground">Walk-in passes today</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Check-in Tabs */}
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full max-w-md grid-cols-2 bg-gradient-light">
-          <TabsTrigger 
-            value="registered" 
-            className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white"
-          >
+          <TabsTrigger value="registered" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
             <UserCheck className="h-4 w-4 mr-2" />
-            Registered Members
+            Members &amp; Staff
           </TabsTrigger>
-          <TabsTrigger 
-            value="daily" 
-            className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white"
-          >
+          <TabsTrigger value="daily" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
             <UserPlus className="h-4 w-4 mr-2" />
             Walk-In / Daily
           </TabsTrigger>
         </TabsList>
 
-        {/* Registered Member Check-in Tab */}
+        {/* ── Members & Staff tab ── */}
         <TabsContent value="registered" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Check-in Interface */}
+
+            {/* People list */}
             <Card className="border-primary/10 shadow-lg">
               <CardHeader className="bg-gradient-light border-b border-primary/10">
-                <CardTitle className="text-primary">Member Check-in</CardTitle>
-                <CardDescription>Search and check-in members manually</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-primary">Members &amp; Staff</CardTitle>
+                    <CardDescription>Search and check-in</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="border-primary/30 text-primary">
+                    {people.length} total
+                  </Badge>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4 pt-6">
+              <CardContent className="space-y-4 pt-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by name or member ID..."
+                    placeholder="Search by name or ID..."
                     className="pl-10 border-primary/20 focus:border-primary"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={e => setSearchTerm(e.target.value)}
                   />
                 </div>
 
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {filteredMembers.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 border border-primary/10 rounded-lg hover:bg-gradient-light transition-colors">
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="border-2 border-primary/20">
-                          <AvatarImage src={member.avatar} />
-                          <AvatarFallback className="bg-gradient-light text-primary">
-                            {member.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{member.name}</div>
-                          <div className="text-sm text-muted-foreground">{member.memberId} • {member.membership}</div>
-                          <div className="text-xs text-muted-foreground">Last visit: {member.lastVisit}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={member.status === "Active" ? "bg-green-100 text-green-800 border-0" : "bg-gray-100 text-gray-800 border-0"}>
-                          {member.status}
-                        </Badge>
-                        <Button size="sm" className="btn-primary" onClick={() => handleCheckIn(member)}>
-                          <LogIn className="mr-2 h-4 w-4" />
-                          Check In
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {scannerActive && (
-                  <div className="p-6 border-2 border-dashed border-primary/30 rounded-lg text-center bg-gradient-light">
-                    <QrCode className="mx-auto h-12 w-12 text-primary mb-4" />
-                    <h3 className="font-medium mb-2 text-primary">QR Code Scanner Active</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Position member's QR code in front of the camera
-                    </p>
-                    <Button variant="outline" onClick={() => setScannerActive(false)} className="border-primary/30">
-                      Stop Scanning
-                    </Button>
+                {loading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading...
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground text-sm">
+                    {searchTerm ? `No results for "${searchTerm}"` : 'No members or staff found'}
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                    {filtered.map(person => (
+                      <PersonRow
+                        key={`${person.kind}-${person.id}`}
+                        person={person}
+                        onCheckIn={handleCheckIn}
+                        onStaffClockIn={handleStaffClockIn}
+                        onStaffClockOut={handleStaffClockOut}
+                        isChecking={checkingInId === person.id}
+                        isClockedIn={!!staffActiveMap[person.id]}
+                        isActing={checkingInId === person.id || checkingOutId === person.id}
+                      />
+                    ))}
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Recent Activity */}
+            {/* Recent check-ins */}
             <Card className="border-primary/10 shadow-lg">
               <CardHeader className="bg-gradient-light border-b border-primary/10">
                 <CardTitle className="text-primary">Recent Check-ins</CardTitle>
-                <CardDescription>Latest member activity</CardDescription>
+                <CardDescription>Latest member activity today</CardDescription>
               </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  {recentCheckIns.map((checkin) => (
-                    <div key={checkin.id} className="flex items-center justify-between p-3 border border-primary/10 rounded-lg hover:bg-gradient-light transition-colors">
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="border-2 border-primary/20">
-                          <AvatarImage src={checkin.avatar} />
-                          <AvatarFallback className="bg-gradient-light text-primary">
-                            {checkin.memberName.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{checkin.memberName}</div>
-                          <div className="text-sm text-muted-foreground">{checkin.memberId}</div>
-                          <div className="text-xs text-muted-foreground">
-                            In: {checkin.checkInTime}
-                            {checkin.checkOutTime && ` • Out: ${checkin.checkOutTime}`}
+              <CardContent className="pt-4">
+                {todayAttendance.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <UserCheck className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
+                    <p className="text-sm">No check-ins yet today</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                    {todayAttendance.map(record => {
+                      const name = record.member_name || record['walk_in_name'] || 'Visitor';
+                      const isActive = record.status === 'active';
+                      const isCheckingOut = checkingOutId === record.id;
+                      return (
+                      <div key={record.id} className="flex items-center justify-between p-3 border border-primary/10 rounded-lg hover:bg-gradient-light transition-colors">
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="border-2 border-primary/20">
+                            <AvatarImage src={record.photo_url} />
+                            <AvatarFallback className="bg-gradient-light text-primary text-sm">
+                              {initials(name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium text-sm">{name}</div>
+                            <div className="text-xs text-muted-foreground">{record.member_biz_id} · {record.membership_type}</div>
+                            <div className="text-xs text-muted-foreground">
+                              In: {formatTime(record.check_in_time)}
+                              {record.check_out_time && ` · Out: ${formatTime(record.check_out_time)}`}
+                              {record.formatted_duration && ` · ${record.formatted_duration}`}
+                            </div>
                           </div>
                         </div>
+                        <div className="flex flex-col items-end gap-1.5">
+                          {isActive ? (
+                            <>
+                              <Badge className="bg-green-100 text-green-800 border-0 text-xs">
+                                <CheckCircle className="mr-1 h-3 w-3" /> In Gym
+                              </Badge>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-xs border-red-200 text-red-600 hover:bg-red-50"
+                                onClick={() => handleCheckOut(record.id, name)}
+                                disabled={isCheckingOut}
+                              >
+                                {isCheckingOut
+                                  ? <div className="animate-spin rounded-full h-3 w-3 border-b border-red-500 mr-1" />
+                                  : <LogOut className="mr-1 h-3 w-3" />
+                                }
+                                Check Out
+                              </Button>
+                            </>
+                          ) : (
+                            <Badge className="bg-gray-100 text-gray-600 border-0 text-xs">Completed</Badge>
+                          )}
+                          <span className="text-xs text-muted-foreground capitalize">{record.check_in_method}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {checkin.status === "Active" ? (
-                          <>
-                            <Badge className="bg-green-100 text-green-800 border-0">
-                              <CheckCircle className="mr-1 h-3 w-3" />
-                              In Gym
-                            </Badge>
-                            <Button size="sm" variant="outline" className="border-primary/30">
-                              <LogOut className="mr-2 h-4 w-4" />
-                              Check Out
-                            </Button>
-                          </>
-                        ) : (
-                          <Badge className="bg-gray-100 text-gray-800 border-0">
-                            Completed
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        {/* Daily Visitor Check-in Tab */}
+        {/* ── Daily Visitor tab ── */}
         <TabsContent value="daily" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Walk-In Access Form */}
             <Card className="lg:col-span-2 border-primary/10 shadow-lg">
               <CardHeader className="bg-gradient-primary text-white">
                 <div className="flex items-center space-x-2">
                   <UserPlus className="h-5 w-5" />
                   <CardTitle>Walk-In / Daily Visitor Access</CardTitle>
                 </div>
-                <CardDescription className="text-white/80">
-                  Register and grant temporary access to daily visitors
-                </CardDescription>
+                <CardDescription className="text-white/80">Register and grant temporary access</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
-                {/* Visitor Information */}
+                {/* Visitor info */}
                 <div className="space-y-4">
                   <h3 className="font-semibold text-primary flex items-center">
-                    <Users className="h-4 w-4 mr-2" />
-                    Visitor Information
+                    <Users className="h-4 w-4 mr-2" /> Visitor Information
                   </h3>
-                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="visitor-name" className="text-primary">
-                        Full Name <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="visitor-name"
-                        placeholder="Enter full name"
-                        value={visitorName}
-                        onChange={(e) => setVisitorName(e.target.value)}
-                        className="border-primary/20 focus:border-primary"
-                      />
+                      <Label className="text-primary">Full Name <span className="text-red-500">*</span></Label>
+                      <Input placeholder="Enter full name" value={visitorName} onChange={e => setVisitorName(e.target.value)} className="border-primary/20 focus:border-primary" />
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="visitor-mobile" className="text-primary">
-                        Mobile Number <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="visitor-mobile"
-                        type="tel"
-                        placeholder="+971 XX XXX XXXX"
-                        value={visitorMobile}
-                        onChange={(e) => setVisitorMobile(e.target.value)}
-                        maxLength={15}
-                        className="border-primary/20 focus:border-primary"
-                      />
+                      <Label className="text-primary">Mobile Number <span className="text-red-500">*</span></Label>
+                      <Input type="tel" placeholder="+971 XX XXX XXXX" value={visitorMobile} onChange={e => setVisitorMobile(e.target.value)} maxLength={15} className="border-primary/20 focus:border-primary" />
                     </div>
                   </div>
 
-                  {/* Photo Capture/Upload */}
+                  {/* Photo */}
                   <div className="space-y-2">
-                    <Label className="text-primary">
-                      Photo <span className="text-muted-foreground text-sm">(Optional)</span>
-                    </Label>
+                    <Label className="text-primary">Photo <span className="text-muted-foreground text-sm">(Optional)</span></Label>
                     <div className="flex flex-col sm:flex-row gap-3">
                       {!visitorPhoto ? (
                         <>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleCapturePhoto}
-                            className="flex-1 border-primary/30"
-                          >
+                          <Button type="button" variant="outline" onClick={handleCapturePhoto} className="flex-1 border-primary/30">
                             <Camera className="mr-2 h-4 w-4" />
-                            {isCameraActive ? "Capture Photo" : "Use Camera"}
+                            {isCameraActive ? 'Capture Photo' : 'Use Camera'}
                           </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="flex-1 border-primary/30"
-                          >
-                            <Upload className="mr-2 h-4 w-4" />
-                            Upload Photo
+                          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1 border-primary/30">
+                            <Upload className="mr-2 h-4 w-4" /> Upload Photo
                           </Button>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleFileUpload}
-                          />
+                          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
                         </>
                       ) : (
-                        <div className="relative w-full">
-                          <div className="flex items-center space-x-3 p-3 border border-primary/20 rounded-lg bg-gradient-light">
-                            <img 
-                              src={visitorPhoto} 
-                              alt="Visitor" 
-                              className="w-16 h-16 rounded-lg object-cover border-2 border-primary/20"
-                            />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-primary">Photo captured</p>
-                              <p className="text-xs text-muted-foreground">Ready for check-in</p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setVisitorPhoto(null);
-                                if (isCameraActive && videoRef.current) {
-                                  const stream = videoRef.current.srcObject as MediaStream;
-                                  stream?.getTracks().forEach(track => track.stop());
-                                  setIsCameraActive(false);
-                                }
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                        <div className="flex items-center space-x-3 p-3 border border-primary/20 rounded-lg bg-gradient-light w-full">
+                          <img src={visitorPhoto} alt="Visitor" className="w-14 h-14 rounded-lg object-cover border-2 border-primary/20" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-primary">Photo ready</p>
+                            <p className="text-xs text-muted-foreground">Ready for check-in</p>
                           </div>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setVisitorPhoto(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
                       )}
                     </div>
-                    
                     {isCameraActive && (
                       <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
-                        <video
-                          ref={videoRef}
-                          className="w-full h-full object-cover"
-                          autoPlay
-                          playsInline
-                        />
+                        <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline />
                       </div>
                     )}
                   </div>
@@ -611,37 +632,26 @@ export function CheckIn() {
                 {/* Plan & Payment */}
                 <div className="space-y-4">
                   <h3 className="font-semibold text-primary flex items-center">
-                    <CalendarClock className="h-4 w-4 mr-2" />
-                    Access Plan & Payment
+                    <CalendarClock className="h-4 w-4 mr-2" /> Access Plan &amp; Payment
                   </h3>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="daily-plan" className="text-primary">
-                        Choose Daily Plan <span className="text-red-500">*</span>
-                      </Label>
+                      <Label className="text-primary">Choose Daily Plan <span className="text-red-500">*</span></Label>
                       <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-                        <SelectTrigger id="daily-plan" className="border-primary/20">
-                          <SelectValue placeholder="Select a plan" />
-                        </SelectTrigger>
+                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select a plan" /></SelectTrigger>
                         <SelectContent>
-                          {dailyPlans.map((plan) => (
-                            <SelectItem key={plan.id} value={plan.id.toString()}>
-                              {plan.name} - AED {plan.price} ({plan.duration})
+                          {dailyPlans.map(p => (
+                            <SelectItem key={p.id} value={p.id.toString()}>
+                              {p.name} — AED {p.price} ({p.duration})
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="payment-method" className="text-primary">
-                        Payment Method <span className="text-red-500">*</span>
-                      </Label>
+                      <Label className="text-primary">Payment Method <span className="text-red-500">*</span></Label>
                       <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                        <SelectTrigger id="payment-method" className="border-primary/20">
-                          <SelectValue placeholder="Select method" />
-                        </SelectTrigger>
+                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select method" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="cash">💵 Cash</SelectItem>
                           <SelectItem value="card">💳 Card</SelectItem>
@@ -653,133 +663,83 @@ export function CheckIn() {
                     </div>
                   </div>
 
-                  {/* Total Charge Display */}
                   {selectedPlan && (
-                    <div className="p-4 bg-gradient-light border border-primary/20 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Total Charge</p>
-                          <p className="text-2xl font-bold text-primary">AED {totalCharge}</p>
-                          {selectedPlanDetails && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Valid for {selectedPlanDetails.duration}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {paymentStatus ? (
-                            <Badge className="bg-green-100 text-green-800 border-0 px-3 py-1">
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Paid
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-yellow-100 text-yellow-800 border-0 px-3 py-1">
-                              <AlertCircle className="h-4 w-4 mr-1" />
-                              Pending
-                            </Badge>
-                          )}
-                        </div>
+                    <div className="p-4 bg-gradient-light border border-primary/20 rounded-lg flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Charge</p>
+                        <p className="text-2xl font-bold text-primary">AED {selectedPlanDetails?.price}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Valid for {selectedPlanDetails?.duration}</p>
                       </div>
+                      {paymentDone ? (
+                        <Badge className="bg-green-100 text-green-800 border-0 px-3 py-1">
+                          <CheckCircle className="h-4 w-4 mr-1" /> Paid
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-yellow-100 text-yellow-800 border-0 px-3 py-1">
+                          <AlertCircle className="h-4 w-4 mr-1" /> Pending
+                        </Badge>
+                      )}
                     </div>
                   )}
                 </div>
 
                 <Separator className="bg-primary/10" />
 
-                {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1 border-primary/30"
-                    onClick={resetDailyVisitorForm}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
+                  <Button variant="outline" className="flex-1 border-primary/30" onClick={resetDailyForm}>
+                    <X className="mr-2 h-4 w-4" /> Cancel
                   </Button>
                   <Button
                     className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white"
                     onClick={handleCollectPayment}
-                    disabled={!visitorName || !visitorMobile || !selectedPlan || !paymentMethod || paymentStatus || isProcessingPayment}
+                    disabled={!visitorName || !visitorMobile || !selectedPlan || !paymentMethod || paymentDone || processingPayment}
                   >
-                    {isProcessingPayment ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="mr-2 h-4 w-4" />
-                        Collect Payment
-                      </>
-                    )}
+                    {processingPayment
+                      ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> Processing...</>
+                      : <><CreditCard className="mr-2 h-4 w-4" /> Collect Payment</>
+                    }
                   </Button>
-                  <Button
-                    className="flex-1 btn-primary"
-                    onClick={handleGrantAccess}
-                    disabled={!paymentStatus}
-                  >
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Grant Access
+                  <Button className="flex-1 btn-primary" onClick={handleGrantAccess} disabled={!paymentDone}>
+                    <CheckCircle className="mr-2 h-4 w-4" /> Grant Access
                   </Button>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Today's Daily Visitors */}
+            {/* Today's daily visitors */}
             <Card className="border-primary/10 shadow-lg">
               <CardHeader className="bg-gradient-light border-b border-primary/10">
                 <CardTitle className="text-primary">Today's Daily Visitors</CardTitle>
                 <CardDescription>Walk-in passes issued</CardDescription>
               </CardHeader>
-              <CardContent className="pt-6">
+              <CardContent className="pt-4">
                 {dailyCheckIns.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <UserPlus className="mx-auto h-12 w-12 text-muted-foreground/50 mb-3" />
+                    <UserPlus className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
                     <p className="text-sm">No daily visitors yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                    {dailyCheckIns.map((visitor) => (
-                      <div key={visitor.id} className="p-3 border border-primary/10 rounded-lg bg-gradient-light hover:shadow-md transition-shadow">
+                  <div className="space-y-3 max-h-[520px] overflow-y-auto">
+                    {dailyCheckIns.map(v => (
+                      <div key={v.id} className="p-3 border border-primary/10 rounded-lg bg-gradient-light">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center space-x-2">
-                            {visitor.avatar ? (
-                              <img 
-                                src={visitor.avatar} 
-                                alt={visitor.memberName}
-                                className="w-10 h-10 rounded-full object-cover border-2 border-primary/20"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                <UserPlus className="h-5 w-5 text-blue-600" />
-                              </div>
-                            )}
+                            {v.avatar
+                              ? <img src={v.avatar} alt={v.memberName} className="w-10 h-10 rounded-full object-cover border-2 border-primary/20" />
+                              : <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center"><UserPlus className="h-5 w-5 text-blue-600" /></div>
+                            }
                             <div>
-                              <p className="font-medium text-sm">{visitor.memberName}</p>
-                              <p className="text-xs text-muted-foreground">{visitor.memberId}</p>
+                              <p className="font-medium text-sm">{v.memberName}</p>
+                              <p className="text-xs text-muted-foreground">{v.memberId}</p>
                             </div>
                           </div>
-                          <Badge className="bg-blue-100 text-blue-800 border-0 text-xs">
-                            Daily User
-                          </Badge>
+                          <Badge className="bg-blue-100 text-blue-800 border-0 text-xs">Daily</Badge>
                         </div>
                         <div className="space-y-1 text-xs text-muted-foreground ml-12">
-                          <div className="flex items-center justify-between">
-                            <span>Plan:</span>
-                            <span className="font-medium text-primary">{visitor.membership}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span>Check-in:</span>
-                            <span className="font-medium">{visitor.checkInTime}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span>Amount:</span>
-                            <span className="font-medium text-green-600">AED {visitor.amount}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span>Mobile:</span>
-                            <span className="font-medium">{visitor.mobile}</span>
-                          </div>
+                          <div className="flex justify-between"><span>Plan:</span><span className="font-medium text-primary">{v.membership}</span></div>
+                          <div className="flex justify-between"><span>Check-in:</span><span className="font-medium">{v.checkInTime}</span></div>
+                          <div className="flex justify-between"><span>Amount:</span><span className="font-medium text-green-600">AED {v.amount}</span></div>
+                          <div className="flex justify-between"><span>Mobile:</span><span className="font-medium">{v.mobile}</span></div>
                         </div>
                       </div>
                     ))}
@@ -791,118 +751,50 @@ export function CheckIn() {
         </TabsContent>
       </Tabs>
 
-      {/* Today's Check-In Log (All) */}
-      <Card className="border-primary/10 shadow-lg">
-        <CardHeader className="bg-gradient-light border-b border-primary/10">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-primary">Today's Check-In Log</CardTitle>
-              <CardDescription>All check-ins (Members + Daily Visitors)</CardDescription>
-            </div>
-            <Badge className="bg-gradient-primary text-white border-0">
-              {allCheckIns.length} Total
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="space-y-3">
-            {allCheckIns.map((checkin) => (
-              <div key={checkin.id} className="flex items-center justify-between p-3 border border-primary/10 rounded-lg hover:bg-gradient-light transition-colors">
-                <div className="flex items-center space-x-3">
-                  {checkin.avatar ? (
-                    <Avatar className="border-2 border-primary/20">
-                      <AvatarImage src={checkin.avatar} />
-                      <AvatarFallback className="bg-gradient-light text-primary">
-                        {checkin.memberName.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center border-2 border-primary/20">
-                      <UserPlus className="h-5 w-5 text-blue-600" />
-                    </div>
-                  )}
-                  <div>
-                    <div className="font-medium">{checkin.memberName}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {checkin.memberId} • {checkin.membership}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      In: {checkin.checkInTime}
-                      {checkin.checkOutTime && ` • Out: ${checkin.checkOutTime}`}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Badge className={
-                    checkin.type === "daily" 
-                      ? "bg-blue-100 text-blue-800 border-0"
-                      : "bg-purple-100 text-purple-800 border-0"
-                  }>
-                    {checkin.type === "daily" ? "Daily User" : "Member"}
-                  </Badge>
-                  {checkin.status === "Active" && (
-                    <Badge className="bg-green-100 text-green-800 border-0">
-                      <CheckCircle className="mr-1 h-3 w-3" />
-                      Active
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Check-in Confirmation Dialog for Members */}
-      {selectedMember && (
-        <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
+      {/* Confirm check-in dialog */}
+      {selectedPerson && (
+        <Dialog open onOpenChange={() => setSelectedPerson(null)}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Confirm Check-in</DialogTitle>
-              <DialogDescription>
-                Checking in {selectedMember.name}
-              </DialogDescription>
+              <DialogDescription>Checking in {selectedPerson.name}</DialogDescription>
             </DialogHeader>
             <div className="flex items-center space-x-4 py-4">
               <Avatar className="h-16 w-16 border-2 border-primary/20">
-                <AvatarImage src={selectedMember.avatar} />
-                <AvatarFallback className="bg-gradient-light text-primary">
-                  {selectedMember.name.split(' ').map((n: string) => n[0]).join('')}
+                <AvatarImage src={selectedPerson.photoUrl} />
+                <AvatarFallback className="bg-gradient-light text-primary text-lg">
+                  {initials(selectedPerson.name)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="text-lg font-medium">{selectedMember.name}</h3>
-                <p className="text-sm text-muted-foreground">{selectedMember.memberId}</p>
+                <h3 className="text-lg font-semibold">{selectedPerson.name}</h3>
+                <p className="text-sm text-muted-foreground">{selectedPerson.bizId}</p>
                 <Badge className="mt-1 bg-gradient-light text-primary border border-primary/20">
-                  {selectedMember.membership}
+                  {selectedPerson.role}
                 </Badge>
               </div>
             </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <Label>Check-in Time</Label>
-                  <div className="font-medium">{new Date().toLocaleTimeString()}</div>
-                </div>
-                <div>
-                  <Label>Date</Label>
-                  <div className="font-medium">{new Date().toLocaleDateString()}</div>
-                </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <Label>Check-in Time</Label>
+                <div className="font-medium">{new Date().toLocaleTimeString()}</div>
+              </div>
+              <div>
+                <Label>Date</Label>
+                <div className="font-medium">{new Date().toLocaleDateString()}</div>
               </div>
             </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setSelectedMember(null)} className="border-primary/30">
-                Cancel
-              </Button>
-              <Button 
-                className="btn-primary" 
-                onClick={() => {
-                  toast.success(`${selectedMember.name} checked in successfully`);
-                  setSelectedMember(null);
-                }}
+            <div className="flex justify-end space-x-2 mt-2">
+              <Button variant="outline" onClick={() => setSelectedPerson(null)} className="border-primary/30">Cancel</Button>
+              <Button
+                className="btn-primary"
+                onClick={confirmCheckIn}
+                disabled={checkingInId !== null}
               >
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Confirm Check-in
+                {checkingInId !== null
+                  ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> Checking in...</>
+                  : <><CheckCircle className="mr-2 h-4 w-4" /> Confirm Check-in</>
+                }
               </Button>
             </div>
           </DialogContent>
@@ -912,3 +804,91 @@ export function CheckIn() {
   );
 }
 
+// ── PersonRow sub-component ───────────────────────────────────────────────────
+
+function PersonRow({ person, onCheckIn, onStaffClockIn, onStaffClockOut, isChecking, isClockedIn, isActing }: {
+  person: PersonEntry;
+  onCheckIn: (p: PersonEntry) => void;
+  onStaffClockIn: (p: PersonEntry) => void;
+  onStaffClockOut: (p: PersonEntry) => void;
+  isChecking: boolean;
+  isClockedIn: boolean;
+  isActing: boolean;
+}) {
+  const isMember  = person.kind === 'member';
+  const isActive  = person.status === 'active';
+
+  const statusColor = isActive
+    ? 'bg-green-100 text-green-800'
+    : person.status === 'suspended'
+    ? 'bg-red-100 text-red-800'
+    : 'bg-gray-100 text-gray-700';
+
+  return (
+    <div className="flex items-center justify-between p-3 border border-primary/10 rounded-lg hover:bg-gradient-light transition-colors">
+      <div className="flex items-center space-x-3">
+        <Avatar className="border-2 border-primary/20">
+          <AvatarImage src={person.photoUrl} />
+          <AvatarFallback className="bg-gradient-light text-primary text-sm">
+            {initials(person.name)}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <div className="font-medium text-sm flex items-center gap-1.5">
+            {person.name}
+            {!isMember && (
+              <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground font-normal">
+                <Briefcase className="h-3 w-3" /> Staff
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground">{person.bizId} · {person.role}</div>
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Badge className={`${statusColor} border-0 text-xs capitalize`}>{person.status}</Badge>
+        {isMember ? (
+          <Button
+            size="sm"
+            className="btn-primary"
+            onClick={() => onCheckIn(person)}
+            disabled={isActing || !isActive}
+          >
+            {isChecking
+              ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+              : <><LogIn className="mr-1 h-3 w-3" /> Check In</>
+            }
+          </Button>
+        ) : isClockedIn ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-red-200 text-red-600 hover:bg-red-50 text-xs"
+            onClick={() => onStaffClockOut(person)}
+            disabled={isActing}
+          >
+            {isActing
+              ? <div className="animate-spin rounded-full h-3 w-3 border-b border-red-500 mr-1" />
+              : <LogOut className="mr-1 h-3 w-3" />
+            }
+            Clock Out
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-primary/30 text-xs"
+            onClick={() => onStaffClockIn(person)}
+            disabled={isActing || !isActive}
+          >
+            {isActing
+              ? <div className="animate-spin rounded-full h-3 w-3 border-b border-primary mr-1" />
+              : <LogIn className="mr-1 h-3 w-3" />
+            }
+            Clock In
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

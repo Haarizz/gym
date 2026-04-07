@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+
+    java.util.Optional<Booking> findByQrCode(String qrCode);
     long countBySessionIdAndStatusNot(Long sessionId, String status);
     boolean existsBySessionId(Long sessionId);
     long deleteBySessionId(Long sessionId);

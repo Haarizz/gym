@@ -21,6 +21,10 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     Optional<Member> findByUserId(Long userId);
 
+    Optional<Member> findByFaceId(String faceId);
+
+    long countByMembershipStatus(String membershipStatus);
+
     List<Member> findAllByMemberIdIn(List<String> memberIds);
 
     // Members with overdue payment status
