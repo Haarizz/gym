@@ -53,8 +53,13 @@ import {
   Download,
   Calendar as CalendarIcon,
   PlayCircle,
-  PlusCircle
+  PlusCircle,
+  MoreVertical,
+  Archive,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
@@ -74,6 +79,8 @@ interface CommunityPost {
   likedByMe: boolean;
   authorUsername: string;
   authorUserId: number;
+  authorRoles: string[];
+  archived: boolean;
   createdAt: string;
   image?: { dataUrl: string; aspectRatio?: string | null } | null;
 }
@@ -88,6 +95,8 @@ const normalizePost = (raw: any): CommunityPost => ({
   likedByMe: raw.liked_by_me ?? raw.likedByMe ?? false,
   authorUsername: raw.author_username ?? raw.authorUsername ?? "Unknown",
   authorUserId: Number(raw.author_user_id ?? raw.authorUserId ?? 0),
+  authorRoles: raw.author_roles ?? raw.authorRoles ?? [],
+  archived: raw.archived ?? false,
   createdAt: raw.created_at ?? raw.createdAt ?? new Date().toISOString(),
   image: raw.image
     ? { dataUrl: raw.image.data_url ?? raw.image.dataUrl ?? "", aspectRatio: raw.image.aspect_ratio ?? raw.image.aspectRatio ?? null }
@@ -176,12 +185,31 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
       .catch(() => {/* silently ignore */});
   }, []);
 
+  // Current user identity — read from sessionStorage (set at login)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+
+  useEffect(() => {
+    const uid = sessionStorage.getItem("userId");
+    if (uid) setCurrentUserId(Number(uid));
+    try {
+      const rolesRaw = sessionStorage.getItem("roles");
+      const roles: string[] = rolesRaw ? JSON.parse(rolesRaw) : [];
+      setIsAdminUser(roles.some((r) => r.toUpperCase().includes("ADMIN")));
+    } catch {}
+  }, []);
+
   // Community feed state
   const [feedPosts, setFeedPosts] = useState<CommunityPost[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [likingId, setLikingId] = useState<number | null>(null);
   const feedLoadedRef = useRef(false);
+
+  // Post action state
+  const [mutatingPostId, setMutatingPostId] = useState<number | null>(null);
+  const [pendingDeletePost, setPendingDeletePost] = useState<CommunityPost | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const loadFeed = useCallback(async () => {
     setFeedLoading(true);
@@ -247,6 +275,65 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
       );
     } finally {
       setLikingId(null);
+    }
+  };
+
+  // ── RBAC: who can see the 3-dot menu on a post ──────────────────────────
+  const canManagePost = (post: CommunityPost) => {
+    if (isAdminUser) return true;
+    return currentUserId !== null && post.authorUserId === currentUserId;
+  };
+
+  // ── Archive post ─────────────────────────────────────────────────────────
+  const handleArchivePost = async (post: CommunityPost) => {
+    if (mutatingPostId !== null) return;
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    setMutatingPostId(post.id);
+    setFeedPosts((prev) => prev.filter((p) => p.id !== post.id));
+    try {
+      const res = await fetch(`${API_BASE}/community/posts/${post.id}/archive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any)?.message || "Failed to archive post");
+      }
+      toast.success("Post archived");
+    } catch (e: any) {
+      setFeedPosts((prev) => [post, ...prev]);
+      toast.error(e?.message || "Could not archive post");
+    } finally {
+      setMutatingPostId(null);
+    }
+  };
+
+  // ── Delete post ───────────────────────────────────────────────────────────
+  const handleDeletePost = async () => {
+    const post = pendingDeletePost;
+    if (!post || mutatingPostId !== null) return;
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    setMutatingPostId(post.id);
+    setDeleteConfirmOpen(false);
+    setPendingDeletePost(null);
+    setFeedPosts((prev) => prev.filter((p) => p.id !== post.id));
+    try {
+      const res = await fetch(`${API_BASE}/community/posts/${post.id}/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any)?.message || "Failed to delete post");
+      }
+      toast.success("Post deleted");
+    } catch (e: any) {
+      setFeedPosts((prev) => [post, ...prev]);
+      toast.error(e?.message || "Could not delete post");
+    } finally {
+      setMutatingPostId(null);
     }
   };
 
@@ -771,6 +858,51 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{post.topic}</p>
                                 )}
                               </div>
+
+                              {/* 3-dot action menu — visible only to owner or ADMIN */}
+                              {canManagePost(post) && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full shrink-0 transition-colors"
+                                      disabled={mutatingPostId === post.id}
+                                      aria-label="Post options"
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="w-44 shadow-lg border border-gray-100 rounded-xl p-1"
+                                  >
+                                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 pb-1">
+                                      Post actions
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator className="my-1" />
+                                    <DropdownMenuItem
+                                      className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg cursor-pointer text-gray-700 hover:bg-gray-50 focus:bg-gray-50"
+                                      disabled={mutatingPostId === post.id}
+                                      onSelect={() => handleArchivePost(post)}
+                                    >
+                                      <Archive className="h-4 w-4 text-gray-500 shrink-0" />
+                                      Archive Post
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg cursor-pointer text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-600"
+                                      disabled={mutatingPostId === post.id}
+                                      onSelect={() => {
+                                        setPendingDeletePost(post);
+                                        setDeleteConfirmOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 shrink-0" />
+                                      Delete Post
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
                             </div>
 
                             {/* Content */}
@@ -1095,6 +1227,42 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
           </Card>
         </div>
       </div>
+
+      {/* Delete post confirmation dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={(open) => { if (!open) { setDeleteConfirmOpen(false); setPendingDeletePost(null); } }}>
+        <DialogContent className="max-w-sm rounded-2xl p-6">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 shrink-0">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <DialogTitle className="text-base font-semibold">Delete post?</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm text-muted-foreground pl-13">
+              This will permanently remove the post and all its comments. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-2 justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={() => { setDeleteConfirmOpen(false); setPendingDeletePost(null); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="rounded-lg bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleDeletePost}
+              disabled={mutatingPostId !== null}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Floating Action Button (FAB) */}
       <div className="fixed bottom-6 right-6 z-50">
