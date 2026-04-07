@@ -28,11 +28,13 @@ public class AttendanceController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAttendance(
             @RequestParam(required = false) String date,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size
     ) {
-        return ResponseEntity.ok(attendanceService.getAttendance(date, search, page, size));
+        return ResponseEntity.ok(attendanceService.getAttendance(date, startDate, endDate, search, page, size));
     }
 
     /**

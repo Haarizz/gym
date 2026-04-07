@@ -83,19 +83,28 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
 
   const resolveDate = () => {
     const today = new Date();
-    if (selectedDate === 'today')     return today.toISOString().split('T')[0];
+    if (selectedDate === 'today')     return { date: today.toISOString().split('T')[0] };
     if (selectedDate === 'yesterday') {
       const y = new Date(today); y.setDate(today.getDate() - 1);
-      return y.toISOString().split('T')[0];
+      return { date: y.toISOString().split('T')[0] };
     }
-    return undefined; // this-week handled by stats
+    if (selectedDate === 'this-week') {
+      const day = today.getDay(); // 0=Sun
+      const diff = day === 0 ? -6 : 1 - day; // days to Monday
+      const monday = new Date(today); monday.setDate(today.getDate() + diff);
+      return {
+        startDate: monday.toISOString().split('T')[0],
+        endDate:   today.toISOString().split('T')[0],
+      };
+    }
+    return { date: today.toISOString().split('T')[0] };
   };
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const dateParam = selectedDate === 'this-week' ? undefined : resolveDate();
-      const res = await staffAttendanceService.getAttendance(dateParam, searchTerm || undefined, page, 50);
+      const { date, startDate, endDate } = resolveDate() as any;
+      const res = await staffAttendanceService.getAttendance(date, searchTerm || undefined, page, 50, startDate, endDate);
       setRecords(res.items);
       setTotal(res.total);
     } catch {
