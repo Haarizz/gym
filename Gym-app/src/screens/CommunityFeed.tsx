@@ -10,6 +10,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -64,6 +65,60 @@ const normalizeImageUri = (value: string) => {
   // Best-effort for legacy rows that stored only the base64 payload
   return `data:image/jpeg;base64,${trimmed}`;
 };
+
+// ── PostImage: double-tap to like with heart pop animation ─────────────────
+
+interface PostImageProps {
+  uri: string;
+  aspectRatio: number;
+  glassColor: string;
+  onDoubleTap: () => void;
+}
+
+function PostImage({ uri, aspectRatio, glassColor, onDoubleTap }: PostImageProps) {
+  const lastTapRef = useRef<number>(0);
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+
+  const handlePress = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      lastTapRef.current = 0;
+      onDoubleTap();
+      // Heart pop animation: scale up then fade out
+      heartScale.setValue(0);
+      heartOpacity.setValue(1);
+      Animated.sequence([
+        Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, speed: 18, bounciness: 14 }),
+        Animated.delay(400),
+        Animated.timing(heartOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start(() => heartScale.setValue(0));
+    } else {
+      lastTapRef.current = now;
+    }
+  };
+
+  return (
+    <TouchableWithoutFeedback onPress={handlePress}>
+      <View style={[feedStyles.imageWrap, { backgroundColor: glassColor, aspectRatio }]}>
+        <Image
+          source={{ uri: normalizeImageUri(uri) }}
+          style={feedStyles.image}
+          resizeMode="cover"
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            feedStyles.heartOverlay,
+            { opacity: heartOpacity, transform: [{ scale: heartScale }] },
+          ]}
+        >
+          <Ionicons name="heart" size={80} color="#fff" />
+        </Animated.View>
+      </View>
+    </TouchableWithoutFeedback>
+  );
+}
 
 export function CommunityFeed() {
   const [postText, setPostText] = useState("");
@@ -499,18 +554,12 @@ export function CommunityFeed() {
                 <Text style={[styles.feedContent, { color: colors.text }]}>{post.content}</Text>
 
                 {post.image?.dataUrl ? (
-                  <View
-                    style={[
-                      styles.feedImageWrap,
-                      { backgroundColor: colors.glass, aspectRatio: parseAspectRatio(post.image.aspectRatio) ?? 4 / 5 },
-                    ]}
-                  >
-                    <Image
-                      source={{ uri: normalizeImageUri(post.image.dataUrl) }}
-                      style={styles.feedImage}
-                      resizeMode="cover"
-                    />
-                  </View>
+                  <PostImage
+                    uri={post.image.dataUrl}
+                    aspectRatio={parseAspectRatio(post.image.aspectRatio) ?? 4 / 5}
+                    glassColor={colors.glass}
+                    onDoubleTap={() => { if (!post.likedByMe) likePost(post); }}
+                  />
                 ) : null}
 
                 <View style={styles.feedActions}>
@@ -1045,5 +1094,25 @@ const styles = StyleSheet.create({
   commentSendText: {
     color: "#fff",
     fontWeight: "700",
+  },
+});
+
+// Styles used by the PostImage sub-component (defined after main styles to avoid hoisting issues)
+const feedStyles = StyleSheet.create({
+  imageWrap: {
+    width: "100%",
+    borderRadius: 18,
+    overflow: "hidden",
+    marginBottom: 14,
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  heartOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.12)",
   },
 });

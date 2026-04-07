@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../components/GlassCard";
 import { GlassScreen } from "../components/GlassScreen";
 import { useSettings } from "../context/SettingsContext";
@@ -116,10 +117,10 @@ const normalizePlan = (raw: any): Plan => ({
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
-const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: string }[] = [
-  { id: "card",  label: "Credit / Debit Card", icon: "💳" },
-  { id: "cash",  label: "Cash at Counter",     icon: "💵" },
-  { id: "bank",  label: "Bank Transfer",        icon: "🏦" },
+const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: "card",  label: "Credit / Debit Card", icon: "card-outline" },
+  { id: "cash",  label: "Cash at Counter",     icon: "cash-outline" },
+  { id: "bank",  label: "Bank Transfer",        icon: "business-outline" },
 ];
 
 const FREEZE_PRESETS = [
@@ -194,7 +195,9 @@ function RenewModal({ visible, plan, member, onClose, onSuccess, authHeader }: R
           {/* ── Success screen ── */}
           {step === "success" && (
             <View style={ms.successBox}>
-              <Text style={ms.successIcon}>✅</Text>
+              <View style={ms.successIcon}>
+                <Ionicons name="checkmark-circle" size={56} color="#10B981" />
+              </View>
               <Text style={ms.successTitle}>Membership Renewed!</Text>
               <Text style={ms.successSub}>
                 {plan.name} is active until {fmt(newExpiry.toISOString())}.
@@ -277,7 +280,7 @@ function RenewModal({ visible, plan, member, onClose, onSuccess, authHeader }: R
                     style={[ms.methodRow, paymentMethod === m.id && ms.methodRowActive]}
                     onPress={() => setPaymentMethod(m.id)}
                   >
-                    <Text style={ms.methodIcon}>{m.icon}</Text>
+                    <Ionicons name={m.icon} size={22} color={paymentMethod === m.id ? "#fff" : "#6366F1"} style={ms.methodIcon} />
                     <Text style={[ms.methodLabel, paymentMethod === m.id && ms.methodLabelActive]}>
                       {m.label}
                     </Text>
@@ -290,11 +293,14 @@ function RenewModal({ visible, plan, member, onClose, onSuccess, authHeader }: R
 
               {paymentMethod !== "card" && (
                 <View style={ms.noteBox}>
-                  <Text style={ms.noteText}>
-                    ℹ️ {paymentMethod === "cash"
-                      ? "Please visit the reception desk to complete your cash payment."
-                      : "Bank transfer details will be provided at the counter."}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                    <Ionicons name="information-circle-outline" size={16} color="#6366F1" style={{ marginTop: 1 }} />
+                    <Text style={[ms.noteText, { flex: 1 }]}>
+                      {paymentMethod === "cash"
+                        ? "Please visit the reception desk to complete your cash payment."
+                        : "Bank transfer details will be provided at the counter."}
+                    </Text>
+                  </View>
                 </View>
               )}
 
@@ -346,7 +352,7 @@ function RenewModal({ visible, plan, member, onClose, onSuccess, authHeader }: R
                 >
                   {loading
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={ms.primaryBtnText}>Confirm ✓</Text>}
+                    : <Text style={ms.primaryBtnText}>Confirm</Text>}
                 </TouchableOpacity>
               </View>
             </>
@@ -410,7 +416,9 @@ function FreezeModal({ visible, member, onClose, onSuccess, authHeader }: Freeze
           {/* ── Success ── */}
           {step === "success" && (
             <View style={ms.successBox}>
-              <Text style={ms.successIcon}>❄️</Text>
+              <View style={ms.successIcon}>
+                <Ionicons name="snow" size={56} color="#6366F1" />
+              </View>
               <Text style={ms.successTitle}>Membership Frozen</Text>
               <Text style={ms.successSub}>
                 Your membership is paused until {fmt(freezeUntil?.toISOString())}.{"\n"}
@@ -450,11 +458,14 @@ function FreezeModal({ visible, member, onClose, onSuccess, authHeader }: Freeze
 
               {selectedPreset !== null && (
                 <View style={ms.noteBox}>
-                  <Text style={ms.noteText}>
-                    📅 Your membership will be paused until{" "}
-                    <Text style={{ fontWeight: "700" }}>{fmt(freezeUntil?.toISOString())}</Text> and
-                    resume automatically after that date.
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                    <Ionicons name="calendar-outline" size={16} color="#6366F1" style={{ marginTop: 1 }} />
+                    <Text style={[ms.noteText, { flex: 1 }]}>
+                      Your membership will be paused until{" "}
+                      <Text style={{ fontWeight: "700" }}>{fmt(freezeUntil?.toISOString())}</Text> and
+                      resume automatically after that date.
+                    </Text>
+                  </View>
                 </View>
               )}
 
@@ -536,9 +547,12 @@ function FreezeModal({ visible, member, onClose, onSuccess, authHeader }: Freeze
                   <Text style={ms.confirmVal}>{selectedReason}</Text>
                 </View>
                 <View style={[ms.confirmRow, { borderTopWidth: 1, borderTopColor: "#F1F5F9", marginTop: 8, paddingTop: 12 }]}>
-                  <Text style={[ms.confirmKey, { color: "#6B7280" }]}>
-                    ℹ️ Your membership timer will pause and resume automatically after the freeze period.
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
+                    <Ionicons name="information-circle-outline" size={14} color="#6B7280" style={{ marginTop: 1 }} />
+                    <Text style={[ms.confirmKey, { color: "#6B7280", flex: 1 }]}>
+                      Your membership timer will pause and resume automatically after the freeze period.
+                    </Text>
+                  </View>
                 </View>
               </View>
 
@@ -553,7 +567,7 @@ function FreezeModal({ visible, member, onClose, onSuccess, authHeader }: Freeze
                 >
                   {loading
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={ms.primaryBtnText}>Confirm Freeze ❄️</Text>}
+                    : <Text style={ms.primaryBtnText}>Confirm Freeze</Text>}
                 </TouchableOpacity>
               </View>
             </>
@@ -607,7 +621,9 @@ function UnfreezeModal({ visible, member, onClose, onSuccess, authHeader }: Unfr
 
           {step === "success" && (
             <View style={ms.successBox}>
-              <Text style={ms.successIcon}>🔓</Text>
+              <View style={ms.successIcon}>
+                <Ionicons name="lock-open" size={56} color="#10B981" />
+              </View>
               <Text style={ms.successTitle}>Membership Reactivated!</Text>
               <Text style={ms.successSub}>
                 Your membership is now active again. Welcome back!
@@ -634,10 +650,13 @@ function UnfreezeModal({ visible, member, onClose, onSuccess, authHeader }: Unfr
                   </View>
                 )}
                 <View style={[ms.confirmRow, { borderTopWidth: 1, borderTopColor: "#F1F5F9", marginTop: 8, paddingTop: 12 }]}>
-                  <Text style={[ms.confirmKey, { color: "#6B7280" }]}>
-                    ℹ️ Unfreezing will reactivate your membership immediately. The remaining frozen days
-                    will be added back to your expiry date.
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
+                    <Ionicons name="information-circle-outline" size={14} color="#6B7280" style={{ marginTop: 1 }} />
+                    <Text style={[ms.confirmKey, { color: "#6B7280", flex: 1 }]}>
+                      Unfreezing will reactivate your membership immediately. The remaining frozen days
+                      will be added back to your expiry date.
+                    </Text>
+                  </View>
                 </View>
               </View>
 
@@ -652,7 +671,7 @@ function UnfreezeModal({ visible, member, onClose, onSuccess, authHeader }: Unfr
                 >
                   {loading
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={ms.primaryBtnText}>Reactivate Now 🔓</Text>}
+                    : <Text style={ms.primaryBtnText}>Reactivate Now</Text>}
                 </TouchableOpacity>
               </View>
             </>
@@ -676,7 +695,6 @@ export function MembershipRenewal() {
 
   // Modal state
   const [renewPlan, setRenewPlan] = useState<Plan | null>(null);
-  const [freezeOpen, setFreezeOpen] = useState(false);
   const [unfreezeOpen, setUnfreezeOpen] = useState(false);
 
   const token = user?.token ?? "";
@@ -753,9 +771,12 @@ export function MembershipRenewal() {
             end={{ x: 1, y: 1 }}
             style={styles.hero}
           >
-            <Text style={styles.heroTitle}>
-              {isFrozen ? "❄️ Membership Frozen" : "Membership Renewal"}
-            </Text>
+            <View style={styles.heroTitleRow}>
+              {isFrozen && <Ionicons name="snow" size={20} color="#fff" style={{ marginRight: 8 }} />}
+              <Text style={styles.heroTitle}>
+                {isFrozen ? "Membership Frozen" : "Membership Renewal"}
+              </Text>
+            </View>
             <Text style={styles.heroSubtitle}>
               {isFrozen
                 ? `Frozen until ${fmt(member.freezeEndDate)}`
@@ -816,8 +837,9 @@ export function MembershipRenewal() {
 
             {isFrozen && member.freezeEndDate && (
               <View style={styles.frozenBanner}>
+                <Ionicons name="snow" size={14} color="#6366F1" style={{ marginRight: 6 }} />
                 <Text style={styles.frozenText}>
-                  ❄️ Frozen until {fmt(member.freezeEndDate)}
+                  Frozen until {fmt(member.freezeEndDate)}
                   {member.freezeReason ? `  ·  ${member.freezeReason}` : ""}
                 </Text>
               </View>
@@ -825,32 +847,27 @@ export function MembershipRenewal() {
 
             {days < 7 && days > 0 && !isFrozen && (
               <View style={styles.expiryWarning}>
+                <Ionicons name="warning-outline" size={14} color="#F59E0B" style={{ marginRight: 6 }} />
                 <Text style={styles.expiryWarningText}>
-                  ⚠️ Expiring in {days} day{days !== 1 ? "s" : ""}! Renew now to avoid interruption.
+                  Expiring in {days} day{days !== 1 ? "s" : ""}! Renew now to avoid interruption.
                 </Text>
               </View>
             )}
           </View>
         </GlassCard>
 
-        {/* Action buttons */}
-        <View style={styles.actionsRow}>
-          {isFrozen ? (
+        {/* Action buttons — only show Unfreeze when membership is currently frozen */}
+        {isFrozen && (
+          <View style={styles.actionsRow}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: "#6366F1" }]}
               onPress={() => setUnfreezeOpen(true)}
             >
-              <Text style={styles.actionButtonText}>🔓  Unfreeze</Text>
+              <Ionicons name="lock-open-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.actionButtonText}>Unfreeze</Text>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: "#475569" }]}
-              onPress={() => setFreezeOpen(true)}
-            >
-              <Text style={styles.actionButtonText}>❄️  Freeze</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        )}
 
         {/* Available Plans */}
         {plans.length > 0 && (
@@ -889,11 +906,16 @@ export function MembershipRenewal() {
                       ) : null}
 
                       <TouchableOpacity
-                        style={[styles.planButton, { backgroundColor: isCurrent ? "#10B981" : "#6366F1" }]}
+                        style={[styles.planButton, { backgroundColor: isCurrent ? "#10B981" : "#6366F1", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}
                         onPress={() => setRenewPlan(plan)}
                       >
+                        <Ionicons
+                          name={isCurrent ? "refresh-outline" : "star-outline"}
+                          size={15}
+                          color="#fff"
+                        />
                         <Text style={styles.planButtonText}>
-                          {isCurrent ? "🔄  Renew Same Plan" : "✨  Choose Plan"}
+                          {isCurrent ? "Renew Same Plan" : "Choose Plan"}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -911,14 +933,6 @@ export function MembershipRenewal() {
         plan={renewPlan}
         member={member}
         onClose={() => setRenewPlan(null)}
-        onSuccess={loadData}
-        authHeader={authHeader}
-      />
-
-      <FreezeModal
-        visible={freezeOpen}
-        member={member}
-        onClose={() => setFreezeOpen(false)}
         onSuccess={loadData}
         authHeader={authHeader}
       />
@@ -947,6 +961,7 @@ const styles = StyleSheet.create({
 
   heroShell: { marginBottom: 20 },
   hero: { borderRadius: 24, padding: 20 },
+  heroTitleRow: { flexDirection: "row", alignItems: "center", marginBottom: 0 },
   heroTitle: { fontSize: 22, fontWeight: "700", color: "#fff" },
   heroSubtitle: { color: "#E0E7FF", marginTop: 6 },
 
@@ -970,14 +985,14 @@ const styles = StyleSheet.create({
   datesRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 12 },
   dateItem: { fontSize: 12 },
 
-  frozenBanner: { backgroundColor: "#EEF2FF", borderRadius: 10, padding: 10, marginTop: 12 },
-  frozenText: { color: "#6366F1", fontSize: 13, fontWeight: "600" },
+  frozenBanner: { flexDirection: "row", alignItems: "center", backgroundColor: "#EEF2FF", borderRadius: 10, padding: 10, marginTop: 12 },
+  frozenText: { color: "#6366F1", fontSize: 13, fontWeight: "600", flex: 1 },
 
-  expiryWarning: { backgroundColor: "#FEF9C3", borderRadius: 10, padding: 10, marginTop: 12 },
-  expiryWarningText: { color: "#92400E", fontSize: 13, fontWeight: "600" },
+  expiryWarning: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEF9C3", borderRadius: 10, padding: 10, marginTop: 12 },
+  expiryWarningText: { color: "#92400E", fontSize: 13, fontWeight: "600", flex: 1 },
 
   actionsRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-  actionButton: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: "center" },
+  actionButton: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: "center", flexDirection: "row", justifyContent: "center" },
   actionButtonText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
   sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
@@ -1090,7 +1105,7 @@ const ms = StyleSheet.create({
 
   // Success
   successBox: { alignItems: "center", paddingVertical: 20 },
-  successIcon: { fontSize: 56, marginBottom: 16 },
+  successIcon: { marginBottom: 16, alignItems: "center", justifyContent: "center" },
   successTitle: { fontSize: 22, fontWeight: "800", color: "#111827", marginBottom: 8 },
   successSub: { fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 22, marginBottom: 28 },
   successBtn: {
