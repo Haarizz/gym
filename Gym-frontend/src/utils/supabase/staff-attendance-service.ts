@@ -95,9 +95,14 @@ class StaffAttendanceService {
     return res.json();
   }
 
-  async getAttendance(date?: string, search?: string, page = 0, size = 50): Promise<AttendanceListResponse> {
+  async getAttendance(date?: string, search?: string, page = 0, size = 50, startDate?: string, endDate?: string): Promise<AttendanceListResponse> {
     const params = new URLSearchParams();
-    if (date)   params.append('date', date);
+    if (startDate && endDate) {
+      params.append('startDate', startDate);
+      params.append('endDate', endDate);
+    } else if (date) {
+      params.append('date', date);
+    }
     if (search) params.append('search', search);
     params.append('page', String(page));
     params.append('size', String(size));

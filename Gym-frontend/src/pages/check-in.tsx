@@ -116,6 +116,7 @@ export function CheckIn() {
   const [paymentDone, setPaymentDone]     = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [dailyCheckIns, setDailyCheckIns] = useState<any[]>([]);
+  const [walkInsLoaded, setWalkInsLoaded] = useState(false);
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -161,9 +162,37 @@ export function CheckIn() {
     }
   }, []);
 
+  const loadTodayWalkIns = useCallback(async () => {
+    if (walkInsLoaded) return;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await staffAttendanceService.getAttendance(today, undefined, 0, 200);
+      const walkIns = res.items
+        .filter(r => r.type === 'walk_in')
+        .map(r => ({
+          id: r.id,
+          memberName: r.walk_in_name || 'Visitor',
+          memberId: `DAILY-${String(r.id).slice(-4)}`,
+          avatar: null,
+          checkInTime: new Date(r.check_in_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          status: r.status === 'active' ? 'Active' : 'Completed',
+          membership: r.activity_type || 'Daily Pass',
+          type: 'daily',
+          mobile: r.walk_in_phone || '',
+          plan: null,
+          paymentMethod: '',
+          amount: null,
+        }));
+      setDailyCheckIns(walkIns);
+      setWalkInsLoaded(true);
+    } catch {
+      // non-fatal
+    }
+  }, [walkInsLoaded]);
+
   useEffect(() => {
-    Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap()]).finally(() => setLoading(false));
-  }, [loadPeople, loadTodayAttendance, loadStaffActiveMap]);
+    Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns()]).finally(() => setLoading(false));
+  }, [loadPeople, loadTodayAttendance, loadStaffActiveMap, loadTodayWalkIns]);
 
   // ── Derived values ───────────────────────────────────────────────────────────
 
@@ -309,9 +338,9 @@ export function CheckIn() {
       await checkInService.walkInCheckIn(req);
 
       const visitor = {
-        id: Date.now(),
+        id: resp.attendance_id,
         memberName: visitorName,
-        memberId: `DAILY-${Date.now().toString().slice(-4)}`,
+        memberId: `DAILY-${String(resp.attendance_id).slice(-4)}`,
         avatar: visitorPhoto,
         checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         status: 'Active',
@@ -322,7 +351,7 @@ export function CheckIn() {
         paymentMethod,
         amount: selectedPlanDetails?.price,
       };
-      setDailyCheckIns(prev => [visitor, ...prev]);
+      setDailyCheckIns(prev => [visitor, ...prev.filter(p => p.id !== resp.attendance_id)]);
       toast.success(`Access granted to ${visitorName}`, {
         description: `${selectedPlanDetails?.name} — Valid for ${selectedPlanDetails?.duration}`,
       });
@@ -357,7 +386,7 @@ export function CheckIn() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { setLoading(true); Promise.all([loadPeople(), loadTodayAttendance()]).finally(() => setLoading(false)); }}
+            onClick={() => { setLoading(true); setWalkInsLoaded(false); Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns()]).finally(() => setLoading(false)); }}
             className="border-primary/30"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />

@@ -31,10 +31,16 @@ public class AttendanceService {
     // ── List / search ─────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getAttendance(String date, String search, int page, int size) {
-        LocalDate targetDate = StringUtils.hasText(date) ? LocalDate.parse(date) : LocalDate.now();
-        LocalDateTime start  = targetDate.atStartOfDay();
-        LocalDateTime end    = targetDate.atTime(LocalTime.MAX);
+    public Map<String, Object> getAttendance(String date, String startDate, String endDate, String search, int page, int size) {
+        LocalDateTime start, end;
+        if (StringUtils.hasText(startDate) && StringUtils.hasText(endDate)) {
+            start = LocalDate.parse(startDate).atStartOfDay();
+            end   = LocalDate.parse(endDate).atTime(LocalTime.MAX);
+        } else {
+            LocalDate targetDate = StringUtils.hasText(date) ? LocalDate.parse(date) : LocalDate.now();
+            start = targetDate.atStartOfDay();
+            end   = targetDate.atTime(LocalTime.MAX);
+        }
 
         Page<Attendance> pageResult = attendanceRepository.findByDateRangeAndSearch(
                 start, end,

@@ -142,9 +142,17 @@ public class CheckInService {
         AttendanceRecordDTO dto = new AttendanceRecordDTO();
         dto.setId(a.getId());
         dto.setCheckInTime(a.getCheckInTime());
+        dto.setCheckOutTime(a.getCheckOutTime());
+        dto.setTotalMinutes(a.getTotalMinutes());
+        dto.setFormattedDuration(a.getTotalMinutes() != null
+                ? AttendanceService.formatDuration(a.getTotalMinutes()) : null);
         dto.setCheckInMethod(a.getCheckInMethod());
         dto.setDeviceId(a.getDeviceId());
         dto.setResolvedBy(a.getResolvedBy());
+        dto.setStatus(a.getStatus());
+        dto.setType(a.getType());
+        dto.setWalkInName(a.getWalkInName());
+        dto.setWalkInPhone(a.getWalkInPhone());
         Member m = a.getMember();
         if (m != null) {
             dto.setMemberId(m.getId());
