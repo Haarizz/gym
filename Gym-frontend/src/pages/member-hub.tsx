@@ -127,9 +127,54 @@ const getTypeStyle = (type: string) => {
   }
 };
 
+interface MemberInfo {
+  name: string;
+  membershipType: string;
+  membershipPlan: string;
+  membershipStatus: string;
+  membershipEndDate: string | null;
+  nextPaymentDate: string | null;
+  paymentStatus: string | null;
+}
+
+const fmtDate = (iso: string | null | undefined): string => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+};
+
 export function MemberHub({ onNavigate }: MemberHubProps = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFABOpen, setIsFABOpen] = useState(false);
+
+  // Live member info state
+  const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null);
+  const memberInfoLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (memberInfoLoadedRef.current) return;
+    memberInfoLoadedRef.current = true;
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_BASE}/members/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return;
+        setMemberInfo({
+          name: data.name ?? data.username ?? "Member",
+          membershipType: data.membership_type ?? data.membershipType ?? "",
+          membershipPlan: data.membership_plan ?? data.membershipPlan ?? "",
+          membershipStatus: data.membership_status ?? data.membershipStatus ?? "",
+          membershipEndDate: data.membership_end_date ?? data.membershipEndDate ?? null,
+          nextPaymentDate: data.next_payment_date ?? data.nextPaymentDate ?? null,
+          paymentStatus: data.payment_status ?? data.paymentStatus ?? null,
+        });
+      })
+      .catch(() => {/* silently ignore */});
+  }, []);
 
   // Community feed state
   const [feedPosts, setFeedPosts] = useState<CommunityPost[]>([]);
@@ -205,19 +250,20 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
     }
   };
 
-  // Mock data
+  // Member display data — falls back to placeholders until API responds
   const memberData = {
-    name: "Sarah Johnson",
-    membershipType: "Premium",
-    joinDate: "Jan 2024",
-    nextBilling: "Dec 15, 2024",
+    name: memberInfo?.name ?? "Member",
+    membershipType: memberInfo?.membershipType ?? "—",
+    joinDate: "—",
+    nextBilling: fmtDate(memberInfo?.nextPaymentDate ?? memberInfo?.membershipEndDate),
     credits: 8,
-    status: "Active",
+    status: memberInfo?.membershipStatus ?? "—",
     streak: 12,
     profileImage: null,
     nextClass: "Yoga – Today 5PM",
     activeChallenges: 2,
-    validUntil: "Nov 30"
+    validUntil: fmtDate(memberInfo?.membershipEndDate),
+    paymentStatus: memberInfo?.paymentStatus ?? null,
   };
 
   const quickActionCards = [
@@ -436,6 +482,12 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                   <CreditCard className="h-5 w-5" />
                   <span className="font-medium">Valid until {memberData.validUntil}</span>
                 </div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 flex items-center space-x-2">
+                  <Clock3 className="h-5 w-5" />
+                  <span className="font-medium">
+                    Due {memberData.nextBilling !== "—" ? memberData.nextBilling : "—"}
+                  </span>
+                </div>
               </div>
             </div>
             <div className="text-right">
@@ -604,6 +656,45 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
             );
           })}
         </div>
+
+        {/* Membership Status Card */}
+        <Card className="bg-white border-0 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center text-base">
+              <CreditCard className="h-5 w-5 mr-2 text-teal-600" />
+              Membership Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Plan</p>
+                <p className="font-semibold text-sm">{memberInfo?.membershipPlan || memberData.membershipType || "—"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Status</p>
+                <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  memberData.status.toLowerCase() === "active" ? "bg-green-100 text-green-700" :
+                  memberData.status.toLowerCase() === "frozen" ? "bg-indigo-100 text-indigo-700" :
+                  memberData.status.toLowerCase() === "expired" ? "bg-red-100 text-red-700" :
+                  "bg-gray-100 text-gray-600"
+                }`}>
+                  {memberData.status || "—"}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Valid Until</p>
+                <p className="font-semibold text-sm">{memberData.validUntil}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground font-medium text-orange-600">Next Payment Due</p>
+                <p className={`font-bold text-sm ${memberData.nextBilling !== "—" ? "text-orange-600" : "text-gray-400"}`}>
+                  {memberData.nextBilling}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Community Feed Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
