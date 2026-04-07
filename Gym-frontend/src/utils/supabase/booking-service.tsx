@@ -11,6 +11,7 @@ export interface BookingApi {
   startTime?: string | null;
   type?: 'class' | 'pt' | 'facility' | null;
   status?: 'confirmed' | 'checked-in' | 'no-show' | 'cancelled' | null;
+  paymentStatus?: 'paid' | 'pay_later' | null;
   price?: number | null;
   qrCode?: string | null;
   guest?: boolean | null;
@@ -51,6 +52,7 @@ class BookingService {
       guestEmail: raw.guestEmail ?? raw.guest_email ?? null,
       guestPhone: raw.guestPhone ?? raw.guest_phone ?? null,
       createdAt: raw.createdAt ?? raw.created_at ?? null,
+      paymentStatus: raw.paymentStatus ?? raw.payment_status ?? null,
     };
   }
 
@@ -99,6 +101,15 @@ class BookingService {
       { method: "PATCH", body: JSON.stringify({ status }) }
     );
     if (!response.ok) throw new Error(`Failed to update booking: ${response.status}`);
+    return this.normalizeBooking(await response.json());
+  }
+
+  async markAsPaid(id: string): Promise<BookingApi> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/bookings/${id}/status`,
+      { method: "PATCH", body: JSON.stringify({ payment_status: "paid" }) }
+    );
+    if (!response.ok) throw new Error(`Failed to mark as paid: ${response.status}`);
     return this.normalizeBooking(await response.json());
   }
 

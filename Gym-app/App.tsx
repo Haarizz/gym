@@ -12,6 +12,7 @@ import { MemberHub } from "./src/screens/MemberHub";
 import { StaffHub } from "./src/screens/StaffHub";
 import { BookSession } from "./src/screens/BookSession";
 import { JoinClass } from "./src/screens/JoinClass";
+import { ClassCalendar } from "./src/screens/ClassCalendar";
 import { AddChallenge } from "./src/screens/AddChallenge";
 import { MembershipRenewal } from "./src/screens/MembershipRenewal";
 import { MyStats } from "./src/screens/MyStats";
@@ -44,6 +45,7 @@ function MemberStack() {
       <Stack.Screen name="MemberHub" component={MemberHub} options={{ headerShown: false }} />
       <Stack.Screen name="BookSession" component={BookSession} options={{ title: "Book Session" }} />
       <Stack.Screen name="JoinClass" component={JoinClass} options={{ title: "Join Class" }} />
+      <Stack.Screen name="ClassCalendar" component={ClassCalendar} options={{ title: "My Schedule" }} />
       <Stack.Screen name="AddChallenge" component={AddChallenge} options={{ title: "Add Challenge" }} />
       <Stack.Screen name="MembershipRenewal" component={MembershipRenewal} options={{ title: "Membership" }} />
       <Stack.Screen name="MyStats" component={MyStats} options={{ title: "My Stats" }} />

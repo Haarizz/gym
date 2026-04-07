@@ -3,6 +3,7 @@ export type RootStackParamList = {
   StaffHub: undefined;
   BookSession: undefined;
   JoinClass: undefined;
+  ClassCalendar: undefined;
   AddChallenge: undefined;
   MembershipRenewal: undefined;
   MyStats: undefined;
