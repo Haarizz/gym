@@ -454,23 +454,23 @@ export function CheckIn() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2 bg-gradient-light">
-          <TabsTrigger value="registered" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
+        <TabsList className="w-full flex">
+          <TabsTrigger value="registered" className="flex-1">
             <UserCheck className="h-4 w-4 mr-2" />
             Members &amp; Staff
           </TabsTrigger>
-          <TabsTrigger value="daily" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
+          <TabsTrigger value="daily" className="flex-1">
             <UserPlus className="h-4 w-4 mr-2" />
             Walk-In / Daily
           </TabsTrigger>
         </TabsList>
 
         {/* ── Members & Staff tab ── */}
-        <TabsContent value="registered" className="space-y-6">
+        <TabsContent value="registered" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
             {/* People list */}
-            <Card className="border-primary/10 shadow-lg">
+            <Card className="border-primary/10 shadow-lg overflow-hidden">
               <CardHeader className="bg-gradient-light border-b border-primary/10">
                 <div className="flex items-center justify-between">
                   <div>
@@ -521,7 +521,7 @@ export function CheckIn() {
             </Card>
 
             {/* Recent check-ins */}
-            <Card className="border-primary/10 shadow-lg">
+            <Card className="border-primary/10 shadow-lg overflow-hidden">
               <CardHeader className="bg-gradient-light border-b border-primary/10">
                 <CardTitle className="text-primary">Recent Check-ins</CardTitle>
                 <CardDescription>Latest member activity today</CardDescription>
@@ -593,9 +593,9 @@ export function CheckIn() {
         </TabsContent>
 
         {/* ── Daily Visitor tab ── */}
-        <TabsContent value="daily" className="space-y-6">
+        <TabsContent value="daily" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 border-primary/10 shadow-lg">
+            <Card className="lg:col-span-2 border-primary/10 shadow-lg overflow-hidden">
               <CardHeader className="bg-gradient-primary text-white">
                 <div className="flex items-center space-x-2">
                   <UserPlus className="h-5 w-5" />
@@ -736,7 +736,7 @@ export function CheckIn() {
             </Card>
 
             {/* Today's daily visitors */}
-            <Card className="border-primary/10 shadow-lg">
+            <Card className="border-primary/10 shadow-lg overflow-hidden">
               <CardHeader className="bg-gradient-light border-b border-primary/10">
                 <CardTitle className="text-primary">Today's Daily Visitors</CardTitle>
                 <CardDescription>Walk-in passes issued</CardDescription>
