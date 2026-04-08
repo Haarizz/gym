@@ -525,9 +525,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     e.preventDefault();
     
     // Validation
-    if (!formData.memberId || !formData.firstName || !formData.lastName || !formData.membershipPlan) {
+    const isMemberIdValid = isEditMode ? !!formData.memberId : true;
+    if (!isMemberIdValid || !formData.firstName || !formData.lastName || !formData.membershipPlan) {
       toast.error('Please fill in all required fields', {
-        description: 'Member ID, first name, last name, and membership plan are required.',
+        description: isEditMode 
+          ? 'Member ID, first name, last name, and membership plan are required.' 
+          : 'First name, last name, and membership plan are required.',
         duration: 4000
       });
       return;
