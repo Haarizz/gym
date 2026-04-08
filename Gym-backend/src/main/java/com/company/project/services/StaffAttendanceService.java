@@ -102,6 +102,45 @@ public class StaffAttendanceService {
                 .orElse(Map.of("active", false));
     }
 
+    // ── Trainer report ────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getTrainerReport(String startDate, String endDate) {
+        LocalDate start = startDate != null && !startDate.isBlank() ? LocalDate.parse(startDate) : LocalDate.now().minusDays(30);
+        LocalDate end   = endDate   != null && !endDate.isBlank()   ? LocalDate.parse(endDate)   : LocalDate.now();
+
+        List<StaffAttendance> records = staffAttendanceRepository.findByDateRange(
+                start.atStartOfDay(), end.plusDays(1).atStartOfDay());
+
+        Map<Long, List<StaffAttendance>> byStaff = records.stream()
+                .collect(java.util.stream.Collectors.groupingBy(sa -> sa.getStaff().getId()));
+
+        return byStaff.entrySet().stream()
+                .map(e -> {
+                    List<StaffAttendance> sr  = e.getValue();
+                    Staff staff               = sr.get(0).getStaff();
+                    long sessions             = sr.size();
+                    java.util.OptionalDouble avgMin = sr.stream()
+                            .filter(sa -> sa.getTotalMinutes() != null)
+                            .mapToInt(StaffAttendance::getTotalMinutes).average();
+                    long totalMin = sr.stream()
+                            .filter(sa -> sa.getTotalMinutes() != null)
+                            .mapToLong(StaffAttendance::getTotalMinutes).sum();
+                    Map<String, Object> m = new java.util.LinkedHashMap<>();
+                    m.put("id",               staff.getId());
+                    m.put("name",             staff.getName());
+                    m.put("role",             staff.getRole() != null ? staff.getRole() : "Staff");
+                    m.put("department",       staff.getDepartment() != null ? staff.getDepartment() : "");
+                    m.put("photoUrl",         staff.getPhotoUrl() != null ? staff.getPhotoUrl() : "");
+                    m.put("sessions",         sessions);
+                    m.put("totalMinutes",     totalMin);
+                    m.put("avgSessionMinutes", avgMin.isPresent() ? Math.round(avgMin.getAsDouble()) : 0L);
+                    return m;
+                })
+                .sorted(java.util.Comparator.comparingLong(m -> -((Long) m.get("sessions"))))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     // ── Internal ──────────────────────────────────────────────────────────────
 
     public StaffAttendanceDTO toDTO(StaffAttendance sa) {
