@@ -65,6 +65,20 @@ public class AttendanceController {
     }
 
     /**
+     * Full analytics report for the reports page.
+     * Returns daily summary, activity breakdown, peak hours, member trends, facility data, insights.
+     *
+     * GET /api/attendance/reports?startDate=2026-03-01&endDate=2026-04-08
+     */
+    @GetMapping("/reports")
+    public ResponseEntity<Map<String, Object>> getReport(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate
+    ) {
+        return ResponseEntity.ok(attendanceService.getReport(startDate, endDate));
+    }
+
+    /**
      * Walk-in check-in for daily visitors (no membership required).
      *
      * POST /api/attendance/walkin
