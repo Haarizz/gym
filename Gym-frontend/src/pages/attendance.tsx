@@ -251,28 +251,28 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
 
       {/* Tabs */}
       <Tabs defaultValue="today" className="space-y-6">
-        <TabsList className="bg-gradient-light">
-          <TabsTrigger value="today" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
+        <TabsList className="w-full flex">
+          <TabsTrigger value="today" className="flex-1">
             Today's Attendance
           </TabsTrigger>
-          <TabsTrigger value="staff" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
+          <TabsTrigger value="staff" className="flex-1">
             <Briefcase className="h-3.5 w-3.5 mr-1.5" />
             Staff &amp; Trainers
           </TabsTrigger>
-          <TabsTrigger value="weekly" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
+          <TabsTrigger value="weekly" className="flex-1">
             Weekly Trends
           </TabsTrigger>
-          <TabsTrigger value="monthly" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
+          <TabsTrigger value="monthly" className="flex-1">
             Monthly Analysis
           </TabsTrigger>
-          <TabsTrigger value="reports" className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white">
+          <TabsTrigger value="reports" className="flex-1">
             Reports
           </TabsTrigger>
         </TabsList>
 
         {/* ── Today's attendance table ── */}
-        <TabsContent value="today" className="space-y-4">
-          <Card className="border-primary/10 shadow-lg">
+        <TabsContent value="today" className="space-y-4 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="border-primary/10 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-light border-b border-primary/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -426,8 +426,8 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
         </TabsContent>
 
         {/* ── Staff & Trainers tab ── */}
-        <TabsContent value="staff" className="space-y-4">
-          <Card className="border-primary/10 shadow-lg">
+        <TabsContent value="staff" className="space-y-4 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="border-primary/10 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-light border-b border-primary/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -536,8 +536,8 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
         </TabsContent>
 
         {/* ── Weekly Trends ── */}
-        <TabsContent value="weekly" className="space-y-6">
-          <Card className="border-primary/10 shadow-lg">
+        <TabsContent value="weekly" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="border-primary/10 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-light border-b border-primary/10">
               <CardTitle className="text-primary">Weekly Attendance Trends</CardTitle>
               <CardDescription>Daily visit patterns for the current week</CardDescription>
@@ -589,8 +589,8 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
         </TabsContent>
 
         {/* ── Monthly Analysis ── */}
-        <TabsContent value="monthly" className="space-y-6">
-          <Card className="border-primary/10 shadow-lg">
+        <TabsContent value="monthly" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="border-primary/10 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-light border-b border-primary/10">
               <CardTitle className="text-primary">Monthly Attendance Trends</CardTitle>
               <CardDescription>Visit patterns for the current year</CardDescription>
@@ -651,8 +651,8 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
         </TabsContent>
 
         {/* ── Reports ── */}
-        <TabsContent value="reports" className="space-y-6">
-          <Card className="border-primary/10 shadow-lg">
+        <TabsContent value="reports" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="border-primary/10 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-light border-b border-primary/10">
               <CardTitle className="text-primary">Attendance Reports</CardTitle>
               <CardDescription>Generate detailed attendance reports and analytics</CardDescription>
