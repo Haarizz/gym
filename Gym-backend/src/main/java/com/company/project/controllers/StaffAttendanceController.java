@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/staff/attendance")
@@ -82,5 +83,18 @@ public class StaffAttendanceController {
     @GetMapping("/active")
     public ResponseEntity<Map<String, Object>> getActiveSession(@RequestParam("staff_id") Long staffId) {
         return ResponseEntity.ok(staffAttendanceService.getActiveSession(staffId));
+    }
+
+    /**
+     * Trainer / staff attendance report for the reports page.
+     *
+     * GET /api/staff/attendance/reports?startDate=2026-03-01&endDate=2026-04-08
+     */
+    @GetMapping("/reports")
+    public ResponseEntity<List<Map<String, Object>>> getTrainerReport(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate
+    ) {
+        return ResponseEntity.ok(staffAttendanceService.getTrainerReport(startDate, endDate));
     }
 }
