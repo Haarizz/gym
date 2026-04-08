@@ -1,5 +1,6 @@
 package com.company.project.services;
 
+import com.company.project.automation.AutomationExecutorService;
 import com.company.project.entities.Asset;
 import com.company.project.entities.FollowUp;
 import com.company.project.entities.Member;
@@ -34,19 +35,22 @@ public class NotificationScheduler {
     private final FollowUpRepository followUpRepository;
     private final AssetRepository assetRepository;
     private final TaxComplianceRepository taxComplianceRepository;
+    private final AutomationExecutorService automationExecutorService;
 
     public NotificationScheduler(NotificationService notificationService,
                                   NotificationRepository notificationRepository,
                                   MemberRepository memberRepository,
                                   FollowUpRepository followUpRepository,
                                   AssetRepository assetRepository,
-                                  TaxComplianceRepository taxComplianceRepository) {
+                                  TaxComplianceRepository taxComplianceRepository,
+                                  AutomationExecutorService automationExecutorService) {
         this.notificationService = notificationService;
         this.notificationRepository = notificationRepository;
         this.memberRepository = memberRepository;
         this.followUpRepository = followUpRepository;
         this.assetRepository = assetRepository;
         this.taxComplianceRepository = taxComplianceRepository;
+        this.automationExecutorService = automationExecutorService;
     }
 
     /** Daily checks at 08:00. */
@@ -59,6 +63,7 @@ public class NotificationScheduler {
         checkFollowUpsOverdue();
         checkAssetMaintenanceDue();
         checkTaxComplianceDue();
+        automationExecutorService.runScheduledWorkflows();
     }
 
     /** Cleanup: soft-delete notifications older than 30 days (runs at 02:00). */

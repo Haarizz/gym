@@ -1,5 +1,6 @@
 package com.company.project.services;
 
+import com.company.project.automation.AutomationExecutorService;
 import com.company.project.dto.FamilyMemberDTO;
 import com.company.project.dto.FreezeRequestDTO;
 import com.company.project.dto.MemberRequestDTO;
@@ -52,6 +53,7 @@ public class MemberService {
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
+    private final AutomationExecutorService automationExecutorService;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
@@ -60,15 +62,17 @@ public class MemberService {
                          RoleRepository roleRepository,
                          UserRoleRepository userRoleRepository,
                          PasswordEncoder passwordEncoder,
-                         NotificationService notificationService) {
-        this.memberRepository    = memberRepository;
-        this.planRepository      = planRepository;
-        this.receiptService      = receiptService;
-        this.userRepository      = userRepository;
-        this.roleRepository      = roleRepository;
-        this.userRoleRepository  = userRoleRepository;
-        this.passwordEncoder     = passwordEncoder;
-        this.notificationService = notificationService;
+                         NotificationService notificationService,
+                         AutomationExecutorService automationExecutorService) {
+        this.memberRepository        = memberRepository;
+        this.planRepository          = planRepository;
+        this.receiptService          = receiptService;
+        this.userRepository          = userRepository;
+        this.roleRepository          = roleRepository;
+        this.userRoleRepository      = userRoleRepository;
+        this.passwordEncoder         = passwordEncoder;
+        this.notificationService     = notificationService;
+        this.automationExecutorService = automationExecutorService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -207,6 +211,9 @@ public class MemberService {
                 saved.getId(), "/members",
                 "MEMBER_CREATED_" + saved.getId()
         );
+
+        // Fire new_signup automation workflows (event-driven, non-blocking)
+        automationExecutorService.handleEvent("new_signup", saved);
 
         return MemberResponseDTO.fromEntity(saved);
     }

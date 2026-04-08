@@ -8,16 +8,22 @@ import {
   Bell,
   BellOff,
   Trash2,
+  RefreshCw,
+  ChevronRight,
+  Users,
+  CreditCard,
+  Calendar,
+  TrendingUp,
+  Package,
+  Briefcase,
+  FileText,
+  Settings,
+  Zap,
 } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "../ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
 import { notificationService, AppNotification } from "../../utils/supabase/notification-service";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function timeAgo(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
@@ -27,7 +33,8 @@ function timeAgo(isoString: string): string {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  if (days < 7) return `${days}d ago`;
+  return new Date(isoString).toLocaleDateString();
 }
 
 function isToday(isoString: string): boolean {
@@ -40,12 +47,73 @@ function isToday(isoString: string): boolean {
   );
 }
 
+function isYesterday(isoString: string): boolean {
+  const d = new Date(isoString);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return (
+    d.getFullYear() === yesterday.getFullYear() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getDate() === yesterday.getDate()
+  );
+}
+
+// ── Type / priority configs ───────────────────────────────────────────────────
+
 const TYPE_CONFIG = {
-  SUCCESS: { icon: CheckCircle, dot: "bg-green-500", text: "text-green-600" },
-  INFO:    { icon: Info,        dot: "bg-blue-500",  text: "text-blue-600"  },
-  WARNING: { icon: AlertTriangle, dot: "bg-yellow-500", text: "text-yellow-600" },
-  DANGER:  { icon: XCircle,    dot: "bg-red-500",   text: "text-red-600"   },
+  SUCCESS: {
+    icon: CheckCircle,
+    iconBg: "bg-green-100",
+    iconColor: "text-green-600",
+    dot: "bg-green-500",
+    border: "border-l-green-500",
+    badge: "bg-green-100 text-green-700",
+  },
+  INFO: {
+    icon: Info,
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+    dot: "bg-blue-500",
+    border: "border-l-blue-500",
+    badge: "bg-blue-100 text-blue-700",
+  },
+  WARNING: {
+    icon: AlertTriangle,
+    iconBg: "bg-yellow-100",
+    iconColor: "text-yellow-600",
+    dot: "bg-yellow-500",
+    border: "border-l-yellow-500",
+    badge: "bg-yellow-100 text-yellow-700",
+  },
+  DANGER: {
+    icon: XCircle,
+    iconBg: "bg-red-100",
+    iconColor: "text-red-600",
+    dot: "bg-red-500",
+    border: "border-l-red-500",
+    badge: "bg-red-100 text-red-700",
+  },
 } as const;
+
+const PRIORITY_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  CRITICAL: { label: "Critical", bg: "bg-red-100",    text: "text-red-700"    },
+  HIGH:     { label: "High",     bg: "bg-orange-100", text: "text-orange-700" },
+  MEDIUM:   { label: "Medium",   bg: "bg-yellow-100", text: "text-yellow-700" },
+  LOW:      { label: "Low",      bg: "bg-gray-100",   text: "text-gray-600"   },
+};
+
+const MODULE_ICON: Record<string, React.ElementType> = {
+  MEMBERS:    Users,
+  BILLING:    CreditCard,
+  BOOKINGS:   Calendar,
+  LEADS:      TrendingUp,
+  FOLLOW_UPS: TrendingUp,
+  FINANCIALS: FileText,
+  PAYROLL:    Briefcase,
+  INVENTORY:  Package,
+  ASSETS:     Settings,
+  GENERAL:    Zap,
+};
 
 // ── Notification row ──────────────────────────────────────────────────────────
 
@@ -61,62 +129,117 @@ function NotificationRow({
   const navigate = useNavigate();
   const cfg = TYPE_CONFIG[notification.type] ?? TYPE_CONFIG.INFO;
   const IconComponent = cfg.icon;
+  const ModuleIcon = MODULE_ICON[notification.module] ?? Zap;
+  const priority = PRIORITY_CONFIG[notification.priority];
+  const isUnread = !notification.isRead;
 
   function handleClick() {
-    onRead(notification.id);
-    if (notification.actionUrl) {
-      navigate(notification.actionUrl);
-    }
+    if (isUnread) onRead(notification.id);
+    if (notification.actionUrl) navigate(notification.actionUrl);
   }
 
   return (
     <div
-      className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-accent/50 transition-colors border-b border-border/50 last:border-0 ${
-        !notification.isRead ? "bg-accent/20" : ""
-      }`}
       onClick={handleClick}
+      className={`
+        group relative flex gap-4 px-5 py-4 cursor-pointer transition-all duration-150
+        border-l-[3px] border-b border-border/40 last:border-b-0
+        hover:bg-accent/40
+        ${isUnread ? `${cfg.border} bg-accent/10` : "border-l-transparent"}
+      `}
     >
-      {/* Color dot */}
-      <span className={`mt-1.5 flex-shrink-0 h-2 w-2 rounded-full ${cfg.dot}`} />
+      {/* Icon circle */}
+      <div className={`flex-shrink-0 mt-0.5 h-10 w-10 rounded-full ${cfg.iconBg} flex items-center justify-center`}>
+        <IconComponent className={`h-5 w-5 ${cfg.iconColor}`} />
+      </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className={`text-sm truncate ${!notification.isRead ? "font-semibold" : "font-medium"}`}>
+      <div className="flex-1 min-w-0 space-y-1">
+        {/* Title row */}
+        <div className="flex items-start gap-2 flex-wrap">
+          <p className={`text-sm leading-snug flex-1 min-w-0 ${isUnread ? "font-semibold text-foreground" : "font-medium text-foreground/80"}`}>
             {notification.count > 1
-              ? `${notification.title} (${notification.count})`
+              ? `${notification.title} (×${notification.count})`
               : notification.title}
           </p>
           {notification.priority === "CRITICAL" && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 uppercase tracking-wide">
-              Critical
+            <span className={`flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${priority.bg} ${priority.text}`}>
+              {priority.label}
             </span>
           )}
           {notification.priority === "HIGH" && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 uppercase tracking-wide">
-              High
+            <span className={`flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${priority.bg} ${priority.text}`}>
+              {priority.label}
             </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+
+        {/* Message */}
+        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
           {notification.message}
         </p>
-        <p className="text-[11px] text-muted-foreground/70 mt-1">
-          {timeAgo(notification.createdAt)}
-        </p>
+
+        {/* Meta row */}
+        <div className="flex items-center gap-3 pt-0.5">
+          <span className="text-[11px] text-muted-foreground/60 font-medium">
+            {timeAgo(notification.createdAt)}
+          </span>
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
+            <ModuleIcon className="h-3 w-3" />
+            <span className="capitalize">{notification.module.toLowerCase().replace("_", " ")}</span>
+          </span>
+          {notification.actionUrl && (
+            <span className="flex items-center gap-0.5 text-[11px] text-primary/70 group-hover:text-primary transition-colors ml-auto">
+              View <ChevronRight className="h-3 w-3" />
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Delete button */}
+      {/* Unread dot */}
+      {isUnread && (
+        <span className={`flex-shrink-0 mt-1.5 h-2.5 w-2.5 rounded-full ${cfg.dot} ring-2 ring-background`} />
+      )}
+
+      {/* Delete — visible on hover */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onDelete(notification.id);
         }}
-        className="flex-shrink-0 p-1 rounded text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent transition-colors"
-        aria-label="Dismiss notification"
+        className="absolute top-3 right-4 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10"
+        aria-label="Dismiss"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>
+    </div>
+  );
+}
+
+// ── Section label ─────────────────────────────────────────────────────────────
+
+function SectionLabel({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center gap-3 px-5 py-2.5 bg-muted/50 border-b border-border/40 sticky top-0 z-10 backdrop-blur-sm">
+      <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+        {label}
+      </span>
+      <span className="text-[11px] text-muted-foreground/50 font-medium">{count}</span>
+    </div>
+  );
+}
+
+// ── Skeleton row ──────────────────────────────────────────────────────────────
+
+function SkeletonRow() {
+  return (
+    <div className="flex gap-4 px-5 py-4 border-b border-border/40 animate-pulse">
+      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted" />
+      <div className="flex-1 space-y-2 py-1">
+        <div className="h-3.5 bg-muted rounded w-3/4" />
+        <div className="h-3 bg-muted rounded w-full" />
+        <div className="h-3 bg-muted rounded w-1/2" />
+      </div>
     </div>
   );
 }
@@ -129,15 +252,19 @@ interface Props {
   onCountChange: (count: number) => void;
 }
 
+type FilterTab = "all" | "unread";
+
 export function NotificationPanel({ open, onClose, onCountChange }: Props) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<FilterTab>("all");
   const loaderRef = useRef<HTMLDivElement | null>(null);
 
   const loadPage = useCallback(async (pageNum: number, replace = false) => {
-    setLoading(true);
+    if (replace) setRefreshing(true); else setLoading(true);
     try {
       const data = await notificationService.getNotifications(pageNum, 20);
       setNotifications((prev) => (replace ? data.content : [...prev, ...data.content]));
@@ -146,10 +273,10 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
       // ignore
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  // Load first page when panel opens
   useEffect(() => {
     if (open) {
       setPage(0);
@@ -157,7 +284,6 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
     }
   }, [open, loadPage]);
 
-  // Infinite scroll via IntersectionObserver
   useEffect(() => {
     if (!loaderRef.current || !hasMore) return;
     const observer = new IntersectionObserver(
@@ -176,9 +302,7 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
 
   async function handleRead(id: number) {
     await notificationService.markAsRead(id);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
     const newUnread = notifications.filter((n) => !n.isRead && n.id !== id).length;
     onCountChange(newUnread);
   }
@@ -196,88 +320,158 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
     onCountChange(0);
   }
 
-  // Group into Today / Earlier
-  const today = notifications.filter((n) => isToday(n.createdAt));
-  const earlier = notifications.filter((n) => !isToday(n.createdAt));
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  const visible = filter === "unread"
+    ? notifications.filter((n) => !n.isRead)
+    : notifications;
+
+  const todayItems = visible.filter((n) => isToday(n.createdAt));
+  const yesterdayItems = visible.filter((n) => isYesterday(n.createdAt));
+  const earlierItems = visible.filter((n) => !isToday(n.createdAt) && !isYesterday(n.createdAt));
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="w-[380px] sm:w-[420px] p-0 flex flex-col">
-        {/* Header */}
-        <SheetHeader className="px-4 py-3 border-b border-border flex-shrink-0">
+      <SheetContent
+        side="right"
+        className="w-full sm:w-[480px] md:w-[520px] p-0 flex flex-col gap-0 border-l shadow-2xl"
+      >
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <SheetHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-border bg-background">
           <div className="flex items-center justify-between">
-            <SheetTitle className="text-base font-semibold flex items-center gap-2">
-              <Bell className="h-4 w-4" />
+            <SheetTitle className="flex items-center gap-3 text-lg font-bold">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Bell className="h-5 w-5 text-primary" />
+              </div>
               Notifications
               {unreadCount > 0 && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  ({unreadCount} unread)
+                <span className="inline-flex items-center justify-center h-6 min-w-6 px-2 rounded-full bg-primary text-primary-foreground text-xs font-bold leading-none">
+                  {unreadCount}
                 </span>
               )}
             </SheetTitle>
-            {notifications.length > 0 && (
+
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleMarkAllRead}
-                className="text-xs text-primary hover:underline flex items-center gap-1"
+                onClick={() => loadPage(0, true)}
+                disabled={refreshing}
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label="Refresh"
               >
-                <BellOff className="h-3 w-3" />
-                Mark all read
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               </button>
-            )}
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllRead}
+                  className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-colors"
+                >
+                  <BellOff className="h-3.5 w-3.5" />
+                  Mark all read
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter tabs */}
+          <div className="flex gap-1 mt-3 p-1 rounded-xl bg-muted w-fit">
+            {(["all", "unread"] as FilterTab[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  filter === tab
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab === "all" ? "All" : `Unread${unreadCount > 0 ? ` (${unreadCount})` : ""}`}
+              </button>
+            ))}
           </div>
         </SheetHeader>
 
-        {/* Body */}
+        {/* ── Body ───────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
-          {notifications.length === 0 && !loading ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground py-16">
-              <CheckCircle className="h-10 w-10 text-green-500 opacity-60" />
-              <p className="text-sm font-medium">You're all caught up</p>
-              <p className="text-xs opacity-60">No new notifications</p>
+          {refreshing ? (
+            <div className="divide-y divide-border/40">
+              {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground px-8 py-20">
+              <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center">
+                <CheckCircle className="h-10 w-10 text-green-500 opacity-70" />
+              </div>
+              <div className="text-center">
+                <p className="text-base font-semibold text-foreground">
+                  {filter === "unread" ? "No unread notifications" : "You're all caught up"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {filter === "unread"
+                    ? "Switch to All to see your history"
+                    : "New alerts will appear here automatically"}
+                </p>
+              </div>
             </div>
           ) : (
             <>
-              {today.length > 0 && (
+              {todayItems.length > 0 && (
                 <div>
-                  <p className="px-4 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/40 sticky top-0">
-                    Today
-                  </p>
-                  {today.map((n) => (
-                    <NotificationRow
-                      key={n.id}
-                      notification={n}
-                      onRead={handleRead}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </div>
-              )}
-              {earlier.length > 0 && (
-                <div>
-                  <p className="px-4 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/40 sticky top-0">
-                    Earlier
-                  </p>
-                  {earlier.map((n) => (
-                    <NotificationRow
-                      key={n.id}
-                      notification={n}
-                      onRead={handleRead}
-                      onDelete={handleDelete}
-                    />
+                  <SectionLabel label="Today" count={todayItems.length} />
+                  {todayItems.map((n) => (
+                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
                   ))}
                 </div>
               )}
 
-              {/* Infinite scroll trigger */}
-              <div ref={loaderRef} className="h-8 flex items-center justify-center">
+              {yesterdayItems.length > 0 && (
+                <div>
+                  <SectionLabel label="Yesterday" count={yesterdayItems.length} />
+                  {yesterdayItems.map((n) => (
+                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
+                  ))}
+                </div>
+              )}
+
+              {earlierItems.length > 0 && (
+                <div>
+                  <SectionLabel label="Earlier" count={earlierItems.length} />
+                  {earlierItems.map((n) => (
+                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
+                  ))}
+                </div>
+              )}
+
+              {/* Infinite scroll sentinel */}
+              <div ref={loaderRef} className="py-6 flex items-center justify-center">
                 {loading && (
-                  <span className="text-xs text-muted-foreground">Loading...</span>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Loading more…
+                  </div>
+                )}
+                {!hasMore && visible.length > 0 && (
+                  <p className="text-xs text-muted-foreground/50">No more notifications</p>
                 )}
               </div>
             </>
           )}
         </div>
+
+        {/* ── Footer ─────────────────────────────────────────────────────── */}
+        {notifications.length > 0 && (
+          <div className="flex-shrink-0 px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {notifications.length} notification{notifications.length !== 1 ? "s" : ""} total
+            </p>
+            <button
+              onClick={handleMarkAllRead}
+              disabled={unreadCount === 0}
+              className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Clear all unread
+            </button>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
