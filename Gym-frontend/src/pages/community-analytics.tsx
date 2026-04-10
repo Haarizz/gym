@@ -239,20 +239,33 @@ export function CommunityAnalytics() {
     return COLORS.error;
   };
 
+  const panelCardShell = "bg-white border-0 shadow-sm";
+  const statCardShell =
+    "bg-white border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none";
+  const tabContentShell = "space-y-6 animate-in fade-in-0 zoom-in-95 duration-200";
+
+  const kpiThemes: Record<string, { iconShell: string; iconColor: string; valueColor: string }> = {
+    primary: { iconShell: "bg-blue-50", iconColor: "text-blue-600", valueColor: "text-blue-700" },
+    secondary: { iconShell: "bg-teal-50", iconColor: "text-teal-600", valueColor: "text-teal-700" },
+    success: { iconShell: "bg-emerald-50", iconColor: "text-emerald-600", valueColor: "text-emerald-700" },
+    warning: { iconShell: "bg-amber-50", iconColor: "text-amber-600", valueColor: "text-amber-700" },
+    error: { iconShell: "bg-rose-50", iconColor: "text-rose-600", valueColor: "text-rose-700" },
+  };
+
   return (
-    <div className="p-6 space-y-6 bg-background">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
+          <p className="text-gray-600">
             Comprehensive business intelligence and performance insights for your gym
           </p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
           <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] shadow-sm">
               <Calendar className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Date Range" />
             </SelectTrigger>
@@ -266,7 +279,7 @@ export function CommunityAnalytics() {
           </Select>
 
           <Select value={staffFilter} onValueChange={setStaffFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] shadow-sm">
               <Users className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Staff Filter" />
             </SelectTrigger>
@@ -278,12 +291,12 @@ export function CommunityAnalytics() {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
 
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -294,13 +307,21 @@ export function CommunityAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpiData.map((kpi, index) => {
           const IconComponent = kpi.icon;
+          const theme = kpiThemes[kpi.color] ?? kpiThemes.primary;
           return (
-            <Card key={index} className="border-border/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <IconComponent className="h-5 w-5 text-primary" />
-                  </div>
+            <Card key={index} className={statCardShell}>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-sm font-medium text-primary">{kpi.title}</CardTitle>
+                  {kpi.subtitle && <CardDescription className="text-xs">{kpi.subtitle}</CardDescription>}
+                </div>
+                <div className={`${theme.iconShell} p-2 rounded-lg`}>
+                  <IconComponent className={`h-4 w-4 ${theme.iconColor}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between gap-3">
+                  <div className={`text-2xl font-bold ${theme.valueColor}`}>{kpi.value}</div>
                   <Badge variant={kpi.trend === "up" ? "default" : "destructive"} className="text-xs">
                     {kpi.trend === "up" ? (
                       <ArrowUpRight className="h-3 w-3 mr-1" />
@@ -310,31 +331,22 @@ export function CommunityAnalytics() {
                     {kpi.change}
                   </Badge>
                 </div>
-                
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground">{kpi.title}</p>
-                  <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
-                  
-                  {kpi.target && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Target: {kpi.target}</span>
-                        <span>{kpi.progress?.toFixed(1)}%</span>
-                      </div>
-                      <Progress 
-                        value={kpi.progress} 
-                        className="h-2"
-                        style={{
-                          '--progress-background': getProgressColor(kpi.progress || 0)
-                        } as React.CSSProperties}
-                      />
+
+                {kpi.target && (
+                  <div className="space-y-2 mt-3">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Target: {kpi.target}</span>
+                      <span>{kpi.progress?.toFixed(1)}%</span>
                     </div>
-                  )}
-                  
-                  {kpi.subtitle && (
-                    <p className="text-xs text-muted-foreground">{kpi.subtitle}</p>
-                  )}
-                </div>
+                    <Progress
+                      value={kpi.progress}
+                      className="h-2"
+                      style={{
+                        '--progress-background': getProgressColor(kpi.progress || 0)
+                      } as React.CSSProperties}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
@@ -342,16 +354,16 @@ export function CommunityAnalytics() {
       </div>
 
       {/* Collections Breakdown Section */}
-      <Card className="border-border/50">
+      <Card className={panelCardShell}>
         <CardHeader className="pb-4">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
-              <CardTitle className="text-xl text-foreground">Total Collections</CardTitle>
+              <CardTitle className="text-xl">Total Collections</CardTitle>
               <CardDescription>Revenue breakdown by income source</CardDescription>
             </div>
             
-            <Tabs value={activeCollectionTab} onValueChange={setActiveCollectionTab}>
-              <TabsList className="grid w-full grid-cols-3 lg:w-[300px]">
+            <Tabs value={activeCollectionTab} onValueChange={setActiveCollectionTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="today">Today</TabsTrigger>
                 <TabsTrigger value="yesterday">Yesterday</TabsTrigger>
                 <TabsTrigger value="thisMonth">This Month</TabsTrigger>
@@ -422,9 +434,9 @@ export function CommunityAnalytics() {
       {/* Trends & Performance Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Daily Revenue Trend */}
-        <Card className="border-border/50">
+        <Card className={panelCardShell}>
           <CardHeader>
-            <CardTitle className="text-lg text-foreground">Daily Revenue Trend</CardTitle>
+            <CardTitle className="text-lg">Daily Revenue Trend</CardTitle>
             <CardDescription>Revenue and member acquisition over the week</CardDescription>
           </CardHeader>
           <CardContent>
@@ -456,9 +468,9 @@ export function CommunityAnalytics() {
         </Card>
 
         {/* Monthly Targets vs Achievement */}
-        <Card className="border-border/50">
+        <Card className={panelCardShell}>
           <CardHeader>
-            <CardTitle className="text-lg text-foreground">Monthly Performance</CardTitle>
+            <CardTitle className="text-lg">Monthly Performance</CardTitle>
             <CardDescription>Target vs actual revenue comparison</CardDescription>
           </CardHeader>
           <CardContent>
@@ -482,21 +494,21 @@ export function CommunityAnalytics() {
       {/* Staff Performance & Retention Funnel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Staff Performance */}
-        <Card className="lg:col-span-2 border-border/50">
+        <Card className={`lg:col-span-2 ${panelCardShell}`}>
           <CardHeader>
-            <CardTitle className="text-lg text-foreground">Staff Performance</CardTitle>
+            <CardTitle className="text-lg">Staff Performance</CardTitle>
             <CardDescription>Sales achievement by team members</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {mockData.staffPerformance.map((staff, index) => (
-                <div key={index} className="flex items-center justify-between p-4 rounded-lg border border-border/50">
+                <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 rounded-full bg-primary/10">
                       <Users className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">{staff.name}</p>
+                      <p className="font-medium">{staff.name}</p>
                       <p className="text-sm text-muted-foreground">
                         AED {staff.sales.toLocaleString()} / AED {staff.target.toLocaleString()}
                       </p>
@@ -505,7 +517,7 @@ export function CommunityAnalytics() {
                   
                   <div className="flex items-center space-x-3">
                     <div className="text-right">
-                      <p className="text-sm font-medium text-foreground">
+                      <p className="text-sm font-medium">
                         {staff.achievement.toFixed(1)}%
                       </p>
                       <Progress 
@@ -527,9 +539,9 @@ export function CommunityAnalytics() {
         </Card>
 
         {/* Retention Funnel */}
-        <Card className="border-border/50">
+        <Card className={panelCardShell}>
           <CardHeader>
-            <CardTitle className="text-lg text-foreground">Member Journey</CardTitle>
+            <CardTitle className="text-lg">Member Journey</CardTitle>
             <CardDescription>Conversion funnel analysis</CardDescription>
           </CardHeader>
           <CardContent>
@@ -565,12 +577,12 @@ export function CommunityAnalytics() {
       <div className="space-y-6">
         <div className="flex items-center space-x-2">
           <Brain className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-bold text-foreground">Advanced Analytics</h2>
+          <h2 className="text-2xl font-bold">Advanced Analytics</h2>
           <Badge variant="outline" className="ml-2">AI Powered</Badge>
         </div>
 
         <Tabs defaultValue="churn" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="churn">Churn Prediction</TabsTrigger>
             <TabsTrigger value="trainers">Trainer Performance</TabsTrigger>
             <TabsTrigger value="engagement">Engagement</TabsTrigger>
@@ -578,10 +590,10 @@ export function CommunityAnalytics() {
           </TabsList>
 
           {/* Churn Prediction */}
-          <TabsContent value="churn">
-            <Card className="border-border/50">
+          <TabsContent value="churn" className={tabContentShell}>
+            <Card className={panelCardShell}>
               <CardHeader>
-                <CardTitle className="text-lg text-foreground flex items-center">
+                <CardTitle className="text-lg flex items-center">
                   <AlertTriangle className="h-5 w-5 mr-2 text-warning" />
                   Member Churn Risk Analysis
                 </CardTitle>
@@ -592,13 +604,13 @@ export function CommunityAnalytics() {
               <CardContent>
                 <div className="space-y-4">
                   {mockData.churnPrediction.map((member, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 rounded-lg border border-border/50">
+                    <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-4">
                         <div className="p-2 rounded-full bg-destructive/10">
                           <UserX className="h-4 w-4 text-destructive" />
                         </div>
                         <div>
-                          <p className="font-medium text-foreground">{member.name}</p>
+                          <p className="font-medium">{member.name}</p>
                           <p className="text-sm text-muted-foreground">
                             {member.membership} • Last visit: {member.lastVisit}
                           </p>
@@ -607,7 +619,7 @@ export function CommunityAnalytics() {
                       
                       <div className="flex items-center space-x-3">
                         <div className="text-right">
-                          <p className="text-sm font-medium text-foreground">
+                          <p className="text-sm font-medium">
                             {member.probability}% Risk
                           </p>
                           <Progress 
@@ -622,7 +634,7 @@ export function CommunityAnalytics() {
                         <Badge variant={getRiskColor(member.risk)}>
                           {member.risk} Risk
                         </Badge>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
                           <MessageSquare className="h-4 w-4 mr-1" />
                           Contact
                         </Button>
@@ -635,10 +647,10 @@ export function CommunityAnalytics() {
           </TabsContent>
 
           {/* Trainer Performance */}
-          <TabsContent value="trainers">
-            <Card className="border-border/50">
+          <TabsContent value="trainers" className={tabContentShell}>
+            <Card className={panelCardShell}>
               <CardHeader>
-                <CardTitle className="text-lg text-foreground flex items-center">
+                <CardTitle className="text-lg flex items-center">
                   <Award className="h-5 w-5 mr-2 text-primary" />
                   Trainer Performance Analytics
                 </CardTitle>
@@ -650,10 +662,10 @@ export function CommunityAnalytics() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     {mockData.trainerPerformance.map((trainer, index) => (
-                      <div key={index} className="p-4 rounded-lg border border-border/50">
+                      <div key={index} className="p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                         <div className="flex justify-between items-start mb-3">
                           <div>
-                            <p className="font-medium text-foreground">{trainer.name}</p>
+                            <p className="font-medium">{trainer.name}</p>
                             <div className="flex items-center space-x-1 mt-1">
                               <Star className="h-4 w-4 text-yellow-500 fill-current" />
                               <span className="text-sm text-muted-foreground">{trainer.rating}</span>
@@ -667,11 +679,11 @@ export function CommunityAnalytics() {
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <p className="text-muted-foreground">Classes</p>
-                            <p className="font-medium text-foreground">{trainer.classes}</p>
+                            <p className="font-medium">{trainer.classes}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Attendance</p>
-                            <p className="font-medium text-foreground">{trainer.attendance}%</p>
+                            <p className="font-medium">{trainer.attendance}%</p>
                           </div>
                         </div>
                       </div>
@@ -697,11 +709,11 @@ export function CommunityAnalytics() {
           </TabsContent>
 
           {/* Engagement Analytics */}
-          <TabsContent value="engagement">
+          <TabsContent value="engagement" className={tabContentShell}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="border-border/50">
+              <Card className={panelCardShell}>
                 <CardHeader>
-                  <CardTitle className="text-lg text-foreground">Community Feature Usage</CardTitle>
+                  <CardTitle className="text-lg">Community Feature Usage</CardTitle>
                   <CardDescription>Most used community features and engagement rates</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -709,10 +721,10 @@ export function CommunityAnalytics() {
                     {mockData.engagementAnalytics.communityFeatures.map((feature, index) => (
                       <div key={index} className="space-y-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-foreground">{feature.feature}</span>
+                          <span className="text-sm font-medium">{feature.feature}</span>
                           <div className="flex items-center space-x-2">
                             <span className="text-xs text-muted-foreground">{feature.usage}% usage</span>
-                            <span className="text-xs font-medium text-foreground">{feature.engagement}% engagement</span>
+                            <span className="text-xs font-medium">{feature.engagement}% engagement</span>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -741,9 +753,9 @@ export function CommunityAnalytics() {
                 </CardContent>
               </Card>
 
-              <Card className="border-border/50">
+              <Card className={panelCardShell}>
                 <CardHeader>
-                  <CardTitle className="text-lg text-foreground">Engagement vs Renewal Correlation</CardTitle>
+                  <CardTitle className="text-lg">Engagement vs Renewal Correlation</CardTitle>
                   <CardDescription>Relationship between community engagement and member renewals</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -770,25 +782,25 @@ export function CommunityAnalytics() {
           </TabsContent>
 
           {/* Profitability Dashboard */}
-          <TabsContent value="profitability">
+          <TabsContent value="profitability" className={tabContentShell}>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="border-border/50">
+              <Card className={panelCardShell}>
                 <CardHeader>
-                  <CardTitle className="text-lg text-foreground">Revenue Breakdown</CardTitle>
+                  <CardTitle className="text-lg">Revenue Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Total Revenue</span>
-                      <span className="font-bold text-foreground">AED 325,000</span>
+                      <span className="font-bold">AED 325,000</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Operating Costs</span>
-                      <span className="font-medium text-foreground">AED 180,000</span>
+                      <span className="font-medium">AED 180,000</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-foreground">Net Profit</span>
+                      <span className="text-sm font-medium">Net Profit</span>
                       <span className="font-bold text-success">AED 145,000</span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -799,9 +811,9 @@ export function CommunityAnalytics() {
                 </CardContent>
               </Card>
 
-              <Card className="border-border/50">
+              <Card className={panelCardShell}>
                 <CardHeader>
-                  <CardTitle className="text-lg text-foreground">Cost Center Analysis</CardTitle>
+                  <CardTitle className="text-lg">Cost Center Analysis</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -815,7 +827,7 @@ export function CommunityAnalytics() {
                       <div key={index} className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">{cost.name}</span>
                         <div className="text-right">
-                          <span className="text-sm font-medium text-foreground">
+                          <span className="text-sm font-medium">
                             AED {cost.amount.toLocaleString()}
                           </span>
                           <p className="text-xs text-muted-foreground">{cost.percentage}%</p>
@@ -826,9 +838,9 @@ export function CommunityAnalytics() {
                 </CardContent>
               </Card>
 
-              <Card className="border-border/50">
+              <Card className={panelCardShell}>
                 <CardHeader>
-                  <CardTitle className="text-lg text-foreground">Key Ratios</CardTitle>
+                  <CardTitle className="text-lg">Key Ratios</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -841,7 +853,7 @@ export function CommunityAnalytics() {
                       <div key={index} className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">{ratio.label}</span>
                         <div className="flex items-center space-x-2">
-                          <span className="font-medium text-foreground">{ratio.value}</span>
+                          <span className="font-medium">{ratio.value}</span>
                           {ratio.trend === "up" ? (
                             <TrendingUp className="h-4 w-4 text-success" />
                           ) : (
@@ -859,9 +871,9 @@ export function CommunityAnalytics() {
       </div>
 
       {/* Action Items & Recommendations */}
-      <Card className="border-border/50">
+      <Card className={panelCardShell}>
         <CardHeader>
-          <CardTitle className="text-lg text-foreground flex items-center">
+          <CardTitle className="text-lg flex items-center">
             <Zap className="h-5 w-5 mr-2 text-primary" />
             AI Recommendations
           </CardTitle>
@@ -901,7 +913,7 @@ export function CommunityAnalytics() {
                 action: "Celebrate Success"
               }
             ].map((recommendation, index) => (
-              <div key={index} className="flex items-start space-x-3 p-4 rounded-lg border border-border/50">
+              <div key={index} className="flex items-start space-x-3 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                 <div className={`p-2 rounded-full ${
                   recommendation.type === 'success' ? 'bg-success/10' :
                   recommendation.type === 'warning' ? 'bg-warning/10' :
@@ -914,9 +926,9 @@ export function CommunityAnalytics() {
                   }`} />
                 </div>
                 <div className="flex-1 space-y-2">
-                  <p className="font-medium text-foreground">{recommendation.title}</p>
+                  <p className="font-medium">{recommendation.title}</p>
                   <p className="text-sm text-muted-foreground">{recommendation.message}</p>
-                  <Button size="sm" variant="outline" className="text-xs">
+                  <Button size="sm" variant="outline" className="text-xs shadow-sm hover:shadow-md transition-all">
                     {recommendation.action}
                   </Button>
                 </div>

@@ -300,10 +300,17 @@ const transactionData: Transaction[] = [
   },
 ];
 
+const panelCardShell = "bg-white border-0 shadow-sm";
+const statCardShell =
+  "bg-white border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none";
+const tabContentShell = "space-y-6 animate-in fade-in-0 zoom-in-95 duration-200";
+
 // Components
 const KPICard: React.FC<{ kpi: KPICard }> = ({ kpi }) => {
-  const changePercentage = ((kpi.value - kpi.previousValue) / kpi.previousValue * 100);
-  const isPositive = changePercentage > 0;
+  const changePercentage = kpi.previousValue === 0
+    ? 0
+    : ((kpi.value - kpi.previousValue) / kpi.previousValue * 100);
+  const isPositive = changePercentage >= 0;
   
   const formatValue = (value: number) => {
     switch (kpi.format) {
@@ -319,7 +326,7 @@ const KPICard: React.FC<{ kpi: KPICard }> = ({ kpi }) => {
   };
 
   return (
-    <Card className="relative overflow-hidden">
+    <Card className={cn(statCardShell, "relative overflow-hidden")}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -386,9 +393,9 @@ const InsightCard: React.FC<{ insight: Insight }> = ({ insight }) => {
   const IconComponent = config.icon;
 
   return (
-    <Card className="border-l-4 border-l-primary">
+    <Card className={cn(panelCardShell, "overflow-hidden")}>
       <CardContent className="p-4">
-        <div className="flex items-start space-x-3">
+        <div className="flex items-start space-x-3 border-l-4 border-l-primary pl-4">
           <div className={cn("rounded-lg p-2", config.color)}>
             <IconComponent className="h-4 w-4" />
           </div>
@@ -549,7 +556,7 @@ export function FinancialAnalytics() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-3">
@@ -557,7 +564,7 @@ export function FinancialAnalytics() {
             <Brain className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Financial Analytics</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Financial Analytics</h1>
             <p className="text-sm text-gray-600">
               Advanced business intelligence and performance insights
             </p>
@@ -565,15 +572,15 @@ export function FinancialAnalytics() {
         </div>
         
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm" onClick={() => handleExport("excel")}>
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={() => handleExport("excel")}>
             <Download className="h-4 w-4 mr-2" />
             Excel
           </Button>
-          <Button variant="outline" size="sm" onClick={() => handleExport("pdf")}>
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={() => handleExport("pdf")}>
             <Download className="h-4 w-4 mr-2" />
             PDF
           </Button>
-          <Button size="sm" className="bg-primary hover:bg-primary/90">
+          <Button size="sm" className="bg-primary hover:bg-primary/90 shadow-sm hover:shadow-md transition-all">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -581,7 +588,7 @@ export function FinancialAnalytics() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className={panelCardShell}>
         <CardHeader>
           <CardTitle className="text-lg">Analytics Filters</CardTitle>
         </CardHeader>
@@ -678,16 +685,16 @@ export function FinancialAnalytics() {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue vs Expenses Trend */}
-        <Card className="lg:col-span-2">
+        <Card className={cn(panelCardShell, "lg:col-span-2")}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Revenue vs Expenses Trend</CardTitle>
               <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
                   <Building2 className="h-4 w-4 mr-2" />
                   Branch View
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
                   <Eye className="h-4 w-4 mr-2" />
                   Drill Down
                 </Button>
@@ -729,7 +736,7 @@ export function FinancialAnalytics() {
         </Card>
 
         {/* Income Distribution */}
-        <Card>
+        <Card className={panelCardShell}>
           <CardHeader>
             <CardTitle className="text-lg">Income Distribution</CardTitle>
           </CardHeader>
@@ -759,7 +766,7 @@ export function FinancialAnalytics() {
         </Card>
 
         {/* Expense Breakdown */}
-        <Card>
+        <Card className={panelCardShell}>
           <CardHeader>
             <CardTitle className="text-lg">Expense Breakdown</CardTitle>
           </CardHeader>
@@ -780,7 +787,7 @@ export function FinancialAnalytics() {
       </div>
 
       {/* Business Performance Insights */}
-      <Card>
+      <Card className={panelCardShell}>
         <CardHeader>
           <div className="flex items-center space-x-3">
             <Brain className="h-5 w-5 text-primary" />
@@ -803,8 +810,8 @@ export function FinancialAnalytics() {
           <TabsTrigger value="receivables">Accounts Receivable</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="transactions">
-          <Card>
+        <TabsContent value="transactions" className={tabContentShell}>
+          <Card className={panelCardShell}>
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <CardTitle className="text-lg">Transaction Summary</CardTitle>
@@ -818,7 +825,7 @@ export function FinancialAnalytics() {
                       className="pl-10 w-64"
                     />
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
                     <Filter className="h-4 w-4 mr-2" />
                     Filter
                   </Button>
@@ -826,9 +833,9 @@ export function FinancialAnalytics() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
+              <div className="rounded-xl overflow-hidden bg-white shadow-sm">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-gray-50">
                     <TableRow>
                       <TableHead className="font-semibold text-primary">Date</TableHead>
                       <TableHead className="font-semibold text-primary">Category</TableHead>
@@ -842,7 +849,7 @@ export function FinancialAnalytics() {
                   </TableHeader>
                   <TableBody>
                     {filteredTransactions.map((transaction) => (
-                      <TableRow key={transaction.id} className="hover:bg-gray-50">
+                      <TableRow key={transaction.id} className="hover:bg-gray-50/60">
                         <TableCell>{format(new Date(transaction.date), "dd/MM/yyyy")}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="bg-blue-100 text-blue-800">
@@ -879,8 +886,8 @@ export function FinancialAnalytics() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="receivables">
-          <Card>
+        <TabsContent value="receivables" className={tabContentShell}>
+          <Card className={panelCardShell}>
             <CardHeader>
               <CardTitle className="text-lg">Accounts Receivable / Payable</CardTitle>
             </CardHeader>
@@ -891,7 +898,7 @@ export function FinancialAnalytics() {
                 <p className="text-gray-600 mb-4">
                   Detailed accounts receivable and payable tracking coming soon.
                 </p>
-                <Button variant="outline">
+                <Button variant="outline" className="shadow-sm hover:shadow-md transition-all">
                   <ExternalLink className="h-4 w-4 mr-2" />
                   View in Ledgers
                 </Button>

@@ -4,7 +4,7 @@ import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { TrendingUp, Users, Calendar, DollarSign, Download, Filter, RefreshCw, BarChart3, FileText } from 'lucide-react';
+import { Users, Calendar, DollarSign, Download, Filter, RefreshCw, BarChart3, FileText, TrendingUp, Activity } from 'lucide-react';
 
 interface ReportsAnalyticsProps {
   onNavigate?: (section: string) => void;
@@ -68,56 +68,78 @@ const kpiData = [
     value: "94.2%",
     change: "+2.1%",
     trend: "up",
-    description: "Monthly retention rate"
+    description: "Monthly retention rate",
+    icon: Users,
+    iconShell: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    valueColor: "text-emerald-700",
   },
   {
     title: "Average Revenue Per Member",
     value: "$127",
     change: "+8.5%",
     trend: "up",
-    description: "Per member monthly"
+    description: "Per member monthly",
+    icon: DollarSign,
+    iconShell: "bg-blue-50",
+    iconColor: "text-blue-600",
+    valueColor: "text-blue-700",
   },
   {
     title: "Class Utilization Rate",
     value: "78%",
     change: "-3.2%",
     trend: "down",
-    description: "Average across all classes"
+    description: "Average across all classes",
+    icon: Activity,
+    iconShell: "bg-amber-50",
+    iconColor: "text-amber-600",
+    valueColor: "text-amber-700",
   },
   {
     title: "Equipment Downtime",
     value: "2.3%",
     change: "-1.1%",
     trend: "up",
-    description: "Equipment availability"
+    description: "Equipment availability",
+    icon: TrendingUp,
+    iconShell: "bg-slate-50",
+    iconColor: "text-slate-600",
+    valueColor: "text-slate-700",
   }
 ];
 
 export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
+  const statCardShell =
+    "bg-white border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none";
+  const panelCardShell = "bg-white border-0 shadow-sm";
+  const tabContentShell = "space-y-6 animate-in fade-in-0 zoom-in-95 duration-200";
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Reports & Analytics</h1>
-          <p className="text-muted-foreground">Comprehensive business intelligence and performance metrics.</p>
+          <p className="text-gray-600 mt-1">Comprehensive business intelligence and performance metrics.</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button 
-            className="btn-primary"
+            size="sm"
+            className="btn-primary shadow-sm hover:shadow-md transition-all"
             onClick={() => onNavigate?.('custom-reports')}
           >
             <FileText className="mr-2 h-4 w-4" />
             Custom Reports
           </Button>
-          <Button variant="outline">
+          <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh Data
           </Button>
-          <Button variant="outline">
+          <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
             <Filter className="mr-2 h-4 w-4" />
             Custom Filter
           </Button>
-          <Button>
+          <Button size="sm" className="shadow-sm hover:shadow-md transition-all">
             <Download className="mr-2 h-4 w-4" />
             Export Report
           </Button>
@@ -127,14 +149,16 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpiData.map((kpi, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
-              <TrendingUp className={`h-4 w-4 ${kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'}`} />
+          <Card key={index} className={statCardShell}>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium text-primary">{kpi.title}</CardTitle>
+              <div className={`${kpi.iconShell} p-2 rounded-lg`}>
+                <kpi.icon className={`h-4 w-4 ${kpi.iconColor}`} />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{kpi.value}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className={`text-2xl font-bold ${kpi.valueColor}`}>{kpi.value}</div>
+              <p className="text-xs text-muted-foreground mt-1">
                 <span className={kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'}>
                   {kpi.change}
                 </span>{' '}
@@ -146,7 +170,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="membership">Membership</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
@@ -154,9 +178,9 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
           <TabsTrigger value="custom">Custom Reports</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className={tabContentShell}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className={panelCardShell}>
               <CardHeader>
                 <CardTitle>Membership Growth Trend</CardTitle>
                 <CardDescription>Member acquisition and retention over time</CardDescription>
@@ -174,7 +198,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={panelCardShell}>
               <CardHeader>
                 <CardTitle>Revenue Distribution</CardTitle>
                 <CardDescription>Revenue breakdown by service type</CardDescription>
@@ -203,7 +227,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
             </Card>
           </div>
 
-          <Card>
+          <Card className={panelCardShell}>
             <CardHeader>
               <CardTitle>Peak Usage Hours</CardTitle>
               <CardDescription>Gym utilization throughout the day</CardDescription>
@@ -222,9 +246,9 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="membership" className="space-y-6">
+        <TabsContent value="membership" className={tabContentShell}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className={panelCardShell}>
               <CardHeader>
                 <CardTitle>Member Acquisition vs Churn</CardTitle>
                 <CardDescription>Monthly new members vs cancellations</CardDescription>
@@ -243,7 +267,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={panelCardShell}>
               <CardHeader>
                 <CardTitle>Member Demographics</CardTitle>
                 <CardDescription>Age distribution of members</CardDescription>
@@ -270,7 +294,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
             </Card>
           </div>
 
-          <Card>
+          <Card className={panelCardShell}>
             <CardHeader>
               <CardTitle>Membership Metrics</CardTitle>
               <CardDescription>Key membership performance indicators</CardDescription>
@@ -294,10 +318,10 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="revenue" className="space-y-6">
+        <TabsContent value="revenue" className={tabContentShell}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              <Card>
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <CardTitle>Revenue Trends</CardTitle>
                   <CardDescription>Monthly revenue by category</CardDescription>
@@ -319,7 +343,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
               </Card>
             </div>
 
-            <Card>
+            <Card className={panelCardShell}>
               <CardHeader>
                 <CardTitle>Revenue Summary</CardTitle>
                 <CardDescription>This month's performance</CardDescription>
@@ -339,9 +363,9 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
           </div>
         </TabsContent>
 
-        <TabsContent value="operations" className="space-y-6">
+        <TabsContent value="operations" className={tabContentShell}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className={panelCardShell}>
               <CardHeader>
                 <CardTitle>Class Attendance Trends</CardTitle>
                 <CardDescription>Attendance rates by class type over time</CardDescription>
@@ -369,7 +393,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={panelCardShell}>
               <CardHeader>
                 <CardTitle>Operational Metrics</CardTitle>
                 <CardDescription>Key operational performance indicators</CardDescription>
@@ -407,8 +431,8 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
           </div>
         </TabsContent>
 
-        <TabsContent value="custom" className="space-y-6">
-          <Card>
+        <TabsContent value="custom" className={tabContentShell}>
+          <Card className={panelCardShell}>
             <CardHeader>
               <CardTitle>Custom Report Builder</CardTitle>
               <CardDescription>Create custom reports and analytics</CardDescription>
@@ -459,17 +483,17 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
               </div>
               
               <div className="flex space-x-4">
-                <Button>
+                <Button className="shadow-sm hover:shadow-md transition-all">
                   <BarChart3 className="mr-2 h-4 w-4" />
                   Generate Report
                 </Button>
-                <Button variant="outline">
+                <Button variant="outline" className="shadow-sm hover:shadow-md transition-all">
                   <Calendar className="mr-2 h-4 w-4" />
                   Schedule Report
                 </Button>
               </div>
 
-              <div className="mt-8 text-center py-8 text-muted-foreground border-t">
+              <div className="mt-8 text-center py-8 text-muted-foreground bg-gray-50 rounded-xl">
                 <BarChart3 className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
                 <h3 className="text-lg font-medium mb-2">Advanced Report Builder</h3>
                 <p>Create custom reports with drag-and-drop functionality and advanced filtering options. This feature is under development.</p>
