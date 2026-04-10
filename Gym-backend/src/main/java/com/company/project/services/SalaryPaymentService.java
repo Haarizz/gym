@@ -35,17 +35,20 @@ public class SalaryPaymentService {
     private final StaffRepository staffRepository;
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
+    private final FinancialEventService financialEventService;
 
     public SalaryPaymentService(SalaryPaymentEmployeeRepository employeeRepository,
                                 SalaryPaymentRepository paymentRepository,
                                 StaffRepository staffRepository,
                                 ObjectMapper objectMapper,
-                                NotificationService notificationService) {
-        this.employeeRepository = employeeRepository;
-        this.paymentRepository = paymentRepository;
-        this.staffRepository = staffRepository;
-        this.objectMapper = objectMapper;
-        this.notificationService = notificationService;
+                                NotificationService notificationService,
+                                FinancialEventService financialEventService) {
+        this.employeeRepository    = employeeRepository;
+        this.paymentRepository     = paymentRepository;
+        this.staffRepository       = staffRepository;
+        this.objectMapper          = objectMapper;
+        this.notificationService   = notificationService;
+        this.financialEventService = financialEventService;
     }
 
     public List<SalaryPaymentEmployeeResponseDTO> getEmployees(String search, String department, String status) {
@@ -186,6 +189,9 @@ public class SalaryPaymentService {
                 payment.getId(), "/salary-payments",
                 "PAYROLL_" + payment.getEmployeeId() + "_" + payment.getMonth() + "_" + payment.getYear()
         );
+
+        // Generate journal entry: DR Salary Expense, CR Cash at Bank
+        financialEventService.onSalaryPaid(payment);
 
         return SalaryPaymentResponseDTO.fromEntity(payment, parseSplitPayments(payment.getSplitPaymentsJson()));
     }

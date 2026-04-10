@@ -41,16 +41,20 @@ public class SupplierBillService {
     private final ProductStockRepository productStockRepository;
     private final WarehouseRepository warehouseRepository;
 
+    private final FinancialEventService financialEventService;
+
     public SupplierBillService(SupplierBillRepository supplierBillRepository,
                                SupplierBillItemRepository supplierBillItemRepository,
                                SupplierRepository supplierRepository,
                                ProductStockRepository productStockRepository,
-                               WarehouseRepository warehouseRepository) {
-        this.supplierBillRepository = supplierBillRepository;
+                               WarehouseRepository warehouseRepository,
+                               FinancialEventService financialEventService) {
+        this.supplierBillRepository     = supplierBillRepository;
         this.supplierBillItemRepository = supplierBillItemRepository;
-        this.supplierRepository = supplierRepository;
-        this.productStockRepository = productStockRepository;
-        this.warehouseRepository = warehouseRepository;
+        this.supplierRepository         = supplierRepository;
+        this.productStockRepository     = productStockRepository;
+        this.warehouseRepository        = warehouseRepository;
+        this.financialEventService      = financialEventService;
     }
 
     // ── Write ────────────────────────────────────────────────────────────────
@@ -143,6 +147,10 @@ public class SupplierBillService {
         }
 
         bill.setStatus("CONFIRMED");
+        bill = supplierBillRepository.save(bill);
+
+        // Generate journal entry: DR Purchase/COGS + GST Input, CR Accounts Payable
+        financialEventService.onSupplierBillConfirmed(bill);
 
         // Increment stock for each item
         List<SupplierBillItem> items = supplierBillItemRepository.findByBillId(bill.getId());
@@ -167,7 +175,6 @@ public class SupplierBillService {
             }
         }
 
-        bill = supplierBillRepository.save(bill);
         return SupplierBillResponseDTO.fromEntity(bill, items);
     }
 

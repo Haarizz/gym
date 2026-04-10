@@ -32,13 +32,16 @@ public class SaleTransactionService {
     private final SaleTransactionRepository saleTransactionRepository;
     private final SaleTransactionItemRepository saleTransactionItemRepository;
     private final ProductStockRepository productStockRepository;
+    private final FinancialEventService financialEventService;
 
     public SaleTransactionService(SaleTransactionRepository saleTransactionRepository,
                                   SaleTransactionItemRepository saleTransactionItemRepository,
-                                  ProductStockRepository productStockRepository) {
-        this.saleTransactionRepository = saleTransactionRepository;
+                                  ProductStockRepository productStockRepository,
+                                  FinancialEventService financialEventService) {
+        this.saleTransactionRepository     = saleTransactionRepository;
         this.saleTransactionItemRepository = saleTransactionItemRepository;
-        this.productStockRepository = productStockRepository;
+        this.productStockRepository        = productStockRepository;
+        this.financialEventService         = financialEventService;
     }
 
     // ── Write ────────────────────────────────────────────────────────────────
@@ -111,6 +114,10 @@ public class SaleTransactionService {
         }
 
         List<SaleTransactionItem> savedItems = saleTransactionItemRepository.findByTransactionId(transaction.getId());
+
+        // Generate journal entry: DR Cash/Bank, CR Sales Revenue, CR Tax Payable
+        financialEventService.onSaleCompleted(transaction);
+
         return SaleTransactionResponseDTO.fromEntity(transaction, savedItems);
     }
 
@@ -133,6 +140,9 @@ public class SaleTransactionService {
         for (SaleTransactionItem item : items) {
             restoreStock(item.getProductId(), item.getQuantity());
         }
+
+        // Generate reversal journal entry: DR Sales Revenue, DR Tax Payable, CR Cash/Bank
+        financialEventService.onSaleRefunded(transaction);
 
         return SaleTransactionResponseDTO.fromEntity(transaction, items);
     }

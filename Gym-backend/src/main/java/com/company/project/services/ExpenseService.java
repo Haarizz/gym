@@ -20,10 +20,14 @@ public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
     private final NotificationService notificationService;
+    private final FinancialEventService financialEventService;
 
-    public ExpenseService(ExpenseRepository expenseRepository, NotificationService notificationService) {
-        this.expenseRepository = expenseRepository;
-        this.notificationService = notificationService;
+    public ExpenseService(ExpenseRepository expenseRepository,
+                          NotificationService notificationService,
+                          FinancialEventService financialEventService) {
+        this.expenseRepository    = expenseRepository;
+        this.notificationService  = notificationService;
+        this.financialEventService = financialEventService;
     }
 
     public List<ExpenseResponseDTO> getExpenses(String search, String status, String category,
@@ -105,7 +109,12 @@ public class ExpenseService {
         Expense expense = expenseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Expense not found: " + id));
         expense.setStatus(status);
-        return ExpenseResponseDTO.fromEntity(expenseRepository.save(expense));
+        Expense saved = expenseRepository.save(expense);
+        // Generate journal entry when expense is approved
+        if ("approved".equalsIgnoreCase(status)) {
+            financialEventService.onExpenseApproved(saved);
+        }
+        return ExpenseResponseDTO.fromEntity(saved);
     }
 
     public void deleteExpense(Long id) {

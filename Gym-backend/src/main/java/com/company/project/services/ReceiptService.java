@@ -33,10 +33,14 @@ public class ReceiptService {
 
     private final ReceiptRepository receiptRepository;
     private final MemberRepository memberRepository;
+    private final FinancialEventService financialEventService;
 
-    public ReceiptService(ReceiptRepository receiptRepository, MemberRepository memberRepository) {
-        this.receiptRepository = receiptRepository;
-        this.memberRepository  = memberRepository;
+    public ReceiptService(ReceiptRepository receiptRepository,
+                          MemberRepository memberRepository,
+                          FinancialEventService financialEventService) {
+        this.receiptRepository    = receiptRepository;
+        this.memberRepository     = memberRepository;
+        this.financialEventService = financialEventService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -192,6 +196,9 @@ public class ReceiptService {
         Receipt saved = receiptRepository.save(settlement);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
         saved = receiptRepository.save(saved);
+
+        // Generate journal entry: DR Cash/Bank, CR Membership Revenue
+        financialEventService.onMemberPaymentReceived(saved);
 
         return ReceiptResponseDTO.fromEntity(saved);
     }
