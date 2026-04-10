@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -38,7 +39,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 
-// Mock data for trainers
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+
+// Mock data for trainers (fallback if API has no trainers yet)
 const trainers = [
   {
     id: 1,
@@ -244,6 +247,9 @@ interface BookSessionProps {
 }
 
 export function BookSession({ onNavigate }: BookSessionProps = {}) {
+  const location = useLocation();
+  const navMemberId: number | null = (location.state as any)?.memberId ?? null;
+
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
@@ -254,15 +260,131 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
   const [filterSpecialization, setFilterSpecialization] = useState('all');
   const [viewMode, setViewMode] = useState<'book' | 'sessions'>('book');
   const [sessionFilter, setSessionFilter] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
-  
-  const weekDates = generateWeekDates(new Date());
-  const timeSlots = generateTimeSlots();
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [weekOffset, setWeekOffset] = useState(0);
 
-  // Member stats
+  // Real data state
+  const [realTrainers, setRealTrainers] = useState<any[]>([]);
+  const [trainersLoading, setTrainersLoading] = useState(true);
+  const [realSessions, setRealSessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [myBookings, setMyBookings] = useState<any[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [memberDbId, setMemberDbId] = useState<number | null>(navMemberId);
+
+  const weekDates = generateWeekDates(new Date(Date.now() + weekOffset * 7 * 86400000));
+
+  // Resolve the member's DB id (for bookings)
+  useEffect(() => {
+    if (navMemberId) { setMemberDbId(navMemberId); return; }
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_BASE}/members/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.id) setMemberDbId(Number(d.id)); })
+      .catch(() => {});
+  }, [navMemberId]);
+
+  // Fetch trainers from /api/staff?role=Trainer
+  const fetchTrainers = useCallback(async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    setTrainersLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/staff?role=Trainer&limit=50`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const items: any[] = data.items ?? data.staff ?? data.members ?? [];
+      setRealTrainers(items.map(s => ({
+        id: s.id,
+        name: s.name ?? "Trainer",
+        photo: s.photoUrl ?? s.photo_url ?? null,
+        specialization: s.department ?? s.role ?? "Training",
+        rating: null,
+        sessionsCompleted: null,
+        certifications: (s.certifications ?? []).map((c: any) => c.certName ?? c),
+        bio: "",
+        price: null,
+        schedule: s.schedule ?? {},
+      })));
+    } catch {
+      // fall back to mock trainers if API has none
+      setRealTrainers(trainers);
+    } finally {
+      setTrainersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchTrainers(); }, [fetchTrainers]);
+
+  // Fetch sessions for selected trainer + date
+  const fetchSessions = useCallback(async (trainerId: any, date: Date) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    setSessionsLoading(true);
+    const dateStr = date.toISOString().slice(0, 10);
+    try {
+      const url = `${API_BASE}/sessions?trainerId=${trainerId}&startDate=${dateStr}&endDate=${dateStr}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const items: any[] = Array.isArray(data) ? data : (data.sessions ?? data.content ?? data.items ?? []);
+      setRealSessions(items);
+    } catch {
+      setRealSessions([]);
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, []);
+
+  // Re-fetch sessions when trainer or date changes (only if on step 3)
+  useEffect(() => {
+    if (currentStep === 3 && selectedTrainer?.id) {
+      fetchSessions(selectedTrainer.id, selectedDate);
+    }
+  }, [selectedTrainer?.id, selectedDate, currentStep, fetchSessions]);
+
+  // Fetch member's bookings for "My Sessions" tab
+  const fetchMyBookings = useCallback(async () => {
+    if (!memberDbId) return;
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    setBookingsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/bookings?memberId=${memberDbId}&limit=50`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const items: any[] = Array.isArray(data) ? data : (data.bookings ?? data.content ?? data.items ?? []);
+      setMyBookings(items.map((b: any) => ({
+        id: b.id,
+        trainer: b.trainerName ?? b.trainer_name ?? "Trainer",
+        trainerPhoto: null,
+        type: b.sessionName ?? b.session_name ?? b.type ?? "Session",
+        date: b.date ?? b.createdAt?.slice(0, 10) ?? "",
+        time: b.startTime ?? b.start_time ?? "—",
+        duration: 60,
+        status: (b.status ?? "confirmed").charAt(0).toUpperCase() + (b.status ?? "confirmed").slice(1),
+        location: b.location ?? "—",
+        price: Number(b.price ?? 0),
+        paymentMethod: b.paymentStatus ?? "—",
+        attended: b.status === "checked-in",
+      })));
+    } catch {
+      setMyBookings([]);
+    } finally {
+      setBookingsLoading(false);
+    }
+  }, [memberDbId]);
+
+  useEffect(() => { if (viewMode === 'sessions') fetchMyBookings(); }, [viewMode, fetchMyBookings]);
+
+  // Derived stats from real bookings
   const memberStats = {
-    upcomingSessions: 2,
+    upcomingSessions: myBookings.filter(b => b.status === 'Confirmed').length,
     remainingCredits: 5,
-    nextSession: "Today, 6:00 PM"
+    nextSession: myBookings.find(b => b.status === 'Confirmed')
+      ? `${new Date(myBookings.find(b => b.status === 'Confirmed')!.date).toLocaleDateString()} ${myBookings.find(b => b.status === 'Confirmed')!.time}`
+      : "No upcoming sessions",
   };
 
   const handleTypeSelection = (typeId: string) => {
@@ -275,51 +397,89 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
     setCurrentStep(3);
   };
 
-  const handleSlotSelection = (slot: any, date: Date) => {
-    if (!slot.available) return;
-    setSelectedSlot({ ...slot, date });
+  const handleSlotSelection = (session: any) => {
+    setSelectedSlot(session);
     setCurrentStep(4);
   };
 
-  const handleConfirmBooking = () => {
-    // In production, this would make an API call
-    toast.success('Session Booked Successfully!', {
-      description: `Your session with ${selectedTrainer.name} is confirmed for ${selectedSlot.date.toLocaleDateString()} at ${selectedSlot.time}`,
-      duration: 5000,
-    });
-
-    // Reset flow
-    setCurrentStep(1);
-    setSelectedType(null);
-    setSelectedTrainer(null);
-    setSelectedSlot(null);
-    setViewMode('sessions');
+  const handleConfirmBooking = async () => {
+    if (!selectedSlot?.id) {
+      toast.error("No session selected.");
+      return;
+    }
+    const token = sessionStorage.getItem("token");
+    if (!token) { toast.error("Not authenticated."); return; }
+    setBookingLoading(true);
+    try {
+      const body: any = {
+        sessionId: Number(selectedSlot.id),
+        paymentStatus: paymentMethod === 'card' ? 'pay_later' : 'paid',
+      };
+      if (memberDbId) {
+        body.memberId = memberDbId;
+      } else {
+        toast.error("No member selected. Please select a member first.");
+        return;
+      }
+      const res = await fetch(`${API_BASE}/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any)?.message ?? `Error ${res.status}`);
+      }
+      toast.success('Session Booked Successfully!', {
+        description: `Booking confirmed for ${selectedDate.toLocaleDateString()} at ${selectedSlot.startTime ?? selectedSlot.time}`,
+        duration: 5000,
+      });
+      setCurrentStep(1);
+      setSelectedType(null);
+      setSelectedTrainer(null);
+      setSelectedSlot(null);
+      setViewMode('sessions');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Could not create booking.');
+    } finally {
+      setBookingLoading(false);
+    }
   };
 
-  const handleCancelSession = (sessionId: number) => {
-    toast.success('Session Cancelled', {
-      description: 'Your booking has been cancelled and credits refunded',
-      duration: 3000,
-    });
+  const handleCancelSession = async (bookingId: any) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/bookings/${bookingId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success('Session Cancelled');
+      fetchMyBookings();
+    } catch {
+      toast.error('Could not cancel session.');
+    }
   };
 
-  const handleRescheduleSession = (sessionId: number) => {
-    toast.info('Reschedule Session', {
-      description: 'Opening booking calendar...',
-      duration: 2000,
-    });
+  const handleRescheduleSession = (_sessionId: any) => {
+    toast.info('Reschedule Session', { description: 'Opening booking calendar...', duration: 2000 });
     setViewMode('book');
   };
 
-  const filteredTrainers = trainers.filter(trainer => {
+  // Display trainers: prefer real API data, fall back to mock if empty
+  const displayTrainers = realTrainers.length > 0 ? realTrainers : trainers;
+
+  const filteredTrainers = displayTrainers.filter((trainer: any) => {
     const matchesSearch = trainer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         trainer.specialization.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterSpecialization === 'all' || 
-                         trainer.specialization.toLowerCase().includes(filterSpecialization.toLowerCase());
+                         (trainer.specialization ?? "").toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterSpecialization === 'all' ||
+                         (trainer.specialization ?? "").toLowerCase().includes(filterSpecialization.toLowerCase());
     return matchesSearch && matchesFilter;
   });
 
-  const filteredSessions = myBookedSessions.filter(session => {
+  const filteredSessions = myBookings.filter(session => {
     if (sessionFilter === 'upcoming') return session.status === 'Confirmed';
     if (sessionFilter === 'completed') return session.status === 'Completed';
     if (sessionFilter === 'cancelled') return session.status === 'Cancelled';
@@ -599,11 +759,11 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold">Select Date</h3>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w - 1)} disabled={weekOffset <= 0}>
                           <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">Today</Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => setWeekOffset(0)}>Today</Button>
+                        <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w + 1)}>
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                       </div>
@@ -633,34 +793,53 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                     </div>
                   </div>
 
-                  {/* Time Slots */}
+                  {/* Time Slots — real sessions from API */}
                   <div>
-                    <h3 className="font-semibold mb-4">Available Time Slots</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                      {timeSlots.map((slot, idx) => (
-                        <Button
-                          key={idx}
-                          variant={slot.available ? 'outline' : 'ghost'}
-                          className={`h-auto py-3 ${
-                            slot.available
-                              ? 'hover:bg-[#327F74] hover:text-white border-[#327F74]'
-                              : 'opacity-50 cursor-not-allowed'
-                          }`}
-                          onClick={() => slot.available && handleSlotSelection(slot, selectedDate)}
-                          disabled={!slot.available}
-                        >
-                          <div className="flex flex-col items-center">
-                            <Clock className="h-4 w-4 mb-1" />
-                            <span className="font-semibold">{slot.time}</span>
-                            {slot.available ? (
-                              <span className="text-xs text-green-600 mt-1">Available</span>
-                            ) : (
-                              <span className="text-xs text-red-600 mt-1">Booked</span>
-                            )}
-                          </div>
-                        </Button>
-                      ))}
-                    </div>
+                    <h3 className="font-semibold mb-4">Available Sessions</h3>
+                    {sessionsLoading ? (
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        {[1,2,3,4,5,6].map(i => <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />)}
+                      </div>
+                    ) : realSessions.length === 0 ? (
+                      <div className="text-center py-10 space-y-2">
+                        <Clock className="h-10 w-10 mx-auto text-gray-300" />
+                        <p className="text-sm text-gray-500">No sessions scheduled for this date.</p>
+                        <p className="text-xs text-gray-400">Try a different date or trainer.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        {realSessions.map((session: any) => {
+                          const available = (session.booked ?? 0) < (session.capacity ?? 1);
+                          const isSelected = selectedSlot?.id === session.id;
+                          return (
+                            <Button
+                              key={session.id}
+                              variant={available ? 'outline' : 'ghost'}
+                              className={`h-auto py-3 ${
+                                isSelected
+                                  ? 'bg-[#327F74] text-white border-[#327F74]'
+                                  : available
+                                    ? 'hover:bg-[#327F74] hover:text-white border-[#327F74]'
+                                    : 'opacity-50 cursor-not-allowed'
+                              }`}
+                              onClick={() => available && handleSlotSelection(session)}
+                              disabled={!available}
+                            >
+                              <div className="flex flex-col items-center">
+                                <Clock className="h-4 w-4 mb-1" />
+                                <span className="font-semibold text-xs">{session.startTime?.slice(0,5) ?? "—"}</span>
+                                <span className="text-xs mt-0.5 truncate max-w-full">{session.name ?? ""}</span>
+                                {available ? (
+                                  <span className="text-xs text-green-600 mt-1">{session.capacity - (session.booked ?? 0)} left</span>
+                                ) : (
+                                  <span className="text-xs text-red-600 mt-1">Full</span>
+                                )}
+                              </div>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -701,7 +880,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                           <Clock className="h-5 w-5 text-[#327F74] mt-0.5" />
                           <div>
                             <p className="text-sm text-gray-600">Time</p>
-                            <p className="font-semibold">{selectedSlot.time}</p>
+                            <p className="font-semibold">{selectedSlot.startTime?.slice(0,5) ?? selectedSlot.time ?? "—"}</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-3">
@@ -715,7 +894,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                           <DollarSign className="h-5 w-5 text-[#327F74] mt-0.5" />
                           <div>
                             <p className="text-sm text-gray-600">Price</p>
-                            <p className="font-semibold">AED {selectedTrainer.price}</p>
+                            <p className="font-semibold">AED {selectedSlot?.price ?? selectedTrainer?.price ?? "—"}</p>
                           </div>
                         </div>
                       </div>
@@ -797,9 +976,14 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                     className="w-full h-12 text-lg"
                     style={{ backgroundColor: '#327F74' }}
                     onClick={handleConfirmBooking}
+                    disabled={bookingLoading}
                   >
-                    <CheckCircle2 className="h-5 w-5 mr-2" />
-                    Confirm & Book Session
+                    {bookingLoading ? (
+                      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    ) : (
+                      <CheckCircle2 className="h-5 w-5 mr-2" />
+                    )}
+                    {bookingLoading ? 'Booking...' : 'Confirm & Book Session'}
                   </Button>
                 </div>
               )}
@@ -821,7 +1005,11 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredSessions.length === 0 ? (
+                {bookingsLoading ? (
+                  <div className="space-y-3">
+                    {[1,2,3].map(i => <div key={i} className="h-32 bg-gray-100 rounded-lg animate-pulse" />)}
+                  </div>
+                ) : filteredSessions.length === 0 ? (
                   <div className="text-center py-12">
                     <CalendarDays className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No {sessionFilter} sessions</p>

@@ -137,6 +137,7 @@ const getTypeStyle = (type: string) => {
 };
 
 interface MemberInfo {
+  id: number;
   name: string;
   membershipType: string;
   membershipPlan: string;
@@ -144,6 +145,24 @@ interface MemberInfo {
   membershipEndDate: string | null;
   nextPaymentDate: string | null;
   paymentStatus: string | null;
+  totalVisits: number;
+}
+
+interface MemberSearchResult {
+  id: number;
+  memberId: string;
+  name: string;
+  membershipType: string;
+  membershipStatus: string;
+}
+
+interface UpcomingBooking {
+  id: string;
+  type: string;
+  title: string;
+  date: string;
+  time: string;
+  instructor: string | null;
 }
 
 const fmtDate = (iso: string | null | undefined): string => {
@@ -159,44 +178,155 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
 
   // Live member info state
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null);
-  const memberInfoLoadedRef = useRef(false);
-
-  useEffect(() => {
-    if (memberInfoLoadedRef.current) return;
-    memberInfoLoadedRef.current = true;
-    const token = sessionStorage.getItem("token");
-    if (!token) return;
-    fetch(`${API_BASE}/members/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
-        if (!data) return;
-        setMemberInfo({
-          name: data.name ?? data.username ?? "Member",
-          membershipType: data.membership_type ?? data.membershipType ?? "",
-          membershipPlan: data.membership_plan ?? data.membershipPlan ?? "",
-          membershipStatus: data.membership_status ?? data.membershipStatus ?? "",
-          membershipEndDate: data.membership_end_date ?? data.membershipEndDate ?? null,
-          nextPaymentDate: data.next_payment_date ?? data.nextPaymentDate ?? null,
-          paymentStatus: data.payment_status ?? data.paymentStatus ?? null,
-        });
-      })
-      .catch(() => {/* silently ignore */});
-  }, []);
 
   // Current user identity — read from sessionStorage (set at login)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [adminUsername, setAdminUsername] = useState<string>("");
 
   useEffect(() => {
     const uid = sessionStorage.getItem("userId");
     if (uid) setCurrentUserId(Number(uid));
+    const uname = sessionStorage.getItem("username");
+    if (uname) setAdminUsername(uname);
     try {
       const rolesRaw = sessionStorage.getItem("roles");
       const roles: string[] = rolesRaw ? JSON.parse(rolesRaw) : [];
       setIsAdminUser(roles.some((r) => r.toUpperCase().includes("ADMIN")));
     } catch {}
+  }, []);
+
+  // Admin "view as" state
+  const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
+  const [selectedMemberName, setSelectedMemberName] = useState<string>("");
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const [memberSearchResults, setMemberSearchResults] = useState<MemberSearchResult[]>([]);
+  const [memberSearchLoading, setMemberSearchLoading] = useState(false);
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const memberSearchRef = useRef<HTMLDivElement>(null);
+  const memberSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Bookings state (replaces hardcoded const upcomingBookings array)
+  const [upcomingBookings, setUpcomingBookings] = useState<UpcomingBooking[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
+
+  // Reusable fetch: no arg = /members/me, with arg = /members/{id}
+  const fetchMemberData = useCallback(async (memberId?: number) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    const url = memberId ? `${API_BASE}/members/${memberId}` : `${API_BASE}/members/me`;
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      setMemberInfo({
+        id: Number(data.id),
+        name: data.name ?? data.username ?? "Member",
+        membershipType: data.membership_type ?? data.membershipType ?? "",
+        membershipPlan: data.membership_plan ?? data.membershipPlan ?? "",
+        membershipStatus: data.membership_status ?? data.membershipStatus ?? "",
+        membershipEndDate: data.membership_end_date ?? data.membershipEndDate ?? null,
+        nextPaymentDate: data.next_payment_date ?? data.nextPaymentDate ?? null,
+        paymentStatus: data.payment_status ?? data.paymentStatus ?? null,
+        totalVisits: Number(data.total_visits ?? data.totalVisits ?? 0),
+      });
+    } catch { /* silently ignore */ }
+  }, []);
+
+  // Runs once on mount — fetches the current user's own member record
+  useEffect(() => { fetchMemberData(); }, [fetchMemberData]);
+
+  // Bookings fetch
+  const fetchBookings = useCallback(async (memberId: number) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    setBookingsLoading(true);
+    setBookingsError(null);
+    try {
+      const res = await fetch(
+        `${API_BASE}/bookings?memberId=${memberId}&status=confirmed&limit=5`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      const raw: any[] = Array.isArray(data) ? data : (data.bookings ?? data.content ?? []);
+      setUpcomingBookings(raw.map((b: any) => ({
+        id: String(b.id),
+        type: b.type ?? "class",
+        title: b.sessionName ?? b.session_name ?? b.title ?? "Session",
+        date: b.date ? new Date(b.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—",
+        time: b.startTime ?? b.start_time ?? b.time ?? "—",
+        instructor: b.trainerName ?? b.trainer_name ?? b.instructorName ?? null,
+      })));
+    } catch {
+      setBookingsError("Could not load bookings.");
+      setUpcomingBookings([]);
+    } finally {
+      setBookingsLoading(false);
+    }
+  }, []);
+
+  // Auto-fetch bookings whenever the viewed member changes
+  useEffect(() => {
+    if (memberInfo?.id) fetchBookings(memberInfo.id);
+  }, [memberInfo?.id, fetchBookings]);
+
+  // Admin member search
+  const searchMembers = useCallback((query: string) => {
+    if (memberSearchDebounceRef.current) clearTimeout(memberSearchDebounceRef.current);
+    if (!query.trim()) { setMemberSearchResults([]); setMemberSearchLoading(false); return; }
+    setMemberSearchLoading(true);
+    memberSearchDebounceRef.current = setTimeout(async () => {
+      const token = sessionStorage.getItem("token");
+      if (!token) { setMemberSearchLoading(false); return; }
+      try {
+        const res = await fetch(`${API_BASE}/members?search=${encodeURIComponent(query)}&limit=10`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        setMemberSearchResults((data.members ?? []).map((m: any) => ({
+          id: Number(m.id),
+          memberId: m.member_id ?? m.memberId ?? "",
+          name: m.name ?? "Unknown",
+          membershipType: m.membership_type ?? m.membershipType ?? "",
+          membershipStatus: m.membership_status ?? m.membershipStatus ?? "",
+        })));
+      } catch { setMemberSearchResults([]); }
+      finally { setMemberSearchLoading(false); }
+    }, 300);
+  }, []);
+
+  useEffect(() => { searchMembers(memberSearchQuery); }, [memberSearchQuery, searchMembers]);
+
+  const handleAdminSelectMember = useCallback((member: MemberSearchResult) => {
+    setSelectedMemberId(member.id);
+    setSelectedMemberName(member.name);
+    setMemberSearchQuery("");
+    setMemberSearchResults([]);
+    setShowMemberDropdown(false);
+    fetchMemberData(member.id);
+  }, [fetchMemberData]);
+
+  const handleAdminClearMember = useCallback(() => {
+    setSelectedMemberId(null);
+    setSelectedMemberName("");
+    setMemberSearchQuery("");
+    setMemberSearchResults([]);
+    setUpcomingBookings([]);
+    setBookingsError(null);
+    fetchMemberData();
+  }, [fetchMemberData]);
+
+  // Click-outside to close member search dropdown
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (memberSearchRef.current && !memberSearchRef.current.contains(e.target as Node))
+        setShowMemberDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   // Community feed state
@@ -339,18 +469,19 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
 
   // Member display data — falls back to placeholders until API responds
   const memberData = {
-    name: memberInfo?.name ?? "Member",
+    name: memberInfo?.name ?? (isAdminUser ? (adminUsername ? adminUsername.charAt(0).toUpperCase() + adminUsername.slice(1) : "Admin") : "Member"),
     membershipType: memberInfo?.membershipType ?? "—",
     joinDate: "—",
     nextBilling: fmtDate(memberInfo?.nextPaymentDate ?? memberInfo?.membershipEndDate),
     credits: 8,
     status: memberInfo?.membershipStatus ?? "—",
     streak: 12,
-    profileImage: null,
-    nextClass: "Yoga – Today 5PM",
+    profileImage: undefined as string | undefined,
+    nextClass: "—",
     activeChallenges: 2,
     validUntil: fmtDate(memberInfo?.membershipEndDate),
     paymentStatus: memberInfo?.paymentStatus ?? null,
+    totalVisits: memberInfo?.totalVisits ?? 0,
   };
 
   const quickActionCards = [
@@ -362,32 +493,6 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
     { id: "membership", icon: CreditCard, label: "Membership & Renewal", color: "bg-teal-500" }
   ];
 
-  const upcomingBookings = [
-    {
-      id: 1,
-      type: "class",
-      title: "HIIT Training",
-      date: "Today",
-      time: "6:00 PM",
-      instructor: "Mike Chen"
-    },
-    {
-      id: 2,
-      type: "training",
-      title: "Personal Training",
-      date: "Tomorrow",
-      time: "10:00 AM",
-      instructor: "Lisa Park"
-    },
-    {
-      id: 3,
-      type: "slot",
-      title: "Gym Floor Access",
-      date: "Dec 20",
-      time: "7:00 AM - 9:00 AM",
-      instructor: null
-    }
-  ];
 
   const activeChallenges = [
     {
@@ -545,6 +650,83 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
         </div>
       </div>
 
+      {/* Admin "View As" Banner — only visible to admins */}
+      {isAdminUser && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-4">
+            <div className="flex items-center gap-2 shrink-0">
+              <User className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-medium text-amber-800">Viewing as:</span>
+            </div>
+
+            {selectedMemberId ? (
+              <div className="flex items-center gap-2 bg-amber-100 border border-amber-300 rounded-full px-3 py-1">
+                <span className="text-sm font-semibold text-amber-900">{selectedMemberName}</span>
+                <button
+                  onClick={handleAdminClearMember}
+                  className="text-amber-600 hover:text-amber-800 leading-none font-bold"
+                  aria-label="Clear selected member"
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <div ref={memberSearchRef} className="relative flex-1 max-w-xs">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-amber-500" />
+                  <Input
+                    placeholder="Search member by name…"
+                    value={memberSearchQuery}
+                    onChange={(e) => { setMemberSearchQuery(e.target.value); setShowMemberDropdown(true); }}
+                    onFocus={() => setShowMemberDropdown(true)}
+                    className="pl-8 h-8 text-sm bg-white border-amber-300 rounded-full focus-visible:ring-amber-400"
+                  />
+                  {memberSearchLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="h-3 w-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                {showMemberDropdown && memberSearchQuery && (
+                  <div className="absolute z-50 top-full mt-1 w-full bg-white border border-amber-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {memberSearchLoading ? (
+                      <p className="text-xs text-muted-foreground p-3 text-center">Searching…</p>
+                    ) : memberSearchResults.length === 0 ? (
+                      <p className="text-xs text-muted-foreground p-3 text-center">No members found</p>
+                    ) : memberSearchResults.map((m) => (
+                      <button
+                        key={m.id}
+                        className="w-full text-left px-3 py-2 hover:bg-amber-50 flex items-center gap-3 border-b border-gray-50 last:border-0"
+                        onMouseDown={(e) => { e.preventDefault(); handleAdminSelectMember(m); }}
+                      >
+                        <Avatar className="h-7 w-7 shrink-0">
+                          <AvatarFallback className="text-xs bg-amber-100 text-amber-700">
+                            {m.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{m.name}</p>
+                          <p className="text-xs text-muted-foreground">{m.memberId} · {m.membershipType}</p>
+                        </div>
+                        <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                          m.membershipStatus === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                        }`}>
+                          {m.membershipStatus}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!selectedMemberId && !memberSearchQuery && (
+              <p className="text-xs text-amber-600 italic">Select a member to view their hub</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Hero / Welcome Section */}
@@ -595,7 +777,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                 <div 
                   key={action.id}
                   className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
-                  onClick={() => onNavigate?.('book-session')}
+                  onClick={() => onNavigate?.('book-session', selectedMemberId ? { memberId: selectedMemberId } : undefined)}
                 >
                   <Card className="bg-white border-0 shadow-sm h-full">
                     <CardContent className="flex flex-col items-center justify-center p-6 h-40">
@@ -652,10 +834,10 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
             // Membership should also navigate directly
             if (action.id === 'membership') {
               return (
-                <div 
+                <div
                   key={action.id}
                   className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
-                  onClick={() => onNavigate?.('membership-renewal')}
+                  onClick={() => onNavigate?.('membership-renewal', selectedMemberId ? { memberId: selectedMemberId } : undefined)}
                 >
                   <Card className="bg-white border-0 shadow-sm h-full">
                     <CardContent className="flex flex-col items-center justify-center p-6 h-40">
@@ -689,8 +871,9 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
               );
             }
 
-            // create-post uses the real CreatePostModal
+            // create-post uses the real CreatePostModal — admin only
             if (action.id === "create-post") {
+              if (!isAdminUser) return null;
               return (
                 <CreatePostModal
                   key={action.id}
@@ -1004,16 +1187,34 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
               <Button variant="outline" size="sm">View All</Button>
             </CardHeader>
             <CardContent className="space-y-3">
-              {upcomingBookings.map((booking) => (
+              {isAdminUser && !selectedMemberId ? (
+                <div className="text-center py-6 space-y-1">
+                  <Calendar className="h-8 w-8 mx-auto text-gray-300" />
+                  <p className="text-sm text-muted-foreground">Select a member above to see their bookings.</p>
+                </div>
+              ) : bookingsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              ) : bookingsError ? (
+                <p className="text-sm text-red-500 text-center py-4">{bookingsError}</p>
+              ) : upcomingBookings.length === 0 ? (
+                <div className="text-center py-6 space-y-1">
+                  <Calendar className="h-8 w-8 mx-auto text-gray-300" />
+                  <p className="text-sm text-muted-foreground">No upcoming bookings</p>
+                </div>
+              ) : upcomingBookings.map((booking) => (
                 <div key={booking.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className={`p-2 rounded-lg ${
                       booking.type === 'class' ? 'bg-blue-100 text-blue-600' :
-                      booking.type === 'training' ? 'bg-purple-100 text-purple-600' :
+                      booking.type === 'pt' ? 'bg-purple-100 text-purple-600' :
                       'bg-green-100 text-green-600'
                     }`}>
                       {booking.type === 'class' ? <Users className="h-4 w-4" /> :
-                       booking.type === 'training' ? <Target className="h-4 w-4" /> :
+                       booking.type === 'pt' ? <Target className="h-4 w-4" /> :
                        <Dumbbell className="h-4 w-4" />}
                     </div>
                     <div>
@@ -1205,16 +1406,16 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Workouts</span>
-                  <span className="font-bold">18</span>
+                  <span className="text-sm text-muted-foreground">Total Visits</span>
+                  <span className="font-bold">{memberInfo ? memberData.totalVisits : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Hours Trained</span>
-                  <span className="font-bold">24h</span>
+                  <span className="font-bold text-muted-foreground italic text-xs">coming soon</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Calories Burned</span>
-                  <span className="font-bold">3,240</span>
+                  <span className="font-bold text-muted-foreground italic text-xs">coming soon</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Streak</span>
@@ -1272,7 +1473,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
               <Button
                 size="sm"
                 className="bg-white text-gray-700 shadow-lg hover:bg-gray-50 rounded-full h-12 px-4"
-                onClick={() => setIsFABOpen(false)}
+                onClick={() => { onNavigate?.('book-session', selectedMemberId ? { memberId: selectedMemberId } : undefined); setIsFABOpen(false); }}
               >
                 <Calendar className="h-4 w-4 mr-2" />
                 Book Session
@@ -1280,23 +1481,25 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
               <Button
                 size="sm"
                 className="bg-white text-gray-700 shadow-lg hover:bg-gray-50 rounded-full h-12 px-4"
-                onClick={() => setIsFABOpen(false)}
+                onClick={() => { onNavigate?.('add-challenge'); setIsFABOpen(false); }}
               >
                 <Trophy className="h-4 w-4 mr-2" />
                 Add Challenge
               </Button>
-              <CreatePostModal
-                onPostCreated={() => { setIsFABOpen(false); loadFeed(); }}
-                trigger={
-                  <Button
-                    size="sm"
-                    className="bg-white text-gray-700 shadow-lg hover:bg-gray-50 rounded-full h-12 px-4"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Post
-                  </Button>
-                }
-              />
+              {isAdminUser && (
+                <CreatePostModal
+                  onPostCreated={() => { setIsFABOpen(false); loadFeed(); }}
+                  trigger={
+                    <Button
+                      size="sm"
+                      className="bg-white text-gray-700 shadow-lg hover:bg-gray-50 rounded-full h-12 px-4"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Post
+                    </Button>
+                  }
+                />
+              )}
             </div>
           )}
         </div>
