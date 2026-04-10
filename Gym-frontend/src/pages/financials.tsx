@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -6,15 +6,15 @@ import { Progress } from "../components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  Receipt, 
-  AlertCircle, 
-  CreditCard, 
-  Calendar, 
-  ArrowUpRight, 
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Receipt,
+  AlertCircle,
+  CreditCard,
+  Calendar,
+  ArrowUpRight,
   ArrowDownRight,
   Eye,
   Plus,
@@ -26,158 +26,113 @@ import {
   BarChart3,
   Activity
 } from 'lucide-react';
+import { financialAnalyticsService } from '../utils/supabase/financial-analytics-service';
+import { ledgersService, LedgerTransaction } from '../utils/supabase/ledgers-service';
 
-// Sample financial data
-const kpiData = {
-  totalIncome: 125000,
-  totalExpenses: 78500,
-  grossProfit: 46500,
-  netBalance: 42300,
-  pendingReconciliations: 5,
-  outstandingPayments: 12500
-};
-
-const monthlyTrends = [
-  { month: 'Jan', income: 95000, expenses: 65000, profit: 30000 },
-  { month: 'Feb', income: 108000, expenses: 72000, profit: 36000 },
-  { month: 'Mar', income: 118000, expenses: 75000, profit: 43000 },
-  { month: 'Apr', income: 125000, expenses: 78500, profit: 46500 },
-  { month: 'May', income: 132000, expenses: 82000, profit: 50000 },
-  { month: 'Jun', income: 140000, expenses: 85000, profit: 55000 }
-];
-
-const expenseBreakdown = [
-  { name: 'Salaries & Benefits', value: 35000, color: '#3b82f6' },
-  { name: 'Rent & Utilities', value: 18000, color: '#10b981' },
-  { name: 'Equipment & Maintenance', value: 12500, color: '#f59e0b' },
-  { name: 'Marketing & Advertising', value: 8000, color: '#ef4444' },
-  { name: 'Supplies & Inventory', value: 5000, color: '#8b5cf6' }
-];
-
-const recentTransactions = [
-  {
-    id: 1,
-    date: '2024-09-25',
-    description: 'Membership Payments - Premium Plan',
-    category: 'Income',
-    amount: 15000,
-    type: 'Credit',
-    status: 'Completed'
-  },
-  {
-    id: 2,
-    date: '2024-09-24',
-    description: 'Equipment Maintenance - Treadmill Service',
-    category: 'Expenses',
-    amount: -2500,
-    type: 'Debit',
-    status: 'Completed'
-  },
-  {
-    id: 3,
-    date: '2024-09-24',
-    description: 'Personal Training Sessions',
-    category: 'Income',
-    amount: 8500,
-    type: 'Credit',
-    status: 'Completed'
-  },
-  {
-    id: 4,
-    date: '2024-09-23',
-    description: 'Electricity Bill - Monthly',
-    category: 'Expenses',
-    amount: -3200,
-    type: 'Debit',
-    status: 'Pending'
-  },
-  {
-    id: 5,
-    date: '2024-09-23',
-    description: 'Supplement Sales',
-    category: 'Income',
-    amount: 4200,
-    type: 'Credit',
-    status: 'Completed'
-  }
-];
-
-const pendingReconciliations = [
-  {
-    id: 1,
-    account: 'Main Business Account',
-    bank: 'Emirates NBD',
-    lastReconciled: '2024-09-20',
-    difference: 1250,
-    status: 'Pending Review'
-  },
-  {
-    id: 2,
-    account: 'Petty Cash Account',
-    bank: 'ADCB',
-    lastReconciled: '2024-09-18',
-    difference: -350,
-    status: 'Action Required'
-  },
-  {
-    id: 3,
-    account: 'Credit Card Processing',
-    bank: 'HSBC',
-    lastReconciled: '2024-09-22',
-    difference: 75,
-    status: 'Minor Variance'
-  }
-];
-
-const outstandingPayments = [
-  {
-    id: 1,
-    vendor: 'Fitness Equipment Co.',
-    description: 'New Rowing Machines',
-    amount: 8500,
-    dueDate: '2024-09-30',
-    overdue: false
-  },
-  {
-    id: 2,
-    vendor: 'Elite Cleaning Services',
-    description: 'Monthly Cleaning Contract',
-    amount: 2200,
-    dueDate: '2024-09-28',
-    overdue: false
-  },
-  {
-    id: 3,
-    vendor: 'Marketing Plus Agency',
-    description: 'Digital Marketing Campaign',
-    amount: 1800,
-    dueDate: '2024-09-20',
-    overdue: true
-  }
-];
+// Chart colours for expense breakdown
+const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
 
 export function Financials() {
-  const getCurrentPeriod = () => {
-    return new Date().toLocaleDateString('en-GB', { 
-      month: 'long', 
-      year: 'numeric' 
-    });
-  };
+  // ── Live data state ────────────────────────────────────────────────────────
+  const [kpiData, setKpiData] = useState({
+    totalIncome: 0,
+    totalExpenses: 0,
+    grossProfit: 0,
+    netBalance: 0,
+    pendingReconciliations: 0,
+    outstandingPayments: 0,
+  });
+  const [monthlyTrends, setMonthlyTrends] = useState<
+    { month: string; income: number; expenses: number; profit: number }[]
+  >([]);
+  const [expenseBreakdown, setExpenseBreakdown] = useState<
+    { name: string; value: number; color: string }[]
+  >([]);
+  const [recentTransactions, setRecentTransactions] = useState<
+    { id: string | number; date: string; description: string; category: string; amount: number; type: string; status: string }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
 
-  const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString()} AED`;
-  };
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [dashboard, trend, expCat, ledger] = await Promise.all([
+        financialAnalyticsService.getDashboard(),
+        financialAnalyticsService.getMonthlyTrend(6),
+        financialAnalyticsService.getExpenseByCategory(),
+        ledgersService.getTransactions(),
+      ]);
+
+      setKpiData({
+        totalIncome: dashboard.totalRevenue,
+        totalExpenses: dashboard.totalExpenses,
+        grossProfit: dashboard.netIncome,
+        netBalance: dashboard.netIncome,
+        pendingReconciliations: dashboard.pendingTaxObligations,
+        outstandingPayments: 0,
+      });
+
+      setMonthlyTrends(
+        trend.map((t) => ({
+          month: t.month,
+          income: t.revenue,
+          expenses: t.expenses,
+          profit: t.profit,
+        }))
+      );
+
+      setExpenseBreakdown(
+        expCat.map((e, i) => ({
+          name: e.category,
+          value: e.amount,
+          color: PIE_COLORS[i % PIE_COLORS.length],
+        }))
+      );
+
+      // Map ledger entries → transaction rows (most recent 20)
+      setRecentTransactions(
+        ledger.slice(0, 20).map((t: LedgerTransaction) => {
+          const isCredit = t.credit > 0;
+          return {
+            id: t.id,
+            date: t.date,
+            description: t.description ?? t.type,
+            category: isCredit ? 'Income' : 'Expenses',
+            amount: isCredit ? t.credit : -t.debit,
+            type: isCredit ? 'Credit' : 'Debit',
+            status: t.status ?? 'Completed',
+          };
+        })
+      );
+    } catch (err) {
+      console.error('Failed to load financials data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const getCurrentPeriod = () =>
+    new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+  const formatCurrency = (amount: number) => `${amount.toLocaleString()} AED`;
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Completed': return 'bg-green-100 text-green-800';
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
+      case 'Pending':   return 'bg-yellow-100 text-yellow-800';
       case 'Action Required': return 'bg-red-100 text-red-800';
-      case 'Pending Review': return 'bg-blue-100 text-blue-800';
-      case 'Minor Variance': return 'bg-gray-100 text-gray-800';
+      case 'Pending Review':  return 'bg-blue-100 text-blue-800';
+      case 'Minor Variance':  return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  // Reconciliations and outstanding vendor payments have no backend API yet
+  const pendingReconciliations: { id: number; account: string; bank: string; lastReconciled: string; difference: number; status: string }[] = [];
+  const outstandingPayments: { id: number; vendor: string; description: string; amount: number; dueDate: string; overdue: boolean }[] = [];
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -198,8 +153,8 @@ export function Financials() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>

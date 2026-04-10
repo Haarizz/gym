@@ -317,30 +317,31 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
     }
   };
 
+  const panelCardShell = "bg-white border-0 shadow-sm";
+  const tabContentShell = "space-y-6 animate-in fade-in-0 zoom-in-95 duration-200";
+
   return (
-    <div className="p-6 space-y-6 bg-background min-h-screen">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            My Profile
-          </h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
+          <p className="text-gray-600 mt-1">
             Manage your personal information, targets, performance, and account settings
           </p>
         </div>
         
         {/* Quick Actions */}
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <Bell className="h-4 w-4 mr-2" />
             Notifications
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
           </Button>
@@ -351,7 +352,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
         {/* Left Column - Profile & Stats Summary */}
         <div className="lg:col-span-1 space-y-6">
           {/* Profile Card */}
-          <Card className="border-primary/10">
+          <Card className={panelCardShell}>
             <CardContent className="p-6">
               <div className="text-center space-y-4">
                 <div className="relative inline-block">
@@ -413,7 +414,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
           </Card>
 
           {/* Quick Stats */}
-          <Card className="border-primary/10">
+          <Card className={panelCardShell}>
             <CardHeader>
               <CardTitle className="text-primary flex items-center space-x-2">
                 <BarChart3 className="h-5 w-5" />
@@ -470,7 +471,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
           </Card>
 
           {/* Recent Achievements */}
-          <Card className="border-primary/10">
+          <Card className={panelCardShell}>
             <CardHeader>
               <CardTitle className="text-primary flex items-center space-x-2">
                 <Trophy className="h-5 w-5" />
@@ -504,32 +505,32 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
         {/* Right Column - Detailed Sections */}
         <div className="lg:col-span-2">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="bg-white border border-primary/10 grid grid-cols-5">
-              <TabsTrigger value="personal" className="data-[state=active]:bg-gradient-light data-[state=active]:text-primary">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="personal">
                 <User className="h-4 w-4 mr-2" />
                 Personal
               </TabsTrigger>
-              <TabsTrigger value="performance" className="data-[state=active]:bg-gradient-light data-[state=active]:text-primary">
+              <TabsTrigger value="performance">
                 <Activity className="h-4 w-4 mr-2" />
                 Performance
               </TabsTrigger>
-              <TabsTrigger value="targets" className="data-[state=active]:bg-gradient-light data-[state=active]:text-primary">
+              <TabsTrigger value="targets">
                 <Target className="h-4 w-4 mr-2" />
                 Targets
               </TabsTrigger>
-              <TabsTrigger value="transactions" className="data-[state=active]:bg-gradient-light data-[state=active]:text-primary">
+              <TabsTrigger value="transactions">
                 <CreditCard className="h-4 w-4 mr-2" />
                 Transactions
               </TabsTrigger>
-              <TabsTrigger value="settings" className="data-[state=active]:bg-gradient-light data-[state=active]:text-primary">
+              <TabsTrigger value="settings">
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </TabsTrigger>
             </TabsList>
 
             {/* Personal Info Tab */}
-            <TabsContent value="personal" className="space-y-6">
-              <Card className="border-primary/10">
+            <TabsContent value="personal" className={tabContentShell}>
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-primary">Personal Information</CardTitle>
@@ -642,7 +643,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
               </Card>
 
               {/* Change Password */}
-              <Card className="border-primary/10">
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <CardTitle className="text-primary flex items-center space-x-2">
                     <Lock className="h-5 w-5" />
@@ -698,10 +699,10 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
             </TabsContent>
 
             {/* Performance Tab */}
-            <TabsContent value="performance" className="space-y-6">
+            <TabsContent value="performance" className={tabContentShell}>
               {/* Performance Overview */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="border-primary/10 overflow-hidden relative">
+                <Card className="border-0 shadow-sm overflow-hidden relative">
                   <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
                   <CardContent className="p-6 relative z-10">
                     <div className="flex items-center justify-between text-white">
@@ -714,7 +715,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   </CardContent>
                 </Card>
 
-                <Card className="border-primary/10 overflow-hidden relative">
+                <Card className="border-0 shadow-sm overflow-hidden relative">
                   <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
                   <CardContent className="p-6 relative z-10">
                     <div className="flex items-center justify-between text-white">
@@ -727,7 +728,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   </CardContent>
                 </Card>
 
-                <Card className="border-primary/10 overflow-hidden relative">
+                <Card className="border-0 shadow-sm overflow-hidden relative">
                   <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
                   <CardContent className="p-6 relative z-10">
                     <div className="flex items-center justify-between text-white">
@@ -740,7 +741,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   </CardContent>
                 </Card>
 
-                <Card className="border-primary/10 overflow-hidden relative">
+                <Card className="border-0 shadow-sm overflow-hidden relative">
                   <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
                   <CardContent className="p-6 relative z-10">
                     <div className="flex items-center justify-between text-white">
@@ -755,7 +756,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
               </div>
 
               {/* Performance Charts */}
-              <Card className="border-primary/10">
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <CardTitle className="text-primary">Performance Trends</CardTitle>
                 </CardHeader>
@@ -771,7 +772,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
               </Card>
 
               {/* KPIs */}
-              <Card className="border-primary/10">
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <CardTitle className="text-primary">Key Performance Indicators</CardTitle>
                 </CardHeader>
@@ -809,9 +810,9 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
             </TabsContent>
 
             {/* Targets Tab */}
-            <TabsContent value="targets" className="space-y-6">
+            <TabsContent value="targets" className={tabContentShell}>
               {/* Current Targets */}
-              <Card className="border-primary/10">
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-primary">Current Targets</CardTitle>
@@ -866,21 +867,21 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
 
               {/* Targets Summary */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="border-primary/10">
+                <Card className={panelCardShell}>
                   <CardContent className="p-6 text-center">
                     <div className="text-3xl font-bold text-primary mb-2">{userStats.currentTargets}</div>
                     <div className="text-sm text-gray-600">Active Targets</div>
                   </CardContent>
                 </Card>
                 
-                <Card className="border-primary/10">
+                <Card className={panelCardShell}>
                   <CardContent className="p-6 text-center">
                     <div className="text-3xl font-bold text-green-600 mb-2">{userStats.completedTargets}</div>
                     <div className="text-sm text-gray-600">Completed</div>
                   </CardContent>
                 </Card>
                 
-                <Card className="border-primary/10">
+                <Card className={panelCardShell}>
                   <CardContent className="p-6 text-center">
                     <div className="text-3xl font-bold text-primary mb-2">{Math.round(targetsProgress)}%</div>
                     <div className="text-sm text-gray-600">Success Rate</div>
@@ -890,9 +891,9 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
             </TabsContent>
 
             {/* Transactions Tab */}
-            <TabsContent value="transactions" className="space-y-6">
+            <TabsContent value="transactions" className={tabContentShell}>
               {/* Recent Transactions */}
-              <Card className="border-primary/10">
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-primary">Recent Transactions</CardTitle>
@@ -946,7 +947,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
 
               {/* Transaction Summary */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="border-primary/10">
+                <Card className={panelCardShell}>
                   <CardContent className="p-4 text-center">
                     <div className="text-2xl font-bold text-green-600 mb-1">4,785</div>
                     <div className="text-sm text-gray-600">Total Earnings (AED)</div>
@@ -954,7 +955,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   </CardContent>
                 </Card>
                 
-                <Card className="border-primary/10">
+                <Card className={panelCardShell}>
                   <CardContent className="p-4 text-center">
                     <div className="text-2xl font-bold text-blue-600 mb-1">156</div>
                     <div className="text-sm text-gray-600">Transactions</div>
@@ -962,7 +963,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   </CardContent>
                 </Card>
                 
-                <Card className="border-primary/10">
+                <Card className={panelCardShell}>
                   <CardContent className="p-4 text-center">
                     <div className="text-2xl font-bold text-purple-600 mb-1">89</div>
                     <div className="text-sm text-gray-600">Purchases</div>
@@ -970,7 +971,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   </CardContent>
                 </Card>
                 
-                <Card className="border-primary/10">
+                <Card className={panelCardShell}>
                   <CardContent className="p-4 text-center">
                     <div className="text-2xl font-bold text-yellow-600 mb-1">2</div>
                     <div className="text-sm text-gray-600">Bonuses</div>
@@ -981,9 +982,9 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
             </TabsContent>
 
             {/* Settings Tab */}
-            <TabsContent value="settings" className="space-y-6">
+            <TabsContent value="settings" className={tabContentShell}>
               {/* Notification Preferences */}
-              <Card className="border-primary/10">
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <CardTitle className="text-primary flex items-center space-x-2">
                     <Bell className="h-5 w-5" />
@@ -1080,7 +1081,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
               </Card>
 
               {/* Linked Accounts */}
-              <Card className="border-primary/10">
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <CardTitle className="text-primary flex items-center space-x-2">
                     <Link className="h-5 w-5" />
@@ -1124,7 +1125,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
               </Card>
 
               {/* Privacy Settings */}
-              <Card className="border-primary/10">
+              <Card className={panelCardShell}>
                 <CardHeader>
                   <CardTitle className="text-primary flex items-center space-x-2">
                     <Shield className="h-5 w-5" />

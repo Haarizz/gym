@@ -124,7 +124,7 @@ public class ReceiptService {
         r.setMemberPhone(member.getPhone());
         r.setTransactionType(transactionType);
         r.setAmount(member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO);
-        r.setPaymentMethod("Cash");
+        r.setPaymentMethod(member.getPaymentMethodUsed() != null ? member.getPaymentMethodUsed() : "Cash");
         boolean isPaid = "paid".equalsIgnoreCase(paymentStatus);
         r.setStatus(isPaid ? "Paid" : "Pending");
         r.setPaidAmount(isPaid ? r.getAmount() : BigDecimal.ZERO);

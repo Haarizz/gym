@@ -126,6 +126,38 @@ public class PaymentVoucherService {
         paymentVoucherRepository.delete(pv);
     }
 
+    /**
+     * Internal helper — called by expense-type modules (Payroll, etc.) to
+     * automatically post a PaymentVoucher into the General Ledger / Financials.
+     * NOT exposed as an HTTP endpoint.
+     */
+    public void createPaymentVoucherFromModule(
+            String supplierName,
+            String supplierType,
+            String billNo,
+            BigDecimal amount,
+            String paymentMethod,
+            String description,
+            String notes) {
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        PaymentVoucher pv = new PaymentVoucher();
+        pv.setVoucherNo(generateVoucherNo());
+        pv.setSupplierName(supplierName);
+        pv.setSupplierType(supplierType != null ? supplierType : "Employee");
+        pv.setBillNo(billNo);
+        pv.setPaymentDate(LocalDate.now());
+        pv.setAmount(amount);
+        pv.setPaymentMethod(paymentMethod != null ? paymentMethod : "Bank Transfer");
+        pv.setDescription(description);
+        pv.setNotes(notes);
+        pv.setStatus("Paid");
+
+        paymentVoucherRepository.save(pv);
+        // No separate notification — callers already send their own
+    }
+
     private void applyRequest(PaymentVoucher pv, PaymentVoucherRequestDTO req) {
         pv.setSupplierName(req.getSupplierName());
         pv.setSupplierType(req.getSupplierType() != null ? req.getSupplierType() : "Supplier");

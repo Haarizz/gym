@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "../components/ui/textarea";
 import { Separator } from "../components/ui/separator";
 import { toast } from 'sonner';
+import { cn } from "../components/ui/utils";
 import {
   Settings,
   Plus,
@@ -42,6 +43,11 @@ const categoryMeta: Record<Category, { label: string; icon: React.ReactNode; col
 };
 
 export function FinancialSettings() {
+  const panelCardShell = "bg-white border-0 shadow-sm";
+  const statCardShell =
+    "bg-white border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none cursor-pointer";
+  const tabContentShell = "animate-in fade-in-0 zoom-in-95 duration-200";
+
   const [settings, setSettings] = useState<FinancialSetting[]>([]);
   const [activeTab, setActiveTab] = useState<string>('GENERAL');
   const [loading, setLoading] = useState(false);
@@ -177,7 +183,7 @@ export function FinancialSettings() {
           const active = settingsForCategory(cat).filter(s => s.isActive).length;
           const meta = categoryMeta[cat];
           return (
-            <Card key={cat} className="cursor-pointer hover:shadow-md transition-shadow"
+            <Card key={cat} className={cn(statCardShell, activeTab === cat && "ring-2 ring-primary/50")}
               onClick={() => setActiveTab(cat)}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -194,7 +200,7 @@ export function FinancialSettings() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 w-full max-w-lg">
+        <TabsList className="grid w-full grid-cols-4">
           {CATEGORIES.map(cat => (
             <TabsTrigger key={cat} value={cat}>
               {categoryMeta[cat].label}
@@ -203,15 +209,15 @@ export function FinancialSettings() {
         </TabsList>
 
         {CATEGORIES.map(cat => (
-          <TabsContent key={cat} value={cat} className="mt-4">
-            <Card>
+          <TabsContent key={cat} value={cat} className={cn("mt-4", tabContentShell)}>
+            <Card className={panelCardShell}>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
                     <span className={categoryMeta[cat].color}>{categoryMeta[cat].icon}</span>
                     {categoryMeta[cat].label} Settings
                   </CardTitle>
-                  <Button size="sm" variant="outline" onClick={openAdd}>
+                  <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all" onClick={openAdd}>
                     <Plus className="h-4 w-4 mr-1" />
                     Add
                   </Button>
@@ -222,7 +228,7 @@ export function FinancialSettings() {
                   <div className="text-center py-10 text-gray-500">
                     <Building2 className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     <p>No {categoryMeta[cat].label.toLowerCase()} settings yet</p>
-                    <Button size="sm" className="mt-3" onClick={openAdd}>
+                    <Button size="sm" className="mt-3 shadow-sm hover:shadow-md transition-all" onClick={openAdd}>
                       <Plus className="h-4 w-4 mr-1" /> Add First Setting
                     </Button>
                   </div>
@@ -341,7 +347,7 @@ function SettingRow({
   };
 
   return (
-    <div className="flex items-start justify-between p-3 rounded-lg border bg-white hover:bg-gray-50">
+    <div className="flex items-start justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
       <div className="flex-1 min-w-0 mr-3">
         <div className="flex items-center gap-2 mb-1">
           <span className="font-medium text-sm truncate">{setting.settingKey}</span>
@@ -372,7 +378,7 @@ function SettingRow({
           </div>
         ) : (
           <div
-            className="text-sm text-gray-700 bg-gray-100 rounded px-2 py-0.5 inline-block cursor-pointer hover:bg-gray-200"
+            className="text-sm text-gray-700 bg-white rounded px-2 py-0.5 inline-block cursor-pointer hover:bg-gray-50 ring-1 ring-black/5"
             onClick={() => setEditing(true)}
             title="Click to edit value"
           >
