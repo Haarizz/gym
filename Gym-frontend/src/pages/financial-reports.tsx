@@ -182,82 +182,6 @@ const reportDefinitions: Report[] = [
   },
 ];
 
-// Mock P&L data
-const profitLossData = [
-  { category: "Revenue", accounts: [
-    { accountName: "Membership Revenue", currentPeriod: 125000, priorPeriod: 118000 },
-    { accountName: "Personal Training Revenue", currentPeriod: 35000, priorPeriod: 32000 },
-    { accountName: "Class & Drop-in Revenue", currentPeriod: 18000, priorPeriod: 16500 },
-    { accountName: "Retail & Merchandise Revenue", currentPeriod: 8500, priorPeriod: 7200 },
-    { accountName: "Other Operating Income", currentPeriod: 2500, priorPeriod: 2100 },
-  ]},
-  { category: "Cost of Sales", accounts: [
-    { accountName: "Cost of Goods Sold (Retail)", currentPeriod: -4250, priorPeriod: -3600 },
-    { accountName: "Trainer Commission", currentPeriod: -10500, priorPeriod: -9600 },
-  ]},
-  { category: "Operating Expenses", accounts: [
-    { accountName: "Employee Benefits Expense", currentPeriod: -45000, priorPeriod: -42000 },
-    { accountName: "Depreciation & Amortisation", currentPeriod: -8500, priorPeriod: -8200 },
-    { accountName: "Rent & Utilities", currentPeriod: -25000, priorPeriod: -24000 },
-    { accountName: "Marketing & Advertising", currentPeriod: -6500, priorPeriod: -5800 },
-    { accountName: "Repairs & Maintenance", currentPeriod: -3200, priorPeriod: -2900 },
-    { accountName: "Software & Hosting", currentPeriod: -2800, priorPeriod: -2600 },
-    { accountName: "Administrative Expenses", currentPeriod: -4200, priorPeriod: -3800 },
-  ]},
-  { category: "Finance", accounts: [
-    { accountName: "Finance Income", currentPeriod: 150, priorPeriod: 200 },
-    { accountName: "Finance Expense", currentPeriod: -1200, priorPeriod: -1100 },
-  ]},
-];
-
-// Mock Balance Sheet data
-const balanceSheetData = [
-  { category: "Non-current Assets", accounts: [
-    { accountName: "Property, Plant & Equipment", amount: 285000 },
-    { accountName: "Right-of-use Assets", amount: 45000 },
-    { accountName: "Intangible Assets", amount: 15000 },
-    { accountName: "Deferred Tax Assets", amount: 2500 },
-  ]},
-  { category: "Current Assets", accounts: [
-    { accountName: "Inventories", amount: 12000 },
-    { accountName: "Trade & Other Receivables", amount: 18500 },
-    { accountName: "Prepayments", amount: 8200 },
-    { accountName: "Cash & Cash Equivalents", amount: 45300 },
-  ]},
-  { category: "Equity", accounts: [
-    { accountName: "Share Capital", amount: 100000 },
-    { accountName: "Retained Earnings", amount: 165500 },
-    { accountName: "Other Reserves", amount: 12000 },
-  ]},
-  { category: "Non-current Liabilities", accounts: [
-    { accountName: "Long-term Borrowings", amount: 85000 },
-    { accountName: "Lease Liabilities", amount: 38000 },
-    { accountName: "Deferred Tax Liabilities", amount: 4200 },
-  ]},
-  { category: "Current Liabilities", accounts: [
-    { accountName: "Trade & Other Payables", amount: 15800 },
-    { accountName: "Contract Liabilities", amount: 22000 },
-    { accountName: "Short-term Borrowings", amount: 8000 },
-    { accountName: "Tax Payable", amount: 3500 },
-  ]},
-];
-
-// Mock Trial Balance data
-const trialBalanceData = [
-  { accountCode: "1000", accountName: "Cash at Bank", debit: 45300, credit: 0 },
-  { accountCode: "1100", accountName: "Trade Receivables", debit: 18500, credit: 0 },
-  { accountCode: "1200", accountName: "Inventory", debit: 12000, credit: 0 },
-  { accountCode: "1500", accountName: "Equipment", debit: 285000, credit: 0 },
-  { accountCode: "2000", accountName: "Trade Payables", debit: 0, credit: 15800 },
-  { accountCode: "2100", accountName: "Contract Liabilities", debit: 0, credit: 22000 },
-  { accountCode: "3000", accountName: "Share Capital", debit: 0, credit: 100000 },
-  { accountCode: "3100", accountName: "Retained Earnings", debit: 0, credit: 165500 },
-  { accountCode: "4000", accountName: "Membership Revenue", debit: 0, credit: 125000 },
-  { accountCode: "4100", accountName: "Training Revenue", debit: 0, credit: 35000 },
-  { accountCode: "5000", accountName: "Staff Salaries", debit: 45000, credit: 0 },
-  { accountCode: "5100", accountName: "Rent Expense", debit: 25000, credit: 0 },
-];
-
 export function FinancialReports() {
   const [selectedReport, setSelectedReport] = useState<string>("");
   const [selectedBranch, setSelectedBranch] = useState("all");
@@ -578,49 +502,48 @@ export function FinancialReports() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {profitLossData.map((section, sectionIndex) => (
-                              <React.Fragment key={sectionIndex}>
-                                <TableRow className="bg-gray-50">
-                                  <TableCell colSpan={4} className="font-semibold text-primary">
-                                    {section.category}
-                                  </TableCell>
-                                </TableRow>
-                                {section.accounts.map((account, accountIndex) => {
-                                  const variance = account.priorPeriod !== 0 
-                                    ? ((account.currentPeriod - account.priorPeriod) / Math.abs(account.priorPeriod) * 100).toFixed(1)
-                                    : "N/A";
-                                  
-                                  return (
-                                    <TableRow key={accountIndex}>
-                                      <TableCell className="pl-6">{account.accountName}</TableCell>
-                                      <TableCell className="text-right">
-                                        {account.currentPeriod.toLocaleString()}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        {account.priorPeriod.toLocaleString()}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        <span className={variance !== "N/A" && parseFloat(variance) > 0 ? "text-green-600" : "text-red-600"}>
-                                          {variance !== "N/A" ? `${variance}%` : "N/A"}
-                                        </span>
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                                {sectionIndex === 0 && (
-                                  <TableRow className="bg-blue-50 font-semibold">
-                                    <TableCell>Total Revenue</TableCell>
-                                    <TableCell className="text-right">
-                                      {section.accounts.reduce((sum, acc) => sum + acc.currentPeriod, 0).toLocaleString()}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {section.accounts.reduce((sum, acc) => sum + acc.priorPeriod, 0).toLocaleString()}
-                                    </TableCell>
-                                    <TableCell className="text-right">-</TableCell>
-                                  </TableRow>
-                                )}
-                              </React.Fragment>
+                            <TableRow className="bg-gray-50">
+                              <TableCell colSpan={4} className="font-semibold text-primary">Revenue</TableCell>
+                            </TableRow>
+                            {incomeStatement?.revenueLines?.map((acc, idx) => (
+                              <TableRow key={`rev-${idx}`}>
+                                <TableCell className="pl-6">{acc.accountName}</TableCell>
+                                <TableCell className="text-right">{acc.amount?.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                              </TableRow>
                             ))}
+                            <TableRow className="bg-blue-50 font-semibold">
+                              <TableCell>Total Revenue</TableCell>
+                              <TableCell className="text-right">{incomeStatement?.totalRevenue?.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                            </TableRow>
+                            
+                            <TableRow className="bg-gray-50">
+                              <TableCell colSpan={4} className="font-semibold text-primary">Expenses</TableCell>
+                            </TableRow>
+                            {incomeStatement?.expenseLines?.map((acc, idx) => (
+                              <TableRow key={`exp-${idx}`}>
+                                <TableCell className="pl-6">{acc.accountName}</TableCell>
+                                <TableCell className="text-right">{acc.amount?.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-blue-50 font-semibold">
+                              <TableCell>Total Expenses</TableCell>
+                              <TableCell className="text-right">{incomeStatement?.totalExpenses?.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                            </TableRow>
+                            
+                            <TableRow className="bg-green-50 font-semibold">
+                              <TableCell>Net Income</TableCell>
+                              <TableCell className="text-right text-green-700">{incomeStatement?.netIncome?.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                            </TableRow>
                           </TableBody>
                         </Table>
                       </div>
@@ -642,21 +565,15 @@ export function FinancialReports() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {balanceSheetData.filter(section => 
-                                  section.category.includes("Assets")
-                                ).map((section, sectionIndex) => (
-                                  <React.Fragment key={sectionIndex}>
+                                {Object.entries(balanceSheet?.accounts || {}).filter(([group]) => group.includes('Asset') || group.includes('ASSET')).map(([group, accounts], groupIndex) => (
+                                  <React.Fragment key={`asset-group-${groupIndex}`}>
                                     <TableRow className="bg-gray-50">
-                                      <TableCell colSpan={2} className="font-semibold text-primary">
-                                        {section.category}
-                                      </TableCell>
+                                      <TableCell colSpan={2} className="font-semibold text-primary">{group}</TableCell>
                                     </TableRow>
-                                    {section.accounts.map((account, accountIndex) => (
-                                      <TableRow key={accountIndex}>
-                                        <TableCell className="pl-6">{account.accountName}</TableCell>
-                                        <TableCell className="text-right">
-                                          {account.amount.toLocaleString()}
-                                        </TableCell>
+                                    {accounts.map((acc, accIdx) => (
+                                      <TableRow key={`asset-acc-${accIdx}`}>
+                                        <TableCell className="pl-6">{acc.name}</TableCell>
+                                        <TableCell className="text-right">{acc.balance?.toLocaleString()}</TableCell>
                                       </TableRow>
                                     ))}
                                   </React.Fragment>
@@ -664,11 +581,7 @@ export function FinancialReports() {
                                 <TableRow className="bg-blue-50 font-semibold">
                                   <TableCell>Total Assets</TableCell>
                                   <TableCell className="text-right">
-                                    {balanceSheetData
-                                      .filter(section => section.category.includes("Assets"))
-                                      .reduce((total, section) => 
-                                        total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
-                                      ).toLocaleString()}
+                                    {balanceSheet?.totalAssets?.toLocaleString() || "0"}
                                   </TableCell>
                                 </TableRow>
                               </TableBody>
@@ -687,21 +600,15 @@ export function FinancialReports() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {balanceSheetData.filter(section => 
-                                  !section.category.includes("Assets")
-                                ).map((section, sectionIndex) => (
-                                  <React.Fragment key={sectionIndex}>
+                                {Object.entries(balanceSheet?.accounts || {}).filter(([group]) => !group.includes('Asset') && !group.includes('ASSET')).map(([group, accounts], groupIndex) => (
+                                  <React.Fragment key={`liab-group-${groupIndex}`}>
                                     <TableRow className="bg-gray-50">
-                                      <TableCell colSpan={2} className="font-semibold text-primary">
-                                        {section.category}
-                                      </TableCell>
+                                      <TableCell colSpan={2} className="font-semibold text-primary">{group}</TableCell>
                                     </TableRow>
-                                    {section.accounts.map((account, accountIndex) => (
-                                      <TableRow key={accountIndex}>
-                                        <TableCell className="pl-6">{account.accountName}</TableCell>
-                                        <TableCell className="text-right">
-                                          {account.amount.toLocaleString()}
-                                        </TableCell>
+                                    {accounts.map((acc, accIdx) => (
+                                      <TableRow key={`liab-acc-${accIdx}`}>
+                                        <TableCell className="pl-6">{acc.name}</TableCell>
+                                        <TableCell className="text-right">{acc.balance?.toLocaleString()}</TableCell>
                                       </TableRow>
                                     ))}
                                   </React.Fragment>
@@ -709,11 +616,7 @@ export function FinancialReports() {
                                 <TableRow className="bg-blue-50 font-semibold">
                                   <TableCell>Total Equity & Liabilities</TableCell>
                                   <TableCell className="text-right">
-                                    {balanceSheetData
-                                      .filter(section => !section.category.includes("Assets"))
-                                      .reduce((total, section) => 
-                                        total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
-                                      ).toLocaleString()}
+                                    {((balanceSheet?.totalLiabilities || 0) + (balanceSheet?.totalEquity || 0)).toLocaleString()}
                                   </TableCell>
                                 </TableRow>
                               </TableBody>
@@ -738,10 +641,10 @@ export function FinancialReports() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {trialBalanceData.map((account, index) => (
+                            {trialBalance?.lines?.map((account, index) => (
                               <TableRow key={index}>
-                                <TableCell>{account.accountCode}</TableCell>
-                                <TableCell>{account.accountName}</TableCell>
+                                <TableCell>{account.code}</TableCell>
+                                <TableCell>{account.name}</TableCell>
                                 <TableCell className="text-right">
                                   {account.debit > 0 ? account.debit.toLocaleString() : "-"}
                                 </TableCell>
@@ -753,10 +656,10 @@ export function FinancialReports() {
                             <TableRow className="bg-blue-50 font-semibold">
                               <TableCell colSpan={2}>Total</TableCell>
                               <TableCell className="text-right">
-                                {trialBalanceData.reduce((sum, acc) => sum + acc.debit, 0).toLocaleString()}
+                                {trialBalance?.totalDebit?.toLocaleString() || "-"}
                               </TableCell>
                               <TableCell className="text-right">
-                                {trialBalanceData.reduce((sum, acc) => sum + acc.credit, 0).toLocaleString()}
+                                {trialBalance?.totalCredit?.toLocaleString() || "-"}
                               </TableCell>
                             </TableRow>
                           </TableBody>
