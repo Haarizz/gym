@@ -54,6 +54,7 @@ public class MemberService {
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
     private final AutomationExecutorService automationExecutorService;
+    private final ReceiptVoucherService receiptVoucherService;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
@@ -63,16 +64,18 @@ public class MemberService {
                          UserRoleRepository userRoleRepository,
                          PasswordEncoder passwordEncoder,
                          NotificationService notificationService,
-                         AutomationExecutorService automationExecutorService) {
-        this.memberRepository        = memberRepository;
-        this.planRepository          = planRepository;
-        this.receiptService          = receiptService;
-        this.userRepository          = userRepository;
-        this.roleRepository          = roleRepository;
-        this.userRoleRepository      = userRoleRepository;
-        this.passwordEncoder         = passwordEncoder;
-        this.notificationService     = notificationService;
+                         AutomationExecutorService automationExecutorService,
+                         ReceiptVoucherService receiptVoucherService) {
+        this.memberRepository          = memberRepository;
+        this.planRepository            = planRepository;
+        this.receiptService            = receiptService;
+        this.userRepository            = userRepository;
+        this.roleRepository            = roleRepository;
+        this.userRoleRepository        = userRoleRepository;
+        this.passwordEncoder           = passwordEncoder;
+        this.notificationService       = notificationService;
         this.automationExecutorService = automationExecutorService;
+        this.receiptVoucherService     = receiptVoucherService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -170,6 +173,21 @@ public class MemberService {
 
         // Auto-create a receipt for the new member
         receiptService.createReceiptForMember(saved, "New", saved.getPaymentStatus());
+
+        // Post to General Ledger — only when payment was actually made
+        if ("paid".equalsIgnoreCase(saved.getPaymentStatus()) && saved.getMembershipFee() != null) {
+            receiptVoucherService.createVoucherFromModule(
+                    "Member Registration – " + saved.getName(),
+                    "Membership",
+                    saved.getName(),
+                    saved.getId(),
+                    saved.getMembershipFee(),
+                    saved.getPaymentMethodUsed(),
+                    saved.getMemberId(),
+                    null,
+                    "New member: " + saved.getMembershipPlan()
+            );
+        }
 
         // Create linked family member records
         if (isFamilyType && hasFamily) {
@@ -354,6 +372,21 @@ public class MemberService {
 
         // Auto-create a receipt for the renewal
         receiptService.createReceiptForMember(saved, "Renewal", "Paid");
+
+        // Post to General Ledger
+        if (saved.getMembershipFee() != null) {
+            receiptVoucherService.createVoucherFromModule(
+                    "Membership Renewal – " + saved.getName(),
+                    "Membership",
+                    saved.getName(),
+                    saved.getId(),
+                    saved.getMembershipFee(),
+                    saved.getPaymentMethodUsed(),
+                    saved.getMemberId(),
+                    null,
+                    "Renewal: " + saved.getMembershipPlan()
+            );
+        }
 
         return MemberResponseDTO.fromEntity(saved);
     }

@@ -114,6 +114,51 @@ public class ReceiptVoucherService {
         receiptVoucherRepository.delete(rv);
     }
 
+    /**
+     * Internal helper — called by any module that receives a payment (Members,
+     * Add-ons, POS, etc.) to automatically post a ReceiptVoucher into the
+     * General Ledger / Financials module.  NOT exposed as an HTTP endpoint.
+     */
+    public void createVoucherFromModule(
+            String source,
+            String sourceCategory,
+            String memberName,
+            Long memberId,
+            BigDecimal amount,
+            String paymentMode,
+            String reference,
+            String transactionId,
+            String notes) {
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        ReceiptVoucher rv = new ReceiptVoucher();
+        rv.setVoucherNo(generateVoucherNo());
+        rv.setDate(LocalDate.now());
+        rv.setSource(source);
+        rv.setSourceCategory(sourceCategory);
+        rv.setMemberName(memberName);
+        rv.setMemberId(memberId);
+        rv.setAmount(amount);
+        rv.setPaymentMode(paymentMode != null ? paymentMode : "Cash");
+        rv.setReference(reference);
+        rv.setTransactionId(transactionId);
+        rv.setNotes(notes);
+        rv.setStatus("completed");   // "completed" matches FinancialAnalyticsService query
+        rv.setVoucherType("Receipt");
+
+        ReceiptVoucher saved = receiptVoucherRepository.save(rv);
+
+        notificationService.notifyRoles(
+                List.of("ADMIN", "MANAGER", "ACCOUNTANT"),
+                "Payment Received – " + sourceCategory,
+                source + " | Voucher " + saved.getVoucherNo() + " | AED " + saved.getAmount(),
+                "SUCCESS", "MEDIUM", "BILLING",
+                saved.getId(), "/receipt-voucher",
+                "RECEIPT_MODULE_" + saved.getId()
+        );
+    }
+
     private void applyRequest(ReceiptVoucher rv, ReceiptVoucherRequestDTO req) {
         rv.setDate(req.getDate() != null ? req.getDate() : LocalDate.now());
         rv.setSource(req.getSource());

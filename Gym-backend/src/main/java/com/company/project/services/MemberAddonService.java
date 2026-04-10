@@ -28,9 +28,12 @@ import java.util.stream.Collectors;
 public class MemberAddonService {
 
     private final MemberAddonRepository memberAddonRepository;
+    private final ReceiptVoucherService receiptVoucherService;
 
-    public MemberAddonService(MemberAddonRepository memberAddonRepository) {
+    public MemberAddonService(MemberAddonRepository memberAddonRepository,
+                               ReceiptVoucherService receiptVoucherService) {
         this.memberAddonRepository = memberAddonRepository;
+        this.receiptVoucherService = receiptVoucherService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -83,6 +86,19 @@ public class MemberAddonService {
         // Generate the business transaction ID: TXN-XXXXXXXXXX (zero-padded sequential)
         saved.setTransactionId("TXN-" + String.format("%010d", saved.getId()));
         saved = memberAddonRepository.save(saved);
+
+        // Post to General Ledger
+        receiptVoucherService.createVoucherFromModule(
+                "Add-on Purchase – " + (saved.getAddonName() != null ? saved.getAddonName() : "Add-on"),
+                "Add-on",
+                saved.getMemberName(),
+                saved.getMemberDbId(),
+                saved.getAmount(),
+                saved.getPaymentMode(),
+                saved.getTransactionId(),
+                saved.getTransactionId(),
+                saved.getNotes()
+        );
 
         return MemberAddonResponseDTO.fromEntity(saved);
     }

@@ -35,17 +35,20 @@ public class SalaryPaymentService {
     private final StaffRepository staffRepository;
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
+    private final PaymentVoucherService paymentVoucherService;
 
     public SalaryPaymentService(SalaryPaymentEmployeeRepository employeeRepository,
                                 SalaryPaymentRepository paymentRepository,
                                 StaffRepository staffRepository,
                                 ObjectMapper objectMapper,
-                                NotificationService notificationService) {
+                                NotificationService notificationService,
+                                PaymentVoucherService paymentVoucherService) {
         this.employeeRepository = employeeRepository;
         this.paymentRepository = paymentRepository;
         this.staffRepository = staffRepository;
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
+        this.paymentVoucherService = paymentVoucherService;
     }
 
     public List<SalaryPaymentEmployeeResponseDTO> getEmployees(String search, String department, String status) {
@@ -177,6 +180,17 @@ public class SalaryPaymentService {
         employee.setLastPaymentDate(payment.getPaymentDate());
         employeeRepository.save(employee);
 
+        // Post to General Ledger as a debit (expense)
+        paymentVoucherService.createPaymentVoucherFromModule(
+                payment.getEmployeeName(),
+                "Employee",
+                "SAL-" + payment.getEmployeeId() + "-" + payment.getMonth() + "-" + payment.getYear(),
+                payment.getNetSalary(),
+                resolvePrimaryPaymentMethod(req.getSplitPayments()),
+                "Salary: " + payment.getEmployeeName() + " – " + payment.getMonth() + "/" + payment.getYear(),
+                payment.getNotes()
+        );
+
         notificationService.notifyRoles(
                 List.of("ADMIN", "HR"),
                 "Salary Payment Processed",
@@ -196,6 +210,15 @@ public class SalaryPaymentService {
             created.add(createPayment(req));
         }
         return created;
+    }
+
+    private String resolvePrimaryPaymentMethod(List<SplitPaymentDTO> splits) {
+        if (splits == null || splits.isEmpty()) return "Bank Transfer";
+        return splits.stream()
+                .filter(s -> s.getAmount() != null)
+                .max(java.util.Comparator.comparing(SplitPaymentDTO::getAmount))
+                .map(SplitPaymentDTO::getMode)
+                .orElse("Bank Transfer");
     }
 
     private String toSplitJson(List<SplitPaymentDTO> splits) {

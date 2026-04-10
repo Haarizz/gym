@@ -33,10 +33,14 @@ public class ReceiptService {
 
     private final ReceiptRepository receiptRepository;
     private final MemberRepository memberRepository;
+    private final ReceiptVoucherService receiptVoucherService;
 
-    public ReceiptService(ReceiptRepository receiptRepository, MemberRepository memberRepository) {
-        this.receiptRepository = receiptRepository;
-        this.memberRepository  = memberRepository;
+    public ReceiptService(ReceiptRepository receiptRepository,
+                          MemberRepository memberRepository,
+                          @org.springframework.context.annotation.Lazy ReceiptVoucherService receiptVoucherService) {
+        this.receiptRepository      = receiptRepository;
+        this.memberRepository       = memberRepository;
+        this.receiptVoucherService  = receiptVoucherService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -116,7 +120,7 @@ public class ReceiptService {
         r.setMemberPhone(member.getPhone());
         r.setTransactionType(transactionType);
         r.setAmount(member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO);
-        r.setPaymentMethod("Cash");
+        r.setPaymentMethod(member.getPaymentMethodUsed() != null ? member.getPaymentMethodUsed() : "Cash");
         boolean isPaid = "paid".equalsIgnoreCase(paymentStatus);
         r.setStatus(isPaid ? "Paid" : "Pending");
         r.setPaidAmount(isPaid ? r.getAmount() : BigDecimal.ZERO);
@@ -192,6 +196,21 @@ public class ReceiptService {
         Receipt saved = receiptRepository.save(settlement);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
         saved = receiptRepository.save(saved);
+
+        // Post to General Ledger via ReceiptVoucher
+        if (totalPaid.compareTo(BigDecimal.ZERO) > 0) {
+            receiptVoucherService.createVoucherFromModule(
+                    "Payment Settlement – " + member.getName(),
+                    "Membership",
+                    member.getName(),
+                    member.getId(),
+                    totalPaid,
+                    req.getPaymentMethod(),
+                    saved.getReceiptNo(),
+                    saved.getReceiptNo(),
+                    req.getRemarks()
+            );
+        }
 
         return ReceiptResponseDTO.fromEntity(saved);
     }
