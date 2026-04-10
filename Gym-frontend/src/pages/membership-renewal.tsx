@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -218,6 +219,8 @@ interface MembershipRenewalProps {
 }
 
 export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
+  const location = useLocation();
+  const navMemberId: number | null = (location.state as any)?.memberId ?? null;
   const [mainTab, setMainTab] = useState<'details' | 'renewal' | 'payments' | 'history'>('details');
   const [showRenewalSheet, setShowRenewalSheet] = useState(false);
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
@@ -251,8 +254,9 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
       setDataLoading(true);
       setDataError(null);
       const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      const memberUrl = navMemberId ? `${API_BASE}/members/${navMemberId}` : `${API_BASE}/members/me`;
       const [mRes, pRes] = await Promise.all([
-        fetch(`${API_BASE}/members/me`, { headers }),
+        fetch(memberUrl, { headers }),
         fetch(`${API_BASE}/plans?status=Active`, { headers }),
       ]);
       if (mRes.status === 404) {
@@ -271,7 +275,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
     } finally {
       setDataLoading(false);
     }
-  }, []);
+  }, [navMemberId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
