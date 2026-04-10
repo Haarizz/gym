@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,13 +35,16 @@ public class ReceiptService {
     private final ReceiptRepository receiptRepository;
     private final MemberRepository memberRepository;
     private final FinancialEventService financialEventService;
+    private final ReceiptVoucherService receiptVoucherService;
 
     public ReceiptService(ReceiptRepository receiptRepository,
                           MemberRepository memberRepository,
-                          FinancialEventService financialEventService) {
-        this.receiptRepository    = receiptRepository;
-        this.memberRepository     = memberRepository;
+                          FinancialEventService financialEventService,
+                          @Lazy ReceiptVoucherService receiptVoucherService) {
+        this.receiptRepository     = receiptRepository;
+        this.memberRepository      = memberRepository;
         this.financialEventService = financialEventService;
+        this.receiptVoucherService = receiptVoucherService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -199,6 +203,21 @@ public class ReceiptService {
 
         // Generate journal entry: DR Cash/Bank, CR Membership Revenue
         financialEventService.onMemberPaymentReceived(saved);
+
+        // Create receipt voucher document for UI display
+        if (totalPaid.compareTo(BigDecimal.ZERO) > 0) {
+            receiptVoucherService.createVoucherFromModule(
+                    "Payment Settlement – " + member.getName(),
+                    "Membership",
+                    member.getName(),
+                    member.getId(),
+                    totalPaid,
+                    req.getPaymentMethod(),
+                    saved.getReceiptNo(),
+                    saved.getReceiptNo(),
+                    req.getRemarks()
+            );
+        }
 
         return ReceiptResponseDTO.fromEntity(saved);
     }

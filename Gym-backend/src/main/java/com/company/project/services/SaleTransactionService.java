@@ -33,15 +33,18 @@ public class SaleTransactionService {
     private final SaleTransactionItemRepository saleTransactionItemRepository;
     private final ProductStockRepository productStockRepository;
     private final FinancialEventService financialEventService;
+    private final ReceiptVoucherService receiptVoucherService;
 
     public SaleTransactionService(SaleTransactionRepository saleTransactionRepository,
                                   SaleTransactionItemRepository saleTransactionItemRepository,
                                   ProductStockRepository productStockRepository,
-                                  FinancialEventService financialEventService) {
+                                  FinancialEventService financialEventService,
+                                  ReceiptVoucherService receiptVoucherService) {
         this.saleTransactionRepository     = saleTransactionRepository;
         this.saleTransactionItemRepository = saleTransactionItemRepository;
         this.productStockRepository        = productStockRepository;
         this.financialEventService         = financialEventService;
+        this.receiptVoucherService         = receiptVoucherService;
     }
 
     // ── Write ────────────────────────────────────────────────────────────────
@@ -117,6 +120,19 @@ public class SaleTransactionService {
 
         // Generate journal entry: DR Cash/Bank, CR Sales Revenue, CR Tax Payable
         financialEventService.onSaleCompleted(transaction);
+
+        // Create receipt voucher document for UI display
+        receiptVoucherService.createVoucherFromModule(
+                "POS Sale – " + transaction.getTransactionNumber(),
+                "POS",
+                transaction.getMemberName(),
+                transaction.getMemberId(),
+                transaction.getTotalAmount(),
+                transaction.getPaymentMethod(),
+                transaction.getTransactionNumber(),
+                transaction.getTransactionNumber(),
+                transaction.getNotes()
+        );
 
         return SaleTransactionResponseDTO.fromEntity(transaction, savedItems);
     }
