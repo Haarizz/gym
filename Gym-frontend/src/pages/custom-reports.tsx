@@ -63,6 +63,8 @@ function mapReceiptToRecord(r: Receipt): ReportRecord {
 }
 
 export function CustomReports({ onNavigate }: CustomReportsProps) {
+  const panelCardShell = "bg-white border-0 shadow-sm rounded-2xl overflow-hidden";
+
   const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'custom'>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -186,8 +188,8 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
       </div>
 
       {/* Date Range Filter Card */}
-      <Card className="border-primary/20 mb-6">
-        <CardHeader className="bg-gradient-light border-b border-primary/10">
+      <Card className={`${panelCardShell} mb-6`}>
+        <CardHeader className="bg-gradient-light border-b border-slate-100">
           <CardTitle className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-primary" />
             <span>Date Range Filter</span>
@@ -265,7 +267,7 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
 
       {/* Summary Toast */}
       {showSummary && (
-        <Card className="border-primary/20 mb-6 bg-white shadow-lg animate-in slide-in-from-top">
+        <Card className={`${panelCardShell} mb-6 animate-in slide-in-from-top duration-200`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-900 flex items-center">
@@ -299,8 +301,8 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
       )}
 
       {/* Membership Report Table */}
-      <Card className="border-primary/20">
-        <CardHeader className="bg-gradient-light border-b border-primary/10">
+      <Card className={panelCardShell}>
+        <CardHeader className="bg-gradient-light border-b border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center space-x-2">
@@ -362,9 +364,8 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
           </div>
 
           {/* Table */}
-          <div className="border border-primary/20 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
+          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+            <Table className="min-w-[1100px]">
                 <TableHeader className="bg-gradient-light sticky top-0 z-10">
                   <TableRow>
                     <TableHead className="text-primary font-semibold">#</TableHead>
@@ -404,7 +405,7 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                                 {record.memberName.split(' ').map(n => n[0]).join('')}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium">{record.memberName}</span>
+                            <span className="font-medium whitespace-normal">{record.memberName}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-gray-600">{record.mobile}</TableCell>
@@ -412,7 +413,7 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                           <span className="text-sm capitalize">{record.membershipType || '—'}</span>
                         </TableCell>
                         <TableCell>{getTransactionBadge(record.transactionType)}</TableCell>
-                        <TableCell className="font-medium">{record.planName}</TableCell>
+                        <TableCell className="font-medium whitespace-normal">{record.planName}</TableCell>
                         <TableCell className="text-right font-semibold text-green-600">
                           {record.planAmount.toLocaleString()}
                         </TableCell>
@@ -462,8 +463,7 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                     </TableRow>
                   )}
                 </TableBody>
-              </Table>
-            </div>
+            </Table>
           </div>
 
           {/* Summary Footer */}

@@ -22,6 +22,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { notificationService, AppNotification } from "../../utils/supabase/notification-service";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -338,25 +339,24 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:w-[420px] md:w-[460px] p-0 flex flex-col gap-0 border-l border-border/50 shadow-2xl bg-background"
+        className="w-full sm:w-[380px] md:w-[420px] p-0 flex flex-col gap-0 border-l border-border/60 shadow-2xl bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 rounded-l-2xl overflow-hidden"
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <SheetHeader className="flex-shrink-0 p-0 border-b border-border/40">
-          {/* Top bar with gradient */}
-          <div className="px-5 pt-5 pb-4" style={{ background: "linear-gradient(135deg, #2B7A78 0%, #235f5d 100%)" }}>
-            <div className="flex items-center justify-between">
-              <SheetTitle className="flex items-center gap-3 text-white">
-                <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center ring-1 ring-white/20">
-                  <Bell className="h-5 w-5 text-white" />
+        <SheetHeader className="flex-shrink-0 p-0 border-b border-slate-100">
+          <div className="px-5 py-4 pr-14 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+            <div className="flex items-start justify-between gap-3">
+              <SheetTitle className="flex items-center gap-3 text-foreground">
+                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center ring-1 ring-primary/15">
+                  <Bell className="h-5 w-5 text-primary" />
                 </div>
-                <div>
-                  <p className="text-[15px] font-bold text-white leading-tight">Notifications</p>
-                  <p className="text-[11px] text-white/60 font-normal leading-tight mt-0.5">
+                <div className="leading-tight">
+                  <p className="text-[15px] font-bold">Notifications</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
                     {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
                   </p>
                 </div>
                 {unreadCount > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-white/20 text-white text-[10px] font-bold leading-none ring-1 ring-white/30">
+                  <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold leading-none ring-1 ring-primary/15">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
@@ -366,7 +366,7 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
                 <button
                   onClick={() => loadPage(0, true)}
                   disabled={refreshing}
-                  className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
                   aria-label="Refresh"
                 >
                   <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -374,7 +374,7 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllRead}
-                    className="flex items-center gap-1.5 text-[11px] font-semibold text-white/80 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/15 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted/60 transition-colors whitespace-nowrap"
                   >
                     <BellOff className="h-3.5 w-3.5" />
                     Mark all read
@@ -382,28 +382,20 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Filter tabs */}
-          <div className="flex gap-0 border-b border-border/40 bg-background">
-            {(["all", "unread"] as FilterTab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setFilter(tab)}
-                className={`flex-1 py-3 text-[12.5px] font-semibold transition-all duration-150 border-b-2 ${
-                  filter === tab
-                    ? "border-primary text-primary bg-primary/5"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                }`}
-              >
-                {tab === "all" ? "All" : `Unread${unreadCount > 0 ? ` (${unreadCount})` : ""}`}
-              </button>
-            ))}
+            <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterTab)} className="mt-3.5">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="unread">
+                  Unread{unreadCount > 0 ? ` (${unreadCount})` : ""}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </SheetHeader>
 
         {/* ── Body ───────────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-white">
           {refreshing ? (
             <div className="divide-y divide-border/30">
               {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
@@ -480,8 +472,8 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
 
         {/* ── Footer ─────────────────────────────────────────────────────── */}
         {notifications.length > 0 && (
-          <div className="flex-shrink-0 px-5 py-3.5 border-t border-border/40 bg-muted/30 flex items-center justify-between">
-            <p className="text-[11.5px] text-muted-foreground/60">
+          <div className="flex-shrink-0 px-5 py-3 border-t border-slate-100 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70 flex items-center justify-between">
+            <p className="text-[11.5px] text-muted-foreground">
               {notifications.length} notification{notifications.length !== 1 ? "s" : ""} total
             </p>
             <button
@@ -489,7 +481,7 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
               disabled={unreadCount === 0}
               className="text-[11.5px] font-semibold text-primary hover:text-primary/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-md hover:bg-primary/8"
             >
-              Clear all unread
+              Mark all read
             </button>
           </div>
         )}

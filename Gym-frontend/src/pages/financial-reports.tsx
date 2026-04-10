@@ -338,7 +338,7 @@ export function FinancialReports() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-3">
@@ -366,8 +366,8 @@ export function FinancialReports() {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
+      <Card className="bg-white border-0 shadow-sm rounded-2xl overflow-hidden">
+        <CardHeader className="bg-gradient-light border-b border-slate-100">
           <CardTitle className="text-lg">Report Filters</CardTitle>
         </CardHeader>
         <CardContent>
@@ -471,7 +471,10 @@ export function FinancialReports() {
       {/* Report Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredReports.map((report) => (
-          <Card key={report.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card
+            key={report.id}
+            className="bg-white border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none cursor-pointer overflow-hidden rounded-2xl"
+          >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
@@ -564,7 +567,7 @@ export function FinancialReports() {
                   {selectedReport === "profit-loss" && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Statement of Profit or Loss</h3>
-                      <div className="rounded-md border">
+                      <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -630,7 +633,7 @@ export function FinancialReports() {
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="space-y-4">
                           <h4 className="font-semibold text-primary">Assets</h4>
-                          <div className="rounded-md border">
+                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -675,7 +678,7 @@ export function FinancialReports() {
 
                         <div className="space-y-4">
                           <h4 className="font-semibold text-primary">Equity & Liabilities</h4>
-                          <div className="rounded-md border">
+                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -724,7 +727,7 @@ export function FinancialReports() {
                   {selectedReport === "trial-balance" && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Trial Balance</h3>
-                      <div className="rounded-md border">
+                      <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
                         <Table>
                           <TableHeader>
                             <TableRow>
