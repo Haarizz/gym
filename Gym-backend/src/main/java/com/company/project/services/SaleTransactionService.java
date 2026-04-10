@@ -32,13 +32,16 @@ public class SaleTransactionService {
     private final SaleTransactionRepository saleTransactionRepository;
     private final SaleTransactionItemRepository saleTransactionItemRepository;
     private final ProductStockRepository productStockRepository;
+    private final ReceiptVoucherService receiptVoucherService;
 
     public SaleTransactionService(SaleTransactionRepository saleTransactionRepository,
                                   SaleTransactionItemRepository saleTransactionItemRepository,
-                                  ProductStockRepository productStockRepository) {
-        this.saleTransactionRepository = saleTransactionRepository;
+                                  ProductStockRepository productStockRepository,
+                                  ReceiptVoucherService receiptVoucherService) {
+        this.saleTransactionRepository     = saleTransactionRepository;
         this.saleTransactionItemRepository = saleTransactionItemRepository;
-        this.productStockRepository = productStockRepository;
+        this.productStockRepository        = productStockRepository;
+        this.receiptVoucherService         = receiptVoucherService;
     }
 
     // ── Write ────────────────────────────────────────────────────────────────
@@ -111,6 +114,20 @@ public class SaleTransactionService {
         }
 
         List<SaleTransactionItem> savedItems = saleTransactionItemRepository.findByTransactionId(transaction.getId());
+
+        // Post to General Ledger
+        receiptVoucherService.createVoucherFromModule(
+                "POS Sale – " + transaction.getTransactionNumber(),
+                "POS",
+                transaction.getMemberName(),
+                transaction.getMemberId(),
+                transaction.getTotalAmount(),
+                transaction.getPaymentMethod(),
+                transaction.getTransactionNumber(),
+                transaction.getTransactionNumber(),
+                transaction.getNotes()
+        );
+
         return SaleTransactionResponseDTO.fromEntity(transaction, savedItems);
     }
 
