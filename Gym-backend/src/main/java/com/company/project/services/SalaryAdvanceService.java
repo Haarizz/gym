@@ -22,11 +22,14 @@ public class SalaryAdvanceService {
 
     private final SalaryAdvanceRepository advanceRepository;
     private final NotificationService notificationService;
+    private final FinancialEventService financialEventService;
 
     public SalaryAdvanceService(SalaryAdvanceRepository advanceRepository,
-                                 NotificationService notificationService) {
-        this.advanceRepository = advanceRepository;
-        this.notificationService = notificationService;
+                                 NotificationService notificationService,
+                                 FinancialEventService financialEventService) {
+        this.advanceRepository     = advanceRepository;
+        this.notificationService   = notificationService;
+        this.financialEventService = financialEventService;
     }
 
     public List<SalaryAdvanceResponseDTO> getAdvances(String search, String status, String department) {
@@ -133,7 +136,15 @@ public class SalaryAdvanceService {
             advance.setRemarks(existing + "Approval Note: " + req.getApprovalRemarks());
         }
 
-        return SalaryAdvanceResponseDTO.fromEntity(advanceRepository.save(advance));
+        SalaryAdvance saved = advanceRepository.save(advance);
+
+        // Generate journal entry when advance is approved and disbursed:
+        // DR Salary Advance Receivable, CR Cash at Bank
+        if ("Approved".equalsIgnoreCase(decision)) {
+            financialEventService.onSalaryAdvanceDisbursed(saved);
+        }
+
+        return SalaryAdvanceResponseDTO.fromEntity(saved);
     }
 
     public void deleteAdvance(Long id) {

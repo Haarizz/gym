@@ -24,9 +24,12 @@ import java.util.stream.Collectors;
 public class AssetService {
 
     private final AssetRepository assetRepository;
+    private final FinancialEventService financialEventService;
 
-    public AssetService(AssetRepository assetRepository) {
-        this.assetRepository = assetRepository;
+    public AssetService(AssetRepository assetRepository,
+                        FinancialEventService financialEventService) {
+        this.assetRepository       = assetRepository;
+        this.financialEventService = financialEventService;
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +73,13 @@ public class AssetService {
         if (asset.getCode() == null || asset.getCode().isBlank()) {
             asset.setCode(generateAssetCode(asset.getId()));
             asset = assetRepository.save(asset);
+        }
+
+        // Generate journal entry when asset has a purchase price:
+        // DR Fixed Assets, CR Accounts Payable
+        if (asset.getPurchasePrice() != null
+                && asset.getPurchasePrice().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            financialEventService.onAssetPurchased(asset);
         }
 
         return AssetResponseDTO.fromEntity(asset);

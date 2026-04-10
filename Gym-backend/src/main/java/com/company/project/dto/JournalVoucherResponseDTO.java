@@ -19,6 +19,9 @@ public class JournalVoucherResponseDTO {
     private String reference;
     private BigDecimal totalDebit;
     private BigDecimal totalCredit;
+    private boolean systemGenerated;
+    private Long reversesVoucherId;
+    private Long reversedByVoucherId;
     private List<JournalVoucherLineDTO> lines;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -36,6 +39,9 @@ public class JournalVoucherResponseDTO {
         dto.setTotalDebit(jv.getTotalDebit());
         dto.setTotalCredit(jv.getTotalCredit());
         dto.setLines(lines.stream().map(JournalVoucherLineDTO::fromEntity).collect(Collectors.toList()));
+        dto.setSystemGenerated(jv.isSystemGenerated());
+        dto.setReversesVoucherId(jv.getReversesVoucherId());
+        dto.setReversedByVoucherId(jv.getReversedByVoucherId());
         dto.setCreatedAt(jv.getCreatedAt());
         dto.setUpdatedAt(jv.getUpdatedAt());
         return dto;
@@ -64,6 +70,15 @@ public class JournalVoucherResponseDTO {
 
     public BigDecimal getTotalCredit() { return totalCredit; }
     public void setTotalCredit(BigDecimal totalCredit) { this.totalCredit = totalCredit; }
+
+    public boolean isSystemGenerated() { return systemGenerated; }
+    public void setSystemGenerated(boolean systemGenerated) { this.systemGenerated = systemGenerated; }
+
+    public Long getReversesVoucherId() { return reversesVoucherId; }
+    public void setReversesVoucherId(Long reversesVoucherId) { this.reversesVoucherId = reversesVoucherId; }
+
+    public Long getReversedByVoucherId() { return reversedByVoucherId; }
+    public void setReversedByVoucherId(Long reversedByVoucherId) { this.reversedByVoucherId = reversedByVoucherId; }
 
     public List<JournalVoucherLineDTO> getLines() { return lines; }
     public void setLines(List<JournalVoucherLineDTO> lines) { this.lines = lines; }

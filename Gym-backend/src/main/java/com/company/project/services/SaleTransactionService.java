@@ -32,15 +32,18 @@ public class SaleTransactionService {
     private final SaleTransactionRepository saleTransactionRepository;
     private final SaleTransactionItemRepository saleTransactionItemRepository;
     private final ProductStockRepository productStockRepository;
+    private final FinancialEventService financialEventService;
     private final ReceiptVoucherService receiptVoucherService;
 
     public SaleTransactionService(SaleTransactionRepository saleTransactionRepository,
                                   SaleTransactionItemRepository saleTransactionItemRepository,
                                   ProductStockRepository productStockRepository,
+                                  FinancialEventService financialEventService,
                                   ReceiptVoucherService receiptVoucherService) {
         this.saleTransactionRepository     = saleTransactionRepository;
         this.saleTransactionItemRepository = saleTransactionItemRepository;
         this.productStockRepository        = productStockRepository;
+        this.financialEventService         = financialEventService;
         this.receiptVoucherService         = receiptVoucherService;
     }
 
@@ -115,7 +118,10 @@ public class SaleTransactionService {
 
         List<SaleTransactionItem> savedItems = saleTransactionItemRepository.findByTransactionId(transaction.getId());
 
-        // Post to General Ledger
+        // Generate journal entry: DR Cash/Bank, CR Sales Revenue, CR Tax Payable
+        financialEventService.onSaleCompleted(transaction);
+
+        // Create receipt voucher document for UI display
         receiptVoucherService.createVoucherFromModule(
                 "POS Sale – " + transaction.getTransactionNumber(),
                 "POS",
@@ -150,6 +156,9 @@ public class SaleTransactionService {
         for (SaleTransactionItem item : items) {
             restoreStock(item.getProductId(), item.getQuantity());
         }
+
+        // Generate reversal journal entry: DR Sales Revenue, DR Tax Payable, CR Cash/Bank
+        financialEventService.onSaleRefunded(transaction);
 
         return SaleTransactionResponseDTO.fromEntity(transaction, items);
     }

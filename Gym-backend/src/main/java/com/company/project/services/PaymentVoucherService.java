@@ -24,11 +24,14 @@ public class PaymentVoucherService {
 
     private final PaymentVoucherRepository paymentVoucherRepository;
     private final PaymentVoucherBillRepository billRepository;
+    private final FinancialEventService financialEventService;
 
     public PaymentVoucherService(PaymentVoucherRepository paymentVoucherRepository,
-                                 PaymentVoucherBillRepository billRepository) {
+                                 PaymentVoucherBillRepository billRepository,
+                                 FinancialEventService financialEventService) {
         this.paymentVoucherRepository = paymentVoucherRepository;
-        this.billRepository = billRepository;
+        this.billRepository           = billRepository;
+        this.financialEventService    = financialEventService;
     }
 
     private synchronized String generateVoucherNo() {
@@ -105,6 +108,13 @@ public class PaymentVoucherService {
                 .orElseThrow(() -> new RuntimeException("Payment Voucher not found: " + id));
         pv.setStatus(status);
         PaymentVoucher saved = paymentVoucherRepository.save(pv);
+
+        // Generate journal entry when payment is marked as Paid:
+        // DR Accounts Payable, CR Cash/Bank
+        if ("Paid".equalsIgnoreCase(status)) {
+            financialEventService.onSupplierPaid(saved);
+        }
+
         List<PaymentVoucherBill> bills = billRepository.findByPaymentVoucherId(id);
         return PaymentVoucherResponseDTO.fromEntity(saved, bills);
     }

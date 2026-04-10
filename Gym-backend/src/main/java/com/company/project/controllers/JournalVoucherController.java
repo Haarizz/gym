@@ -3,9 +3,12 @@ package com.company.project.controllers;
 import com.company.project.dto.JournalVoucherRequestDTO;
 import com.company.project.dto.JournalVoucherResponseDTO;
 import com.company.project.services.JournalVoucherService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 import java.util.List;
 
@@ -53,6 +56,24 @@ public class JournalVoucherController {
     @PostMapping("/{id}/cancel")
     public ResponseEntity<JournalVoucherResponseDTO> cancelJournalVoucher(@PathVariable Long id) {
         return ResponseEntity.ok(journalVoucherService.cancelJournalVoucher(id));
+    }
+
+    /**
+     * Reverse a POSTED journal voucher.
+     * Creates an equal-and-opposite POSTED reversal entry.
+     * The original voucher is marked REVERSED — it is never deleted or modified.
+     *
+     * Body params (all optional):
+     *   reversal_date  — date for the reversal entry (defaults to today)
+     *   reason         — free-text reason for the reversal
+     */
+    @PostMapping("/{id}/reverse")
+    public ResponseEntity<JournalVoucherResponseDTO> reverseJournalVoucher(
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate reversalDate,
+            @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(
+                journalVoucherService.reverseJournalVoucher(id, reversalDate, reason));
     }
 
     @DeleteMapping("/{id}")

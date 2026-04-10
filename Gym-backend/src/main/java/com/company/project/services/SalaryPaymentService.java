@@ -35,6 +35,7 @@ public class SalaryPaymentService {
     private final StaffRepository staffRepository;
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
+    private final FinancialEventService financialEventService;
     private final PaymentVoucherService paymentVoucherService;
 
     public SalaryPaymentService(SalaryPaymentEmployeeRepository employeeRepository,
@@ -42,12 +43,14 @@ public class SalaryPaymentService {
                                 StaffRepository staffRepository,
                                 ObjectMapper objectMapper,
                                 NotificationService notificationService,
+                                FinancialEventService financialEventService,
                                 PaymentVoucherService paymentVoucherService) {
-        this.employeeRepository = employeeRepository;
-        this.paymentRepository = paymentRepository;
-        this.staffRepository = staffRepository;
-        this.objectMapper = objectMapper;
-        this.notificationService = notificationService;
+        this.employeeRepository    = employeeRepository;
+        this.paymentRepository     = paymentRepository;
+        this.staffRepository       = staffRepository;
+        this.objectMapper          = objectMapper;
+        this.notificationService   = notificationService;
+        this.financialEventService = financialEventService;
         this.paymentVoucherService = paymentVoucherService;
     }
 
@@ -180,7 +183,7 @@ public class SalaryPaymentService {
         employee.setLastPaymentDate(payment.getPaymentDate());
         employeeRepository.save(employee);
 
-        // Post to General Ledger as a debit (expense)
+        // Create payment voucher document for UI display
         paymentVoucherService.createPaymentVoucherFromModule(
                 payment.getEmployeeName(),
                 "Employee",
@@ -190,6 +193,9 @@ public class SalaryPaymentService {
                 "Salary: " + payment.getEmployeeName() + " – " + payment.getMonth() + "/" + payment.getYear(),
                 payment.getNotes()
         );
+
+        // Generate journal entry: DR Salary Expense, CR Cash at Bank
+        financialEventService.onSalaryPaid(payment);
 
         notificationService.notifyRoles(
                 List.of("ADMIN", "HR"),
