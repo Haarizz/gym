@@ -51,4 +51,38 @@ public class FinancialReportController {
         if (to == null) to = LocalDate.now();
         return ResponseEntity.ok(financialReportService.getCashFlowStatement(from, to));
     }
+
+    @GetMapping("/day-book")
+    public ResponseEntity<Map<String, Object>> getDayBook(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(name = "account", required = false) String accountCode) {
+        if (from == null) from = LocalDate.now().withDayOfMonth(1);
+        if (to == null) to = LocalDate.now();
+        return ResponseEntity.ok(financialReportService.getDayBook(from, to, accountCode));
+    }
+
+    @GetMapping("/bank-book")
+    public ResponseEntity<Map<String, Object>> getBankBook(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        if (from == null) from = LocalDate.now().withDayOfMonth(1);
+        if (to == null) to = LocalDate.now();
+        return ResponseEntity.ok(financialReportService.getBankBook(from, to));
+    }
+
+    @GetMapping("/fund-flow")
+    public ResponseEntity<Map<String, Object>> getFundFlow(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        if (from == null) from = LocalDate.now().withDayOfMonth(1);
+        if (to == null) to = LocalDate.now();
+        return ResponseEntity.ok(financialReportService.getFundFlowStatement(from, to));
+    }
+
+    @GetMapping("/pdc-report")
+    public ResponseEntity<Map<String, Object>> getPdcReport(
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(financialReportService.getPdcReport(status));
+    }
 }

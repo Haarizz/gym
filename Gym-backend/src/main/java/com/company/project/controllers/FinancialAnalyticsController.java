@@ -1,9 +1,13 @@
 package com.company.project.controllers;
 
+import com.company.project.dto.LedgerTransactionDTO;
 import com.company.project.services.FinancialAnalyticsService;
+import com.company.project.services.LedgerTransactionService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -12,9 +16,12 @@ import java.util.Map;
 public class FinancialAnalyticsController {
 
     private final FinancialAnalyticsService financialAnalyticsService;
+    private final LedgerTransactionService  ledgerTransactionService;
 
-    public FinancialAnalyticsController(FinancialAnalyticsService financialAnalyticsService) {
+    public FinancialAnalyticsController(FinancialAnalyticsService financialAnalyticsService,
+                                         LedgerTransactionService ledgerTransactionService) {
         this.financialAnalyticsService = financialAnalyticsService;
+        this.ledgerTransactionService  = ledgerTransactionService;
     }
 
     @GetMapping("/dashboard")
@@ -36,5 +43,14 @@ public class FinancialAnalyticsController {
     @GetMapping("/expense-by-category")
     public ResponseEntity<List<Map<String, Object>>> getExpenseByCategory() {
         return ResponseEntity.ok(financialAnalyticsService.getExpenseByCategory());
+    }
+
+    @GetMapping("/transactions")
+    public ResponseEntity<List<LedgerTransactionDTO>> getTransactions(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(ledgerTransactionService.getTransactions(from, to, type, search));
     }
 }

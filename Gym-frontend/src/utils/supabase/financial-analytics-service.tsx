@@ -28,6 +28,19 @@ export interface ExpenseByCategory {
   amount: number;
 }
 
+export interface LedgerTransaction {
+  id: string;
+  date: string;
+  type: string;
+  referenceNo: string;
+  description: string;
+  debit: number;
+  credit: number;
+  branch: string | null;
+  status: string;
+  costCenter: string | null;
+}
+
 class FinancialAnalyticsService {
   async getDashboard(): Promise<AnalyticsDashboard> {
     const res = await authService.makeAuthenticatedRequest(
@@ -84,6 +97,37 @@ class FinancialAnalyticsService {
     return data.map((d: any) => ({
       category: d.category,
       amount: d.amount ?? 0,
+    }));
+  }
+
+  async getTransactions(params?: {
+    from?: string;
+    to?: string;
+    type?: string;
+    search?: string;
+  }): Promise<LedgerTransaction[]> {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    if (params?.type) q.set("type", params.type);
+    if (params?.search) q.set("search", params.search);
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/financial-analytics/transactions${q.toString() ? "?" + q : ""}`,
+      { method: "GET" }
+    );
+    if (!res.ok) throw new Error("Failed to fetch transactions");
+    const data = await res.json();
+    return data.map((d: any) => ({
+      id: d.id,
+      date: d.date,
+      type: d.type,
+      referenceNo: d.referenceNo,
+      description: d.description,
+      debit: d.debit ?? 0,
+      credit: d.credit ?? 0,
+      branch: d.branch ?? null,
+      status: d.status,
+      costCenter: d.costCenter ?? null,
     }));
   }
 }
