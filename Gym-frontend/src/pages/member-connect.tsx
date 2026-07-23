@@ -59,6 +59,7 @@ export function MemberConnect() {
   const followUpCompletionRate = 87;
   const messagingEffectiveness = 74;
   const engagementScore = 82;
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   const handleViewDetails = (section: string) => {
     // In a real app, this would navigate to the specific sub-module
@@ -66,7 +67,7 @@ export function MemberConnect() {
   };
 
   return (
-    <div className="p-6 space-y-8">
+      <div className="p-6 space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Member Connect</h1>
@@ -80,10 +81,12 @@ export function MemberConnect() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <Card className="relative overflow-hidden">
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Members Engaged</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Total Members Engaged</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-blue-600">{totalMembersEngaged.toLocaleString()}</div>
@@ -100,13 +103,14 @@ export function MemberConnect() {
               View Details
             </Button>
           </CardContent>
-          <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-full -mr-8 -mt-8"></div>
         </Card>
 
-        <Card className="relative overflow-hidden">
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Campaign Conversions</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Campaign Conversions</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <Target className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">{campaignConversions}</div>
@@ -123,13 +127,14 @@ export function MemberConnect() {
               View Details
             </Button>
           </CardContent>
-          <div className="absolute top-0 right-0 w-16 h-16 bg-green-50 rounded-full -mr-8 -mt-8"></div>
         </Card>
 
-        <Card className="relative overflow-hidden">
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Follow-up Completion</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Follow-up Completion</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-orange-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-orange-600">{followUpCompletionRate}%</div>
@@ -146,13 +151,14 @@ export function MemberConnect() {
               View Details
             </Button>
           </CardContent>
-          <div className="absolute top-0 right-0 w-16 h-16 bg-orange-50 rounded-full -mr-8 -mt-8"></div>
         </Card>
 
-        <Card className="relative overflow-hidden">
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Messaging Effectiveness</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Messaging Effectiveness</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <MessageSquare className="h-4 w-4 text-purple-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-purple-600">{messagingEffectiveness}%</div>
@@ -169,13 +175,14 @@ export function MemberConnect() {
               View Details
             </Button>
           </CardContent>
-          <div className="absolute top-0 right-0 w-16 h-16 bg-purple-50 rounded-full -mr-8 -mt-8"></div>
         </Card>
 
-        <Card className="relative overflow-hidden">
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Engagement Score</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Engagement Score</CardTitle>
+            <div className="bg-indigo-50 p-2 rounded-lg">
+              <Activity className="h-4 w-4 text-indigo-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-indigo-600">{engagementScore}/100</div>
@@ -192,14 +199,13 @@ export function MemberConnect() {
               View Details
             </Button>
           </CardContent>
-          <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-50 rounded-full -mr-8 -mt-8"></div>
         </Card>
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Engagement Trends Chart */}
-        <Card>
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Engagement Trends</CardTitle>
@@ -248,7 +254,7 @@ export function MemberConnect() {
         </Card>
 
         {/* Referral Sources Pie Chart */}
-        <Card>
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Referral Sources</CardTitle>
@@ -288,7 +294,7 @@ export function MemberConnect() {
       </div>
 
       {/* Lead Funnel Chart */}
-      <Card>
+      <Card className={cardShell}>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Lead Conversion Funnel</CardTitle>
@@ -324,7 +330,7 @@ export function MemberConnect() {
       </Card>
 
       {/* Engagement Score Gauge */}
-      <Card>
+      <Card className={cardShell}>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Engagement Score Overview</CardTitle>
@@ -428,7 +434,7 @@ export function MemberConnect() {
 
       {/* Quick Actions Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleViewDetails('promotions-campaign')}>
+        <Card className={`${cardShell} p-4 cursor-pointer`} onClick={() => handleViewDetails('promotions-campaign')}>
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-blue-100 rounded-lg">
               <Megaphone className="h-5 w-5 text-blue-600" />
@@ -440,7 +446,7 @@ export function MemberConnect() {
           </div>
         </Card>
 
-        <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleViewDetails('referrals')}>
+        <Card className={`${cardShell} p-4 cursor-pointer`} onClick={() => handleViewDetails('referrals')}>
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-green-100 rounded-lg">
               <Share className="h-5 w-5 text-green-600" />
@@ -452,7 +458,7 @@ export function MemberConnect() {
           </div>
         </Card>
 
-        <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleViewDetails('leads')}>
+        <Card className={`${cardShell} p-4 cursor-pointer`} onClick={() => handleViewDetails('leads')}>
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-orange-100 rounded-lg">
               <Target className="h-5 w-5 text-orange-600" />
@@ -464,7 +470,7 @@ export function MemberConnect() {
           </div>
         </Card>
 
-        <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleViewDetails('follow-ups')}>
+        <Card className={`${cardShell} p-4 cursor-pointer`} onClick={() => handleViewDetails('follow-ups')}>
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-purple-100 rounded-lg">
               <Phone className="h-5 w-5 text-purple-600" />

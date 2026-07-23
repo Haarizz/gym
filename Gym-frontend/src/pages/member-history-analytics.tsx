@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -354,6 +355,7 @@ const communicationHistory = [
 const COLORS = ['#0047AB', '#00c5cb', '#4CAF50', '#FFC107', '#F44336'];
 
 export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAnalyticsProps) {
+  const { currencyCode } = useCurrency();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState(memberData);
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
@@ -758,7 +760,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </div>
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Paid</p>
-              <p className="font-semibold text-gray-900">AED 1,800</p>
+              <p className="font-semibold text-gray-900"><CurrencyGlyph /> 1,800</p>
             </div>
             <div>
               <p className="text-sm text-gray-600 mb-1">Transferable</p>
@@ -834,7 +836,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 </div>
                 <div className="bg-green-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-600 mb-1">Total Income</p>
-                  <p className="font-semibold text-green-600">AED {selectedMember.totalIncome.toLocaleString()}</p>
+                  <p className="font-semibold text-green-600"><CurrencyGlyph /> {selectedMember.totalIncome.toLocaleString()}</p>
                 </div>
                 <div className="bg-purple-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-600 mb-1">Memberships</p>
@@ -864,20 +866,20 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">By Cash</span>
-                  <span className="font-semibold text-green-600">AED {selectedMember.paymentBreakdown.cash.toLocaleString()}</span>
+                  <span className="font-semibold text-green-600"><CurrencyGlyph /> {selectedMember.paymentBreakdown.cash.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">By Card</span>
-                  <span className="font-semibold text-blue-600">AED {selectedMember.paymentBreakdown.card.toLocaleString()}</span>
+                  <span className="font-semibold text-blue-600"><CurrencyGlyph /> {selectedMember.paymentBreakdown.card.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">By Wallet/UPI</span>
-                  <span className="font-semibold text-purple-600">AED {selectedMember.paymentBreakdown.wallet.toLocaleString()}</span>
+                  <span className="font-semibold text-purple-600"><CurrencyGlyph /> {selectedMember.paymentBreakdown.wallet.toLocaleString()}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-gray-900">Outstanding Dues</span>
-                  <span className="font-semibold text-red-600">AED {selectedMember.outstandingDues.toLocaleString()}</span>
+                  <span className="font-semibold text-red-600"><CurrencyGlyph /> {selectedMember.outstandingDues.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -1027,7 +1029,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                               </Badge>
                             </td>
                             <td className="p-3 text-sm text-right font-semibold text-green-600">
-                              AED {payment.amount.toLocaleString()}
+                              <CurrencyGlyph /> {payment.amount.toLocaleString()}
                             </td>
                             <td className="p-3 text-sm text-gray-600">{payment.remarks}</td>
                           </tr>
@@ -1037,14 +1039,14 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         <tr className="bg-gradient-light border-t-2 border-primary/20">
                           <td colSpan={3} className="p-3 text-sm font-semibold">Total Paid</td>
                           <td className="p-3 text-sm text-right font-semibold text-green-600">
-                            AED {selectedMember.totalIncome.toLocaleString()}
+                            <CurrencyGlyph /> {selectedMember.totalIncome.toLocaleString()}
                           </td>
                           <td></td>
                         </tr>
                         <tr className="bg-red-50">
                           <td colSpan={3} className="p-3 text-sm font-semibold">Outstanding</td>
                           <td className="p-3 text-sm text-right font-semibold text-red-600">
-                            AED {selectedMember.outstandingDues.toLocaleString()}
+                            <CurrencyGlyph /> {selectedMember.outstandingDues.toLocaleString()}
                           </td>
                           <td></td>
                         </tr>
@@ -1062,7 +1064,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         <YAxis />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey="hours" fill="#0047AB" name="Monthly Revenue (AED)" />
+                        <Bar dataKey="hours" fill="#0047AB" name={`Monthly Revenue (${currencyCode})`} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1168,7 +1170,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-6 text-center">
                         <ShoppingCart className="h-12 w-12 mx-auto mb-3 text-blue-600" />
-                        <p className="text-3xl font-bold text-blue-600 mb-1">AED {memberData.posSpend}</p>
+                        <p className="text-3xl font-bold text-blue-600 mb-1"><CurrencyGlyph /> {memberData.posSpend}</p>
                         <p className="text-sm text-gray-600">POS Purchases</p>
                       </CardContent>
                     </Card>
@@ -1241,7 +1243,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                             </li>
                             <li className="flex items-center space-x-2">
                               <CheckCircle className="h-4 w-4" />
-                              <span>Lifetime spend AED {selectedMember.totalIncome.toLocaleString()}</span>
+                              <span>Lifetime spend <CurrencyGlyph /> {selectedMember.totalIncome.toLocaleString()}</span>
                             </li>
                           </ul>
                           <Badge className="bg-green-600 text-white">
@@ -1274,7 +1276,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                             <p className="text-sm text-gray-600">Applied on Jul 2023</p>
                           </div>
                           <Badge variant="outline" className="border-blue-600 text-blue-600">
-                            AED 200 Credit
+                            <CurrencyGlyph /> 200 Credit
                           </Badge>
                         </div>
                       </div>
@@ -1995,7 +1997,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                               <TableHead className="table-header">Transaction Type</TableHead>
                               <TableHead className="table-header">Reference / Invoice No.</TableHead>
                               <TableHead className="table-header">Mode</TableHead>
-                              <TableHead className="table-header text-right">Amount (AED)</TableHead>
+                              <TableHead className="table-header text-right">Amount ({currencyCode})</TableHead>
                               <TableHead className="table-header">Remarks</TableHead>
                               <TableHead className="table-header text-center">Actions</TableHead>
                             </TableRow>
@@ -2105,13 +2107,13 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Total Amount</p>
                             <p className="text-2xl font-bold text-green-600">
-                              AED {transactionsData.reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
+                              <CurrencyGlyph /> {transactionsData.reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
                             </p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Membership Transactions</p>
                             <p className="text-2xl font-bold text-purple-600">
-                              AED{' '}
+                              <CurrencyGlyph />{' '}
                               {transactionsData
                                 .filter((t) => t.transactionType.includes('Membership'))
                                 .reduce((sum, t) => sum + t.amount, 0)
@@ -2121,7 +2123,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           <div>
                             <p className="text-sm text-gray-600 mb-1">POS Purchases</p>
                             <p className="text-2xl font-bold text-blue-600">
-                              AED{' '}
+                              <CurrencyGlyph />{' '}
                               {transactionsData
                                 .filter((t) => t.transactionType.includes('POS'))
                                 .reduce((sum, t) => sum + t.amount, 0)
@@ -2437,7 +2439,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <div>
                 <Label htmlFor="transferFee" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-gray-500" />
-                  <span>Transfer Fee (AED)</span>
+                  <span>Transfer Fee ({currencyCode})</span>
                 </Label>
                 <Input
                   id="transferFee"
@@ -2501,7 +2503,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               disabled={!transferForm.fullName || !transferForm.mobileNumber || !transferForm.confirmTransfer}
               onClick={() => {
                 toast.success('Membership transferred successfully!', {
-                  description: `Transferred to ${transferForm.fullName}. Transfer fee: AED ${transferForm.transferFee}`,
+                  description: `Transferred to ${transferForm.fullName}. Transfer fee: ${currencyCode} ${transferForm.transferFee}`,
                 });
                 setIsTransferModalOpen(false);
                 setTransferForm({
@@ -2778,7 +2780,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   <div>
                     <Label htmlFor="refundAmount" className="text-sm font-medium text-orange-800 mb-2 flex items-center gap-2">
                       <DollarSign className="h-4 w-4 text-orange-700" />
-                      <span>Refund Amount (AED)</span>
+                      <span>Refund Amount ({currencyCode})</span>
                     </Label>
                     <Input
                       id="refundAmount"
@@ -2839,7 +2841,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </div>
                   <div>
                     <p className="text-gray-600">Total Paid</p>
-                    <p className="font-semibold text-green-600">AED 1,800</p>
+                    <p className="font-semibold text-green-600"><CurrencyGlyph /> 1,800</p>
                   </div>
                 </div>
               </CardContent>
@@ -2855,7 +2857,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <Label htmlFor="confirmDeactivation" className="text-sm text-red-900 cursor-pointer flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 mt-0.5" />
                 <span>
-                  Confirm deactivation of this member's plan. This action will mark the membership as inactive{deactivateForm.refundAmount > 0 ? ` and process a refund of AED ${deactivateForm.refundAmount}` : ''}.
+                  Confirm deactivation of this member's plan. This action will mark the membership as inactive{deactivateForm.refundAmount > 0 ? ` and process a refund of ${currencyCode} ${deactivateForm.refundAmount}` : ''}.
                 </span>
               </Label>
             </div>
@@ -2884,7 +2886,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               onClick={() => {
                 toast.success('Membership deactivated successfully!', {
                   description: deactivateForm.refundAmount > 0 
-                    ? `Refund of AED ${deactivateForm.refundAmount} processed via ${deactivateForm.refundMode}`
+                    ? `Refund of ${currencyCode} ${deactivateForm.refundAmount} processed via ${deactivateForm.refundMode}`
                     : 'Member plan has been deactivated',
                 });
                 setIsDeactivateModalOpen(false);
@@ -3054,7 +3056,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       <ul className="list-disc list-inside space-y-0.5 text-blue-800">
                         <li>This plan allows up to 60 days of freeze</li>
                         <li>No charges for freeze days within the limit</li>
-                        <li>Additional days will be charged at AED 10/day</li>
+                        <li>Additional days will be charged at <CurrencyGlyph /> 10/day</li>
                         <li>Member can freeze membership up to 2 times during the plan period</li>
                       </ul>
                     </div>

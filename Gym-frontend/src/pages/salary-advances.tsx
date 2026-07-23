@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -41,183 +42,37 @@ import {
   ArrowRight,
   Calculator
 } from 'lucide-react';
-import { format, addMonths, addDays, differenceInDays } from 'date-fns';
+import { format, addMonths } from 'date-fns';
+import { toast } from "sonner";
+import { salaryAdvancesService, SalaryAdvance } from "../utils/supabase/salary-advances-service";
+import { staffService } from "../utils/supabase/staff-service";
 
-// Sample employee data
-const sampleEmployees = [
-  { id: "EMP001", name: "Ahmed Hassan", department: "Personal Training", designation: "Senior Trainer" },
-  { id: "EMP002", name: "Sarah Johnson", department: "Front Desk", designation: "Receptionist" },
-  { id: "EMP003", name: "Mohammed Ali", department: "Group Classes", designation: "Yoga Instructor" },
-  { id: "EMP004", name: "Fatima Ahmed", department: "Management", designation: "Operations Manager" },
-  { id: "EMP005", name: "John Smith", department: "Personal Training", designation: "Fitness Trainer" },
-  { id: "EMP006", name: "Aisha Khan", department: "Nutrition", designation: "Nutritionist" },
-  { id: "EMP007", name: "Omar Rashid", department: "Maintenance", designation: "Facility Manager" },
-  { id: "EMP008", name: "Lisa Williams", department: "Sales", designation: "Sales Executive" }
-];
-
-// Sample advances data
-const sampleAdvances = [
-  {
-    id: 1,
-    employeeId: "EMP001",
-    employeeName: "Ahmed Hassan",
-    department: "Personal Training",
-    requestDate: new Date(2025, 8, 15),
-    advanceType: "Salary Advance",
-    requestedAmount: 5000,
-    approvedAmount: 5000,
-    approvalStatus: "Approved",
-    remarks: "Emergency medical expenses for family",
-    totalDeducted: 3000,
-    balance: 2000,
-    installmentCount: 5,
-    installmentAmount: 1000,
-    startMonth: new Date(2025, 9, 1),
-    deductionMode: "Monthly",
-    autoDeduct: true,
-    status: "Active",
-    nextDeductionDate: new Date(2025, 11, 1),
-    approvedBy: "Fatima Ahmed",
-    approvedDate: new Date(2025, 8, 16),
-    attachment: "medical_invoice.pdf"
-  },
-  {
-    id: 2,
-    employeeId: "EMP002",
-    employeeName: "Sarah Johnson",
-    department: "Front Desk",
-    requestDate: new Date(2025, 9, 1),
-    advanceType: "Loan",
-    requestedAmount: 10000,
-    approvedAmount: 8000,
-    approvalStatus: "Approved",
-    remarks: "Home renovation project",
-    totalDeducted: 4000,
-    balance: 4000,
-    installmentCount: 8,
-    installmentAmount: 1000,
-    startMonth: new Date(2025, 9, 15),
-    deductionMode: "Monthly",
-    autoDeduct: true,
-    status: "Active",
-    nextDeductionDate: new Date(2025, 11, 15),
-    approvedBy: "Fatima Ahmed",
-    approvedDate: new Date(2025, 9, 2),
-    attachment: null
-  },
-  {
-    id: 3,
-    employeeId: "EMP003",
-    employeeName: "Mohammed Ali",
-    department: "Group Classes",
-    requestDate: new Date(2025, 9, 10),
-    advanceType: "Salary Advance",
-    requestedAmount: 3000,
-    approvedAmount: 0,
-    approvalStatus: "Pending",
-    remarks: "Personal emergency",
-    totalDeducted: 0,
-    balance: 0,
-    installmentCount: 0,
-    installmentAmount: 0,
-    startMonth: null,
-    deductionMode: "Monthly",
-    autoDeduct: true,
-    status: "Pending Approval",
-    nextDeductionDate: null,
-    approvedBy: null,
-    approvedDate: null,
-    attachment: null
-  },
-  {
-    id: 4,
-    employeeId: "EMP005",
-    employeeName: "John Smith",
-    department: "Personal Training",
-    requestDate: new Date(2025, 7, 1),
-    advanceType: "Loan",
-    requestedAmount: 6000,
-    approvedAmount: 6000,
-    approvalStatus: "Approved",
-    remarks: "Education expenses for children",
-    totalDeducted: 6000,
-    balance: 0,
-    installmentCount: 6,
-    installmentAmount: 1000,
-    startMonth: new Date(2025, 7, 15),
-    deductionMode: "Monthly",
-    autoDeduct: true,
-    status: "Completed",
-    nextDeductionDate: null,
-    approvedBy: "Fatima Ahmed",
-    approvedDate: new Date(2025, 7, 2),
-    attachment: null
-  },
-  {
-    id: 5,
-    employeeId: "EMP006",
-    employeeName: "Aisha Khan",
-    department: "Nutrition",
-    requestDate: new Date(2025, 8, 20),
-    advanceType: "Salary Advance",
-    requestedAmount: 4000,
-    approvedAmount: 0,
-    approvalStatus: "Rejected",
-    remarks: "Travel expenses",
-    totalDeducted: 0,
-    balance: 0,
-    installmentCount: 0,
-    installmentAmount: 0,
-    startMonth: null,
-    deductionMode: "Monthly",
-    autoDeduct: false,
-    status: "Rejected",
-    nextDeductionDate: null,
-    approvedBy: "Fatima Ahmed",
-    approvedDate: new Date(2025, 8, 21),
-    attachment: null
-  },
-  {
-    id: 6,
-    employeeId: "EMP007",
-    employeeName: "Omar Rashid",
-    department: "Maintenance",
-    requestDate: new Date(2025, 8, 5),
-    advanceType: "Loan",
-    requestedAmount: 12000,
-    approvedAmount: 12000,
-    approvalStatus: "Approved",
-    remarks: "Vehicle purchase down payment",
-    totalDeducted: 8000,
-    balance: 4000,
-    installmentCount: 12,
-    installmentAmount: 1000,
-    startMonth: new Date(2025, 8, 15),
-    deductionMode: "Monthly",
-    autoDeduct: true,
-    status: "Active",
-    nextDeductionDate: new Date(2025, 10, 28),
-    approvedBy: "Fatima Ahmed",
-    approvedDate: new Date(2025, 8, 6),
-    attachment: "vehicle_invoice.pdf"
-  }
-];
+interface EmployeeOption {
+  id: string;
+  name: string;
+  department: string;
+  designation: string;
+}
 
 interface SalaryAdvancesProps {
   onNavigate?: (section: string) => void;
 }
 
 export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState("requests");
-  const [advances, setAdvances] = useState(sampleAdvances);
+  const [advances, setAdvances] = useState<SalaryAdvance[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [loading, setLoading] = useState(false);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
-  const [editingAdvance, setEditingAdvance] = useState<typeof sampleAdvances[0] | null>(null);
-  const [selectedAdvance, setSelectedAdvance] = useState<typeof sampleAdvances[0] | null>(null);
+  const [selectedAdvance, setSelectedAdvance] = useState<SalaryAdvance | null>(null);
+  const [deleteConfirmAdvance, setDeleteConfirmAdvance] = useState<SalaryAdvance | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterDepartment, setFilterDepartment] = useState("all");
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-all";
 
   // Form data for advance request
   const [requestFormData, setRequestFormData] = useState({
@@ -251,7 +106,6 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
       requestedAmount: "",
       remarks: ""
     });
-    setEditingAdvance(null);
   };
 
   const resetApprovalForm = () => {
@@ -267,87 +121,113 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
     setSelectedAdvance(null);
   };
 
-  const handleEmployeeSelect = (employeeId: string) => {
-    const employee = sampleEmployees.find(e => e.id === employeeId);
-    if (employee) {
-      setRequestFormData({
-        ...requestFormData,
-        employeeId: employee.id,
-        employeeName: employee.name,
-        department: employee.department
-      });
+  const loadAdvances = async () => {
+    setLoading(true);
+    try {
+      const data = await salaryAdvancesService.getAdvances();
+      setAdvances(data);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load salary advances");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAddRequest = () => {
-    const newAdvance = {
-      id: Date.now(),
-      employeeId: requestFormData.employeeId,
-      employeeName: requestFormData.employeeName,
-      department: requestFormData.department,
-      requestDate: new Date(requestFormData.requestDate),
-      advanceType: requestFormData.advanceType as "Salary Advance" | "Loan",
-      requestedAmount: parseFloat(requestFormData.requestedAmount) || 0,
-      approvedAmount: 0,
-      approvalStatus: "Pending" as "Pending" | "Approved" | "Rejected",
-      remarks: requestFormData.remarks,
-      totalDeducted: 0,
-      balance: 0,
-      installmentCount: 0,
-      installmentAmount: 0,
-      startMonth: null,
-      deductionMode: "Monthly" as "Monthly" | "Bi-weekly" | "Custom",
-      autoDeduct: true,
-      status: "Pending Approval",
-      nextDeductionDate: null,
-      approvedBy: null,
-      approvedDate: null,
-      attachment: null
-    };
-    setAdvances([...advances, newAdvance]);
-    setShowRequestDialog(false);
-    resetRequestForm();
+  const loadEmployees = async () => {
+    try {
+      const staffPage = await staffService.getStaff({}, 1, 200);
+      const mapped = (staffPage.items ?? []).map((staff) => ({
+        id: staff.staff_id,
+        name: staff.name,
+        department: staff.department,
+        designation: staff.role,
+      }));
+      setEmployees(mapped);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load employees");
+    }
   };
 
-  const handleApproveRequest = () => {
+  useEffect(() => {
+    loadAdvances();
+    loadEmployees();
+  }, []);
+
+  const handleEmployeeSelect = (employeeId: string) => {
+    const employee = employees.find(e => e.id === employeeId);
+    if (employee) {
+      setRequestFormData((prev) => ({
+        ...prev,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        department: employee.department
+      }));
+    }
+  };
+
+  const handleAddRequest = async () => {
+    if (!requestFormData.employeeId || !requestFormData.requestedAmount) {
+      toast.error("Please select an employee and enter the requested amount.");
+      return;
+    }
+
+    try {
+      await salaryAdvancesService.createAdvance({
+        employeeId: requestFormData.employeeId,
+        employeeName: requestFormData.employeeName,
+        department: requestFormData.department,
+        requestDate: requestFormData.requestDate,
+        advanceType: requestFormData.advanceType,
+        requestedAmount: parseFloat(requestFormData.requestedAmount) || 0,
+        remarks: requestFormData.remarks,
+      });
+      toast.success("Advance request submitted successfully.");
+      setShowRequestDialog(false);
+      resetRequestForm();
+      await loadAdvances();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit advance request");
+    }
+  };
+
+  const handleApproveRequest = async () => {
     if (!selectedAdvance) return;
-    
-    const approvedAmount = parseFloat(approvalFormData.approvedAmount) || 0;
-    const installmentCount = parseInt(approvalFormData.installmentCount) || 1;
-    const installmentAmount = approvedAmount / installmentCount;
-    const startMonth = new Date(approvalFormData.startMonth);
-    
-    const updatedAdvances = advances.map(adv =>
-      adv.id === selectedAdvance.id
-        ? {
-            ...adv,
-            approvedAmount,
-            approvalStatus: approvalFormData.approvalStatus as "Pending" | "Approved" | "Rejected",
-            installmentCount,
-            installmentAmount,
-            balance: approvalFormData.approvalStatus === "Approved" ? approvedAmount : 0,
-            startMonth,
-            deductionMode: approvalFormData.deductionMode as "Monthly" | "Bi-weekly" | "Custom",
-            autoDeduct: approvalFormData.autoDeduct,
-            status: approvalFormData.approvalStatus === "Approved" ? "Active" : approvalFormData.approvalStatus,
-            nextDeductionDate: approvalFormData.approvalStatus === "Approved" ? startMonth : null,
-            approvedBy: "Fatima Ahmed",
-            approvedDate: new Date(),
-            remarks: adv.remarks + (approvalFormData.approvalRemarks ? `\nApproval Note: ${approvalFormData.approvalRemarks}` : "")
-          }
-        : adv
-    );
-    
-    setAdvances(updatedAdvances);
-    setShowApprovalDialog(false);
-    resetApprovalForm();
+
+    const isApproved = approvalFormData.approvalStatus === "Approved";
+    const approvedAmount = isApproved ? (parseFloat(approvalFormData.approvedAmount) || 0) : 0;
+    const installmentCount = isApproved ? (parseInt(approvalFormData.installmentCount) || 1) : 0;
+
+    try {
+      await salaryAdvancesService.approveAdvance(selectedAdvance.id, {
+        approvedAmount,
+        approvalStatus: approvalFormData.approvalStatus,
+        installmentCount,
+        deductionMode: approvalFormData.deductionMode,
+        startMonth: isApproved ? approvalFormData.startMonth : undefined,
+        autoDeduct: approvalFormData.autoDeduct,
+        approvalRemarks: approvalFormData.approvalRemarks,
+        approvedBy: "HR Manager",
+      });
+      toast.success(`Request ${approvalFormData.approvalStatus.toLowerCase()} successfully.`);
+      setShowApprovalDialog(false);
+      resetApprovalForm();
+      await loadAdvances();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update approval status");
+    }
   };
 
-  const handleDeleteRequest = (id: number) => {
-    setAdvances(advances.filter(adv => adv.id !== id));
+  const handleDeleteRequest = async (id: number) => {
+    try {
+      await salaryAdvancesService.deleteAdvance(id);
+      toast.success("Advance request deleted.");
+      await loadAdvances();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete advance request");
+    }
   };
 
-  const handleOpenApprovalDialog = (advance: typeof sampleAdvances[0]) => {
+  const handleOpenApprovalDialog = (advance: SalaryAdvance) => {
     setSelectedAdvance(advance);
     setApprovalFormData({
       approvedAmount: advance.requestedAmount.toString(),
@@ -395,16 +275,18 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
     }
   };
 
-  const filteredAdvances = advances.filter(advance => {
-    const matchesSearch = advance.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          advance.employeeId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === "all" || advance.status.toLowerCase().includes(filterStatus.toLowerCase());
-    const matchesDepartment = filterDepartment === "all" || advance.department === filterDepartment;
-    return matchesSearch && matchesStatus && matchesDepartment;
-  });
+  const filteredAdvances = useMemo(() => {
+    return advances.filter(advance => {
+      const matchesSearch = advance.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            advance.employeeId.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = filterStatus === "all" || advance.status.toLowerCase().includes(filterStatus.toLowerCase());
+      const matchesDepartment = filterDepartment === "all" || advance.department === filterDepartment;
+      return matchesSearch && matchesStatus && matchesDepartment;
+    });
+  }, [advances, searchTerm, filterStatus, filterDepartment]);
 
-  const calculateRepaymentProgress = (advance: typeof sampleAdvances[0]) => {
-    if (advance.approvedAmount === 0) return 0;
+  const calculateRepaymentProgress = (advance: SalaryAdvance) => {
+    if (!advance.approvedAmount) return 0;
     return (advance.totalDeducted / advance.approvedAmount) * 100;
   };
 
@@ -416,28 +298,26 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
   const totalApprovedThisMonth = advances.filter(a => {
     if (!a.approvedDate) return false;
     const now = new Date();
-    return a.approvedDate.getMonth() === now.getMonth() && 
+    return a.approvedDate.getMonth() === now.getMonth() &&
            a.approvedDate.getFullYear() === now.getFullYear();
   }).length;
   const pendingRequests = advances.filter(a => a.status === "Pending Approval").length;
 
-  const departments = Array.from(new Set(advances.map(a => a.department)));
+  const departments = Array.from(new Set(advances.map(a => a.department).filter(Boolean)));
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-3">
-            <Wallet className="h-8 w-8" style={{ color: '#2B7A78' }} />
-            Salary Advances
-          </h1>
+          <h1 className="text-3xl font-bold">Salary Advances</h1>
           <p className="text-muted-foreground">
             Manage employee salary advance requests, loan tracking, and automatic deduction schedules
           </p>
         </div>
         <Button 
           onClick={() => setShowRequestDialog(true)}
+          disabled={loading}
           style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -447,10 +327,12 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border-l-4" style={{ borderLeftColor: '#2B7A78' }}>
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Advances</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Active Advances</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <CreditCard className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalActiveAdvances}</div>
@@ -460,23 +342,27 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4" style={{ borderLeftColor: '#E63946' }}>
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Outstanding Amount</CardTitle>
-            <DollarSign className="h-4 w-4" style={{ color: '#E63946' }} />
+            <CardTitle className="text-sm font-medium text-primary">Outstanding Amount</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <DollarSign className="h-4 w-4 text-red-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">AED {totalOutstandingAmount.toLocaleString()}</div>
+            <div className="text-2xl font-bold"><CurrencyGlyph /> {totalOutstandingAmount.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Total balance across all advances
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-yellow-500">
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Requests</CardTitle>
-            <Bell className="h-4 w-4 text-yellow-600" />
+            <CardTitle className="text-sm font-medium text-primary">Pending Requests</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <Bell className="h-4 w-4 text-yellow-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{pendingRequests}</div>
@@ -486,10 +372,12 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500">
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved This Month</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-primary">Approved This Month</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalApprovedThisMonth}</div>
@@ -499,6 +387,16 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
           </CardContent>
         </Card>
       </div>
+
+      <style>{`
+        @keyframes tabSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: tabSlideIn 0.22s ease-out;
+        }
+      `}</style>
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -519,7 +417,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
 
         {/* Requests Tab */}
         <TabsContent value="requests" className="space-y-6">
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Advance & Loan Requests</CardTitle>
               <CardDescription>View and manage all salary advance and loan requests</CardDescription>
@@ -527,12 +425,12 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             <CardContent>
               <div className="mb-4 flex gap-4">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search by employee name or ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-11 h-10"
                   />
                 </div>
 
@@ -589,12 +487,12 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">AED {advance.requestedAmount.toLocaleString()}</span>
+                        <span className="font-medium"><CurrencyGlyph /> {advance.requestedAmount.toLocaleString()}</span>
                       </TableCell>
                       <TableCell>
                         {advance.approvedAmount > 0 ? (
                           <span className="font-medium" style={{ color: '#2B7A78' }}>
-                            AED {advance.approvedAmount.toLocaleString()}
+                            <CurrencyGlyph /> {advance.approvedAmount.toLocaleString()}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -636,7 +534,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => handleDeleteRequest(advance.id)}
+                              onClick={() => setDeleteConfirmAdvance(advance)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -661,7 +559,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                 const remainingInstallments = advance.installmentCount - (advance.totalDeducted / advance.installmentAmount);
                 
                 return (
-                  <Card key={advance.id}>
+                  <Card key={advance.id} className={cardShell}>
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div>
@@ -684,8 +582,8 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                         </div>
                         <Progress value={progress} className="h-3" />
                         <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
-                          <span>AED {advance.totalDeducted.toLocaleString()} paid</span>
-                          <span>AED {advance.balance.toLocaleString()} remaining</span>
+                          <span><CurrencyGlyph /> {advance.totalDeducted.toLocaleString()} paid</span>
+                          <span><CurrencyGlyph /> {advance.balance.toLocaleString()} remaining</span>
                         </div>
                       </div>
 
@@ -694,13 +592,13 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                         <div>
                           <div className="text-sm text-muted-foreground mb-1">Total Amount</div>
                           <div className="text-lg font-bold" style={{ color: '#2B7A78' }}>
-                            AED {advance.approvedAmount.toLocaleString()}
+                            <CurrencyGlyph /> {advance.approvedAmount.toLocaleString()}
                           </div>
                         </div>
                         <div>
                           <div className="text-sm text-muted-foreground mb-1">Installment Amount</div>
                           <div className="text-lg font-bold">
-                            AED {advance.installmentAmount.toLocaleString()}
+                            <CurrencyGlyph /> {advance.installmentAmount.toLocaleString()}
                           </div>
                         </div>
                         <div>
@@ -717,7 +615,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
 
                       {/* Schedule Timeline */}
                       {advance.nextDeductionDate && (
-                        <div className="border rounded-lg p-4 bg-muted/50">
+                        <div className="rounded-lg p-4 bg-muted/50">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <CalendarIcon className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -729,7 +627,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="font-medium">AED {advance.installmentAmount.toLocaleString()}</div>
+                              <div className="font-medium"><CurrencyGlyph /> {advance.installmentAmount.toLocaleString()}</div>
                               <div className="text-sm text-muted-foreground">
                                 {advance.autoDeduct ? "Auto-deduct enabled" : "Manual payment"}
                               </div>
@@ -758,7 +656,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
         {/* Reports Tab */}
         <TabsContent value="reports" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Users className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -779,7 +677,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total Amount Disbursed</span>
                     <span className="font-medium">
-                      AED {advances.filter(a => a.approvalStatus === "Approved").reduce((sum, a) => sum + a.approvedAmount, 0).toLocaleString()}
+                      <CurrencyGlyph /> {advances.filter(a => a.approvalStatus === "Approved").reduce((sum, a) => sum + a.approvedAmount, 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -790,7 +688,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <History className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -807,7 +705,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total Deducted</span>
                     <span className="font-medium">
-                      AED {advances.reduce((sum, a) => sum + a.totalDeducted, 0).toLocaleString()}
+                      <CurrencyGlyph /> {advances.reduce((sum, a) => sum + a.totalDeducted, 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -822,7 +720,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <AlertCircle className="h-5 w-5" style={{ color: '#E63946' }} />
@@ -839,13 +737,13 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Outstanding Balance</span>
                     <span className="font-medium" style={{ color: '#E63946' }}>
-                      AED {totalOutstandingAmount.toLocaleString()}
+                      <CurrencyGlyph /> {totalOutstandingAmount.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Avg. Deduction/Month</span>
                     <span className="font-medium">
-                      AED {(advances.filter(a => a.status === "Active").reduce((sum, a) => sum + a.installmentAmount, 0) / Math.max(advances.filter(a => a.status === "Active").length, 1)).toFixed(0)}
+                      <CurrencyGlyph /> {(advances.filter(a => a.status === "Active").reduce((sum, a) => sum + a.installmentAmount, 0) / Math.max(advances.filter(a => a.status === "Active").length, 1)).toFixed(0)}
                     </span>
                   </div>
                 </div>
@@ -858,7 +756,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
           </div>
 
           {/* Department-wise Breakdown */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Department-wise Advance Distribution</CardTitle>
               <CardDescription>Breakdown of advances by department</CardDescription>
@@ -896,11 +794,11 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">AED {totalAmount.toLocaleString()}</span>
+                          <span className="font-medium"><CurrencyGlyph /> {totalAmount.toLocaleString()}</span>
                         </TableCell>
                         <TableCell>
                           <span className="font-medium" style={{ color: '#E63946' }}>
-                            AED {outstanding.toLocaleString()}
+                            <CurrencyGlyph /> {outstanding.toLocaleString()}
                           </span>
                         </TableCell>
                       </TableRow>
@@ -937,11 +835,17 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                     <SelectValue placeholder="Select employee" />
                   </SelectTrigger>
                   <SelectContent>
-                    {sampleEmployees.map(emp => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.id})
+                    {employees.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        No employees found
                       </SelectItem>
-                    ))}
+                    ) : (
+                      employees.map(emp => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.name} ({emp.id})
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -996,7 +900,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="requestedAmount">Requested Amount (AED) *</Label>
+              <Label htmlFor="requestedAmount">Requested Amount ({currencyCode}) *</Label>
               <Input
                 id="requestedAmount"
                 type="number"
@@ -1068,7 +972,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
               <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Requested Amount:</span>
-                  <span className="font-medium">AED {selectedAdvance.requestedAmount.toLocaleString()}</span>
+                  <span className="font-medium"><CurrencyGlyph /> {selectedAdvance.requestedAmount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Request Date:</span>
@@ -1102,7 +1006,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             {approvalFormData.approvalStatus === "Approved" && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="approvedAmount">Approved Amount (AED) *</Label>
+                  <Label htmlFor="approvedAmount">Approved Amount ({currencyCode}) *</Label>
                   <Input
                     id="approvedAmount"
                     type="number"
@@ -1127,7 +1031,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="space-y-2">
                     <Label>Installment Amount</Label>
                     <div className="flex items-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
-                      AED {approvalFormData.approvedAmount && approvalFormData.installmentCount 
+                      <CurrencyGlyph /> {approvalFormData.approvedAmount && approvalFormData.installmentCount 
                         ? (parseFloat(approvalFormData.approvedAmount) / parseInt(approvalFormData.installmentCount)).toFixed(2)
                         : "0.00"}
                     </div>
@@ -1233,7 +1137,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">Approved Amount</div>
                       <div className="text-xl font-bold" style={{ color: '#2B7A78' }}>
-                        AED {selectedAdvance.approvedAmount.toLocaleString()}
+                        <CurrencyGlyph /> {selectedAdvance.approvedAmount.toLocaleString()}
                       </div>
                     </div>
                   </CardContent>
@@ -1243,7 +1147,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">Deducted</div>
                       <div className="text-xl font-bold">
-                        AED {selectedAdvance.totalDeducted.toLocaleString()}
+                        <CurrencyGlyph /> {selectedAdvance.totalDeducted.toLocaleString()}
                       </div>
                     </div>
                   </CardContent>
@@ -1253,7 +1157,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">Balance</div>
                       <div className="text-xl font-bold" style={{ color: '#E63946' }}>
-                        AED {selectedAdvance.balance.toLocaleString()}
+                        <CurrencyGlyph /> {selectedAdvance.balance.toLocaleString()}
                       </div>
                     </div>
                   </CardContent>
@@ -1321,7 +1225,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">Installment Amount:</span>
-                      <div className="font-medium">AED {selectedAdvance.installmentAmount.toLocaleString()}</div>
+                      <div className="font-medium"><CurrencyGlyph /> {selectedAdvance.installmentAmount.toLocaleString()}</div>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Total Installments:</span>
@@ -1371,6 +1275,46 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             <Button variant="outline">
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Export Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmAdvance} onOpenChange={(open) => {
+        if (!open) setDeleteConfirmAdvance(null);
+      }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Delete Advance Request</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2 text-sm">
+            <div className="text-muted-foreground">Employee</div>
+            <div className="font-medium">
+              {deleteConfirmAdvance?.employeeName} ({deleteConfirmAdvance?.employeeId})
+            </div>
+            <div className="text-muted-foreground mt-2">Requested Amount</div>
+            <div className="font-medium">
+              <CurrencyGlyph /> {deleteConfirmAdvance?.requestedAmount?.toLocaleString()}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmAdvance(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteConfirmAdvance) {
+                  handleDeleteRequest(deleteConfirmAdvance.id);
+                  setDeleteConfirmAdvance(null);
+                }
+              }}
+            >
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

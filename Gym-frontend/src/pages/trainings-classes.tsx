@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
@@ -35,123 +35,32 @@ import {
 import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Progress } from "../components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import {
-  Calendar,
   Clock,
   MapPin,
   Users,
   Plus,
   Search,
-  Filter,
   Eye,
-  Edit,
+  Edit3,
   X,
   ChevronLeft,
   ChevronRight,
   User,
   Dumbbell,
-  Heart,
-  Zap,
-  Target,
-  BookOpen,
   CalendarDays,
   Grid3X3,
   List,
-  AlertTriangle,
   CheckCircle2,
-  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-
-// Mock data for classes and trainers
-const mockTrainers = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    email: "sarah@gymbios.com",
-    specialties: ["Yoga", "Pilates"],
-    avatar: "/avatars/sarah.jpg",
-    rating: 4.9,
-    experience: "5 years",
-  },
-  {
-    id: "2",
-    name: "Mike Chen",
-    email: "mike@gymbios.com",
-    specialties: ["Strength Training", "CrossFit"],
-    avatar: "/avatars/mike.jpg",
-    rating: 4.8,
-    experience: "7 years",
-  },
-  {
-    id: "3",
-    name: "Elena Rodriguez",
-    email: "elena@gymbios.com",
-    specialties: ["Martial Arts", "Boxing"],
-    avatar: "/avatars/elena.jpg",
-    rating: 4.9,
-    experience: "6 years",
-  },
-];
+import { trainingService, TrainingSessionApi } from "../utils/supabase/training-service";
+import { staffService, Staff } from "../utils/supabase/staff-service";
 
 const classTypes = [
-  { id: "yoga", name: "Yoga", color: "#2B7A78", icon: Heart },
-  { id: "strength", name: "Strength Training", color: "#2B7A78", icon: Dumbbell },
-  { id: "martial-arts", name: "Martial Arts", color: "#E63946", icon: Target },
-  { id: "cardio", name: "Cardio", color: "#2B7A78", icon: Zap },
-  { id: "pilates", name: "Pilates", color: "#2B7A78", icon: BookOpen },
-];
-
-const mockClasses = [
-  {
-    id: "1",
-    name: "Morning Yoga Flow",
-    trainer: mockTrainers[0],
-    type: "yoga",
-    date: "2024-10-04",
-    startTime: "09:00",
-    endTime: "10:00",
-    duration: 60,
-    location: "Studio A",
-    capacity: 20,
-    enrolled: 15,
-    status: "active",
-    description: "Start your day with a peaceful yoga flow session designed to energize your body and calm your mind.",
-    price: "50 AED",
-  },
-  {
-    id: "2",
-    name: "Strength & Power",
-    trainer: mockTrainers[1],
-    type: "strength",
-    date: "2024-10-04",
-    startTime: "10:30",
-    endTime: "11:30",
-    duration: 60,
-    location: "Gym Floor",
-    capacity: 15,
-    enrolled: 12,
-    status: "active",
-    description: "Build strength and power with compound movements and progressive overload techniques.",
-    price: "75 AED",
-  },
-  {
-    id: "3",
-    name: "Boxing Fundamentals",
-    trainer: mockTrainers[2],
-    type: "martial-arts",
-    date: "2024-10-04",
-    startTime: "18:00",
-    endTime: "19:00",
-    duration: 60,
-    location: "Boxing Ring",
-    capacity: 12,
-    enrolled: 10,
-    status: "active",
-    description: "Learn the fundamentals of boxing including proper stance, basic punches, and defensive techniques.",
-    price: "80 AED",
-  },
+  { id: "class", name: "Group Class", color: "#2B7A78", icon: Users },
+  { id: "pt", name: "Personal Training", color: "#E63946", icon: Dumbbell },
+  { id: "facility", name: "Facility Booking", color: "#2563EB", icon: MapPin },
 ];
 
 const timeSlots = [
@@ -160,24 +69,183 @@ const timeSlots = [
   "18:00", "19:00", "20:00", "21:00", "22:00"
 ];
 
-const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
 interface TrainingsClassesProps {
   onNavigate?: (section: string) => void;
 }
 
+interface TrainerProfile {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+  rating?: number;
+  experience?: string;
+  specialties?: string[];
+}
+
+interface ClassItem {
+  id: string;
+  name: string;
+  trainer: TrainerProfile;
+  type: "class" | "pt" | "facility";
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  location: string;
+  capacity: number;
+  enrolled: number;
+  status: "active" | "cancelled";
+  description: string;
+  price: number;
+}
+
 export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
+  const { currencyCode } = useCurrency();
   const [view, setView] = useState<"calendar" | "list">("calendar");
-  const [calendarView, setCalendarView] = useState<"week" | "month">("week");
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedClass, setSelectedClass] = useState<any>(null);
+  const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
   const [showClassDialog, setShowClassDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterTrainer, setFilterTrainer] = useState("all");
   const [isStaffView, setIsStaffView] = useState(false);
-  const [classes, setClasses] = useState(mockClasses);
+  const [trainers, setTrainers] = useState<TrainerProfile[]>([]);
+  const [sessions, setSessions] = useState<TrainingSessionApi[]>([]);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<ClassItem | null>(null);
+  const [newClassData, setNewClassData] = useState({
+    name: "",
+    type: "class",
+    trainerId: "",
+    date: "",
+    startTime: "",
+    endTime: "",
+    location: "",
+    capacity: "",
+    price: "",
+  });
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+
+  const formatTime = (value?: string | null) => {
+    if (!value) return "";
+    return value.length >= 5 ? value.slice(0, 5) : value;
+  };
+
+  const calculateDurationMinutes = (start?: string, end?: string) => {
+    if (!start || !end) return 0;
+    const startTime = new Date(`1970-01-01T${start}:00`);
+    const endTime = new Date(`1970-01-01T${end}:00`);
+    const diff = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+    return diff > 0 ? diff : 0;
+  };
+
+  const resolveSlotKey = (value?: string) => {
+    if (!value) return "";
+    const parts = value.split(":");
+    if (parts.length < 2) return "";
+    return `${parts[0].padStart(2, "0")}:00`;
+  };
+
+  const formatPrice = (price: number) => `${currencyCode} ${price}`;
+
+  const getExperienceLabel = (joinDate?: string) => {
+    if (!joinDate) return "Trainer";
+    const parsed = new Date(joinDate);
+    if (Number.isNaN(parsed.getTime())) return "Trainer";
+    const years = Math.max(0, new Date().getFullYear() - parsed.getFullYear());
+    return years > 0 ? `${years} years` : "New Coach";
+  };
+
+  const mapTrainer = (staff: Staff): TrainerProfile => ({
+    id: String(staff.id),
+    name: staff.name,
+    email: staff.email,
+    avatar: staff.photo_url || undefined,
+    rating: 4.8,
+    experience: getExperienceLabel(staff.join_date),
+    specialties: [staff.department, staff.role].filter(Boolean),
+  });
+
+  const trainerLookup = useMemo(() => {
+    const map = new Map<string, TrainerProfile>();
+    trainers.forEach((trainer) => {
+      map.set(trainer.id, trainer);
+    });
+    return map;
+  }, [trainers]);
+
+  const classes = useMemo(() => {
+    return sessions.map((session) => {
+      const trainerId = session.trainerId ? String(session.trainerId) : "";
+      const fallbackTrainer: TrainerProfile = {
+        id: trainerId || "trainer",
+        name: session.trainerName || "Trainer",
+        rating: 4.8,
+        experience: "Trainer",
+        specialties: [],
+      };
+      const trainer = trainerLookup.get(trainerId) || fallbackTrainer;
+      const startTime = formatTime(session.startTime);
+      const endTime = formatTime(session.endTime);
+      const duration = session.durationMinutes ?? calculateDurationMinutes(startTime, endTime);
+
+      return {
+        id: String(session.id),
+        name: session.name,
+        trainer,
+        type: session.type,
+        date: session.date,
+        startTime,
+        endTime,
+        duration,
+        location: session.location || "Main Studio",
+        capacity: Number(session.capacity ?? 0),
+        enrolled: Number(session.booked ?? 0),
+        status: (session.status as ClassItem["status"]) || "active",
+        description: session.description || "Session details will be shared at the front desk.",
+        price: Number(session.price ?? 0),
+      };
+    });
+  }, [sessions, trainerLookup]);
+
+  const resetNewClassForm = () => {
+    setNewClassData({
+      name: "",
+      type: "class",
+      trainerId: "",
+      date: selectedDate.toISOString().split("T")[0],
+      startTime: "",
+      endTime: "",
+      location: "",
+      capacity: "",
+      price: "",
+    });
+    setEditingClassId(null);
+  };
+
+  const fetchTrainers = async () => {
+    const response = await staffService.getStaff({}, 1, 200);
+    setTrainers(response.items.map(mapTrainer));
+  };
+
+  const fetchSessions = async () => {
+    const response = await trainingService.getSessions();
+    setSessions(response);
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        await Promise.all([fetchTrainers(), fetchSessions()]);
+      } catch (error: any) {
+        toast.error(error?.message || "Failed to load trainings data");
+      }
+    };
+    load();
+  }, []);
 
   // Filter classes based on search and filters
   const filteredClasses = classes.filter((cls) => {
@@ -194,18 +262,126 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
   };
 
   const getEnrollmentPercentage = (enrolled: number, capacity: number) => {
+    if (!capacity) return 0;
     return Math.round((enrolled / capacity) * 100);
   };
 
-  const handleViewClass = (classItem: any) => {
+  const totalClasses = classes.length;
+  const activeClasses = classes.filter((cls) => cls.status === "active").length;
+  const totalTrainers = trainers.length;
+  const avgFill = classes.length
+    ? Math.round(classes.reduce((sum, cls) => sum + getEnrollmentPercentage(cls.enrolled, cls.capacity), 0) / classes.length)
+    : 0;
+
+  const handleViewClass = (classItem: ClassItem) => {
     setSelectedClass(classItem);
     setShowClassDialog(true);
   };
 
-  const handleBookClass = (classItem: any) => {
+  const handleBookClass = (classItem: ClassItem) => {
+    if (onNavigate) {
+      onNavigate("bookings");
+      toast.info("Continue booking in Bookings Management.");
+      return;
+    }
     toast.success("Class Booked!", {
       description: `Successfully booked ${classItem.name} with ${classItem.trainer.name}`,
     });
+  };
+
+  const handleCreateClass = async () => {
+    if (!newClassData.name.trim()) {
+      toast.error("Class name is required");
+      return;
+    }
+    if (!newClassData.date) {
+      toast.error("Class date is required");
+      return;
+    }
+    if (!newClassData.startTime || !newClassData.endTime) {
+      toast.error("Start and end time are required");
+      return;
+    }
+    const duration = calculateDurationMinutes(newClassData.startTime, newClassData.endTime);
+    if (!duration) {
+      toast.error("End time must be after start time");
+      return;
+    }
+
+    const rawCapacity = Number(newClassData.capacity);
+    const capacity = rawCapacity > 0 ? rawCapacity : 1;
+    const rawPrice = Number(newClassData.price);
+    const price = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
+    const payload = {
+      name: newClassData.name.trim(),
+      type: newClassData.type as "class" | "pt" | "facility",
+      trainerId: newClassData.trainerId ? Number(newClassData.trainerId) : undefined,
+      date: newClassData.date,
+      startTime: newClassData.startTime,
+      endTime: newClassData.endTime,
+      durationMinutes: duration,
+      location: newClassData.location || "Main Studio",
+      capacity,
+      price,
+      status: "active",
+      description: "",
+    };
+
+    try {
+      if (editingClassId) {
+        await trainingService.updateSession(editingClassId, payload);
+      } else {
+        await trainingService.createSession(payload);
+      }
+      await fetchSessions();
+      toast.success(editingClassId ? "Class Updated!" : "Class Added!", {
+        description: editingClassId
+          ? "Class schedule has been updated"
+          : "New class has been successfully created",
+      });
+      setShowAddDialog(false);
+      resetNewClassForm();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to save class");
+    }
+  };
+
+  const handleEditClass = (classItem: ClassItem) => {
+    setEditingClassId(classItem.id);
+    setNewClassData({
+      name: classItem.name,
+      type: classItem.type,
+      trainerId: classItem.trainer.id || "",
+      date: classItem.date,
+      startTime: classItem.startTime,
+      endTime: classItem.endTime,
+      location: classItem.location,
+      capacity: String(classItem.capacity ?? ""),
+      price: String(classItem.price ?? ""),
+    });
+    setShowAddDialog(true);
+  };
+
+  const handleDeleteClass = async (classItem: ClassItem) => {
+    setClassToDelete(classItem);
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDeleteClass = async () => {
+    if (!classToDelete) return;
+    try {
+      await trainingService.deleteSession(classToDelete.id);
+      await fetchSessions();
+      toast.success("Class deleted");
+      if (selectedClass?.id === classToDelete.id) {
+        setShowClassDialog(false);
+        setSelectedClass(null);
+      }
+      setShowDeleteDialog(false);
+      setClassToDelete(null);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to delete class");
+    }
   };
 
   const renderCalendarView = () => {
@@ -296,9 +472,10 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 </div>
                 {currentWeek.map((day, dayIndex) => {
                   const dayClasses = filteredClasses.filter(cls => {
-                    const classDate = new Date(cls.date);
+                    const classDate = new Date(`${cls.date}T00:00:00`);
+                    const slotKey = resolveSlotKey(cls.startTime);
                     return classDate.toDateString() === day.toDateString() &&
-                           cls.startTime === time;
+                           slotKey === time;
                   });
 
                   return (
@@ -352,27 +529,56 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                                 </div>
                               </div>
                               <div className="flex space-x-2">
-                                <Button
-                                  size="sm"
-                                  className="btn-primary text-xs h-7"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleBookClass(classItem);
-                                  }}
-                                >
-                                  Book
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs h-7 border-primary/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewClass(classItem);
-                                  }}
-                                >
-                                  View
-                                </Button>
+                                {isStaffView ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-7 border-primary/20"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditClass(classItem);
+                                      }}
+                                    >
+                                      Reschedule
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-7 border-red-200 text-red-600"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteClass(classItem);
+                                      }}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      className="btn-primary text-xs h-7"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleBookClass(classItem);
+                                      }}
+                                    >
+                                      Book
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-7 border-primary/20"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleViewClass(classItem);
+                                      }}
+                                    >
+                                      View
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -385,13 +591,18 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
             ))}
           </div>
         </div>
+        {filteredClasses.length === 0 && (
+          <div className="text-center text-sm text-gray-500">
+            No sessions scheduled for the selected week.
+          </div>
+        )}
       </div>
     );
   };
 
   const renderListView = () => {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-primary/10">
+      <div className="bg-white rounded-xl shadow-sm border border-primary/10 overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow style={{ backgroundColor: '#2B7A7810' }}>
@@ -441,7 +652,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   <TableCell>
                     <div className="text-sm">
                       <div className="font-medium">
-                        {new Date(classItem.date).toLocaleDateString('en-GB')}
+                        {new Date(`${classItem.date}T00:00:00`).toLocaleDateString('en-GB')}
                       </div>
                       <div className="text-gray-500">
                         {classItem.startTime} - {classItem.endTime}
@@ -479,19 +690,49 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                       >
                         <Eye className="h-3 w-3" />
                       </Button>
-                      <Button
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
-                        onClick={() => handleBookClass(classItem)}
-                      >
-                        Book
-                      </Button>
+                      {isStaffView ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditClass(classItem)}
+                            className="h-7 w-7 p-0"
+                            style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+                          >
+                            <Edit3 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteClass(classItem)}
+                            className="h-7 w-7 p-0"
+                            style={{ borderColor: '#E6394640', color: '#E63946' }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                          onClick={() => handleBookClass(classItem)}
+                        >
+                          Book
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
               );
             })}
+            {filteredClasses.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="py-8 text-center text-sm text-gray-500">
+                  No sessions match the current filters.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
@@ -504,6 +745,11 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     const typeConfig = getClassTypeConfig(selectedClass.type);
     const TypeIcon = typeConfig.icon;
     const enrollmentPercentage = getEnrollmentPercentage(selectedClass.enrolled, selectedClass.capacity);
+    const trainerExperience = selectedClass.trainer.experience || "Trainer";
+    const trainerRating = selectedClass.trainer.rating ?? 4.8;
+    const trainerSpecialties = selectedClass.trainer.specialties?.length
+      ? selectedClass.trainer.specialties.join(", ")
+      : "General Training";
 
     return (
       <Dialog open={showClassDialog} onOpenChange={setShowClassDialog}>
@@ -520,7 +766,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
               <div className="flex-1">
                 <h2 className="text-2xl font-bold">{selectedClass.name}</h2>
                 <p className="text-white/90 mt-1">
-                  {typeConfig.name} • {selectedClass.duration} minutes
+                  {typeConfig.name} - {selectedClass.duration} minutes
                 </p>
               </div>
               <Avatar className="h-16 w-16 border-4 border-white/20">
@@ -541,7 +787,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center space-x-2">
                       <CalendarDays className="h-4 w-4 text-gray-400" />
-                      <span>{new Date(selectedClass.date).toLocaleDateString('en-GB', { 
+                      <span>{new Date(`${selectedClass.date}T00:00:00`).toLocaleDateString('en-GB', { 
                         weekday: 'long',
                         day: 'numeric',
                         month: 'long',
@@ -562,7 +808,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 <div>
                   <h3 className="font-semibold text-primary mb-2">Pricing</h3>
                   <div className="text-xl font-bold text-primary">
-                    {selectedClass.price}
+                    {formatPrice(selectedClass.price)}
                   </div>
                 </div>
               </div>
@@ -580,10 +826,10 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                     <div>
                       <div className="font-medium">{selectedClass.trainer.name}</div>
                       <div className="text-sm text-gray-500">
-                        {selectedClass.trainer.experience} • ⭐ {selectedClass.trainer.rating}
+                        {trainerExperience} - {trainerRating} rating
                       </div>
                       <div className="text-xs text-gray-400">
-                        {selectedClass.trainer.specialties.join(', ')}
+                        {trainerSpecialties}
                       </div>
                     </div>
                   </div>
@@ -615,35 +861,69 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
 
             {/* Action Buttons */}
             <div className="flex space-x-3 pt-4 border-t">
-              <Button
-                className="flex-1"
-                style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
-                onClick={() => {
-                  handleBookClass(selectedClass);
-                  setShowClassDialog(false);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Book This Class
-              </Button>
-              <Button
-                variant="outline"
-                style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
-                onClick={() => {
-                  toast.info("Share Class", {
-                    description: "Share functionality coming soon!"
-                  });
-                }}
-              >
-                Share
-              </Button>
-              <Button
-                variant="outline"
-                style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
-                onClick={() => setShowClassDialog(false)}
-              >
-                Close
-              </Button>
+              {isStaffView ? (
+                <>
+                  <Button
+                    className="flex-1"
+                    style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+                    onClick={() => {
+                      handleEditClass(selectedClass);
+                      setShowClassDialog(false);
+                    }}
+                  >
+                    <Edit3 className="h-4 w-4 mr-2" />
+                    Reschedule
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    style={{ borderColor: '#E6394640', color: '#E63946' }}
+                    onClick={() => handleDeleteClass(selectedClass)}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                  <Button
+                    variant="outline"
+                    style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+                    onClick={() => setShowClassDialog(false)}
+                  >
+                    Close
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    className="flex-1"
+                    style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                    onClick={() => {
+                      handleBookClass(selectedClass);
+                      setShowClassDialog(false);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Book This Class
+                  </Button>
+                  <Button
+                    variant="outline"
+                    style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+                    onClick={() => {
+                      toast.info("Share Class", {
+                        description: "Share functionality coming soon!"
+                      });
+                    }}
+                  >
+                    Share
+                  </Button>
+                  <Button
+                    variant="outline"
+                    style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+                    onClick={() => setShowClassDialog(false)}
+                  >
+                    Close
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </DialogContent>
@@ -652,13 +932,11 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
   };
 
   return (
-    <div className="p-6 space-y-6 min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: '#2B7A78' }}>
-            Trainings & Classes
-          </h1>
+          <h1 className="text-3xl font-bold">Trainings & Classes</h1>
           <p className="text-muted-foreground mt-1">
             Schedule and manage fitness classes, training sessions, and group activities
           </p>
@@ -667,13 +945,15 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
           <Button
             variant="outline"
             onClick={() => setIsStaffView(!isStaffView)}
-            style={isStaffView ? { backgroundColor: '#2B7A7815', color: '#2B7A78', borderColor: '#2B7A7840' } : { color: '#2B7A78', borderColor: '#2B7A7840' }}
+            className={isStaffView ? "bg-primary/10 text-primary border-primary/30" : "border-primary/30 text-primary"}
           >
             {isStaffView ? 'Member View' : 'Staff View'}
           </Button>
           <Button
-            style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
-            onClick={() => setShowAddDialog(true)}
+            onClick={() => {
+              resetNewClassForm();
+              setShowAddDialog(true);
+            }}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Class
@@ -681,8 +961,63 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
         </div>
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Classes</CardTitle>
+            <div className="bg-gradient-light p-2 rounded-lg">
+              <CalendarDays className="h-4 w-4 text-primary" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{totalClasses}</div>
+            <p className="text-xs text-muted-foreground">All scheduled sessions</p>
+          </CardContent>
+        </Card>
+
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Active Classes</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{activeClasses}</div>
+            <p className="text-xs text-muted-foreground">Currently running</p>
+          </CardContent>
+        </Card>
+
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Trainers</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <User className="h-4 w-4 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{totalTrainers}</div>
+            <p className="text-xs text-muted-foreground">Available coaches</p>
+          </CardContent>
+        </Card>
+
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Avg Fill</CardTitle>
+            <div className="bg-amber-50 p-2 rounded-lg">
+              <Users className="h-4 w-4 text-amber-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">{avgFill}%</div>
+            <p className="text-xs text-muted-foreground">Average occupancy</p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Controls */}
-      <Card className="shadow-sm" style={{ borderColor: '#2B7A7820' }}>
+      <Card className={cardShell}>
         <CardContent className="p-4">
           <div className="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
             {/* Search */}
@@ -692,15 +1027,14 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 placeholder="Search classes or trainers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                style={{ borderColor: '#2B7A7840' }}
+                className="pl-10 border-0 bg-muted/40 focus-visible:ring-1 focus-visible:ring-primary/30"
               />
             </div>
 
             {/* Filters */}
             <div className="flex items-center space-x-3">
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-40" style={{ borderColor: '#2B7A7840' }}>
+                <SelectTrigger className="w-40 border-0 bg-muted/40">
                   <SelectValue placeholder="Class Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -714,12 +1048,12 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
               </Select>
 
               <Select value={filterTrainer} onValueChange={setFilterTrainer}>
-                <SelectTrigger className="w-40" style={{ borderColor: '#2B7A7840' }}>
+                <SelectTrigger className="w-40 border-0 bg-muted/40">
                   <SelectValue placeholder="Trainer" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Trainers</SelectItem>
-                  {mockTrainers.map((trainer) => (
+                  {trainers.map((trainer) => (
                     <SelectItem key={trainer.id} value={trainer.id}>
                       {trainer.name}
                     </SelectItem>
@@ -754,37 +1088,57 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
       </Card>
 
       {/* Content */}
-      {view === "calendar" ? renderCalendarView() : renderListView()}
+      <div key={view} className="animate-in fade-in-0 zoom-in-95 duration-200">
+        {view === "calendar" ? renderCalendarView() : renderListView()}
+      </div>
 
       {/* Class Detail Dialog */}
       {renderClassDetailDialog()}
 
       {/* Add Class Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+      <Dialog
+        open={showAddDialog}
+        onOpenChange={(open) => {
+          setShowAddDialog(open);
+          if (open) {
+            setNewClassData((prev) => ({
+              ...prev,
+              date: selectedDate.toISOString().split("T")[0],
+            }));
+          } else {
+            resetNewClassForm();
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-xl bg-gradient-primary bg-clip-text text-transparent">
-              Add New Class
+            <DialogTitle className="text-xl text-foreground">
+              {editingClassId ? "Reschedule Class" : "Add New Class"}
             </DialogTitle>
             <DialogDescription>
-              Create a new training class or session
+              {editingClassId ? "Update the class schedule details" : "Create a new training class or session"}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
-              <Label htmlFor="class-name">Class Name</Label>
+              <Label htmlFor="class-name" className="block mb-2">Class Name</Label>
               <Input
                 id="class-name"
                 placeholder="e.g., Morning Yoga Flow"
+                value={newClassData.name}
+                onChange={(e) => setNewClassData((prev) => ({ ...prev, name: e.target.value }))}
                 className="border-primary/20 focus:border-primary"
               />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="class-type">Class Type</Label>
-                <Select>
+                <Label htmlFor="class-type" className="block mb-2">Class Type</Label>
+                <Select
+                  value={newClassData.type}
+                  onValueChange={(value) => setNewClassData((prev) => ({ ...prev, type: value }))}
+                >
                   <SelectTrigger className="border-primary/20">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -799,13 +1153,16 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
               </div>
               
               <div>
-                <Label htmlFor="trainer">Trainer</Label>
-                <Select>
+                <Label htmlFor="trainer" className="block mb-2">Trainer</Label>
+                <Select
+                  value={newClassData.trainerId}
+                  onValueChange={(value) => setNewClassData((prev) => ({ ...prev, trainerId: value }))}
+                >
                   <SelectTrigger className="border-primary/20">
                     <SelectValue placeholder="Select trainer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockTrainers.map((trainer) => (
+                    {trainers.map((trainer) => (
                       <SelectItem key={trainer.id} value={trainer.id}>
                         {trainer.name}
                       </SelectItem>
@@ -814,67 +1171,150 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 </Select>
               </div>
             </div>
+
+            <div>
+              <Label htmlFor="class-date" className="block mb-2">Date</Label>
+              <Input
+                id="class-date"
+                type="date"
+                value={newClassData.date}
+                onChange={(e) => setNewClassData((prev) => ({ ...prev, date: e.target.value }))}
+                className="border-primary/20 focus:border-primary"
+              />
+            </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="start-time">Start Time</Label>
+                <Label htmlFor="start-time" className="block mb-2">Start Time</Label>
                 <Input
                   id="start-time"
                   type="time"
+                  value={newClassData.startTime}
+                  onChange={(e) => setNewClassData((prev) => ({ ...prev, startTime: e.target.value }))}
                   className="border-primary/20 focus:border-primary"
                 />
               </div>
               
               <div>
-                <Label htmlFor="end-time">End Time</Label>
+                <Label htmlFor="end-time" className="block mb-2">End Time</Label>
                 <Input
                   id="end-time"
                   type="time"
+                  value={newClassData.endTime}
+                  onChange={(e) => setNewClassData((prev) => ({ ...prev, endTime: e.target.value }))}
                   className="border-primary/20 focus:border-primary"
                 />
               </div>
             </div>
             
             <div>
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location" className="block mb-2">Location</Label>
               <Input
                 id="location"
                 placeholder="e.g., Studio A"
+                value={newClassData.location}
+                onChange={(e) => setNewClassData((prev) => ({ ...prev, location: e.target.value }))}
                 className="border-primary/20 focus:border-primary"
               />
             </div>
             
             <div>
-              <Label htmlFor="capacity">Capacity</Label>
+              <Label htmlFor="capacity" className="block mb-2">Capacity</Label>
               <Input
                 id="capacity"
                 type="number"
                 placeholder="20"
+                value={newClassData.capacity}
+                onChange={(e) => setNewClassData((prev) => ({ ...prev, capacity: e.target.value }))}
                 className="border-primary/20 focus:border-primary"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="price" className="block mb-2">Price</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="price"
+                  type="number"
+                  placeholder="0"
+                  value={newClassData.price}
+                  onChange={(e) => setNewClassData((prev) => ({ ...prev, price: e.target.value }))}
+                  className="border-primary/20 focus:border-primary"
+                />
+                <span className="text-sm font-medium text-gray-500"><CurrencyGlyph /></span>
+              </div>
             </div>
           </div>
           
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowAddDialog(false)}
+              onClick={() => {
+                setShowAddDialog(false);
+                resetNewClassForm();
+              }}
               className="border-primary/20"
             >
               Cancel
             </Button>
             <Button
               className="btn-primary"
-              onClick={() => {
-                toast.success("Class Added!", {
-                  description: "New class has been successfully created",
-                });
-                setShowAddDialog(false);
-              }}
+              onClick={handleCreateClass}
             >
-              Create Class
+              {editingClassId ? "Save Changes" : "Create Class"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Class Dialog */}
+      <Dialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDialog(open);
+          if (!open) {
+            setClassToDelete(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-primary">
+              Delete Class
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              This action cannot be undone. The class will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {classToDelete && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-primary/10 bg-primary/5 p-4 text-sm">
+                <div className="font-medium text-gray-900">{classToDelete.name}</div>
+                <div className="text-gray-600">{classToDelete.trainer.name}</div>
+                <div className="text-xs text-gray-500">
+                  {classToDelete.date} at {classToDelete.startTime}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowDeleteDialog(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                  onClick={handleConfirmDeleteClass}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

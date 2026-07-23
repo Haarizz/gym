@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { plansService, Plan } from '../utils/supabase/plans-service';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -145,109 +147,12 @@ const availableCampaigns = [
   }
 ];
 
-// Sample plans data
-const samplePlans = [
-  {
-    id: 1,
-    name: "Basic Monthly",
-    type: "Membership",
-    duration: "1 month",
-    durationType: "Monthly",
-    price: 49.99,
-    discount: 0,
-    status: "Active",
-    maxSessions: null,
-    assignableTrainers: [],
-    description: "Access to gym equipment and basic facilities",
-    planType: "Individual",
-    trainingStreams: [1, 2, 3, 5], // Strength Training, Cardio & HIIT, Yoga & Mindfulness, Group Classes
-    selectedPromotions: [2], // Student Discount
-    selectedCampaigns: [2], // Member Appreciation Week
-    selectedFacilities: ["FAC-001", "FAC-002"] // Basketball Court, Swimming Pool
-  },
-  {
-    id: 2,
-    name: "Premium Annual",
-    type: "Membership", 
-    duration: "12 months",
-    durationType: "Annual",
-    price: 499.99,
-    discount: 15,
-    status: "Active",
-    maxSessions: null,
-    assignableTrainers: [],
-    description: "Full gym access with group classes included",
-    planType: "Individual",
-    trainingStreams: [1, 2, 3, 4, 5, 6, 7, 8], // Most training streams
-    selectedPromotions: [1, 5], // New Year Special, Early Bird Special
-    selectedCampaigns: [1, 2, 3], // January Fitness Challenge, Member Appreciation Week, Bring a Friend Month
-    selectedFacilities: ["FAC-001", "FAC-002", "FAC-003", "FAC-004"] // All facilities
-  },
-  {
-    id: 3,
-    name: "Personal Training Package",
-    type: "Personal Training",
-    duration: "8 sessions",
-    durationType: "Sessions",
-    price: 800.00,
-    discount: 0,
-    status: "Active",
-    maxSessions: 8,
-    assignableTrainers: ["John Smith", "Sarah Wilson"],
-    description: "One-on-one personal training sessions",
-    planType: "Individual",
-    trainingStreams: [6, 9], // Personal Training, Martial Arts
-    selectedPromotions: [4], // Referral Bonus
-    selectedCampaigns: [],
-    selectedFacilities: [] // No facilities included
-  },
-  {
-    id: 4,
-    name: "Family Plan",
-    type: "Membership",
-    duration: "6 months",
-    durationType: "Monthly",
-    price: 129.99,
-    discount: 20,
-    status: "Active",
-    maxSessions: null,
-    assignableTrainers: [],
-    description: "Gym access for up to 4 family members",
-    planType: "Family",
-    trainingStreams: [1, 2, 3, 5, 10], // Strength Training, Cardio & HIIT, Yoga & Mindfulness, Group Classes, Senior Fitness
-    selectedPromotions: [],
-    selectedCampaigns: [3], // Bring a Friend Month
-    selectedFacilities: ["FAC-002", "FAC-004"] // Swimming Pool, Football Ground
-  },
-  {
-    id: 5,
-    name: "Corporate Wellness",
-    type: "Membership",
-    duration: "12 months",
-    durationType: "Annual",
-    price: 2999.99,
-    discount: 25,
-    status: "Inactive",
-    maxSessions: null,
-    assignableTrainers: [],
-    description: "Corporate membership for employee wellness programs",
-    planType: "Corporate",
-    trainingStreams: [1, 2, 3, 4, 5], // Basic wellness streams
-    selectedPromotions: [],
-    selectedCampaigns: [],
-    selectedFacilities: ["FAC-001", "FAC-003"] // Basketball Court, Padel Court
-  }
-];
-
-type Plan = typeof samplePlans[0] & {
-  trainingStreams: number[];
-  selectedPromotions: number[];
-  selectedCampaigns: number[];
-  selectedFacilities: string[];
-};
 
 export function ManagePlans() {
-  const [plans, setPlans] = useState<Plan[]>(samplePlans);
+  const { currencyCode } = useCurrency();
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [viewingPlan, setViewingPlan] = useState<Plan | null>(null);
@@ -295,6 +200,23 @@ export function ManagePlans() {
   // Freeze Policy Configuration state
   const [isFreezePolicyOpen, setIsFreezePolicyOpen] = useState(false);
 
+  useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await plansService.getPlans();
+        setPlans(data);
+      } catch (err) {
+        setError('Failed to load plans. Please try again.');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadPlans();
+  }, []);
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -326,29 +248,42 @@ export function ManagePlans() {
     });
   };
 
-  const handleCreatePlan = () => {
-    const newPlan: Plan = {
-      id: Date.now(),
-      name: formData.name,
-      type: formData.type as "Membership" | "Class Package" | "Personal Training",
-      duration: formData.durationType === "Sessions" ? `${formData.durationValue} sessions` : `${formData.durationValue} ${formData.durationType.toLowerCase()}`,
-      durationType: formData.durationType,
-      price: parseFloat(formData.price),
-      discount: parseFloat(formData.discount) || 0,
-      status: formData.status as "Active" | "Inactive",
-      maxSessions: formData.maxSessions ? parseInt(formData.maxSessions) : null,
-      assignableTrainers: formData.assignableTrainers ? formData.assignableTrainers.split(",").map(t => t.trim()) : [],
-      description: formData.description,
-      planType: formData.planType as "Individual" | "Family" | "Corporate",
-      trainingStreams: formData.trainingStreams,
-      selectedPromotions: formData.selectedPromotions,
-      selectedCampaigns: formData.selectedCampaigns,
-      selectedFacilities: formData.selectedFacilities
-    };
-
-    setPlans([...plans, newPlan]);
-    setShowCreateDialog(false);
-    resetForm();
+  const handleCreatePlan = async () => {
+    try {
+      const created = await plansService.createPlan({
+        name: formData.name,
+        type: formData.type,
+        planType: formData.planType,
+        durationType: formData.durationType,
+        durationValue: formData.durationValue,
+        price: parseFloat(formData.price as string) || 0,
+        discount: parseFloat(formData.discount as string) || 0,
+        status: formData.status,
+        description: formData.description,
+        maxSessions: formData.maxSessions ? parseInt(formData.maxSessions as string) : null,
+        assignableTrainers: formData.assignableTrainers ? (formData.assignableTrainers as string).split(",").map(t => t.trim()) : [],
+        membershipCapacity: formData.membershipCapacity,
+        maxCapacity: formData.maxCapacity ? parseInt(formData.maxCapacity as string) : null,
+        attendanceLimit: formData.attendanceLimit,
+        attendanceValue: formData.attendanceValue ? parseInt(formData.attendanceValue as string) : null,
+        attendancePeriod: formData.attendancePeriod,
+        maxFreezeDays: formData.maxFreezeDays ? parseInt(formData.maxFreezeDays as string) : null,
+        maxFreezeOccurrences: formData.maxFreezeOccurrences ? parseInt(formData.maxFreezeOccurrences as string) : null,
+        chargePerExtraDay: formData.chargePerExtraDay ? parseFloat(formData.chargePerExtraDay as string) : null,
+        freeDaysAllowed: formData.freeDaysAllowed ? parseInt(formData.freeDaysAllowed as string) : null,
+        autoUnfreeze: formData.autoUnfreeze,
+        trainingStreams: formData.trainingStreams,
+        selectedFacilities: formData.selectedFacilities,
+        selectedPromotions: formData.selectedPromotions,
+        selectedCampaigns: formData.selectedCampaigns,
+      });
+      setPlans([...plans, created]);
+      setShowCreateDialog(false);
+      resetForm();
+    } catch (err) {
+      console.error('Failed to create plan:', err);
+      setError('Failed to create plan. Please try again.');
+    }
   };
 
   const handleEditPlan = (plan: Plan) => {
@@ -357,81 +292,94 @@ export function ManagePlans() {
       name: plan.name,
       type: plan.type,
       durationType: plan.durationType,
-      durationValue: plan.duration.split(" ")[0],
+      durationValue: plan.durationValue || plan.duration.split(" ")[0],
       price: plan.price.toString(),
       discount: plan.discount.toString(),
       maxSessions: plan.maxSessions?.toString() || "",
-      assignableTrainers: plan.assignableTrainers.join(", "),
+      assignableTrainers: (plan.assignableTrainers || []).join(", "),
       description: plan.description,
       planType: plan.planType,
       status: plan.status,
-      trainingStreams: plan.trainingStreams || [], // Load existing training streams
-      membershipCapacity: "Unlimited", // Default to Unlimited for editing too
-      maxCapacity: "0",
-      attendanceLimit: "Unlimited", // Default to Unlimited for editing too
-      attendanceValue: "3",
-      attendancePeriod: "Payment",
-      selectedPromotions: plan.selectedPromotions || [], // Load existing promotions
-      selectedCampaigns: plan.selectedCampaigns || [], // Load existing campaigns
-      selectedFacilities: plan.selectedFacilities || [], // Load existing facilities
-      // Freeze Policy Configuration - with defaults for existing plans
-      maxFreezeDays: (plan as any).maxFreezeDays?.toString() || "30",
-      maxFreezeOccurrences: (plan as any).maxFreezeOccurrences?.toString() || "2",
-      chargePerExtraDay: (plan as any).chargePerExtraDay?.toString() || "5",
-      freeDaysAllowed: (plan as any).freeDaysAllowed?.toString() || "10",
-      autoUnfreeze: (plan as any).autoUnfreeze !== undefined ? (plan as any).autoUnfreeze : true
+      trainingStreams: plan.trainingStreams || [],
+      membershipCapacity: plan.membershipCapacity || "Unlimited",
+      maxCapacity: plan.maxCapacity?.toString() || "0",
+      attendanceLimit: plan.attendanceLimit || "Unlimited",
+      attendanceValue: plan.attendanceValue?.toString() || "3",
+      attendancePeriod: plan.attendancePeriod || "Payment",
+      selectedPromotions: plan.selectedPromotions || [],
+      selectedCampaigns: plan.selectedCampaigns || [],
+      selectedFacilities: plan.selectedFacilities || [],
+      maxFreezeDays: plan.maxFreezeDays?.toString() || "30",
+      maxFreezeOccurrences: plan.maxFreezeOccurrences?.toString() || "2",
+      chargePerExtraDay: plan.chargePerExtraDay?.toString() || "5",
+      freeDaysAllowed: plan.freeDaysAllowed?.toString() || "10",
+      autoUnfreeze: plan.autoUnfreeze !== undefined ? plan.autoUnfreeze : true
     });
     setShowCreateDialog(true);
   };
 
-  const handleUpdatePlan = () => {
+  const handleUpdatePlan = async () => {
     if (!editingPlan) return;
-    
-    const updatedPlan: Plan = {
-      ...editingPlan,
-      name: formData.name,
-      type: formData.type as "Membership" | "Class Package" | "Personal Training",
-      duration: formData.durationType === "Sessions" ? `${formData.durationValue} sessions` : `${formData.durationValue} ${formData.durationType.toLowerCase()}`,
-      durationType: formData.durationType,
-      price: parseFloat(formData.price),
-      discount: parseFloat(formData.discount) || 0,
-      status: formData.status as "Active" | "Inactive",
-      maxSessions: formData.maxSessions ? parseInt(formData.maxSessions) : null,
-      assignableTrainers: formData.assignableTrainers ? formData.assignableTrainers.split(",").map(t => t.trim()) : [],
-      description: formData.description,
-      planType: formData.planType as "Individual" | "Family" | "Corporate",
-      trainingStreams: formData.trainingStreams,
-      selectedPromotions: formData.selectedPromotions,
-      selectedCampaigns: formData.selectedCampaigns,
-      selectedFacilities: formData.selectedFacilities
-    };
-
-    setPlans(plans.map(p => p.id === editingPlan.id ? updatedPlan : p));
-    setShowCreateDialog(false);
-    setEditingPlan(null);
-    resetForm();
+    try {
+      const updated = await plansService.updatePlan(editingPlan.id, {
+        name: formData.name,
+        type: formData.type,
+        planType: formData.planType,
+        durationType: formData.durationType,
+        durationValue: formData.durationValue,
+        price: parseFloat(formData.price as string) || 0,
+        discount: parseFloat(formData.discount as string) || 0,
+        status: formData.status,
+        description: formData.description,
+        maxSessions: formData.maxSessions ? parseInt(formData.maxSessions as string) : null,
+        assignableTrainers: formData.assignableTrainers ? (formData.assignableTrainers as string).split(",").map(t => t.trim()) : [],
+        membershipCapacity: formData.membershipCapacity,
+        maxCapacity: formData.maxCapacity ? parseInt(formData.maxCapacity as string) : null,
+        attendanceLimit: formData.attendanceLimit,
+        attendanceValue: formData.attendanceValue ? parseInt(formData.attendanceValue as string) : null,
+        attendancePeriod: formData.attendancePeriod,
+        maxFreezeDays: formData.maxFreezeDays ? parseInt(formData.maxFreezeDays as string) : null,
+        maxFreezeOccurrences: formData.maxFreezeOccurrences ? parseInt(formData.maxFreezeOccurrences as string) : null,
+        chargePerExtraDay: formData.chargePerExtraDay ? parseFloat(formData.chargePerExtraDay as string) : null,
+        freeDaysAllowed: formData.freeDaysAllowed ? parseInt(formData.freeDaysAllowed as string) : null,
+        autoUnfreeze: formData.autoUnfreeze,
+        trainingStreams: formData.trainingStreams,
+        selectedFacilities: formData.selectedFacilities,
+        selectedPromotions: formData.selectedPromotions,
+        selectedCampaigns: formData.selectedCampaigns,
+      });
+      setPlans(plans.map(p => p.id === editingPlan.id ? updated : p));
+      setShowCreateDialog(false);
+      setEditingPlan(null);
+      resetForm();
+    } catch (err) {
+      console.error('Failed to update plan:', err);
+      setError('Failed to update plan. Please try again.');
+    }
   };
 
-  const handleDuplicatePlan = (plan: Plan) => {
-    const duplicatedPlan: Plan = {
-      ...plan,
-      id: Date.now(),
-      name: `${plan.name} (Copy)`,
-      status: "Inactive",
-      trainingStreams: plan.trainingStreams || [],
-      selectedPromotions: plan.selectedPromotions || [],
-      selectedCampaigns: plan.selectedCampaigns || [],
-      selectedFacilities: plan.selectedFacilities || []
-    };
-    setPlans([...plans, duplicatedPlan]);
+  const handleDuplicatePlan = async (plan: Plan) => {
+    try {
+      const duplicated = await plansService.duplicatePlan(plan.id);
+      setPlans([...plans, duplicated]);
+    } catch (err) {
+      console.error('Failed to duplicate plan:', err);
+      setError('Failed to duplicate plan. Please try again.');
+    }
   };
 
   const handleViewPlan = (plan: Plan) => {
     setViewingPlan(plan);
   };
 
-  const handleDeletePlan = (planId: number) => {
-    setPlans(plans.filter(p => p.id !== planId));
+  const handleDeletePlan = async (planId: number) => {
+    try {
+      await plansService.deletePlan(planId);
+      setPlans(plans.filter(p => p.id !== planId));
+    } catch (err) {
+      console.error('Failed to delete plan:', err);
+      setError('Failed to delete plan. Please try again.');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -576,8 +524,21 @@ export function ManagePlans() {
     }));
   };
 
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Loading plans...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-md px-4 py-3 text-sm">
+          {error}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -629,7 +590,7 @@ export function ManagePlans() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              AED {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
+              <CurrencyGlyph /> {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
             </div>
             <p className="text-xs text-muted-foreground">Across all plans</p>
           </CardContent>
@@ -746,7 +707,7 @@ export function ManagePlans() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium">AED {plan.price}</div>
+                      <div className="font-medium"><CurrencyGlyph /> {plan.price}</div>
                       {plan.discount > 0 && (
                         <div className="text-sm text-green-600">{plan.discount}% off</div>
                       )}
@@ -935,7 +896,7 @@ export function ManagePlans() {
                 </div>
                 <div className="p-3 rounded-lg border bg-white">
                   <p className="text-xs text-muted-foreground">Price</p>
-                  <p className="font-semibold text-primary">AED {viewingPlan.price}</p>
+                  <p className="font-semibold text-primary"><CurrencyGlyph /> {viewingPlan.price}</p>
                 </div>
                 <div className="p-3 rounded-lg border bg-white">
                   <p className="text-xs text-muted-foreground">Discount</p>
@@ -1122,7 +1083,7 @@ export function ManagePlans() {
             {/* Price and Discount */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="price">Price (AED) *</Label>
+                <Label htmlFor="price">Price ({currencyCode}) *</Label>
                 <Input
                   id="price"
                   type="number"
@@ -1709,7 +1670,7 @@ export function ManagePlans() {
                   <div className="space-y-2">
                     <Label htmlFor="chargePerExtraDay">
                       Charge for Extra Days
-                      <span className="text-xs text-muted-foreground ml-2">(AED per day)</span>
+                      <span className="text-xs text-muted-foreground ml-2">({currencyCode} per day)</span>
                     </Label>
                     <Input
                       id="chargePerExtraDay"
@@ -1762,7 +1723,7 @@ export function ManagePlans() {
                     </div>
                     <div>
                       <span className="text-gray-600">Extra Day Charge:</span>
-                      <span className="ml-2 font-medium text-[#E63946]">AED {formData.chargePerExtraDay || "0"}</span>
+                      <span className="ml-2 font-medium text-[#E63946]"><CurrencyGlyph /> {formData.chargePerExtraDay || "0"}</span>
                     </div>
                     <div className="col-span-2">
                       <span className="text-gray-600">Auto Unfreeze:</span>

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -37,9 +38,10 @@ import {
   Search,
   Filter
 } from "lucide-react";
-import { format, addMonths, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
+import { format, getDaysInMonth } from "date-fns";
 import { BarChart, Bar, PieChart as RechartsPie, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts";
 import { toast } from "sonner";
+import { salaryPaymentsService } from "../utils/supabase/salary-payments-service";
 
 interface PayrollProps {
   onNavigate?: (section: string) => void;
@@ -102,206 +104,27 @@ interface EmployeePayroll {
   paymentDate?: Date;
 }
 
-// Sample employee data with attendance
-const sampleEmployees: Employee[] = [
-  {
-    id: "1",
-    name: "Ahmed Hassan",
-    employeeId: "EMP001",
-    designation: "Senior Trainer",
-    department: "Personal Training",
-    basicSalary: 8000,
-    allowances: 1500,
-    workingDays: 26,
-    presentDays: 24,
-    absentDays: 2,
-    lateArrivals: 3,
-    overtimeHours: 8,
-    paidLeaves: 0,
-    unpaidLeaves: 2,
-    email: "ahmed.hassan@gymbios.com",
-    bankAccount: "ADCB ****1234"
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    employeeId: "EMP002",
-    designation: "Receptionist",
-    department: "Front Desk",
-    basicSalary: 4500,
-    allowances: 800,
-    workingDays: 26,
-    presentDays: 26,
-    absentDays: 0,
-    lateArrivals: 1,
-    overtimeHours: 4,
-    paidLeaves: 0,
-    unpaidLeaves: 0,
-    email: "sarah.johnson@gymbios.com",
-    bankAccount: "ENBD ****5678"
-  },
-  {
-    id: "3",
-    name: "Mohammed Ali",
-    employeeId: "EMP003",
-    designation: "Yoga Instructor",
-    department: "Group Classes",
-    basicSalary: 5500,
-    allowances: 1000,
-    workingDays: 26,
-    presentDays: 25,
-    absentDays: 1,
-    lateArrivals: 2,
-    overtimeHours: 6,
-    paidLeaves: 0,
-    unpaidLeaves: 1,
-    email: "mohammed.ali@gymbios.com",
-    bankAccount: "FAB ****9012"
-  },
-  {
-    id: "4",
-    name: "Fatima Ahmed",
-    employeeId: "EMP004",
-    designation: "Operations Manager",
-    department: "Management",
-    basicSalary: 12000,
-    allowances: 2000,
-    workingDays: 26,
-    presentDays: 26,
-    absentDays: 0,
-    lateArrivals: 0,
-    overtimeHours: 10,
-    paidLeaves: 0,
-    unpaidLeaves: 0,
-    email: "fatima.ahmed@gymbios.com",
-    bankAccount: "ADIB ****3456"
-  },
-  {
-    id: "5",
-    name: "John Smith",
-    employeeId: "EMP005",
-    designation: "Fitness Trainer",
-    department: "Personal Training",
-    basicSalary: 6500,
-    allowances: 1200,
-    workingDays: 26,
-    presentDays: 23,
-    absentDays: 3,
-    lateArrivals: 5,
-    overtimeHours: 5,
-    paidLeaves: 0,
-    unpaidLeaves: 3,
-    email: "john.smith@gymbios.com",
-    bankAccount: "HSBC ****7890"
-  },
-  {
-    id: "6",
-    name: "Aisha Khan",
-    employeeId: "EMP006",
-    designation: "Nutritionist",
-    department: "Nutrition",
-    basicSalary: 7000,
-    allowances: 1300,
-    workingDays: 26,
-    presentDays: 24,
-    absentDays: 2,
-    lateArrivals: 1,
-    overtimeHours: 7,
-    paidLeaves: 0,
-    unpaidLeaves: 2,
-    email: "aisha.khan@gymbios.com",
-    bankAccount: "RAK ****2468"
-  },
-  {
-    id: "7",
-    name: "Omar Rashid",
-    employeeId: "EMP007",
-    designation: "Facility Manager",
-    department: "Maintenance",
-    basicSalary: 5000,
-    allowances: 900,
-    workingDays: 26,
-    presentDays: 26,
-    absentDays: 0,
-    lateArrivals: 0,
-    overtimeHours: 3,
-    paidLeaves: 0,
-    unpaidLeaves: 0,
-    email: "omar.rashid@gymbios.com",
-    bankAccount: "DIB ****1357"
-  },
-  {
-    id: "8",
-    name: "Lisa Williams",
-    employeeId: "EMP008",
-    designation: "Sales Executive",
-    department: "Sales",
-    basicSalary: 7500,
-    allowances: 1400,
-    workingDays: 26,
-    presentDays: 25,
-    absentDays: 1,
-    lateArrivals: 2,
-    overtimeHours: 9,
-    paidLeaves: 0,
-    unpaidLeaves: 1,
-    email: "lisa.williams@gymbios.com",
-    bankAccount: "CBD ****8642"
-  }
-];
-
-// Sample payroll cycles
-const samplePayrollCycles: PayrollCycle[] = [
-  {
-    id: "1",
-    month: "November",
-    year: 2025,
-    period: "November 2025",
-    totalEmployees: 8,
-    totalWorkingDays: 26,
-    status: "Draft",
-    grossSalary: 58500,
-    totalDeductions: 2340,
-    netSalary: 56160,
-    createdAt: new Date(2025, 10, 1)
-  },
-  {
-    id: "2",
-    month: "October",
-    year: 2025,
-    period: "October 2025",
-    totalEmployees: 8,
-    totalWorkingDays: 27,
-    status: "Disbursed",
-    grossSalary: 57800,
-    totalDeductions: 2312,
-    netSalary: 55488,
-    createdAt: new Date(2025, 9, 1),
-    approvedAt: new Date(2025, 9, 28),
-    disbursedAt: new Date(2025, 9, 30),
-    approvedBy: "HR Manager"
-  },
-  {
-    id: "3",
-    month: "September",
-    year: 2025,
-    period: "September 2025",
-    totalEmployees: 8,
-    totalWorkingDays: 26,
-    status: "Disbursed",
-    grossSalary: 58200,
-    totalDeductions: 2328,
-    netSalary: 55872,
-    createdAt: new Date(2025, 8, 1),
-    approvedAt: new Date(2025, 8, 27),
-    disbursedAt: new Date(2025, 8, 30),
-    approvedBy: "HR Manager"
-  }
+const monthNames = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
 ];
 
 export function Payroll({ onNavigate }: PayrollProps) {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [payrollCycles, setPayrollCycles] = useState<PayrollCycle[]>(samplePayrollCycles);
+  const [payrollCycles, setPayrollCycles] = useState<PayrollCycle[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [selectedCycle, setSelectedCycle] = useState<PayrollCycle | null>(null);
   const [generatedPayroll, setGeneratedPayroll] = useState<EmployeePayroll[]>([]);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
@@ -310,10 +133,47 @@ export function Payroll({ onNavigate }: PayrollProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeePayroll | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-all";
   
   // Generation form
   const [generationMonth, setGenerationMonth] = useState("November");
   const [generationYear, setGenerationYear] = useState("2025");
+
+  const loadEmployees = async () => {
+    setLoadingEmployees(true);
+    try {
+      const data = await salaryPaymentsService.getEmployees();
+      const today = new Date();
+      const workingDays = getDaysInMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+      const mapped: Employee[] = data.map((emp) => ({
+        id: emp.id,
+        name: emp.name,
+        employeeId: emp.employeeId,
+        designation: emp.designation,
+        department: emp.department,
+        basicSalary: emp.baseSalary,
+        allowances: emp.allowances,
+        workingDays,
+        presentDays: workingDays,
+        absentDays: 0,
+        lateArrivals: 0,
+        overtimeHours: 0,
+        paidLeaves: 0,
+        unpaidLeaves: 0,
+        email: emp.email ?? "",
+        bankAccount: emp.bankAccount ?? ""
+      }));
+      setEmployees(mapped);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load employees");
+    } finally {
+      setLoadingEmployees(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEmployees();
+  }, []);
 
   // Calculate salary for an employee
   const calculateSalary = (employee: Employee): EmployeePayroll => {
@@ -356,7 +216,28 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
   // Generate payroll for selected period
   const handleGeneratePayroll = () => {
-    const payrollData = sampleEmployees.map(emp => calculateSalary(emp));
+    if (employees.length === 0) {
+      toast.error("No employees found. Please add employees before generating payroll.");
+      return;
+    }
+
+    const monthIndex = monthNames.indexOf(generationMonth);
+    const yearNumber = parseInt(generationYear);
+    const workingDays = getDaysInMonth(new Date(yearNumber, monthIndex, 1));
+
+    const payrollData = employees.map(emp => {
+      const normalized = {
+        ...emp,
+        workingDays,
+        presentDays: workingDays,
+        absentDays: 0,
+        lateArrivals: 0,
+        overtimeHours: 0,
+        paidLeaves: 0,
+        unpaidLeaves: 0
+      };
+      return calculateSalary(normalized);
+    });
     setGeneratedPayroll(payrollData);
     
     const totalGross = payrollData.reduce((sum, p) => sum + p.grossSalary, 0);
@@ -366,10 +247,10 @@ export function Payroll({ onNavigate }: PayrollProps) {
     const newCycle: PayrollCycle = {
       id: Date.now().toString(),
       month: generationMonth,
-      year: parseInt(generationYear),
+      year: yearNumber,
       period: `${generationMonth} ${generationYear}`,
-      totalEmployees: sampleEmployees.length,
-      totalWorkingDays: 26,
+      totalEmployees: employees.length,
+      totalWorkingDays: workingDays,
       status: "Draft",
       grossSalary: totalGross,
       totalDeductions: totalDed,
@@ -425,7 +306,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
   // Summary stats
   const dashboardStats = useMemo(() => {
-    const totalEmp = sampleEmployees.length;
+    const totalEmp = employees.length;
     const pendingPayrolls = payrollCycles.filter(c => c.status === "Pending").length;
     const approvedPayrolls = payrollCycles.filter(c => c.status === "Approved").length;
     const disbursedPayrolls = payrollCycles.filter(c => c.status === "Disbursed").length;
@@ -448,7 +329,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
     });
   }, [generatedPayroll, searchTerm, departmentFilter]);
 
-  const departments = Array.from(new Set(sampleEmployees.map(e => e.department)));
+  const departments = Array.from(new Set(employees.map(e => e.department).filter(Boolean)));
 
   // Chart data
   const departmentChartData = useMemo(() => {
@@ -468,11 +349,15 @@ export function Payroll({ onNavigate }: PayrollProps) {
     ];
   }, [generatedPayroll]);
 
-  const monthlyTrendData = [
-    { month: "Sep", amount: 55872 },
-    { month: "Oct", amount: 55488 },
-    { month: "Nov", amount: 56160 }
-  ];
+  const monthlyTrendData = useMemo(() => {
+    const monthIndex = (monthName: string) => monthNames.indexOf(monthName);
+    return [...payrollCycles]
+      .sort((a, b) => (a.year - b.year) || (monthIndex(a.month) - monthIndex(b.month)))
+      .map(cycle => ({
+        month: cycle.month.slice(0, 3),
+        amount: cycle.netSalary
+      }));
+  }, [payrollCycles]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -513,16 +398,14 @@ export function Payroll({ onNavigate }: PayrollProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-3">
-            <Calculator className="h-8 w-8" style={{ color: '#2B7A78' }} />
-            Payroll Management
-          </h1>
+          <h1 className="text-3xl font-bold">Payroll Management</h1>
           <p className="text-muted-foreground">
             Automated salary processing based on attendance, shifts, and leave records
           </p>
         </div>
         <Button
           onClick={() => setShowGenerateDialog(true)}
+          disabled={loadingEmployees}
           style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -531,21 +414,30 @@ export function Payroll({ onNavigate }: PayrollProps) {
       </div>
 
       {/* Main Tabs */}
+      <style>{`
+        @keyframes tabSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: tabSlideIn 0.22s ease-out;
+        }
+      `}</style>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="dashboard">
+        <TabsList className="w-full flex">
+          <TabsTrigger value="dashboard" className="flex-1">
             <BarChart3 className="mr-2 h-4 w-4" />
             Dashboard
           </TabsTrigger>
-          <TabsTrigger value="review">
+          <TabsTrigger value="review" className="flex-1">
             <Eye className="mr-2 h-4 w-4" />
             Review Payroll
           </TabsTrigger>
-          <TabsTrigger value="history">
+          <TabsTrigger value="history" className="flex-1">
             <CalendarIcon className="mr-2 h-4 w-4" />
             Payroll History
           </TabsTrigger>
-          <TabsTrigger value="reports">
+          <TabsTrigger value="reports" className="flex-1">
             <FileText className="mr-2 h-4 w-4" />
             Reports
           </TabsTrigger>
@@ -555,52 +447,60 @@ export function Payroll({ onNavigate }: PayrollProps) {
         <TabsContent value="dashboard" className="space-y-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="border-l-4" style={{ borderLeftColor: '#2B7A78' }}>
+            <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-                <Users className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                <CardTitle className="text-sm font-medium text-primary">Total Employees</CardTitle>
+                <div className="bg-gradient-light p-2 rounded-lg">
+                  <Users className="h-4 w-4 text-primary" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.totalEmployees}</div>
+                <div className="text-2xl font-bold text-primary">{dashboardStats.totalEmployees}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Active staff members
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-yellow-500">
+            <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending Payrolls</CardTitle>
-                <Clock className="h-4 w-4 text-yellow-600" />
+                <CardTitle className="text-sm font-medium text-primary">Pending Payrolls</CardTitle>
+                <div className="bg-yellow-50 p-2 rounded-lg">
+                  <Clock className="h-4 w-4 text-yellow-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.pendingPayrolls}</div>
+                <div className="text-2xl font-bold text-yellow-600">{dashboardStats.pendingPayrolls}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Awaiting approval
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-blue-500">
+            <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Approved Payrolls</CardTitle>
-                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <CardTitle className="text-sm font-medium text-primary">Approved Payrolls</CardTitle>
+                <div className="bg-blue-50 p-2 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.approvedPayrolls}</div>
+                <div className="text-2xl font-bold text-blue-600">{dashboardStats.approvedPayrolls}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Ready for disbursement
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-green-500">
+            <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Disbursed Payrolls</CardTitle>
-                <Wallet className="h-4 w-4 text-green-600" />
+                <CardTitle className="text-sm font-medium text-primary">Disbursed Payrolls</CardTitle>
+                <div className="bg-green-50 p-2 rounded-lg">
+                  <Wallet className="h-4 w-4 text-green-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.disbursedPayrolls}</div>
+                <div className="text-2xl font-bold text-green-600">{dashboardStats.disbursedPayrolls}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Successfully paid
                 </p>
@@ -611,7 +511,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
           {/* Quick Actions & Recent Payrolls */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Quick Actions */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarIcon className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -628,7 +528,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   Generate New Payroll
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   className="w-full justify-start"
                   onClick={() => setActiveTab("history")}
                 >
@@ -636,7 +536,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   View History
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   className="w-full justify-start"
                   onClick={() => toast.info("Exporting payroll report...")}
                 >
@@ -647,7 +547,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             </Card>
 
             {/* Recent Payroll Cycles */}
-            <Card className="lg:col-span-2">
+            <Card className={`${cardShell} lg:col-span-2`}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -657,11 +557,11 @@ export function Payroll({ onNavigate }: PayrollProps) {
               <CardContent>
                 <div className="space-y-3">
                   {payrollCycles.slice(0, 3).map((cycle) => (
-                    <div key={cycle.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div key={cycle.id} className="flex items-center justify-between p-4 rounded-lg hover:bg-muted/50 transition-colors">
                       <div className="flex-1">
                         <div className="font-medium">{cycle.period}</div>
                         <div className="text-sm text-muted-foreground">
-                          {cycle.totalEmployees} employees • AED {cycle.netSalary.toLocaleString()}
+                          {cycle.totalEmployees} employees • <CurrencyGlyph /> {cycle.netSalary.toLocaleString()}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -670,7 +570,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                           <span className="ml-1">{cycle.status}</span>
                         </Badge>
                         {cycle.status === "Draft" && (
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="ghost">
                             <Eye className="h-4 w-4" />
                           </Button>
                         )}
@@ -683,7 +583,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
           </div>
 
           {/* Monthly Trend Chart */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -697,7 +597,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => `AED ${value.toLocaleString()}`} />
+                  <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                   <Line type="monotone" dataKey="amount" stroke="#2B7A78" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
@@ -710,7 +610,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
           {selectedCycle ? (
             <>
               {/* Cycle Summary */}
-              <Card>
+              <Card className={cardShell}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -740,7 +640,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                         <div className="text-center">
                           <div className="text-sm text-muted-foreground mb-1">Gross Salary</div>
                           <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
-                            AED {selectedCycle.grossSalary.toLocaleString()}
+                            <CurrencyGlyph /> {selectedCycle.grossSalary.toLocaleString()}
                           </div>
                         </div>
                       </CardContent>
@@ -750,7 +650,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                         <div className="text-center">
                           <div className="text-sm text-muted-foreground mb-1">Total Deductions</div>
                           <div className="text-2xl font-bold text-red-600">
-                            AED {selectedCycle.totalDeductions.toLocaleString()}
+                            <CurrencyGlyph /> {selectedCycle.totalDeductions.toLocaleString()}
                           </div>
                         </div>
                       </CardContent>
@@ -760,7 +660,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                         <div className="text-center">
                           <div className="text-sm text-muted-foreground mb-1">Net Payable</div>
                           <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
-                            AED {selectedCycle.netSalary.toLocaleString()}
+                            <CurrencyGlyph /> {selectedCycle.netSalary.toLocaleString()}
                           </div>
                         </div>
                       </CardContent>
@@ -770,7 +670,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               </Card>
 
               {/* Filters */}
-              <Card>
+              <Card className={cardShell}>
                 <CardContent className="pt-6">
                   <div className="flex gap-4 items-center">
                     <div className="relative flex-1 max-w-md">
@@ -798,7 +698,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               </Card>
 
               {/* Employee Payroll Table */}
-              <Card>
+              <Card className={cardShell}>
                 <CardHeader>
                   <CardTitle>Employee Payroll Details</CardTitle>
                   <CardDescription>Auto-calculated from attendance records</CardDescription>
@@ -833,16 +733,16 @@ export function Payroll({ onNavigate }: PayrollProps) {
                               <div className="text-muted-foreground">{payroll.overtimeHours}h OT</div>
                             </div>
                           </TableCell>
-                          <TableCell>AED {payroll.basicSalary.toLocaleString()}</TableCell>
+                          <TableCell><CurrencyGlyph /> {payroll.basicSalary.toLocaleString()}</TableCell>
                           <TableCell className="text-green-600">+{payroll.allowances.toLocaleString()}</TableCell>
                           <TableCell className="text-green-600">+{payroll.overtimePay.toLocaleString()}</TableCell>
                           <TableCell>
-                            <span className="font-medium">AED {payroll.grossSalary.toLocaleString()}</span>
+                            <span className="font-medium"><CurrencyGlyph /> {payroll.grossSalary.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-red-600">-{payroll.deductions.toLocaleString()}</TableCell>
                           <TableCell>
                             <span className="font-bold" style={{ color: '#2B7A78' }}>
-                              AED {payroll.netSalary.toLocaleString()}
+                              <CurrencyGlyph /> {payroll.netSalary.toLocaleString()}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -899,7 +799,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               )}
             </>
           ) : (
-            <Card>
+            <Card className={cardShell}>
               <CardContent className="py-12 text-center">
                 <Calculator className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="font-medium mb-2">No Payroll Generated</h3>
@@ -920,7 +820,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
         {/* Payroll History Tab */}
         <TabsContent value="history" className="space-y-6">
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Payroll History</CardTitle>
               <CardDescription>View all past payroll cycles and their status</CardDescription>
@@ -947,11 +847,11 @@ export function Payroll({ onNavigate }: PayrollProps) {
                         <div className="font-medium">{cycle.period}</div>
                       </TableCell>
                       <TableCell>{cycle.totalEmployees}</TableCell>
-                      <TableCell>AED {cycle.grossSalary.toLocaleString()}</TableCell>
+                      <TableCell><CurrencyGlyph /> {cycle.grossSalary.toLocaleString()}</TableCell>
                       <TableCell className="text-red-600">-{cycle.totalDeductions.toLocaleString()}</TableCell>
                       <TableCell>
                         <span className="font-medium" style={{ color: '#2B7A78' }}>
-                          AED {cycle.netSalary.toLocaleString()}
+                          <CurrencyGlyph /> {cycle.netSalary.toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -966,10 +866,10 @@ export function Payroll({ onNavigate }: PayrollProps) {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
+                          <Button variant="ghost" size="sm">
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="sm">
+                          <Button variant="ghost" size="sm">
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
@@ -986,7 +886,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
         <TabsContent value="reports" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Department-wise Payroll */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <PieChart className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -1012,7 +912,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => `AED ${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                     </RechartsPie>
                   </ResponsiveContainer>
                 ) : (
@@ -1024,7 +924,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             </Card>
 
             {/* Deduction Breakdown */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -1039,7 +939,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip formatter={(value: number) => `AED ${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                       <Bar dataKey="value" fill="#E63946" />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1054,7 +954,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
 
           {/* Report Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -1072,7 +972,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -1090,7 +990,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -1129,7 +1029,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(month => (
+                    {monthNames.map(month => (
                       <SelectItem key={month} value={month}>{month}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1268,20 +1168,20 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Basic Salary</span>
-                      <span className="font-medium">AED {selectedEmployee.basicSalary.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.basicSalary.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Allowances</span>
-                      <span className="font-medium">AED {selectedEmployee.allowances.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.allowances.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Overtime Pay</span>
-                      <span className="font-medium">AED {selectedEmployee.overtimePay.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.overtimePay.toLocaleString()}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-bold">
                       <span>Gross Salary</span>
-                      <span>AED {selectedEmployee.grossSalary.toLocaleString()}</span>
+                      <span><CurrencyGlyph /> {selectedEmployee.grossSalary.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -1291,16 +1191,16 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Late Arrivals</span>
-                      <span className="font-medium">AED {selectedEmployee.lateArrivalDeduction.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.lateArrivalDeduction.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Absences</span>
-                      <span className="font-medium">AED {selectedEmployee.absenceDeduction.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.absenceDeduction.toLocaleString()}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-bold">
                       <span>Total Deductions</span>
-                      <span>AED {selectedEmployee.deductions.toLocaleString()}</span>
+                      <span><CurrencyGlyph /> {selectedEmployee.deductions.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -1313,7 +1213,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <span className="text-lg">Net Payable Amount:</span>
-                    <span className="text-3xl font-bold">AED {selectedEmployee.netSalary.toLocaleString()}</span>
+                    <span className="text-3xl font-bold"><CurrencyGlyph /> {selectedEmployee.netSalary.toLocaleString()}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1358,16 +1258,16 @@ export function Payroll({ onNavigate }: PayrollProps) {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Gross Amount:</span>
-                      <span className="font-medium">AED {selectedCycle.grossSalary.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedCycle.grossSalary.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Deductions:</span>
-                      <span className="font-medium text-red-600">-AED {selectedCycle.totalDeductions.toLocaleString()}</span>
+                      <span className="font-medium text-red-600">-<CurrencyGlyph /> {selectedCycle.totalDeductions.toLocaleString()}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-bold">
                       <span>Net Payable:</span>
-                      <span style={{ color: '#2B7A78' }}>AED {selectedCycle.netSalary.toLocaleString()}</span>
+                      <span style={{ color: '#2B7A78' }}><CurrencyGlyph /> {selectedCycle.netSalary.toLocaleString()}</span>
                     </div>
                   </div>
                 </CardContent>

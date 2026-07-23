@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -6,7 +7,7 @@ import { Progress } from "../components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Separator } from "../components/ui/separator";
 import { Alert, AlertDescription } from "../components/ui/alert";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import {
   Target,
   DollarSign,
@@ -38,7 +39,9 @@ import {
   Gauge,
   Heart,
   Coffee,
-  Dumbbell
+  Dumbbell,
+  Shield,
+  Info
 } from "lucide-react";
 import {
   LineChart as RechartsLineChart,
@@ -90,7 +93,7 @@ const currentEmployee = {
       achieved: 6,
       percentage: 60,
       status: "in-progress",
-      icon: "🥋"
+      iconKey: "karate"
     },
     {
       id: "2", 
@@ -99,7 +102,7 @@ const currentEmployee = {
       achieved: 8,
       percentage: 67,
       status: "in-progress",
-      icon: "🥊"
+      iconKey: "martial_arts"
     },
     {
       id: "3",
@@ -108,7 +111,7 @@ const currentEmployee = {
       achieved: 8,
       percentage: 100,
       status: "completed",
-      icon: "🛡️"
+      iconKey: "self_defense"
     },
     {
       id: "4",
@@ -117,7 +120,7 @@ const currentEmployee = {
       achieved: 10,
       percentage: 67,
       status: "in-progress",
-      icon: "👦"
+      iconKey: "youth_training"
     }
   ],
   weeklyProgress: [
@@ -145,7 +148,7 @@ const currentEmployee = {
       id: "1",
       title: "5-Day Streak",
       description: "Met daily targets for 5 consecutive days",
-      icon: "🔥",
+      iconKey: "streak",
       date: "Today",
       type: "streak"
     },
@@ -153,7 +156,7 @@ const currentEmployee = {
       id: "2",
       title: "Unit Target Champion",
       description: "First to complete Self Defense target",
-      icon: "🏆",
+      iconKey: "champion",
       date: "Yesterday",
       type: "achievement"
     },
@@ -161,7 +164,7 @@ const currentEmployee = {
       id: "3",
       title: "Weekend Warrior",
       description: "Exceeded weekend target by 16%",
-      icon: "⚡",
+      iconKey: "momentum",
       date: "2 days ago",
       type: "performance"
     }
@@ -187,7 +190,30 @@ const COLORS = {
 };
 
 export function MyTargets() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const { currencyCode } = useCurrency();
+  const panelCardShell = "bg-white border-0 shadow-sm";
+  const statCardShell =
+    "bg-white border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none";
+  const tabContentShell = "space-y-6 animate-in fade-in-0 zoom-in-95 duration-200";
+
+  const unitIconMap: Record<
+    string,
+    { Icon: typeof Target; shell: string; color: string }
+  > = {
+    karate: { Icon: Dumbbell, shell: "bg-blue-50", color: "text-blue-600" },
+    martial_arts: { Icon: Activity, shell: "bg-purple-50", color: "text-purple-600" },
+    self_defense: { Icon: Shield, shell: "bg-emerald-50", color: "text-emerald-600" },
+    youth_training: { Icon: Users, shell: "bg-amber-50", color: "text-amber-600" },
+  };
+
+  const achievementIconMap: Record<
+    string,
+    { Icon: typeof Target; shell: string; color: string }
+  > = {
+    streak: { Icon: Flame, shell: "bg-orange-50", color: "text-orange-600" },
+    champion: { Icon: Trophy, shell: "bg-yellow-50", color: "text-yellow-700" },
+    momentum: { Icon: Zap, shell: "bg-indigo-50", color: "text-indigo-600" },
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -206,41 +232,41 @@ export function MyTargets() {
   };
 
   const motivationalMessage = useMemo(() => {
-    const { percentage, daysLeft, streak } = currentEmployee.currentMonth;
+    const { percentage, daysLeft } = currentEmployee.currentMonth;
     
     if (percentage >= 100) {
       return {
         type: "success",
         icon: <Crown className="h-5 w-5" />,
-        title: "🎉 Target Achieved!",
+        title: "Target Achieved!",
         message: "Congratulations! You've exceeded your monthly target. Keep up the excellent work!"
       };
     } else if (percentage >= 85) {
       return {
         type: "success", 
         icon: <Trophy className="h-5 w-5" />,
-        title: "🔥 Almost There!",
+        title: "Almost There!",
         message: `You're at ${percentage}% of your target with ${daysLeft} days left. You're on fire!`
       };
     } else if (percentage >= 70) {
       return {
         type: "info",
         icon: <ThumbsUp className="h-5 w-5" />,
-        title: "💪 Good Progress!",
+        title: "Good Progress!",
         message: `You've achieved ${percentage}% of your target. Keep pushing forward!`
       };
     } else if (daysLeft <= 5) {
       return {
         type: "warning",
         icon: <Clock className="h-5 w-5" />,
-        title: "⏰ Time Running Out!",
-        message: `Only ${daysLeft} days left! You need AED ${currentEmployee.currentMonth.dailyRequired}/day to reach your target.`
+        title: "Time Running Out!",
+        message: `Only ${daysLeft} days left! You need ${currencyCode} ${currentEmployee.currentMonth.dailyRequired.toLocaleString()}/day to reach your target.`
       };
     } else {
       return {
         type: "info",
         icon: <Target className="h-5 w-5" />,
-        title: "🎯 Stay Focused!",
+        title: "Stay Focused!",
         message: `You're ${percentage}% there. Consistent effort will get you to your goal!`
       };
     }
@@ -251,13 +277,13 @@ export function MyTargets() {
     if (streak >= 7) {
       return {
         type: "success",
-        title: "🔥 Incredible Streak!",
+        title: "Incredible Streak!",
         message: `${streak} days of consistent progress! You're unstoppable!`
       };
     } else if (streak >= 3) {
       return {
         type: "info", 
-        title: "⚡ Great Momentum!",
+        title: "Great Momentum!",
         message: `${streak} day streak! Keep the momentum going!`
       };
     }
@@ -265,72 +291,165 @@ export function MyTargets() {
   }, []);
 
   return (
-    <div className="p-6 space-y-6 bg-background">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">My Targets</h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-gray-600 mt-1">
             Track your progress, targets, and earnings
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
             <BarChart3 className="h-4 w-4 mr-2" />
             View Details
           </Button>
         </div>
       </div>
 
-      {/* Motivational Banners */}
-      <div className="space-y-4">
-        <Alert className={cn(
-          "border-l-4",
-          motivationalMessage.type === "success" && "border-l-green-500 bg-green-50 border-green-200",
-          motivationalMessage.type === "warning" && "border-l-yellow-500 bg-yellow-50 border-yellow-200",
-          motivationalMessage.type === "info" && "border-l-blue-500 bg-blue-50 border-blue-200"
-        )}>
-          <div className="flex items-center space-x-3">
-            <div className={cn(
-              "p-2 rounded-full",
-              motivationalMessage.type === "success" && "bg-green-100 text-green-600",
-              motivationalMessage.type === "warning" && "bg-yellow-100 text-yellow-600",
-              motivationalMessage.type === "info" && "bg-blue-100 text-blue-600"
-            )}>
-              {motivationalMessage.icon}
-            </div>
-            <div>
-              <h4 className="font-medium">{motivationalMessage.title}</h4>
-              <AlertDescription className="mt-1">
-                {motivationalMessage.message}
-              </AlertDescription>
-            </div>
-          </div>
-        </Alert>
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="units">Unit Targets</TabsTrigger>
+          <TabsTrigger value="insights">Insights</TabsTrigger>
+          <TabsTrigger value="sales">Sales</TabsTrigger>
+          <TabsTrigger value="achievements">Achievements</TabsTrigger>
+        </TabsList>
 
-        {streakMessage && (
-          <Alert className="border-l-4 border-l-orange-500 bg-orange-50 border-orange-200">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 rounded-full bg-orange-100 text-orange-600">
-                <Flame className="h-5 w-5" />
+        <TabsContent value="overview" className={tabContentShell}>
+          {/* Motivational Banners */}
+          <div className="space-y-4">
+            <Alert className={cn(
+              "border-l-4 bg-white",
+              motivationalMessage.type === "success" && "border-l-green-500 border-green-200",
+              motivationalMessage.type === "warning" && "border-l-yellow-500 border-yellow-200",
+              motivationalMessage.type === "info" && "border-l-blue-500 border-blue-200"
+            )}>
+              <div className="flex items-center space-x-3">
+                <div className={cn(
+                  "p-2 rounded-full",
+                  motivationalMessage.type === "success" && "bg-green-100 text-green-600",
+                  motivationalMessage.type === "warning" && "bg-yellow-100 text-yellow-600",
+                  motivationalMessage.type === "info" && "bg-blue-100 text-blue-600"
+                )}>
+                  {motivationalMessage.icon}
+                </div>
+                <div>
+                  <h4 className="font-medium">{motivationalMessage.title}</h4>
+                  <AlertDescription className="mt-1">
+                    {motivationalMessage.message}
+                  </AlertDescription>
+                </div>
               </div>
-              <div>
-                <h4 className="font-medium">{streakMessage.title}</h4>
-                <AlertDescription className="mt-1">
-                  {streakMessage.message}
-                </AlertDescription>
-              </div>
-            </div>
-          </Alert>
-        )}
-      </div>
+            </Alert>
+
+            {streakMessage && (
+              <Alert className="border-l-4 border-l-orange-500 bg-white border-orange-200">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-full bg-orange-100 text-orange-600">
+                    <Flame className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">{streakMessage.title}</h4>
+                    <AlertDescription className="mt-1">
+                      {streakMessage.message}
+                    </AlertDescription>
+                  </div>
+                </div>
+              </Alert>
+            )}
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+            <Card className={statCardShell}>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Target</CardTitle>
+                <div className="bg-blue-50 p-2 rounded-lg">
+                  <Target className="h-4 w-4 text-blue-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-700"><CurrencyGlyph /> {currentEmployee.currentMonth.target.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground mt-1">This month</p>
+              </CardContent>
+            </Card>
+
+            <Card className={statCardShell}>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Achieved</CardTitle>
+                <div className="bg-emerald-50 p-2 rounded-lg">
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-emerald-700"><CurrencyGlyph /> {currentEmployee.currentMonth.achieved.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground mt-1">{currentEmployee.currentMonth.percentage}% complete</p>
+              </CardContent>
+            </Card>
+
+            <Card className={statCardShell}>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Remaining</CardTitle>
+                <div className="bg-rose-50 p-2 rounded-lg">
+                  <TrendingDown className="h-4 w-4 text-rose-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-rose-700">
+                  <CurrencyGlyph /> {Math.max(0, currentEmployee.currentMonth.target - currentEmployee.currentMonth.achieved).toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">To hit target</p>
+              </CardContent>
+            </Card>
+
+            <Card className={statCardShell}>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Earnings</CardTitle>
+                <div className="bg-amber-50 p-2 rounded-lg">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-700"><CurrencyGlyph /> {currentEmployee.currentMonth.commission.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground mt-1">Current commission</p>
+              </CardContent>
+            </Card>
+
+            <Card className={statCardShell}>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Projected</CardTitle>
+                <div className="bg-indigo-50 p-2 rounded-lg">
+                  <LineChart className="h-4 w-4 text-indigo-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-indigo-700"><CurrencyGlyph /> {currentEmployee.currentMonth.projectedCommission.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground mt-1">If target met</p>
+              </CardContent>
+            </Card>
+
+            <Card className={statCardShell}>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-primary">Days Left</CardTitle>
+                <div className="bg-slate-50 p-2 rounded-lg">
+                  <Calendar className="h-4 w-4 text-slate-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-slate-700">{currentEmployee.currentMonth.daysLeft}</div>
+                <p className="text-xs text-muted-foreground mt-1">Daily required: <CurrencyGlyph /> {currentEmployee.currentMonth.dailyRequired.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+          </div>
 
       {/* Personal Overview Card */}
-      <Card className="border-border/50">
+      <Card className={panelCardShell}>
         <CardHeader className="pb-4">
           <CardTitle className="text-xl text-foreground">Personal Overview</CardTitle>
         </CardHeader>
@@ -406,7 +525,7 @@ export function MyTargets() {
       </Card>
 
       {/* Revenue Target Progress */}
-      <Card className="border-border/50">
+      <Card className={panelCardShell}>
         <CardHeader className="pb-4">
           <CardTitle className="text-xl text-foreground flex items-center">
             <Target className="h-6 w-6 mr-3 text-primary" />
@@ -456,19 +575,19 @@ export function MyTargets() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Target</span>
                   <span className="font-bold text-foreground">
-                    AED {currentEmployee.currentMonth.target.toLocaleString()}
+                    <CurrencyGlyph /> {currentEmployee.currentMonth.target.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Achieved</span>
                   <span className="font-bold text-primary">
-                    AED {currentEmployee.currentMonth.achieved.toLocaleString()}
+                    <CurrencyGlyph /> {currentEmployee.currentMonth.achieved.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Remaining</span>
                   <span className="font-bold text-error">
-                    AED {(currentEmployee.currentMonth.target - currentEmployee.currentMonth.achieved).toLocaleString()}
+                    <CurrencyGlyph /> {(currentEmployee.currentMonth.target - currentEmployee.currentMonth.achieved).toLocaleString()}
                   </span>
                 </div>
                 <Separator />
@@ -479,7 +598,7 @@ export function MyTargets() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Daily Required</span>
                   <span className="font-medium text-warning">
-                    AED {currentEmployee.currentMonth.dailyRequired.toLocaleString()}
+                    <CurrencyGlyph /> {currentEmployee.currentMonth.dailyRequired.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -496,7 +615,7 @@ export function MyTargets() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Current Bonus</span>
                     <span className="font-bold text-success">
-                      AED {currentEmployee.currentMonth.commission.toLocaleString()}
+                      <CurrencyGlyph /> {currentEmployee.currentMonth.commission.toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -504,24 +623,27 @@ export function MyTargets() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Potential Bonus</span>
                     <span className="font-bold text-warning">
-                      AED {currentEmployee.currentMonth.projectedCommission.toLocaleString()}
+                      <CurrencyGlyph /> {currentEmployee.currentMonth.projectedCommission.toLocaleString()}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     If target fully achieved
                   </p>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  💡 {currentEmployee.commissionPlan.description}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Info className="h-4 w-4" />
+                  <span>{currentEmployee.commissionPlan.description}</span>
                 </div>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
 
-      {/* Unit Targets */}
-      <Card className="border-border/50">
+        <TabsContent value="units" className={tabContentShell}>
+          {/* Unit Targets */}
+          <Card className={panelCardShell}>
         <CardHeader className="pb-4">
           <CardTitle className="text-xl text-foreground flex items-center">
             <Activity className="h-6 w-6 mr-3 text-secondary" />
@@ -531,11 +653,20 @@ export function MyTargets() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {currentEmployee.unitTargets.map((unit) => (
-              <div key={unit.id} className="p-4 rounded-lg border border-border/50 hover:shadow-sm transition-shadow">
+            {currentEmployee.unitTargets.map((unit) => {
+              const meta =
+                unitIconMap[(unit as any).iconKey] ??
+                { Icon: Target, shell: "bg-slate-50", color: "text-slate-600" };
+              const UnitIcon = meta.Icon;
+              const remainingUnits = Math.max(0, unit.target - unit.achieved);
+
+              return (
+              <div key={unit.id} className="p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <span className="text-2xl">{unit.icon}</span>
+                    <div className={`${meta.shell} w-10 h-10 rounded-lg flex items-center justify-center`}>
+                      <UnitIcon className={`h-5 w-5 ${meta.color}`} />
+                    </div>
                     <div>
                       <h4 className="font-medium text-foreground">{unit.service}</h4>
                       <p className="text-sm text-muted-foreground">
@@ -549,12 +680,12 @@ export function MyTargets() {
                       {unit.status === "completed" ? (
                         <>
                           <CheckCircle className="h-3 w-3 mr-1" />
-                          Done ✅
+                          Done
                         </>
                       ) : (
                         <>
                           <Clock className="h-3 w-3 mr-1" />
-                          In Progress
+                          In progress
                         </>
                       )}
                     </Badge>
@@ -568,19 +699,21 @@ export function MyTargets() {
                   } as React.CSSProperties}
                 />
                 <div className="mt-2 text-xs text-muted-foreground">
-                  {unit.percentage === 100 ? "🎉 Target achieved!" : 
-                   `${unit.target - unit.achieved} more units needed`}
+                  {unit.percentage === 100 ? "Target achieved!" : `${remainingUnits} more units needed`}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
 
-      {/* Analytics & Comparisons */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TabsContent value="insights" className={tabContentShell}>
+          {/* Analytics & Comparisons */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Weekly Performance Trend */}
-        <Card className="border-border/50">
+        <Card className={panelCardShell}>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg text-foreground flex items-center">
               <LineChart className="h-5 w-5 mr-2 text-primary" />
@@ -595,7 +728,7 @@ export function MyTargets() {
                 <XAxis dataKey="day" stroke="#666" />
                 <YAxis stroke="#666" />
                 <Tooltip 
-                  formatter={(value: number) => [`AED ${value.toLocaleString()}`, '']}
+                  formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
                 />
                 <Legend />
                 <Bar dataKey="target" fill={COLORS.muted} name="Target" />
@@ -606,7 +739,7 @@ export function MyTargets() {
         </Card>
 
         {/* Leaderboard Comparison */}
-        <Card className="border-border/50">
+        <Card className={panelCardShell}>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg text-foreground flex items-center">
               <Trophy className="h-5 w-5 mr-2 text-secondary" />
@@ -620,8 +753,8 @@ export function MyTargets() {
                 <div 
                   key={index} 
                   className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border",
-                    staff.name === currentEmployee.name ? "bg-primary/5 border-primary/20" : "border-border/50"
+                    "flex items-center justify-between p-3 rounded-xl",
+                    staff.name === currentEmployee.name ? "bg-primary/5" : "bg-gray-50"
                   )}
                 >
                   <div className="flex items-center space-x-3">
@@ -654,9 +787,11 @@ export function MyTargets() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
 
-      {/* Sales Breakdown */}
-      <Card className="border-border/50">
+        <TabsContent value="sales" className={tabContentShell}>
+          {/* Sales Breakdown */}
+          <Card className={panelCardShell}>
         <CardHeader className="pb-4">
           <CardTitle className="text-xl text-foreground flex items-center">
             <PieChart className="h-6 w-6 mr-3 text-secondary" />
@@ -669,13 +804,13 @@ export function MyTargets() {
             {/* Categories List */}
             <div className="space-y-4">
               {currentEmployee.salesBreakdown.map((category, index) => (
-                <div key={index} className="flex items-center justify-between p-4 rounded-lg border border-border/50">
+                <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-gray-50">
                   <div>
                     <p className="font-medium text-foreground">{category.category}</p>
                     <p className="text-sm text-muted-foreground">{category.percentage}% of total</p>
                   </div>
                   <span className="font-bold text-foreground">
-                    AED {category.amount.toLocaleString()}
+                    <CurrencyGlyph /> {category.amount.toLocaleString()}
                   </span>
                 </div>
               ))}
@@ -699,7 +834,7 @@ export function MyTargets() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value: number) => [`AED ${value.toLocaleString()}`, 'Revenue']}
+                    formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, 'Revenue']}
                   />
                   <Legend />
                 </RechartsPieChart>
@@ -708,9 +843,11 @@ export function MyTargets() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
 
-      {/* Recent Achievements */}
-      <Card className="border-border/50">
+        <TabsContent value="achievements" className={tabContentShell}>
+          {/* Recent Achievements */}
+          <Card className={panelCardShell}>
         <CardHeader className="pb-4">
           <CardTitle className="text-xl text-foreground flex items-center">
             <Award className="h-6 w-6 mr-3 text-warning" />
@@ -720,10 +857,18 @@ export function MyTargets() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {currentEmployee.achievements.map((achievement) => (
-              <div key={achievement.id} className="p-4 rounded-lg border border-border/50 hover:shadow-sm transition-shadow">
+            {currentEmployee.achievements.map((achievement) => {
+              const meta =
+                achievementIconMap[(achievement as any).iconKey] ??
+                { Icon: Award, shell: "bg-slate-50", color: "text-slate-600" };
+              const AchievementIcon = meta.Icon;
+
+              return (
+              <div key={achievement.id} className="p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                 <div className="flex items-start space-x-3">
-                  <span className="text-2xl">{achievement.icon}</span>
+                  <div className={`${meta.shell} w-10 h-10 rounded-lg flex items-center justify-center`}>
+                    <AchievementIcon className={`h-5 w-5 ${meta.color}`} />
+                  </div>
                   <div className="flex-1">
                     <h4 className="font-medium text-foreground">{achievement.title}</h4>
                     <p className="text-sm text-muted-foreground mt-1">{achievement.description}</p>
@@ -736,10 +881,13 @@ export function MyTargets() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

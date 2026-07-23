@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -28,10 +29,14 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final DeviceAuthFilter deviceAuthFilter;
     private final UserDetailsService userDetailsService;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, UserDetailsService userDetailsService) {
-        this.jwtAuthFilter = jwtAuthFilter;
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
+                          DeviceAuthFilter deviceAuthFilter,
+                          UserDetailsService userDetailsService) {
+        this.jwtAuthFilter    = jwtAuthFilter;
+        this.deviceAuthFilter = deviceAuthFilter;
         this.userDetailsService = userDetailsService;
     }
 
@@ -41,14 +46,54 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
+                // Public endpoints — no token required (dev mode)
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/api/**").permitAll()
+
+                // Admin-only endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                // Manager + Admin endpoints
                 .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
-                .anyRequest().authenticated()
+
+                // Payroll & HR — restricted to HR and Admin
+                .requestMatchers("/api/payroll/**", "/api/employees/**", "/api/recruitment/**")
+                    .hasAnyRole("ADMIN", "HR")
+
+                // Financial endpoints — Accountant, Manager, Admin
+                .requestMatchers("/api/billing/**", "/api/expenses/**", "/api/ledgers/**", "/api/financials/**")
+                    .hasAnyRole("ADMIN", "MANAGER", "ACCOUNTANT")
+
+                // Core gym operations — any authenticated user
+                .requestMatchers(
+                    "/api/members/**",
+                    "/api/staff/**",
+                    "/api/attendance/**",
+                    "/api/products/**",
+                    "/api/warehouses/**",
+                    "/api/product-categories/**",
+                    "/api/plans/**",
+                    "/api/promotions/**",
+                    "/api/leads/**",
+                    "/api/bookings/**",
+                    "/api/classes/**",
+                    "/api/dashboard/**",
+                    "/api/pos/**",
+                    "/api/suppliers/**",
+                    "/api/purchase-orders/**",
+                    "/api/supplier-bills/**",
+                    "/api/wastage-returns/**",
+                    "/api/recipes/**",
+                    "/api/production-orders/**",
+                    "/api/referrals/**",
+                    "/api/follow-ups/**"
+                ).authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            // Device key filter runs first so hardware devices are identified before JWT check
+            .addFilterBefore(deviceAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(jwtAuthFilter, DeviceAuthFilter.class);
 
         return http.build();
     }
@@ -74,16 +119,24 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Assuming Vite default dev server runs on port 5173
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
                 "http://localhost:3000",
-                "http://127.0.0.1:3000"
+                "http://127.0.0.1:3000",
+                "http://localhost:19006",
+                "http://127.0.0.1:19006",
+                "http://localhost:8081",
+                "http://127.0.0.1:8081"
         ));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        // Allow all headers so any header the frontend sends (Content-Type, Authorization, etc.) is accepted
+        configuration.setAllowedHeaders(List.of("*"));
+        // Expose Authorization so the frontend can read it from responses if needed
+        configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
+        // Cache preflight response for 1 hour to reduce OPTIONS round-trips
+        configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

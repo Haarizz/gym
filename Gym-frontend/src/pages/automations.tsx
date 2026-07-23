@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { automationService, type AutomationWorkflow as ApiWorkflow, type CreateWorkflowPayload } from '../utils/automation-service';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -211,11 +212,16 @@ export function Automations() {
   const [showWorkflowDetail, setShowWorkflowDetail] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [templates, setTemplates] = useState<AutomationWorkflow[]>([]);
+  const [executionLogs, setExecutionLogs] = useState<any[]>([]);
   const [triggerFilter, setTriggerFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
   const [selectedWorkflows, setSelectedWorkflows] = useState<string[]>([]);
   const [sortField, setSortField] = useState<keyof AutomationWorkflow>('createdDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   // Workflow builder state
   const [currentStep, setCurrentStep] = useState(1);
@@ -375,141 +381,54 @@ export function Automations() {
     }
   ];
 
-  // Sample workflows
-  const workflows: AutomationWorkflow[] = [
-    {
-      id: '1',
-      name: 'Welcome New Members',
-      description: 'Send welcome email sequence to new members',
-      status: 'active',
-      trigger: { type: 'new_signup', parameters: { delay_hours: 1 } },
-      action: { 
-        type: 'send_email', 
-        subject: 'Welcome to GymBios!',
-        content: 'Welcome {FirstName} to our fitness family! We\'re excited to help you achieve your fitness goals.',
-        delay: 1,
-        delayUnit: 'hours'
-      },
-      frequency: 'once',
-      createdDate: new Date('2024-01-15'),
-      lastRun: new Date('2024-03-20'),
-      nextRun: undefined,
-      totalRuns: 145,
-      successfulRuns: 142,
-      failedRuns: 3,
-      membersEngaged: 145,
-      openRate: 85.2,
-      clickRate: 23.4,
-      conversionRate: 12.1,
-      createdBy: 'System',
-      isSystem: true
+  // Live workflows from API
+  const [workflows, setWorkflows] = useState<AutomationWorkflow[]>([]);
+
+  const mapApiWorkflow = useCallback((w: ApiWorkflow): AutomationWorkflow => ({
+    id: String(w.id),
+    name: w.name,
+    description: w.description,
+    status: w.status,
+    trigger: {
+      type: w.triggerType,
+      parameters: (() => { try { return JSON.parse(w.triggerParams || '{}'); } catch { return {}; } })()
     },
-    {
-      id: '2',
-      name: 'Membership Renewal Reminder',
-      description: 'Remind members about upcoming membership expiry',
-      status: 'active',
-      trigger: { type: 'membership_expiry', parameters: { days_before: 7 } },
-      action: { 
-        type: 'send_email', 
-        subject: 'Your membership expires soon',
-        content: 'Hi {FirstName}, your {MembershipPlan} membership expires on {ExpiryDate}. Renew now to continue your fitness journey!',
-        delay: 0,
-        delayUnit: 'hours'
-      },
-      frequency: 'once',
-      createdDate: new Date('2024-01-20'),
-      lastRun: new Date('2024-03-19'),
-      nextRun: addDays(new Date(), 2),
-      totalRuns: 89,
-      successfulRuns: 87,
-      failedRuns: 2,
-      membersEngaged: 89,
-      openRate: 92.1,
-      clickRate: 45.6,
-      conversionRate: 67.4,
-      createdBy: 'Sarah Johnson',
-      isSystem: false
+    action: {
+      type: w.actionType,
+      subject: w.actionSubject,
+      content: w.actionContent,
+      delay: w.delayMinutes < 60 ? w.delayMinutes : w.delayMinutes < 1440 ? Math.round(w.delayMinutes / 60) : Math.round(w.delayMinutes / 1440),
+      delayUnit: w.delayMinutes < 60 ? 'minutes' : w.delayMinutes < 1440 ? 'hours' : 'days'
     },
-    {
-      id: '3',
-      name: 'Missed Workout Check-in',
-      description: 'Reach out to members who haven\'t visited in a week',
-      status: 'active',
-      trigger: { type: 'missed_workout', parameters: { consecutive_days: 7 } },
-      action: { 
-        type: 'send_sms', 
-        content: 'Hi {FirstName}! We miss you at the gym. Your next workout is just a click away. See you soon! 💪',
-        delay: 24,
-        delayUnit: 'hours'
-      },
-      frequency: 'once',
-      createdDate: new Date('2024-02-01'),
-      lastRun: new Date('2024-03-18'),
-      nextRun: new Date(),
-      totalRuns: 56,
-      successfulRuns: 54,
-      failedRuns: 2,
-      membersEngaged: 56,
-      openRate: 95.5,
-      clickRate: 28.6,
-      conversionRate: 35.7,
-      createdBy: 'Ahmed Hassan',
-      isSystem: false
-    },
-    {
-      id: '4',
-      name: 'Birthday Celebration',
-      description: 'Send birthday wishes and special offers',
-      status: 'active',
-      trigger: { type: 'birthday', parameters: { days_before: 0, include_offer: true } },
-      action: { 
-        type: 'send_whatsapp', 
-        content: '🎉 Happy Birthday {FirstName}! Celebrate with us - enjoy 20% off personal training sessions this month!',
-        delay: 0,
-        delayUnit: 'hours'
-      },
-      frequency: 'once',
-      createdDate: new Date('2024-01-10'),
-      lastRun: new Date('2024-03-15'),
-      nextRun: addDays(new Date(), 5),
-      totalRuns: 23,
-      successfulRuns: 23,
-      failedRuns: 0,
-      membersEngaged: 23,
-      openRate: 100,
-      clickRate: 78.3,
-      conversionRate: 52.2,
-      createdBy: 'Maria Rodriguez',
-      isSystem: false
-    },
-    {
-      id: '5',
-      name: 'Class Reminder',
-      description: 'Remind members about their booked classes',
-      status: 'paused',
-      trigger: { type: 'class_reminder', parameters: { hours_before: 2 } },
-      action: { 
-        type: 'send_push', 
-        content: 'Your {ClassName} class starts in 2 hours! Don\'t forget your water bottle 💧',
-        delay: 0,
-        delayUnit: 'hours'
-      },
-      frequency: 'daily',
-      createdDate: new Date('2024-02-15'),
-      lastRun: new Date('2024-03-10'),
-      nextRun: undefined,
-      totalRuns: 234,
-      successfulRuns: 231,
-      failedRuns: 3,
-      membersEngaged: 234,
-      openRate: 88.9,
-      clickRate: 12.3,
-      conversionRate: 89.7,
-      createdBy: 'David Wilson',
-      isSystem: false
+    frequency: w.frequency as AutomationWorkflow['frequency'],
+    createdDate: new Date(w.createdAt),
+    lastRun: w.lastRunAt ? new Date(w.lastRunAt) : undefined,
+    nextRun: w.nextRunAt ? new Date(w.nextRunAt) : undefined,
+    totalRuns: w.totalRuns,
+    successfulRuns: w.successfulRuns,
+    failedRuns: w.failedRuns,
+    membersEngaged: w.membersEngaged,
+    openRate: 0,
+    clickRate: 0,
+    conversionRate: 0,
+    createdBy: w.isSystem ? 'System' : (w.updatedAt ?? 'Staff'),
+    isSystem: w.isSystem,
+  }), []);
+
+  const fetchWorkflows = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await automationService.getAll();
+      setWorkflows(data.filter(w => w.status !== 'template').map(mapApiWorkflow));
+      setTemplates(data.filter(w => w.status === 'template').map(mapApiWorkflow));
+    } catch {
+      toast.error('Failed to load automations');
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  }, [mapApiWorkflow]);
+
+  useEffect(() => { fetchWorkflows(); }, [fetchWorkflows]);
 
   // Sample templates
   const automationTemplates: AutomationTemplate[] = [
@@ -642,33 +561,100 @@ export function Automations() {
     return <Send className="h-4 w-4" />;
   };
 
-  const handleWorkflowClick = useCallback((workflow: AutomationWorkflow) => {
-    setSelectedWorkflow(workflow);
-    setShowWorkflowDetail(true);
+  const populateBuilderFromWorkflow = useCallback((workflow: AutomationWorkflow) => {
+    setWorkflowBuilder({
+      name: workflow.name,
+      description: workflow.description,
+      trigger: { type: workflow.trigger.type, parameters: workflow.trigger.parameters as any },
+      action: {
+        type: workflow.action.type,
+        content: workflow.action.content,
+        subject: workflow.action.subject ?? '',
+        delay: workflow.action.delay,
+        delayUnit: workflow.action.delayUnit as 'minutes' | 'hours' | 'days',
+      },
+      conditions: [],
+      frequency: workflow.frequency,
+    });
+    setCurrentStep(1);
   }, []);
 
-  const handleQuickAction = useCallback((workflow: AutomationWorkflow, action: string) => {
+  const handleWorkflowClick = useCallback((workflow: AutomationWorkflow) => {
+    setSelectedWorkflow(workflow);
+    setExecutionLogs([]);
+    setShowWorkflowDetail(true);
+    automationService.getLogs(Number(workflow.id)).then(setExecutionLogs).catch(() => {});
+  }, []);
+
+  const handleQuickAction = useCallback(async (workflow: AutomationWorkflow, action: string) => {
+    const id = Number(workflow.id);
     switch (action) {
       case 'play':
-        toast.success(`Automation "${workflow.name}" activated`);
+      case 'pause': {
+        try {
+          await automationService.toggle(id);
+          toast.success(`Automation "${workflow.name}" ${action === 'play' ? 'activated' : 'paused'}`);
+          fetchWorkflows();
+        } catch {
+          toast.error('Failed to update automation status');
+        }
         break;
-      case 'pause':
-        toast.success(`Automation "${workflow.name}" paused`);
-        break;
+      }
       case 'edit':
         setSelectedWorkflow(workflow);
+        setIsCreatingTemplate(false);
+        populateBuilderFromWorkflow(workflow);
         setShowCreateWorkflow(true);
         break;
-      case 'duplicate':
-        toast.success(`Created duplicate of "${workflow.name}"`);
+      case 'run': {
+        try {
+          await automationService.run(id);
+          toast.success(`"${workflow.name}" triggered manually`);
+          fetchWorkflows();
+        } catch {
+          toast.error('Failed to trigger automation');
+        }
         break;
-      case 'delete':
-        toast.success(`Deleted automation "${workflow.name}"`);
+      }
+      case 'delete': {
+        if (workflow.isSystem) { toast.error('System workflows cannot be deleted'); return; }
+        try {
+          await automationService.delete(id);
+          toast.success(`Deleted automation "${workflow.name}"`);
+          setWorkflows(prev => prev.filter(w => w.id !== workflow.id));
+        } catch {
+          toast.error('Failed to delete automation');
+        }
         break;
+      }
+      case 'duplicate': {
+        try {
+          const payload = automationService.buildPayload({
+            name: workflow.name + ' (Copy)',
+            description: workflow.description,
+            trigger: { type: workflow.trigger.type, parameters: workflow.trigger.parameters as any },
+            action: {
+              type: workflow.action.type,
+              content: workflow.action.content,
+              subject: workflow.action.subject ?? '',
+              delay: workflow.action.delay,
+              delayUnit: workflow.action.delayUnit as 'minutes' | 'hours' | 'days',
+            },
+            conditions: [],
+            frequency: workflow.frequency,
+          });
+          await automationService.create(payload);
+          toast.success(`Duplicated "${workflow.name}"`);
+          fetchWorkflows();
+        } catch {
+          toast.error('Failed to duplicate automation');
+        }
+        break;
+      }
       default:
         toast.info(`Action: ${action} for "${workflow.name}"`);
     }
-  }, []);
+  }, [fetchWorkflows, populateBuilderFromWorkflow]);
 
   const handleCreateWorkflow = useCallback(() => {
     setWorkflowBuilder({
@@ -680,6 +666,8 @@ export function Automations() {
       frequency: 'once'
     });
     setCurrentStep(1);
+    setSelectedWorkflow(null);
+    setIsCreatingTemplate(false);
     setShowCreateWorkflow(true);
   }, []);
 
@@ -695,16 +683,96 @@ export function Automations() {
     }
   }, [currentStep]);
 
-  const handleSaveWorkflow = useCallback(() => {
+  const handleSaveWorkflow = useCallback(async () => {
     if (!workflowBuilder.name || !workflowBuilder.trigger.type || !workflowBuilder.action.type) {
       toast.error('Please complete all required fields');
       return;
     }
 
-    toast.success('Automation workflow created successfully');
-    setShowCreateWorkflow(false);
+    const payload = {
+      ...automationService.buildPayload(workflowBuilder),
+      ...(isCreatingTemplate ? { status: 'template' } : {}),
+    };
+    try {
+      if (selectedWorkflow) {
+        await automationService.update(Number(selectedWorkflow.id), payload);
+        toast.success(isCreatingTemplate ? 'Template updated successfully' : 'Automation updated successfully');
+      } else {
+        await automationService.create(payload);
+        toast.success(isCreatingTemplate ? 'Template created successfully' : 'Automation created successfully');
+      }
+      setShowCreateWorkflow(false);
+      setCurrentStep(1);
+      setIsCreatingTemplate(false);
+      fetchWorkflows();
+    } catch {
+      toast.error('Failed to save');
+    }
+  }, [workflowBuilder, selectedWorkflow, isCreatingTemplate, fetchWorkflows]);
+
+  const handleCreateTemplate = useCallback(() => {
+    setWorkflowBuilder({
+      name: '',
+      description: '',
+      trigger: { type: '', parameters: {} },
+      action: { type: '', content: '', subject: '', delay: 0, delayUnit: 'hours' },
+      conditions: [],
+      frequency: 'once'
+    });
     setCurrentStep(1);
-  }, [workflowBuilder]);
+    setSelectedWorkflow(null);
+    setIsCreatingTemplate(true);
+    setShowCreateWorkflow(true);
+  }, []);
+
+  const handleUseTemplate = useCallback((template: AutomationWorkflow) => {
+    populateBuilderFromWorkflow(template);
+    setSelectedWorkflow(null);
+    setIsCreatingTemplate(false);
+    setShowCreateWorkflow(true);
+  }, [populateBuilderFromWorkflow]);
+
+  const handleEditTemplate = useCallback((template: AutomationWorkflow) => {
+    populateBuilderFromWorkflow(template);
+    setSelectedWorkflow(template);
+    setIsCreatingTemplate(true);
+    setShowCreateWorkflow(true);
+  }, [populateBuilderFromWorkflow]);
+
+  const handleDeleteTemplate = useCallback(async (template: AutomationWorkflow) => {
+    try {
+      await automationService.delete(Number(template.id));
+      setTemplates(prev => prev.filter(t => t.id !== template.id));
+      toast.success(`Template "${template.name}" deleted`);
+    } catch {
+      toast.error('Failed to delete template');
+    }
+  }, []);
+
+  const handleExport = useCallback(() => {
+    const rows = [
+      ['Name', 'Status', 'Trigger', 'Action', 'Frequency', 'Total Runs', 'Members Engaged', 'Last Run'],
+      ...filteredWorkflows.map(w => [
+        `"${w.name}"`,
+        w.status,
+        w.trigger.type,
+        w.action.type,
+        w.frequency,
+        w.totalRuns,
+        w.membersEngaged,
+        w.lastRun ? w.lastRun.toISOString() : '-',
+      ])
+    ];
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'automations.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Exported automations.csv');
+  }, [filteredWorkflows]);
 
   const renderWorkflowBuilderStep = () => {
     switch (currentStep) {
@@ -920,7 +988,7 @@ export function Automations() {
               <h3 className="text-lg font-semibold mb-4">Step 4: Review & Save</h3>
               <p className="text-muted-foreground mb-4">Review your automation workflow before saving</p>
               
-              <Card>
+              <Card className={cardShell}>
                 <CardContent className="p-6">
                   <div className="space-y-4">
                     <div>
@@ -998,16 +1066,16 @@ export function Automations() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={() => setActiveTab('templates')}>
+            <Layers className="mr-2 h-4 w-4" />
             Templates
           </Button>
-          <Button onClick={handleCreateWorkflow}>
-            <Plus className="mr-2 h-4 w-4" />
+          <Button onClick={handleCreateWorkflow} disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
             Create Automation
           </Button>
         </div>
@@ -1015,105 +1083,113 @@ export function Automations() {
 
       {/* Analytics KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Active</p>
-                <p className="text-2xl font-bold">{analytics.activeWorkflows}</p>
-              </div>
-              <PlayCircle className="h-6 w-6 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Active</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <PlayCircle className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{analytics.activeWorkflows}</div>
+            <p className="text-xs text-muted-foreground">Running workflows</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Members Engaged</p>
-                <p className="text-2xl font-bold text-blue-600">{analytics.totalMembersEngaged}</p>
-              </div>
-              <Users className="h-6 w-6 text-blue-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Members Engaged</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Users className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{analytics.totalMembersEngaged}</div>
+            <p className="text-xs text-muted-foreground">Total engaged</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Runs</p>
-                <p className="text-2xl font-bold text-purple-600">{analytics.totalRuns}</p>
-              </div>
-              <Activity className="h-6 w-6 text-purple-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Runs</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <Activity className="h-4 w-4 text-purple-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{analytics.totalRuns}</div>
+            <p className="text-xs text-muted-foreground">All executions</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Success Rate</p>
-                <p className="text-2xl font-bold text-green-600">{analytics.successRate.toFixed(1)}%</p>
-              </div>
-              <CheckCircle className="h-6 w-6 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Success Rate</CardTitle>
+            <div className="bg-emerald-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-emerald-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600">{analytics.successRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Successful runs</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Open Rate</p>
-                <p className="text-2xl font-bold text-indigo-600">{analytics.avgOpenRate.toFixed(1)}%</p>
-              </div>
-              <Eye className="h-6 w-6 text-indigo-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Open Rate</CardTitle>
+            <div className="bg-indigo-50 p-2 rounded-lg">
+              <Eye className="h-4 w-4 text-indigo-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-indigo-600">{analytics.avgOpenRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Average open</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Conversion</p>
-                <p className="text-2xl font-bold text-orange-600">{analytics.avgConversionRate.toFixed(1)}%</p>
-              </div>
-              <Target className="h-6 w-6 text-orange-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Conversion</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <Target className="h-4 w-4 text-orange-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{analytics.avgConversionRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Average conversion</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{analytics.pendingTasks}</p>
-              </div>
-              <Clock className="h-6 w-6 text-yellow-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Pending</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <Clock className="h-4 w-4 text-yellow-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{analytics.pendingTasks}</div>
+            <p className="text-xs text-muted-foreground">Next 24 hours</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Errors</p>
-                <p className="text-2xl font-bold text-red-600">{analytics.errorCount}</p>
-              </div>
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Errors</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{analytics.errorCount}</div>
+            <p className="text-xs text-muted-foreground">Requires attention</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters and Search */}
-      <Card>
+      <Card className={cardShell}>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
@@ -1198,17 +1274,17 @@ export function Automations() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="workflows">Workflows</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+          <TabsTrigger value="workflows" className="flex-1">Workflows</TabsTrigger>
+          <TabsTrigger value="templates" className="flex-1">Templates</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           {/* Recent Activity */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Recent Workflow Activity</CardTitle>
               </CardHeader>
@@ -1236,7 +1312,7 @@ export function Automations() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Upcoming Scheduled Runs</CardTitle>
               </CardHeader>
@@ -1266,7 +1342,7 @@ export function Automations() {
           </div>
 
           {/* Performance Summary */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Top Performing Automations</CardTitle>
             </CardHeader>
@@ -1277,7 +1353,7 @@ export function Automations() {
                   .sort((a, b) => b.conversionRate - a.conversionRate)
                   .slice(0, 5)
                   .map(workflow => (
-                    <div key={workflow.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div key={workflow.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50/60">
                       <div className="flex items-center space-x-3">
                         <div className="flex space-x-1">
                           {getTriggerIcon(workflow.trigger.type)}
@@ -1300,12 +1376,26 @@ export function Automations() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="workflows" className="space-y-6">
-          {activeView === 'grid' ? (
-            /* Grid View */
+        <TabsContent value="workflows" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          {isLoading && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredWorkflows.map((workflow) => (
-                <Card key={workflow.id} className="hover:shadow-lg transition-shadow cursor-pointer group">
+              {[1, 2, 3].map(i => (
+                <Card key={i} className={cardShell}>
+                  <CardContent className="p-6 space-y-3">
+                    <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                    <div className="h-3 bg-muted rounded animate-pulse w-full" />
+                    <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          <div key={activeView} className="animate-in fade-in-0 zoom-in-95 duration-200">
+            {activeView === 'grid' ? (
+              /* Grid View */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredWorkflows.map((workflow) => (
+                  <Card key={workflow.id} className={`${cardShell} cursor-pointer group`}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <Badge className={getStatusColor(workflow.status)}>
@@ -1426,234 +1516,270 @@ export function Automations() {
                     )}
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          ) : (
-            /* Table View */
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Automation Workflows ({filteredWorkflows.length})</span>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                    >
-                      {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Workflow</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Trigger</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Runs</TableHead>
-                      <TableHead>Success Rate</TableHead>
-                      <TableHead>Last Run</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredWorkflows.map((workflow) => (
-                      <TableRow key={workflow.id} className="cursor-pointer hover:bg-muted/50">
-                        <TableCell onClick={() => handleWorkflowClick(workflow)}>
-                          <div>
-                            <p className="font-medium">{workflow.name}</p>
-                            <p className="text-sm text-muted-foreground line-clamp-1">{workflow.description}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(workflow.status)}>
-                            {getStatusIcon(workflow.status)}
-                            <span className="ml-1 capitalize">{workflow.status}</span>
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {getTriggerIcon(workflow.trigger.type)}
-                            <span className="text-sm">
-                              {automationTriggers.find(t => t.id === workflow.trigger.type)?.name || workflow.trigger.type}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {getActionIcon(workflow.action.type)}
-                            <span className="text-sm">
-                              {automationActions.find(a => a.id === workflow.action.type)?.name || workflow.action.type}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <span className="font-medium">{workflow.totalRuns}</span>
-                            <p className="text-xs text-muted-foreground">{workflow.membersEngaged} engaged</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium text-green-600">
-                            {workflow.totalRuns > 0 ? ((workflow.successfulRuns / workflow.totalRuns) * 100).toFixed(1) : 0}%
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">
-                            {workflow.lastRun ? format(workflow.lastRun, 'MMM dd, HH:mm') : 'Never'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-1">
-                            {workflow.status === 'active' ? (
-                              <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'pause')}>
-                                <Pause className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'play')}>
-                                <Play className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'edit')}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => handleWorkflowClick(workflow)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'duplicate')}>
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                ))}
+              </div>
+            ) : (
+              /* Table View */
+              <Card className={cardShell}>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Automation Workflows ({filteredWorkflows.length})</span>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                      >
+                        {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow>
+                        <TableHead>Workflow</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Trigger</TableHead>
+                        <TableHead>Action</TableHead>
+                        <TableHead>Runs</TableHead>
+                        <TableHead>Success Rate</TableHead>
+                        <TableHead>Last Run</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
+                    </TableHeader>
+                    <TableBody>
+                      {filteredWorkflows.map((workflow) => (
+                        <TableRow key={workflow.id} className="cursor-pointer transition-colors hover:bg-slate-50/50">
+                          <TableCell onClick={() => handleWorkflowClick(workflow)}>
+                            <div>
+                              <p className="font-medium">{workflow.name}</p>
+                              <p className="text-sm text-muted-foreground line-clamp-1">{workflow.description}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(workflow.status)}>
+                              {getStatusIcon(workflow.status)}
+                              <span className="ml-1 capitalize">{workflow.status}</span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              {getTriggerIcon(workflow.trigger.type)}
+                              <span className="text-sm">
+                                {automationTriggers.find(t => t.id === workflow.trigger.type)?.name || workflow.trigger.type}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              {getActionIcon(workflow.action.type)}
+                              <span className="text-sm">
+                                {automationActions.find(a => a.id === workflow.action.type)?.name || workflow.action.type}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <span className="font-medium">{workflow.totalRuns}</span>
+                              <p className="text-xs text-muted-foreground">{workflow.membersEngaged} engaged</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium text-green-600">
+                              {workflow.totalRuns > 0 ? ((workflow.successfulRuns / workflow.totalRuns) * 100).toFixed(1) : 0}%
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">
+                              {workflow.lastRun ? format(workflow.lastRun, 'MMM dd, HH:mm') : 'Never'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-1">
+                              {workflow.status === 'active' ? (
+                                <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'pause')}>
+                                  <Pause className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'play')}>
+                                  <Play className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'edit')}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => handleWorkflowClick(workflow)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => handleQuickAction(workflow, 'duplicate')}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
-        <TabsContent value="templates" className="space-y-6">
+        <TabsContent value="templates" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Automation Templates</h2>
-            <Button>
+            <div>
+              <h2 className="text-xl font-semibold">Automation Templates</h2>
+              <p className="text-sm text-muted-foreground mt-1">Save reusable workflow configurations as templates</p>
+            </div>
+            <Button onClick={handleCreateTemplate}>
               <Plus className="mr-2 h-4 w-4" />
               Create Template
             </Button>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {automationTemplates.map((template) => (
-              <Card key={template.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{template.name}</CardTitle>
-                    <Badge variant="outline">{template.category}</Badge>
-                  </div>
-                  <CardDescription>{template.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        {getTriggerIcon(template.trigger)}
-                        <span className="text-sm">
-                          {automationTriggers.find(t => t.id === template.trigger)?.name}
-                        </span>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex items-center space-x-2">
-                        {getActionIcon(template.action)}
-                        <span className="text-sm">
-                          {automationActions.find(a => a.id === template.action)?.name}
-                        </span>
-                      </div>
+
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map(i => (
+                <Card key={i} className={cardShell}>
+                  <CardContent className="p-6 space-y-3">
+                    <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                    <div className="h-3 bg-muted rounded animate-pulse w-full" />
+                    <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : templates.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4 text-muted-foreground">
+              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                <Layers className="h-8 w-8 opacity-50" />
+              </div>
+              <div className="text-center">
+                <p className="font-semibold text-foreground">No templates yet</p>
+                <p className="text-sm mt-1">Create a template to save and reuse workflow configurations</p>
+              </div>
+              <Button onClick={handleCreateTemplate} variant="outline">
+                <Plus className="mr-2 h-4 w-4" />
+                Create your first template
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {templates.map((template) => (
+                <Card key={template.id} className={`${cardShell} group`}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">{template.name}</CardTitle>
+                      <Badge variant="outline" className="capitalize">{template.frequency}</Badge>
                     </div>
-                    
-                    {template.subject && (
-                      <div>
-                        <Label className="text-sm text-muted-foreground">Subject</Label>
-                        <p className="text-sm font-medium">{template.subject}</p>
+                    <CardDescription className="line-clamp-2">{template.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          {getTriggerIcon(template.trigger.type)}
+                          <span className="text-sm truncate">
+                            {automationTriggers.find(t => t.id === template.trigger.type)?.name ?? template.trigger.type}
+                          </span>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <div className="flex items-center space-x-2">
+                          {getActionIcon(template.action.type)}
+                          <span className="text-sm truncate">
+                            {automationActions.find(a => a.id === template.action.type)?.name ?? template.action.type}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                    
-                    <div>
-                      <Label className="text-sm text-muted-foreground">Content Preview</Label>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{template.content}</p>
+
+                      {template.action.subject && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Subject</Label>
+                          <p className="text-sm font-medium truncate">{template.action.subject}</p>
+                        </div>
+                      )}
+
+                      {template.action.content && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Content Preview</Label>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{template.action.content}</p>
+                        </div>
+                      )}
                     </div>
-                    
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Used {template.usageCount} times</span>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button variant="outline" size="sm">
-                    Use Template
-                  </Button>
-                  <div className="flex space-x-1">
-                    <Button variant="ghost" size="sm">
-                      <Edit className="h-4 w-4" />
+                  </CardContent>
+                  <CardFooter className="flex justify-between">
+                    <Button variant="default" size="sm" onClick={() => handleUseTemplate(template)}>
+                      <Play className="mr-1.5 h-3.5 w-3.5" />
+                      Use Template
                     </Button>
-                    <Button variant="ghost" size="sm">
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+                    <div className="flex space-x-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleEditTemplate(template)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteTemplate(template)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
+        <TabsContent value="analytics" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Workflows</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{workflows.length}</div>
-                <p className="text-xs text-muted-foreground">+15% from last month</p>
+                <p className="text-xs text-muted-foreground">{analytics.activeWorkflows} active</p>
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Average Success Rate</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{analytics.successRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground">+8.2% from last month</p>
+                <p className="text-xs text-muted-foreground">{analytics.totalRuns} total runs</p>
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Members Engaged</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{analytics.totalMembersEngaged}</div>
-                <p className="text-xs text-muted-foreground">+23% from last month</p>
+                <p className="text-xs text-muted-foreground">across all automations</p>
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Average Conversion</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{analytics.avgConversionRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground">+12.1% from last month</p>
+                <p className="text-xs text-muted-foreground">average conversion rate</p>
               </CardContent>
             </Card>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Workflow Performance by Type</CardTitle>
               </CardHeader>
@@ -1681,7 +1807,7 @@ export function Automations() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Recent Workflow Runs</CardTitle>
               </CardHeader>
@@ -1735,7 +1861,7 @@ export function Automations() {
 
               <div className="space-y-6 mt-6">
                 {/* Workflow Flow */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Workflow Flow</CardTitle>
                   </CardHeader>
@@ -1778,7 +1904,7 @@ export function Automations() {
                 </Card>
 
                 {/* Message Content */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Message Content</CardTitle>
                   </CardHeader>
@@ -1798,7 +1924,7 @@ export function Automations() {
                 </Card>
 
                 {/* Performance Metrics */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Performance Metrics</CardTitle>
                   </CardHeader>
@@ -1835,7 +1961,7 @@ export function Automations() {
                 </Card>
 
                 {/* Schedule Information */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Schedule Information</CardTitle>
                   </CardHeader>
@@ -1876,7 +2002,7 @@ export function Automations() {
                 </Card>
 
                 {/* Quick Actions */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Quick Actions</CardTitle>
                   </CardHeader>
@@ -1901,11 +2027,48 @@ export function Automations() {
                           Activate
                         </Button>
                       )}
-                      <Button variant="outline" className="justify-start">
-                        <History className="mr-2 h-4 w-4" />
-                        View History
-                      </Button>
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* Run History */}
+                <Card className={cardShell}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <History className="h-4 w-4" />
+                      Run History
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {executionLogs.length === 0 ? (
+                      <div className="text-center py-6 text-sm text-muted-foreground">
+                        No runs recorded yet. Trigger this automation manually or wait for the scheduler.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-5 text-xs font-semibold text-muted-foreground uppercase tracking-wide pb-1 border-b border-border">
+                          <span className="col-span-2">Ran at</span>
+                          <span>Status</span>
+                          <span>Matched</span>
+                          <span>Sent</span>
+                        </div>
+                        {executionLogs.slice(0, 10).map((log: any) => (
+                          <div key={log.id} className="grid grid-cols-5 text-sm py-1.5 border-b border-border/40 last:border-0 items-center">
+                            <span className="col-span-2 text-muted-foreground text-xs">
+                              {log.ranAt ? new Date(log.ranAt).toLocaleString() : '-'}
+                            </span>
+                            <span className={`font-medium capitalize text-xs ${
+                              log.status === 'success' ? 'text-green-600' :
+                              log.status === 'failed' ? 'text-red-600' : 'text-yellow-600'
+                            }`}>
+                              {log.status}
+                            </span>
+                            <span>{log.matchedCount ?? '-'}</span>
+                            <span>{log.processedCount ?? '-'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1918,9 +2081,15 @@ export function Automations() {
       <Dialog open={showCreateWorkflow} onOpenChange={setShowCreateWorkflow}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Automation Workflow</DialogTitle>
+            <DialogTitle>
+              {isCreatingTemplate
+                ? (selectedWorkflow ? 'Edit Template' : 'Create Template')
+                : (selectedWorkflow ? 'Edit Automation' : 'Create Automation Workflow')}
+            </DialogTitle>
             <DialogDescription>
-              Set up an automated workflow to engage with your members
+              {isCreatingTemplate
+                ? 'Save a reusable workflow configuration as a template'
+                : 'Set up an automated workflow to engage with your members'}
             </DialogDescription>
           </DialogHeader>
           
@@ -1965,7 +2134,7 @@ export function Automations() {
               {currentStep === 4 ? (
                 <Button onClick={handleSaveWorkflow}>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Workflow
+                  {isCreatingTemplate ? 'Save Template' : 'Save Workflow'}
                 </Button>
               ) : (
                 <Button 

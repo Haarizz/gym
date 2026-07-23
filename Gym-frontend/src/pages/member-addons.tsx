@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   Search,
   Plus,
@@ -61,12 +62,14 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
-import { 
-  getNextRewardForMember, 
+import {
+  getNextRewardForMember,
   getTotalUnredeemedAmount,
   applyRewardToTransaction,
   type ReferralReward
 } from "../utils/referral-rewards";
+import { membersService, Member as ApiMember } from "../utils/supabase/members-service";
+import { addonsService, MemberAddon } from "../utils/supabase/addons-service";
 
 interface MemberAddonsProps {
   onNavigate?: (section: string) => void;
@@ -82,6 +85,19 @@ interface Member {
   status: "Active" | "Expired" | "Frozen";
   email: string;
   phone: string;
+}
+
+function toLocalMember(m: ApiMember): Member {
+  return {
+    id: m.id,
+    name: m.name,
+    membershipId: m.member_id || m.id,
+    currentPlan: m.membership_plan || m.membership_type || "—",
+    validTill: m.membership_end_date ? new Date(m.membership_end_date) : new Date(),
+    status: m.membership_status === "active" ? "Active" : m.membership_status === "frozen" ? "Frozen" : "Expired",
+    email: m.email,
+    phone: m.phone,
+  };
 }
 
 interface Addon {
@@ -114,51 +130,7 @@ const getCategoryColor = (category: string) => {
   }
 };
 
-interface AddonTransaction {
-  id: string;
-  memberId: string;
-  memberName: string;
-  addonName: string;
-  startDate: Date;
-  expiryDate: Date;
-  amount: number;
-  paymentMode: "Cash" | "Card" | "UPI" | "Bank Transfer";
-  status: "Active" | "Expired" | "Cancelled";
-  purchaseDate: Date;
-}
-
-const mockMembers: Member[] = [
-  {
-    id: "MB-1024",
-    name: "John Mathew",
-    membershipId: "MB-1024",
-    currentPlan: "2-Month Membership",
-    validTill: new Date("2025-10-25"),
-    status: "Active",
-    email: "john.mathew@example.com",
-    phone: "+971 50 123 4567",
-  },
-  {
-    id: "MB-1025",
-    name: "Sarah Johnson",
-    membershipId: "MB-1025",
-    currentPlan: "3-Month Membership",
-    validTill: new Date("2025-11-15"),
-    status: "Active",
-    email: "sarah.j@example.com",
-    phone: "+971 50 234 5678",
-  },
-  {
-    id: "MB-1026",
-    name: "Ahmed Al-Mansoori",
-    membershipId: "MB-1026",
-    currentPlan: "Premium Annual",
-    validTill: new Date("2026-03-20"),
-    status: "Active",
-    email: "ahmed.m@example.com",
-    phone: "+971 55 345 6789",
-  },
-];
+// Use the MemberAddon type from the API service directly
 
 const availableAddons: Addon[] = [
   {
@@ -227,70 +199,9 @@ const availableAddons: Addon[] = [
   },
 ];
 
-const mockTransactions: AddonTransaction[] = [
-  {
-    id: "TXN-001",
-    memberId: "MB-1024",
-    memberName: "John Mathew",
-    addonName: "Personal Training – 15 Sessions",
-    startDate: new Date("2025-10-10"),
-    expiryDate: new Date("2025-11-15"),
-    amount: 450,
-    paymentMode: "Cash",
-    status: "Active",
-    purchaseDate: new Date("2025-10-10"),
-  },
-  {
-    id: "TXN-002",
-    memberId: "MB-1025",
-    memberName: "Sarah Johnson",
-    addonName: "Nutrition Plan – 30 Days",
-    startDate: new Date("2025-10-08"),
-    expiryDate: new Date("2025-11-07"),
-    amount: 200,
-    paymentMode: "Card",
-    status: "Active",
-    purchaseDate: new Date("2025-10-08"),
-  },
-  {
-    id: "TXN-003",
-    memberId: "MB-1026",
-    memberName: "Ahmed Al-Mansoori",
-    addonName: "Group Classes – 20 Sessions",
-    startDate: new Date("2025-10-05"),
-    expiryDate: new Date("2025-11-04"),
-    amount: 300,
-    paymentMode: "UPI",
-    status: "Active",
-    purchaseDate: new Date("2025-10-05"),
-  },
-  {
-    id: "TXN-004",
-    memberId: "MB-1024",
-    memberName: "John Mathew",
-    addonName: "Nutrition Plan – 30 Days",
-    startDate: new Date("2025-09-01"),
-    expiryDate: new Date("2025-09-30"),
-    amount: 200,
-    paymentMode: "Cash",
-    status: "Expired",
-    purchaseDate: new Date("2025-09-01"),
-  },
-  {
-    id: "TXN-005",
-    memberId: "MB-1025",
-    memberName: "Sarah Johnson",
-    addonName: "Spa & Recovery – 10 Sessions",
-    startDate: new Date("2025-10-12"),
-    expiryDate: new Date("2025-11-26"),
-    amount: 500,
-    paymentMode: "Card",
-    status: "Active",
-    purchaseDate: new Date("2025-10-12"),
-  },
-];
 
 export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
+  const { currencyCode } = useCurrency();
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -298,19 +209,38 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [selectedAddon, setSelectedAddon] = useState<Addon | null>(null);
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
-  const [transactions, setTransactions] = useState<AddonTransaction[]>(mockTransactions);
+  const [transactions, setTransactions] = useState<MemberAddon[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
   const [notes, setNotes] = useState("");
   const [customValidity, setCustomValidity] = useState<number>(30);
   const [customAmount, setCustomAmount] = useState<number>(0);
   const [transactionSearchQuery, setTransactionSearchQuery] = useState("");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<string>("all");
-  
+  const [lastCreatedAddon, setLastCreatedAddon] = useState<MemberAddon | null>(null);
+
   // Reward Redemption States
   const [availableReward, setAvailableReward] = useState<ReferralReward | null>(null);
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardApplied, setRewardApplied] = useState(false);
   const [finalAmountAfterReward, setFinalAmountAfterReward] = useState<number>(0);
+
+  // Load transactions from API on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setTransactionsLoading(true);
+        const res = await addonsService.getAddons({}, { limit: 500 });
+        setTransactions(res.addons);
+      } catch {
+        toast.error("Failed to load add-on transactions");
+      } finally {
+        setTransactionsLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   useEffect(() => {
     if (isPurchaseModalOpen) {
@@ -321,19 +251,19 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     }
   }, [isPurchaseModalOpen]);
 
-  const handleMemberSearch = () => {
-    const found = mockMembers.find(
-      (m) =>
-        m.membershipId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.phone.includes(searchQuery)
-    );
-    
-    if (found) {
-      setSelectedMember(found);
-      toast.success(`Member ${found.name} found!`);
-    } else {
-      toast.error("Member not found. Please check ID or name.");
+  const handleMemberSearch = async () => {
+    if (!searchQuery.trim()) return;
+    try {
+      const results = await membersService.searchMembers(searchQuery);
+      if (results.length > 0) {
+        const found = toLocalMember(results[0]);
+        setSelectedMember(found);
+        toast.success(`Member ${found.name} found!`);
+      } else {
+        toast.error("Member not found. Please check ID or name.");
+      }
+    } catch {
+      toast.error("Search failed. Please try again.");
     }
   };
 
@@ -344,22 +274,27 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
 
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions];
-    
+
     if (transactionSearchQuery) {
+      const q = transactionSearchQuery.toLowerCase();
       filtered = filtered.filter(
         (txn) =>
-          txn.memberName.toLowerCase().includes(transactionSearchQuery.toLowerCase()) ||
-          txn.memberId.toLowerCase().includes(transactionSearchQuery.toLowerCase()) ||
-          txn.addonName.toLowerCase().includes(transactionSearchQuery.toLowerCase()) ||
-          txn.id.toLowerCase().includes(transactionSearchQuery.toLowerCase())
+          txn.member_name?.toLowerCase().includes(q) ||
+          txn.member_id?.toLowerCase().includes(q) ||
+          txn.addon_name?.toLowerCase().includes(q) ||
+          txn.transaction_id?.toLowerCase().includes(q)
       );
     }
-    
+
     if (transactionStatusFilter !== "all") {
       filtered = filtered.filter((txn) => txn.status === transactionStatusFilter);
     }
-    
-    return filtered.sort((a, b) => b.purchaseDate.getTime() - a.purchaseDate.getTime());
+
+    return filtered.sort((a, b) => {
+      const da = a.purchase_date ? new Date(a.purchase_date).getTime() : 0;
+      const db = b.purchase_date ? new Date(b.purchase_date).getTime() : 0;
+      return db - da;
+    });
   }, [transactions, transactionSearchQuery, transactionStatusFilter]);
 
   const getDaysUntilExpiry = (date: Date) => {
@@ -390,35 +325,38 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     return addonExpiry > memberExpiry ? addonExpiry : memberExpiry;
   };
 
-  const handleConfirmPurchase = () => {
+  const handleConfirmPurchase = async () => {
     if (!selectedMember || !selectedAddon || !customAmount) return;
 
     const newExpiry = calculateNewExpiry();
     const startDate = new Date();
 
-    const newTransaction: AddonTransaction = {
-      id: `TXN-${String(transactions.length + 1).padStart(3, "0")}`,
-      memberId: selectedMember.membershipId,
-      memberName: selectedMember.name,
-      addonName: selectedAddon.name,
-      startDate,
-      expiryDate: newExpiry || new Date(),
-      amount: customAmount,
-      paymentMode: paymentMethod as any,
-      status: "Active",
-      purchaseDate: new Date(),
-    };
-
-    setTransactions([newTransaction, ...transactions]);
-
-    if (newExpiry && newExpiry > selectedMember.validTill) {
-      selectedMember.validTill = newExpiry;
+    try {
+      setIsSubmitting(true);
+      const created = await addonsService.createAddon({
+        member_db_id: Number(selectedMember.id),
+        member_id: selectedMember.membershipId,
+        member_name: selectedMember.name,
+        addon_name: selectedAddon.name,
+        addon_description: selectedAddon.description,
+        category: selectedAddon.category,
+        amount: customAmount,
+        payment_mode: paymentMethod,
+        start_date: startDate.toISOString(),
+        expiry_date: (newExpiry || startDate).toISOString(),
+        notes: notes || undefined,
+      });
+      setTransactions(prev => [created, ...prev]);
+      setLastCreatedAddon(created);
+      setIsPurchaseDialogOpen(false);
+      setIsSuccessDialogOpen(true);
+      setNotes("");
+      setPaymentMethod("Cash");
+    } catch {
+      toast.error("Failed to save add-on purchase. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsPurchaseDialogOpen(false);
-    setIsSuccessDialogOpen(true);
-    setNotes("");
-    setPaymentMethod("Cash");
   };
 
   const handleSuccessClose = () => {
@@ -438,7 +376,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
 
   const totalRevenue = transactions
     .filter((txn) => txn.status !== "Cancelled")
-    .reduce((sum, txn) => sum + txn.amount, 0);
+    .reduce((sum, txn) => sum + Number(txn.amount || 0), 0);
 
   const activeAddons = transactions.filter((txn) => txn.status === "Active").length;
 
@@ -512,7 +450,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">AED {totalRevenue}</p>
+                <p className="text-2xl font-bold"><CurrencyGlyph /> {totalRevenue}</p>
                 <p className="text-xs text-muted-foreground mt-1">From add-on sales</p>
               </CardContent>
             </Card>
@@ -566,13 +504,19 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                     <TableHead>Add-on Name</TableHead>
                     <TableHead>Purchase Date</TableHead>
                     <TableHead>Expiry Date</TableHead>
-                    <TableHead>Amount (AED)</TableHead>
+                    <TableHead>Amount ({currencyCode})</TableHead>
                     <TableHead>Payment Mode</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTransactions.length === 0 ? (
+                  {transactionsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        Loading transactions...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredTransactions.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No transactions found
@@ -585,31 +529,35 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                         className="hover:bg-slate-50/50 transition-colors"
                       >
                         <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{txn.id}</TableCell>
+                        <TableCell className="font-medium">{txn.transaction_id}</TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{txn.memberName}</p>
-                            <p className="text-xs text-muted-foreground">{txn.memberId}</p>
+                            <p className="font-medium">{txn.member_name}</p>
+                            <p className="text-xs text-muted-foreground">{txn.member_id}</p>
                           </div>
                         </TableCell>
-                        <TableCell>{txn.addonName}</TableCell>
+                        <TableCell>{txn.addon_name}</TableCell>
                         <TableCell>
-                          {txn.purchaseDate.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {txn.purchase_date
+                            ? new Date(txn.purchase_date).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
                         </TableCell>
                         <TableCell>
-                          {txn.expiryDate.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {txn.expiry_date
+                            ? new Date(txn.expiry_date).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
                         </TableCell>
-                        <TableCell className="font-medium">{txn.amount}</TableCell>
+                        <TableCell className="font-medium">{Number(txn.amount).toLocaleString()}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{txn.paymentMode}</Badge>
+                          <Badge variant="outline">{txn.payment_mode}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -773,7 +721,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                             <HiOutlineClock className="h-4 w-4 shrink-0" />
                             {addon.validity} days
                           </div>
-                          <span className="text-sm font-bold text-primary">AED {addon.price}</span>
+                          <span className="text-sm font-bold text-primary"><CurrencyGlyph /> {addon.price}</span>
                         </div>
                         <Button
                           size="sm"
@@ -853,7 +801,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="amount" className="text-xs font-medium">Amount (AED)</Label>
+                  <Label htmlFor="amount" className="text-xs font-medium">Amount ({currencyCode})</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -923,11 +871,11 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             <Button variant="outline" onClick={() => setIsPurchaseDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmPurchase} className="gap-2">
+            <Button onClick={handleConfirmPurchase} disabled={isSubmitting} className="gap-2">
               <span className="inline-flex items-center justify-center w-4 h-4 shrink-0">
                 <FaCircleCheck className="w-4 h-4" />
               </span>
-              Confirm Purchase
+              {isSubmitting ? "Saving..." : "Confirm Purchase"}
             </Button>
           </div>
         </DialogContent>
@@ -949,7 +897,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
           <div className="px-8 py-6 space-y-2">
             {[
               { label: "Add-on", value: selectedAddon?.name },
-              { label: "Amount", value: `AED ${customAmount}` },
+              { label: "Amount", value: `${currencyCode} ${customAmount}` },
               { label: "Payment", value: paymentMethod },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between text-sm">

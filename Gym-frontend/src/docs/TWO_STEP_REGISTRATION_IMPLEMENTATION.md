@@ -17,7 +17,7 @@ GymBios now features a comprehensive two-step member registration pipeline that 
   - Personal Information (Full Name, DOB, Gender, Address)
   - Health Information (Medical Conditions, Emergency Contact)
 - Form validation with error messages
-- Saves draft to localStorage
+- Saves draft to sessionStorage
 - Shows success toast: "Registration request submitted for approval"
 
 **Color Scheme:** GymBios teal green (#2B7A78) primary, red (#E63946) for health alerts
@@ -83,7 +83,7 @@ GymBios now features a comprehensive two-step member registration pipeline that 
 4. MemberDraftModal opens with plan pre-filled
 5. Fills in personal, identity, and health information
 6. Clicks "Request for On-board"
-7. Draft saved to localStorage
+7. Draft saved to sessionStorage
 8. Success toast displayed
 
 ### Step 2: Approval & Finalization
@@ -103,7 +103,7 @@ GymBios now features a comprehensive two-step member registration pipeline that 
 
 ## Data Storage (Current Implementation)
 
-**localStorage Keys:**
+**sessionStorage Keys:**
 - `pendingMembers`: Array of draft member requests
 - `activeMembers`: Array of approved/active members
 
@@ -112,7 +112,7 @@ GymBios now features a comprehensive two-step member registration pipeline that 
 ## Technical Details
 
 ### State Management
-- Pending members stored in localStorage
+- Pending members stored in sessionStorage
 - Real-time sync via custom events ('pendingMembersUpdated')
 - Automatic component updates on changes
 

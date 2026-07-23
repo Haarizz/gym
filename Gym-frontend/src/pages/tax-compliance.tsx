@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
+import { taxComplianceService, TaxComplianceItem, TaxComplianceCreateRequest } from '../utils/supabase/tax-compliance-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -6,615 +8,513 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
-import { Switch } from "../components/ui/switch";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Calendar } from "../components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
-import { 
-  FileText,
-  Plus,
-  Edit,
-  Trash2,
-  Download,
-  Upload,
-  Calendar as CalendarIcon,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  TrendingUp,
-  Filter,
-  Search,
-  FileSpreadsheet,
-  FileCode,
-  Eye,
-  Settings,
-  History,
-  Bell,
-  ChevronRight,
-  Building2,
-  Receipt,
-  DollarSign,
-  BarChart3,
-  Archive
+import {
+  FileText, Plus, Edit, Trash2, Download, Calendar as CalendarIcon,
+  AlertCircle, CheckCircle, Clock, Filter, Search, FileSpreadsheet,
+  FileCode, Eye, Settings, Building2, Receipt, DollarSign, BarChart3,
+  ChevronRight, Bell
 } from 'lucide-react';
-import { format, addMonths, addQuarters, addYears, isBefore, isAfter, isWithinInterval } from 'date-fns';
+import { format } from 'date-fns';
 
-// Sample data for tax types
-const sampleTaxTypes = [
-  {
-    id: 1,
-    taxType: "Corporate Tax",
-    filingFrequency: "Quarterly",
-    rate: "9%",
-    linkedAccounts: ["Revenue", "Operating Expenses", "Depreciation"],
-    status: "Active",
-    nextDueDate: new Date(2025, 11, 31), // Dec 31, 2025
-    lastFiled: new Date(2025, 8, 30), // Sep 30, 2025
-    currentPeriod: "Q4 2025",
-    amountPayable: 45500
-  },
-  {
-    id: 2,
-    taxType: "VAT",
-    filingFrequency: "Monthly",
-    rate: "5%",
-    linkedAccounts: ["Sales Revenue", "Purchase Expenses"],
-    status: "Active",
-    nextDueDate: new Date(2025, 10, 28), // Nov 28, 2025
-    lastFiled: new Date(2025, 9, 28), // Oct 28, 2025
-    currentPeriod: "November 2025",
-    amountPayable: 12300
-  },
-  {
-    id: 3,
-    taxType: "Excise Tax",
-    filingFrequency: "Quarterly",
-    rate: "50%",
-    linkedAccounts: ["Excisable Goods Revenue"],
-    status: "Active",
-    nextDueDate: new Date(2025, 11, 31), // Dec 31, 2025
-    lastFiled: new Date(2025, 8, 30), // Sep 30, 2025
-    currentPeriod: "Q4 2025",
-    amountPayable: 8900
-  }
+const TAX_TYPE_OPTIONS = [
+  { value: "VAT", label: "VAT (Value Added Tax)" },
+  { value: "CORPORATE_TAX", label: "Corporate Tax" },
+  { value: "EXCISE_TAX", label: "Excise Tax" },
+  { value: "WITHHOLDING_TAX", label: "Withholding Tax" },
+  { value: "CUSTOMS_DUTY", label: "Customs Duty" },
 ];
 
-// Sample filings data
-const sampleFilings = [
-  {
-    id: 1,
-    taxTypeId: 1,
-    taxType: "Corporate Tax",
-    period: "Q3 2025",
-    dueDate: new Date(2025, 8, 30),
-    status: "Filed",
-    amountPayable: 42000,
-    filedDate: new Date(2025, 8, 25),
-    documents: ["Q3_Corporate_Tax_Return.pdf", "Payment_Receipt_42000.pdf"],
-    notes: "Filed on time with all supporting documents"
-  },
-  {
-    id: 2,
-    taxTypeId: 2,
-    taxType: "VAT",
-    period: "October 2025",
-    dueDate: new Date(2025, 9, 28),
-    status: "Filed",
-    amountPayable: 11800,
-    filedDate: new Date(2025, 9, 26),
-    documents: ["October_VAT_Return.pdf", "VAT_Payment_Receipt.pdf"],
-    notes: "Regular monthly filing completed"
-  },
-  {
-    id: 3,
-    taxTypeId: 2,
-    taxType: "VAT",
-    period: "November 2025",
-    dueDate: new Date(2025, 10, 28),
-    status: "Pending",
-    amountPayable: 12300,
-    filedDate: null,
-    documents: [],
-    notes: ""
-  },
-  {
-    id: 4,
-    taxTypeId: 1,
-    taxType: "Corporate Tax",
-    period: "Q4 2025",
-    dueDate: new Date(2025, 11, 31),
-    status: "Pending",
-    amountPayable: 45500,
-    filedDate: null,
-    documents: [],
-    notes: ""
-  },
-  {
-    id: 5,
-    taxTypeId: 3,
-    taxType: "Excise Tax",
-    period: "Q4 2025",
-    dueDate: new Date(2025, 11, 31),
-    status: "Pending",
-    amountPayable: 8900,
-    filedDate: null,
-    documents: [],
-    notes: ""
-  },
-  {
-    id: 6,
-    taxTypeId: 2,
-    taxType: "VAT",
-    period: "September 2025",
-    dueDate: new Date(2025, 8, 28),
-    status: "Overdue",
-    amountPayable: 10500,
-    filedDate: null,
-    documents: [],
-    notes: "Requires immediate attention"
-  }
+const STATUS_OPTIONS = [
+  { value: "PENDING", label: "Pending" },
+  { value: "FILED", label: "Filed" },
+  { value: "OVERDUE", label: "Overdue" },
+  { value: "EXEMPT", label: "Exempt" },
 ];
 
-// Sample audit log data
-const sampleAuditLog = [
-  {
-    id: 1,
-    timestamp: new Date(2025, 9, 26, 14, 30),
-    user: "Sarah Johnson",
-    action: "Filed VAT Return",
-    taxType: "VAT",
-    period: "October 2025",
-    details: "Submitted October VAT return with AED 11,800 payable"
-  },
-  {
-    id: 2,
-    timestamp: new Date(2025, 9, 26, 14, 25),
-    user: "Sarah Johnson",
-    action: "Uploaded Document",
-    taxType: "VAT",
-    period: "October 2025",
-    details: "Uploaded October_VAT_Return.pdf"
-  },
-  {
-    id: 3,
-    timestamp: new Date(2025, 8, 25, 16, 45),
-    user: "Ahmed Hassan",
-    action: "Filed Corporate Tax Return",
-    taxType: "Corporate Tax",
-    period: "Q3 2025",
-    details: "Submitted Q3 Corporate Tax return with AED 42,000 payable"
-  },
-  {
-    id: 4,
-    timestamp: new Date(2025, 8, 20, 10, 15),
-    user: "Sarah Johnson",
-    action: "Updated Configuration",
-    taxType: "VAT",
-    period: "N/A",
-    details: "Updated VAT filing frequency to Monthly"
+function displayTaxType(t: string) {
+  return t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function displayStatus(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+function getStatusColor(status: string) {
+  switch (status.toUpperCase()) {
+    case "FILED": return "bg-green-100 text-green-800 border-green-200";
+    case "PENDING": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    case "OVERDUE": return "bg-red-100 text-red-800 border-red-200";
+    case "EXEMPT": return "bg-blue-100 text-blue-800 border-blue-200";
+    default: return "bg-gray-100 text-gray-800 border-gray-200";
   }
+}
+
+function getStatusIcon(status: string) {
+  switch (status.toUpperCase()) {
+    case "FILED": return <CheckCircle className="h-4 w-4 text-green-600" />;
+    case "PENDING": return <Clock className="h-4 w-4 text-yellow-600" />;
+    case "OVERDUE": return <AlertCircle className="h-4 w-4 text-red-600" />;
+    default: return <Clock className="h-4 w-4 text-gray-400" />;
+  }
+}
+
+function daysUntil(dateStr: string): number {
+  const d = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+const defaultFilingForm = {
+  taxType: "VAT",
+  taxPeriod: "",
+  dueDate: "",
+  filingAmount: "",
+  status: "PENDING",
+  notes: "",
+  documentUrl: "",
+};
+
+const defaultMarkFiledForm = {
+  filedDate: format(new Date(), 'yyyy-MM-dd'),
+  filingAmount: "",
+  filingReference: "",
+};
+
+const defaultConfigForm = {
+  taxType: "",
+  filingFrequency: "Monthly",
+  rate: "",
+  linkedAccounts: "",
+  status: "Active",
+};
+
+const initialTaxTypeConfigs = [
+  { id: 1, taxType: "Corporate Tax", filingFrequency: "Quarterly", rate: "9%", linkedAccounts: ["Revenue", "Operating Expenses", "Depreciation"], status: "Active" },
+  { id: 2, taxType: "VAT", filingFrequency: "Monthly", rate: "5%", linkedAccounts: ["Sales Revenue", "Purchase Expenses"], status: "Active" },
+  { id: 3, taxType: "Excise Tax", filingFrequency: "Quarterly", rate: "50%", linkedAccounts: ["Excisable Goods Revenue"], status: "Active" },
 ];
 
 export function TaxCompliance() {
+  const { currencyCode } = useCurrency();
+  const [filings, setFilings] = useState<TaxComplianceItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const [taxTypes, setTaxTypes] = useState(sampleTaxTypes);
-  const [filings, setFilings] = useState(sampleFilings);
-  const [auditLog] = useState(sampleAuditLog);
-  const [showConfigDialog, setShowConfigDialog] = useState(false);
-  const [showFilingDialog, setShowFilingDialog] = useState(false);
-  const [editingTaxType, setEditingTaxType] = useState<typeof sampleTaxTypes[0] | null>(null);
-  const [selectedFiling, setSelectedFiling] = useState<typeof sampleFilings[0] | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterTaxType, setFilterTaxType] = useState("all");
-  const [showAuditLog, setShowAuditLog] = useState(false);
 
-  // Form data for tax configuration
-  const [configFormData, setConfigFormData] = useState({
-    taxType: "",
-    filingFrequency: "Monthly",
-    rate: "",
-    linkedAccounts: "",
-    status: "Active"
+  // Filing add/edit dialog
+  const [showFilingDialog, setShowFilingDialog] = useState(false);
+  const [editingFiling, setEditingFiling] = useState<TaxComplianceItem | null>(null);
+  const [filingForm, setFilingForm] = useState(defaultFilingForm);
+  const [savingFiling, setSavingFiling] = useState(false);
+
+  // Mark Filed dialog
+  const [showMarkFiledDialog, setShowMarkFiledDialog] = useState(false);
+  const [markFiledTarget, setMarkFiledTarget] = useState<TaxComplianceItem | null>(null);
+  const [markFiledForm, setMarkFiledForm] = useState(defaultMarkFiledForm);
+  const [savingMarkFiled, setSavingMarkFiled] = useState(false);
+
+  // View filing dialog
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [viewingFiling, setViewingFiling] = useState<TaxComplianceItem | null>(null);
+
+  // Configuration tab — local state only (no backend entity for tax type config)
+  const [taxTypeConfigs, setTaxTypeConfigs] = useState(initialTaxTypeConfigs);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<typeof initialTaxTypeConfigs[0] | null>(null);
+  const [configForm, setConfigForm] = useState(defaultConfigForm);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await taxComplianceService.getAll();
+      setFilings(data);
+    } catch { /* silently degrade */ } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // ── Summary stats ────────────────────────────────────────────────────
+  const totalPendingAmount = filings
+    .filter(f => f.status === 'PENDING' || f.status === 'OVERDUE')
+    .reduce((sum, f) => sum + (f.filingAmount ?? 0), 0);
+
+  const overdueCount = filings.filter(f => f.status === 'OVERDUE').length;
+
+  const dueThisWeekCount = filings.filter(f => {
+    if (f.status !== 'PENDING' || !f.dueDate) return false;
+    const d = daysUntil(f.dueDate);
+    return d >= 0 && d <= 7;
+  }).length;
+
+  const filedThisMonth = filings.filter(f => {
+    if (!f.filedDate) return false;
+    const d = new Date(f.filedDate);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+
+  // ── Overview: group by taxType ────────────────────────────────────────
+  const uniqueTaxTypes = [...new Set(filings.map(f => f.taxType))];
+
+  // ── Filtered filings (Filings tab) ───────────────────────────────────
+  const filteredFilings = filings.filter(f => {
+    const label = displayTaxType(f.taxType).toLowerCase();
+    const matchesSearch = label.includes(searchTerm.toLowerCase()) ||
+      f.taxPeriod.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (f.filingReference ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || f.status.toLowerCase() === filterStatus.toLowerCase();
+    const matchesTaxType = filterTaxType === 'all' || f.taxType === filterTaxType;
+    return matchesSearch && matchesStatus && matchesTaxType;
   });
 
-  // Form data for filing
-  const [filingFormData, setFilingFormData] = useState({
-    period: "",
-    amountPayable: "",
-    notes: "",
-    status: "Filed"
-  });
-
-  const resetConfigForm = () => {
-    setConfigFormData({
-      taxType: "",
-      filingFrequency: "Monthly",
-      rate: "",
-      linkedAccounts: "",
-      status: "Active"
-    });
-    setEditingTaxType(null);
+  // ── Filing CRUD ───────────────────────────────────────────────────────
+  const openAdd = () => {
+    setEditingFiling(null);
+    setFilingForm(defaultFilingForm);
+    setShowFilingDialog(true);
   };
 
-  const resetFilingForm = () => {
-    setFilingFormData({
-      period: "",
-      amountPayable: "",
-      notes: "",
-      status: "Filed"
-    });
-    setSelectedFiling(null);
-  };
-
-  const handleAddTaxType = () => {
-    const newTaxType = {
-      id: Date.now(),
-      taxType: configFormData.taxType,
-      filingFrequency: configFormData.filingFrequency,
-      rate: configFormData.rate,
-      linkedAccounts: configFormData.linkedAccounts.split(",").map(a => a.trim()),
-      status: configFormData.status as "Active" | "Inactive",
-      nextDueDate: addMonths(new Date(), 1),
-      lastFiled: null,
-      currentPeriod: format(new Date(), "MMMM yyyy"),
-      amountPayable: 0
-    };
-    setTaxTypes([...taxTypes, newTaxType]);
-    setShowConfigDialog(false);
-    resetConfigForm();
-  };
-
-  const handleUpdateTaxType = () => {
-    if (!editingTaxType) return;
-    const updatedTaxTypes = taxTypes.map(tt => 
-      tt.id === editingTaxType.id 
-        ? {
-            ...tt,
-            taxType: configFormData.taxType,
-            filingFrequency: configFormData.filingFrequency,
-            rate: configFormData.rate,
-            linkedAccounts: configFormData.linkedAccounts.split(",").map(a => a.trim()),
-            status: configFormData.status as "Active" | "Inactive"
-          }
-        : tt
-    );
-    setTaxTypes(updatedTaxTypes);
-    setShowConfigDialog(false);
-    resetConfigForm();
-  };
-
-  const handleEditTaxType = (taxType: typeof sampleTaxTypes[0]) => {
-    setEditingTaxType(taxType);
-    setConfigFormData({
-      taxType: taxType.taxType,
-      filingFrequency: taxType.filingFrequency,
-      rate: taxType.rate,
-      linkedAccounts: taxType.linkedAccounts.join(", "),
-      status: taxType.status
-    });
-    setShowConfigDialog(true);
-  };
-
-  const handleDeleteTaxType = (id: number) => {
-    setTaxTypes(taxTypes.filter(tt => tt.id !== id));
-  };
-
-  const handleUpdateFiling = () => {
-    if (!selectedFiling) return;
-    const updatedFilings = filings.map(f =>
-      f.id === selectedFiling.id
-        ? {
-            ...f,
-            status: filingFormData.status as "Pending" | "Filed" | "Overdue",
-            amountPayable: parseFloat(filingFormData.amountPayable) || f.amountPayable,
-            notes: filingFormData.notes,
-            filedDate: filingFormData.status === "Filed" ? new Date() : null
-          }
-        : f
-    );
-    setFilings(updatedFilings);
-    setShowFilingDialog(false);
-    resetFilingForm();
-  };
-
-  const handleEditFiling = (filing: typeof sampleFilings[0]) => {
-    setSelectedFiling(filing);
-    setFilingFormData({
-      period: filing.period,
-      amountPayable: filing.amountPayable.toString(),
-      notes: filing.notes,
-      status: filing.status
+  const openEdit = (f: TaxComplianceItem) => {
+    setEditingFiling(f);
+    setFilingForm({
+      taxType: f.taxType,
+      taxPeriod: f.taxPeriod,
+      dueDate: f.dueDate,
+      filingAmount: f.filingAmount?.toString() ?? "",
+      status: f.status,
+      notes: f.notes ?? "",
+      documentUrl: f.documentUrl ?? "",
     });
     setShowFilingDialog(true);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Filed": return "bg-green-100 text-green-800 border-green-200";
-      case "Pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "Overdue": return "bg-red-100 text-red-800 border-red-200";
-      case "Active": return "bg-green-100 text-green-800 border-green-200";
-      case "Inactive": return "bg-gray-100 text-gray-800 border-gray-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+  const handleSaveFiling = async () => {
+    setSavingFiling(true);
+    try {
+      const req: TaxComplianceCreateRequest = {
+        taxType: filingForm.taxType,
+        taxPeriod: filingForm.taxPeriod,
+        dueDate: filingForm.dueDate,
+        filingAmount: filingForm.filingAmount ? parseFloat(filingForm.filingAmount) : undefined,
+        status: filingForm.status,
+        notes: filingForm.notes || undefined,
+        documentUrl: filingForm.documentUrl || undefined,
+      };
+      if (editingFiling) {
+        await taxComplianceService.update(editingFiling.id, req);
+      } else {
+        await taxComplianceService.create(req);
+      }
+      setShowFilingDialog(false);
+      await load();
+    } catch { /* ignore */ } finally {
+      setSavingFiling(false);
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Filed": return <CheckCircle className="h-4 w-4" />;
-      case "Pending": return <Clock className="h-4 w-4" />;
-      case "Overdue": return <AlertCircle className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+  const openMarkFiled = (f: TaxComplianceItem) => {
+    setMarkFiledTarget(f);
+    setMarkFiledForm({
+      filedDate: format(new Date(), 'yyyy-MM-dd'),
+      filingAmount: f.filingAmount?.toString() ?? "",
+      filingReference: f.filingReference ?? "",
+    });
+    setShowMarkFiledDialog(true);
+  };
+
+  const handleMarkFiled = async () => {
+    if (!markFiledTarget) return;
+    setSavingMarkFiled(true);
+    try {
+      await taxComplianceService.markFiled(markFiledTarget.id, {
+        filedDate: markFiledForm.filedDate,
+        filingAmount: markFiledForm.filingAmount ? parseFloat(markFiledForm.filingAmount) : undefined,
+        filingReference: markFiledForm.filingReference || undefined,
+      });
+      setShowMarkFiledDialog(false);
+      await load();
+    } catch { /* ignore */ } finally {
+      setSavingMarkFiled(false);
     }
   };
 
-  const filteredFilings = filings.filter(filing => {
-    const matchesSearch = filing.taxType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          filing.period.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === "all" || filing.status.toLowerCase() === filterStatus.toLowerCase();
-    const matchesTaxType = filterTaxType === "all" || filing.taxType === filterTaxType;
-    return matchesSearch && matchesStatus && matchesTaxType;
-  });
-
-  const getDaysUntilDue = (dueDate: Date) => {
-    const today = new Date();
-    const diffTime = dueDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Delete this filing record?")) return;
+    try {
+      await taxComplianceService.delete(id);
+      await load();
+    } catch { /* ignore */ }
   };
 
-  // Calculate summary stats
-  const totalPendingAmount = filings
-    .filter(f => f.status === "Pending" || f.status === "Overdue")
-    .reduce((sum, f) => sum + f.amountPayable, 0);
-  
-  const overdueFilings = filings.filter(f => f.status === "Overdue").length;
-  const upcomingFilings = filings.filter(f => {
-    const daysUntil = getDaysUntilDue(f.dueDate);
-    return f.status === "Pending" && daysUntil <= 7 && daysUntil >= 0;
-  }).length;
-  const filedThisMonth = filings.filter(f => {
-    const filedDate = f.filedDate;
-    if (!filedDate) return false;
-    const now = new Date();
-    return filedDate.getMonth() === now.getMonth() && filedDate.getFullYear() === now.getFullYear();
-  }).length;
+  // ── Config tab (local only) ───────────────────────────────────────────
+  const openAddConfig = () => {
+    setEditingConfig(null);
+    setConfigForm(defaultConfigForm);
+    setShowConfigDialog(true);
+  };
+
+  const openEditConfig = (c: typeof initialTaxTypeConfigs[0]) => {
+    setEditingConfig(c);
+    setConfigForm({
+      taxType: c.taxType,
+      filingFrequency: c.filingFrequency,
+      rate: c.rate,
+      linkedAccounts: c.linkedAccounts.join(", "),
+      status: c.status,
+    });
+    setShowConfigDialog(true);
+  };
+
+  const handleSaveConfig = () => {
+    const accounts = configForm.linkedAccounts.split(',').map(a => a.trim()).filter(Boolean);
+    if (editingConfig) {
+      setTaxTypeConfigs(prev => prev.map(c => c.id === editingConfig.id
+        ? { ...c, taxType: configForm.taxType, filingFrequency: configForm.filingFrequency, rate: configForm.rate, linkedAccounts: accounts, status: configForm.status }
+        : c));
+    } else {
+      setTaxTypeConfigs(prev => [...prev, { id: Date.now(), taxType: configForm.taxType, filingFrequency: configForm.filingFrequency, rate: configForm.rate, linkedAccounts: accounts, status: configForm.status }]);
+    }
+    setShowConfigDialog(false);
+  };
+
+  const handleDeleteConfig = (id: number) => {
+    setTaxTypeConfigs(prev => prev.filter(c => c.id !== id));
+  };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-3">
-            <Receipt className="h-8 w-8" style={{ color: '#2B7A78' }} />
-            Tax Compliance Dashboard
-          </h1>
-          <p className="text-muted-foreground">Manage Corporate Tax, VAT, and Excise Tax compliance in one centralized interface</p>
+          <h1 className="text-3xl font-bold">Tax Compliance Dashboard</h1>
+          <p className="text-gray-600 mt-1">Manage Corporate Tax, VAT, and Excise Tax compliance in one centralized interface</p>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowAuditLog(true)}
-          >
-            <History className="mr-2 h-4 w-4" />
-            Audit Log
-          </Button>
-          <Button 
-            onClick={() => setShowConfigDialog(true)}
-            style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Tax Type
-          </Button>
-        </div>
+        <Button
+          size="sm"
+          className="bg-primary hover:bg-primary/90 shadow-sm hover:shadow-md transition-all"
+          onClick={openAdd}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add Filing
+        </Button>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border-l-4" style={{ borderLeftColor: '#2B7A78' }}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pending Amount</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Total Pending Amount</CardTitle>
+            <div className="bg-emerald-50 p-2 rounded-lg"><DollarSign className="h-4 w-4 text-emerald-600" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">AED {totalPendingAmount.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across all tax types
-            </p>
+            <div className="text-2xl font-bold text-emerald-700"><CurrencyGlyph /> {totalPendingAmount.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">Across all tax types</p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4" style={{ borderLeftColor: '#E63946' }}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue Filings</CardTitle>
-            <AlertCircle className="h-4 w-4" style={{ color: '#E63946' }} />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Overdue Filings</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg"><AlertCircle className="h-4 w-4 text-red-600" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{overdueFilings}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Requires immediate attention
-            </p>
+            <div className="text-2xl font-bold text-red-700">{overdueCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">Requires immediate attention</p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-yellow-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Due This Week</CardTitle>
-            <Bell className="h-4 w-4 text-yellow-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Due This Week</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg"><Bell className="h-4 w-4 text-yellow-600" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{upcomingFilings}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Upcoming in next 7 days
-            </p>
+            <div className="text-2xl font-bold text-yellow-700">{dueThisWeekCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">Upcoming in next 7 days</p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Filed This Month</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">Filed This Month</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg"><CheckCircle className="h-4 w-4 text-green-600" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{filedThisMonth}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Successfully completed
-            </p>
+            <div className="text-2xl font-bold text-green-700">{filedThisMonth}</div>
+            <p className="text-xs text-muted-foreground mt-1">Successfully completed</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content Tabs */}
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">
-            <BarChart3 className="mr-2 h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="configuration">
-            <Settings className="mr-2 h-4 w-4" />
-            Configuration
-          </TabsTrigger>
-          <TabsTrigger value="reports">
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Reports
-          </TabsTrigger>
-          <TabsTrigger value="filings">
-            <FileText className="mr-2 h-4 w-4" />
-            Filings
-          </TabsTrigger>
+          <TabsTrigger value="overview"><BarChart3 className="mr-2 h-4 w-4" />Overview</TabsTrigger>
+          <TabsTrigger value="configuration"><Settings className="mr-2 h-4 w-4" />Configuration</TabsTrigger>
+          <TabsTrigger value="reports"><FileSpreadsheet className="mr-2 h-4 w-4" />Reports</TabsTrigger>
+          <TabsTrigger value="filings"><FileText className="mr-2 h-4 w-4" />Filings</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {taxTypes.filter(tt => tt.status === "Active").map((taxType) => {
-              const daysUntil = getDaysUntilDue(taxType.nextDueDate);
-              const isUrgent = daysUntil <= 7 && daysUntil >= 0;
-              
-              return (
-                <Card key={taxType.id} className={`${isUrgent ? 'border-2' : 'border'}`} style={isUrgent ? { borderColor: '#E63946' } : {}}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{taxType.taxType}</CardTitle>
-                      <Badge className={getStatusColor(taxType.status)}>
-                        {taxType.status}
-                      </Badge>
-                    </div>
-                    <CardDescription>{taxType.currentPeriod}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-muted-foreground">Next Due Date</span>
-                        {isUrgent && <Badge variant="outline" className="text-xs" style={{ color: '#E63946', borderColor: '#E63946' }}>
-                          {daysUntil} days left
-                        </Badge>}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{format(taxType.nextDueDate, "dd MMM yyyy")}</span>
-                      </div>
-                    </div>
+        {/* ── Overview Tab ── */}
+        <TabsContent value="overview" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground">Loading...</div>
+          ) : uniqueTaxTypes.length === 0 ? (
+            <Card className="bg-white shadow-sm">
+              <CardContent className="py-12 text-center text-muted-foreground">
+                No filings yet. Click <strong>Add Filing</strong> to create the first record.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {uniqueTaxTypes.map(taxType => {
+                const typeFilings = filings.filter(f => f.taxType === taxType);
+                const pending = typeFilings.filter(f => f.status === 'PENDING' || f.status === 'OVERDUE');
+                const nextDue = pending.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
+                const totalOwed = pending.reduce((s, f) => s + (f.filingAmount ?? 0), 0);
+                const lastFiled = typeFilings
+                  .filter(f => f.status === 'FILED' && f.filedDate)
+                  .sort((a, b) => new Date(b.filedDate!).getTime() - new Date(a.filedDate!).getTime())[0];
+                const isUrgent = nextDue && daysUntil(nextDue.dueDate) <= 7 && daysUntil(nextDue.dueDate) >= 0;
 
-                    <div>
-                      <div className="text-sm text-muted-foreground mb-1">Amount Payable</div>
-                      <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
-                        AED {taxType.amountPayable.toLocaleString()}
+                return (
+                  <Card key={taxType} className={`bg-white border border-gray-100 shadow-sm ${isUrgent ? 'ring-2 ring-red-200' : ''}`}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{displayTaxType(taxType)}</CardTitle>
+                        {nextDue && (
+                          <Badge className={getStatusColor(nextDue.status)}>
+                            {displayStatus(nextDue.status)}
+                          </Badge>
+                        )}
                       </div>
-                    </div>
+                      <CardDescription>{typeFilings.length} filing{typeFilings.length !== 1 ? 's' : ''} total</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {nextDue && (
+                        <div>
+                          <div className="flex items-center justify-between text-sm mb-1">
+                            <span className="text-muted-foreground">Next Due Date</span>
+                            {isUrgent && (
+                              <Badge variant="outline" className="text-xs text-red-600 border-red-300">
+                                {daysUntil(nextDue.dueDate)} days left
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{format(new Date(nextDue.dueDate), "dd MMM yyyy")}</span>
+                          </div>
+                        </div>
+                      )}
 
-                    <div>
-                      <div className="text-sm text-muted-foreground mb-1">Filing Frequency</div>
-                      <Badge variant="outline">{taxType.filingFrequency}</Badge>
-                    </div>
-
-                    {taxType.lastFiled && (
                       <div>
-                        <div className="text-sm text-muted-foreground mb-1">Last Filed</div>
-                        <div className="text-sm">{format(taxType.lastFiled, "dd MMM yyyy")}</div>
+                        <div className="text-sm text-muted-foreground mb-1">Pending Amount</div>
+                        <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
+                          <CurrencyGlyph /> {totalOwed.toLocaleString()}
+                        </div>
                       </div>
-                    )}
 
-                    <Button 
-                      className="w-full mt-4"
-                      variant="outline"
-                      onClick={() => {
-                        const filing = filings.find(f => 
-                          f.taxTypeId === taxType.id && f.status === "Pending"
-                        );
-                        if (filing) handleEditFiling(filing);
-                      }}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      File Return
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                      {lastFiled && (
+                        <div>
+                          <div className="text-sm text-muted-foreground mb-1">Last Filed</div>
+                          <div className="text-sm">{format(new Date(lastFiled.filedDate!), "dd MMM yyyy")}</div>
+                        </div>
+                      )}
+
+                      {nextDue && nextDue.status !== 'FILED' && (
+                        <Button
+                          className="w-full mt-4 bg-white shadow-sm hover:shadow-md border border-gray-200"
+                          variant="ghost"
+                          onClick={() => openMarkFiled(nextDue)}
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          File Return
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
 
           {/* Filing Calendar */}
-          <Card>
+          <Card className="bg-white border border-gray-100 shadow-sm">
             <CardHeader>
               <CardTitle>Filing Calendar</CardTitle>
               <CardDescription>Upcoming due dates and filing statuses</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {filings
-                  .filter(f => f.status !== "Filed")
-                  .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
-                  .slice(0, 5)
-                  .map((filing) => {
-                    const daysUntil = getDaysUntilDue(filing.dueDate);
-                    return (
-                      <div key={filing.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center justify-center w-12 h-12 rounded-lg" style={{ backgroundColor: '#F0F9F9' }}>
-                            {getStatusIcon(filing.status)}
-                          </div>
-                          <div>
-                            <div className="font-medium">{filing.taxType}</div>
-                            <div className="text-sm text-muted-foreground">{filing.period}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="text-sm font-medium">AED {filing.amountPayable.toLocaleString()}</div>
-                            <div className="text-sm text-muted-foreground">
-                              Due: {format(filing.dueDate, "dd MMM yyyy")}
+              {filings.filter(f => f.status !== 'FILED').length === 0 ? (
+                <p className="text-center py-6 text-muted-foreground">No pending or overdue filings.</p>
+              ) : (
+                <div className="space-y-3">
+                  {filings
+                    .filter(f => f.status !== 'FILED')
+                    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+                    .slice(0, 6)
+                    .map(f => {
+                      const days = daysUntil(f.dueDate);
+                      return (
+                        <div key={f.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-50">
+                              {getStatusIcon(f.status)}
+                            </div>
+                            <div>
+                              <div className="font-medium">{displayTaxType(f.taxType)}</div>
+                              <div className="text-sm text-muted-foreground">{f.taxPeriod}</div>
                             </div>
                           </div>
-                          <Badge className={getStatusColor(filing.status)}>
-                            {filing.status}
-                          </Badge>
-                          <Button variant="ghost" size="sm" onClick={() => handleEditFiling(filing)}>
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className="text-sm font-medium">
+                                {f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Due: {format(new Date(f.dueDate), "dd MMM yyyy")}
+                              </div>
+                            </div>
+                            <Badge className={getStatusColor(f.status)}>{displayStatus(f.status)}</Badge>
+                            <Button variant="ghost" size="sm" onClick={() => openMarkFiled(f)}>
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-              </div>
+                      );
+                    })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Configuration Tab */}
-        <TabsContent value="configuration" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tax Type Configuration</CardTitle>
-              <CardDescription>Define and manage tax types, filing frequencies, and linked accounts</CardDescription>
+        {/* ── Configuration Tab (local only) ── */}
+        <TabsContent value="configuration" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="bg-white border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Tax Type Configuration</CardTitle>
+                <CardDescription>Define tax types, filing frequencies, and linked accounts</CardDescription>
+              </div>
+              <Button size="sm" onClick={openAddConfig}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Tax Type
+              </Button>
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50">
                   <TableRow>
                     <TableHead>Tax Type</TableHead>
                     <TableHead>Filing Frequency</TableHead>
@@ -625,48 +525,32 @@ export function TaxCompliance() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {taxTypes.map((taxType) => (
-                    <TableRow key={taxType.id}>
-                      <TableCell>
-                        <div className="font-medium">{taxType.taxType}</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{taxType.filingFrequency}</Badge>
-                      </TableCell>
-                      <TableCell>{taxType.rate}</TableCell>
+                  {taxTypeConfigs.map(c => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">{c.taxType}</TableCell>
+                      <TableCell><Badge variant="outline">{c.filingFrequency}</Badge></TableCell>
+                      <TableCell>{c.rate}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {taxType.linkedAccounts.slice(0, 2).map((account, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
-                              {account}
-                            </Badge>
+                          {c.linkedAccounts.slice(0, 2).map((a, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">{a}</Badge>
                           ))}
-                          {taxType.linkedAccounts.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{taxType.linkedAccounts.length - 2} more
-                            </Badge>
+                          {c.linkedAccounts.length > 2 && (
+                            <Badge variant="outline" className="text-xs">+{c.linkedAccounts.length - 2} more</Badge>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(taxType.status)}>
-                          {taxType.status}
+                        <Badge className={c.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                          {c.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleEditTaxType(taxType)}
-                          >
+                          <Button variant="outline" size="sm" onClick={() => openEditConfig(c)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleDeleteTaxType(taxType.id)}
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleDeleteConfig(c.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -679,10 +563,10 @@ export function TaxCompliance() {
           </Card>
         </TabsContent>
 
-        {/* Reports Tab */}
-        <TabsContent value="reports" className="space-y-6">
+        {/* ── Reports Tab (static) ── */}
+        <TabsContent value="reports" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Building2 className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -692,37 +576,19 @@ export function TaxCompliance() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Revenue</span>
-                    <span className="font-medium">AED 1,850,000</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Deductions</span>
-                    <span className="font-medium">AED 1,344,440</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Taxable Profit</span>
-                    <span className="font-medium">AED 505,560</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t">
-                    <span className="font-medium">Tax Payable (9%)</span>
-                    <span className="font-bold" style={{ color: '#2B7A78' }}>AED 45,500</span>
-                  </div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Revenue</span><span className="font-medium"><CurrencyGlyph /> 1,850,000</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Deductions</span><span className="font-medium"><CurrencyGlyph /> 1,344,440</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxable Profit</span><span className="font-medium"><CurrencyGlyph /> 505,560</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Tax Payable (9%)</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 45,500</span></div>
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1" variant="outline" size="sm">
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    Excel
-                  </Button>
-                  <Button className="flex-1" variant="outline" size="sm">
-                    <FileText className="mr-2 h-4 w-4" />
-                    PDF
-                  </Button>
+                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
+                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileText className="mr-2 h-4 w-4" />PDF</Button>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Receipt className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -732,33 +598,18 @@ export function TaxCompliance() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Output VAT (5%)</span>
-                    <span className="font-medium">AED 92,500</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Input VAT (5%)</span>
-                    <span className="font-medium">AED 80,200</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t">
-                    <span className="font-medium">Net VAT Payable</span>
-                    <span className="font-bold" style={{ color: '#2B7A78' }}>AED 12,300</span>
-                  </div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Output VAT (5%)</span><span className="font-medium"><CurrencyGlyph /> 92,500</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Input VAT (5%)</span><span className="font-medium"><CurrencyGlyph /> 80,200</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Net VAT Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 12,300</span></div>
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1" variant="outline" size="sm">
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    Excel
-                  </Button>
-                  <Button className="flex-1" variant="outline" size="sm">
-                    <FileCode className="mr-2 h-4 w-4" />
-                    XML
-                  </Button>
+                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
+                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileCode className="mr-2 h-4 w-4" />XML</Button>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <DollarSign className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -768,312 +619,317 @@ export function TaxCompliance() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Excisable Goods Value</span>
-                    <span className="font-medium">AED 17,800</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tax Rate</span>
-                    <span className="font-medium">50%</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t">
-                    <span className="font-medium">Excise Tax Payable</span>
-                    <span className="font-bold" style={{ color: '#2B7A78' }}>AED 8,900</span>
-                  </div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Excisable Goods Value</span><span className="font-medium"><CurrencyGlyph /> 17,800</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax Rate</span><span className="font-medium">50%</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Excise Tax Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 8,900</span></div>
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1" variant="outline" size="sm">
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    Excel
-                  </Button>
-                  <Button className="flex-1" variant="outline" size="sm">
-                    <FileText className="mr-2 h-4 w-4" />
-                    PDF
-                  </Button>
+                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
+                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileText className="mr-2 h-4 w-4" />PDF</Button>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Filing History */}
-          <Card>
+          {/* Filing History from API */}
+          <Card className="bg-white border-0 shadow-sm">
             <CardHeader>
-              <CardTitle>Filing History</CardTitle>
-              <CardDescription>Log of all submitted returns and payment statuses</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Filing History</CardTitle>
+                  <CardDescription>Log of all submitted returns</CardDescription>
+                </div>
+                <div className="flex gap-3">
+                  <Select value={filterTaxType} onValueChange={setFilterTaxType}>
+                    <SelectTrigger className="w-[180px] shadow-sm"><SelectValue placeholder="All Tax Types" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Tax Types</SelectItem>
+                      {TAX_TYPE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="mb-4 flex gap-4">
-                <Select value={filterTaxType} onValueChange={setFilterTaxType}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="All Tax Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Tax Types</SelectItem>
-                    <SelectItem value="Corporate Tax">Corporate Tax</SelectItem>
-                    <SelectItem value="VAT">VAT</SelectItem>
-                    <SelectItem value="Excise Tax">Excise Tax</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="filed">Filed</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button variant="outline">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Report
-                </Button>
-              </div>
-
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50">
                   <TableRow>
                     <TableHead>Tax Type</TableHead>
                     <TableHead>Period</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Filed Date</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Reference</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredFilings
-                    .filter(f => f.status === "Filed")
-                    .sort((a, b) => (b.filedDate?.getTime() || 0) - (a.filedDate?.getTime() || 0))
-                    .map((filing) => (
-                      <TableRow key={filing.id}>
+                  {filings
+                    .filter(f => f.status === 'FILED' && (filterTaxType === 'all' || f.taxType === filterTaxType))
+                    .sort((a, b) => new Date(b.filedDate ?? 0).getTime() - new Date(a.filedDate ?? 0).getTime())
+                    .map(f => (
+                      <TableRow key={f.id}>
+                        <TableCell className="font-medium">{displayTaxType(f.taxType)}</TableCell>
+                        <TableCell>{f.taxPeriod}</TableCell>
+                        <TableCell>{format(new Date(f.dueDate), "dd MMM yyyy")}</TableCell>
+                        <TableCell>{f.filedDate ? format(new Date(f.filedDate), "dd MMM yyyy") : '—'}</TableCell>
+                        <TableCell>{f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}</TableCell>
+                        <TableCell>{f.filingReference ?? '—'}</TableCell>
                         <TableCell>
-                          <div className="font-medium">{filing.taxType}</div>
-                        </TableCell>
-                        <TableCell>{filing.period}</TableCell>
-                        <TableCell>{format(filing.dueDate, "dd MMM yyyy")}</TableCell>
-                        <TableCell>
-                          {filing.filedDate ? format(filing.filedDate, "dd MMM yyyy") : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium">AED {filing.amountPayable.toLocaleString()}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(filing.status)}>
-                            {getStatusIcon(filing.status)}
-                            <span className="ml-1">{filing.status}</span>
+                          <Badge className={getStatusColor(f.status)}>
+                            {getStatusIcon(f.status)}
+                            <span className="ml-1">{displayStatus(f.status)}</span>
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
+                  {filings.filter(f => f.status === 'FILED').length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No filed returns yet.</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Filings Tab */}
-        <TabsContent value="filings" className="space-y-6">
-          <Card>
+        {/* ── Filings Tab (full CRUD) ── */}
+        <TabsContent value="filings" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="bg-white border-0 shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Tax Filings Management</CardTitle>
-                  <CardDescription>Manage tax periods, filing due dates, and document uploads</CardDescription>
+                  <CardDescription>Manage all tax periods, due dates, and filing statuses</CardDescription>
                 </div>
+                <Button size="sm" onClick={openAdd}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Filing
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="mb-4 flex gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <div className="mb-4 flex flex-wrap gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by tax type or period..."
+                    placeholder="Search tax type, period, reference..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={e => setSearchTerm(e.target.value)}
                     className="pl-10"
                   />
                 </div>
-
                 <Select value={filterTaxType} onValueChange={setFilterTaxType}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="All Tax Types" />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-[200px] shadow-sm"><SelectValue placeholder="All Tax Types" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Tax Types</SelectItem>
-                    <SelectItem value="Corporate Tax">Corporate Tax</SelectItem>
-                    <SelectItem value="VAT">VAT</SelectItem>
-                    <SelectItem value="Excise Tax">Excise Tax</SelectItem>
+                    {TAX_TYPE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
-
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-[160px] shadow-sm"><SelectValue placeholder="All Statuses" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="filed">Filed</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
+                    {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-3">
-                {filteredFilings.map((filing) => {
-                  const daysUntil = getDaysUntilDue(filing.dueDate);
-                  const isUrgent = daysUntil <= 7 && daysUntil >= 0 && filing.status !== "Filed";
-
-                  return (
-                    <div 
-                      key={filing.id} 
-                      className={`p-4 border rounded-lg hover:bg-muted/50 transition-colors ${isUrgent ? 'border-2' : ''}`}
-                      style={isUrgent ? { borderColor: '#E63946' } : {}}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex gap-4 flex-1">
-                          <div className="flex items-center justify-center w-12 h-12 rounded-lg" style={{ backgroundColor: '#F0F9F9' }}>
-                            {getStatusIcon(filing.status)}
-                          </div>
-                          <div className="flex-1 space-y-3">
-                            <div>
-                              <div className="flex items-center gap-3">
-                                <h3 className="font-semibold">{filing.taxType}</h3>
-                                <Badge className={getStatusColor(filing.status)}>
-                                  {filing.status}
-                                </Badge>
+              {loading ? (
+                <div className="text-center py-12 text-muted-foreground">Loading...</div>
+              ) : filteredFilings.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">No filings match your filters.</div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredFilings.map(f => {
+                    const days = f.dueDate ? daysUntil(f.dueDate) : null;
+                    const isUrgent = days !== null && days >= 0 && days <= 7 && f.status === 'PENDING';
+                    return (
+                      <div
+                        key={f.id}
+                        className={`p-4 rounded-lg bg-white shadow-sm hover:shadow-md transition-all border border-gray-100 ${isUrgent ? 'ring-2 ring-red-200' : ''}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex gap-4 flex-1">
+                            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-50 shrink-0">
+                              {getStatusIcon(f.status)}
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <h3 className="font-semibold">{displayTaxType(f.taxType)}</h3>
+                                <Badge className={getStatusColor(f.status)}>{displayStatus(f.status)}</Badge>
+                                {f.isOverdue && f.status !== 'FILED' && (
+                                  <Badge variant="outline" className="border-red-200 text-red-600 text-xs">
+                                    <AlertCircle className="h-3 w-3 mr-1" />Overdue
+                                  </Badge>
+                                )}
                                 {isUrgent && (
-                                  <Badge variant="outline" style={{ color: '#E63946', borderColor: '#E63946' }}>
-                                    <AlertCircle className="h-3 w-3 mr-1" />
-                                    Due in {daysUntil} days
+                                  <Badge variant="outline" className="border-orange-200 text-orange-600 text-xs">
+                                    Due in {days} days
                                   </Badge>
                                 )}
                               </div>
-                              <div className="text-sm text-muted-foreground mt-1">
-                                Tax Period: {filing.period}
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Due Date:</span>
-                                <div className="font-medium">{format(filing.dueDate, "dd MMM yyyy")}</div>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Amount:</span>
-                                <div className="font-medium" style={{ color: '#2B7A78' }}>
-                                  AED {filing.amountPayable.toLocaleString()}
+                              <div className="text-sm text-muted-foreground">Period: {f.taxPeriod}</div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground">Due:</span>
+                                  <div className="font-medium">{f.dueDate ? format(new Date(f.dueDate), "dd MMM yyyy") : '—'}</div>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Amount:</span>
+                                  <div className="font-medium" style={{ color: '#2B7A78' }}>
+                                    {f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Filed:</span>
+                                  <div className="font-medium">{f.filedDate ? format(new Date(f.filedDate), "dd MMM yyyy") : '—'}</div>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Reference:</span>
+                                  <div className="font-medium">{f.filingReference ?? '—'}</div>
                                 </div>
                               </div>
-                              <div>
-                                <span className="text-muted-foreground">Documents:</span>
-                                <div className="font-medium">{filing.documents.length} file(s)</div>
-                              </div>
+                              {f.notes && (
+                                <div className="text-sm p-2 bg-slate-50 rounded">
+                                  <span className="text-muted-foreground">Notes: </span>{f.notes}
+                                </div>
+                              )}
                             </div>
-
-                            {filing.notes && (
-                              <div className="text-sm p-2 bg-muted rounded">
-                                <span className="text-muted-foreground">Notes: </span>
-                                {filing.notes}
-                              </div>
+                          </div>
+                          <div className="flex gap-2 shrink-0">
+                            {f.status !== 'FILED' && (
+                              <Button variant="ghost" size="sm" className="text-green-700 hover:bg-green-50" onClick={() => openMarkFiled(f)} title="Mark as Filed">
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
                             )}
-
-                            {filing.documents.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
-                                {filing.documents.map((doc, idx) => (
-                                  <Badge key={idx} variant="outline" className="text-xs">
-                                    <FileText className="h-3 w-3 mr-1" />
-                                    {doc}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(f)} title="Edit">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => handleDelete(f.id)} title="Delete">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleEditFiling(filing)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                          >
-                            <Upload className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Tax Configuration Dialog */}
-      <Dialog open={showConfigDialog} onOpenChange={(open) => {
-        setShowConfigDialog(open);
-        if (!open) resetConfigForm();
-      }}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* ── Add / Edit Filing Dialog ── */}
+      <Dialog open={showFilingDialog} onOpenChange={open => { setShowFilingDialog(open); }}>
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>
-              {editingTaxType ? "Edit Tax Type" : "Add New Tax Type"}
-            </DialogTitle>
+            <DialogTitle>{editingFiling ? "Edit Filing" : "Add Filing"}</DialogTitle>
             <DialogDescription>
-              Configure tax type, filing frequency, and linked accounts
+              {editingFiling ? `Editing ${displayTaxType(editingFiling.taxType)} — ${editingFiling.taxPeriod}` : "Create a new tax compliance filing record"}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="taxType">Tax Type *</Label>
-              <Select 
-                value={configFormData.taxType} 
-                onValueChange={(value) => setConfigFormData({...configFormData, taxType: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select tax type" />
-                </SelectTrigger>
+              <Label>Tax Type *</Label>
+              <Select value={filingForm.taxType} onValueChange={v => setFilingForm(f => ({ ...f, taxType: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Corporate Tax">Corporate Tax</SelectItem>
-                  <SelectItem value="VAT">VAT (Value Added Tax)</SelectItem>
-                  <SelectItem value="Excise Tax">Excise Tax</SelectItem>
-                  <SelectItem value="Customs Duty">Customs Duty</SelectItem>
+                  {TAX_TYPE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="filingFrequency">Filing Frequency *</Label>
-              <Select 
-                value={configFormData.filingFrequency} 
-                onValueChange={(value) => setConfigFormData({...configFormData, filingFrequency: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Label>Tax Period *</Label>
+              <Input placeholder="e.g. Q1 2026 or January 2026" value={filingForm.taxPeriod} onChange={e => setFilingForm(f => ({ ...f, taxPeriod: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Due Date *</Label>
+              <Input type="date" value={filingForm.dueDate} onChange={e => setFilingForm(f => ({ ...f, dueDate: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Filing Amount ({currencyCode})</Label>
+              <Input type="number" placeholder="0.00" value={filingForm.filingAmount} onChange={e => setFilingForm(f => ({ ...f, filingAmount: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={filingForm.status} onValueChange={v => setFilingForm(f => ({ ...f, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea placeholder="Optional notes..." rows={2} value={filingForm.notes} onChange={e => setFilingForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Document URL</Label>
+              <Input placeholder="https://..." value={filingForm.documentUrl} onChange={e => setFilingForm(f => ({ ...f, documentUrl: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFilingDialog(false)}>Cancel</Button>
+            <Button onClick={handleSaveFiling} disabled={savingFiling || !filingForm.taxPeriod || !filingForm.dueDate}
+              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
+              {savingFiling ? "Saving..." : editingFiling ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Mark Filed Dialog ── */}
+      <Dialog open={showMarkFiledDialog} onOpenChange={setShowMarkFiledDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Mark as Filed</DialogTitle>
+            <DialogDescription>
+              {markFiledTarget && `${displayTaxType(markFiledTarget.taxType)} — ${markFiledTarget.taxPeriod}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Filed Date *</Label>
+              <Input type="date" value={markFiledForm.filedDate} onChange={e => setMarkFiledForm(f => ({ ...f, filedDate: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Filing Amount ({currencyCode})</Label>
+              <Input type="number" placeholder="0.00" value={markFiledForm.filingAmount} onChange={e => setMarkFiledForm(f => ({ ...f, filingAmount: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Filing Reference</Label>
+              <Input placeholder="e.g. TRN-2026-001" value={markFiledForm.filingReference} onChange={e => setMarkFiledForm(f => ({ ...f, filingReference: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMarkFiledDialog(false)}>Cancel</Button>
+            <Button onClick={handleMarkFiled} disabled={savingMarkFiled || !markFiledForm.filedDate}
+              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
+              {savingMarkFiled ? "Saving..." : "Confirm Filed"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Tax Type Config Dialog (local only) ── */}
+      <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>{editingConfig ? "Edit Tax Type" : "Add Tax Type"}</DialogTitle>
+            <DialogDescription>Configure tax type, filing frequency, and linked accounts</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Tax Type *</Label>
+              <Input placeholder="e.g. VAT, Corporate Tax" value={configForm.taxType} onChange={e => setConfigForm(f => ({ ...f, taxType: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Filing Frequency *</Label>
+              <Select value={configForm.filingFrequency} onValueChange={v => setConfigForm(f => ({ ...f, filingFrequency: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Monthly">Monthly</SelectItem>
                   <SelectItem value="Quarterly">Quarterly</SelectItem>
@@ -1081,37 +937,18 @@ export function TaxCompliance() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="rate">Tax Rate *</Label>
-              <Input
-                id="rate"
-                placeholder="e.g., 5%, 9%, 50%"
-                value={configFormData.rate}
-                onChange={(e) => setConfigFormData({...configFormData, rate: e.target.value})}
-              />
+              <Label>Tax Rate</Label>
+              <Input placeholder="e.g. 5%, 9%, 50%" value={configForm.rate} onChange={e => setConfigForm(f => ({ ...f, rate: e.target.value }))} />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="linkedAccounts">Linked Accounts (comma-separated)</Label>
-              <Textarea
-                id="linkedAccounts"
-                placeholder="e.g., Revenue, Operating Expenses, Depreciation"
-                value={configFormData.linkedAccounts}
-                onChange={(e) => setConfigFormData({...configFormData, linkedAccounts: e.target.value})}
-                rows={3}
-              />
+              <Label>Linked Accounts (comma-separated)</Label>
+              <Textarea placeholder="e.g. Revenue, Operating Expenses" rows={2} value={configForm.linkedAccounts} onChange={e => setConfigForm(f => ({ ...f, linkedAccounts: e.target.value }))} />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select 
-                value={configFormData.status} 
-                onValueChange={(value) => setConfigFormData({...configFormData, status: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Label>Status</Label>
+              <Select value={configForm.status} onValueChange={v => setConfigForm(f => ({ ...f, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Inactive">Inactive</SelectItem>
@@ -1120,171 +957,10 @@ export function TaxCompliance() {
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowConfigDialog(false);
-                resetConfigForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={editingTaxType ? handleUpdateTaxType : handleAddTaxType}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
-            >
-              {editingTaxType ? "Update" : "Add"} Tax Type
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Filing Dialog */}
-      <Dialog open={showFilingDialog} onOpenChange={(open) => {
-        setShowFilingDialog(open);
-        if (!open) resetFilingForm();
-      }}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Update Filing Status</DialogTitle>
-            <DialogDescription>
-              {selectedFiling && `${selectedFiling.taxType} - ${selectedFiling.period}`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="period">Tax Period</Label>
-              <Input
-                id="period"
-                value={filingFormData.period}
-                disabled
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="amountPayable">Amount Payable (AED) *</Label>
-              <Input
-                id="amountPayable"
-                type="number"
-                placeholder="0.00"
-                value={filingFormData.amountPayable}
-                onChange={(e) => setFilingFormData({...filingFormData, amountPayable: e.target.value})}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status">Filing Status *</Label>
-              <Select 
-                value={filingFormData.status} 
-                onValueChange={(value) => setFilingFormData({...filingFormData, status: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="Filed">Filed</SelectItem>
-                  <SelectItem value="Overdue">Overdue</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes / Remarks</Label>
-              <Textarea
-                id="notes"
-                placeholder="Add any notes or remarks..."
-                value={filingFormData.notes}
-                onChange={(e) => setFilingFormData({...filingFormData, notes: e.target.value})}
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Upload Documents</Label>
-              <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer">
-                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <div className="text-sm text-muted-foreground">
-                  Click to upload or drag and drop
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  PDF, Excel, or XML files
-                </div>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowFilingDialog(false);
-                resetFilingForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleUpdateFiling}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
-            >
-              Update Filing
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Audit Log Dialog */}
-      <Dialog open={showAuditLog} onOpenChange={setShowAuditLog}>
-        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Audit & History Log
-            </DialogTitle>
-            <DialogDescription>
-              Track user actions, edits, and submissions
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-4">
-            {auditLog.map((log) => (
-              <div key={log.id} className="flex gap-4 p-3 border rounded-lg">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full" style={{ backgroundColor: '#F0F9F9' }}>
-                  <History className="h-5 w-5" style={{ color: '#2B7A78' }} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-start justify-between mb-1">
-                    <div>
-                      <div className="font-medium">{log.action}</div>
-                      <div className="text-sm text-muted-foreground">{log.user}</div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {format(log.timestamp, "dd MMM yyyy, HH:mm")}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline" className="text-xs">
-                      {log.taxType}
-                    </Badge>
-                    {log.period !== "N/A" && (
-                      <Badge variant="outline" className="text-xs">
-                        {log.period}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {log.details}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAuditLog(false)}>
-              Close
-            </Button>
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Export Log
+            <Button variant="outline" onClick={() => setShowConfigDialog(false)}>Cancel</Button>
+            <Button onClick={handleSaveConfig} disabled={!configForm.taxType}
+              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
+              {editingConfig ? "Update" : "Add"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1292,4 +968,3 @@ export function TaxCompliance() {
     </div>
   );
 }
-

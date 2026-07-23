@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { membersService, Member } from '../utils/supabase/members-service';
+import { CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -136,7 +138,7 @@ const freezeHistory = [
 ];
 
 export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [freezeStartDate, setFreezeStartDate] = useState<Date | undefined>(undefined);
   const [freezeEndDate, setFreezeEndDate] = useState<Date | undefined>(undefined);
@@ -145,6 +147,27 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
   const [filterStatus, setFilterStatus] = useState('frozen');
   const [showFreezeHistory, setShowFreezeHistory] = useState(false);
   const [selectedMemberHistory, setSelectedMemberHistory] = useState<any>(null);
+  const [frozenMembers, setFrozenMembers] = useState<Member[]>([]);
+  const [searchResults, setSearchResults] = useState<Member[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load frozen members from API
+  const loadFrozenMembers = async () => {
+    try {
+      const res = await membersService.getMembers({ status: 'frozen' }, { limit: 100 });
+      setFrozenMembers(res.members);
+    } catch {
+      // silently fail — show empty list
+    }
+  };
+
+  useEffect(() => { loadFrozenMembers(); }, []);
+
+  // Search active members as user types
+  useEffect(() => {
+    if (!searchQuery || searchQuery.length < 2) { setSearchResults([]); return; }
+    membersService.searchMembers(searchQuery).then(setSearchResults).catch(() => {});
+  }, [searchQuery]);
 
   const calculateFreezeDays = () => {
     if (!freezeStartDate || !freezeEndDate) return 0;
@@ -152,33 +175,17 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
   };
 
   const totalDays = calculateFreezeDays();
-  const freeDaysAvailable = selectedMember ? Math.max(0, selectedMember.maxFreezeDays - selectedMember.usedFreezeDays) : 0;
-  const extraDays = Math.max(0, totalDays - freeDaysAvailable);
-  const chargeForExtraDays = selectedMember ? extraDays * (selectedMember.chargePerExtraDay || 0) : 0;
 
-  const filteredMembers = frozenMembersData.filter((member) => {
-    const matchesSearch =
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.phone.includes(searchQuery);
-    const matchesStatus =
-      filterStatus === 'all' ||
-      (filterStatus === 'frozen' && member.status === 'Frozen') ||
-      (filterStatus === 'active' && member.status === 'Active');
-    return matchesSearch && matchesStatus;
-  });
-
-  const searchResults = allMembers.filter((member) => {
-    if (!searchQuery) return false;
+  const filteredMembers = frozenMembers.filter((member) => {
+    if (!searchQuery) return true;
     return (
-      member.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.phone?.includes(searchQuery) ||
-      (member as any).email?.toLowerCase().includes(searchQuery.toLowerCase())
+      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (member.member_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.phone.includes(searchQuery)
     );
   });
 
-  const handleFreezeMembership = () => {
+  const handleFreezeMembership = async () => {
     if (!selectedMember || !freezeStartDate || !freezeEndDate) {
       toast.error('Please fill all required fields');
       return;
@@ -187,22 +194,38 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
       toast.error('End date must be after start date');
       return;
     }
-    if (selectedMember.usedFreezeCount >= selectedMember.maxFreezeCount) {
-      toast.error(`Member has used all ${selectedMember.maxFreezeCount} freezes allowed for this plan`);
-      return;
+    setIsSubmitting(true);
+    try {
+      const freezeUntil = freezeEndDate.toISOString().split('T')[0] + 'T00:00:00Z';
+      await membersService.freezeMember(String(selectedMember.id), {
+        freezeUntil,
+        reason: freezeNotes || undefined,
+      });
+      toast.success(`Membership frozen for ${selectedMember.name}`, {
+        description: `${totalDays} days until ${format(freezeEndDate, 'dd MMM yyyy')}`,
+      });
+      setSelectedMember(null);
+      setFreezeStartDate(undefined);
+      setFreezeEndDate(undefined);
+      setFreezeNotes('');
+      setSearchQuery('');
+      setSearchResults([]);
+      await loadFrozenMembers();
+    } catch {
+      toast.error('Failed to freeze membership. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-    toast.success(`Membership frozen for ${selectedMember.name}`, {
-      description: `${totalDays} days from ${format(freezeStartDate, 'dd MMM yyyy')} to ${format(freezeEndDate, 'dd MMM yyyy')}${chargeForExtraDays > 0 ? ` | Charge: AED ${chargeForExtraDays}` : ''}`,
-    });
-    setSelectedMember(null);
-    setFreezeStartDate(undefined);
-    setFreezeEndDate(undefined);
-    setFreezeNotes('');
-    setSearchQuery('');
   };
 
-  const handleUnfreeze = (member: any) => {
-    toast.success(`Membership unfrozen for ${member.name}`, { description: 'Member status updated to Active' });
+  const handleUnfreeze = async (member: any) => {
+    try {
+      await membersService.unfreezeMember(String(member.id));
+      toast.success(`Membership unfrozen for ${member.name}`, { description: 'Member status updated to Active' });
+      await loadFrozenMembers();
+    } catch {
+      toast.error('Failed to unfreeze membership. Please try again.');
+    }
   };
 
   const initials = (name: string) => name.split(' ').map((n) => n[0]).join('');
@@ -291,7 +314,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                       {searchResults.map((member) => (
                         <button
                           key={member.id}
-                          onClick={() => { setSelectedMember(member); setSearchQuery(member.name); setAutoUnfreeze(member.autoUnfreezeDefault); }}
+                          onClick={() => { setSelectedMember(member); setSearchQuery(member.name); }}
                           className="w-full px-3 py-2.5 hover:bg-muted/50 text-left transition-colors flex items-center gap-3 border-b last:border-0"
                         >
                           <Avatar className="h-8 w-8 shrink-0">
@@ -299,10 +322,10 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{member.name}</p>
-                            <p className="text-xs text-muted-foreground">{member.id} · {member.planName}</p>
+                            <p className="text-xs text-muted-foreground">{member.member_id || member.id} · {member.membership_plan}</p>
                           </div>
-                          <Badge className={member.status === 'Active' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-blue-100 text-blue-700 border-blue-200'}>
-                            {member.status}
+                          <Badge className="bg-green-100 text-green-700 border-green-200">
+                            {member.membership_status}
                           </Badge>
                         </button>
                       ))}
@@ -328,36 +351,28 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                     <div className="grid grid-cols-2 divide-x divide-blue-100">
                       <div className="px-4 py-2.5">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Plan</p>
-                        <p className="text-xs font-semibold">{selectedMember.planName}</p>
+                        <p className="text-xs font-semibold">{selectedMember.membership_plan || selectedMember.planName || '—'}</p>
                       </div>
                       <div className="px-4 py-2.5">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Status</p>
-                        <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">{selectedMember.status}</Badge>
+                        <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">
+                          {selectedMember.membership_status || selectedMember.status || '—'}
+                        </Badge>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 divide-x divide-blue-100 border-t border-blue-100">
                       <div className="px-4 py-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Max Freeze Days</p>
-                        <p className="text-xs font-semibold text-primary">{selectedMember.maxFreezeDays} days</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Member ID</p>
+                        <p className="text-xs font-semibold text-primary">{selectedMember.member_id || selectedMember.id}</p>
                       </div>
                       <div className="px-4 py-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Used Days</p>
-                        <p className="text-xs font-semibold text-orange-600">{selectedMember.usedFreezeDays} days</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 divide-x divide-blue-100 border-t border-blue-100">
-                      <div className="px-4 py-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Freezes Allowed</p>
-                        <p className="text-xs font-semibold text-primary">{selectedMember.maxFreezeCount}</p>
-                      </div>
-                      <div className="px-4 py-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Freezes Used</p>
-                        <p className="text-xs font-semibold text-orange-600">{selectedMember.usedFreezeCount}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Phone</p>
+                        <p className="text-xs font-semibold">{selectedMember.phone || '—'}</p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between px-4 py-2.5 border-t border-blue-100 bg-blue-50/60">
-                      <p className="text-xs text-muted-foreground">Balance Remaining</p>
-                      <p className="text-xs font-bold text-primary">{selectedMember.maxFreezeDays - selectedMember.usedFreezeDays} days</p>
+                      <p className="text-xs text-muted-foreground">Email</p>
+                      <p className="text-xs font-bold text-primary">{selectedMember.email || '—'}</p>
                     </div>
                   </div>
                 )}
@@ -403,11 +418,8 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                         <div className="px-4 py-3 space-y-2">
                           {[
                             { label: 'Total Days', value: `${totalDays} days`, color: 'text-foreground' },
-                            { label: 'Free Days Available', value: `${freeDaysAvailable} days`, color: 'text-green-600' },
-                            ...(extraDays > 0 ? [
-                              { label: 'Extra Days', value: `${extraDays} days`, color: 'text-orange-600' },
-                              { label: 'Charge for Extra Days', value: `AED ${chargeForExtraDays}`, color: 'text-red-600' },
-                            ] : []),
+                            { label: 'From', value: freezeStartDate ? format(freezeStartDate, 'dd MMM yyyy') : '—', color: 'text-green-600' },
+                            { label: 'Until', value: freezeEndDate ? format(freezeEndDate, 'dd MMM yyyy') : '—', color: 'text-primary' },
                           ].map(({ label, value, color }) => (
                             <div key={label} className="flex items-center justify-between text-xs">
                               <span className="text-muted-foreground">{label}</span>
@@ -444,7 +456,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                       onClick={handleFreezeMembership}
                       className="w-full gap-2"
                       variant="destructive"
-                      disabled={!freezeStartDate || !freezeEndDate}
+                      disabled={!freezeStartDate || !freezeEndDate || isSubmitting}
                     >
                       <Snowflake className="h-4 w-4" />
                       Freeze Membership
@@ -497,68 +509,62 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                         <TableHead>Plan</TableHead>
                         <TableHead>Freeze Period</TableHead>
                         <TableHead>Days</TableHead>
-                        <TableHead>Auto Unfreeze</TableHead>
+                        <TableHead>Reason</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredMembers.length > 0 ? (
-                        filteredMembers.map((member) => (
-                          <TableRow key={member.id} className="hover:bg-slate-50/50 transition-colors">
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8 shrink-0">
-                                  <AvatarFallback className="bg-primary text-white text-xs">{initials(member.name)}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="text-sm font-medium">{member.name}</p>
-                                  <p className="text-xs text-muted-foreground">{member.id}</p>
+                        filteredMembers.map((member: any) => {
+                          const freezeStart = member.freeze_start_date ? new Date(member.freeze_start_date) : null;
+                          const freezeEnd = member.freeze_end_date ? new Date(member.freeze_end_date) : null;
+                          const daysFrozen = freezeStart && freezeEnd ? differenceInDays(freezeEnd, freezeStart) + 1 : 0;
+                          return (
+                            <TableRow key={member.id} className="hover:bg-slate-50/50 transition-colors">
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-8 w-8 shrink-0">
+                                    <AvatarFallback className="bg-primary text-white text-xs">{initials(member.name)}</AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="text-sm font-medium">{member.name}</p>
+                                    <p className="text-xs text-muted-foreground">{member.member_id || member.id}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm">{member.planName}</TableCell>
-                            <TableCell>
-                              <div className="text-xs">
-                                <p className="font-medium">{format(new Date(member.freezeStartDate), 'dd MMM yyyy')}</p>
-                                <p className="text-muted-foreground">→ {format(new Date(member.freezeEndDate), 'dd MMM yyyy')}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className="bg-blue-100 text-blue-700 border-blue-200">{member.daysFrozen}d</Badge>
-                            </TableCell>
-                            <TableCell>
-                              {member.autoUnfreeze ? (
-                                <Badge className="bg-green-100 text-green-700 border-green-200 gap-1">
-                                  <CheckCircle className="h-3 w-3" />Yes
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-gray-100 text-gray-600 border-gray-200 gap-1">
-                                  <XCircle className="h-3 w-3" />No
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 text-xs gap-1"
-                                  onClick={() => { setSelectedMemberHistory(member); setShowFreezeHistory(true); }}
-                                >
-                                  <Eye className="h-3 w-3" />History
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 text-xs gap-1 border-green-300 text-green-700 hover:bg-green-50"
-                                  onClick={() => handleUnfreeze(member)}
-                                >
-                                  <Sun className="h-3 w-3" />Unfreeze
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                              </TableCell>
+                              <TableCell className="text-sm">{member.membership_plan || '—'}</TableCell>
+                              <TableCell>
+                                <div className="text-xs">
+                                  {freezeStart && <p className="font-medium">{format(freezeStart, 'dd MMM yyyy')}</p>}
+                                  {freezeEnd && <p className="text-muted-foreground">→ {format(freezeEnd, 'dd MMM yyyy')}</p>}
+                                  {!freezeStart && <p className="text-muted-foreground">—</p>}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className="bg-blue-100 text-blue-700 border-blue-200">{daysFrozen}d</Badge>
+                              </TableCell>
+                              <TableCell>
+                                {member.freeze_reason ? (
+                                  <span className="text-xs text-muted-foreground">{member.freeze_reason}</span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs gap-1 border-green-300 text-green-700 hover:bg-green-50"
+                                    onClick={() => handleUnfreeze(member)}
+                                  >
+                                    <Sun className="h-3 w-3" />Unfreeze
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       ) : (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
@@ -601,15 +607,23 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
               <div className="grid grid-cols-3 divide-x divide-blue-100">
                 <div className="px-4 py-3">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Current Plan</p>
-                  <p className="text-xs font-semibold">{selectedMemberHistory?.planName}</p>
+                  <p className="text-xs font-semibold">{selectedMemberHistory?.membership_plan || selectedMemberHistory?.planName || '—'}</p>
                 </div>
                 <div className="px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Freezes Used</p>
-                  <p className="text-xs font-semibold">{selectedMemberHistory?.freezeCount} / {selectedMemberHistory?.maxFreezeCount}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Freeze Start</p>
+                  <p className="text-xs font-semibold">
+                    {selectedMemberHistory?.freeze_start_date
+                      ? format(new Date(selectedMemberHistory.freeze_start_date), 'dd MMM yyyy')
+                      : '—'}
+                  </p>
                 </div>
                 <div className="px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Days Used</p>
-                  <p className="text-xs font-semibold">{selectedMemberHistory?.usedDays} / {selectedMemberHistory?.maxFreezeDays} days</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Freeze Until</p>
+                  <p className="text-xs font-semibold">
+                    {selectedMemberHistory?.freeze_end_date
+                      ? format(new Date(selectedMemberHistory.freeze_end_date), 'dd MMM yyyy')
+                      : '—'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -638,7 +652,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                       <TableCell className="text-sm">{record.reason}</TableCell>
                       <TableCell>
                         {record.chargedAmount > 0 ? (
-                          <span className="text-sm font-medium text-red-600">AED {record.chargedAmount}</span>
+                          <span className="text-sm font-medium text-red-600"><CurrencyGlyph /> {record.chargedAmount}</span>
                         ) : (
                           <span className="text-sm text-muted-foreground">Free</span>
                         )}

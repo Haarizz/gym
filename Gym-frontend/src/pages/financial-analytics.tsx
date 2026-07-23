@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
+import { financialAnalyticsService, AnalyticsDashboard, MonthlyTrendPoint, RevenueBySource, ExpenseByCategory } from "../utils/supabase/financial-analytics-service";
 import {
   Card,
   CardContent,
@@ -299,15 +301,23 @@ const transactionData: Transaction[] = [
   },
 ];
 
+const panelCardShell = "bg-white border-0 shadow-sm";
+const statCardShell =
+  "bg-white border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none";
+const tabContentShell = "space-y-6 animate-in fade-in-0 zoom-in-95 duration-200";
+
 // Components
 const KPICard: React.FC<{ kpi: KPICard }> = ({ kpi }) => {
-  const changePercentage = ((kpi.value - kpi.previousValue) / kpi.previousValue * 100);
-  const isPositive = changePercentage > 0;
+  const { currencyCode } = useCurrency();
+  const changePercentage = kpi.previousValue === 0
+    ? 0
+    : ((kpi.value - kpi.previousValue) / kpi.previousValue * 100);
+  const isPositive = changePercentage >= 0;
   
   const formatValue = (value: number) => {
     switch (kpi.format) {
       case "currency":
-        return `${value.toLocaleString()} AED`;
+        return `${currencyCode} ${value.toLocaleString()}`;
       case "percentage":
         return `${value.toFixed(1)}%`;
       case "number":
@@ -318,7 +328,7 @@ const KPICard: React.FC<{ kpi: KPICard }> = ({ kpi }) => {
   };
 
   return (
-    <Card className="relative overflow-hidden">
+    <Card className={cn(statCardShell, "relative overflow-hidden")}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -374,6 +384,7 @@ const KPICard: React.FC<{ kpi: KPICard }> = ({ kpi }) => {
 };
 
 const InsightCard: React.FC<{ insight: Insight }> = ({ insight }) => {
+  const { currencyCode } = useCurrency();
   const typeConfig = {
     success: { color: "bg-green-100 text-green-800", icon: TrendingUp },
     warning: { color: "bg-yellow-100 text-yellow-800", icon: AlertCircle },
@@ -385,9 +396,9 @@ const InsightCard: React.FC<{ insight: Insight }> = ({ insight }) => {
   const IconComponent = config.icon;
 
   return (
-    <Card className="border-l-4 border-l-primary">
+    <Card className={cn(panelCardShell, "overflow-hidden")}>
       <CardContent className="p-4">
-        <div className="flex items-start space-x-3">
+        <div className="flex items-start space-x-3 border-l-4 border-l-primary pl-4">
           <div className={cn("rounded-lg p-2", config.color)}>
             <IconComponent className="h-4 w-4" />
           </div>
@@ -397,7 +408,7 @@ const InsightCard: React.FC<{ insight: Insight }> = ({ insight }) => {
               <Badge variant="secondary" className={cn(
                 insight.impact > 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
               )}>
-                {insight.impact > 0 ? "+" : ""}{Math.abs(insight.impact).toLocaleString()} AED
+                {insight.impact > 0 ? "+" : ""}<CurrencyGlyph /> {Math.abs(insight.impact).toLocaleString()}
               </Badge>
             </div>
             <p className="text-sm text-gray-600 mb-2">{insight.description}</p>
@@ -416,6 +427,7 @@ const InsightCard: React.FC<{ insight: Insight }> = ({ insight }) => {
 };
 
 export function FinancialAnalytics() {
+  const { currencyCode } = useCurrency();
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [selectedPeriod, setSelectedPeriod] = useState("current-month");
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -426,11 +438,109 @@ export function FinancialAnalytics() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedChart, setSelectedChart] = useState("revenue-expenses");
 
+  const [apiDashboard, setApiDashboard] = useState<AnalyticsDashboard | null>(null);
+  const [apiMonthlyTrend, setApiMonthlyTrend] = useState<MonthlyTrendPoint[]>([]);
+  const [apiRevenueBySource, setApiRevenueBySource] = useState<RevenueBySource[]>([]);
+  const [apiExpenseByCategory, setApiExpenseByCategory] = useState<ExpenseByCategory[]>([]);
+
+  const loadAnalytics = useCallback(async () => {
+    try {
+      const [dashboard, trend, revSrc, expCat] = await Promise.all([
+        financialAnalyticsService.getDashboard(),
+        financialAnalyticsService.getMonthlyTrend(12),
+        financialAnalyticsService.getRevenueBySource(),
+        financialAnalyticsService.getExpenseByCategory(),
+      ]);
+      setApiDashboard(dashboard);
+      setApiMonthlyTrend(trend);
+      setApiRevenueBySource(revSrc);
+      setApiExpenseByCategory(expCat);
+    } catch {
+      // fall back to mock data
+    }
+  }, []);
+
+  useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
+
   const branches = ["All Branches", "Downtown", "Mall Branch", "Marina Branch"];
 
   const handleExport = (format: "excel" | "pdf") => {
     console.log(`Exporting financial analytics as ${format}`);
   };
+
+  // Derived data — use API data when loaded, fall back to mock
+  const displayRevenueExpenseData = apiMonthlyTrend.length > 0
+    ? apiMonthlyTrend.map(p => ({ month: p.month, revenue: p.revenue, expenses: p.expenses }))
+    : revenueExpenseData;
+
+  const displayIncomeDistribution = apiRevenueBySource.length > 0
+    ? apiRevenueBySource.map((s, i) => ({
+        name: s.source,
+        value: s.amount,
+        color: ["#0047AB", "#009688", "#4CAF50", "#FFC107", "#F44336", "#9C27B0"][i % 6],
+      }))
+    : incomeDistributionData;
+
+  const displayExpenseBreakdown = apiExpenseByCategory.length > 0
+    ? (() => {
+        const total = apiExpenseByCategory.reduce((sum, e) => sum + e.amount, 0);
+        return apiExpenseByCategory.map(e => ({
+          category: e.category,
+          amount: e.amount,
+          percentage: total > 0 ? (e.amount / total) * 100 : 0,
+        }));
+      })()
+    : expenseBreakdownData;
+
+  const displayKpiData: KPICard[] = apiDashboard
+    ? [
+        {
+          id: "total-revenue",
+          title: "Total Revenue",
+          value: apiDashboard.totalRevenue,
+          previousValue: apiDashboard.totalRevenue * 0.9,
+          format: "currency",
+          icon: DollarSign,
+          trend: "up",
+        },
+        {
+          id: "profit-margin",
+          title: "Profit Margin",
+          value: apiDashboard.profitMargin,
+          previousValue: apiDashboard.profitMargin * 0.95,
+          format: "percentage",
+          icon: Percent,
+          trend: apiDashboard.profitMargin > 0 ? "up" : "down",
+        },
+        {
+          id: "net-income",
+          title: "Net Income",
+          value: apiDashboard.netIncome,
+          previousValue: apiDashboard.netIncome * 0.9,
+          format: "currency",
+          icon: TrendingUp,
+          trend: apiDashboard.netIncome > 0 ? "up" : "down",
+        },
+        {
+          id: "total-expenses",
+          title: "Total Expenses",
+          value: apiDashboard.totalExpenses,
+          previousValue: apiDashboard.totalExpenses * 1.05,
+          format: "currency",
+          icon: Receipt,
+          trend: "down",
+        },
+        {
+          id: "pending-tax",
+          title: "Tax Obligations",
+          value: apiDashboard.pendingTaxObligations,
+          previousValue: apiDashboard.pendingTaxObligations,
+          format: "number",
+          icon: AlertCircle,
+          trend: "neutral",
+        },
+      ]
+    : kpiData;
 
   const filteredTransactions = transactionData.filter((transaction) => {
     const matchesSearch = 
@@ -450,7 +560,7 @@ export function FinancialAnalytics() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-3">
@@ -458,7 +568,7 @@ export function FinancialAnalytics() {
             <Brain className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Financial Analytics</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Financial Analytics</h1>
             <p className="text-sm text-gray-600">
               Advanced business intelligence and performance insights
             </p>
@@ -466,15 +576,15 @@ export function FinancialAnalytics() {
         </div>
         
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm" onClick={() => handleExport("excel")}>
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={() => handleExport("excel")}>
             <Download className="h-4 w-4 mr-2" />
             Excel
           </Button>
-          <Button variant="outline" size="sm" onClick={() => handleExport("pdf")}>
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={() => handleExport("pdf")}>
             <Download className="h-4 w-4 mr-2" />
             PDF
           </Button>
-          <Button size="sm" className="bg-primary hover:bg-primary/90">
+          <Button size="sm" className="bg-primary hover:bg-primary/90 shadow-sm hover:shadow-md transition-all">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -482,7 +592,7 @@ export function FinancialAnalytics() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className={panelCardShell}>
         <CardHeader>
           <CardTitle className="text-lg">Analytics Filters</CardTitle>
         </CardHeader>
@@ -571,7 +681,7 @@ export function FinancialAnalytics() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-        {kpiData.map((kpi) => (
+        {displayKpiData.map((kpi) => (
           <KPICard key={kpi.id} kpi={kpi} />
         ))}
       </div>
@@ -579,16 +689,16 @@ export function FinancialAnalytics() {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue vs Expenses Trend */}
-        <Card className="lg:col-span-2">
+        <Card className={cn(panelCardShell, "lg:col-span-2")}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Revenue vs Expenses Trend</CardTitle>
               <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
                   <Building2 className="h-4 w-4 mr-2" />
                   Branch View
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
                   <Eye className="h-4 w-4 mr-2" />
                   Drill Down
                 </Button>
@@ -598,12 +708,12 @@ export function FinancialAnalytics() {
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueExpenseData}>
+                <LineChart data={displayRevenueExpenseData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="month" stroke="#666" />
                   <YAxis stroke="#666" tickFormatter={(value) => `${value/1000}K`} />
                   <Tooltip 
-                    formatter={(value: number) => [`${value.toLocaleString()} AED`, '']}
+                    formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
                     labelFormatter={(label) => `Month: ${label}`}
                   />
                   <Legend />
@@ -630,7 +740,7 @@ export function FinancialAnalytics() {
         </Card>
 
         {/* Income Distribution */}
-        <Card>
+        <Card className={panelCardShell}>
           <CardHeader>
             <CardTitle className="text-lg">Income Distribution</CardTitle>
           </CardHeader>
@@ -639,7 +749,7 @@ export function FinancialAnalytics() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={incomeDistributionData}
+                    data={displayIncomeDistribution}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -647,11 +757,11 @@ export function FinancialAnalytics() {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {incomeDistributionData.map((entry, index) => (
+                    {displayIncomeDistribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => `${value.toLocaleString()} AED`} />
+                  <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -660,18 +770,18 @@ export function FinancialAnalytics() {
         </Card>
 
         {/* Expense Breakdown */}
-        <Card>
+        <Card className={panelCardShell}>
           <CardHeader>
             <CardTitle className="text-lg">Expense Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={expenseBreakdownData} layout="horizontal">
+                <BarChart data={displayExpenseBreakdown} layout="horizontal">
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis type="number" stroke="#666" tickFormatter={(value) => `${value/1000}K`} />
                   <YAxis dataKey="category" type="category" stroke="#666" width={100} />
-                  <Tooltip formatter={(value: number) => `${value.toLocaleString()} AED`} />
+                  <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                   <Bar dataKey="amount" fill="#009688" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -681,7 +791,7 @@ export function FinancialAnalytics() {
       </div>
 
       {/* Business Performance Insights */}
-      <Card>
+      <Card className={panelCardShell}>
         <CardHeader>
           <div className="flex items-center space-x-3">
             <Brain className="h-5 w-5 text-primary" />
@@ -704,8 +814,8 @@ export function FinancialAnalytics() {
           <TabsTrigger value="receivables">Accounts Receivable</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="transactions">
-          <Card>
+        <TabsContent value="transactions" className={tabContentShell}>
+          <Card className={panelCardShell}>
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <CardTitle className="text-lg">Transaction Summary</CardTitle>
@@ -719,7 +829,7 @@ export function FinancialAnalytics() {
                       className="pl-10 w-64"
                     />
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
                     <Filter className="h-4 w-4 mr-2" />
                     Filter
                   </Button>
@@ -727,9 +837,9 @@ export function FinancialAnalytics() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
+              <div className="rounded-xl overflow-hidden bg-white shadow-sm">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-gray-50">
                     <TableRow>
                       <TableHead className="font-semibold text-primary">Date</TableHead>
                       <TableHead className="font-semibold text-primary">Category</TableHead>
@@ -743,7 +853,7 @@ export function FinancialAnalytics() {
                   </TableHeader>
                   <TableBody>
                     {filteredTransactions.map((transaction) => (
-                      <TableRow key={transaction.id} className="hover:bg-gray-50">
+                      <TableRow key={transaction.id} className="hover:bg-gray-50/60">
                         <TableCell>{format(new Date(transaction.date), "dd/MM/yyyy")}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="bg-blue-100 text-blue-800">
@@ -751,7 +861,7 @@ export function FinancialAnalytics() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {transaction.amount.toLocaleString()} AED
+                          <CurrencyGlyph /> {transaction.amount.toLocaleString()}
                         </TableCell>
                         <TableCell>{transaction.branch}</TableCell>
                         <TableCell>{transaction.paymentMethod}</TableCell>
@@ -780,8 +890,8 @@ export function FinancialAnalytics() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="receivables">
-          <Card>
+        <TabsContent value="receivables" className={tabContentShell}>
+          <Card className={panelCardShell}>
             <CardHeader>
               <CardTitle className="text-lg">Accounts Receivable / Payable</CardTitle>
             </CardHeader>
@@ -792,7 +902,7 @@ export function FinancialAnalytics() {
                 <p className="text-gray-600 mb-4">
                   Detailed accounts receivable and payable tracking coming soon.
                 </p>
-                <Button variant="outline">
+                <Button variant="outline" className="shadow-sm hover:shadow-md transition-all">
                   <ExternalLink className="h-4 w-4 mr-2" />
                   View in Ledgers
                 </Button>

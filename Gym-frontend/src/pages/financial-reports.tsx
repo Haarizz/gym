@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
+import { financialReportsService, IncomeStatementData, BalanceSheetData, TrialBalanceData, CashFlowData } from "../utils/supabase/financial-reports-service";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -257,6 +260,7 @@ const trialBalanceData = [
 ];
 
 export function FinancialReports() {
+  const { currencyCode } = useCurrency();
   const [selectedReport, setSelectedReport] = useState<string>("");
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [selectedPeriod, setSelectedPeriod] = useState("current-month");
@@ -267,27 +271,184 @@ export function FinancialReports() {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState("all");
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [incomeStatement, setIncomeStatement] = useState<IncomeStatementData | null>(null);
+  const [balanceSheet, setBalanceSheet] = useState<BalanceSheetData | null>(null);
+  const [trialBalance, setTrialBalance] = useState<TrialBalanceData | null>(null);
+  const [cashFlow, setCashFlow] = useState<CashFlowData | null>(null);
 
   // Filter reports based on category
-  const filteredReports = reportDefinitions.filter(report => 
+  const filteredReports = reportDefinitions.filter(report =>
     reportCategory === "all" || report.category === reportCategory
   );
 
   const branches = ["All Branches", "Downtown", "Mall Branch", "Marina Branch"];
 
+  const getDateParams = () => {
+    const from = format(dateRange.from, "yyyy-MM-dd");
+    const to = format(dateRange.to, "yyyy-MM-dd");
+    return { from, to };
+  };
+
   const handleGenerateReport = async (reportId: string) => {
     setIsGeneratingReport(true);
     setSelectedReport(reportId);
-    
-    // Simulate report generation
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsGeneratingReport(false);
+    setIncomeStatement(null);
+    setBalanceSheet(null);
+    setTrialBalance(null);
+    setCashFlow(null);
+    const { from, to } = getDateParams();
+    try {
+      if (reportId === "profit-loss") {
+        const data = await financialReportsService.getIncomeStatement(from, to);
+        setIncomeStatement(data);
+      } else if (reportId === "balance-sheet") {
+        const data = await financialReportsService.getBalanceSheet(to);
+        setBalanceSheet(data);
+      } else if (reportId === "trial-balance") {
+        const data = await financialReportsService.getTrialBalance(to);
+        setTrialBalance(data);
+      } else if (reportId === "cash-flow") {
+        const data = await financialReportsService.getCashFlow(from, to);
+        setCashFlow(data);
+      }
+      toast.success("Report generated successfully");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to generate report");
+    } finally {
+      setIsGeneratingReport(false);
+    }
   };
 
-  const handleExportReport = (format: "csv" | "excel" | "pdf") => {
-    console.log(`Exporting ${selectedReport} as ${format}`);
-    // Implementation for export functionality
+  const downloadBlob = (filename: string, blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const toCsvCell = (value: unknown) => {
+    const s = value == null ? "" : String(value);
+    return `"${s.replaceAll('"', '""')}"`;
+  };
+
+  const exportAsCsv = (filename: string, header: string[], rows: Array<Array<unknown>>) => {
+    const csv = [
+      header.map(toCsvCell).join(","),
+      ...rows.map((r) => r.map(toCsvCell).join(",")),
+    ].join("\n");
+    downloadBlob(filename, new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  };
+
+  const exportAsExcel = (filename: string, header: string[], rows: Array<Array<unknown>>) => {
+    const html = `
+      <html><head><meta charset="utf-8" /></head><body>
+      <table border="1" cellspacing="0" cellpadding="4">
+        <thead><tr>${header.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+        <tbody>
+          ${rows.map((r) => `<tr>${r.map((c) => `<td>${c ?? ""}</td>`).join("")}</tr>`).join("")}
+        </tbody>
+      </table>
+      </body></html>
+    `.trim();
+    downloadBlob(filename, new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" }));
+  };
+
+  const handleExportReport = (exportFormat: "csv" | "excel" | "pdf") => {
+    if (!selectedReport) return;
+
+    const dateLabel = `${format(dateRange.from, "yyyy-MM-dd")}_to_${format(dateRange.to, "yyyy-MM-dd")}`;
+
+    // Build a flat table depending on report type.
+    if (selectedReport === "profit-loss") {
+      const src = incomeStatement;
+      const rows = src
+        ? [
+            ...src.revenueLines.map((l) => ["Revenue", l.accountName, l.amount]),
+            ...src.expenseLines.map((l) => ["Expense", l.accountName, l.amount]),
+            ["", "Total Revenue", src.totalRevenue],
+            ["", "Total Expenses", src.totalExpenses],
+            ["", "Net Income", src.netIncome],
+          ]
+        : profitLossData.flatMap((s) => s.accounts.map((a) => [s.category, a.accountName, a.currentPeriod]));
+
+      const header = ["Section", "Account", `Amount (${currencyCode})`];
+      const filename = `profit-loss_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
+      if (exportFormat === "pdf") {
+        window.print();
+        return;
+      }
+      if (exportFormat === "excel") exportAsExcel(filename, header, rows);
+      else exportAsCsv(filename, header, rows);
+      toast.success("Export started");
+      return;
+    }
+
+    if (selectedReport === "trial-balance") {
+      const src = trialBalance;
+      const header = ["Code", "Account", `Debit (${currencyCode})`, `Credit (${currencyCode})`, `Net Balance (${currencyCode})`];
+      const rows = src
+        ? src.lines.map((l) => [l.code, l.name, l.debit, l.credit, l.netBalance])
+        : trialBalanceData.map((l) => [l.accountCode, l.accountName, l.debit, l.credit, (l.debit || 0) - (l.credit || 0)]);
+      const filename = `trial-balance_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
+      if (exportFormat === "pdf") {
+        window.print();
+        return;
+      }
+      if (exportFormat === "excel") exportAsExcel(filename, header, rows);
+      else exportAsCsv(filename, header, rows);
+      toast.success("Export started");
+      return;
+    }
+
+    if (selectedReport === "balance-sheet") {
+      const src = balanceSheet;
+      const header = ["Group", "Code", "Account", `Balance (${currencyCode})`];
+      const rows = src
+        ? Object.entries(src.accounts || {}).flatMap(([group, lines]) =>
+            (lines || []).map((l) => [group, l.code, l.name, l.balance])
+          )
+        : balanceSheetData.flatMap((s) => s.accounts.map((a) => [s.category, "", a.accountName, a.amount]));
+      const filename = `balance-sheet_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
+      if (exportFormat === "pdf") {
+        window.print();
+        return;
+      }
+      if (exportFormat === "excel") exportAsExcel(filename, header, rows);
+      else exportAsCsv(filename, header, rows);
+      toast.success("Export started");
+      return;
+    }
+
+    if (selectedReport === "cash-flow") {
+      const src = cashFlow;
+      if (!src) {
+        toast.error("Generate the cash flow report first");
+        return;
+      }
+      const header = ["Metric", "Value"];
+      const rows = [
+        [`Total Inflows (${currencyCode})`, src.totalInflows],
+        [`Total Outflows (${currencyCode})`, src.totalOutflows],
+        [`Net Cash Flow (${currencyCode})`, src.netCashFlow],
+        ["Inflow Count", src.inflowCount],
+        ["Outflow Count", src.outflowCount],
+      ];
+      const filename = `cash-flow_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
+      if (exportFormat === "pdf") {
+        window.print();
+        return;
+      }
+      if (exportFormat === "excel") exportAsExcel(filename, header, rows);
+      else exportAsCsv(filename, header, rows);
+      toast.success("Export started");
+      return;
+    }
+
+    toast.info("Export for this report type is not available yet.");
   };
 
   const calculateTotals = (data: any[], field: string) => {
@@ -309,8 +470,35 @@ export function FinancialReports() {
     );
   };
 
+  const profitLossSections = incomeStatement
+    ? ([
+        {
+          category: "Revenue",
+          accounts: incomeStatement.revenueLines.map((l) => ({
+            accountName: l.accountName,
+            currentPeriod: l.amount,
+            priorPeriod: 0,
+          })),
+        },
+        {
+          category: "Expenses",
+          accounts: incomeStatement.expenseLines.map((l) => ({
+            accountName: l.accountName,
+            currentPeriod: l.amount,
+            priorPeriod: 0,
+          })),
+        },
+        {
+          category: "Net Income",
+          accounts: [
+            { accountName: "Net Income", currentPeriod: incomeStatement.netIncome, priorPeriod: 0 },
+          ],
+        },
+      ] as typeof profitLossData)
+    : profitLossData;
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-3">
@@ -338,8 +526,8 @@ export function FinancialReports() {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
+      <Card className="bg-white border-0 shadow-sm rounded-2xl overflow-hidden">
+        <CardHeader className="bg-gradient-light border-b border-slate-100">
           <CardTitle className="text-lg">Report Filters</CardTitle>
         </CardHeader>
         <CardContent>
@@ -443,7 +631,10 @@ export function FinancialReports() {
       {/* Report Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredReports.map((report) => (
-          <Card key={report.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card
+            key={report.id}
+            className="bg-white border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none cursor-pointer overflow-hidden rounded-2xl"
+          >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
@@ -536,18 +727,18 @@ export function FinancialReports() {
                   {selectedReport === "profit-loss" && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Statement of Profit or Loss</h3>
-                      <div className="rounded-md border">
+                      <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
                         <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead className="font-semibold text-primary">Account</TableHead>
-                              <TableHead className="font-semibold text-primary text-right">Current Period (AED)</TableHead>
-                              <TableHead className="font-semibold text-primary text-right">Prior Period (AED)</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Current Period ({currencyCode})</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Prior Period ({currencyCode})</TableHead>
                               <TableHead className="font-semibold text-primary text-right">Variance (%)</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {profitLossData.map((section, sectionIndex) => (
+                            {profitLossSections.map((section, sectionIndex) => (
                               <React.Fragment key={sectionIndex}>
                                 <TableRow className="bg-gray-50">
                                   <TableCell colSpan={4} className="font-semibold text-primary">
@@ -602,42 +793,65 @@ export function FinancialReports() {
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="space-y-4">
                           <h4 className="font-semibold text-primary">Assets</h4>
-                          <div className="rounded-md border">
+                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
                             <Table>
                               <TableHeader>
                                 <TableRow>
                                   <TableHead className="font-semibold text-primary">Account</TableHead>
-                                  <TableHead className="font-semibold text-primary text-right">Amount (AED)</TableHead>
+                                  <TableHead className="font-semibold text-primary text-right">Amount ({currencyCode})</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {balanceSheetData.filter(section => 
-                                  section.category.includes("Assets")
-                                ).map((section, sectionIndex) => (
-                                  <React.Fragment key={sectionIndex}>
-                                    <TableRow className="bg-gray-50">
-                                      <TableCell colSpan={2} className="font-semibold text-primary">
-                                        {section.category}
-                                      </TableCell>
-                                    </TableRow>
-                                    {section.accounts.map((account, accountIndex) => (
-                                      <TableRow key={accountIndex}>
-                                        <TableCell className="pl-6">{account.accountName}</TableCell>
-                                        <TableCell className="text-right">
-                                          {account.amount.toLocaleString()}
+                                {balanceSheet ? (
+                                  Object.entries(balanceSheet.accounts ?? {})
+                                    .filter(([group]) => group.toLowerCase().includes("asset"))
+                                    .map(([group, lines]) => (
+                                      <React.Fragment key={group}>
+                                        <TableRow className="bg-gray-50">
+                                          <TableCell colSpan={2} className="font-semibold text-primary">
+                                            {group}
+                                          </TableCell>
+                                        </TableRow>
+                                        {(lines ?? []).map((l) => (
+                                          <TableRow key={`${group}-${l.code}-${l.name}`}>
+                                            <TableCell className="pl-6">{l.name}</TableCell>
+                                            <TableCell className="text-right">{Number(l.balance || 0).toLocaleString()}</TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </React.Fragment>
+                                    ))
+                                ) : (
+                                  balanceSheetData.filter(section =>
+                                    section.category.includes("Assets")
+                                  ).map((section, sectionIndex) => (
+                                    <React.Fragment key={sectionIndex}>
+                                      <TableRow className="bg-gray-50">
+                                        <TableCell colSpan={2} className="font-semibold text-primary">
+                                          {section.category}
                                         </TableCell>
                                       </TableRow>
-                                    ))}
-                                  </React.Fragment>
-                                ))}
+                                      {section.accounts.map((account, accountIndex) => (
+                                        <TableRow key={accountIndex}>
+                                          <TableCell className="pl-6">{account.accountName}</TableCell>
+                                          <TableCell className="text-right">
+                                            {account.amount.toLocaleString()}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </React.Fragment>
+                                  ))
+                                )}
                                 <TableRow className="bg-blue-50 font-semibold">
                                   <TableCell>Total Assets</TableCell>
                                   <TableCell className="text-right">
-                                    {balanceSheetData
-                                      .filter(section => section.category.includes("Assets"))
-                                      .reduce((total, section) => 
-                                        total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
-                                      ).toLocaleString()}
+                                    {(balanceSheet
+                                      ? balanceSheet.totalAssets
+                                      : balanceSheetData
+                                          .filter(section => section.category.includes("Assets"))
+                                          .reduce((total, section) =>
+                                            total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
+                                          )
+                                    ).toLocaleString()}
                                   </TableCell>
                                 </TableRow>
                               </TableBody>
@@ -647,42 +861,65 @@ export function FinancialReports() {
 
                         <div className="space-y-4">
                           <h4 className="font-semibold text-primary">Equity & Liabilities</h4>
-                          <div className="rounded-md border">
+                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
                             <Table>
                               <TableHeader>
                                 <TableRow>
                                   <TableHead className="font-semibold text-primary">Account</TableHead>
-                                  <TableHead className="font-semibold text-primary text-right">Amount (AED)</TableHead>
+                                  <TableHead className="font-semibold text-primary text-right">Amount ({currencyCode})</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {balanceSheetData.filter(section => 
-                                  !section.category.includes("Assets")
-                                ).map((section, sectionIndex) => (
-                                  <React.Fragment key={sectionIndex}>
-                                    <TableRow className="bg-gray-50">
-                                      <TableCell colSpan={2} className="font-semibold text-primary">
-                                        {section.category}
-                                      </TableCell>
-                                    </TableRow>
-                                    {section.accounts.map((account, accountIndex) => (
-                                      <TableRow key={accountIndex}>
-                                        <TableCell className="pl-6">{account.accountName}</TableCell>
-                                        <TableCell className="text-right">
-                                          {account.amount.toLocaleString()}
+                                {balanceSheet ? (
+                                  Object.entries(balanceSheet.accounts ?? {})
+                                    .filter(([group]) => !group.toLowerCase().includes("asset"))
+                                    .map(([group, lines]) => (
+                                      <React.Fragment key={group}>
+                                        <TableRow className="bg-gray-50">
+                                          <TableCell colSpan={2} className="font-semibold text-primary">
+                                            {group}
+                                          </TableCell>
+                                        </TableRow>
+                                        {(lines ?? []).map((l) => (
+                                          <TableRow key={`${group}-${l.code}-${l.name}`}>
+                                            <TableCell className="pl-6">{l.name}</TableCell>
+                                            <TableCell className="text-right">{Number(l.balance || 0).toLocaleString()}</TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </React.Fragment>
+                                    ))
+                                ) : (
+                                  balanceSheetData.filter(section =>
+                                    !section.category.includes("Assets")
+                                  ).map((section, sectionIndex) => (
+                                    <React.Fragment key={sectionIndex}>
+                                      <TableRow className="bg-gray-50">
+                                        <TableCell colSpan={2} className="font-semibold text-primary">
+                                          {section.category}
                                         </TableCell>
                                       </TableRow>
-                                    ))}
-                                  </React.Fragment>
-                                ))}
+                                      {section.accounts.map((account, accountIndex) => (
+                                        <TableRow key={accountIndex}>
+                                          <TableCell className="pl-6">{account.accountName}</TableCell>
+                                          <TableCell className="text-right">
+                                            {account.amount.toLocaleString()}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </React.Fragment>
+                                  ))
+                                )}
                                 <TableRow className="bg-blue-50 font-semibold">
                                   <TableCell>Total Equity & Liabilities</TableCell>
                                   <TableCell className="text-right">
-                                    {balanceSheetData
-                                      .filter(section => !section.category.includes("Assets"))
-                                      .reduce((total, section) => 
-                                        total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
-                                      ).toLocaleString()}
+                                    {(balanceSheet
+                                      ? (balanceSheet.totalLiabilities + balanceSheet.totalEquity)
+                                      : balanceSheetData
+                                          .filter(section => !section.category.includes("Assets"))
+                                          .reduce((total, section) =>
+                                            total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
+                                          )
+                                    ).toLocaleString()}
                                   </TableCell>
                                 </TableRow>
                               </TableBody>
@@ -696,36 +933,36 @@ export function FinancialReports() {
                   {selectedReport === "trial-balance" && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Trial Balance</h3>
-                      <div className="rounded-md border">
+                      <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
                         <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead className="font-semibold text-primary">Account Code</TableHead>
                               <TableHead className="font-semibold text-primary">Account Name</TableHead>
-                              <TableHead className="font-semibold text-primary text-right">Debit (AED)</TableHead>
-                              <TableHead className="font-semibold text-primary text-right">Credit (AED)</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Debit ({currencyCode})</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Credit ({currencyCode})</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {trialBalanceData.map((account, index) => (
-                              <TableRow key={index}>
-                                <TableCell>{account.accountCode}</TableCell>
-                                <TableCell>{account.accountName}</TableCell>
+                            {(trialBalance?.lines ?? trialBalanceData).map((account: any, index: number) => (
+                              <TableRow key={account.code ?? account.accountCode ?? index}>
+                                <TableCell>{account.code ?? account.accountCode}</TableCell>
+                                <TableCell>{account.name ?? account.accountName}</TableCell>
                                 <TableCell className="text-right">
-                                  {account.debit > 0 ? account.debit.toLocaleString() : "-"}
+                                  {(account.debit ?? 0) > 0 ? Number(account.debit).toLocaleString() : "-"}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {account.credit > 0 ? account.credit.toLocaleString() : "-"}
+                                  {(account.credit ?? 0) > 0 ? Number(account.credit).toLocaleString() : "-"}
                                 </TableCell>
                               </TableRow>
                             ))}
                             <TableRow className="bg-blue-50 font-semibold">
                               <TableCell colSpan={2}>Total</TableCell>
                               <TableCell className="text-right">
-                                {trialBalanceData.reduce((sum, acc) => sum + acc.debit, 0).toLocaleString()}
+                                {(trialBalance?.totalDebit ?? trialBalanceData.reduce((sum, acc) => sum + acc.debit, 0)).toLocaleString()}
                               </TableCell>
                               <TableCell className="text-right">
-                                {trialBalanceData.reduce((sum, acc) => sum + acc.credit, 0).toLocaleString()}
+                                {(trialBalance?.totalCredit ?? trialBalanceData.reduce((sum, acc) => sum + acc.credit, 0)).toLocaleString()}
                               </TableCell>
                             </TableRow>
                           </TableBody>
@@ -738,11 +975,45 @@ export function FinancialReports() {
                   {selectedReport === "cash-flow" && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Statement of Cash Flows</h3>
-                      <div className="text-center py-8 text-gray-500">
-                        <BarChart3 className="h-12 w-12 mx-auto mb-4" />
-                        <p>Cash Flow Statement implementation in progress</p>
-                        <p className="text-sm">Operating, Investing, and Financing Activities</p>
-                      </div>
+                      {!cashFlow ? (
+                        <div className="text-center py-10 text-gray-500">
+                          <BarChart3 className="h-12 w-12 mx-auto mb-4" />
+                          <p>Generate the report to view cash flow totals.</p>
+                          <p className="text-sm">Uses your real transactions for the selected range.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <Card className="border-0 shadow-sm">
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm text-muted-foreground">Total Inflows</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-semibold text-green-700"><CurrencyGlyph /> {cashFlow.totalInflows.toLocaleString()}</div>
+                              <p className="text-xs text-muted-foreground mt-1">{cashFlow.inflowCount} inflow transactions</p>
+                            </CardContent>
+                          </Card>
+                          <Card className="border-0 shadow-sm">
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm text-muted-foreground">Total Outflows</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-semibold text-red-700"><CurrencyGlyph /> {cashFlow.totalOutflows.toLocaleString()}</div>
+                              <p className="text-xs text-muted-foreground mt-1">{cashFlow.outflowCount} outflow transactions</p>
+                            </CardContent>
+                          </Card>
+                          <Card className="border-0 shadow-sm">
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm text-muted-foreground">Net Cash Flow</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-semibold text-primary"><CurrencyGlyph /> {cashFlow.netCashFlow.toLocaleString()}</div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {cashFlow.periodFrom} → {cashFlow.periodTo}
+                              </p>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
                     </div>
                   )}
 

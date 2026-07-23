@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -46,6 +47,7 @@ import {
 import { format, addMonths } from "date-fns";
 import { BarChart, Bar, PieChart as RechartsPie, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { toast } from "sonner";
+import { salaryPaymentsService } from "../utils/supabase/salary-payments-service";
 
 interface SalaryPaymentsProps {
   onNavigate?: (section: string) => void;
@@ -88,174 +90,19 @@ interface PaymentHistory {
   processedBy: string;
 }
 
-// Sample employee data
-const sampleEmployees: Employee[] = [
-  {
-    id: "1",
-    name: "Ahmed Hassan",
-    employeeId: "EMP001",
-    department: "Personal Training",
-    designation: "Senior Trainer",
-    baseSalary: 8000,
-    allowances: 1000,
-    deductions: 500,
-    netSalary: 8500,
-    paymentStatus: "Paid",
-    lastPaymentDate: new Date(2025, 9, 5),
-    bankAccount: "ADCB ****1234",
-    email: "ahmed.hassan@gymbios.com"
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    employeeId: "EMP002",
-    department: "Front Desk",
-    designation: "Receptionist",
-    baseSalary: 4000,
-    allowances: 500,
-    deductions: 200,
-    netSalary: 4300,
-    paymentStatus: "Pending",
-    lastPaymentDate: new Date(2025, 8, 5),
-    bankAccount: "ENBD ****5678",
-    email: "sarah.j@gymbios.com"
-  },
-  {
-    id: "3",
-    name: "Mohammed Ali",
-    employeeId: "EMP003",
-    department: "Group Classes",
-    designation: "Yoga Instructor",
-    baseSalary: 5000,
-    allowances: 800,
-    deductions: 300,
-    netSalary: 5500,
-    paymentStatus: "Pending",
-    lastPaymentDate: new Date(2025, 8, 5),
-    bankAccount: "FAB ****9012",
-    email: "mohammed.ali@gymbios.com"
-  },
-  {
-    id: "4",
-    name: "Fatima Ahmed",
-    employeeId: "EMP004",
-    department: "Management",
-    designation: "Operations Manager",
-    baseSalary: 11000,
-    allowances: 1500,
-    deductions: 500,
-    netSalary: 12000,
-    paymentStatus: "Paid",
-    lastPaymentDate: new Date(2025, 9, 5),
-    bankAccount: "ADIB ****3456",
-    email: "fatima.ahmed@gymbios.com"
-  },
-  {
-    id: "5",
-    name: "John Smith",
-    employeeId: "EMP005",
-    department: "Personal Training",
-    designation: "Fitness Trainer",
-    baseSalary: 6000,
-    allowances: 700,
-    deductions: 200,
-    netSalary: 6500,
-    paymentStatus: "Pending",
-    lastPaymentDate: new Date(2025, 8, 5),
-    bankAccount: "HSBC ****7890",
-    email: "john.smith@gymbios.com"
-  },
-  {
-    id: "6",
-    name: "Aisha Khan",
-    employeeId: "EMP006",
-    department: "Nutrition",
-    designation: "Nutritionist",
-    baseSalary: 6500,
-    allowances: 800,
-    deductions: 300,
-    netSalary: 7000,
-    paymentStatus: "On Hold",
-    lastPaymentDate: new Date(2025, 7, 5),
-    bankAccount: "RAK ****2468",
-    email: "aisha.khan@gymbios.com"
-  },
-  {
-    id: "7",
-    name: "Omar Rashid",
-    employeeId: "EMP007",
-    department: "Maintenance",
-    designation: "Facility Manager",
-    baseSalary: 4500,
-    allowances: 600,
-    deductions: 100,
-    netSalary: 5000,
-    paymentStatus: "Paid",
-    lastPaymentDate: new Date(2025, 9, 5),
-    bankAccount: "DIB ****1357",
-    email: "omar.rashid@gymbios.com"
-  },
-  {
-    id: "8",
-    name: "Lisa Williams",
-    employeeId: "EMP008",
-    department: "Sales",
-    designation: "Sales Executive",
-    baseSalary: 7000,
-    allowances: 800,
-    deductions: 300,
-    netSalary: 7500,
-    paymentStatus: "Pending",
-    lastPaymentDate: new Date(2025, 8, 5),
-    bankAccount: "CBD ****8642",
-    email: "lisa.williams@gymbios.com"
-  }
-];
-
-// Sample payment history
-const samplePaymentHistory: PaymentHistory[] = [
-  {
-    id: "1",
-    employeeId: "1",
-    employeeName: "Ahmed Hassan",
-    month: "October",
-    year: 2025,
-    netSalary: 8500,
-    splitPayments: [
-      { id: "1", mode: "Bank Transfer", amount: 6500, reference: "TXN001234567" },
-      { id: "2", mode: "Cash", amount: 2000, reference: "Paid by Admin" }
-    ],
-    paymentDate: new Date(2025, 9, 5),
-    notes: "Split payment requested by employee",
-    status: "Paid",
-    processedBy: "HR Manager"
-  },
-  {
-    id: "2",
-    employeeId: "4",
-    employeeName: "Fatima Ahmed",
-    month: "October",
-    year: 2025,
-    netSalary: 12000,
-    splitPayments: [
-      { id: "1", mode: "Bank Transfer", amount: 12000, reference: "TXN001234568" }
-    ],
-    paymentDate: new Date(2025, 9, 5),
-    notes: "",
-    status: "Paid",
-    processedBy: "HR Manager"
-  }
-];
 
 export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState("individual");
-  const [employees, setEmployees] = useState<Employee[]>(sampleEmployees);
-  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>(samplePaymentHistory);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("October");
   const [yearFilter, setYearFilter] = useState("2025");
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-all";
   
   // Individual payment state
   const [showIndividualPaymentModal, setShowIndividualPaymentModal] = useState(false);
@@ -264,6 +111,10 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
   const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([
     { id: "1", mode: "Bank Transfer", amount: 0, reference: "" }
   ]);
+  const [paymentAdjustments, setPaymentAdjustments] = useState({
+    allowances: 0,
+    deductions: 0,
+  });
   const [paymentFormData, setPaymentFormData] = useState({
     month: "November",
     year: "2025",
@@ -278,6 +129,26 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
   const [bulkSplitPayments, setBulkSplitPayments] = useState<SplitPayment[]>([
     { id: "1", mode: "Bank Transfer", amount: 0, reference: "" }
   ]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [employeesData, paymentsData] = await Promise.all([
+        salaryPaymentsService.getEmployees(),
+        salaryPaymentsService.getPayments(),
+      ]);
+      setEmployees(employeesData);
+      setPaymentHistory(paymentsData);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load salary payment data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   // Get unique departments
   const departments = Array.from(new Set(employees.map(e => e.department)));
@@ -340,10 +211,17 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
   };
 
   const handleOpenIndividualPayment = (employee: Employee) => {
+    const initialAllowances = employee.allowances || 0;
+    const initialDeductions = employee.deductions || 0;
+    const computedNet = Math.max(0, employee.baseSalary + initialAllowances - initialDeductions);
     setSelectedEmployee(employee);
     setEnableSplitPayment(false);
+    setPaymentAdjustments({
+      allowances: initialAllowances,
+      deductions: initialDeductions,
+    });
     setSplitPayments([
-      { id: "1", mode: "Bank Transfer", amount: employee.netSalary, reference: "" }
+      { id: "1", mode: "Bank Transfer", amount: computedNet, reference: "" }
     ]);
     setPaymentFormData({
       month: "November",
@@ -374,51 +252,47 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
     ));
   };
 
-  const handleProcessIndividualPayment = () => {
+  const handleProcessIndividualPayment = async () => {
     if (!selectedEmployee) return;
 
+    const netSalary = Math.max(
+      0,
+      selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions
+    );
     const paymentsToUse = enableSplitPayment ? splitPayments : [{
       id: "1",
       mode: splitPayments[0]?.mode || "Bank Transfer",
-      amount: selectedEmployee.netSalary,
+      amount: netSalary,
       reference: splitPayments[0]?.reference || ""
     }];
 
-    const validation = validateSplitPayment(selectedEmployee.netSalary, paymentsToUse);
-    
+    const validation = validateSplitPayment(netSalary, paymentsToUse);
     if (enableSplitPayment && !validation.isValid) {
-      toast.error(`Split payment total must equal net salary. Difference: AED ${Math.abs(validation.difference)}`);
+      toast.error(`Split payment total must equal net salary. Difference: ${currencyCode} ${Math.abs(validation.difference)}`);
       return;
     }
 
-    const newPayment: PaymentHistory = {
-      id: Date.now().toString(),
-      employeeId: selectedEmployee.id,
-      employeeName: selectedEmployee.name,
-      month: paymentFormData.month,
-      year: parseInt(paymentFormData.year),
-      netSalary: selectedEmployee.netSalary,
-      splitPayments: paymentsToUse,
-      paymentDate: new Date(paymentFormData.paymentDate),
-      notes: paymentFormData.notes,
-      status: "Paid",
-      processedBy: "HR Manager"
-    };
-
-    setPaymentHistory([...paymentHistory, newPayment]);
-
-    // Update employee status
-    setEmployees(employees.map(emp =>
-      emp.id === selectedEmployee.id
-        ? { ...emp, paymentStatus: "Paid", lastPaymentDate: new Date(paymentFormData.paymentDate) }
-        : emp
-    ));
-
-    toast.success(`Payment processed successfully for ${selectedEmployee.name}!`);
-    setShowIndividualPaymentModal(false);
+    try {
+      await salaryPaymentsService.createPayment({
+        employeeId: selectedEmployee.employeeId,
+        employeeName: selectedEmployee.name,
+        month: paymentFormData.month,
+        year: parseInt(paymentFormData.year),
+        netSalary,
+        splitPayments: paymentsToUse,
+        paymentDate: paymentFormData.paymentDate,
+        notes: paymentFormData.notes,
+        processedBy: "HR Manager",
+      });
+      toast.success(`Payment processed successfully for ${selectedEmployee.name}!`);
+      setShowIndividualPaymentModal(false);
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process payment");
+    }
   };
 
-  const handleProcessBulkPayment = () => {
+  const handleProcessBulkPayment = async () => {
     const selectedCount = selectedEmployees.length;
     if (selectedCount === 0) {
       toast.error("Please select at least one employee");
@@ -431,16 +305,14 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
     if (bulkEnableSplit) {
       const validation = validateSplitPayment(totalAmount, bulkSplitPayments);
       if (!validation.isValid) {
-        toast.error(`Split payment total must equal total salary. Difference: AED ${Math.abs(validation.difference)}`);
+        toast.error(`Split payment total must equal total salary. Difference: ${currencyCode} ${Math.abs(validation.difference)}`);
         return;
       }
     }
 
-    // Process bulk payment
-    const paymentDate = new Date();
-    const newPayments: PaymentHistory[] = selectedEmps.map(emp => ({
-      id: Date.now().toString() + emp.id,
-      employeeId: emp.id,
+    const paymentDate = format(new Date(), "yyyy-MM-dd");
+    const bulkRequests = selectedEmps.map(emp => ({
+      employeeId: emp.employeeId,
       employeeName: emp.name,
       month: paymentFormData.month,
       year: parseInt(paymentFormData.year),
@@ -450,22 +322,18 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
         : [{ id: "1", mode: "Bank Transfer", amount: emp.netSalary, reference: `Bulk-${Date.now()}` }],
       paymentDate,
       notes: "Bulk payment processing",
-      status: "Paid",
-      processedBy: "HR Manager"
+      processedBy: "HR Manager",
     }));
 
-    setPaymentHistory([...paymentHistory, ...newPayments]);
-
-    const updatedEmployees = employees.map(emp =>
-      selectedEmployees.includes(emp.id)
-        ? { ...emp, paymentStatus: "Paid" as const, lastPaymentDate: paymentDate }
-        : emp
-    );
-
-    setEmployees(updatedEmployees);
-    setSelectedEmployees([]);
-    toast.success(`Bulk payment processed for ${selectedCount} employees!`);
-    setShowBulkPaymentModal(false);
+    try {
+      await salaryPaymentsService.createBulkPayments(bulkRequests);
+      setSelectedEmployees([]);
+      toast.success(`Bulk payment processed for ${selectedCount} employees!`);
+      setShowBulkPaymentModal(false);
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process bulk payments");
+    }
   };
 
   const handleToggleEmployee = (employeeId: string) => {
@@ -540,10 +408,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-3">
-            <Wallet className="h-8 w-8" style={{ color: '#2B7A78' }} />
-            Salary Payments
-          </h1>
+          <h1 className="text-3xl font-bold">Salary Payments</h1>
           <p className="text-muted-foreground">
             {monthFilter} {yearFilter} - Process individual and bulk salary payments with split payment options
           </p>
@@ -552,10 +417,12 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-l-4" style={{ borderLeftColor: '#2B7A78' }}>
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Total Employees</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summaryStats.totalEmployees}</div>
@@ -565,36 +432,42 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4" style={{ borderLeftColor: '#2B7A78' }}>
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Payable</CardTitle>
-            <DollarSign className="h-4 w-4" style={{ color: '#2B7A78' }} />
+            <CardTitle className="text-sm font-medium text-primary">Total Payable</CardTitle>
+            <div className="bg-emerald-50 p-2 rounded-lg">
+              <DollarSign className="h-4 w-4 text-emerald-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">AED {summaryStats.totalSalary.toLocaleString()}</div>
+            <div className="text-2xl font-bold"><CurrencyGlyph /> {summaryStats.totalSalary.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">
               This month
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4" style={{ borderLeftColor: '#E63946' }}>
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
-            <Clock className="h-4 w-4" style={{ color: '#E63946' }} />
+            <CardTitle className="text-sm font-medium text-primary">Pending Payments</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <Clock className="h-4 w-4 text-yellow-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summaryStats.pendingCount}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              AED {summaryStats.pendingAmount.toLocaleString()} to process
+              <CurrencyGlyph /> {summaryStats.pendingAmount.toLocaleString()} to process
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500">
+        <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paid This Month</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-primary">Paid This Month</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summaryStats.paidCount}</div>
@@ -604,6 +477,16 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
           </CardContent>
         </Card>
       </div>
+
+      <style>{`
+        @keyframes tabSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        [role="tabpanel"][data-state="active"] {
+          animation: tabSlideIn 0.22s ease-out;
+        }
+      `}</style>
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -625,16 +508,16 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
         {/* Individual Payment Tab */}
         <TabsContent value="individual" className="space-y-6">
           {/* Filters */}
-          <Card>
+          <Card className={cardShell}>
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search by name or employee ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-11 h-10"
                   />
                 </div>
 
@@ -666,7 +549,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
           </Card>
 
           {/* Employee List */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Select Employee for Payment</CardTitle>
               <CardDescription>Click "Pay" to process individual salary payment</CardDescription>
@@ -700,12 +583,12 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                           <div className="text-sm text-muted-foreground">{employee.designation}</div>
                         </div>
                       </TableCell>
-                      <TableCell>AED {employee.baseSalary.toLocaleString()}</TableCell>
+                      <TableCell><CurrencyGlyph /> {employee.baseSalary.toLocaleString()}</TableCell>
                       <TableCell className="text-green-600">+{employee.allowances.toLocaleString()}</TableCell>
                       <TableCell className="text-red-600">-{employee.deductions.toLocaleString()}</TableCell>
                       <TableCell>
                         <span className="font-bold" style={{ color: '#2B7A78' }}>
-                          AED {employee.netSalary.toLocaleString()}
+                          <CurrencyGlyph /> {employee.netSalary.toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -735,7 +618,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
         {/* Bulk Payment Tab */}
         <TabsContent value="bulk" className="space-y-6">
           {/* Filters */}
-          <Card>
+          <Card className={cardShell}>
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-4 items-center justify-between">
                 <div className="flex gap-4 flex-1">
@@ -784,7 +667,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
           </Card>
 
           {/* Bulk Selection Table */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Select Employees for Bulk Payment</CardTitle>
               <CardDescription>Select multiple employees to process payments in batch</CardDescription>
@@ -823,7 +706,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       <TableCell>{employee.department}</TableCell>
                       <TableCell>
                         <span className="font-bold" style={{ color: '#2B7A78' }}>
-                          AED {employee.netSalary.toLocaleString()}
+                          <CurrencyGlyph /> {employee.netSalary.toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -844,7 +727,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                     </div>
                     <div>
                       <span className="font-bold" style={{ color: '#2B7A78' }}>
-                        Total Amount: AED {employees
+                        Total Amount: <CurrencyGlyph /> {employees
                           .filter(e => selectedEmployees.includes(e.id))
                           .reduce((sum, e) => sum + e.netSalary, 0)
                           .toLocaleString()}
@@ -861,7 +744,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
         <TabsContent value="summary" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Payment Mode Distribution Chart */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <PieChart className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -878,7 +761,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, value }) => `${name}: AED ${value.toLocaleString()}`}
+                        label={({ name, value }) => `${name}: ${currencyCode} ${value.toLocaleString()}`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
@@ -887,7 +770,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => `AED ${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                     </RechartsPie>
                   </ResponsiveContainer>
                 ) : (
@@ -899,7 +782,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
             </Card>
 
             {/* Payment Statistics */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" style={{ color: '#2B7A78' }} />
@@ -909,7 +792,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Card className="bg-muted/50">
+                  <Card className="bg-muted/50 border-0 shadow-none">
                     <CardContent className="pt-6">
                       <div className="text-center">
                         <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
@@ -919,11 +802,11 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="bg-muted/50">
+                  <Card className="bg-muted/50 border-0 shadow-none">
                     <CardContent className="pt-6">
                       <div className="text-center">
                         <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
-                          AED {paymentHistory.reduce((sum, p) => sum + p.netSalary, 0).toLocaleString()}
+                          <CurrencyGlyph /> {paymentHistory.reduce((sum, p) => sum + p.netSalary, 0).toLocaleString()}
                         </div>
                         <div className="text-sm text-muted-foreground">Amount Paid</div>
                       </div>
@@ -942,7 +825,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                         <span className="font-medium">{mode}</span>
                       </div>
                       <span className="font-bold" style={{ color: '#2B7A78' }}>
-                        AED {amount.toLocaleString()}
+                        <CurrencyGlyph /> {amount.toLocaleString()}
                       </span>
                     </div>
                   ))}
@@ -952,7 +835,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
           </div>
 
           {/* Recent Payments */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -989,7 +872,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       </TableCell>
                       <TableCell>{payment.month} {payment.year}</TableCell>
                       <TableCell>
-                        <span className="font-bold">AED {payment.netSalary.toLocaleString()}</span>
+                        <span className="font-bold"><CurrencyGlyph /> {payment.netSalary.toLocaleString()}</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
@@ -1044,24 +927,42 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                     <CardTitle className="text-base">Salary Breakdown</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Base Salary:</span>
-                        <span className="font-medium">AED {selectedEmployee.baseSalary.toLocaleString()}</span>
+                        <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.baseSalary.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between text-green-600">
-                        <span>Allowances:</span>
-                        <span className="font-medium">+ AED {selectedEmployee.allowances.toLocaleString()}</span>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Allowances ({currencyCode})</Label>
+                          <Input
+                            type="number"
+                            value={paymentAdjustments.allowances}
+                            onChange={(e) => {
+                              const value = Math.max(0, parseFloat(e.target.value) || 0);
+                              setPaymentAdjustments((prev) => ({ ...prev, allowances: value }));
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Deductions ({currencyCode})</Label>
+                          <Input
+                            type="number"
+                            value={paymentAdjustments.deductions}
+                            onChange={(e) => {
+                              const value = Math.max(0, parseFloat(e.target.value) || 0);
+                              setPaymentAdjustments((prev) => ({ ...prev, deductions: value }));
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div className="flex justify-between text-red-600">
-                        <span>Deductions:</span>
-                        <span className="font-medium">- AED {selectedEmployee.deductions.toLocaleString()}</span>
-                      </div>
+
                       <Separator />
                       <div className="flex justify-between">
                         <span className="font-bold">Net Payable:</span>
                         <span className="text-xl font-bold" style={{ color: '#2B7A78' }}>
-                          AED {selectedEmployee.netSalary.toLocaleString()}
+                          <CurrencyGlyph /> {Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions).toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -1166,16 +1067,41 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="Cash">💵 Cash</SelectItem>
-                                      <SelectItem value="Bank Transfer">🏦 Bank Transfer</SelectItem>
-                                      <SelectItem value="Cheque">📄 Cheque</SelectItem>
-                                      <SelectItem value="Digital Wallet">📱 Digital Wallet</SelectItem>
-                                      <SelectItem value="Other">⚙️ Other</SelectItem>
+                                      <SelectItem value="Cash">
+                                        <span className="inline-flex items-center gap-2">
+                                          <Banknote className="h-4 w-4 text-emerald-600" />
+                                          Cash
+                                        </span>
+                                      </SelectItem>
+                                      <SelectItem value="Bank Transfer">
+                                        <span className="inline-flex items-center gap-2">
+                                          <CreditCard className="h-4 w-4 text-blue-600" />
+                                          Bank Transfer
+                                        </span>
+                                      </SelectItem>
+                                      <SelectItem value="Cheque">
+                                        <span className="inline-flex items-center gap-2">
+                                          <FileText className="h-4 w-4 text-slate-600" />
+                                          Cheque
+                                        </span>
+                                      </SelectItem>
+                                      <SelectItem value="Digital Wallet">
+                                        <span className="inline-flex items-center gap-2">
+                                          <Smartphone className="h-4 w-4 text-purple-600" />
+                                          Digital Wallet
+                                        </span>
+                                      </SelectItem>
+                                      <SelectItem value="Other">
+                                        <span className="inline-flex items-center gap-2">
+                                          <ArrowLeftRight className="h-4 w-4 text-amber-600" />
+                                          Other
+                                        </span>
+                                      </SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
                                 <div className="space-y-2">
-                                  <Label>Amount (AED) *</Label>
+                                  <Label>Amount ({currencyCode}) *</Label>
                                   <Input
                                     type="number"
                                     placeholder="0.00"
@@ -1210,7 +1136,10 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
 
                     {/* Split Validation */}
                     <Card className={
-                      validateSplitPayment(selectedEmployee.netSalary, splitPayments).isValid
+                      validateSplitPayment(
+                        Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions),
+                        splitPayments
+                      ).isValid
                         ? "bg-green-50 border-green-200"
                         : "bg-red-50 border-red-200"
                     }>
@@ -1218,13 +1147,19 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                         <div className="flex items-center justify-between">
                           <span className="font-medium">Total Split Amount:</span>
                           <span className="text-xl font-bold">
-                            AED {calculateSplitTotal(splitPayments).toLocaleString()}
+                            <CurrencyGlyph /> {calculateSplitTotal(splitPayments).toLocaleString()}
                           </span>
                         </div>
-                        {!validateSplitPayment(selectedEmployee.netSalary, splitPayments).isValid && (
+                        {!validateSplitPayment(
+                          Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions),
+                          splitPayments
+                        ).isValid && (
                           <p className="text-sm text-red-600 mt-2">
-                            ⚠️ Total must equal Net Payable (AED {selectedEmployee.netSalary.toLocaleString()})
-                            - Difference: AED {Math.abs(validateSplitPayment(selectedEmployee.netSalary, splitPayments).difference).toLocaleString()}
+                            Total must equal Net Payable (<CurrencyGlyph /> {Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions).toLocaleString()})
+                            - Difference: <CurrencyGlyph /> {Math.abs(validateSplitPayment(
+                              Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions),
+                              splitPayments
+                            ).difference).toLocaleString()}
                           </p>
                         )}
                       </CardContent>
@@ -1243,11 +1178,36 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Cash">💵 Cash</SelectItem>
-                            <SelectItem value="Bank Transfer">🏦 Bank Transfer</SelectItem>
-                            <SelectItem value="Cheque">📄 Cheque</SelectItem>
-                            <SelectItem value="Digital Wallet">📱 Digital Wallet</SelectItem>
-                            <SelectItem value="Other">⚙️ Other</SelectItem>
+                            <SelectItem value="Cash">
+                              <span className="inline-flex items-center gap-2">
+                                <Banknote className="h-4 w-4 text-emerald-600" />
+                                Cash
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="Bank Transfer">
+                              <span className="inline-flex items-center gap-2">
+                                <CreditCard className="h-4 w-4 text-blue-600" />
+                                Bank Transfer
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="Cheque">
+                              <span className="inline-flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-slate-600" />
+                                Cheque
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="Digital Wallet">
+                              <span className="inline-flex items-center gap-2">
+                                <Smartphone className="h-4 w-4 text-purple-600" />
+                                Digital Wallet
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="Other">
+                              <span className="inline-flex items-center gap-2">
+                                <ArrowLeftRight className="h-4 w-4 text-amber-600" />
+                                Other
+                              </span>
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1326,7 +1286,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   <div className="flex justify-between">
                     <span className="font-bold">Total Amount:</span>
                     <span className="text-xl font-bold" style={{ color: '#2B7A78' }}>
-                      AED {employees
+                      <CurrencyGlyph /> {employees
                         .filter(e => selectedEmployees.includes(e.id))
                         .reduce((sum, e) => sum + e.netSalary, 0)
                         .toLocaleString()}
@@ -1411,10 +1371,30 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Cash">💵 Cash</SelectItem>
-                    <SelectItem value="Bank Transfer">🏦 Bank Transfer</SelectItem>
-                    <SelectItem value="Cheque">📄 Cheque</SelectItem>
-                    <SelectItem value="Digital Wallet">📱 Digital Wallet</SelectItem>
+                    <SelectItem value="Cash">
+                      <span className="inline-flex items-center gap-2">
+                        <Banknote className="h-4 w-4 text-emerald-600" />
+                        Cash
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="Bank Transfer">
+                      <span className="inline-flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-blue-600" />
+                        Bank Transfer
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="Cheque">
+                      <span className="inline-flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-slate-600" />
+                        Cheque
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="Digital Wallet">
+                      <span className="inline-flex items-center gap-2">
+                        <Smartphone className="h-4 w-4 text-purple-600" />
+                        Digital Wallet
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1452,15 +1432,35 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Cash">💵 Cash</SelectItem>
-                                <SelectItem value="Bank Transfer">🏦 Bank Transfer</SelectItem>
-                                <SelectItem value="Cheque">📄 Cheque</SelectItem>
-                                <SelectItem value="Digital Wallet">📱 Digital Wallet</SelectItem>
+                                <SelectItem value="Cash">
+                                  <span className="inline-flex items-center gap-2">
+                                    <Banknote className="h-4 w-4 text-emerald-600" />
+                                    Cash
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="Bank Transfer">
+                                  <span className="inline-flex items-center gap-2">
+                                    <CreditCard className="h-4 w-4 text-blue-600" />
+                                    Bank Transfer
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="Cheque">
+                                  <span className="inline-flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-slate-600" />
+                                    Cheque
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="Digital Wallet">
+                                  <span className="inline-flex items-center gap-2">
+                                    <Smartphone className="h-4 w-4 text-purple-600" />
+                                    Digital Wallet
+                                  </span>
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <Label>Amount (AED) *</Label>
+                            <Label>Amount ({currencyCode}) *</Label>
                             <Input
                               type="number"
                               placeholder="0.00"
@@ -1495,7 +1495,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   .map(emp => (
                     <div key={emp.id} className="flex justify-between p-2 bg-muted rounded">
                       <span className="font-medium">{emp.name}</span>
-                      <span style={{ color: '#2B7A78' }}>AED {emp.netSalary.toLocaleString()}</span>
+                      <span style={{ color: '#2B7A78' }}><CurrencyGlyph /> {emp.netSalary.toLocaleString()}</span>
                     </div>
                   ))}
               </div>

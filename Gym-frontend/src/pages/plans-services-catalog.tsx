@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -266,7 +267,7 @@ const classes = [
 ];
 
 export function PlansServicesCatalog() {
-  const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
   const [showInquiryForm, setShowInquiryForm] = useState(false);
   const [showOnboardForm, setShowOnboardForm] = useState(false);
@@ -287,6 +288,7 @@ export function PlansServicesCatalog() {
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [pendingMembers, setPendingMembers] = useState<any[]>([]);
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   // Auto-refresh functionality for kiosk mode
   useEffect(() => {
@@ -592,20 +594,20 @@ export function PlansServicesCatalog() {
 
       {/* Content Sections */}
       <Tabs defaultValue="memberships" className="space-y-6">
-        <TabsList className={`grid w-full grid-cols-3 ${isFullscreen ? 'h-16 text-lg' : ''}`}>
+        <TabsList className={`w-full flex ${isFullscreen ? 'h-16 text-lg' : ''}`}>
           {catalogConfig.membershipPlans && (
-            <TabsTrigger value="memberships" className="flex items-center space-x-2">
+            <TabsTrigger value="memberships" className="flex-1 flex items-center justify-center space-x-2">
               <Award className="h-4 w-4" />
               <span>Membership Plans & Pricing</span>
             </TabsTrigger>
           )}
           {catalogConfig.trainingStreams && (
-            <TabsTrigger value="training" className="flex items-center space-x-2">
+            <TabsTrigger value="training" className="flex-1 flex items-center justify-center space-x-2">
               <Dumbbell className="h-4 w-4" />
               <span>Training Streams</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="classes" className="flex items-center space-x-2">
+          <TabsTrigger value="classes" className="flex-1 flex items-center justify-center space-x-2">
             <Calendar className="h-4 w-4" />
             <span>Scheduled Classes</span>
           </TabsTrigger>
@@ -613,7 +615,7 @@ export function PlansServicesCatalog() {
 
         {/* Membership Plans Section */}
         {catalogConfig.membershipPlans && (
-          <TabsContent value="memberships" className="space-y-6">
+          <TabsContent value="memberships" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
             <div className="text-center mb-8">
               <h2 className={`${isFullscreen ? 'text-3xl' : 'text-2xl'} font-bold mb-4`}>Choose Your Perfect Plan</h2>
               <p className={`text-gray-600 max-w-2xl mx-auto ${isFullscreen ? 'text-lg' : ''}`}>
@@ -623,7 +625,7 @@ export function PlansServicesCatalog() {
 
             <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
               {membershipPlans.map((plan) => (
-                <Card key={plan.id} className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl ${plan.popular ? 'ring-2 ring-purple-500 scale-105' : ''} ${isFullscreen ? 'h-auto' : ''}`}>
+                <Card key={plan.id} className={`${cardShell} relative overflow-hidden transition-all duration-300 ${plan.popular ? 'ring-2 ring-purple-500 scale-105' : ''} ${isFullscreen ? 'h-auto' : ''}`}>
                   {plan.popular && (
                     <div className="absolute top-0 right-0 bg-gradient-to-l from-purple-500 to-pink-500 text-white px-3 py-1 text-sm font-medium">
                       Most Popular
@@ -691,7 +693,7 @@ export function PlansServicesCatalog() {
 
         {/* Training Streams Section */}
         {catalogConfig.trainingStreams && (
-          <TabsContent value="training" className="space-y-6">
+          <TabsContent value="training" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
             <div className="text-center mb-8">
               <h2 className={`${isFullscreen ? 'text-3xl' : 'text-2xl'} font-bold mb-4`}>Specialized Training Programs</h2>
               <p className={`text-gray-600 max-w-2xl mx-auto ${isFullscreen ? 'text-lg' : ''}`}>
@@ -701,7 +703,7 @@ export function PlansServicesCatalog() {
 
             <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
               {trainingStreams.map((stream) => (
-                <Card key={stream.id} className="overflow-hidden hover:shadow-lg transition-all duration-300">
+                <Card key={stream.id} className={`${cardShell} overflow-hidden transition-all duration-300`}>
                   <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
                     <div className="flex justify-between items-start">
                       <div>
@@ -759,7 +761,7 @@ export function PlansServicesCatalog() {
                       <h4 className={`${isFullscreen ? 'text-base' : 'text-sm'} font-semibold mb-3`}>Our Expert Trainers:</h4>
                       <div className="space-y-2">
                         {stream.trainers.map((trainer, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                          <div key={index} className="flex items-center justify-between p-2 bg-slate-50/60 rounded-lg">
                             <div className="flex items-center space-x-3">
                               <Avatar className="h-10 w-10">
                                 <AvatarImage src={trainer.image} alt={trainer.name} />
@@ -795,7 +797,7 @@ export function PlansServicesCatalog() {
         )}
 
         {/* Classes Section */}
-        <TabsContent value="classes" className="space-y-6">
+        <TabsContent value="classes" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="text-center mb-8">
             <h2 className={`${isFullscreen ? 'text-3xl' : 'text-2xl'} font-bold mb-4`}>Group Class Schedule</h2>
             <p className={`text-gray-600 max-w-2xl mx-auto ${isFullscreen ? 'text-lg' : ''}`}>
@@ -805,7 +807,7 @@ export function PlansServicesCatalog() {
 
           <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
             {classes.map((classItem) => (
-              <Card key={classItem.id} className="overflow-hidden hover:shadow-lg transition-all duration-300">
+              <Card key={classItem.id} className={`${cardShell} overflow-hidden transition-all duration-300`}>
                 <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
                   <div className="flex items-start justify-between">
                     <div>
@@ -958,7 +960,7 @@ export function PlansServicesCatalog() {
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <h4 className="font-semibold text-sm mb-2 text-yellow-800">Important Notes:</h4>
                   <ul className="text-xs text-yellow-700 space-y-1">
-                    <li>• All prices are in AED and inclusive of VAT</li>
+                    <li>• All prices are in <CurrencyGlyph /> and inclusive of VAT</li>
                     <li>• Membership starts from the date of registration</li>
                     <li>• No refunds on early cancellation</li>
                     <li>• Photo ID required for registration</li>
@@ -1034,7 +1036,7 @@ export function PlansServicesCatalog() {
                   <h4 className="font-semibold">Choose Your Action:</h4>
                   
                   {/* Option 1: Existing Member */}
-                  <Card className="border-2 border-transparent hover:border-[#2B7A78] transition-all cursor-pointer">
+                  <Card className={`${cardShell} border-2 border-transparent hover:border-[#2B7A78] transition-all cursor-pointer`}>
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -1059,7 +1061,7 @@ export function PlansServicesCatalog() {
                   </Card>
 
                   {/* Option 2: New Member */}
-                  <Card className="border-2 border-transparent hover:border-[#2B7A78] transition-all cursor-pointer">
+                  <Card className={`${cardShell} border-2 border-transparent hover:border-[#2B7A78] transition-all cursor-pointer`}>
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -1083,7 +1085,7 @@ export function PlansServicesCatalog() {
                   </Card>
 
                   {/* Option 3: Inquiry */}
-                  <Card className="border-2 border-transparent hover:border-[#2B7A78] transition-all cursor-pointer">
+                  <Card className={`${cardShell} border-2 border-transparent hover:border-[#2B7A78] transition-all cursor-pointer`}>
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -1149,10 +1151,10 @@ export function PlansServicesCatalog() {
         onSubmitDraft={(draftData) => {
           setPendingMembers(prev => [...prev, draftData]);
           
-          // Save to localStorage (simulating backend)
-          const existing = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+          // Save to sessionStorage (simulating backend)
+          const existing = JSON.parse(sessionStorage.getItem('pendingMembers') || '[]');
           existing.push(draftData);
-          localStorage.setItem('pendingMembers', JSON.stringify(existing));
+          sessionStorage.setItem('pendingMembers', JSON.stringify(existing));
           
           // Notify other components
           window.dispatchEvent(new Event('pendingMembersUpdated'));

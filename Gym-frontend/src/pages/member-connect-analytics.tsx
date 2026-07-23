@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -151,7 +152,8 @@ interface CampaignAnalytics {
 }
 
 export function MemberConnectAnalytics() {
-  const [activeTab, setActiveTab] = useState('overview');  
+  const { currencyCode } = useCurrency();
+  const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('month');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedPlan, setSelectedPlan] = useState('all');
@@ -161,6 +163,7 @@ export function MemberConnectAnalytics() {
   const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(undefined);
   const [customDateTo, setCustomDateTo] = useState<Date | undefined>(undefined);
   const [isExporting, setIsExporting] = useState(false);
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   // Sample data - in real app this would come from your backend
   const acquisitionData: AcquisitionData[] = [
@@ -409,7 +412,7 @@ export function MemberConnectAnalytics() {
       </div>
 
       {/* Filters Panel */}
-      <Card>
+      <Card className={cardShell}>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
             <div className="flex-1 min-w-[250px]">
@@ -555,102 +558,102 @@ export function MemberConnectAnalytics() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Members</p>
-                <p className="text-2xl font-bold">{analytics.totalMembers.toLocaleString()}</p>
-                <div className="flex items-center text-sm">
-                  {getTrendIcon(analytics.memberGrowth)}
-                  <span className={cn("ml-1", getTrendColor(analytics.memberGrowth))}>
-                    {Math.abs(analytics.memberGrowth).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-              <Users className="h-6 w-6 text-blue-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Members</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{analytics.totalMembers.toLocaleString()}</div>
+            <div className="flex items-center text-xs text-muted-foreground">
+              {getTrendIcon(analytics.memberGrowth)}
+              <span className={cn("ml-1", getTrendColor(analytics.memberGrowth))}>
+                {Math.abs(analytics.memberGrowth).toFixed(1)}% vs last month
+              </span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">New Members</p>
-                <p className="text-2xl font-bold text-green-600">{analytics.newMembersThisMonth}</p>
-                <div className="flex items-center text-sm">
-                  {getTrendIcon(analytics.newMemberGrowth)}
-                  <span className={cn("ml-1", getTrendColor(analytics.newMemberGrowth))}>
-                    {Math.abs(analytics.newMemberGrowth).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-              <UserPlus className="h-6 w-6 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">New Members</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <UserPlus className="h-4 w-4 text-green-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{analytics.newMembersThisMonth}</div>
+            <div className="flex items-center text-xs text-muted-foreground">
+              {getTrendIcon(analytics.newMemberGrowth)}
+              <span className={cn("ml-1", getTrendColor(analytics.newMemberGrowth))}>
+                {Math.abs(analytics.newMemberGrowth).toFixed(1)}% vs last month
+              </span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Retention Rate</p>
-                <p className="text-2xl font-bold text-purple-600">{analytics.retentionRate.toFixed(1)}%</p>
-                <div className="flex items-center text-sm">
-                  {getTrendIcon(2.3)}
-                  <span className="ml-1 text-green-600">2.3%</span>
-                </div>
-              </div>
-              <UserCheck className="h-6 w-6 text-purple-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Retention Rate</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <UserCheck className="h-4 w-4 text-purple-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{analytics.retentionRate.toFixed(1)}%</div>
+            <div className="flex items-center text-xs text-muted-foreground">
+              {getTrendIcon(2.3)}
+              <span className="ml-1 text-green-600">2.3% vs last month</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Churn Rate</p>
-                <p className="text-2xl font-bold text-red-600">{analytics.churnRate.toFixed(1)}%</p>
-                <div className="flex items-center text-sm">
-                  {getTrendIcon(-1.2, true)}
-                  <span className="ml-1 text-green-600">1.2%</span>
-                </div>
-              </div>
-              <UserX className="h-6 w-6 text-red-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Churn Rate</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <UserX className="h-4 w-4 text-red-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{analytics.churnRate.toFixed(1)}%</div>
+            <div className="flex items-center text-xs text-muted-foreground">
+              {getTrendIcon(-1.2, true)}
+              <span className="ml-1 text-green-600">1.2% improvement</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Engagement</p>
-                <p className="text-2xl font-bold text-orange-600">{analytics.avgEngagement.toFixed(0)}</p>
-                <div className="flex items-center text-sm">
-                  {getTrendIcon(5.7)}
-                  <span className="ml-1 text-green-600">5.7%</span>
-                </div>
-              </div>
-              <Activity className="h-6 w-6 text-orange-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Avg Engagement</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <Activity className="h-4 w-4 text-orange-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{analytics.avgEngagement.toFixed(0)}</div>
+            <div className="flex items-center text-xs text-muted-foreground">
+              {getTrendIcon(5.7)}
+              <span className="ml-1 text-green-600">5.7% vs last month</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">LTV:CAC Ratio</p>
-                <p className="text-2xl font-bold text-indigo-600">{analytics.ltvcacRatio.toFixed(1)}:1</p>
-                <div className="flex items-center text-sm">
-                  {getTrendIcon(12.5)}
-                  <span className="ml-1 text-green-600">12.5%</span>
-                </div>
-              </div>
-              <Target className="h-6 w-6 text-indigo-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">LTV:CAC Ratio</CardTitle>
+            <div className="bg-indigo-50 p-2 rounded-lg">
+              <Target className="h-4 w-4 text-indigo-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-indigo-600">{analytics.ltvcacRatio.toFixed(1)}:1</div>
+            <div className="flex items-center text-xs text-muted-foreground">
+              {getTrendIcon(12.5)}
+              <span className="ml-1 text-green-600">12.5% vs last month</span>
             </div>
           </CardContent>
         </Card>
@@ -658,20 +661,20 @@ export function MemberConnectAnalytics() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="acquisition">Acquisition</TabsTrigger>
-          <TabsTrigger value="retention">Retention</TabsTrigger>
-          <TabsTrigger value="engagement">Engagement</TabsTrigger>
-          <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+          <TabsTrigger value="acquisition" className="flex-1">Acquisition</TabsTrigger>
+          <TabsTrigger value="retention" className="flex-1">Retention</TabsTrigger>
+          <TabsTrigger value="engagement" className="flex-1">Engagement</TabsTrigger>
+          <TabsTrigger value="campaigns" className="flex-1">Campaigns</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Member Growth Chart */}
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle className="flex items-center">
                   <LineChartIcon className="mr-2 h-5 w-5" />
                   Member Growth Trend
@@ -695,8 +698,8 @@ export function MemberConnectAnalytics() {
             </Card>
 
             {/* Membership Distribution */}
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle className="flex items-center">
                   <PieChartIcon className="mr-2 h-5 w-5" />
                   Membership Distribution
@@ -729,8 +732,8 @@ export function MemberConnectAnalytics() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Acquisition Sources */}
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle>Acquisition Sources</CardTitle>
                 <CardDescription>Where new members are coming from</CardDescription>
               </CardHeader>
@@ -748,8 +751,8 @@ export function MemberConnectAnalytics() {
             </Card>
 
             {/* Revenue Growth */}
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle className="flex items-center">
                   <BarChart3 className="mr-2 h-5 w-5" />
                   Revenue Growth
@@ -763,12 +766,12 @@ export function MemberConnectAnalytics() {
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: number) => [`AED ${value.toLocaleString()}`, '']}
+                      formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
                       content={<CustomTooltip />}
                     />
                     <Legend />
-                    <Bar dataKey="revenue" fill="#10b981" name="Revenue (AED)" />
-                    <Bar dataKey="acquisitionCost" fill="#f59e0b" name="Acquisition Cost (AED)" />
+                    <Bar dataKey="revenue" fill="#10b981" name={`Revenue (${currencyCode})`} />
+                    <Bar dataKey="acquisitionCost" fill="#f59e0b" name={`Acquisition Cost (${currencyCode})`} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -777,11 +780,11 @@ export function MemberConnectAnalytics() {
         </TabsContent>
 
         {/* Acquisition Tab */}
-        <TabsContent value="acquisition" className="space-y-6">
+        <TabsContent value="acquisition" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Acquisition Funnel */}
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle>Acquisition Funnel</CardTitle>
                 <CardDescription>Member acquisition process breakdown</CardDescription>
               </CardHeader>
@@ -802,19 +805,19 @@ export function MemberConnectAnalytics() {
             </Card>
 
             {/* Acquisition Metrics */}
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle>Acquisition Metrics</CardTitle>
                 <CardDescription>Key performance indicators for member acquisition</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">AED {analytics.avgAcquisitionCost.toFixed(0)}</p>
+                    <p className="text-2xl font-bold text-blue-600"><CurrencyGlyph /> {analytics.avgAcquisitionCost.toFixed(0)}</p>
                     <p className="text-sm text-muted-foreground">Avg Cost per Acquisition</p>
                   </div>
                   <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">AED {analytics.avgLTV.toFixed(0)}</p>
+                    <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {analytics.avgLTV.toFixed(0)}</p>
                     <p className="text-sm text-muted-foreground">Avg Lifetime Value</p>
                   </div>
                 </div>
@@ -843,14 +846,14 @@ export function MemberConnectAnalytics() {
           </div>
 
           {/* Recent Acquisitions Table */}
-          <Card>
-            <CardHeader>
+          <Card className={cardShell}>
+<CardHeader>
               <CardTitle>Recent New Members</CardTitle>
               <CardDescription>Latest member acquisitions with source tracking</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50/50">
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Plan</TableHead>
@@ -861,7 +864,7 @@ export function MemberConnectAnalytics() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
+                  <TableRow className="transition-colors hover:bg-slate-50/50">
                     <TableCell>
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-8 w-8">
@@ -880,12 +883,12 @@ export function MemberConnectAnalytics() {
                       <Badge className="bg-blue-100 text-blue-800">Referral</Badge>
                     </TableCell>
                     <TableCell>{format(new Date(), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell>AED 2,400</TableCell>
+                    <TableCell><CurrencyGlyph /> 2,400</TableCell>
                     <TableCell>
                       <Badge className="bg-green-100 text-green-800">Active</Badge>
                     </TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="transition-colors hover:bg-slate-50/50">
                     <TableCell>
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-8 w-8">
@@ -904,12 +907,12 @@ export function MemberConnectAnalytics() {
                       <Badge className="bg-green-100 text-green-800">Online</Badge>
                     </TableCell>
                     <TableCell>{format(subDays(new Date(), 1), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell>AED 250</TableCell>
+                    <TableCell><CurrencyGlyph /> 250</TableCell>
                     <TableCell>
                       <Badge className="bg-green-100 text-green-800">Active</Badge>
                     </TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="transition-colors hover:bg-slate-50/50">
                     <TableCell>
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-8 w-8">
@@ -928,7 +931,7 @@ export function MemberConnectAnalytics() {
                       <Badge className="bg-purple-100 text-purple-800">Walk-in</Badge>
                     </TableCell>
                     <TableCell>{format(subDays(new Date(), 2), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell>AED 180</TableCell>
+                    <TableCell><CurrencyGlyph /> 180</TableCell>
                     <TableCell>
                       <Badge className="bg-yellow-100 text-yellow-800">Trial</Badge>
                     </TableCell>
@@ -940,10 +943,10 @@ export function MemberConnectAnalytics() {
         </TabsContent>
 
         {/* Retention Tab */}
-        <TabsContent value="retention" className="space-y-6">
+        <TabsContent value="retention" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Retention Cohort Analysis */}
-            <Card className="lg:col-span-2">
+            <Card className={`lg:col-span-2 ${cardShell}`}>
               <CardHeader>
                 <CardTitle>Cohort Retention Analysis</CardTitle>
                 <CardDescription>Member retention rates by signup month</CardDescription>
@@ -1047,8 +1050,8 @@ export function MemberConnectAnalytics() {
 
           {/* Retention Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle className="flex items-center">
                   <Award className="mr-2 h-5 w-5 text-yellow-600" />
                   Best Performing Cohort
@@ -1072,8 +1075,8 @@ export function MemberConnectAnalytics() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle className="flex items-center">
                   <AlertCircle className="mr-2 h-5 w-5 text-red-600" />
                   At-Risk Members
@@ -1097,8 +1100,8 @@ export function MemberConnectAnalytics() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle className="flex items-center">
                   <Sparkles className="mr-2 h-5 w-5 text-purple-600" />
                   Retention Initiatives
@@ -1125,11 +1128,11 @@ export function MemberConnectAnalytics() {
         </TabsContent>
 
         {/* Engagement Tab */}
-        <TabsContent value="engagement" className="space-y-6">
+        <TabsContent value="engagement" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Engagement Score Distribution */}
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle>Engagement Score Distribution</CardTitle>
                 <CardDescription>Member engagement levels across your gym</CardDescription>
               </CardHeader>
@@ -1153,8 +1156,8 @@ export function MemberConnectAnalytics() {
             </Card>
 
             {/* Engagement Trends */}
-            <Card>
-              <CardHeader>
+            <Card className={cardShell}>
+<CardHeader>
                 <CardTitle>Engagement Trends</CardTitle>
                 <CardDescription>Average engagement score over time</CardDescription>
               </CardHeader>
@@ -1180,14 +1183,14 @@ export function MemberConnectAnalytics() {
           </div>
 
           {/* Engagement Details Table */}
-          <Card>
-            <CardHeader>
+          <Card className={cardShell}>
+<CardHeader>
               <CardTitle>Member Engagement Details</CardTitle>
               <CardDescription>Detailed engagement metrics for individual members</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50/50">
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Sessions</TableHead>
@@ -1201,7 +1204,7 @@ export function MemberConnectAnalytics() {
                 </TableHeader>
                 <TableBody>
                   {engagementMetrics.map((metric) => (
-                    <TableRow key={metric.memberId}>
+                    <TableRow className="transition-colors hover:bg-slate-50/50" key={metric.memberId}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
@@ -1258,11 +1261,11 @@ export function MemberConnectAnalytics() {
         </TabsContent>
 
         {/* Campaigns Tab */}
-        <TabsContent value="campaigns" className="space-y-6">
+        <TabsContent value="campaigns" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Campaign Performance Cards */}
             {campaignAnalytics.map((campaign) => (
-              <Card key={campaign.id}>
+              <Card key={campaign.id} className={cardShell}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{campaign.name}</CardTitle>
@@ -1311,11 +1314,11 @@ export function MemberConnectAnalytics() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Cost</span>
-                      <span className="font-medium">AED {campaign.cost.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {campaign.cost.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Revenue</span>
-                      <span className="font-medium text-green-600">AED {campaign.revenue.toLocaleString()}</span>
+                      <span className="font-medium text-green-600"><CurrencyGlyph /> {campaign.revenue.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="font-medium">ROI</span>
@@ -1334,8 +1337,8 @@ export function MemberConnectAnalytics() {
           </div>
 
           {/* Campaign ROI Chart */}
-          <Card>
-            <CardHeader>
+          <Card className={cardShell}>
+<CardHeader>
               <CardTitle>Campaign Performance Comparison</CardTitle>
               <CardDescription>ROI and conversion rates across all campaigns</CardDescription>
             </CardHeader>
@@ -1359,4 +1362,7 @@ export function MemberConnectAnalytics() {
     </div>
   );
 }
+
+
+
 

@@ -74,12 +74,12 @@ export const healthCheck = {
       issues.push('Not running in browser environment');
     }
     
-    // Check localStorage availability
+    // Check sessionStorage availability
     try {
-      localStorage.setItem('test', 'test');
-      localStorage.removeItem('test');
+      sessionStorage.setItem('test', 'test');
+      sessionStorage.removeItem('test');
     } catch (error) {
-      issues.push('localStorage not available');
+      issues.push('sessionStorage not available');
     }
     
     // Check fetch availability

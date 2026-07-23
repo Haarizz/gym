@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCurrency } from '../utils/currency';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -105,6 +106,7 @@ interface Interview {
 }
 
 export function Recruitment() {
+  const { currencyCode } = useCurrency();
   const [currentView, setCurrentView] = useState<'dashboard' | 'kanban' | 'calendar'>('dashboard');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -1167,7 +1169,7 @@ export function Recruitment() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Salary Range *</Label>
-                <Input placeholder="e.g., AED 5,000 - 8,000" />
+                <Input placeholder={`e.g., ${currencyCode} 5,000 - 8,000`} />
               </div>
               <div>
                 <Label>Priority *</Label>

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -22,182 +23,72 @@ import {
   RefreshCcw,
 } from 'lucide-react';
 import { toast } from "sonner";
+import { receiptsService, Receipt } from '../utils/supabase/receipts-service';
 
 interface CustomReportsProps {
   onNavigate?: (section: string) => void;
 }
 
-// Sample membership report data
-const membershipReportData = [
-  {
-    id: 1,
-    memberId: 'M-0092',
-    memberName: 'John Mathew',
+interface ReportRecord {
+  id: string;
+  memberId: string;
+  memberName: string;
+  photoUrl: string | null;
+  mobile: string;
+  membershipType: string;
+  transactionType: string;
+  planName: string;
+  planAmount: number;
+  paymentMode: string;
+  dueAmount: number;
+  dueDate: string | null;
+  transactionDate: string;
+}
+
+function mapReceiptToRecord(r: Receipt): ReportRecord {
+  return {
+    id: r.id,
+    memberId: r.member_id || '',
+    memberName: r.member_name || '',
     photoUrl: null,
-    mobile: '0501234567',
-    transactionType: 'Renewal',
-    planName: 'Premium 6M',
-    planAmount: 1200,
-    paymentMode: 'Card',
-    paidByCash: 0,
-    paidByCard: 1200,
-    dueAmount: 0,
-    dueDate: null,
-    transactionDate: '2025-10-11',
-  },
-  {
-    id: 2,
-    memberId: 'M-0145',
-    memberName: 'Sara Ahmed',
-    photoUrl: null,
-    mobile: '0509876543',
-    transactionType: 'New Member',
-    planName: 'Basic 3M',
-    planAmount: 600,
-    paymentMode: 'Cash',
-    paidByCash: 600,
-    paidByCard: 0,
-    dueAmount: 0,
-    dueDate: null,
-    transactionDate: '2025-10-11',
-  },
-  {
-    id: 3,
-    memberId: 'M-0178',
-    memberName: 'Mohammed Ali',
-    photoUrl: null,
-    mobile: '0551234567',
-    transactionType: 'Upgrade',
-    planName: 'Premium Annual',
-    planAmount: 2400,
-    paymentMode: 'Mixed',
-    paidByCash: 1000,
-    paidByCard: 1200,
-    dueAmount: 200,
-    dueDate: '2025-10-20',
-    transactionDate: '2025-10-11',
-  },
-  {
-    id: 4,
-    memberId: 'M-0201',
-    memberName: 'Fatima Hassan',
-    photoUrl: null,
-    mobile: '0504445566',
-    transactionType: 'New Member',
-    planName: 'Standard 6M',
-    planAmount: 900,
-    paymentMode: 'Card',
-    paidByCash: 0,
-    paidByCard: 900,
-    dueAmount: 0,
-    dueDate: null,
-    transactionDate: '2025-10-11',
-  },
-  {
-    id: 5,
-    memberId: 'M-0089',
-    memberName: 'Ahmed Khalid',
-    photoUrl: null,
-    mobile: '0557778899',
-    transactionType: 'Add-on',
-    planName: 'Personal Training 10 Sessions',
-    planAmount: 800,
-    paymentMode: 'Card',
-    paidByCash: 0,
-    paidByCard: 800,
-    dueAmount: 0,
-    dueDate: null,
-    transactionDate: '2025-10-11',
-  },
-  {
-    id: 6,
-    memberId: 'M-0156',
-    memberName: 'Layla Omar',
-    photoUrl: null,
-    mobile: '0502223344',
-    transactionType: 'Renewal',
-    planName: 'Premium 6M',
-    planAmount: 1200,
-    paymentMode: 'Cash',
-    paidByCash: 1200,
-    paidByCard: 0,
-    dueAmount: 0,
-    dueDate: null,
-    transactionDate: '2025-10-10',
-  },
-  {
-    id: 7,
-    memberId: 'M-0234',
-    memberName: 'Yousef Ibrahim',
-    photoUrl: null,
-    mobile: '0558889999',
-    transactionType: 'New Member',
-    planName: 'Basic 6M',
-    planAmount: 1000,
-    paymentMode: 'Mixed',
-    paidByCash: 500,
-    paidByCard: 300,
-    dueAmount: 200,
-    dueDate: '2025-10-18',
-    transactionDate: '2025-10-10',
-  },
-  {
-    id: 8,
-    memberId: 'M-0067',
-    memberName: 'Mariam Saeed',
-    photoUrl: null,
-    mobile: '0503334455',
-    transactionType: 'Add-on',
-    planName: 'Nutrition Consultation',
-    planAmount: 300,
-    paymentMode: 'Card',
-    paidByCash: 0,
-    paidByCard: 300,
-    dueAmount: 0,
-    dueDate: null,
-    transactionDate: '2025-10-09',
-  },
-  {
-    id: 9,
-    memberId: 'M-0198',
-    memberName: 'Hassan Mahmoud',
-    photoUrl: null,
-    mobile: '0556667788',
-    transactionType: 'Upgrade',
-    planName: 'Premium Annual',
-    planAmount: 2400,
-    paymentMode: 'Card',
-    paidByCash: 0,
-    paidByCard: 2400,
-    dueAmount: 0,
-    dueDate: null,
-    transactionDate: '2025-10-09',
-  },
-  {
-    id: 10,
-    memberId: 'M-0112',
-    memberName: 'Aisha Abdullah',
-    photoUrl: null,
-    mobile: '0509998877',
-    transactionType: 'Renewal',
-    planName: 'Standard 3M',
-    planAmount: 500,
-    paymentMode: 'Cash',
-    paidByCash: 500,
-    paidByCard: 0,
-    dueAmount: 0,
-    dueDate: null,
-    transactionDate: '2025-10-08',
-  },
-];
+    mobile: r.member_phone || '',
+    membershipType: (r as any).membership_type || '',
+    transactionType: r.transaction_type || '',
+    planName: r.plan_name || '',
+    planAmount: r.amount ? Number(r.amount) : 0,
+    paymentMode: r.payment_method || '',
+    dueAmount: r.status?.toLowerCase() === 'pending' ? (r.amount ? Number(r.amount) : 0) : 0,
+    dueDate: r.valid_till || null,
+    transactionDate: r.transaction_date ? r.transaction_date.split('T')[0] : '',
+  };
+}
 
 export function CustomReports({ onNavigate }: CustomReportsProps) {
+  const { currencyCode } = useCurrency();
+  const panelCardShell = "bg-white border-0 shadow-sm rounded-2xl overflow-hidden";
+
   const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'custom'>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<string>('all');
   const [showSummary, setShowSummary] = useState(false);
+  const [reportData, setReportData] = useState<ReportRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Load receipts from backend
+  useEffect(() => {
+    setLoading(true);
+    receiptsService.getReceipts({}, { page: 1, limit: 500 })
+      .then(res => {
+        setReportData(res.receipts.map(mapReceiptToRecord));
+      })
+      .catch(err => {
+        console.error('Failed to load receipts:', err);
+        toast.error('Failed to load report data');
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   // Get today and yesterday dates
   const today = new Date().toISOString().split('T')[0];
@@ -216,11 +107,11 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
       endDate = customEndDate || today;
     }
 
-    return membershipReportData.filter(record => {
+    return reportData.filter(record => {
       const recordDate = record.transactionDate;
       return recordDate >= startDate && recordDate <= endDate;
     });
-  }, [dateRange, customStartDate, customEndDate, today, yesterday]);
+  }, [reportData, dateRange, customStartDate, customEndDate, today, yesterday]);
 
   // Filter by transaction type
   const filteredByType = useMemo(() => {
@@ -243,15 +134,11 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
   const summary = useMemo(() => {
     const totalPlans = filteredData.length;
     const totalRevenue = filteredData.reduce((sum, record) => sum + record.planAmount, 0);
-    const totalCash = filteredData.reduce((sum, record) => sum + record.paidByCash, 0);
-    const totalCard = filteredData.reduce((sum, record) => sum + record.paidByCard, 0);
     const totalDue = filteredData.reduce((sum, record) => sum + record.dueAmount, 0);
 
     return {
       totalPlans,
       totalRevenue,
-      totalCash,
-      totalCard,
       totalDue,
     };
   }, [filteredData]);
@@ -268,12 +155,172 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
   };
 
   // Export functions
-  const handleExportPDF = () => {
-    toast.success('Exporting report as PDF...');
+  const downloadBlob = (filename: string, blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const toCsvCell = (value: unknown) => {
+    const s = value == null ? "" : String(value);
+    const escaped = s.replaceAll('"', '""');
+    return `"${escaped}"`;
+  };
+
+  const buildCsv = (rows: ReportRecord[]) => {
+    const header = [
+      "#",
+      "Member ID",
+      "Member Name",
+      "Mobile",
+      "Membership Type",
+      "Transaction Type",
+      "Plan",
+      `Amount (${currencyCode})`,
+      "Payment Mode",
+      `Due (${currencyCode})`,
+      "Due Date",
+      "Transaction Date",
+    ];
+    const lines = [
+      header.map(toCsvCell).join(","),
+      ...rows.map((r, i) => ([
+        i + 1,
+        r.memberId,
+        r.memberName,
+        r.mobile,
+        r.membershipType,
+        r.transactionType,
+        r.planName,
+        r.planAmount,
+        r.paymentMode,
+        r.dueAmount,
+        r.dueDate ?? "",
+        r.transactionDate,
+      ]).map(toCsvCell).join(",")),
+    ];
+    return lines.join("\n");
+  };
+
+  const getRangeLabel = () => {
+    if (dateRange === "today") return today;
+    if (dateRange === "yesterday") return yesterday;
+    return `${customStartDate || today}_to_${customEndDate || today}`;
+  };
+
+  const handleExportCSV = () => {
+    const csv = buildCsv(filteredData);
+    downloadBlob(`custom-reports_${getRangeLabel()}.csv`, new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    toast.success("CSV downloaded");
   };
 
   const handleExportExcel = () => {
-    toast.success('Exporting report as Excel...');
+    // Simple HTML table export that Excel can open.
+    const rows = filteredData;
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+        </head>
+        <body>
+          <table border="1" cellspacing="0" cellpadding="4">
+            <thead>
+              <tr>
+                <th>#</th><th>Member ID</th><th>Member Name</th><th>Mobile</th><th>Membership Type</th>
+                <th>Transaction Type</th><th>Plan</th><th>Amount (${currencyCode})</th><th>Payment Mode</th><th>Due (${currencyCode})</th><th>Due Date</th><th>Transaction Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((r, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${r.memberId}</td>
+                  <td>${r.memberName}</td>
+                  <td>${r.mobile}</td>
+                  <td>${r.membershipType || ""}</td>
+                  <td>${r.transactionType}</td>
+                  <td>${r.planName}</td>
+                  <td>${r.planAmount}</td>
+                  <td>${r.paymentMode}</td>
+                  <td>${r.dueAmount}</td>
+                  <td>${r.dueDate ?? ""}</td>
+                  <td>${r.transactionDate}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `.trim();
+    downloadBlob(`custom-reports_${getRangeLabel()}.xls`, new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" }));
+    toast.success("Excel downloaded");
+  };
+
+  const handleExportPDF = () => {
+    // Print-friendly HTML export (browser Save as PDF)
+    const w = window.open("", "_blank");
+    if (!w) {
+      toast.error("Popup blocked. Please allow popups to export PDF.");
+      return;
+    }
+    const rangeLabel = getRangeLabel().replaceAll("_", " ");
+    const rows = filteredData;
+    w.document.write(`
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Custom Reports</title>
+          <style>
+            body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 24px; }
+            h1 { margin: 0 0 6px; font-size: 18px; }
+            .sub { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
+            th { background: #f9fafb; }
+            .right { text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>Membership Report (Detailed)</h1>
+          <div class="sub">Range: ${rangeLabel} • Records: ${rows.length}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Member ID</th><th>Member Name</th><th>Mobile</th><th>Membership Type</th>
+                <th>Transaction</th><th>Plan</th><th class="right">Amount (${currencyCode})</th><th>Pay Mode</th><th class="right">Due</th><th>Due Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((r, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${r.memberId}</td>
+                  <td>${r.memberName}</td>
+                  <td>${r.mobile}</td>
+                  <td>${r.membershipType || ""}</td>
+                  <td>${r.transactionType}</td>
+                  <td>${r.planName}</td>
+                  <td class="right">${r.planAmount.toLocaleString()}</td>
+                  <td>${r.paymentMode}</td>
+                  <td class="right">${r.dueAmount ? r.dueAmount.toLocaleString() : "-"}</td>
+                  <td>${r.dueDate ?? "-"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+          <script>
+            window.onload = () => { window.print(); };
+          </script>
+        </body>
+      </html>
+    `);
+    w.document.close();
+    toast.success("Print dialog opened (Save as PDF)");
   };
 
   // Get transaction type badge
@@ -303,8 +350,8 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
       </div>
 
       {/* Date Range Filter Card */}
-      <Card className="border-primary/20 mb-6">
-        <CardHeader className="bg-gradient-light border-b border-primary/10">
+      <Card className={`${panelCardShell} mb-6`}>
+        <CardHeader className="bg-gradient-light border-b border-slate-100">
           <CardTitle className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-primary" />
             <span>Date Range Filter</span>
@@ -382,7 +429,7 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
 
       {/* Summary Toast */}
       {showSummary && (
-        <Card className="border-primary/20 mb-6 bg-white shadow-lg animate-in slide-in-from-top">
+        <Card className={`${panelCardShell} mb-6 animate-in slide-in-from-top duration-200`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-900 flex items-center">
@@ -397,26 +444,18 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-600 mb-1">Total Plans Sold</p>
+                <p className="text-xs text-blue-600 mb-1">Total Transactions</p>
                 <p className="text-2xl font-bold text-blue-700">{summary.totalPlans}</p>
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <p className="text-xs text-green-600 mb-1">Total Revenue</p>
-                <p className="text-2xl font-bold text-green-700">AED {summary.totalRevenue.toLocaleString()}</p>
-              </div>
-              <div className="text-center p-3 bg-purple-50 rounded-lg">
-                <p className="text-xs text-purple-600 mb-1">Cash</p>
-                <p className="text-2xl font-bold text-purple-700">AED {summary.totalCash.toLocaleString()}</p>
-              </div>
-              <div className="text-center p-3 bg-orange-50 rounded-lg">
-                <p className="text-xs text-orange-600 mb-1">Card</p>
-                <p className="text-2xl font-bold text-orange-700">AED {summary.totalCard.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-green-700"><CurrencyGlyph /> {summary.totalRevenue.toLocaleString()}</p>
               </div>
               <div className="text-center p-3 bg-red-50 rounded-lg">
                 <p className="text-xs text-red-600 mb-1">Total Dues</p>
-                <p className="text-2xl font-bold text-red-700">AED {summary.totalDue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-red-700"><CurrencyGlyph /> {summary.totalDue.toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
@@ -424,8 +463,8 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
       )}
 
       {/* Membership Report Table */}
-      <Card className="border-primary/20">
-        <CardHeader className="bg-gradient-light border-b border-primary/10">
+      <Card className={panelCardShell}>
+        <CardHeader className="bg-gradient-light border-b border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center space-x-2">
@@ -444,6 +483,10 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
               <Button variant="outline" size="sm" onClick={handleExportExcel}>
                 <Download className="h-4 w-4 mr-2" />
                 Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                CSV
               </Button>
             </div>
           </div>
@@ -482,32 +525,36 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
           {/* Results Count */}
           <div className="mb-4">
             <p className="text-sm text-gray-600">
-              Showing <span className="font-semibold text-primary">{filteredData.length}</span> of {membershipReportData.length} records
+              Showing <span className="font-semibold text-primary">{filteredData.length}</span> of {reportData.length} records
             </p>
           </div>
 
           {/* Table */}
-          <div className="border border-primary/20 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
+          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+            <Table className="min-w-[1100px]">
                 <TableHeader className="bg-gradient-light sticky top-0 z-10">
                   <TableRow>
                     <TableHead className="text-primary font-semibold">#</TableHead>
                     <TableHead className="text-primary font-semibold">Member ID</TableHead>
                     <TableHead className="text-primary font-semibold">Photo & Name</TableHead>
                     <TableHead className="text-primary font-semibold">Mobile</TableHead>
-                    <TableHead className="text-primary font-semibold">Type</TableHead>
+                    <TableHead className="text-primary font-semibold">Membership Type</TableHead>
+                    <TableHead className="text-primary font-semibold">Transaction</TableHead>
                     <TableHead className="text-primary font-semibold">Plan</TableHead>
-                    <TableHead className="text-primary font-semibold text-right">Amount (AED)</TableHead>
+                    <TableHead className="text-primary font-semibold text-right">Amount ({currencyCode})</TableHead>
                     <TableHead className="text-primary font-semibold">Pay Mode</TableHead>
-                    <TableHead className="text-primary font-semibold text-right">Cash</TableHead>
-                    <TableHead className="text-primary font-semibold text-right">Card</TableHead>
                     <TableHead className="text-primary font-semibold text-right">Due</TableHead>
                     <TableHead className="text-primary font-semibold">Due Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredData.length > 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-12 text-gray-500">
+                        Loading report data...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredData.length > 0 ? (
                     filteredData.map((record, index) => (
                       <TableRow key={record.id} className="hover:bg-gradient-light transition-colors">
                         <TableCell className="font-medium">{index + 1}</TableCell>
@@ -524,12 +571,15 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                                 {record.memberName.split(' ').map(n => n[0]).join('')}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium">{record.memberName}</span>
+                            <span className="font-medium whitespace-normal">{record.memberName}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-gray-600">{record.mobile}</TableCell>
+                        <TableCell>
+                          <span className="text-sm capitalize">{record.membershipType || '—'}</span>
+                        </TableCell>
                         <TableCell>{getTransactionBadge(record.transactionType)}</TableCell>
-                        <TableCell className="font-medium">{record.planName}</TableCell>
+                        <TableCell className="font-medium whitespace-normal">{record.planName}</TableCell>
                         <TableCell className="text-right font-semibold text-green-600">
                           {record.planAmount.toLocaleString()}
                         </TableCell>
@@ -543,12 +593,9 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                           {record.paymentMode === 'Mixed' && (
                             <Badge className="bg-orange-100 text-orange-700">Mixed</Badge>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {record.paidByCash > 0 ? record.paidByCash.toLocaleString() : '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {record.paidByCard > 0 ? record.paidByCard.toLocaleString() : '-'}
+                          {record.paymentMode && !['Cash','Card','Mixed'].includes(record.paymentMode) && (
+                            <Badge className="bg-gray-100 text-gray-700">{record.paymentMode}</Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {record.dueAmount > 0 ? (
@@ -572,7 +619,7 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center py-12">
+                      <TableCell colSpan={11} className="text-center py-12">
                         <div className="flex flex-col items-center justify-center text-gray-500">
                           <FileText className="h-12 w-12 mb-3 text-gray-300" />
                           <p className="font-medium">No records found</p>
@@ -582,31 +629,24 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                     </TableRow>
                   )}
                 </TableBody>
-              </Table>
-            </div>
+            </Table>
           </div>
 
           {/* Summary Footer */}
           {filteredData.length > 0 && (
             <div className="mt-6 p-4 bg-gradient-light rounded-lg border border-primary/20">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Transactions</p>
                   <p className="text-xl font-bold text-primary">{summary.totalPlans}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
-                  <p className="text-xl font-bold text-green-600">AED {summary.totalRevenue.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Collected</p>
-                  <p className="text-xl font-bold text-blue-600">
-                    AED {(summary.totalCash + summary.totalCard).toLocaleString()}
-                  </p>
+                  <p className="text-xl font-bold text-green-600"><CurrencyGlyph /> {summary.totalRevenue.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Outstanding Dues</p>
-                  <p className="text-xl font-bold text-red-600">AED {summary.totalDue.toLocaleString()}</p>
+                  <p className="text-xl font-bold text-red-600"><CurrencyGlyph /> {summary.totalDue.toLocaleString()}</p>
                 </div>
               </div>
             </div>

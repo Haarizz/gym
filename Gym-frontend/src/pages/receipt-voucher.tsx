@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useCurrency, CurrencyValue } from '../utils/currency';
+import { toast } from 'sonner';
+import { receiptVoucherService, type ReceiptVoucher as RVType } from '../utils/supabase/receipt-voucher-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -13,7 +16,6 @@ import { Switch } from "../components/ui/switch";
 import { Progress } from "../components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
-import { Separator } from "../components/ui/separator";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Checkbox } from "../components/ui/checkbox";
@@ -84,177 +86,6 @@ import {
   BookOpen
 } from 'lucide-react';
 
-// Mock receipt voucher data
-const receiptVouchersData = [
-  {
-    id: 'RV-2024-001',
-    date: '2024-01-21',
-    source: 'Membership Revenue',
-    sourceCategory: 'membership',
-    member: 'Ahmed Hassan',
-    memberId: 'MEM-2024-001',
-    amount: 1560,
-    paymentMode: 'Card',
-    status: 'completed',
-    branch: 'Dubai Branch',
-    reference: 'Monthly Membership - Premium',
-    createdBy: 'Lisa Wang',
-    createdAt: '2024-01-21 09:15:00',
-    notes: 'Monthly membership fee for January 2024',
-    attachments: ['receipt_001.pdf'],
-    approvedBy: 'Sarah Ahmed',
-    voucherType: 'membership',
-    cashierName: 'Lisa Wang',
-    transactionId: 'TXN-001-2024'
-  },
-  {
-    id: 'RV-2024-002',
-    date: '2024-01-21',
-    source: 'Personal Training',
-    sourceCategory: 'services',
-    member: 'Maria Santos',
-    memberId: 'MEM-2024-002',
-    amount: 450,
-    paymentMode: 'Cash',
-    status: 'completed',
-    branch: 'Dubai Branch',
-    reference: '3 PT Sessions Package',
-    createdBy: 'Mike Johnson',
-    createdAt: '2024-01-21 11:30:00',
-    notes: 'Personal training package - 3 sessions',
-    attachments: ['receipt_002.pdf'],
-    approvedBy: 'Sarah Ahmed',
-    voucherType: 'services',
-    cashierName: 'Mike Johnson',
-    transactionId: 'TXN-002-2024'
-  },
-  {
-    id: 'RV-2024-003',
-    date: '2024-01-21',
-    source: 'Merchandise Sales',
-    sourceCategory: 'retail',
-    member: 'John Smith',
-    memberId: 'MEM-2024-003',
-    amount: 125,
-    paymentMode: 'Online Transfer',
-    status: 'completed',
-    branch: 'Dubai Branch',
-    reference: 'Protein Powder + Shaker',
-    createdBy: 'Lisa Wang',
-    createdAt: '2024-01-21 14:20:00',
-    notes: 'Whey protein 2kg + gym shaker bottle',
-    attachments: ['receipt_003.pdf'],
-    approvedBy: 'Sarah Ahmed',
-    voucherType: 'retail',
-    cashierName: 'Lisa Wang',
-    transactionId: 'TXN-003-2024'
-  },
-  {
-    id: 'RV-2024-004',
-    date: '2024-01-20',
-    source: 'Event Registration',
-    sourceCategory: 'events',
-    member: 'Sarah Johnson',
-    memberId: 'MEM-2024-004',
-    amount: 89,
-    paymentMode: 'Card',
-    status: 'pending',
-    branch: 'Marina Branch',
-    reference: 'Fitness Challenge 2024',
-    createdBy: 'Ahmed Hassan',
-    createdAt: '2024-01-20 16:45:00',
-    notes: 'Registration for 30-day fitness challenge',
-    attachments: [],
-    approvedBy: 'Pending',
-    voucherType: 'events',
-    cashierName: 'Ahmed Hassan',
-    transactionId: 'TXN-004-2024'
-  },
-  {
-    id: 'RV-2024-005',
-    date: '2024-01-20',
-    source: 'Cafe Sales',
-    sourceCategory: 'fnb',
-    member: 'David Wilson',
-    memberId: 'MEM-2024-005',
-    amount: 35,
-    paymentMode: 'Cash',
-    status: 'completed',
-    branch: 'Dubai Branch',
-    reference: 'Post-workout smoothie + energy bar',
-    createdBy: 'Lisa Wang',
-    createdAt: '2024-01-20 18:10:00',
-    notes: 'Protein smoothie and energy bar',
-    attachments: ['receipt_005.pdf'],
-    approvedBy: 'Sarah Ahmed',
-    voucherType: 'fnb',
-    cashierName: 'Lisa Wang',
-    transactionId: 'TXN-005-2024'
-  },
-  {
-    id: 'RV-2024-006',
-    date: '2024-01-19',
-    source: 'Equipment Rental',
-    sourceCategory: 'rental',
-    member: 'Emma Davis',
-    memberId: 'MEM-2024-006',
-    amount: 75,
-    paymentMode: 'Card',
-    status: 'partially-paid',
-    branch: 'Marina Branch',
-    reference: 'Yoga mat rental - 1 week',
-    createdBy: 'Ahmed Hassan',
-    createdAt: '2024-01-19 10:20:00',
-    notes: 'Weekly yoga mat rental, partial payment received',
-    attachments: [],
-    approvedBy: 'Pending',
-    voucherType: 'rental',
-    cashierName: 'Ahmed Hassan',
-    transactionId: 'TXN-006-2024'
-  },
-  {
-    id: 'RV-2024-007',
-    date: '2024-01-19',
-    source: 'Locker Rental',
-    sourceCategory: 'facilities',
-    member: 'Robert Brown',
-    memberId: 'MEM-2024-007',
-    amount: 150,
-    paymentMode: 'Online Transfer',
-    status: 'completed',
-    branch: 'Dubai Branch',
-    reference: 'Monthly locker rental - Premium',
-    createdBy: 'Mike Johnson',
-    createdAt: '2024-01-19 13:15:00',
-    notes: 'Premium locker rental for January 2024',
-    attachments: ['receipt_007.pdf', 'locker_agreement.pdf'],
-    approvedBy: 'Sarah Ahmed',
-    voucherType: 'facilities',
-    cashierName: 'Mike Johnson',
-    transactionId: 'TXN-007-2024'
-  },
-  {
-    id: 'RV-2024-008',
-    date: '2024-01-18',
-    source: 'Day Pass',
-    sourceCategory: 'membership',
-    member: 'Jennifer Lee',
-    memberId: 'GUEST-001',
-    amount: 45,
-    paymentMode: 'Cash',
-    status: 'completed',
-    branch: 'Marina Branch',
-    reference: 'Single day gym access',
-    createdBy: 'Ahmed Hassan',
-    createdAt: '2024-01-18 08:30:00',
-    notes: 'Guest day pass with full facility access',
-    attachments: ['receipt_008.pdf'],
-    approvedBy: 'Sarah Ahmed',
-    voucherType: 'membership',
-    cashierName: 'Ahmed Hassan',
-    transactionId: 'TXN-008-2024'
-  }
-];
 
 // Income sources configuration
 const incomeSourcesConfig = [
@@ -282,7 +113,7 @@ const incomeSourcesConfig = [
   {
     id: 'events',
     name: 'Events & Workshops',
-    icon: Calendar,
+    icon: CalendarDays,
     color: 'bg-orange-100 text-orange-800 border-orange-200',
     iconColor: 'text-orange-600'
   },
@@ -321,13 +152,57 @@ const membersData = [
 ];
 
 export function ReceiptVoucher() {
-  const [receipts, setReceipts] = useState(receiptVouchersData);
+  const { currencyCode } = useCurrency();
+  const [receipts, setReceipts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadReceipts = useCallback(async (filters?: {
+    search?: string; status?: string; branch?: string; sourceCategory?: string;
+  }) => {
+    try {
+      setLoading(true);
+      const data = await receiptVoucherService.getReceiptVouchers(filters ?? {});
+      // Map API response to the shape expected by existing UI (member, id as voucherNo)
+      setReceipts(data.map((rv: RVType) => ({
+        id: rv.voucherNo,
+        _dbId: rv.id,
+        date: rv.date,
+        source: rv.source,
+        sourceCategory: rv.sourceCategory,
+        member: rv.memberName,
+        memberId: rv.memberId ? String(rv.memberId) : '',
+        amount: rv.amount,
+        paymentMode: rv.paymentMode,
+        status: rv.status,
+        branch: rv.branch,
+        reference: rv.reference,
+        createdBy: rv.createdAt ?? '',
+        createdAt: rv.createdAt ?? '',
+        notes: rv.notes,
+        attachments: [],
+        approvedBy: rv.approvedBy ?? '',
+        voucherType: rv.voucherType ?? rv.sourceCategory,
+        cashierName: '',
+        transactionId: rv.transactionId ?? '',
+      })));
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load receipt vouchers');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadReceipts(); }, [loadReceipts]);
+
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const [showAddReceipt, setShowAddReceipt] = useState(false);
   const [showReceiptDetails, setShowReceiptDetails] = useState(false);
+  const [showEditReceipt, setShowEditReceipt] = useState(false);
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [selectedReceipts, setSelectedReceipts] = useState<string[]>([]);
-  
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [calendarDate, setCalendarDate] = useState<Date | undefined>(undefined);
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState('all');
@@ -336,8 +211,7 @@ export function ReceiptVoucher() {
   const [paymentModeFilter, setPaymentModeFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
 
-  // New receipt form state
-  const [newReceipt, setNewReceipt] = useState({
+  const emptyForm = {
     date: new Date().toISOString().split('T')[0],
     member: '',
     source: '',
@@ -346,13 +220,22 @@ export function ReceiptVoucher() {
     paymentMode: '',
     reference: '',
     notes: '',
-    branch: 'Dubai Branch'
-  });
+    branch: 'Dubai Branch',
+    transactionId: '',
+    approvedBy: '',
+    status: 'completed',
+  };
+
+  // New receipt form state
+  const [newReceipt, setNewReceipt] = useState({ ...emptyForm });
+
+  // Edit receipt form state
+  const [editForm, setEditForm] = useState({ ...emptyForm });
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-AE', {
+    return new Intl.NumberFormat(undefined, {
       style: 'currency',
-      currency: 'AED',
+      currency: currencyCode,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -416,6 +299,7 @@ export function ReceiptVoucher() {
     }
   };
 
+  const calendarDateStr = calendarDate ? calendarDate.toISOString().split('T')[0] : '';
   const filteredReceipts = receipts.filter(receipt => {
     const matchesSearch = 
       receipt.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -427,17 +311,21 @@ export function ReceiptVoucher() {
     const matchesStatus = statusFilter === 'all' || receipt.status === statusFilter;
     const matchesPaymentMode = paymentModeFilter === 'all' || receipt.paymentMode === paymentModeFilter;
     const matchesBranch = branchFilter === 'all' || receipt.branch.toLowerCase().includes(branchFilter.toLowerCase());
+    const matchesCalendar = !calendarDateStr || receipt.date === calendarDateStr;
     
-    return matchesSearch && matchesSource && matchesStatus && matchesPaymentMode && matchesBranch;
+    return matchesSearch && matchesSource && matchesStatus && matchesPaymentMode && matchesBranch && matchesCalendar;
   });
 
   // Calculate dashboard metrics
+  const today = new Date().toISOString().split('T')[0];
+  const currentMonthPrefix = today.substring(0, 7); // "YYYY-MM"
+
   const todayTotal = receipts
-    .filter(r => r.date === new Date().toISOString().split('T')[0] && r.status === 'completed')
+    .filter(r => r.date === today && r.status === 'completed')
     .reduce((sum, r) => sum + r.amount, 0);
 
   const thisMonthTotal = receipts
-    .filter(r => r.date.startsWith('2024-01') && r.status === 'completed')
+    .filter(r => r.date.startsWith(currentMonthPrefix) && r.status === 'completed')
     .reduce((sum, r) => sum + r.amount, 0);
 
   const pendingAmount = receipts
@@ -445,59 +333,141 @@ export function ReceiptVoucher() {
     .reduce((sum, r) => sum + r.amount, 0);
 
   const completedToday = receipts
-    .filter(r => r.date === new Date().toISOString().split('T')[0] && r.status === 'completed')
+    .filter(r => r.date === today && r.status === 'completed')
     .length;
 
-  const handleAddReceipt = () => {
-    if (!newReceipt.member || !newReceipt.source || !newReceipt.amount) {
-      alert('Please fill in all required fields');
-      return;
-    }
+  const printDate = selectedReceipt?.date
+    ? new Date(selectedReceipt.date).toLocaleDateString()
+    : '-';
+  const printCreatedAt = selectedReceipt?.createdAt
+    ? new Date(selectedReceipt.createdAt).toLocaleString()
+    : '-';
 
-    const nextId = `RV-2024-${String(receipts.length + 1).padStart(3, '0')}`;
-    
-    const receipt = {
-      id: nextId,
-      date: newReceipt.date,
-      source: newReceipt.source,
-      sourceCategory: newReceipt.sourceCategory,
-      member: newReceipt.member,
-      memberId: membersData.find(m => m.name === newReceipt.member)?.id || 'MEM-NEW',
-      amount: parseFloat(newReceipt.amount),
-      paymentMode: newReceipt.paymentMode,
-      status: 'completed',
-      branch: newReceipt.branch,
-      reference: newReceipt.reference,
-      createdBy: 'Current User',
-      createdAt: new Date().toISOString(),
-      notes: newReceipt.notes,
-      attachments: [],
-      approvedBy: 'System',
-      voucherType: newReceipt.sourceCategory,
-      cashierName: 'Current User',
-      transactionId: `TXN-${String(receipts.length + 1).padStart(3, '0')}-2024`
-    };
-
-    setReceipts([...receipts, receipt]);
-    setShowAddReceipt(false);
-    
-    // Reset form
-    setNewReceipt({
-      date: new Date().toISOString().split('T')[0],
-      member: '',
-      source: '',
-      sourceCategory: '',
-      amount: '',
-      paymentMode: '',
-      reference: '',
-      notes: '',
-      branch: 'Dubai Branch'
+  const applyFilters = () => {
+    loadReceipts({
+      search: searchTerm || undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      branch: branchFilter !== 'all' ? branchFilter : undefined,
+      sourceCategory: sourceFilter !== 'all' ? sourceFilter : undefined,
     });
   };
 
+  const handleAddReceipt = async () => {
+    if (!newReceipt.member || !newReceipt.source || !newReceipt.amount || !newReceipt.paymentMode) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    try {
+      await receiptVoucherService.createReceiptVoucher({
+        date: newReceipt.date,
+        source: newReceipt.source,
+        sourceCategory: newReceipt.sourceCategory,
+        memberName: newReceipt.member,
+        amount: parseFloat(newReceipt.amount),
+        paymentMode: newReceipt.paymentMode,
+        status: newReceipt.status || 'completed',
+        branch: newReceipt.branch,
+        reference: newReceipt.reference,
+        notes: newReceipt.notes,
+        transactionId: newReceipt.transactionId || undefined,
+        approvedBy: newReceipt.approvedBy || undefined,
+        voucherType: newReceipt.sourceCategory,
+      });
+      toast.success('Receipt voucher created');
+      await loadReceipts();
+      setShowAddReceipt(false);
+      setNewReceipt({ ...emptyForm });
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create receipt voucher');
+    }
+  };
+
+  const openEditReceipt = (receipt: any) => {
+    setEditForm({
+      date: receipt.date,
+      member: receipt.member,
+      source: receipt.source,
+      sourceCategory: receipt.sourceCategory,
+      amount: String(receipt.amount),
+      paymentMode: receipt.paymentMode,
+      reference: receipt.reference,
+      notes: receipt.notes,
+      branch: receipt.branch,
+      transactionId: receipt.transactionId || '',
+      approvedBy: receipt.approvedBy || '',
+      status: receipt.status,
+    });
+    setSelectedReceipt(receipt);
+    setShowEditReceipt(true);
+  };
+
+  const handleEditReceipt = async () => {
+    if (!editForm.member || !editForm.source || !editForm.amount || !editForm.paymentMode) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    if (!selectedReceipt?._dbId) return;
+    try {
+      await receiptVoucherService.updateReceiptVoucher(selectedReceipt._dbId, {
+        date: editForm.date,
+        source: editForm.source,
+        sourceCategory: editForm.sourceCategory,
+        memberName: editForm.member,
+        amount: parseFloat(editForm.amount),
+        paymentMode: editForm.paymentMode,
+        status: editForm.status,
+        branch: editForm.branch,
+        reference: editForm.reference,
+        notes: editForm.notes,
+        transactionId: editForm.transactionId || undefined,
+        approvedBy: editForm.approvedBy || undefined,
+        voucherType: editForm.sourceCategory,
+      });
+      toast.success('Receipt voucher updated');
+      await loadReceipts();
+      setShowEditReceipt(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update receipt voucher');
+    }
+  };
+
+  const handleDeleteReceipt = async (dbId: string) => {
+    try {
+      await receiptVoucherService.deleteReceiptVoucher(dbId);
+      toast.success('Receipt voucher deleted');
+      setDeleteConfirmId(null);
+      setShowReceiptDetails(false);
+      await loadReceipts();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete receipt voucher');
+    }
+  };
+
+  const handleStatusUpdate = async (receipt: any, newStatus: string) => {
+    if (!receipt._dbId) return;
+    try {
+      await receiptVoucherService.updateStatus(receipt._dbId, newStatus);
+      toast.success(`Status updated to ${newStatus}`);
+      await loadReceipts();
+      // Refresh the selected receipt view
+      setSelectedReceipt((prev: any) => prev ? { ...prev, status: newStatus } : null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update status');
+    }
+  };
+
   const handleBulkAction = (action: string) => {
-    console.log(`Performing ${action} on receipts:`, selectedReceipts);
-    // Implementation for bulk actions
+    if (action === 'delete') {
+      Promise.all(
+        selectedReceipts.map(id => {
+          const r = receipts.find(r => r.id === id);
+          return r?._dbId ? receiptVoucherService.deleteReceiptVoucher(r._dbId) : Promise.resolve();
+        })
+      ).then(() => {
+        toast.success(`Deleted ${selectedReceipts.length} receipt(s)`);
+        loadReceipts();
+      }).catch(() => toast.error('Failed to delete some receipts'));
+    }
     setSelectedReceipts([]);
     setShowBulkActions(false);
   };
@@ -522,6 +492,175 @@ export function ReceiptVoucher() {
 
   return (
     <TooltipProvider>
+      <style>{`
+        @media print {
+          body { background: #fff; }
+          body * { visibility: hidden; }
+          .print-receipt, .print-receipt * { visibility: visible !important; }
+          .print-receipt {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 24px;
+            display: block !important;
+          }
+        }
+        .print-receipt { display: none; color: #0f172a; font-family: Arial, sans-serif; }
+        .print-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 2px solid #e2e8f0;
+          padding-bottom: 12px;
+          margin-bottom: 16px;
+        }
+        .print-brand h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .print-brand p { margin: 4px 0 0; font-size: 12px; color: #64748b; }
+        .print-badge {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.4px;
+          text-transform: uppercase;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid #e2e8f0;
+          background: #f8fafc;
+          color: #0f172a;
+        }
+        .print-meta {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          margin: 16px 0;
+        }
+        .print-meta .label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .print-meta .value { font-size: 14px; font-weight: 600; margin-top: 4px; }
+        .print-card {
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          padding: 12px;
+          background: #fff;
+        }
+        .print-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .print-amount {
+          border: 2px solid #0f172a;
+          border-radius: 10px;
+          padding: 14px;
+          text-align: right;
+          font-size: 20px;
+          font-weight: 800;
+          margin-bottom: 16px;
+        }
+        .print-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 8px;
+        }
+        .print-table th {
+          text-align: left;
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #64748b;
+          padding: 8px 6px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .print-table td {
+          padding: 10px 6px;
+          font-size: 13px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .print-footer {
+          margin-top: 16px;
+          font-size: 11px;
+          color: #64748b;
+          text-align: center;
+        }
+      `}</style>
+
+      <div className="print-receipt">
+        <div className="print-header">
+          <div className="print-brand">
+            <h1>GymBios</h1>
+            <p>Receipt Voucher</p>
+          </div>
+          <div className="print-badge">{selectedReceipt?.status ?? 'N/A'}</div>
+        </div>
+
+        <div className="print-meta">
+          <div>
+            <div className="label">Voucher ID</div>
+            <div className="value">{selectedReceipt?.id ?? '-'}</div>
+          </div>
+          <div>
+            <div className="label">Date</div>
+            <div className="value">{printDate}</div>
+          </div>
+          <div>
+            <div className="label">Branch</div>
+            <div className="value">{selectedReceipt?.branch ?? '-'}</div>
+          </div>
+        </div>
+
+        <div className="print-grid">
+          <div className="print-card">
+            <div className="label">Member</div>
+            <div className="value">{selectedReceipt?.member ?? '-'}</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+              ID: {selectedReceipt?.memberId ?? '-'}
+            </div>
+          </div>
+          <div className="print-card">
+            <div className="label">Payment</div>
+            <div className="value">{selectedReceipt?.paymentMode ?? '-'}</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+              Reference: {selectedReceipt?.reference ?? '-'}
+            </div>
+          </div>
+        </div>
+
+        <div className="print-amount">
+          {selectedReceipt ? formatCurrency(selectedReceipt.amount) : `${currencyCode} 0`}
+        </div>
+
+        <div className="print-card">
+          <div className="label">Receipt Details</div>
+          <table className="print-table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Category</th>
+                <th>Transaction</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{selectedReceipt?.source ?? '-'}</td>
+                <td>{selectedReceipt?.sourceCategory ?? '-'}</td>
+                <td>{selectedReceipt?.transactionId ?? '-'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="print-card" style={{ marginTop: '12px' }}>
+          <div className="label">Notes</div>
+          <div style={{ fontSize: '12px', marginTop: '6px' }}>
+            {selectedReceipt?.notes ?? '—'}
+          </div>
+        </div>
+
+        <div className="print-footer">
+          Created at: {printCreatedAt}
+        </div>
+      </div>
+
       <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -566,7 +705,7 @@ export function ReceiptVoucher() {
               <Printer className="h-4 w-4 mr-2" />
               Export PDF
             </Button>
-            <Button onClick={() => setShowAddReceipt(true)}>
+            <Button size="sm" onClick={() => setShowAddReceipt(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Receipt
             </Button>
@@ -575,76 +714,70 @@ export function ReceiptVoucher() {
 
         {/* Dashboard Preview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-700">Today's Receipts</p>
-                  <p className="text-2xl font-bold text-blue-800">{formatCurrency(todayTotal)}</p>
-                  <p className="text-xs text-blue-600">{completedToday} transactions</p>
-                </div>
-                <div className="bg-blue-200 p-2 rounded-lg">
-                  <DollarSign className="h-6 w-6 text-blue-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Today's Receipts</CardTitle>
+              <div className="bg-blue-50 p-2 rounded-lg">
+                <DollarSign className="h-4 w-4 text-blue-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-700"><CurrencyValue amount={todayTotal} /></div>
+              <p className="text-xs text-muted-foreground mt-1">{completedToday} transactions</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-green-700">This Month</p>
-                  <p className="text-2xl font-bold text-green-800">{formatCurrency(thisMonthTotal)}</p>
-                  <p className="text-xs text-green-600">January 2024</p>
-                </div>
-                <div className="bg-green-200 p-2 rounded-lg">
-                  <TrendingUp className="h-6 w-6 text-green-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">This Month</CardTitle>
+              <div className="bg-green-50 p-2 rounded-lg">
+                <TrendingUp className="h-4 w-4 text-green-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-700"><CurrencyValue amount={thisMonthTotal} /></div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+              </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-amber-50 to-amber-100 border-amber-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-amber-700">Pending Amount</p>
-                  <p className="text-2xl font-bold text-amber-800">{formatCurrency(pendingAmount)}</p>
-                  <p className="text-xs text-amber-600">Awaiting payment</p>
-                </div>
-                <div className="bg-amber-200 p-2 rounded-lg">
-                  <Timer className="h-6 w-6 text-amber-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Pending Amount</CardTitle>
+              <div className="bg-amber-50 p-2 rounded-lg">
+                <Timer className="h-4 w-4 text-amber-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-700"><CurrencyValue amount={pendingAmount} /></div>
+              <p className="text-xs text-muted-foreground mt-1">Awaiting payment</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-purple-700">Total Receipts</p>
-                  <p className="text-2xl font-bold text-purple-800">{filteredReceipts.length}</p>
-                  <p className="text-xs text-purple-600">This period</p>
-                </div>
-                <div className="bg-purple-200 p-2 rounded-lg">
-                  <Receipt className="h-6 w-6 text-purple-700" />
-                </div>
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-primary">Total Receipts</CardTitle>
+              <div className="bg-purple-50 p-2 rounded-lg">
+                <Receipt className="h-4 w-4 text-purple-600" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-700">{filteredReceipts.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">This period</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Income Sources Chart */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2 bg-white border-0 shadow-sm">
             <CardHeader>
               <CardTitle>Income Source Distribution</CardTitle>
               <CardDescription>Revenue breakdown by source category</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 {incomeSourcesConfig.map((source) => {
                   const sourceReceipts = receipts.filter(r => r.sourceCategory === source.id && r.status === 'completed');
                   const sourceTotal = sourceReceipts.reduce((sum, r) => sum + r.amount, 0);
@@ -656,7 +789,7 @@ export function ReceiptVoucher() {
                         <IconComponent className={`h-6 w-6 ${source.iconColor}`} />
                       </div>
                       <div className="text-sm font-medium">{source.name}</div>
-                      <div className="text-lg font-bold">{formatCurrency(sourceTotal)}</div>
+                      <div className="text-lg font-bold"><CurrencyValue amount={sourceTotal} /></div>
                       <div className="text-xs text-gray-600">{sourceReceipts.length} receipts</div>
                     </div>
                   );
@@ -665,7 +798,7 @@ export function ReceiptVoucher() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white border-0 shadow-sm self-start">
             <CardHeader>
               <CardTitle>Quick Stats</CardTitle>
               <CardDescription>Recent receipt overview</CardDescription>
@@ -693,12 +826,34 @@ export function ReceiptVoucher() {
                 <span className="text-sm text-gray-600">Most Used Payment</span>
                 <Badge variant="outline">Card</Badge>
               </div>
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Sort by Date</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setCalendarDate(undefined)}
+                    disabled={!calendarDate}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                <div className="w-full rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
+                  <Calendar
+                    mode="single"
+                    selected={calendarDate}
+                    onSelect={setCalendarDate}
+                    className="w-full [&_table]:w-full [&_table]:table-fixed [&_caption]:w-full"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Filters */}
-        <Card>
+        <Card className="bg-white border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Filter className="h-5 w-5" />
@@ -798,11 +953,25 @@ export function ReceiptVoucher() {
                 </Select>
               </div>
             </div>
+            <div className="flex justify-end mt-4 space-x-2">
+              <Button variant="outline" onClick={() => {
+                setSearchTerm(''); setStatusFilter('all'); setSourceFilter('all');
+                setPaymentModeFilter('all'); setBranchFilter('all');
+                loadReceipts();
+              }}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reset
+              </Button>
+              <Button onClick={applyFilters}>
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
         {/* Receipt Vouchers Table */}
-        <Card>
+        <Card className="bg-white border-0 shadow-sm">
           <CardHeader>
             <CardTitle>Receipt Vouchers</CardTitle>
             <CardDescription>
@@ -810,9 +979,9 @@ export function ReceiptVoucher() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+            <div className="overflow-x-auto rounded-lg bg-white">
+              <Table className="min-w-full">
+                <TableHeader className="bg-slate-50">
                   <TableRow>
                     <TableHead className="w-12">
                       <Checkbox
@@ -830,15 +999,28 @@ export function ReceiptVoucher() {
                     <TableHead>Date</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Member</TableHead>
-                    <TableHead className="text-right">Amount (AED)</TableHead>
+                    <TableHead className="text-right">Amount ({currencyCode})</TableHead>
                     <TableHead>Payment Mode</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredReceipts.map((receipt) => (
-                    <TableRow key={receipt.id} className="hover:bg-gray-50">
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                        <RefreshCw className="h-5 w-5 animate-spin inline mr-2" />
+                        Loading receipt vouchers...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredReceipts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                        No receipt vouchers found.
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredReceipts.map((receipt, index) => (
+                    <TableRow key={receipt.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-slate-50/80 transition-colors`}>
                       <TableCell>
                         <Checkbox
                           checked={selectedReceipts.includes(receipt.id)}
@@ -881,7 +1063,7 @@ export function ReceiptVoucher() {
                       </TableCell>
                       <TableCell className="text-right">
                         <span className="font-medium text-green-600">
-                          {formatCurrency(receipt.amount)}
+                          <CurrencyValue amount={receipt.amount} />
                         </span>
                       </TableCell>
                       <TableCell>
@@ -920,23 +1102,30 @@ export function ReceiptVoucher() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditReceipt(receipt)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Receipt
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              {receipt.status === 'draft' || receipt.status === 'pending' ? (
+                                <DropdownMenuItem onClick={() => handleStatusUpdate(receipt, 'completed')}>
+                                  <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                                  Mark Completed
+                                </DropdownMenuItem>
+                              ) : null}
+                              {receipt.status !== 'cancelled' ? (
+                                <DropdownMenuItem onClick={() => handleStatusUpdate(receipt, 'cancelled')}>
+                                  <XCircle className="h-4 w-4 mr-2 text-orange-500" />
+                                  Cancel
+                                </DropdownMenuItem>
+                              ) : null}
+                              <DropdownMenuItem onClick={() => { openReceiptDetails(receipt); setTimeout(() => window.print(), 300); }}>
                                 <Printer className="h-4 w-4 mr-2" />
                                 Print Receipt
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Mail className="h-4 w-4 mr-2" />
-                                Email Receipt
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Copy className="h-4 w-4 mr-2" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => setDeleteConfirmId(receipt._dbId)}
+                              >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -1044,7 +1233,7 @@ export function ReceiptVoucher() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Amount (AED) *</Label>
+                  <Label>Amount ({currencyCode}) *</Label>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -1092,6 +1281,38 @@ export function ReceiptVoucher() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={newReceipt.status} onValueChange={(v) => setNewReceipt({...newReceipt, status: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="partially-paid">Partially Paid</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Transaction ID</Label>
+                  <Input
+                    placeholder="TXN-XXXXXX"
+                    value={newReceipt.transactionId}
+                    onChange={(e) => setNewReceipt({...newReceipt, transactionId: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Approved By</Label>
+                  <Input
+                    placeholder="Approver name"
+                    value={newReceipt.approvedBy}
+                    onChange={(e) => setNewReceipt({...newReceipt, approvedBy: e.target.value})}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label>Notes</Label>
                 <Textarea
@@ -1128,32 +1349,165 @@ export function ReceiptVoucher() {
           </DialogContent>
         </Dialog>
 
+        {/* Edit Receipt Dialog */}
+        <Dialog open={showEditReceipt} onOpenChange={setShowEditReceipt}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Edit className="h-5 w-5" />
+                <span>Edit Receipt — {selectedReceipt?.id}</span>
+              </DialogTitle>
+              <DialogDescription>Update receipt voucher details</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Voucher Date *</Label>
+                  <Input type="date" value={editForm.date} onChange={(e) => setEditForm({...editForm, date: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Branch</Label>
+                  <Select value={editForm.branch} onValueChange={(v) => setEditForm({...editForm, branch: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Dubai Branch">Dubai Branch</SelectItem>
+                      <SelectItem value="Marina Branch">Marina Branch</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Member Name *</Label>
+                  <Input placeholder="Member name" value={editForm.member} onChange={(e) => setEditForm({...editForm, member: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Income Source Category *</Label>
+                  <Select value={editForm.sourceCategory} onValueChange={(v) => {
+                    const src = incomeSourcesConfig.find(s => s.id === v);
+                    setEditForm({...editForm, sourceCategory: v, source: src?.name || ''});
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Select income source" /></SelectTrigger>
+                    <SelectContent>
+                      {incomeSourcesConfig.map((source) => {
+                        const IconComponent = source.icon;
+                        return (
+                          <SelectItem key={source.id} value={source.id}>
+                            <div className="flex items-center space-x-2">
+                              <IconComponent className={`h-4 w-4 ${source.iconColor}`} />
+                              <span>{source.name}</span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Amount ({currencyCode}) *</Label>
+                  <Input type="number" placeholder="0.00" value={editForm.amount} onChange={(e) => setEditForm({...editForm, amount: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Payment Mode *</Label>
+                  <Select value={editForm.paymentMode} onValueChange={(v) => setEditForm({...editForm, paymentMode: v})}>
+                    <SelectTrigger><SelectValue placeholder="Select payment mode" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Cash"><div className="flex items-center space-x-2"><Banknote className="h-4 w-4 text-green-600" /><span>Cash</span></div></SelectItem>
+                      <SelectItem value="Card"><div className="flex items-center space-x-2"><CreditCard className="h-4 w-4 text-blue-600" /><span>Card</span></div></SelectItem>
+                      <SelectItem value="Online Transfer"><div className="flex items-center space-x-2"><Smartphone className="h-4 w-4 text-purple-600" /><span>Online Transfer</span></div></SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Reference / Description *</Label>
+                <Input placeholder="Reference or description" value={editForm.reference} onChange={(e) => setEditForm({...editForm, reference: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={editForm.status} onValueChange={(v) => setEditForm({...editForm, status: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="partially-paid">Partially Paid</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Transaction ID</Label>
+                  <Input placeholder="TXN-XXXXXX" value={editForm.transactionId} onChange={(e) => setEditForm({...editForm, transactionId: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Approved By</Label>
+                  <Input placeholder="Approver name" value={editForm.approvedBy} onChange={(e) => setEditForm({...editForm, approvedBy: e.target.value})} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea placeholder="Additional notes..." value={editForm.notes} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} rows={3} />
+              </div>
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setShowEditReceipt(false)}>Cancel</Button>
+                <Button onClick={handleEditReceipt}>Save Changes</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirm Dialog */}
+        <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2 text-red-600">
+                <Trash2 className="h-5 w-5" />
+                <span>Delete Receipt?</span>
+              </DialogTitle>
+              <DialogDescription>
+                This action cannot be undone. The receipt voucher will be permanently deleted.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center justify-end space-x-3 pt-4">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => deleteConfirmId && handleDeleteReceipt(deleteConfirmId)}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Receipt Details Sheet */}
         <Sheet open={showReceiptDetails} onOpenChange={setShowReceiptDetails}>
-          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto bg-gray-50 p-0">
             {selectedReceipt && (
-              <>
-                <SheetHeader>
-                  <SheetTitle className="flex items-center space-x-2">
-                    <Receipt className="h-5 w-5" />
-                    <span>Receipt Details</span>
-                  </SheetTitle>
-                  <SheetDescription>
-                    {selectedReceipt.id} - {selectedReceipt.source}
-                  </SheetDescription>
-                </SheetHeader>
+              <div className="min-h-full">
+                <div className="px-6 py-5 bg-white border-b">
+                  <SheetHeader>
+                    <SheetTitle className="flex items-center space-x-2">
+                      <div className="p-2 rounded-lg bg-purple-50">
+                        <Receipt className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <span>Receipt Details</span>
+                    </SheetTitle>
+                    <SheetDescription>
+                      {selectedReceipt.id} - {selectedReceipt.source}
+                    </SheetDescription>
+                  </SheetHeader>
+                </div>
 
-                <div className="space-y-6 mt-6">
+                <div className="px-6 py-6 space-y-6">
                   {/* Receipt Overview */}
                   <div className="grid grid-cols-2 gap-4">
-                    <Card>
+                    <Card className="border-primary/10 shadow-sm">
                       <CardContent className="p-4 text-center">
-                        <div className="text-2xl font-bold text-green-600">{formatCurrency(selectedReceipt.amount)}</div>
+                        <div className="text-2xl font-bold text-green-600"><CurrencyValue amount={selectedReceipt.amount} /></div>
                         <div className="text-sm text-gray-600">Receipt Amount</div>
                       </CardContent>
                     </Card>
 
-                    <Card>
+                    <Card className="border-primary/10 shadow-sm">
                       <CardContent className="p-4 text-center">
                         <Badge className={getStatusColor(selectedReceipt.status)}>
                           <div className="flex items-center space-x-1">
@@ -1167,7 +1521,7 @@ export function ReceiptVoucher() {
                   </div>
 
                   {/* Receipt Information */}
-                  <div className="space-y-4">
+                  <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-4">
                     <h3 className="font-semibold">Receipt Information</h3>
                     
                     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1202,7 +1556,7 @@ export function ReceiptVoucher() {
                   </div>
 
                   {/* Income Source */}
-                  <div className="space-y-2">
+                  <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-2">
                     <h3 className="font-semibold">Income Source</h3>
                     <div className="flex items-center space-x-2">
                       {React.createElement(getSourceIcon(selectedReceipt.sourceCategory), {
@@ -1217,7 +1571,7 @@ export function ReceiptVoucher() {
 
                   {/* Notes */}
                   {selectedReceipt.notes && (
-                    <div className="space-y-2">
+                    <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-2">
                       <h3 className="font-semibold">Notes</h3>
                       <div className="p-3 bg-gray-50 rounded-lg text-sm">
                         {selectedReceipt.notes}
@@ -1226,7 +1580,7 @@ export function ReceiptVoucher() {
                   )}
 
                   {/* Audit Information */}
-                  <div className="space-y-2">
+                  <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-2">
                     <h3 className="font-semibold">Audit Trail</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
@@ -1250,7 +1604,7 @@ export function ReceiptVoucher() {
 
                   {/* Attachments */}
                   {selectedReceipt.attachments && selectedReceipt.attachments.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4 space-y-2">
                       <h3 className="font-semibold">Attachments</h3>
                       <div className="space-y-2">
                         {selectedReceipt.attachments.map((attachment: string, index: number) => (
@@ -1268,23 +1622,67 @@ export function ReceiptVoucher() {
                     </div>
                   )}
 
-                  {/* Actions */}
-                  <div className="flex space-x-2 pt-4 border-t">
-                    <Button className="flex-1">
+                  {/* Status Actions */}
+                  {(selectedReceipt.status === 'draft' || selectedReceipt.status === 'pending') && (
+                    <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4">
+                      <div className="flex space-x-2">
+                        <Button
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          onClick={() => handleStatusUpdate(selectedReceipt, 'completed')}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Mark Completed
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
+                          onClick={() => handleStatusUpdate(selectedReceipt, 'cancelled')}
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Cancel Receipt
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {selectedReceipt.status === 'completed' && (
+                    <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4">
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
+                          onClick={() => handleStatusUpdate(selectedReceipt, 'cancelled')}
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Cancel Receipt
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Main Actions */}
+                  <div className="flex space-x-2 pt-2 border-t border-gray-200">
+                    <Button
+                      className="flex-1"
+                      onClick={() => { setShowReceiptDetails(false); openEditReceipt(selectedReceipt); }}
+                    >
                       <Edit className="h-4 w-4 mr-2" />
                       Edit Receipt
                     </Button>
-                    <Button variant="outline" className="flex-1">
+                    <Button variant="outline" className="flex-1" onClick={() => window.print()}>
                       <Printer className="h-4 w-4 mr-2" />
                       Print
                     </Button>
-                    <Button variant="outline" className="flex-1">
-                      <Mail className="h-4 w-4 mr-2" />
-                      Email
+                    <Button
+                      variant="outline"
+                      className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => { setShowReceiptDetails(false); setDeleteConfirmId(selectedReceipt._dbId); }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
                     </Button>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </SheetContent>
         </Sheet>

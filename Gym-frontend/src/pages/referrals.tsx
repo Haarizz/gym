@@ -1,4 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
+import { referralService, type ReferralResponse, type RewardRuleResponse } from '../utils/supabase/referral-service';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -108,6 +110,7 @@ interface ReferralReward {
 }
 
 export function Referrals() {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedMember, setSelectedMember] = useState<string>('');
   const [showAddRule, setShowAddRule] = useState(false);
@@ -117,139 +120,76 @@ export function Referrals() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [dateRange, setDateRange] = useState('7d');
 
-  // Sample data - in real app this would come from your backend
+  // API state
+  const [apiReferrals, setApiReferrals] = useState<ReferralResponse[]>([]);
+  const [apiStats, setApiStats] = useState({ totalReferrals: 0, successfulReferrals: 0, conversionRate: 0, totalRewards: 0, activeRules: 0 });
+  const [apiRules, setApiRules] = useState<RewardRuleResponse[]>([]);
+
+  // New referral form state
+  const [newReferral, setNewReferral] = useState({ referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '' });
+  // New rule form state
+  const [newRule, setNewRule] = useState({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
+  const [editingReferral, setEditingReferral] = useState<ReferralResponse | null>(null);
+  const [showEditReferral, setShowEditReferral] = useState(false);
+  const [editReferral, setEditReferral] = useState({ referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: '', status: 'pending', notes: '' });
+  const [editingRule, setEditingRule] = useState<RewardRuleResponse | null>(null);
+  const [showEditRule, setShowEditRule] = useState(false);
+  const [editRule, setEditRule] = useState({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
+  const [viewingReferral, setViewingReferral] = useState<ReferralResponse | null>(null);
+  const [showViewReferral, setShowViewReferral] = useState(false);
+
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+
+  const loadData = useCallback(async () => {
+    try {
+      const [statsData, referralsData, rulesData] = await Promise.all([
+        referralService.getStats(),
+        referralService.getReferrals({ size: 100, status: filterStatus !== 'all' ? filterStatus : undefined, search: searchTerm || undefined }),
+        referralService.getRules(),
+      ]);
+      setApiStats({ totalReferrals: statsData.totalReferrals, successfulReferrals: statsData.successfulReferrals, conversionRate: statsData.conversionRate, totalRewards: Number(statsData.totalRewards), activeRules: statsData.activeRules });
+      setApiReferrals(referralsData.referrals);
+      setApiRules(rulesData);
+    } catch {
+      // keep existing display on error
+    }
+  }, [filterStatus, searchTerm]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
   const referralStats = {
-    totalReferrals: 245,
-    successfulReferrals: 189,
-    conversionRate: 77.1,
-    totalRewards: 15680,
-    activePrograms: 3,
-    avgRewardValue: 85.2
+    totalReferrals: apiStats.totalReferrals,
+    successfulReferrals: apiStats.successfulReferrals,
+    conversionRate: apiStats.conversionRate,
+    totalRewards: apiStats.totalRewards,
+    activePrograms: apiStats.activeRules,
+    avgRewardValue: apiStats.successfulReferrals > 0 ? Math.round(apiStats.totalRewards / apiStats.successfulReferrals) : 0,
   };
 
-  const memberReferrals: ReferralData[] = [
-    {
-      id: '1',
-      memberName: 'Sarah Johnson',
-      memberEmail: 'sarah.j@email.com',
-      referralCode: 'GYM123-SARAH',
-      referralLink: 'gymbios.app/ref/GYM123-SARAH',
-      totalReferrals: 12,
-      successfulReferrals: 9,
-      pendingReferrals: 3,
-      totalRewardsEarned: 450,
-      rewardBalance: 180,
-      joinDate: '2024-01-15',
-      lastActivity: '2024-03-20',
-      tier: 'Gold',
-      avatar: ''
-    },
-    {
-      id: '2',
-      memberName: 'Ahmed Hassan',
-      memberEmail: 'ahmed.h@email.com',
-      referralCode: 'GYM123-AHMED',
-      referralLink: 'gymbios.app/ref/GYM123-AHMED',
-      totalReferrals: 8,
-      successfulReferrals: 6,
-      pendingReferrals: 2,
-      totalRewardsEarned: 300,
-      rewardBalance: 120,
-      joinDate: '2024-02-01',
-      lastActivity: '2024-03-18',
-      tier: 'Silver',
-      avatar: ''
-    },
-    {
-      id: '3',
-      memberName: 'Maria Rodriguez',
-      memberEmail: 'maria.r@email.com',
-      referralCode: 'GYM123-MARIA',
-      referralLink: 'gymbios.app/ref/GYM123-MARIA',
-      totalReferrals: 15,
-      successfulReferrals: 12,
-      pendingReferrals: 3,
-      totalRewardsEarned: 600,
-      rewardBalance: 220,
-      joinDate: '2023-12-10',
-      lastActivity: '2024-03-19',
-      tier: 'Platinum',
-      avatar: ''
-    }
-  ];
 
-  const recentActivity: ReferralActivity[] = [
-    {
-      id: '1',
-      referrerName: 'Sarah Johnson',
-      refereeName: 'John Smith',
-      refereeEmail: 'john.s@email.com',
-      status: 'successful',
-      reward: 50,
-      date: '2024-03-20',
-      signupDate: '2024-03-18',
-      paymentDate: '2024-03-20'
-    },
-    {
-      id: '2',
-      referrerName: 'Ahmed Hassan',
-      refereeName: 'Lisa Chen',
-      refereeEmail: 'lisa.c@email.com',
-      status: 'pending',
-      reward: 50,
-      date: '2024-03-19',
-      signupDate: '2024-03-19'
-    },
-    {
-      id: '3',
-      referrerName: 'Maria Rodriguez',
-      refereeName: 'David Wilson',
-      refereeEmail: 'david.w@email.com',
-      status: 'successful',
-      reward: 50,
-      date: '2024-03-18',
-      signupDate: '2024-03-16',
-      paymentDate: '2024-03-18'
-    }
-  ];
 
-  const rewardRules: RewardRule[] = [
-    {
-      id: '1',
-      name: 'New Member Bonus',
-      type: 'credit',
-      value: 50,
-      unit: 'AED',
-      eligibility: 'referrer',
-      condition: 'payment',
-      isActive: true,
-      expiryDays: 90
-    },
-    {
-      id: '2',
-      name: 'Welcome Discount',
-      type: 'discount',
-      value: 10,
-      unit: '%',
-      eligibility: 'referee',
-      condition: 'signup',
-      isActive: true,
-      expiryDays: 30
-    },
-    {
-      id: '3',
-      name: 'Free Session',
-      type: 'free_session',
-      value: 1,
-      unit: 'session',
-      eligibility: 'both',
-      condition: 'payment',
-      isActive: true,
-      expiryDays: 60
-    }
-  ];
 
-  const topReferrers = memberReferrals.slice().sort((a, b) => b.successfulReferrals - a.successfulReferrals).slice(0, 5);
+  const rewardRulesState: RewardRule[] = apiRules.map(r => ({ id: String(r.id), name: r.name, type: r.type as any, value: r.value, unit: r.unit, eligibility: r.eligibility as any, condition: r.conditionTrigger as any, isActive: r.isActive, expiryDays: r.expiryDays }));
+
+  const topReferrers = Object.values(apiReferrals.reduce<Record<string, { id: string; memberName: string; memberEmail: string; referralCode: string; referralLink: string; totalReferrals: number; successfulReferrals: number; pendingReferrals: number; totalRewardsEarned: number; rewardBalance: number; joinDate: string; lastActivity: string; tier: 'Bronze'|'Silver'|'Gold'|'Platinum' }>>((acc, r) => {
+      const key = r.referrerName || 'Unknown';
+      if (!acc[key]) acc[key] = { id: key, memberName: r.referrerName || '', memberEmail: '', referralCode: r.referralCode, referralLink: r.referralLink, totalReferrals: 0, successfulReferrals: 0, pendingReferrals: 0, totalRewardsEarned: 0, rewardBalance: 0, joinDate: r.createdAt, lastActivity: r.createdAt, tier: 'Bronze' };
+      acc[key].totalReferrals++;
+      if (r.status === 'successful') { acc[key].successfulReferrals++; acc[key].totalRewardsEarned += Number(r.rewardAmount || 0); }
+      if (r.status === 'pending') acc[key].pendingReferrals++;
+      const s = acc[key].successfulReferrals;
+      acc[key].tier = s >= 11 ? 'Platinum' : s >= 6 ? 'Gold' : s >= 3 ? 'Silver' : 'Bronze';
+      return acc;
+    }, {})).sort((a, b) => b.successfulReferrals - a.successfulReferrals).slice(0, 5);
+
+  const handleToggleRewardRule = useCallback(async (ruleId: string, nextValue: boolean) => {
+    try {
+      await referralService.toggleRule(Number(ruleId));
+      await loadData();
+    } catch {
+      toast.error('Failed to toggle rule');
+    }
+  }, [loadData]);
 
   const handleCopyCode = useCallback((code: string) => {
     navigator.clipboard.writeText(code);
@@ -266,7 +206,7 @@ export function Referrals() {
   }, []);
 
   const handleShareWhatsApp = useCallback((code: string, memberName: string) => {
-    const message = `Join our amazing gym with my referral code: ${code}! Get exclusive benefits and let's achieve our fitness goals together! 💪`;
+    const message = `Join our amazing gym with my referral code: ${code}! Get exclusive benefits and let's achieve our fitness goals together! ??`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
     
@@ -355,96 +295,102 @@ export function Referrals() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Referrals</p>
-                <p className="text-2xl font-bold">{referralStats.totalReferrals}</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Referrals</CardTitle>
+            <div className="bg-gradient-light p-2 rounded-lg">
+              <Users className="h-4 w-4 text-primary" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{referralStats.totalReferrals}</div>
+            <p className="text-xs text-muted-foreground">All referrals recorded</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Successful</p>
-                <p className="text-2xl font-bold text-green-600">{referralStats.successfulReferrals}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Successful</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{referralStats.successfulReferrals}</div>
+            <p className="text-xs text-muted-foreground">Converted referrals</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Conversion</p>
-                <p className="text-2xl font-bold text-purple-600">{referralStats.conversionRate}%</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-purple-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Conversion</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-purple-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{referralStats.conversionRate}%</div>
+            <p className="text-xs text-muted-foreground">Referral success rate</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Rewards</p>
-                <p className="text-2xl font-bold text-orange-600">{referralStats.totalRewards} AED</p>
-              </div>
-              <Gift className="h-8 w-8 text-orange-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Rewards</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <Gift className="h-4 w-4 text-orange-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600"><CurrencyGlyph /> {referralStats.totalRewards}</div>
+            <p className="text-xs text-muted-foreground">Rewards distributed</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Active Programs</p>
-                <p className="text-2xl font-bold text-indigo-600">{referralStats.activePrograms}</p>
-              </div>
-              <Zap className="h-8 w-8 text-indigo-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Active Programs</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Zap className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{referralStats.activePrograms}</div>
+            <p className="text-xs text-muted-foreground">Running referral programs</p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Reward</p>
-                <p className="text-2xl font-bold text-teal-600">{referralStats.avgRewardValue} AED</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-teal-600" />
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Avg Reward</CardTitle>
+            <div className="bg-teal-50 p-2 rounded-lg">
+              <DollarSign className="h-4 w-4 text-teal-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-teal-600"><CurrencyGlyph /> {referralStats.avgRewardValue}</div>
+            <p className="text-xs text-muted-foreground">Average per referral</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="rewards">Rewards</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+          <TabsTrigger value="members" className="flex-1">Members</TabsTrigger>
+          <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
+          <TabsTrigger value="rewards" className="flex-1">Rewards</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
+          <TabsTrigger value="settings" className="flex-1">Settings</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Top Referrers Leaderboard */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Trophy className="h-5 w-5 text-yellow-600" />
@@ -457,7 +403,7 @@ export function Referrals() {
               <CardContent>
                 <div className="space-y-4">
                   {topReferrers.map((member, index) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div key={member.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50/60">
                       <div className="flex items-center space-x-3">
                         <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full font-bold text-sm">
                           {index + 1}
@@ -487,7 +433,7 @@ export function Referrals() {
             </Card>
 
             {/* Recent Activity */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Bell className="h-5 w-5 text-blue-600" />
@@ -499,8 +445,8 @@ export function Referrals() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentActivity.slice(0, 5).map((activity) => (
-                    <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg border">
+                  {apiReferrals.slice(0, 5).map((activity) => (
+                    <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50/60">
                       <div className="flex items-center space-x-3">
                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                         <div>
@@ -515,7 +461,7 @@ export function Referrals() {
                           {activity.status}
                         </Badge>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {activity.reward} AED
+                          <CurrencyGlyph /> {activity.rewardAmount}
                         </p>
                       </div>
                     </div>
@@ -526,7 +472,7 @@ export function Referrals() {
           </div>
 
           {/* Quick Actions */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Zap className="h-5 w-5 text-purple-600" />
@@ -538,19 +484,19 @@ export function Referrals() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button variant="outline" className="h-20 flex-col space-y-2">
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={() => { setShowAddReferral(true); }}>
                   <Send className="h-6 w-6 text-blue-600" />
-                  <span>Send Bulk Invite</span>
+                  <span>Add Referral</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex-col space-y-2">
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={async () => { toast.loading('Processing...'); try { await loadData(); toast.success('Data refreshed'); } catch { toast.error('Refresh failed'); } }}>
                   <Gift className="h-6 w-6 text-green-600" />
-                  <span>Process Rewards</span>
+                  <span>Refresh Data</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex-col space-y-2">
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={() => { const csv = ['Referrer,Referee,Email,Status,Reward,Date', ...apiReferrals.map(r => `${r.referrerName},${r.refereeName},${r.refereeEmail || ''},${r.status},${r.rewardAmount || 0},${r.date || r.createdAt}`)].join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'referrals.csv'; a.click(); URL.revokeObjectURL(url); toast.success('Report downloaded'); }}>
                   <BarChart3 className="h-6 w-6 text-purple-600" />
-                  <span>Generate Report</span>
+                  <span>Export CSV</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex-col space-y-2">
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={() => setActiveTab('settings')}>
                   <Settings className="h-6 w-6 text-gray-600" />
                   <span>Program Settings</span>
                 </Button>
@@ -560,9 +506,9 @@ export function Referrals() {
         </TabsContent>
 
         {/* Members Tab */}
-        <TabsContent value="members" className="space-y-6">
+        <TabsContent value="members" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           {/* Filters */}
-          <Card>
+          <Card className={cardShell}>
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex-1 min-w-[200px]">
@@ -612,35 +558,35 @@ export function Referrals() {
           </Card>
 
           {/* Members List */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {memberReferrals.map((member) => (
-              <Card key={member.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {topReferrers.map((member) => (
+              <Card key={member.id} className={cardShell}>
+                <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <Avatar className="h-12 w-12">
+                      <Avatar className="h-10 w-10">
                         <AvatarImage src={member.avatar} />
                         <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
                           {member.memberName.split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <h3 className="font-semibold">{member.memberName}</h3>
-                        <p className="text-sm text-muted-foreground">{member.memberEmail}</p>
+                        <h3 className="font-semibold text-sm">{member.memberName}</h3>
+                        <p className="text-xs text-muted-foreground">{member.memberEmail}</p>
                       </div>
                     </div>
-                    <Badge className={getTierColor(member.tier)}>
+                    <Badge className={getTierColor(member.tier)} variant="outline">
                       {getTierIcon(member.tier)}
                       <span className="ml-1">{member.tier}</span>
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   {/* Referral Code */}
                   <div>
-                    <Label>Referral Code</Label>
+                    <Label className="text-xs">Referral Code</Label>
                     <div className="flex items-center space-x-2 mt-1">
-                      <Input value={member.referralCode} readOnly className="flex-1" />
+                      <Input value={member.referralCode} readOnly className="flex-1 h-9 text-xs" />
                       <Button
                         size="sm"
                         variant="outline"
@@ -653,9 +599,9 @@ export function Referrals() {
 
                   {/* Referral Link */}
                   <div>
-                    <Label>Referral Link</Label>
+                    <Label className="text-xs">Referral Link</Label>
                     <div className="flex items-center space-x-2 mt-1">
-                      <Input value={member.referralLink} readOnly className="flex-1 text-xs" />
+                      <Input value={member.referralLink} readOnly className="flex-1 h-9 text-[11px]" />
                       <Button
                         size="sm"
                         variant="outline"
@@ -667,30 +613,30 @@ export function Referrals() {
                   </div>
 
                   {/* Stats */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Successful</p>
-                      <p className="text-xl font-bold text-green-600">{member.successfulReferrals}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center p-2 bg-green-50 rounded-lg">
+                      <p className="text-[11px] text-muted-foreground">Successful</p>
+                      <p className="text-base font-bold text-green-600">{member.successfulReferrals}</p>
                     </div>
-                    <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Pending</p>
-                      <p className="text-xl font-bold text-yellow-600">{member.pendingReferrals}</p>
+                    <div className="text-center p-2 bg-yellow-50 rounded-lg">
+                      <p className="text-[11px] text-muted-foreground">Pending</p>
+                      <p className="text-base font-bold text-yellow-600">{member.pendingReferrals}</p>
                     </div>
                   </div>
 
                   {/* Rewards */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-purple-50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Total Earned</p>
-                      <p className="text-lg font-bold text-purple-600">{member.totalRewardsEarned} AED</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center p-2 bg-purple-50 rounded-lg">
+                      <p className="text-[11px] text-muted-foreground">Total Earned</p>
+                      <p className="text-sm font-bold text-purple-600"><CurrencyGlyph /> {member.totalRewardsEarned}</p>
                     </div>
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Balance</p>
-                      <p className="text-lg font-bold text-blue-600">{member.rewardBalance} AED</p>
+                    <div className="text-center p-2 bg-blue-50 rounded-lg">
+                      <p className="text-[11px] text-muted-foreground">Balance</p>
+                      <p className="text-sm font-bold text-blue-600"><CurrencyGlyph /> {member.rewardBalance}</p>
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between">
+                <CardFooter className="flex justify-between pt-2">
                   <div className="flex space-x-2">
                     <Button
                       size="sm"
@@ -723,8 +669,8 @@ export function Referrals() {
         </TabsContent>
 
         {/* Activity Tab */}
-        <TabsContent value="activity" className="space-y-6">
-          <Card>
+        <TabsContent value="activity" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Referral Activity Log</CardTitle>
               <CardDescription>
@@ -733,8 +679,8 @@ export function Referrals() {
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Referrer</TableHead>
                     <TableHead>Referee</TableHead>
                     <TableHead>Status</TableHead>
@@ -745,8 +691,8 @@ export function Referrals() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentActivity.map((activity) => (
-                    <TableRow key={activity.id}>
+                  {apiReferrals.map((activity) => (
+                    <TableRow key={activity.id} className="hover:bg-slate-50/50 transition-colors">
                       <TableCell>
                         <div>
                           <p className="font-medium">{activity.referrerName}</p>
@@ -767,7 +713,7 @@ export function Referrals() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">{activity.reward} AED</span>
+                        <span className="font-medium"><CurrencyGlyph /> {activity.rewardAmount}</span>
                       </TableCell>
                       <TableCell>
                         {activity.signupDate || '-'}
@@ -777,12 +723,20 @@ export function Referrals() {
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" onClick={() => { setViewingReferral(activity); setShowViewReferral(true); }}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" onClick={() => { setEditingReferral(activity); setEditReferral({ referrerName: activity.referrerName || '', refereeName: activity.refereeName || '', refereeEmail: activity.refereeEmail || '', refereePhone: activity.refereePhone || '', date: activity.date || activity.createdAt, status: activity.status, notes: '' }); setShowEditReferral(true); }}>
                             <Edit className="h-4 w-4" />
                           </Button>
+                          <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={async () => { if (!window.confirm('Delete this referral?')) return; try { await referralService.delete(Number(activity.id)); toast.success('Referral deleted'); loadData(); } catch { toast.error('Failed to delete'); } }}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                          {activity.status === 'pending' && (
+                            <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700" onClick={async () => { try { await referralService.markSuccessful(Number(activity.id)); toast.success('Referral marked successful'); loadData(); } catch { toast.error('Failed to update'); } }}>
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -794,7 +748,7 @@ export function Referrals() {
         </TabsContent>
 
         {/* Rewards Tab */}
-        <TabsContent value="rewards" className="space-y-6">
+        <TabsContent value="rewards" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold">Reward Rules</h2>
@@ -806,59 +760,65 @@ export function Referrals() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {rewardRules.map((rule) => (
-              <Card key={rule.id} className={rule.isActive ? 'border-green-200 bg-green-50/30' : 'border-gray-200'}>
-                <CardHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {rewardRulesState.map((rule) => (
+              <Card
+                key={rule.id}
+                className={`${rule.isActive ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} shadow-md hover:shadow-lg transition-shadow`}
+              >
+                <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{rule.name}</CardTitle>
-                    <Switch checked={rule.isActive} />
+                    <CardTitle className="text-base">{rule.name}</CardTitle>
+                    <Switch
+                      checked={rule.isActive}
+                      onCheckedChange={(checked) => handleToggleRewardRule(rule.id, checked === true)}
+                    />
                   </div>
-                  <CardDescription>
+                  <CardDescription className="text-xs">
                     {rule.type === 'discount' && 'Percentage discount'}
                     {rule.type === 'credit' && 'Account credit'}
                     {rule.type === 'points' && 'Loyalty points'}
                     {rule.type === 'free_session' && 'Free training session'}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label>Reward Value</Label>
-                      <p className="text-2xl font-bold text-green-600">
+                      <Label className="text-xs">Reward Value</Label>
+                      <p className="text-lg font-bold text-green-600">
                         {rule.value} {rule.unit}
                       </p>
                     </div>
                     <div>
-                      <Label>Eligibility</Label>
+                      <Label className="text-xs">Eligibility</Label>
                       <Badge variant="outline" className="capitalize">
                         {rule.eligibility}
                       </Badge>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label>Condition</Label>
+                      <Label className="text-xs">Condition</Label>
                       <Badge variant="outline" className="capitalize">
                         {rule.condition}
                       </Badge>
                     </div>
                     <div>
-                      <Label>Expires in</Label>
-                      <p className="text-sm font-medium">
+                      <Label className="text-xs">Expires in</Label>
+                      <p className="text-xs font-medium">
                         {rule.expiryDays} days
                       </p>
                     </div>
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => { const apiRule = apiRules.find(r => String(r.id) === rule.id); if (apiRule) { setEditingRule(apiRule); setEditRule({ name: apiRule.name, type: apiRule.type, value: String(apiRule.value), unit: apiRule.unit, eligibility: apiRule.eligibility, conditionTrigger: apiRule.conditionTrigger, expiryDays: String(apiRule.expiryDays || 90) }); setShowEditRule(true); } }}>
                     <Edit className="h-4 w-4 mr-1" />
                     Edit
                   </Button>
-                  <Button variant="outline" size="sm">
-                    <Eye className="h-4 w-4 mr-1" />
-                    Details
+                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={async () => { if (!window.confirm(`Delete rule "${rule.name}"?`)) return; try { await referralService.deleteRule(Number(rule.id)); toast.success('Rule deleted'); loadData(); } catch { toast.error('Failed to delete rule'); } }}>
+                    <X className="h-4 w-4 mr-1" />
+                    Delete
                   </Button>
                 </CardFooter>
               </Card>
@@ -867,10 +827,10 @@ export function Referrals() {
         </TabsContent>
 
         {/* Analytics Tab */}
-        <TabsContent value="analytics" className="space-y-6">
+        <TabsContent value="analytics" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Conversion Funnel */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Referral Conversion Funnel</CardTitle>
                 <CardDescription>Track referral progress through the conversion funnel</CardDescription>
@@ -905,7 +865,7 @@ export function Referrals() {
             </Card>
 
             {/* Monthly Trends */}
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Monthly Performance</CardTitle>
                 <CardDescription>Referral program performance over time</CardDescription>
@@ -920,14 +880,14 @@ export function Referrals() {
                     </div>
                     <div className="text-center p-4 bg-purple-50 rounded-lg">
                       <p className="text-sm text-muted-foreground">Rewards Paid</p>
-                      <p className="text-2xl font-bold text-purple-600">2,250 AED</p>
+                      <p className="text-2xl font-bold text-purple-600"><CurrencyGlyph /> 2,250</p>
                       <p className="text-xs text-green-600">+8% from last month</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <p className="text-sm text-muted-foreground">Avg. Value</p>
-                      <p className="text-2xl font-bold text-green-600">50 AED</p>
+                      <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> 50</p>
                       <p className="text-xs text-gray-600">per referral</p>
                     </div>
                     <div className="text-center p-4 bg-orange-50 rounded-lg">
@@ -942,7 +902,7 @@ export function Referrals() {
           </div>
 
           {/* Performance Insights */}
-          <Card>
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Performance Insights</CardTitle>
               <CardDescription>AI-powered insights and recommendations</CardDescription>
@@ -964,7 +924,7 @@ export function Referrals() {
                 <Alert>
                   <Gift className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Reward Optimization:</strong> 50 AED credit shows highest conversion rate.
+                    <strong>Reward Optimization:</strong> <CurrencyGlyph /> 50 credit shows highest conversion rate.
                   </AlertDescription>
                 </Alert>
               </div>
@@ -973,8 +933,8 @@ export function Referrals() {
         </TabsContent>
 
         {/* Settings Tab */}
-        <TabsContent value="settings" className="space-y-6">
-          <Card>
+        <TabsContent value="settings" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Referral Program Settings</CardTitle>
               <CardDescription>Configure global referral program parameters</CardDescription>
@@ -1025,7 +985,7 @@ export function Referrals() {
                   <div>
                     <Label htmlFor="maxRewards">Maximum Rewards per Member</Label>
                     <Input id="maxRewards" type="number" defaultValue="1000" className="mt-1" />
-                    <p className="text-sm text-muted-foreground mt-1">Monthly limit in AED</p>
+                    <p className="text-sm text-muted-foreground mt-1">Monthly limit in <CurrencyGlyph /></p>
                   </div>
 
                   <div>
@@ -1037,7 +997,7 @@ export function Referrals() {
                   <div>
                     <Label htmlFor="minAmount">Minimum Transaction Amount</Label>
                     <Input id="minAmount" type="number" defaultValue="100" className="mt-1" />
-                    <p className="text-sm text-muted-foreground mt-1">Minimum AED amount to trigger rewards</p>
+                    <p className="text-sm text-muted-foreground mt-1">Minimum <CurrencyGlyph /> amount to trigger rewards</p>
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -1096,6 +1056,165 @@ export function Referrals() {
         </TabsContent>
       </Tabs>
 
+      {/* View Referral Dialog */}
+      <Dialog open={showViewReferral} onOpenChange={setShowViewReferral}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Referral Details</DialogTitle>
+          </DialogHeader>
+          {viewingReferral && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-xs text-muted-foreground">Referrer</Label><p className="font-medium">{viewingReferral.referrerName}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Referee</Label><p className="font-medium">{viewingReferral.refereeName}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Email</Label><p className="text-sm">{viewingReferral.refereeEmail || '—'}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Phone</Label><p className="text-sm">{viewingReferral.refereePhone || '—'}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Status</Label><Badge className={getStatusColor(viewingReferral.status)}>{viewingReferral.status}</Badge></div>
+                <div><Label className="text-xs text-muted-foreground">Reward</Label><p className="font-medium"><CurrencyGlyph /> {viewingReferral.rewardAmount || 0}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Referral Code</Label><p className="text-sm font-mono">{viewingReferral.referralCode}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Date</Label><p className="text-sm">{viewingReferral.date || viewingReferral.createdAt}</p></div>
+              </div>
+              {viewingReferral.status === 'pending' && (
+                <div className="flex gap-2 pt-2">
+                  <Button size="sm" className="flex-1" onClick={async () => { try { await referralService.markSuccessful(Number(viewingReferral.id)); toast.success('Marked successful'); setShowViewReferral(false); loadData(); } catch { toast.error('Failed'); } }}>Mark Successful</Button>
+                  <Button size="sm" variant="outline" className="flex-1" onClick={async () => { try { await referralService.markExpired(Number(viewingReferral.id)); toast.success('Marked expired'); setShowViewReferral(false); loadData(); } catch { toast.error('Failed'); } }}>Mark Expired</Button>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowViewReferral(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Referral Dialog */}
+      <Dialog open={showEditReferral} onOpenChange={setShowEditReferral}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#2B7A78]">Edit Referral</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label>Referrer Name</Label>
+              <Input className="mt-1" value={editReferral.referrerName} onChange={e => setEditReferral(p => ({ ...p, referrerName: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Referee Name</Label>
+              <Input className="mt-1" value={editReferral.refereeName} onChange={e => setEditReferral(p => ({ ...p, refereeName: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Referee Email</Label>
+              <Input type="email" className="mt-1" value={editReferral.refereeEmail} onChange={e => setEditReferral(p => ({ ...p, refereeEmail: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Referee Phone</Label>
+              <Input className="mt-1" value={editReferral.refereePhone} onChange={e => setEditReferral(p => ({ ...p, refereePhone: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={editReferral.status} onValueChange={v => setEditReferral(p => ({ ...p, status: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="successful">Successful</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Input className="mt-1" value={editReferral.notes} onChange={e => setEditReferral(p => ({ ...p, notes: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowEditReferral(false)}>Cancel</Button>
+            <Button className="bg-[#2B7A78] hover:bg-[#236763] text-white" onClick={async () => {
+              if (!editingReferral) return;
+              try {
+                await referralService.update(Number(editingReferral.id), { referrerName: editReferral.referrerName, refereeName: editReferral.refereeName, refereeEmail: editReferral.refereeEmail || undefined, refereePhone: editReferral.refereePhone || undefined, date: editReferral.date, status: editReferral.status, notes: editReferral.notes || undefined });
+                toast.success('Referral updated');
+                setShowEditReferral(false);
+                loadData();
+              } catch { toast.error('Failed to update referral'); }
+            }}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Rule Dialog */}
+      <Dialog open={showEditRule} onOpenChange={setShowEditRule}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#2B7A78]">Edit Reward Rule</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label>Rule Name</Label>
+              <Input className="mt-1" value={editRule.name} onChange={e => setEditRule(p => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Reward Type</Label>
+              <Select value={editRule.type} onValueChange={v => setEditRule(p => ({ ...p, type: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="credit">Cash Credit</SelectItem>
+                  <SelectItem value="discount">Membership Discount</SelectItem>
+                  <SelectItem value="points">Loyalty Points</SelectItem>
+                  <SelectItem value="free_session">Free Session</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Value</Label>
+              <Input type="number" className="mt-1" value={editRule.value} onChange={e => setEditRule(p => ({ ...p, value: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Unit</Label>
+              <Input className="mt-1" value={editRule.unit} onChange={e => setEditRule(p => ({ ...p, unit: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Eligibility</Label>
+              <Select value={editRule.eligibility} onValueChange={v => setEditRule(p => ({ ...p, eligibility: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="referrer">Referrer Only</SelectItem>
+                  <SelectItem value="referee">Referee Only</SelectItem>
+                  <SelectItem value="both">Both Parties</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Condition</Label>
+              <Select value={editRule.conditionTrigger} onValueChange={v => setEditRule(p => ({ ...p, conditionTrigger: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="signup">On Signup</SelectItem>
+                  <SelectItem value="payment">On Payment</SelectItem>
+                  <SelectItem value="both">Both</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Expiry Days</Label>
+              <Input type="number" className="mt-1" value={editRule.expiryDays} onChange={e => setEditRule(p => ({ ...p, expiryDays: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowEditRule(false)}>Cancel</Button>
+            <Button className="bg-[#E63946] hover:bg-[#c92e3a] text-white" onClick={async () => {
+              if (!editingRule) return;
+              try {
+                await referralService.updateRule(Number(editingRule.id), { name: editRule.name, type: editRule.type, value: Number(editRule.value), unit: editRule.unit, eligibility: editRule.eligibility, conditionTrigger: editRule.conditionTrigger, expiryDays: Number(editRule.expiryDays), isActive: editingRule.isActive });
+                toast.success('Rule updated');
+                setShowEditRule(false);
+                loadData();
+              } catch { toast.error('Failed to update rule'); }
+            }}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ---------------- Add Reward Rule Modal ---------------- */}
       <Dialog open={showAddRule} onOpenChange={setShowAddRule}>
         <DialogContent className="max-w-md rounded-2xl">
@@ -1111,14 +1230,12 @@ export function Referrals() {
           <div className="space-y-4 mt-2">
             <div>
               <Label>Rule Name</Label>
-              <Input placeholder="e.g., 10% discount on next month" className="mt-1" />
+              <Input placeholder="e.g., 10% discount on next month" className="mt-1" value={newRule.name} onChange={e => setNewRule(p => ({ ...p, name: e.target.value }))} />
             </div>
             <div>
               <Label>Reward Type</Label>
-              <Select defaultValue="credit">
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={newRule.type} onValueChange={v => setNewRule(p => ({ ...p, type: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="credit">Cash Credit</SelectItem>
                   <SelectItem value="discount">Membership Discount</SelectItem>
@@ -1129,14 +1246,16 @@ export function Referrals() {
             </div>
             <div>
               <Label>Reward Value</Label>
-              <Input placeholder="e.g., 25 AED / 10%" type="text" className="mt-1" />
+              <Input placeholder="e.g., 25" type="number" className="mt-1" value={newRule.value} onChange={e => setNewRule(p => ({ ...p, value: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Unit</Label>
+              <Input placeholder={`${currencyCode} / % / session`} className="mt-1" value={newRule.unit} onChange={e => setNewRule(p => ({ ...p, unit: e.target.value }))} />
             </div>
             <div>
               <Label>Eligibility</Label>
-              <Select defaultValue="referrer">
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={newRule.eligibility} onValueChange={v => setNewRule(p => ({ ...p, eligibility: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="referrer">Referrer Only</SelectItem>
                   <SelectItem value="referee">Referee Only</SelectItem>
@@ -1146,10 +1265,8 @@ export function Referrals() {
             </div>
             <div>
               <Label>Condition</Label>
-              <Select defaultValue="payment">
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={newRule.conditionTrigger} onValueChange={v => setNewRule(p => ({ ...p, conditionTrigger: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="signup">On Signup</SelectItem>
                   <SelectItem value="payment">On Payment</SelectItem>
@@ -1159,25 +1276,24 @@ export function Referrals() {
             </div>
             <div>
               <Label>Expiry Days</Label>
-              <Input placeholder="e.g., 90" type="number" defaultValue="90" className="mt-1" />
+              <Input placeholder="e.g., 90" type="number" className="mt-1" value={newRule.expiryDays} onChange={e => setNewRule(p => ({ ...p, expiryDays: e.target.value }))} />
             </div>
           </div>
 
           <DialogFooter className="mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowAddRule(false)}
-              className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#2B7A78]/10"
-            >
+            <Button variant="outline" onClick={() => setShowAddRule(false)} className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#2B7A78]/10">
               Cancel
             </Button>
             <Button
               className="bg-[#E63946] hover:bg-[#c92e3a] text-white"
-              onClick={() => {
-                toast.success('Reward Rule Created!', {
-                  description: 'The new reward rule has been added successfully.',
-                });
-                setShowAddRule(false);
+              onClick={async () => {
+                try {
+                  await referralService.createRule({ name: newRule.name, type: newRule.type, value: Number(newRule.value), unit: newRule.unit, eligibility: newRule.eligibility, conditionTrigger: newRule.conditionTrigger, expiryDays: Number(newRule.expiryDays), isActive: true });
+                  toast.success('Reward Rule Created!', { description: 'The new reward rule has been added.' });
+                  setNewRule({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
+                  setShowAddRule(false);
+                  await loadData();
+                } catch { toast.error('Failed to create rule'); }
               }}
             >
               Save Rule
@@ -1198,42 +1314,29 @@ export function Referrals() {
 
           <div className="space-y-4 mt-2">
             <div>
-              <Label>Referrer (Existing Member)</Label>
-              <Select>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select existing member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {memberReferrals.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.memberName} - {member.memberEmail}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Referrer Name (Existing Member)</Label>
+              <Input placeholder="e.g., Sarah Johnson" className="mt-1" value={newReferral.referrerName} onChange={e => setNewReferral(p => ({ ...p, referrerName: e.target.value }))} />
             </div>
             <div>
-              <Label>Referred Member Name</Label>
-              <Input placeholder="New member's full name" className="mt-1" />
+              <Label>Referred Person Name</Label>
+              <Input placeholder="New person's full name" className="mt-1" value={newReferral.refereeName} onChange={e => setNewReferral(p => ({ ...p, refereeName: e.target.value }))} />
             </div>
             <div>
-              <Label>Referred Member Email</Label>
-              <Input placeholder="email@example.com" type="email" className="mt-1" />
+              <Label>Referred Person Email</Label>
+              <Input placeholder="email@example.com" type="email" className="mt-1" value={newReferral.refereeEmail} onChange={e => setNewReferral(p => ({ ...p, refereeEmail: e.target.value }))} />
             </div>
             <div>
-              <Label>Referred Member Phone</Label>
-              <Input placeholder="+971 XX XXX XXXX" type="tel" className="mt-1" />
+              <Label>Referred Person Phone</Label>
+              <Input placeholder="+971 XX XXX XXXX" type="tel" className="mt-1" value={newReferral.refereePhone} onChange={e => setNewReferral(p => ({ ...p, refereePhone: e.target.value }))} />
             </div>
             <div>
               <Label>Referral Date</Label>
-              <Input type="date" className="mt-1" defaultValue={new Date().toISOString().split('T')[0]} />
+              <Input type="date" className="mt-1" value={newReferral.date} onChange={e => setNewReferral(p => ({ ...p, date: e.target.value }))} />
             </div>
             <div>
               <Label>Status</Label>
-              <Select defaultValue="pending">
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={newReferral.status} onValueChange={v => setNewReferral(p => ({ ...p, status: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="successful">Successful</SelectItem>
@@ -1243,25 +1346,24 @@ export function Referrals() {
             </div>
             <div>
               <Label>Notes (Optional)</Label>
-              <Input placeholder="Additional notes about this referral" className="mt-1" />
+              <Input placeholder="Additional notes about this referral" className="mt-1" value={newReferral.notes} onChange={e => setNewReferral(p => ({ ...p, notes: e.target.value }))} />
             </div>
           </div>
 
           <DialogFooter className="mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowAddReferral(false)}
-              className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#2B7A78]/10"
-            >
+            <Button variant="outline" onClick={() => setShowAddReferral(false)} className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#2B7A78]/10">
               Cancel
             </Button>
             <Button
               className="bg-[#2B7A78] hover:bg-[#236763] text-white"
-              onClick={() => {
-                toast.success('Referral Added!', {
-                  description: 'The new referral has been registered successfully.',
-                });
-                setShowAddReferral(false);
+              onClick={async () => {
+                try {
+                  await referralService.create({ referrerName: newReferral.referrerName, refereeName: newReferral.refereeName, refereeEmail: newReferral.refereeEmail || undefined, refereePhone: newReferral.refereePhone || undefined, date: newReferral.date, status: newReferral.status, notes: newReferral.notes || undefined });
+                  toast.success('Referral Added!', { description: 'The new referral has been registered.' });
+                  setNewReferral({ referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '' });
+                  setShowAddReferral(false);
+                  await loadData();
+                } catch { toast.error('Failed to create referral'); }
               }}
             >
               Save Referral

@@ -263,6 +263,7 @@ export function PostWorkoutCheckin() {
   const [filterWorkoutType, setFilterWorkoutType] = useState('all');
   const [filterDateRange, setFilterDateRange] = useState('today');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   // Form state
   const [checkInForm, setCheckInForm] = useState<CheckInForm>({
@@ -550,11 +551,11 @@ export function PostWorkoutCheckin() {
     );
   };
 
-  // Get satisfaction emoji
+  // Get satisfaction icon
   const getSatisfactionEmoji = (rating: number) => {
-    if (rating >= 4.5) return { emoji: '😊', color: 'text-green-600', bg: 'bg-green-100' };
-    if (rating >= 3.5) return { emoji: '😐', color: 'text-yellow-600', bg: 'bg-yellow-100' };
-    return { emoji: '😔', color: 'text-red-600', bg: 'bg-red-100' };
+    if (rating >= 4.5) return { icon: Smile, color: 'text-green-600', bg: 'bg-green-100' };
+    if (rating >= 3.5) return { icon: Meh, color: 'text-yellow-600', bg: 'bg-yellow-100' };
+    return { icon: Frown, color: 'text-red-600', bg: 'bg-red-100' };
   };
 
   // Handle form submission
@@ -640,6 +641,7 @@ export function PostWorkoutCheckin() {
 
     return filtered.sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
   }, [feedbackResponses, searchTerm, filterTrainer, filterWorkoutType, filterDateRange]);
+  const selectedSatisfaction = selectedFeedback ? getSatisfactionEmoji(selectedFeedback.overallSatisfaction) : null;
 
   return (
     <div className="p-6 space-y-6">
@@ -669,119 +671,127 @@ export function PostWorkoutCheckin() {
 
       {/* Analytics KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Today's Feedback</p>
-                <p className="text-2xl font-bold">{analytics.todayFeedback}</p>
-              </div>
-              <CheckCircle className="h-6 w-6 text-green-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Today's Feedback</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{analytics.todayFeedback}</div>
+            <p className="text-xs text-muted-foreground">Submitted today</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Responses</p>
-                <p className="text-2xl font-bold text-blue-600">{analytics.totalFeedback}</p>
-              </div>
-              <MessageSquare className="h-6 w-6 text-blue-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Total Responses</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <MessageSquare className="h-4 w-4 text-blue-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{analytics.totalFeedback}</div>
+            <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Satisfaction</p>
-                <div className="flex items-center space-x-2">
-                  <p className="text-2xl font-bold text-green-600">{analytics.avgSatisfaction.toFixed(1)}</p>
-                  <StarRating rating={analytics.avgSatisfaction} size="sm" readonly />
-                </div>
-              </div>
-              <Star className="h-6 w-6 text-yellow-500" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Avg Satisfaction</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <Star className="h-4 w-4 text-yellow-500" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold text-green-600">{analytics.avgSatisfaction.toFixed(1)}</div>
+              <StarRating rating={analytics.avgSatisfaction} size="sm" readonly />
+            </div>
+            <p className="text-xs text-muted-foreground">Overall score</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Recommendation Rate</p>
-                <p className="text-2xl font-bold text-purple-600">{analytics.recommendationRate.toFixed(1)}%</p>
-              </div>
-              <ThumbsUp className="h-6 w-6 text-purple-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Recommendation Rate</CardTitle>
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <ThumbsUp className="h-4 w-4 text-purple-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{analytics.recommendationRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Would recommend</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Response Rate</p>
-                <p className="text-2xl font-bold text-indigo-600">{analytics.responseRate.toFixed(1)}%</p>
-              </div>
-              <BarChart3 className="h-6 w-6 text-indigo-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Response Rate</CardTitle>
+            <div className="bg-indigo-50 p-2 rounded-lg">
+              <BarChart3 className="h-4 w-4 text-indigo-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-indigo-600">{analytics.responseRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">From completed sessions</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Sessions Today</p>
-                <p className="text-2xl font-bold text-orange-600">{analytics.completedSessions}</p>
-              </div>
-              <Activity className="h-6 w-6 text-orange-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Sessions Today</CardTitle>
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <Activity className="h-4 w-4 text-orange-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{analytics.completedSessions}</div>
+            <p className="text-xs text-muted-foreground">Completed sessions</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Follow-ups</p>
-                <p className="text-2xl font-bold text-yellow-600">{analytics.followUpCount}</p>
-              </div>
-              <Bell className="h-6 w-6 text-yellow-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Follow-ups</CardTitle>
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <Bell className="h-4 w-4 text-yellow-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{analytics.followUpCount}</div>
+            <p className="text-xs text-muted-foreground">Needs action</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Flagged</p>
-                <p className="text-2xl font-bold text-red-600">{analytics.flaggedCount}</p>
-              </div>
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Flagged</CardTitle>
+            <div className="bg-red-50 p-2 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{analytics.flaggedCount}</div>
+            <p className="text-xs text-muted-foreground">Requires review</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="check-in">Check-in Form</TabsTrigger>
-          <TabsTrigger value="feedback">Recent Feedback</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="sessions">Active Sessions</TabsTrigger>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="check-in" className="flex-1">Check-in Form</TabsTrigger>
+          <TabsTrigger value="feedback" className="flex-1">Recent Feedback</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
+          <TabsTrigger value="sessions" className="flex-1">Active Sessions</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="check-in" className="space-y-6">
+        <TabsContent value="check-in" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Session Selection */}
-            <Card className="lg:col-span-1">
+            <Card className={`lg:col-span-1 ${cardShell}`}>
               <CardHeader>
                 <CardTitle>Select Workout Session</CardTitle>
                 <CardDescription>Choose a recent workout session to provide feedback</CardDescription>
@@ -791,7 +801,7 @@ export function PostWorkoutCheckin() {
                   <Card 
                     key={session.id}
                     className={cn(
-                      "cursor-pointer transition-all hover:shadow-md",
+                      "cursor-pointer transition-all border-0 shadow-sm bg-slate-50/60 hover:bg-slate-100/70 hover:shadow-md",
                       selectedSession?.id === session.id ? "ring-2 ring-primary" : ""
                     )}
                     onClick={() => setSelectedSession(session)}
@@ -872,7 +882,7 @@ export function PostWorkoutCheckin() {
             </Card>
 
             {/* Feedback Form */}
-            <Card className="lg:col-span-2">
+            <Card className={`lg:col-span-2 ${cardShell}`}>
               <CardHeader>
                 <CardTitle>Workout Feedback</CardTitle>
                 <CardDescription>
@@ -1191,9 +1201,9 @@ export function PostWorkoutCheckin() {
           </div>
         </TabsContent>
 
-        <TabsContent value="feedback" className="space-y-6">
+        <TabsContent value="feedback" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           {/* Filters */}
-          <Card>
+          <Card className={cardShell}>
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex-1 min-w-[250px]">
@@ -1254,9 +1264,10 @@ export function PostWorkoutCheckin() {
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredFeedback.map((feedback) => {
               const satisfactionData = getSatisfactionEmoji(feedback.overallSatisfaction);
+              const SatisfactionIcon = satisfactionData.icon;
               
               return (
-                <Card key={feedback.id} className="hover:shadow-lg transition-shadow cursor-pointer"
+                <Card key={feedback.id} className={`${cardShell} cursor-pointer`}
                       onClick={() => {
                         setSelectedFeedback(feedback);
                         setShowFeedbackDetail(true);
@@ -1265,7 +1276,7 @@ export function PostWorkoutCheckin() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-xl", satisfactionData.bg)}>
-                          {satisfactionData.emoji}
+                          <SatisfactionIcon className={cn("h-5 w-5", satisfactionData.color)} />
                         </div>
                         <div>
                           <CardTitle className="text-lg">{feedback.memberName}</CardTitle>
@@ -1387,7 +1398,7 @@ export function PostWorkoutCheckin() {
           </div>
 
           {filteredFeedback.length === 0 && (
-            <Card>
+            <Card className={cardShell}>
               <CardContent className="text-center py-12">
                 <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">No Feedback Found</h3>
@@ -1399,9 +1410,9 @@ export function PostWorkoutCheckin() {
           )}
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
+        <TabsContent value="analytics" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Feedback</CardTitle>
               </CardHeader>
@@ -1411,7 +1422,7 @@ export function PostWorkoutCheckin() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Avg Satisfaction</CardTitle>
               </CardHeader>
@@ -1421,7 +1432,7 @@ export function PostWorkoutCheckin() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Response Rate</CardTitle>
               </CardHeader>
@@ -1431,7 +1442,7 @@ export function PostWorkoutCheckin() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className={cardShell}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Flagged Issues</CardTitle>
               </CardHeader>
@@ -1443,7 +1454,7 @@ export function PostWorkoutCheckin() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Satisfaction Trends</CardTitle>
               </CardHeader>
@@ -1472,7 +1483,7 @@ export function PostWorkoutCheckin() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Common Feedback Themes</CardTitle>
               </CardHeader>
@@ -1535,15 +1546,15 @@ export function PostWorkoutCheckin() {
           </div>
         </TabsContent>
 
-        <TabsContent value="sessions" className="space-y-6">
-          <Card>
+        <TabsContent value="sessions" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className={cardShell}>
             <CardHeader>
               <CardTitle>Active & Recent Sessions</CardTitle>
               <CardDescription>Monitor ongoing and recently completed workout sessions</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50/50">
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Workout Type</TableHead>
@@ -1560,7 +1571,7 @@ export function PostWorkoutCheckin() {
                     const hasFeedback = feedbackResponses.some(f => f.sessionId === session.id);
                     
                     return (
-                      <TableRow key={session.id}>
+                      <TableRow key={session.id} className="transition-colors hover:bg-slate-50/50">
                         <TableCell>
                           <div className="flex items-center space-x-3">
                             <Avatar className="h-8 w-8">
@@ -1660,7 +1671,9 @@ export function PostWorkoutCheckin() {
               <SheetHeader>
                 <SheetTitle className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    {getSatisfactionEmoji(selectedFeedback.overallSatisfaction).emoji}
+                    {selectedSatisfaction && (
+                      <selectedSatisfaction.icon className={cn("h-5 w-5", selectedSatisfaction.color)} />
+                    )}
                     <h3 className="text-xl font-bold">{selectedFeedback.memberName}</h3>
                   </div>
                   <Badge className={cn(
@@ -1678,7 +1691,7 @@ export function PostWorkoutCheckin() {
 
               <div className="space-y-6 mt-6">
                 {/* Workout Information */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Workout Details</CardTitle>
                   </CardHeader>
@@ -1705,7 +1718,7 @@ export function PostWorkoutCheckin() {
                 </Card>
 
                 {/* Ratings */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Ratings & Scores</CardTitle>
                   </CardHeader>
@@ -1772,7 +1785,7 @@ export function PostWorkoutCheckin() {
                 </Card>
 
                 {/* Multiple Choice Responses */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Experience Assessment</CardTitle>
                   </CardHeader>
@@ -1829,7 +1842,7 @@ export function PostWorkoutCheckin() {
                 </Card>
 
                 {/* Feedback Categories */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Feedback Categories</CardTitle>
                   </CardHeader>
@@ -1862,7 +1875,7 @@ export function PostWorkoutCheckin() {
 
                 {/* Comments & Suggestions */}
                 {(selectedFeedback.comments || selectedFeedback.suggestions) && (
-                  <Card>
+                  <Card className={cardShell}>
                     <CardHeader>
                       <CardTitle className="text-lg">Comments & Suggestions</CardTitle>
                     </CardHeader>
@@ -1889,7 +1902,7 @@ export function PostWorkoutCheckin() {
                 )}
 
                 {/* Staff Notes & Actions */}
-                <Card>
+                <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle className="text-lg">Staff Actions</CardTitle>
                   </CardHeader>
@@ -1962,7 +1975,7 @@ export function PostWorkoutCheckin() {
             
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {members.map((member) => (
-                <Card key={member.id} className="cursor-pointer hover:shadow-md">
+                <Card key={member.id} className={`${cardShell} cursor-pointer`}>
                   <CardContent className="p-4">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-12 w-12">
@@ -2006,4 +2019,5 @@ export function PostWorkoutCheckin() {
     </div>
   );
 }
+
 

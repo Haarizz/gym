@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
+import { useLocation } from "react-router-dom";
+import { staffService, Staff, StaffTarget } from '../utils/supabase/staff-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -20,7 +23,8 @@ import {
   CheckCircle,
   ArrowLeft,
   Save,
-  RotateCcw
+  RotateCcw,
+  TrendingUp
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
 import { format } from "date-fns";
@@ -41,17 +45,7 @@ interface TargetFormData {
   unitTargets: UnitTarget[];
 }
 
-// Mock data for staff members
-const staffMembers = [
-  { id: "1", name: "Sara Al-Rashid", specialties: "Karate & Martial Arts" },
-  { id: "2", name: "Looka Johnson", specialties: "Yoga & Swimming" },
-  { id: "3", name: "Arshi Hassan", specialties: "MMA & HIIT" },
-  { id: "4", name: "Mery Wilson", specialties: "Sales & Reception" },
-  { id: "5", name: "Ahmed Al-Mansoori", specialties: "Personal Training" },
-  { id: "6", name: "Fatima Al-Zahra", specialties: "Group Fitness" }
-];
-
-// Mock data for services/products
+// Static services list (could be fetched from API in the future)
 const services = [
   { id: "karate", name: "Karate", category: "Martial Arts" },
   { id: "martial-arts", name: "Martial Arts", category: "Martial Arts" },
@@ -74,15 +68,54 @@ interface SetTargetsProps {
 }
 
 export function SetTargets({ onNavigate }: SetTargetsProps) {
+  const { currencyCode } = useCurrency();
+  const location = useLocation();
+  const preselectedStaffId: string | undefined = (location.state as any)?.staffId;
+
   const [formData, setFormData] = useState<TargetFormData>({
     scope: "individual",
-    staffMember: "",
+    staffMember: preselectedStaffId ?? "",
     timeframe: "monthly",
     revenueTarget: 0,
     unitTargets: []
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [currentTargets, setCurrentTargets] = useState<StaffTarget[]>([]);
+
+  useEffect(() => {
+    staffService.getStaff({}, 1, 100).then(res => setStaffList(res.items)).catch(console.error);
+  }, []);
+
+  // Apply preselected staff once staff list is loaded
+  useEffect(() => {
+    if (preselectedStaffId && staffList.length > 0) {
+      setFormData(prev => ({ ...prev, staffMember: preselectedStaffId, scope: "individual" }));
+    }
+  }, [staffList, preselectedStaffId]);
+
+  // Fetch current targets whenever selected staff changes
+  useEffect(() => {
+    if (formData.staffMember && formData.scope === "individual") {
+      const selectedStaff = staffList.find(s => s.id === formData.staffMember);
+      staffService.getTargets().then(all => {
+        const filtered = all.filter(t =>
+          t.staff_db_id === formData.staffMember ||
+          (selectedStaff && t.staff_name === selectedStaff.name)
+        );
+        setCurrentTargets(filtered);
+      }).catch(console.error);
+    } else if (formData.scope === "institution") {
+      staffService.getTargets().then(all => {
+        setCurrentTargets(all.filter(t => t.scope === "institution"));
+      }).catch(console.error);
+    } else {
+      setCurrentTargets([]);
+    }
+  }, [formData.staffMember, formData.scope, staffList]);
 
   const handleScopeChange = (value: "individual" | "institution") => {
     setFormData(prev => ({
@@ -167,14 +200,37 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
-    if (validateForm()) {
-      // Here you would typically save to your backend
-      console.log("Saving target data:", formData);
-      
-      // Show success message or navigate back
-      alert("Target saved successfully!");
-      onNavigate("staffs-trainers");
+  const handleSave = async () => {
+    if (!validateForm()) return;
+    setIsSaving(true);
+    try {
+      const now = new Date();
+      const payload: any = {
+        scope: formData.scope,
+        timeframe: formData.timeframe,
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        revenue_target: formData.revenueTarget,
+        unit_targets_json: JSON.stringify(formData.unitTargets.map(u => ({
+          service: u.service,
+          target_units: u.targetUnits,
+          achieved_units: 0
+        }))),
+      };
+      if (formData.scope === "individual" && formData.staffMember) {
+        payload.staff_db_id = Number(formData.staffMember);
+      }
+      if (formData.timeframe === "custom" && formData.customStartDate) {
+        payload.start_date = formData.customStartDate.toISOString().split('T')[0];
+        payload.end_date = formData.customEndDate?.toISOString().split('T')[0];
+      }
+      await staffService.createTarget(payload);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (e) {
+      console.error('Failed to save target', e);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -196,21 +252,12 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
     }
   };
 
-  const selectedStaff = staffMembers.find(staff => staff.id === formData.staffMember);
+  const selectedStaff = staffList.find(staff => staff.id === formData.staffMember);
 
   return (
     <div className="p-6 space-y-6 bg-background">
-      {/* Header with Breadcrumbs */}
+      {/* Header */}
       <div className="space-y-4">
-        {/* Breadcrumbs */}
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <span>Payroll & Employees</span>
-          <span>→</span>
-          <span>Staffs & Trainers</span>
-          <span>→</span>
-          <span className="text-foreground font-medium">Set Targets</span>
-        </div>
-
         {/* Title Section */}
         <div className="flex items-center justify-between">
           <div>
@@ -218,7 +265,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
               <div className="p-2 rounded-lg bg-primary/10">
                 <Target className="h-6 w-6 text-primary" />
               </div>
-              <h1 className="text-3xl font-bold text-foreground">🎯 Set Targets</h1>
+              <h1 className="text-3xl font-bold text-foreground">Set Targets</h1>
             </div>
             <p className="text-muted-foreground">
               Assign revenue and unit-based targets for staff or institution-wide goals.
@@ -236,7 +283,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
         {/* Main Form - Left Side */}
         <div className="lg:col-span-2 space-y-6">
           {/* Section 1: Select Scope */}
-          <Card className="border-border/50">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg text-foreground flex items-center">
                 <Users className="h-5 w-5 mr-2 text-primary" />
@@ -270,11 +317,13 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                       <SelectValue placeholder="Choose a staff member" />
                     </SelectTrigger>
                     <SelectContent>
-                      {staffMembers.map((staff) => (
+                      {staffList.map((staff) => (
                         <SelectItem key={staff.id} value={staff.id}>
                           <div className="flex flex-col">
                             <span className="font-medium">{staff.name}</span>
-                            <span className="text-xs text-muted-foreground">({staff.specialties})</span>
+                            {staff.role && (
+                              <span className="text-xs text-muted-foreground">({staff.role})</span>
+                            )}
                           </div>
                         </SelectItem>
                       ))}
@@ -289,7 +338,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
           </Card>
 
           {/* Section 2: Timeframe */}
-          <Card className="border-border/50">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg text-foreground flex items-center">
                 <CalendarIcon className="h-5 w-5 mr-2 text-primary" />
@@ -377,17 +426,17 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
           </Card>
 
           {/* Section 3: Revenue Target */}
-          <Card className="border-border/50">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg text-foreground flex items-center">
                 <DollarSign className="h-5 w-5 mr-2 text-primary" />
                 Revenue Target
               </CardTitle>
-              <CardDescription>Set the revenue target amount in AED</CardDescription>
+              <CardDescription>Set the revenue target amount in <CurrencyGlyph /></CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <Label>Target Amount (AED)</Label>
+                <Label>Target Amount ({currencyCode})</Label>
                 <Input
                   type="number"
                   placeholder="e.g. 10000"
@@ -406,7 +455,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
           </Card>
 
           {/* Section 4: Unit Targets */}
-          <Card className="border-border/50">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg text-foreground flex items-center">
                 <Target className="h-5 w-5 mr-2 text-primary" />
@@ -424,7 +473,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
               ) : (
                 <div className="space-y-3">
                   {formData.unitTargets.map((target, index) => (
-                    <div key={target.id} className="flex items-center space-x-3 p-4 border border-border/50 rounded-lg">
+                    <div key={target.id} className="flex items-center space-x-3 p-4 border border-primary/10 shadow-md hover:shadow-lg transition-shadow rounded-lg">
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs">Service/Product</Label>
@@ -499,7 +548,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
 
         {/* Section 5: Summary Preview - Right Side */}
         <div className="space-y-6">
-          <Card className="border-border/50 bg-primary/5">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-primary/5">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg text-foreground flex items-center">
                 <CheckCircle className="h-5 w-5 mr-2 text-primary" />
@@ -518,7 +567,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                     <Building2 className="h-4 w-4 text-primary" />
                   )}
                   <span className="font-medium">
-                    {formData.scope === "individual" 
+                    {formData.scope === "individual"
                       ? (selectedStaff ? selectedStaff.name : "No staff selected")
                       : "Institution-wide"
                     }
@@ -526,7 +575,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                 </div>
                 {formData.scope === "individual" && selectedStaff && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    {selectedStaff.specialties}
+                    {selectedStaff.role}
                   </p>
                 )}
               </div>
@@ -550,7 +599,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                 <div className="flex items-center space-x-2 mt-1">
                   <DollarSign className="h-4 w-4 text-primary" />
                   <span className="font-medium text-lg">
-                    AED {formData.revenueTarget.toLocaleString()}
+                    <CurrencyGlyph /> {formData.revenueTarget.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -582,21 +631,71 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
             </CardContent>
           </Card>
 
+          {/* Current Targets */}
+          {currentTargets.length > 0 && (
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-foreground flex items-center">
+                  <TrendingUp className="h-5 w-5 mr-2 text-primary" />
+                  Current Targets
+                </CardTitle>
+                <CardDescription>Existing targets for the selected scope</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {currentTargets.map(t => {
+                  const pct = Math.min(100, Math.round(t.percentage || 0));
+                  const period = t.timeframe === 'monthly' && t.year && t.month
+                    ? `${new Date(t.year, t.month - 1).toLocaleString('default', { month: 'short' })} ${t.year}`
+                    : t.timeframe === 'yearly' ? String(t.year)
+                    : t.start_date && t.end_date
+                      ? `${t.start_date} – ${t.end_date}`
+                      : t.timeframe;
+                  return (
+                    <div key={t.id} className="p-3 rounded-lg border border-primary/10 bg-muted/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium capitalize">{period}</span>
+                        <Badge variant={pct >= 100 ? 'default' : pct >= 50 ? 'secondary' : 'outline'} className="text-xs">
+                          {pct}%
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground flex justify-between">
+                        <span>Target: <CurrencyGlyph /> {(t.revenue_target || 0).toLocaleString()}</span>
+                        <span>Achieved: <CurrencyGlyph /> {(t.revenue_achieved || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full ${pct >= 100 ? 'bg-green-500' : pct >= 50 ? 'bg-primary' : 'bg-orange-400'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Section 6: Action Buttons */}
-          <Card className="border-border/50">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardContent className="pt-6">
               <div className="space-y-3">
-                <Button 
+                {saveSuccess && (
+                  <div className="flex items-center space-x-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Target saved successfully!</span>
+                  </div>
+                )}
+                <Button
                   onClick={handleSave}
                   className="w-full"
-                  disabled={!formData.revenueTarget || (formData.scope === "individual" && !formData.staffMember)}
+                  disabled={isSaving || !formData.revenueTarget || (formData.scope === "individual" && !formData.staffMember)}
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  Save Target
+                  {isSaving ? 'Saving...' : 'Save Target'}
                 </Button>
-                
-                <Button 
-                  variant="outline" 
+
+                <Button
+                  variant="outline"
                   onClick={handleCancel}
                   className="w-full"
                 >
@@ -608,7 +707,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
           </Card>
 
           {/* Additional Info Card */}
-          <Card className="border-border/50 bg-muted/20">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-muted/20">
             <CardContent className="pt-6">
               <div className="space-y-3 text-sm">
                 <div className="flex items-start space-x-2">

@@ -174,7 +174,7 @@ If a draft needs to be rejected:
 ### "Draft not showing up"
 - Refresh the page (F5)
 - Check if draft was successfully submitted (look for success toast)
-- Verify localStorage is not disabled
+- Verify sessionStorage is not disabled
 
 ### "Photo upload not working"
 - Check file size (max 5MB recommended)

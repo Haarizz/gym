@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   Search,
   Filter,
@@ -55,202 +56,19 @@ import {
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { toast } from "sonner";
+import { receiptsService, Receipt as ApiReceipt } from "../utils/supabase/receipts-service";
 
 interface MemberReceiptsProps {
   onNavigate?: (section: string) => void;
 }
 
-interface Receipt {
-  id: string;
-  receiptNo: string;
-  date: Date;
-  memberId: string;
-  memberName: string;
-  memberPhone: string;
-  transactionType: "Membership" | "Renewal" | "Add-on" | "Daily Entry";
-  amount: number;
-  paymentMethod: "Cash" | "Card" | "Online" | "Wallet";
-  status: "Paid" | "Pending";
-  planName?: string;
-  validFrom?: Date;
-  validTill?: Date;
-  processedBy: string;
-  remarks?: string;
-}
-
-const mockReceipts: Receipt[] = [
-  {
-    id: "1",
-    receiptNo: "RCPT-10240",
-    date: new Date("2025-10-17"),
-    memberId: "MB-1024",
-    memberName: "John Mathew",
-    memberPhone: "+971 50 123 4567",
-    transactionType: "Renewal",
-    amount: 450,
-    paymentMethod: "Card",
-    status: "Paid",
-    planName: "Premium Gym Access (3 Months)",
-    validFrom: new Date("2025-10-17"),
-    validTill: new Date("2026-01-17"),
-    processedBy: "Sarah Admin",
-    remarks: "Renewed via counter",
-  },
-  {
-    id: "2",
-    receiptNo: "RCPT-10239",
-    date: new Date("2025-10-16"),
-    memberId: "MB-1025",
-    memberName: "Sarah Johnson",
-    memberPhone: "+971 50 234 5678",
-    transactionType: "Add-on",
-    amount: 200,
-    paymentMethod: "Cash",
-    status: "Paid",
-    planName: "Nutrition Plan – 30 Days",
-    validFrom: new Date("2025-10-16"),
-    validTill: new Date("2025-11-15"),
-    processedBy: "Ahmed Staff",
-    remarks: "Add-on purchase",
-  },
-  {
-    id: "3",
-    receiptNo: "RCPT-10238",
-    date: new Date("2025-10-15"),
-    memberId: "MB-1026",
-    memberName: "Ahmed Al-Mansoori",
-    memberPhone: "+971 55 345 6789",
-    transactionType: "Membership",
-    amount: 1500,
-    paymentMethod: "Online",
-    status: "Paid",
-    planName: "Premium Annual Membership",
-    validFrom: new Date("2025-10-15"),
-    validTill: new Date("2026-10-15"),
-    processedBy: "Sarah Admin",
-    remarks: "New member registration",
-  },
-  {
-    id: "4",
-    receiptNo: "RCPT-10237",
-    date: new Date("2025-10-15"),
-    memberId: "MB-1027",
-    memberName: "Fatima Hassan",
-    memberPhone: "+971 50 456 7890",
-    transactionType: "Daily Entry",
-    amount: 50,
-    paymentMethod: "Cash",
-    status: "Paid",
-    planName: "Single Day Access",
-    validFrom: new Date("2025-10-15"),
-    validTill: new Date("2025-10-15"),
-    processedBy: "Reception Desk",
-    remarks: "Walk-in customer",
-  },
-  {
-    id: "5",
-    receiptNo: "RCPT-10236",
-    date: new Date("2025-10-14"),
-    memberId: "MB-1028",
-    memberName: "Mohammed Ali",
-    memberPhone: "+971 52 567 8901",
-    transactionType: "Renewal",
-    amount: 800,
-    paymentMethod: "Card",
-    status: "Paid",
-    planName: "Premium Gym Access (6 Months)",
-    validFrom: new Date("2025-10-14"),
-    validTill: new Date("2026-04-14"),
-    processedBy: "Ahmed Staff",
-    remarks: "Early renewal with discount",
-  },
-  {
-    id: "6",
-    receiptNo: "RCPT-10235",
-    date: new Date("2025-10-14"),
-    memberId: "MB-1029",
-    memberName: "Layla Ibrahim",
-    memberPhone: "+971 50 678 9012",
-    transactionType: "Add-on",
-    amount: 450,
-    paymentMethod: "Wallet",
-    status: "Paid",
-    planName: "Personal Training – 15 Sessions",
-    validFrom: new Date("2025-10-14"),
-    validTill: new Date("2025-11-13"),
-    processedBy: "Sarah Admin",
-    remarks: "Add-on package",
-  },
-  {
-    id: "7",
-    receiptNo: "RCPT-10234",
-    date: new Date("2025-10-13"),
-    memberId: "MB-1030",
-    memberName: "Omar Khalid",
-    memberPhone: "+971 55 789 0123",
-    transactionType: "Membership",
-    amount: 300,
-    paymentMethod: "Cash",
-    status: "Pending",
-    planName: "Basic Gym Access (2 Months)",
-    validFrom: new Date("2025-10-13"),
-    validTill: new Date("2025-12-13"),
-    processedBy: "Reception Desk",
-    remarks: "Payment pending confirmation",
-  },
-  {
-    id: "8",
-    receiptNo: "RCPT-10233",
-    date: new Date("2025-10-12"),
-    memberId: "MB-1031",
-    memberName: "Aisha Rahman",
-    memberPhone: "+971 50 890 1234",
-    transactionType: "Add-on",
-    amount: 300,
-    paymentMethod: "Card",
-    status: "Paid",
-    planName: "Group Classes – 20 Sessions",
-    validFrom: new Date("2025-10-12"),
-    validTill: new Date("2025-11-11"),
-    processedBy: "Ahmed Staff",
-  },
-  {
-    id: "9",
-    receiptNo: "RCPT-10232",
-    date: new Date("2025-10-11"),
-    memberId: "MB-1032",
-    memberName: "Khalid Mansoor",
-    memberPhone: "+971 52 901 2345",
-    transactionType: "Daily Entry",
-    amount: 50,
-    paymentMethod: "Cash",
-    status: "Paid",
-    planName: "Single Day Access",
-    validFrom: new Date("2025-10-11"),
-    validTill: new Date("2025-10-11"),
-    processedBy: "Reception Desk",
-    remarks: "Day pass",
-  },
-  {
-    id: "10",
-    receiptNo: "RCPT-10231",
-    date: new Date("2025-10-10"),
-    memberId: "MB-1024",
-    memberName: "John Mathew",
-    memberPhone: "+971 50 123 4567",
-    transactionType: "Add-on",
-    amount: 500,
-    paymentMethod: "Online",
-    status: "Paid",
-    planName: "Spa & Recovery – 10 Sessions",
-    validFrom: new Date("2025-10-10"),
-    validTill: new Date("2025-11-24"),
-    processedBy: "Sarah Admin",
-    remarks: "Wellness package",
-  },
-];
+// Use the API Receipt type directly
+type Receipt = ApiReceipt;
 
 export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
+  const { currencyCode } = useCurrency();
+  const [allReceipts, setAllReceipts] = useState<Receipt[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -258,54 +76,67 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await receiptsService.getReceipts({}, { limit: 500 });
+        setAllReceipts(res.receipts);
+      } catch {
+        toast.error("Failed to load receipts");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
   const filteredReceipts = useMemo(() => {
-    let filtered = [...mockReceipts];
+    let filtered = [...allReceipts];
 
-    // Search filter
     if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (receipt) =>
-          receipt.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          receipt.memberId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          receipt.memberPhone.includes(searchQuery) ||
-          receipt.receiptNo.toLowerCase().includes(searchQuery.toLowerCase())
+        (r) =>
+          r.member_name?.toLowerCase().includes(q) ||
+          r.member_id?.toLowerCase().includes(q) ||
+          r.member_phone?.includes(searchQuery) ||
+          r.receipt_no?.toLowerCase().includes(q)
       );
     }
 
-    // Transaction type filter
     if (transactionTypeFilter !== "All") {
-      filtered = filtered.filter(
-        (receipt) => receipt.transactionType === transactionTypeFilter
-      );
+      filtered = filtered.filter((r) => r.transaction_type === transactionTypeFilter);
     }
 
-    // Status filter
     if (statusFilter !== "All") {
-      filtered = filtered.filter((receipt) => receipt.status === statusFilter);
+      filtered = filtered.filter((r) => r.status === statusFilter);
     }
 
-    // Date filter
     const today = new Date();
     if (dateFilter === "today") {
       filtered = filtered.filter(
-        (receipt) =>
-          receipt.date.toDateString() === today.toDateString()
+        (r) => r.transaction_date && new Date(r.transaction_date).toDateString() === today.toDateString()
       );
     } else if (dateFilter === "week") {
       const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      filtered = filtered.filter((receipt) => receipt.date >= weekAgo);
+      filtered = filtered.filter((r) => r.transaction_date && new Date(r.transaction_date) >= weekAgo);
     } else if (dateFilter === "month") {
       const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-      filtered = filtered.filter((receipt) => receipt.date >= monthAgo);
+      filtered = filtered.filter((r) => r.transaction_date && new Date(r.transaction_date) >= monthAgo);
     }
 
-    return filtered.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [searchQuery, transactionTypeFilter, statusFilter, dateFilter]);
+    return filtered.sort((a, b) => {
+      const da = a.transaction_date ? new Date(a.transaction_date).getTime() : 0;
+      const db = b.transaction_date ? new Date(b.transaction_date).getTime() : 0;
+      return db - da;
+    });
+  }, [allReceipts, searchQuery, transactionTypeFilter, statusFilter, dateFilter]);
 
   const totalCollected = useMemo(() => {
     return filteredReceipts
       .filter((r) => r.status === "Paid")
-      .reduce((sum, r) => sum + r.amount, 0);
+      .reduce((sum, r) => sum + Number(r.amount || 0), 0);
   }, [filteredReceipts]);
 
   const handleViewReceipt = (receipt: Receipt) => {
@@ -314,19 +145,19 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
   };
 
   const handleDownloadReceipt = (receipt: Receipt) => {
-    toast.success(`Downloading receipt ${receipt.receiptNo}...`);
+    toast.success(`Downloading receipt ${receipt.receipt_no}...`);
   };
 
   const handleSendWhatsApp = (receipt: Receipt) => {
-    toast.success(`Receipt sent via WhatsApp to ${receipt.memberPhone}`);
+    toast.success(`Receipt sent via WhatsApp to ${receipt.member_phone}`);
   };
 
   const handleSendSMS = (receipt: Receipt) => {
-    toast.success(`Receipt sent via SMS to ${receipt.memberPhone}`);
+    toast.success(`Receipt sent via SMS to ${receipt.member_phone}`);
   };
 
   const handlePrintReceipt = (receipt: Receipt) => {
-    toast.success(`Printing receipt ${receipt.receiptNo}...`);
+    toast.success(`Printing receipt ${receipt.receipt_no}...`);
   };
 
   const getTransactionTypeColor = (type: string) => {
@@ -441,7 +272,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Collected</p>
-                    <p className="text-2xl mt-1">AED {totalCollected}</p>
+                    <p className="text-2xl mt-1"><CurrencyGlyph /> {totalCollected}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-purple-100">
                     <DollarSign className="h-6 w-6 text-purple-600" />
@@ -458,7 +289,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                 <DollarSign className="h-6 w-6" />
                 <div>
                   <p className="text-sm opacity-90">Total Collected (Current Filter)</p>
-                  <p className="text-2xl">AED {totalCollected.toLocaleString()}</p>
+                  <p className="text-2xl"><CurrencyGlyph /> {totalCollected.toLocaleString()}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -536,7 +367,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
             <Badge variant="secondary">{filteredReceipts.length}</Badge>
           </h2>
           <div className="text-sm text-muted-foreground">
-            Showing {filteredReceipts.length} of {mockReceipts.length} receipts
+            Showing {filteredReceipts.length} of {allReceipts.length} receipts
           </div>
         </div>
 
@@ -550,14 +381,20 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                     <TableHead className="font-semibold">Receipt No.</TableHead>
                     <TableHead className="font-semibold">Member Name / ID</TableHead>
                     <TableHead className="font-semibold">Transaction Type</TableHead>
-                    <TableHead className="font-semibold">Amount (AED)</TableHead>
+                    <TableHead className="font-semibold">Amount ({currencyCode})</TableHead>
                     <TableHead className="font-semibold">Payment Method</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredReceipts.length === 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        Loading receipts...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredReceipts.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No receipts found
@@ -567,35 +404,37 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                     filteredReceipts.map((receipt) => (
                       <TableRow key={receipt.id} className="hover:bg-muted/50">
                         <TableCell>
-                          {receipt.date.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {receipt.transaction_date
+                            ? new Date(receipt.transaction_date).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {receipt.receiptNo}
+                          {receipt.receipt_no}
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{receipt.memberName}</p>
+                            <p className="font-medium">{receipt.member_name}</p>
                             <p className="text-sm text-muted-foreground">
-                              {receipt.memberId}
+                              {receipt.member_id}
                             </p>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge className={getTransactionTypeColor(receipt.transactionType)}>
-                            {receipt.transactionType}
+                          <Badge className={getTransactionTypeColor(receipt.transaction_type)}>
+                            {receipt.transaction_type}
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium">
-                          {receipt.amount}
+                          {Number(receipt.amount).toLocaleString()}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {getPaymentMethodIcon(receipt.paymentMethod)}
-                            <span>{receipt.paymentMethod}</span>
+                            {getPaymentMethodIcon(receipt.payment_method)}
+                            <span>{receipt.payment_method}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -682,10 +521,10 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              Receipt #{selectedReceipt?.receiptNo}
+              Receipt #{selectedReceipt?.receipt_no}
             </DialogTitle>
             <DialogDescription>
-              Member: {selectedReceipt?.memberName} | ID: {selectedReceipt?.memberId}
+              Member: {selectedReceipt?.member_name} | ID: {selectedReceipt?.member_id}
             </DialogDescription>
           </DialogHeader>
 
@@ -705,25 +544,27 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                           Transaction Type
                         </Label>
                         <p className="mt-1">
-                          <Badge className={getTransactionTypeColor(selectedReceipt.transactionType)}>
-                            {selectedReceipt.transactionType}
+                          <Badge className={getTransactionTypeColor(selectedReceipt.transaction_type)}>
+                            {selectedReceipt.transaction_type}
                           </Badge>
                         </p>
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Date</Label>
                         <p className="mt-1 font-medium">
-                          {selectedReceipt.date.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {selectedReceipt.transaction_date
+                            ? new Date(selectedReceipt.transaction_date).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
                         </p>
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Amount</Label>
                         <p className="mt-1 text-xl text-[#0047ab]">
-                          AED {selectedReceipt.amount}
+                          <CurrencyGlyph /> {Number(selectedReceipt.amount).toLocaleString()}
                         </p>
                       </div>
                       <div>
@@ -731,8 +572,8 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                           Payment Method
                         </Label>
                         <p className="mt-1 font-medium flex items-center gap-2">
-                          {getPaymentMethodIcon(selectedReceipt.paymentMethod)}
-                          {selectedReceipt.paymentMethod}
+                          {getPaymentMethodIcon(selectedReceipt.payment_method)}
+                          {selectedReceipt.payment_method}
                         </p>
                       </div>
                     </div>
@@ -752,34 +593,34 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                   <CardContent className="pt-6 space-y-3">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Member Name:</span>
-                      <span className="font-medium">{selectedReceipt.memberName}</span>
+                      <span className="font-medium">{selectedReceipt.member_name}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Member ID:</span>
-                      <span className="font-medium">{selectedReceipt.memberId}</span>
+                      <span className="font-medium">{selectedReceipt.member_id}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Phone:</span>
-                      <span className="font-medium">{selectedReceipt.memberPhone}</span>
+                      <span className="font-medium">{selectedReceipt.member_phone}</span>
                     </div>
-                    {selectedReceipt.planName && (
+                    {selectedReceipt.plan_name && (
                       <>
                         <Separator />
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Plan Name:</span>
-                          <span className="font-medium">{selectedReceipt.planName}</span>
+                          <span className="font-medium">{selectedReceipt.plan_name}</span>
                         </div>
-                        {selectedReceipt.validFrom && selectedReceipt.validTill && (
+                        {selectedReceipt.valid_from && selectedReceipt.valid_till && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Validity:</span>
                             <span className="font-medium">
-                              {selectedReceipt.validFrom.toLocaleDateString("en-GB", {
+                              {new Date(selectedReceipt.valid_from).toLocaleDateString("en-GB", {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
                               })}{" "}
                               –{" "}
-                              {selectedReceipt.validTill.toLocaleDateString("en-GB", {
+                              {new Date(selectedReceipt.valid_till).toLocaleDateString("en-GB", {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
@@ -805,7 +646,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                   <CardContent className="pt-6 space-y-3">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Processed By:</span>
-                      <span className="font-medium">{selectedReceipt.processedBy}</span>
+                      <span className="font-medium">{selectedReceipt.processed_by || "—"}</span>
                     </div>
                     {selectedReceipt.remarks && (
                       <div className="flex justify-between">

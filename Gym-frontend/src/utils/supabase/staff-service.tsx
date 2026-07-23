@@ -1,23 +1,64 @@
 import { authService } from './auth-service';
-import { demoService } from './demo-service';
-import { projectId } from './info';
 
-const baseUrl = `https://${projectId}.supabase.co/functions/v1/make-server-0a04502f`;
+const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+
+export interface StaffCertification {
+  id?: string;
+  cert_name: string;
+  issuer: string;
+  issue_date: string;
+  expiry_date: string;
+  document_url?: string;
+}
 
 export interface Staff {
   id: string;
+  staff_id: string;
   name: string;
   email: string;
   phone: string;
   role: string;
   department: string;
+  branch: string;
+  monthly_target: number;
+  base_salary?: number;
   status: 'active' | 'inactive' | 'on_leave';
-  hire_date: string;
-  salary: number;
-  certifications: string[];
-  schedule: 'full_time' | 'part_time' | 'contract';
+  join_date: string;
+  address: string;
+  photo_url?: string;
+  certifications: StaffCertification[];
+  schedule: Record<string, string[]>;
   created_at: string;
   updated_at: string;
+  // App authentication fields
+  user_id?: number;
+  app_username?: string;
+  app_access_enabled?: boolean;
+}
+
+export interface StaffRequestData {
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  department: string;
+  branch: string;
+  monthly_target: number;
+  base_salary?: number;
+  status: string;
+  join_date: string;
+  address: string;
+  photo_url?: string;
+  certifications: Array<{
+    cert_name: string;
+    issuer: string;
+    issue_date: string;
+    expiry_date: string;
+    document_url?: string;
+  }>;
+  schedule: Record<string, string[]>;
+  app_username?: string;
+  app_password?: string;
 }
 
 export interface StaffFilters {
@@ -25,235 +66,212 @@ export interface StaffFilters {
   role?: string;
   department?: string;
   status?: string;
+  branch?: string;
+}
+
+export interface StaffPageResponse {
+  items: Staff[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+}
+
+export interface StaffTarget {
+  id: string;
+  staff_db_id: string;
+  staff_id: string;
+  staff_name: string;
+  staff_role: string;
+  staff_department: string;
+  scope: string;
+  timeframe: string;
+  year: number;
+  month: number;
+  start_date: string;
+  end_date: string;
+  revenue_target: number;
+  revenue_achieved: number;
+  percentage: number;
+  sessions_target: number;
+  sessions_achieved: number;
+  new_clients_target: number;
+  new_clients_achieved: number;
+  unit_targets_json: string;
+  commission_earned: number;
+  trend: string;
+  forecast: number;
+}
+
+export interface CommissionRule {
+  id: string;
+  role: string;
+  base_commission: number;
+  target_bonuses_json: string;
 }
 
 class StaffService {
-  // Get all staff members
-  async getStaff(filters: StaffFilters = {}): Promise<Staff[]> {
-    try {
-      // If demo mode, return demo data directly
-      if (authService.isDemoMode()) {
-        console.log('Demo mode detected, returning demo staff');
-        const demoStaff = demoService.getDemoStaff();
-        
-        // Apply filters to demo data
-        let filteredStaff = demoStaff;
-        
-        if (filters.search) {
-          const searchLower = filters.search.toLowerCase();
-          filteredStaff = filteredStaff.filter(staff => 
-            staff.name.toLowerCase().includes(searchLower) ||
-            staff.email.toLowerCase().includes(searchLower) ||
-            staff.role.toLowerCase().includes(searchLower)
-          );
-        }
-        
-        if (filters.role) {
-          filteredStaff = filteredStaff.filter(staff => 
-            staff.role === filters.role
-          );
-        }
-        
-        if (filters.department) {
-          filteredStaff = filteredStaff.filter(staff => 
-            staff.department === filters.department
-          );
-        }
-        
-        if (filters.status) {
-          filteredStaff = filteredStaff.filter(staff => 
-            staff.status === filters.status
-          );
-        }
-        
-        return filteredStaff;
-      }
 
-      const queryParams = new URLSearchParams();
-      
-      if (filters.search) queryParams.append('search', filters.search);
-      if (filters.role) queryParams.append('role', filters.role);
-      if (filters.department) queryParams.append('department', filters.department);
-      if (filters.status) queryParams.append('status', filters.status);
+  // ── Staff CRUD ──────────────────────────────────────────────────────────
 
-      const response = await authService.makeAuthenticatedRequest(
-        `${baseUrl}/staff?${queryParams.toString()}`
-      );
+  async getStaff(filters: StaffFilters = {}, page = 1, limit = 50): Promise<StaffPageResponse> {
+    const params = new URLSearchParams();
+    params.append('page', String(page));
+    params.append('limit', String(limit));
+    if (filters.search)     params.append('search',     filters.search);
+    if (filters.role)       params.append('role',       filters.role);
+    if (filters.department) params.append('department', filters.department);
+    if (filters.status)     params.append('status',     filters.status);
+    if (filters.branch)     params.append('branch',     filters.branch);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch staff');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Get staff error:', error);
-      
-      // Fallback to demo data if authenticated and demo mode
-      if (authService.isDemoMode()) {
-        console.log('Backend failed, falling back to demo staff');
-        return demoService.getDemoStaff();
-      }
-      
-      throw error;
-    }
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff?${params.toString()}`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch staff: ${response.status}`);
+    return response.json();
   }
 
-  // Get staff member by ID
   async getStaffById(id: string): Promise<Staff> {
-    try {
-      const response = await authService.makeAuthenticatedRequest(`${baseUrl}/staff/${id}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch staff member');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Get staff by ID error:', error);
-      throw error;
-    }
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff/${id}`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch staff member: ${response.status}`);
+    return response.json();
   }
 
-  // Create new staff member
-  async createStaff(staffData: Omit<Staff, 'id' | 'created_at' | 'updated_at'>): Promise<Staff> {
-    try {
-      const response = await authService.makeAuthenticatedRequest(`${baseUrl}/staff`, {
-        method: 'POST',
-        body: JSON.stringify(staffData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create staff member');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Create staff error:', error);
-      throw error;
-    }
+  async createStaff(data: StaffRequestData): Promise<Staff> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(`Failed to create staff member: ${response.status}`);
+    return response.json();
   }
 
-  // Update staff member
-  async updateStaff(id: string, updateData: Partial<Staff>): Promise<Staff> {
-    try {
-      const response = await authService.makeAuthenticatedRequest(`${baseUrl}/staff/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updateData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to update staff member');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Update staff error:', error);
-      throw error;
-    }
+  async updateStaff(id: string, data: Partial<StaffRequestData>): Promise<Staff> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff/${id}`,
+      { method: 'PUT', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(`Failed to update staff member: ${response.status}`);
+    return response.json();
   }
 
-  // Delete staff member
   async deleteStaff(id: string): Promise<void> {
-    try {
-      const response = await authService.makeAuthenticatedRequest(`${baseUrl}/staff/${id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to delete staff member');
-      }
-    } catch (error) {
-      console.error('Delete staff error:', error);
-      throw error;
-    }
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff/${id}`,
+      { method: 'DELETE' }
+    );
+    if (!response.ok) throw new Error(`Failed to delete staff member: ${response.status}`);
   }
 
-  // Get departments
-  async getDepartments(): Promise<string[]> {
-    try {
-      const staff = await this.getStaff();
-      const departments = [...new Set(staff.map(s => s.department))];
-      return departments.sort();
-    } catch (error) {
-      console.error('Get departments error:', error);
-      return [];
+  async setStaffCredentials(id: string, appUsername: string, appPassword: string): Promise<Staff> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff/${id}/set-credentials`,
+      { method: 'POST', body: JSON.stringify({ appUsername, appPassword }) }
+    );
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any) || `Failed to set credentials: ${response.status}`);
     }
+    return response.json();
   }
 
-  // Get roles
-  async getRoles(): Promise<string[]> {
-    try {
-      const staff = await this.getStaff();
-      const roles = [...new Set(staff.map(s => s.role))];
-      return roles.sort();
-    } catch (error) {
-      console.error('Get roles error:', error);
-      return [];
-    }
+  async toggleStaffAccess(id: string, enabled: boolean): Promise<Staff> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff/${id}/toggle-access`,
+      { method: 'PATCH', body: JSON.stringify({ enabled }) }
+    );
+    if (!response.ok) throw new Error(`Failed to toggle staff access: ${response.status}`);
+    return response.json();
   }
 
-  // Get staff statistics
-  async getStaffStats(): Promise<{
-    total: number;
-    active: number;
-    onLeave: number;
-    byDepartment: Record<string, number>;
-    byRole: Record<string, number>;
-  }> {
-    try {
-      const staff = await this.getStaff();
-      
-      const stats = {
-        total: staff.length,
-        active: staff.filter(s => s.status === 'active').length,
-        onLeave: staff.filter(s => s.status === 'on_leave').length,
-        byDepartment: {} as Record<string, number>,
-        byRole: {} as Record<string, number>
-      };
+  // ── Staff Targets ────────────────────────────────────────────────────────
 
-      // Count by department
-      staff.forEach(member => {
-        stats.byDepartment[member.department] = (stats.byDepartment[member.department] || 0) + 1;
-        stats.byRole[member.role] = (stats.byRole[member.role] || 0) + 1;
-      });
+  async getTargets(year?: number, month?: number, scope?: string, staffDbId?: number): Promise<StaffTarget[]> {
+    const params = new URLSearchParams();
+    if (year)       params.append('year',         String(year));
+    if (month)      params.append('month',        String(month));
+    if (scope)      params.append('scope',        scope);
+    if (staffDbId)  params.append('staff_db_id',  String(staffDbId));
 
-      return stats;
-    } catch (error) {
-      console.error('Get staff stats error:', error);
-      throw error;
-    }
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff-targets?${params.toString()}`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch targets: ${response.status}`);
+    return response.json();
+  }
+
+  async createTarget(data: {
+    staff_db_id?: number;
+    scope: string;
+    timeframe: string;
+    year?: number;
+    month?: number;
+    start_date?: string;
+    end_date?: string;
+    revenue_target: number;
+    sessions_target?: number;
+    new_clients_target?: number;
+    unit_targets_json?: string;
+  }): Promise<StaffTarget> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff-targets`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(`Failed to create target: ${response.status}`);
+    return response.json();
+  }
+
+  async updateTarget(id: string, data: Partial<StaffTarget>): Promise<StaffTarget> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff-targets/${id}`,
+      { method: 'PUT', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(`Failed to update target: ${response.status}`);
+    return response.json();
+  }
+
+  async deleteTarget(id: string): Promise<void> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff-targets/${id}`,
+      { method: 'DELETE' }
+    );
+    if (!response.ok) throw new Error(`Failed to delete target: ${response.status}`);
+  }
+
+  // ── Commission Rules ─────────────────────────────────────────────────────
+
+  async getCommissionRules(): Promise<CommissionRule[]> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/commission-rules`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch commission rules: ${response.status}`);
+    return response.json();
+  }
+
+  async updateCommissionRule(id: string, data: {
+    role?: string;
+    base_commission?: number;
+    target_bonuses_json?: string;
+  }): Promise<CommissionRule> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/commission-rules/${id}`,
+      { method: 'PUT', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(`Failed to update commission rule: ${response.status}`);
+    return response.json();
+  }
+
+  async createCommissionRule(data: {
+    role: string;
+    base_commission: number;
+    target_bonuses_json: string;
+  }): Promise<CommissionRule> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/commission-rules`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(`Failed to create commission rule: ${response.status}`);
+    return response.json();
   }
 }
 
-// Export singleton instance
 export const staffService = new StaffService();
