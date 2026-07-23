@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { leadService, type LeadResponse } from '../utils/supabase/lead-service';
+import { useCurrency } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -122,6 +123,7 @@ interface Staff {
 }
 
 export function Leads() {
+  const { currencyCode } = useCurrency();
   const [activeView, setActiveView] = useState<'table' | 'kanban'>('table');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAddLead, setShowAddLead] = useState(false);
@@ -962,7 +964,7 @@ export function Leads() {
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Budget</Label>
-                        <p className="font-medium">{selectedLead.budget ? `${selectedLead.budget} AED` : 'Not specified'}</p>
+                        <p className="font-medium">{selectedLead.budget ? `${currencyCode} ${selectedLead.budget}` : 'Not specified'}</p>
                       </div>
                     </div>
                     

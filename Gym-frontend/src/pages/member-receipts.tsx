@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   Search,
   Filter,
@@ -65,6 +66,7 @@ interface MemberReceiptsProps {
 type Receipt = ApiReceipt;
 
 export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
+  const { currencyCode } = useCurrency();
   const [allReceipts, setAllReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -270,7 +272,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Collected</p>
-                    <p className="text-2xl mt-1">AED {totalCollected}</p>
+                    <p className="text-2xl mt-1"><CurrencyGlyph /> {totalCollected}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-purple-100">
                     <DollarSign className="h-6 w-6 text-purple-600" />
@@ -287,7 +289,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                 <DollarSign className="h-6 w-6" />
                 <div>
                   <p className="text-sm opacity-90">Total Collected (Current Filter)</p>
-                  <p className="text-2xl">AED {totalCollected.toLocaleString()}</p>
+                  <p className="text-2xl"><CurrencyGlyph /> {totalCollected.toLocaleString()}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -379,7 +381,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                     <TableHead className="font-semibold">Receipt No.</TableHead>
                     <TableHead className="font-semibold">Member Name / ID</TableHead>
                     <TableHead className="font-semibold">Transaction Type</TableHead>
-                    <TableHead className="font-semibold">Amount (AED)</TableHead>
+                    <TableHead className="font-semibold">Amount ({currencyCode})</TableHead>
                     <TableHead className="font-semibold">Payment Method</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold text-right">Actions</TableHead>
@@ -562,7 +564,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                       <div>
                         <Label className="text-sm text-muted-foreground">Amount</Label>
                         <p className="mt-1 text-xl text-[#0047ab]">
-                          AED {Number(selectedReceipt.amount).toLocaleString()}
+                          <CurrencyGlyph /> {Number(selectedReceipt.amount).toLocaleString()}
                         </p>
                       </div>
                       <div>

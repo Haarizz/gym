@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -91,6 +92,7 @@ interface PaymentHistory {
 
 
 export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState("individual");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
@@ -266,7 +268,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
 
     const validation = validateSplitPayment(netSalary, paymentsToUse);
     if (enableSplitPayment && !validation.isValid) {
-      toast.error(`Split payment total must equal net salary. Difference: AED ${Math.abs(validation.difference)}`);
+      toast.error(`Split payment total must equal net salary. Difference: ${currencyCode} ${Math.abs(validation.difference)}`);
       return;
     }
 
@@ -303,7 +305,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
     if (bulkEnableSplit) {
       const validation = validateSplitPayment(totalAmount, bulkSplitPayments);
       if (!validation.isValid) {
-        toast.error(`Split payment total must equal total salary. Difference: AED ${Math.abs(validation.difference)}`);
+        toast.error(`Split payment total must equal total salary. Difference: ${currencyCode} ${Math.abs(validation.difference)}`);
         return;
       }
     }
@@ -438,7 +440,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">AED {summaryStats.totalSalary.toLocaleString()}</div>
+            <div className="text-2xl font-bold"><CurrencyGlyph /> {summaryStats.totalSalary.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">
               This month
             </p>
@@ -455,7 +457,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
           <CardContent>
             <div className="text-2xl font-bold">{summaryStats.pendingCount}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              AED {summaryStats.pendingAmount.toLocaleString()} to process
+              <CurrencyGlyph /> {summaryStats.pendingAmount.toLocaleString()} to process
             </p>
           </CardContent>
         </Card>
@@ -581,12 +583,12 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                           <div className="text-sm text-muted-foreground">{employee.designation}</div>
                         </div>
                       </TableCell>
-                      <TableCell>AED {employee.baseSalary.toLocaleString()}</TableCell>
+                      <TableCell><CurrencyGlyph /> {employee.baseSalary.toLocaleString()}</TableCell>
                       <TableCell className="text-green-600">+{employee.allowances.toLocaleString()}</TableCell>
                       <TableCell className="text-red-600">-{employee.deductions.toLocaleString()}</TableCell>
                       <TableCell>
                         <span className="font-bold" style={{ color: '#2B7A78' }}>
-                          AED {employee.netSalary.toLocaleString()}
+                          <CurrencyGlyph /> {employee.netSalary.toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -704,7 +706,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       <TableCell>{employee.department}</TableCell>
                       <TableCell>
                         <span className="font-bold" style={{ color: '#2B7A78' }}>
-                          AED {employee.netSalary.toLocaleString()}
+                          <CurrencyGlyph /> {employee.netSalary.toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -725,7 +727,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                     </div>
                     <div>
                       <span className="font-bold" style={{ color: '#2B7A78' }}>
-                        Total Amount: AED {employees
+                        Total Amount: <CurrencyGlyph /> {employees
                           .filter(e => selectedEmployees.includes(e.id))
                           .reduce((sum, e) => sum + e.netSalary, 0)
                           .toLocaleString()}
@@ -759,7 +761,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, value }) => `${name}: AED ${value.toLocaleString()}`}
+                        label={({ name, value }) => `${name}: ${currencyCode} ${value.toLocaleString()}`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
@@ -768,7 +770,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => `AED ${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                     </RechartsPie>
                   </ResponsiveContainer>
                 ) : (
@@ -804,7 +806,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                     <CardContent className="pt-6">
                       <div className="text-center">
                         <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
-                          AED {paymentHistory.reduce((sum, p) => sum + p.netSalary, 0).toLocaleString()}
+                          <CurrencyGlyph /> {paymentHistory.reduce((sum, p) => sum + p.netSalary, 0).toLocaleString()}
                         </div>
                         <div className="text-sm text-muted-foreground">Amount Paid</div>
                       </div>
@@ -823,7 +825,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                         <span className="font-medium">{mode}</span>
                       </div>
                       <span className="font-bold" style={{ color: '#2B7A78' }}>
-                        AED {amount.toLocaleString()}
+                        <CurrencyGlyph /> {amount.toLocaleString()}
                       </span>
                     </div>
                   ))}
@@ -870,7 +872,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       </TableCell>
                       <TableCell>{payment.month} {payment.year}</TableCell>
                       <TableCell>
-                        <span className="font-bold">AED {payment.netSalary.toLocaleString()}</span>
+                        <span className="font-bold"><CurrencyGlyph /> {payment.netSalary.toLocaleString()}</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
@@ -928,12 +930,12 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Base Salary:</span>
-                        <span className="font-medium">AED {selectedEmployee.baseSalary.toLocaleString()}</span>
+                        <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.baseSalary.toLocaleString()}</span>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Allowances (AED)</Label>
+                          <Label>Allowances ({currencyCode})</Label>
                           <Input
                             type="number"
                             value={paymentAdjustments.allowances}
@@ -944,7 +946,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Deductions (AED)</Label>
+                          <Label>Deductions ({currencyCode})</Label>
                           <Input
                             type="number"
                             value={paymentAdjustments.deductions}
@@ -960,7 +962,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       <div className="flex justify-between">
                         <span className="font-bold">Net Payable:</span>
                         <span className="text-xl font-bold" style={{ color: '#2B7A78' }}>
-                          AED {Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions).toLocaleString()}
+                          <CurrencyGlyph /> {Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions).toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -1099,7 +1101,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                                   </Select>
                                 </div>
                                 <div className="space-y-2">
-                                  <Label>Amount (AED) *</Label>
+                                  <Label>Amount ({currencyCode}) *</Label>
                                   <Input
                                     type="number"
                                     placeholder="0.00"
@@ -1145,7 +1147,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                         <div className="flex items-center justify-between">
                           <span className="font-medium">Total Split Amount:</span>
                           <span className="text-xl font-bold">
-                            AED {calculateSplitTotal(splitPayments).toLocaleString()}
+                            <CurrencyGlyph /> {calculateSplitTotal(splitPayments).toLocaleString()}
                           </span>
                         </div>
                         {!validateSplitPayment(
@@ -1153,8 +1155,8 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                           splitPayments
                         ).isValid && (
                           <p className="text-sm text-red-600 mt-2">
-                            Total must equal Net Payable (AED {Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions).toLocaleString()})
-                            - Difference: AED {Math.abs(validateSplitPayment(
+                            Total must equal Net Payable (<CurrencyGlyph /> {Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions).toLocaleString()})
+                            - Difference: <CurrencyGlyph /> {Math.abs(validateSplitPayment(
                               Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions),
                               splitPayments
                             ).difference).toLocaleString()}
@@ -1284,7 +1286,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   <div className="flex justify-between">
                     <span className="font-bold">Total Amount:</span>
                     <span className="text-xl font-bold" style={{ color: '#2B7A78' }}>
-                      AED {employees
+                      <CurrencyGlyph /> {employees
                         .filter(e => selectedEmployees.includes(e.id))
                         .reduce((sum, e) => sum + e.netSalary, 0)
                         .toLocaleString()}
@@ -1458,7 +1460,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <Label>Amount (AED) *</Label>
+                            <Label>Amount ({currencyCode}) *</Label>
                             <Input
                               type="number"
                               placeholder="0.00"
@@ -1493,7 +1495,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   .map(emp => (
                     <div key={emp.id} className="flex justify-between p-2 bg-muted rounded">
                       <span className="font-medium">{emp.name}</span>
-                      <span style={{ color: '#2B7A78' }}>AED {emp.netSalary.toLocaleString()}</span>
+                      <span style={{ color: '#2B7A78' }}><CurrencyGlyph /> {emp.netSalary.toLocaleString()}</span>
                     </div>
                   ))}
               </div>

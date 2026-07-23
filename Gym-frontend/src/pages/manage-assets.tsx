@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCurrency, CurrencyValue } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -123,6 +124,7 @@ export const conditionColors = {
 
 export function ManageAssets() {
   const navigate = useNavigate();
+  const { currencyCode } = useCurrency();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -360,10 +362,6 @@ export function ManageAssets() {
     }
   };
 
-  const formatCurrency = (amount?: number) => {
-    return `${(amount ?? 0).toLocaleString()} AED`;
-  };
-
   const getDepreciationAmount = (asset: { purchasePrice?: number; currentValue?: number }) => {
     const purchasePrice = asset.purchasePrice ?? 0;
     const currentValue = asset.currentValue ?? 0;
@@ -466,7 +464,7 @@ export function ManageAssets() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{formatCurrency(totalAssetsValue)}</div>
+              <div className="text-2xl font-bold text-primary"><CurrencyValue amount={totalAssetsValue} /></div>
               <p className="text-xs text-muted-foreground">Current portfolio value</p>
             </CardContent>
           </Card>
@@ -732,7 +730,7 @@ export function ManageAssets() {
                             </div>
                           </TableCell>
                           <TableCell>{new Date(asset.purchaseDate).toLocaleDateString()}</TableCell>
-                          <TableCell className="font-medium">{formatCurrency(asset.purchasePrice)}</TableCell>
+                          <TableCell className="font-medium"><CurrencyValue amount={asset.purchasePrice} /></TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
                               <MapPin className="h-3 w-3 text-gray-400" />
@@ -746,7 +744,7 @@ export function ManageAssets() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
-                              <span className="font-medium">{formatCurrency(asset.currentValue)}</span>
+                              <span className="font-medium"><CurrencyValue amount={asset.currentValue} /></span>
                               {getDepreciationTrend(asset) > 0 && (
                                 <TrendingDown className="h-4 w-4 text-red-500" />
                               )}
@@ -842,16 +840,16 @@ export function ManageAssets() {
                                   <CardContent className="space-y-3">
                                     <div className="flex justify-between">
                                       <span className="text-sm text-gray-600">Purchase Price:</span>
-                                      <span className="text-sm font-medium">{formatCurrency(asset.purchasePrice)}</span>
+                                      <span className="text-sm font-medium"><CurrencyValue amount={asset.purchasePrice} /></span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-sm text-gray-600">Current Value:</span>
-                                      <span className="text-sm font-medium">{formatCurrency(asset.currentValue)}</span>
+                                      <span className="text-sm font-medium"><CurrencyValue amount={asset.currentValue} /></span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-sm text-gray-600">Depreciation:</span>
                                       <span className="text-sm font-medium text-red-600">
-                                        -{formatCurrency(getDepreciationAmount(asset))} ({asset.depreciationRate ?? 0}%)
+                                        -<CurrencyValue amount={getDepreciationAmount(asset)} /> ({asset.depreciationRate ?? 0}%)
                                       </span>
                                     </div>
                                   </CardContent>
@@ -997,16 +995,16 @@ export function ManageAssets() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label>Purchase Price</Label>
-                          <div className="text-lg font-medium mt-1">{formatCurrency(selectedAsset.purchasePrice)}</div>
+                          <div className="text-lg font-medium mt-1"><CurrencyValue amount={selectedAsset.purchasePrice} /></div>
                         </div>
                         <div>
                           <Label>Current Value</Label>
-                          <div className="text-lg font-medium mt-1">{formatCurrency(selectedAsset.currentValue)}</div>
+                          <div className="text-lg font-medium mt-1"><CurrencyValue amount={selectedAsset.currentValue} /></div>
                         </div>
                         <div>
                           <Label>Total Depreciation</Label>
                           <div className="text-lg font-medium mt-1 text-red-600">
-                            -{formatCurrency(getDepreciationAmount(selectedAsset))}
+                            -<CurrencyValue amount={getDepreciationAmount(selectedAsset)} />
                           </div>
                         </div>
                         <div>
@@ -1058,7 +1056,7 @@ export function ManageAssets() {
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="font-medium">{formatCurrency(maintenance.cost)}</div>
+                                <div className="font-medium"><CurrencyValue amount={maintenance.cost} /></div>
                                 <div className="text-sm text-gray-500">Cost</div>
                               </div>
                             </div>
@@ -1084,11 +1082,11 @@ export function ManageAssets() {
                       
                       <div className="grid grid-cols-2 gap-4">
                         <div className="text-center p-4 border rounded-lg">
-                          <div className="text-xl font-bold">{formatCurrency(selectedAsset.purchasePrice)}</div>
+                          <div className="text-xl font-bold"><CurrencyValue amount={selectedAsset.purchasePrice} /></div>
                           <div className="text-sm text-gray-600">Original Value</div>
                         </div>
                         <div className="text-center p-4 border rounded-lg">
-                          <div className="text-xl font-bold">{formatCurrency(selectedAsset.currentValue)}</div>
+                          <div className="text-xl font-bold"><CurrencyValue amount={selectedAsset.currentValue} /></div>
                           <div className="text-sm text-gray-600">Current Value</div>
                         </div>
                       </div>
@@ -1199,7 +1197,7 @@ export function ManageAssets() {
                 </Select>
               </div>
               <div>
-                <Label>Purchase Price (AED)</Label>
+                <Label>Purchase Price ({currencyCode})</Label>
                 <Input
                   type="number"
                   placeholder="0"

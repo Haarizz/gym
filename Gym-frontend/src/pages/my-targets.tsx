@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -189,6 +190,7 @@ const COLORS = {
 };
 
 export function MyTargets() {
+  const { currencyCode } = useCurrency();
   const panelCardShell = "bg-white border-0 shadow-sm";
   const statCardShell =
     "bg-white border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none";
@@ -258,7 +260,7 @@ export function MyTargets() {
         type: "warning",
         icon: <Clock className="h-5 w-5" />,
         title: "Time Running Out!",
-        message: `Only ${daysLeft} days left! You need AED ${currentEmployee.currentMonth.dailyRequired.toLocaleString()}/day to reach your target.`
+        message: `Only ${daysLeft} days left! You need ${currencyCode} ${currentEmployee.currentMonth.dailyRequired.toLocaleString()}/day to reach your target.`
       };
     } else {
       return {
@@ -373,7 +375,7 @@ export function MyTargets() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-700">AED {currentEmployee.currentMonth.target.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-blue-700"><CurrencyGlyph /> {currentEmployee.currentMonth.target.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground mt-1">This month</p>
               </CardContent>
             </Card>
@@ -386,7 +388,7 @@ export function MyTargets() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-emerald-700">AED {currentEmployee.currentMonth.achieved.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-emerald-700"><CurrencyGlyph /> {currentEmployee.currentMonth.achieved.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground mt-1">{currentEmployee.currentMonth.percentage}% complete</p>
               </CardContent>
             </Card>
@@ -400,7 +402,7 @@ export function MyTargets() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-rose-700">
-                  AED {Math.max(0, currentEmployee.currentMonth.target - currentEmployee.currentMonth.achieved).toLocaleString()}
+                  <CurrencyGlyph /> {Math.max(0, currentEmployee.currentMonth.target - currentEmployee.currentMonth.achieved).toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">To hit target</p>
               </CardContent>
@@ -414,7 +416,7 @@ export function MyTargets() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-amber-700">AED {currentEmployee.currentMonth.commission.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-amber-700"><CurrencyGlyph /> {currentEmployee.currentMonth.commission.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground mt-1">Current commission</p>
               </CardContent>
             </Card>
@@ -427,7 +429,7 @@ export function MyTargets() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-indigo-700">AED {currentEmployee.currentMonth.projectedCommission.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-indigo-700"><CurrencyGlyph /> {currentEmployee.currentMonth.projectedCommission.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground mt-1">If target met</p>
               </CardContent>
             </Card>
@@ -441,7 +443,7 @@ export function MyTargets() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-slate-700">{currentEmployee.currentMonth.daysLeft}</div>
-                <p className="text-xs text-muted-foreground mt-1">Daily required: AED {currentEmployee.currentMonth.dailyRequired.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">Daily required: <CurrencyGlyph /> {currentEmployee.currentMonth.dailyRequired.toLocaleString()}</p>
               </CardContent>
             </Card>
           </div>
@@ -573,19 +575,19 @@ export function MyTargets() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Target</span>
                   <span className="font-bold text-foreground">
-                    AED {currentEmployee.currentMonth.target.toLocaleString()}
+                    <CurrencyGlyph /> {currentEmployee.currentMonth.target.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Achieved</span>
                   <span className="font-bold text-primary">
-                    AED {currentEmployee.currentMonth.achieved.toLocaleString()}
+                    <CurrencyGlyph /> {currentEmployee.currentMonth.achieved.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Remaining</span>
                   <span className="font-bold text-error">
-                    AED {(currentEmployee.currentMonth.target - currentEmployee.currentMonth.achieved).toLocaleString()}
+                    <CurrencyGlyph /> {(currentEmployee.currentMonth.target - currentEmployee.currentMonth.achieved).toLocaleString()}
                   </span>
                 </div>
                 <Separator />
@@ -596,7 +598,7 @@ export function MyTargets() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Daily Required</span>
                   <span className="font-medium text-warning">
-                    AED {currentEmployee.currentMonth.dailyRequired.toLocaleString()}
+                    <CurrencyGlyph /> {currentEmployee.currentMonth.dailyRequired.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -613,7 +615,7 @@ export function MyTargets() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Current Bonus</span>
                     <span className="font-bold text-success">
-                      AED {currentEmployee.currentMonth.commission.toLocaleString()}
+                      <CurrencyGlyph /> {currentEmployee.currentMonth.commission.toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -621,7 +623,7 @@ export function MyTargets() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Potential Bonus</span>
                     <span className="font-bold text-warning">
-                      AED {currentEmployee.currentMonth.projectedCommission.toLocaleString()}
+                      <CurrencyGlyph /> {currentEmployee.currentMonth.projectedCommission.toLocaleString()}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -726,7 +728,7 @@ export function MyTargets() {
                 <XAxis dataKey="day" stroke="#666" />
                 <YAxis stroke="#666" />
                 <Tooltip 
-                  formatter={(value: number) => [`AED ${value.toLocaleString()}`, '']}
+                  formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
                 />
                 <Legend />
                 <Bar dataKey="target" fill={COLORS.muted} name="Target" />
@@ -808,7 +810,7 @@ export function MyTargets() {
                     <p className="text-sm text-muted-foreground">{category.percentage}% of total</p>
                   </div>
                   <span className="font-bold text-foreground">
-                    AED {category.amount.toLocaleString()}
+                    <CurrencyGlyph /> {category.amount.toLocaleString()}
                   </span>
                 </div>
               ))}
@@ -832,7 +834,7 @@ export function MyTargets() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value: number) => [`AED ${value.toLocaleString()}`, 'Revenue']}
+                    formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, 'Revenue']}
                   />
                   <Legend />
                 </RechartsPieChart>

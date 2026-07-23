@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { toast } from 'sonner';
 import { staffService, Staff, CommissionRule, StaffCertification } from '../utils/supabase/staff-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -358,6 +359,7 @@ function EditScheduleTab({ schedule, onChange }: EditScheduleTabProps) {
 }
 
 export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('all-staff');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
@@ -1108,7 +1110,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium">—</span>
                               <Badge className={`text-xs ${getTargetColor(0)}`}>
-                                0 AED
+                                <CurrencyGlyph /> 0
                               </Badge>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -1118,14 +1120,14 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                               ></div>
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Target: {(employee.monthly_target || 0).toLocaleString()} AED
+                              Target: <CurrencyGlyph /> {(employee.monthly_target || 0).toLocaleString()}
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-1">
                             <DollarSign className="h-4 w-4 text-green-600" />
-                            <span className="font-medium">0 AED</span>
+                            <span className="font-medium"><CurrencyGlyph /> 0</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1322,11 +1324,11 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                             <div className="text-sm text-gray-600">New Clients</div>
                           </div>
                           <div className="text-center p-3 bg-purple-50 rounded-lg">
-                            <div className="text-lg font-bold text-purple-600">0 AED</div>
+                            <div className="text-lg font-bold text-purple-600"><CurrencyGlyph /> 0</div>
                             <div className="text-sm text-gray-600">Revenue Generated</div>
                           </div>
                           <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                            <div className="text-lg font-bold text-yellow-600">0 AED</div>
+                            <div className="text-lg font-bold text-yellow-600"><CurrencyGlyph /> 0</div>
                             <div className="text-sm text-gray-600">Commission Earned</div>
                           </div>
                         </div>
@@ -1502,7 +1504,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   </Select>
                 </div>
                 <div>
-                  <Label>Monthly Target (AED)</Label>
+                  <Label>Monthly Target ({currencyCode})</Label>
                   <Input
                     type="number"
                     placeholder="25000"
@@ -1512,7 +1514,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   />
                 </div>
                 <div>
-                  <Label>Base Salary (AED)</Label>
+                  <Label>Base Salary ({currencyCode})</Label>
                   <Input
                     type="number"
                     placeholder="8000"
@@ -1751,12 +1753,12 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     </Select>
                   </div>
                   <div>
-                    <Label>Monthly Target (AED)</Label>
+                    <Label>Monthly Target ({currencyCode})</Label>
                     <Input type="number" className="mt-1" value={editEmployeeData.monthly_target || ''}
                       onChange={e => setEditEmployeeData(p => p ? {...p, monthly_target: Number(e.target.value)} : p)} />
                   </div>
                   <div>
-                    <Label>Base Salary (AED)</Label>
+                    <Label>Base Salary ({currencyCode})</Label>
                     <Input type="number" className="mt-1" value={editEmployeeData.base_salary || ''}
                       onChange={e => setEditEmployeeData(p => p ? {...p, base_salary: Number(e.target.value)} : p)} />
                   </div>
@@ -2002,7 +2004,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               </Select>
             </div>
             <div>
-              <Label>Revenue Target (AED) <span className="text-destructive">*</span></Label>
+              <Label>Revenue Target ({currencyCode}) <span className="text-destructive">*</span></Label>
               <Input type="number" placeholder="e.g. 50000" className="mt-1"
                 value={targetForm.revenue_target}
                 onChange={e => setTargetForm(p => ({...p, revenue_target: e.target.value}))} />
@@ -2120,7 +2122,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div>
-                          <Label className="text-xs text-muted-foreground mb-1 block">Revenue Target (AED)</Label>
+                          <Label className="text-xs text-muted-foreground mb-1 block">Revenue Target ({currencyCode})</Label>
                           <Input type="number" value={targets.revenue} className="h-8 text-sm"
                             onChange={e => setRoleTargets(prev => ({ ...prev, [role]: { ...prev[role], revenue: Number(e.target.value) } }))}
                           />

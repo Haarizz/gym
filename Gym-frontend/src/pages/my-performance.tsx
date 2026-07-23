@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -148,7 +149,7 @@ const aiInsights = [
 ];
 
 export function MyPerformance({ onNavigate }: MyPerformanceProps) {
-  const [dateRange, setDateRange] = useState("month");
+    const [dateRange, setDateRange] = useState("month");
   const [compareWithPrevious, setCompareWithPrevious] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState("revenue");
   const [activeTab, setActiveTab] = useState("activity");
@@ -300,10 +301,10 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                 )}
               </div>
               <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-primary">AED {kpiData.revenue.current.toLocaleString()}</h3>
+                <h3 className="text-2xl font-bold text-primary"><CurrencyGlyph /> {kpiData.revenue.current.toLocaleString()}</h3>
                 <p className="text-sm text-gray-600">Revenue Generated</p>
                 {compareWithPrevious && (
-                  <p className="text-xs text-gray-500">vs. AED {kpiData.revenue.previous.toLocaleString()} last period</p>
+                  <p className="text-xs text-gray-500">vs. <CurrencyGlyph /> {kpiData.revenue.previous.toLocaleString()} last period</p>
                 )}
               </div>
               <div className="mt-4">
@@ -513,7 +514,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                                 <span className="font-medium">{session.feedback}</span>
                               </div>
                             </td>
-                            <td className="p-4 font-semibold text-primary">AED {session.revenue.toLocaleString()}</td>
+                            <td className="p-4 font-semibold text-primary"><CurrencyGlyph /> {session.revenue.toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>

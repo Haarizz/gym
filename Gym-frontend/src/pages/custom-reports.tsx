@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -63,6 +64,7 @@ function mapReceiptToRecord(r: Receipt): ReportRecord {
 }
 
 export function CustomReports({ onNavigate }: CustomReportsProps) {
+  const { currencyCode } = useCurrency();
   const panelCardShell = "bg-white border-0 shadow-sm rounded-2xl overflow-hidden";
 
   const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'custom'>('today');
@@ -153,12 +155,172 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
   };
 
   // Export functions
-  const handleExportPDF = () => {
-    toast.success('Exporting report as PDF...');
+  const downloadBlob = (filename: string, blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const toCsvCell = (value: unknown) => {
+    const s = value == null ? "" : String(value);
+    const escaped = s.replaceAll('"', '""');
+    return `"${escaped}"`;
+  };
+
+  const buildCsv = (rows: ReportRecord[]) => {
+    const header = [
+      "#",
+      "Member ID",
+      "Member Name",
+      "Mobile",
+      "Membership Type",
+      "Transaction Type",
+      "Plan",
+      `Amount (${currencyCode})`,
+      "Payment Mode",
+      `Due (${currencyCode})`,
+      "Due Date",
+      "Transaction Date",
+    ];
+    const lines = [
+      header.map(toCsvCell).join(","),
+      ...rows.map((r, i) => ([
+        i + 1,
+        r.memberId,
+        r.memberName,
+        r.mobile,
+        r.membershipType,
+        r.transactionType,
+        r.planName,
+        r.planAmount,
+        r.paymentMode,
+        r.dueAmount,
+        r.dueDate ?? "",
+        r.transactionDate,
+      ]).map(toCsvCell).join(",")),
+    ];
+    return lines.join("\n");
+  };
+
+  const getRangeLabel = () => {
+    if (dateRange === "today") return today;
+    if (dateRange === "yesterday") return yesterday;
+    return `${customStartDate || today}_to_${customEndDate || today}`;
+  };
+
+  const handleExportCSV = () => {
+    const csv = buildCsv(filteredData);
+    downloadBlob(`custom-reports_${getRangeLabel()}.csv`, new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    toast.success("CSV downloaded");
   };
 
   const handleExportExcel = () => {
-    toast.success('Exporting report as Excel...');
+    // Simple HTML table export that Excel can open.
+    const rows = filteredData;
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+        </head>
+        <body>
+          <table border="1" cellspacing="0" cellpadding="4">
+            <thead>
+              <tr>
+                <th>#</th><th>Member ID</th><th>Member Name</th><th>Mobile</th><th>Membership Type</th>
+                <th>Transaction Type</th><th>Plan</th><th>Amount (${currencyCode})</th><th>Payment Mode</th><th>Due (${currencyCode})</th><th>Due Date</th><th>Transaction Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((r, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${r.memberId}</td>
+                  <td>${r.memberName}</td>
+                  <td>${r.mobile}</td>
+                  <td>${r.membershipType || ""}</td>
+                  <td>${r.transactionType}</td>
+                  <td>${r.planName}</td>
+                  <td>${r.planAmount}</td>
+                  <td>${r.paymentMode}</td>
+                  <td>${r.dueAmount}</td>
+                  <td>${r.dueDate ?? ""}</td>
+                  <td>${r.transactionDate}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `.trim();
+    downloadBlob(`custom-reports_${getRangeLabel()}.xls`, new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" }));
+    toast.success("Excel downloaded");
+  };
+
+  const handleExportPDF = () => {
+    // Print-friendly HTML export (browser Save as PDF)
+    const w = window.open("", "_blank");
+    if (!w) {
+      toast.error("Popup blocked. Please allow popups to export PDF.");
+      return;
+    }
+    const rangeLabel = getRangeLabel().replaceAll("_", " ");
+    const rows = filteredData;
+    w.document.write(`
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Custom Reports</title>
+          <style>
+            body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 24px; }
+            h1 { margin: 0 0 6px; font-size: 18px; }
+            .sub { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
+            th { background: #f9fafb; }
+            .right { text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>Membership Report (Detailed)</h1>
+          <div class="sub">Range: ${rangeLabel} • Records: ${rows.length}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Member ID</th><th>Member Name</th><th>Mobile</th><th>Membership Type</th>
+                <th>Transaction</th><th>Plan</th><th class="right">Amount (${currencyCode})</th><th>Pay Mode</th><th class="right">Due</th><th>Due Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((r, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${r.memberId}</td>
+                  <td>${r.memberName}</td>
+                  <td>${r.mobile}</td>
+                  <td>${r.membershipType || ""}</td>
+                  <td>${r.transactionType}</td>
+                  <td>${r.planName}</td>
+                  <td class="right">${r.planAmount.toLocaleString()}</td>
+                  <td>${r.paymentMode}</td>
+                  <td class="right">${r.dueAmount ? r.dueAmount.toLocaleString() : "-"}</td>
+                  <td>${r.dueDate ?? "-"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+          <script>
+            window.onload = () => { window.print(); };
+          </script>
+        </body>
+      </html>
+    `);
+    w.document.close();
+    toast.success("Print dialog opened (Save as PDF)");
   };
 
   // Get transaction type badge
@@ -289,11 +451,11 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <p className="text-xs text-green-600 mb-1">Total Revenue</p>
-                <p className="text-2xl font-bold text-green-700">AED {summary.totalRevenue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-green-700"><CurrencyGlyph /> {summary.totalRevenue.toLocaleString()}</p>
               </div>
               <div className="text-center p-3 bg-red-50 rounded-lg">
                 <p className="text-xs text-red-600 mb-1">Total Dues</p>
-                <p className="text-2xl font-bold text-red-700">AED {summary.totalDue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-red-700"><CurrencyGlyph /> {summary.totalDue.toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
@@ -321,6 +483,10 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
               <Button variant="outline" size="sm" onClick={handleExportExcel}>
                 <Download className="h-4 w-4 mr-2" />
                 Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                CSV
               </Button>
             </div>
           </div>
@@ -375,7 +541,7 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                     <TableHead className="text-primary font-semibold">Membership Type</TableHead>
                     <TableHead className="text-primary font-semibold">Transaction</TableHead>
                     <TableHead className="text-primary font-semibold">Plan</TableHead>
-                    <TableHead className="text-primary font-semibold text-right">Amount (AED)</TableHead>
+                    <TableHead className="text-primary font-semibold text-right">Amount ({currencyCode})</TableHead>
                     <TableHead className="text-primary font-semibold">Pay Mode</TableHead>
                     <TableHead className="text-primary font-semibold text-right">Due</TableHead>
                     <TableHead className="text-primary font-semibold">Due Date</TableHead>
@@ -476,11 +642,11 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
-                  <p className="text-xl font-bold text-green-600">AED {summary.totalRevenue.toLocaleString()}</p>
+                  <p className="text-xl font-bold text-green-600"><CurrencyGlyph /> {summary.totalRevenue.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Outstanding Dues</p>
-                  <p className="text-xl font-bold text-red-600">AED {summary.totalDue.toLocaleString()}</p>
+                  <p className="text-xl font-bold text-red-600"><CurrencyGlyph /> {summary.totalDue.toLocaleString()}</p>
                 </div>
               </div>
             </div>

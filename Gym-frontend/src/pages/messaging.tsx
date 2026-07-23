@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { CurrencyGlyph } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -215,7 +216,7 @@ interface Promotion {
 const getRecipientKey = (recipient: Recipient) => `${recipient.type}:${recipient.id}`;
 
 export function Messaging() {
-  const [activeTab, setActiveTab] = useState('compose');
+    const [activeTab, setActiveTab] = useState('compose');
   const [activeRecipientTab, setActiveRecipientTab] = useState('members');
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -959,7 +960,7 @@ export function Messaging() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{analytics.totalCost.toFixed(2)} AED</div>
+            <div className="text-2xl font-bold text-orange-600"><CurrencyGlyph /> {analytics.totalCost.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">Total spend</p>
           </CardContent>
         </Card>
@@ -1338,7 +1339,7 @@ export function Messaging() {
                                 )}
                                 {promo.discountType === 'fixed' && (
                                   <Badge variant="outline" className="text-xs">
-                                    AED {promo.discountValue} OFF
+                                    <CurrencyGlyph /> {promo.discountValue} OFF
                                   </Badge>
                                 )}
                               </div>
@@ -1525,7 +1526,7 @@ export function Messaging() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">{message.cost.toFixed(2)} AED</span>
+                        <span className="font-medium"><CurrencyGlyph /> {message.cost.toFixed(2)}</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-1">
@@ -1650,7 +1651,7 @@ export function Messaging() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Cost</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{analytics.totalCost.toFixed(2)} AED</div>
+                <div className="text-2xl font-bold"><CurrencyGlyph /> {analytics.totalCost.toFixed(2)}</div>
                 <p className="text-xs text-muted-foreground">-8.5% from last month</p>
               </CardContent>
             </Card>

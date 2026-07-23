@@ -33,6 +33,7 @@ import { PromotionsCampaign } from "./pages/promotions-campaign";
 import { SalesPurchases } from "./pages/sales-purchases";
 import { SalesReports } from "./pages/sales-reports";
 import { SalesAnalytics } from "./pages/sales-analytics";
+import { SalesSettings } from "./pages/sales-settings";
 import { Financials } from "./pages/financials";
 import { PayrollEmployees } from "./pages/payroll-employees";
 import { Assets } from "./pages/assets";
@@ -90,6 +91,7 @@ import { Payroll } from "./pages/payroll";
 import { SalaryPayments } from "./pages/salary-payments";
 import { SalaryAdvances } from "./pages/salary-advances";
 import { MyProfile } from "./pages/my-profile";
+import { AppSettings } from "./pages/settings";
 import { MyPerformance } from "./pages/my-performance";
 import AttendanceReports from "./pages/attendance-reports";
 import { MemberHistoryAnalytics } from "./pages/member-history-analytics";
@@ -474,12 +476,6 @@ const menuItems = [
         path: "/salary-advances",
       },
       {
-        title: "Recruitment",
-        icon: Briefcase,
-        id: "recruitment",
-        path: "/recruitment",
-      },
-      {
         title: "Reports",
         icon: BarChart3,
         id: "payroll-reports",
@@ -586,6 +582,12 @@ const menuItems = [
         path: "/profile-settings",
       },
     ],
+  },
+  {
+    title: "Settings",
+    icon: Settings,
+    id: "settings",
+    path: "/settings",
   },
 ];
 
@@ -902,14 +904,7 @@ export default function App() {
       <Route path="/production-recipe" element={<ProductionRecipe />} />
       <Route path="/sales-reports" element={<SalesReports />} />
       <Route path="/sales-analytics" element={<SalesAnalytics />} />
-      <Route path="/sales-settings" element={
-        <div className="p-6">
-          <h1>Sales Settings</h1>
-          <p className="text-muted-foreground">
-            Configure sales system settings including tax rates, payment methods, and transaction preferences.
-          </p>
-        </div>
-      } />
+      <Route path="/sales-settings" element={<SalesSettings />} />
       
       <Route path="/financials" element={<Financials />} />
       <Route path="/ledgers" element={<Ledgers />} />
@@ -938,6 +933,7 @@ export default function App() {
         </div>
       } />
       <Route path="/my-profile" element={<MyProfile onNavigate={handleNavClick} />} />
+      <Route path="/settings" element={<AppSettings />} />
       <Route path="/trainings-classes" element={<TrainingsClasses onNavigate={handleNavClick} />} />
       <Route path="/bookings" element={<Bookings onNavigate={handleNavClick} />} />
       <Route path="/payroll" element={<Payroll onNavigate={handleNavClick} />} />

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCurrency, CurrencyValue } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -191,15 +192,12 @@ const topPerformingClasses = [
 ];
 
 export function PayrollEmployees() {
+  const { currencyCode } = useCurrency();
   const getCurrentPeriod = () => {
-    return new Date().toLocaleDateString('en-GB', { 
-      month: 'long', 
-      year: 'numeric' 
+    return new Date().toLocaleDateString('en-GB', {
+      month: 'long',
+      year: 'numeric'
     });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString()} AED`;
   };
 
   const getStatusColor = (status: string) => {
@@ -309,7 +307,7 @@ export function PayrollEmployees() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Monthly Payroll</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {formatCurrency(kpiData.monthlyPayroll)}
+                  <CurrencyValue amount={kpiData.monthlyPayroll} />
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="h-4 w-4 text-purple-500 mr-1" />
@@ -349,7 +347,7 @@ export function PayrollEmployees() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Salary Advances Outstanding</p>
                 <p className="text-2xl font-bold text-cyan-600">
-                  {formatCurrency(kpiData.salaryAdvancesOutstanding)}
+                  <CurrencyValue amount={kpiData.salaryAdvancesOutstanding} />
                 </p>
                 <div className="flex items-center mt-2">
                   <Wallet className="h-4 w-4 text-cyan-500 mr-1" />
@@ -391,7 +389,7 @@ export function PayrollEmployees() {
                 <YAxis />
                 <Tooltip 
                   formatter={(value, name) => {
-                    if (name === 'payroll') return [`${value.toLocaleString()} AED`, 'Payroll'];
+                    if (name === 'payroll') return [`${currencyCode} ${value.toLocaleString()}`, 'Payroll'];
                     return [value, name === 'classes' ? 'Active Classes' : 'Bookings'];
                   }} 
                 />
@@ -415,7 +413,7 @@ export function PayrollEmployees() {
                   dataKey="payroll" 
                   stroke="#8b5cf6" 
                   strokeWidth={3}
-                  name="Payroll (AED)"
+                  name={`Payroll (${currencyCode})`}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -486,7 +484,7 @@ export function PayrollEmployees() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="category" />
               <YAxis />
-              <Tooltip formatter={(value) => [`${value.toLocaleString()} AED`, 'Payroll']} />
+              <Tooltip formatter={(value) => [`${currencyCode} ${value.toLocaleString()}`, 'Payroll']} />
               <Bar dataKey="amount" fill="#8b5cf6" />
             </BarChart>
           </ResponsiveContainer>
@@ -542,7 +540,7 @@ export function PayrollEmployees() {
                       <TableCell>
                         {new Date(employee.hireDate).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell>{formatCurrency(employee.salary)}</TableCell>
+                      <TableCell><CurrencyValue amount={employee.salary} /></TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(employee.status)}>
                           {employee.status}
@@ -597,7 +595,7 @@ export function PayrollEmployees() {
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">{payment.employee}</TableCell>
                       <TableCell>{payment.position}</TableCell>
-                      <TableCell>{formatCurrency(payment.amount)}</TableCell>
+                      <TableCell><CurrencyValue amount={payment.amount} /></TableCell>
                       <TableCell>
                         {new Date(payment.dueDate).toLocaleDateString('en-GB')}
                       </TableCell>
@@ -656,11 +654,11 @@ export function PayrollEmployees() {
                     <TableRow key={advance.id}>
                       <TableCell className="font-medium">{advance.employee}</TableCell>
                       <TableCell>{advance.position}</TableCell>
-                      <TableCell>{formatCurrency(advance.advanceAmount)}</TableCell>
+                      <TableCell><CurrencyValue amount={advance.advanceAmount} /></TableCell>
                       <TableCell className="text-red-600 font-semibold">
-                        {formatCurrency(advance.remainingBalance)}
+                        <CurrencyValue amount={advance.remainingBalance} />
                       </TableCell>
-                      <TableCell>{formatCurrency(advance.monthlyDeduction)}</TableCell>
+                      <TableCell><CurrencyValue amount={advance.monthlyDeduction} /></TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(advance.status)}>
                           {advance.status}
@@ -725,7 +723,7 @@ export function PayrollEmployees() {
                         </div>
                       </TableCell>
                       <TableCell>{classData.capacity}</TableCell>
-                      <TableCell>{formatCurrency(classData.revenue)}</TableCell>
+                      <TableCell><CurrencyValue amount={classData.revenue} /></TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-1">
                           <span className="text-yellow-500">⭐</span>

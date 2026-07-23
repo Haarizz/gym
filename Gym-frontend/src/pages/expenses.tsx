@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   Card,
   CardContent,
@@ -102,6 +103,7 @@ const defaultForm: ExpenseCreateRequest = {
 };
 
 export function Expenses() {
+  const { currencyCode } = useCurrency();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [stats, setStats] = useState<ExpenseStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -304,7 +306,7 @@ export function Expenses() {
       </div>
 
       <div className="space-y-2">
-        <Label>Amount (AED)</Label>
+        <Label>Amount ({currencyCode})</Label>
         <Input
           type="number"
           step="0.01"
@@ -328,7 +330,7 @@ export function Expenses() {
       </div>
 
       <div className="space-y-2">
-        <Label>Total Amount (AED)</Label>
+        <Label>Total Amount ({currencyCode})</Label>
         <div className="bg-gray-50 p-3 rounded-md border">
           <span className="text-lg font-semibold text-primary">
             {calculateTotal().toFixed(2)}
@@ -422,7 +424,7 @@ export function Expenses() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-700">
-              {totalExpenses.toFixed(2)} AED
+              <CurrencyGlyph /> {totalExpenses.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">{filteredExpenses.length} transactions</p>
           </CardContent>
@@ -437,7 +439,7 @@ export function Expenses() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-700">
-              {totalTax.toFixed(2)} AED
+              <CurrencyGlyph /> {totalTax.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">VAT & other taxes</p>
           </CardContent>
@@ -455,7 +457,7 @@ export function Expenses() {
               {topCategory?.[0] || "N/A"}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {topCategory ? `${topCategory[1].toFixed(2)} AED` : "No data"}
+              {topCategory ? `${currencyCode} ${topCategory[1].toFixed(2)}` : "No data"}
             </p>
           </CardContent>
         </Card>
@@ -589,9 +591,9 @@ export function Expenses() {
                     </TableCell>
                     <TableCell>{expense.costCenter}</TableCell>
                     <TableCell>{expense.location}</TableCell>
-                    <TableCell className="text-right">{expense.amount.toFixed(2)} AED</TableCell>
+                    <TableCell className="text-right"><CurrencyGlyph /> {expense.amount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">{expense.taxRate}%</TableCell>
-                    <TableCell className="text-right font-semibold">{expense.totalAmount.toFixed(2)} AED</TableCell>
+                    <TableCell className="text-right font-semibold"><CurrencyGlyph /> {expense.totalAmount.toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge
                         variant="secondary"

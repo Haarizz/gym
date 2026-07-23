@@ -39,6 +39,7 @@ import { toast } from 'sonner';
 import { billingService, BillingStats, MemberDue } from '../utils/supabase/billing-service';
 import { receiptsService } from '../utils/supabase/receipts-service';
 import type { Receipt } from '../utils/supabase/receipts-service';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 
 interface BillingProps {
   onNavigate?: (section: string) => void;
@@ -46,6 +47,7 @@ interface BillingProps {
 
 export function Billing({ onNavigate }: BillingProps = {}) {
   const navigate = useNavigate();
+  const { currencyCode } = useCurrency();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -213,18 +215,18 @@ export function Billing({ onNavigate }: BillingProps = {}) {
       <tr>
         <td><strong>${receipt.plan_name ?? receipt.transaction_type}</strong><br/><small>Transaction Type: ${receipt.transaction_type}</small></td>
         <td>${receipt.transaction_type}</td>
-        <td style="text-align:right"><strong>AED ${totalAmt.toFixed(2)}</strong></td>
+        <td style="text-align:right"><strong>${currencyCode} ${totalAmt.toFixed(2)}</strong></td>
       </tr>
     </tbody>
   </table>
   <hr class="thin"/>
   <div class="totals">
-    <div class="row"><span>Subscription Total (Incl. VAT):</span><span>AED ${totalAmt.toFixed(2)}</span></div>
-    <div class="row bold" style="color:#c00"><span>Discount:</span><span>- AED 0.00</span></div>
-    <div class="row bold"><span>Gross Total:</span><span>AED ${totalAmt.toFixed(2)}</span></div>
-    <div class="row"><span>VAT (5%):</span><span>AED ${vatAmount.toFixed(2)}</span></div>
-    <div class="row total-final"><span>Invoice Amount:</span><span>AED ${totalAmt.toFixed(2)}</span></div>
-    <div class="row total-paid"><span>TOTAL PAID:</span><span>AED ${totalAmt.toFixed(2)}</span></div>
+    <div class="row"><span>Subscription Total (Incl. VAT):</span><span>${currencyCode} ${totalAmt.toFixed(2)}</span></div>
+    <div class="row bold" style="color:#c00"><span>Discount:</span><span>- ${currencyCode} 0.00</span></div>
+    <div class="row bold"><span>Gross Total:</span><span>${currencyCode} ${totalAmt.toFixed(2)}</span></div>
+    <div class="row"><span>VAT (5%):</span><span>${currencyCode} ${vatAmount.toFixed(2)}</span></div>
+    <div class="row total-final"><span>Invoice Amount:</span><span>${currencyCode} ${totalAmt.toFixed(2)}</span></div>
+    <div class="row total-paid"><span>TOTAL PAID:</span><span>${currencyCode} ${totalAmt.toFixed(2)}</span></div>
   </div>
   <hr class="thin"/>
   <div class="payment-box">
@@ -374,8 +376,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           <CardContent>
             {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : (
               <>
-                <div className="text-2xl font-bold">AED {Number(monthlyCollection).toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">Target: AED {monthlyTarget.toLocaleString()}</p>
+                <div className="text-2xl font-bold"><CurrencyGlyph /> {Number(monthlyCollection).toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">Target: <CurrencyGlyph /> {monthlyTarget.toLocaleString()}</p>
               </>
             )}
           </CardContent>
@@ -390,7 +392,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : (
               <>
                 <div className="text-2xl font-bold text-red-600">{overdueCount}</div>
-                <p className="text-xs text-muted-foreground">AED {Number(overdueAmount).toLocaleString()} total</p>
+                <p className="text-xs text-muted-foreground"><CurrencyGlyph /> {Number(overdueAmount).toLocaleString()} total</p>
               </>
             )}
           </CardContent>
@@ -530,7 +532,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         <TableCell>
                           <Badge variant="outline" className="text-xs">{receipt.transaction_type}</Badge>
                         </TableCell>
-                        <TableCell className="font-medium">AED {Number(receipt.amount).toLocaleString()}</TableCell>
+                        <TableCell className="font-medium"><CurrencyGlyph /> {Number(receipt.amount).toLocaleString()}</TableCell>
                         <TableCell>
                           {receipt.transaction_date ? new Date(receipt.transaction_date).toLocaleDateString() : '-'}
                         </TableCell>
@@ -648,7 +650,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         </TableCell>
                         <TableCell>{due.membership ?? '-'}</TableCell>
                         <TableCell className="font-medium text-red-600">
-                          AED {due.amount != null ? Number(due.amount).toLocaleString() : '-'}
+                          <CurrencyGlyph /> {due.amount != null ? Number(due.amount).toLocaleString() : '-'}
                         </TableCell>
                         <TableCell>
                           <div className={due.status === "Overdue" ? "text-red-600 font-medium" : ""}>
@@ -714,7 +716,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span>Total Overdue Amount</span>
-                    <span className="font-bold text-red-600">AED {Number(overdueAmount).toLocaleString()}</span>
+                    <span className="font-bold text-red-600"><CurrencyGlyph /> {Number(overdueAmount).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Overdue Members</span>
@@ -810,8 +812,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                    <YAxis tickFormatter={(v) => `AED ${(v/1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(value: number) => [`AED ${value.toLocaleString()}`, '']} />
+                    <YAxis tickFormatter={(v) => `${currencyCode} ${(v/1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']} />
                     <Legend />
                     <Bar dataKey="collected" fill="#2B7A78" name="Collected" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="target"    fill="#DFF5F4" name="Target"    radius={[4, 4, 0, 0]} />
@@ -825,7 +827,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader><CardTitle>This Month</CardTitle></CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">AED {Number(monthlyCollection).toLocaleString()}</div>
+                <div className="text-3xl font-bold"><CurrencyGlyph /> {Number(monthlyCollection).toLocaleString()}</div>
                 <p className="text-sm text-muted-foreground">
                   {monthlyTarget > 0 ? ((Number(monthlyCollection) / monthlyTarget) * 100).toFixed(1) : 0}% of target
                 </p>
@@ -844,7 +846,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               <CardHeader><CardTitle>Average Monthly</CardTitle></CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">
-                  AED {chartData.length > 0
+                  <CurrencyGlyph /> {chartData.length > 0
                     ? Math.round(chartData.reduce((s, d) => s + d.collected, 0) / chartData.length).toLocaleString()
                     : 0}
                 </div>
@@ -890,7 +892,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-sm font-medium">{method}</p>
                             <div className="flex items-center gap-3">
-                              <span className="text-sm text-muted-foreground">AED {Number(amount).toLocaleString()}</span>
+                              <span className="text-sm text-muted-foreground"><CurrencyGlyph /> {Number(amount).toLocaleString()}</span>
                               <span className="text-sm font-semibold text-blue-600">{pct.toFixed(1)}%</span>
                             </div>
                           </div>
@@ -902,7 +904,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                     })}
                   <div className="flex justify-between p-3 bg-slate-50 rounded-lg mt-2">
                     <span className="font-medium">Total Collected This Month</span>
-                    <span className="font-bold">AED {totalBreakdown.toLocaleString()}</span>
+                    <span className="font-bold"><CurrencyGlyph /> {totalBreakdown.toLocaleString()}</span>
                   </div>
                 </div>
               )}
@@ -971,7 +973,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                 <Separator />
                 <div className="flex justify-between">
                   <span className="font-medium">Total Amount:</span>
-                  <span className="font-bold text-lg">AED {Number(selectedReceipt.amount).toLocaleString()}</span>
+                  <span className="font-bold text-lg"><CurrencyGlyph /> {Number(selectedReceipt.amount).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -1048,7 +1050,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             </DialogTitle>
             <DialogDescription>
               {reminderMember
-                ? `Amount due: AED ${Number(reminderMember.amount ?? 0).toLocaleString()} · Due: ${reminderMember.due_date ?? '-'}`
+                ? `Amount due: ${currencyCode} ${Number(reminderMember.amount ?? 0).toLocaleString()} · Due: ${reminderMember.due_date ?? '-'}`
                 : `Send a payment reminder to all ${memberDues.length} member(s) with outstanding dues`}
             </DialogDescription>
           </DialogHeader>
@@ -1095,7 +1097,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </DialogHeader>
           <div className="py-4 space-y-2">
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
-              <strong>Outstanding Amount:</strong> AED {Number(freezeMember?.amount ?? 0).toLocaleString()} · {freezeMember?.days_overdue ?? 0} days overdue
+              <strong>Outstanding Amount:</strong> <CurrencyGlyph /> {Number(freezeMember?.amount ?? 0).toLocaleString()} · {freezeMember?.days_overdue ?? 0} days overdue
             </div>
           </div>
           <DialogFooter>

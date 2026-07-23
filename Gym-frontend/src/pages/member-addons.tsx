@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   Search,
   Plus,
@@ -200,6 +201,7 @@ const availableAddons: Addon[] = [
 
 
 export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
+  const { currencyCode } = useCurrency();
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -448,7 +450,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">AED {totalRevenue}</p>
+                <p className="text-2xl font-bold"><CurrencyGlyph /> {totalRevenue}</p>
                 <p className="text-xs text-muted-foreground mt-1">From add-on sales</p>
               </CardContent>
             </Card>
@@ -502,7 +504,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                     <TableHead>Add-on Name</TableHead>
                     <TableHead>Purchase Date</TableHead>
                     <TableHead>Expiry Date</TableHead>
-                    <TableHead>Amount (AED)</TableHead>
+                    <TableHead>Amount ({currencyCode})</TableHead>
                     <TableHead>Payment Mode</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -719,7 +721,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                             <HiOutlineClock className="h-4 w-4 shrink-0" />
                             {addon.validity} days
                           </div>
-                          <span className="text-sm font-bold text-primary">AED {addon.price}</span>
+                          <span className="text-sm font-bold text-primary"><CurrencyGlyph /> {addon.price}</span>
                         </div>
                         <Button
                           size="sm"
@@ -799,7 +801,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="amount" className="text-xs font-medium">Amount (AED)</Label>
+                  <Label htmlFor="amount" className="text-xs font-medium">Amount ({currencyCode})</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -895,7 +897,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
           <div className="px-8 py-6 space-y-2">
             {[
               { label: "Add-on", value: selectedAddon?.name },
-              { label: "Amount", value: `AED ${customAmount}` },
+              { label: "Amount", value: `${currencyCode} ${customAmount}` },
               { label: "Payment", value: paymentMethod },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between text-sm">

@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { plansService, Plan as MembershipPlanData } from '../utils/supabase/plans-service';
 import { membersService } from '../utils/supabase/members-service';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -91,6 +92,7 @@ interface AddMemberProps {
 export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { memberId: routeMemberId } = useParams();
   const navigate = useNavigate();
+  const { currencyCode } = useCurrency();
   const isEditMode = Boolean(routeMemberId);
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
@@ -1410,10 +1412,10 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         </div>
                         <div className="text-right">
                           <div className="text-3xl font-bold text-purple-600">
-                            {Math.round(discountedPrice * 100) / 100} <span className="text-lg text-gray-500">AED</span>
+                            {Math.round(discountedPrice * 100) / 100} <span className="text-lg text-gray-500"><CurrencyGlyph /></span>
                           </div>
                           {originalPrice && (
-                            <div className="text-sm text-gray-500 line-through">{originalPrice} AED</div>
+                            <div className="text-sm text-gray-500 line-through"><CurrencyGlyph /> {originalPrice}</div>
                           )}
                           {plan.discount && Number(plan.discount) > 0 && (
                             <div className="text-xs text-green-600 font-semibold">{plan.discount}% OFF</div>
@@ -1467,8 +1469,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     <div>
                       <p className="font-semibold text-green-800">Plan Selected</p>
                       <p className="text-sm text-green-600">
-                        {getMembershipDetails().name} — {getMembershipDetails().price} AED
-                        {getMembershipDetails().savings ? ` (Save ${getMembershipDetails().savings} AED)` : ''}
+                        {getMembershipDetails().name} — <CurrencyGlyph /> {getMembershipDetails().price}
+                        {getMembershipDetails().savings ? ` (Save ${currencyCode} ${getMembershipDetails().savings})` : ''}
                       </p>
                     </div>
                   </div>
@@ -2199,16 +2201,16 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-blue-900">
-                      {getMembershipDetails().price} <span className="text-sm text-blue-600">AED</span>
+                      {getMembershipDetails().price} <span className="text-sm text-blue-600"><CurrencyGlyph /></span>
                     </div>
                     {getMembershipDetails().originalPrice && (
                       <div className="text-xs text-blue-600 line-through">
-                        {getMembershipDetails().originalPrice} AED
+                        <CurrencyGlyph /> {getMembershipDetails().originalPrice}
                       </div>
                     )}
                     {getMembershipDetails().savings && (
                       <div className="text-xs text-green-600 font-semibold">
-                        Save {getMembershipDetails().savings} AED
+                        Save <CurrencyGlyph /> {getMembershipDetails().savings}
                       </div>
                     )}
                   </div>
@@ -2227,13 +2229,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         </span>
                       </div>
                       <span className="font-semibold text-green-600">
-                        - {discountAmount.toFixed(2)} AED
+                        - <CurrencyGlyph /> {discountAmount.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-200">
                       <span className="font-semibold text-blue-900">Final Amount:</span>
                       <span className="text-2xl font-bold text-green-600">
-                        {getFinalPrice().toFixed(2)} <span className="text-sm">AED</span>
+                        {getFinalPrice().toFixed(2)} <span className="text-sm"><CurrencyGlyph /></span>
                       </span>
                     </div>
                   </div>
@@ -2266,7 +2268,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         <span className="ml-4 text-green-600 font-semibold">
                           {discount.discountType === 'percentage' 
                             ? `${discount.discountValue}% Off` 
-                            : `AED ${discount.discountValue} Off`}
+                            : `${currencyCode} ${discount.discountValue} Off`}
                         </span>
                       </div>
                     </SelectItem>
@@ -2284,7 +2286,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </span>
                     </div>
                     <span className="font-semibold text-green-600">
-                      Save {discountAmount.toFixed(2)} AED
+                      Save <CurrencyGlyph /> {discountAmount.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -2466,7 +2468,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div>
                     <Label htmlFor="cashAmount" className="flex items-center space-x-2">
                       <FaMoneyBillWave className="h-4 w-4 text-green-600" />
-                      <span>Cash Amount (AED)</span>
+                      <span>Cash Amount ({currencyCode})</span>
                     </Label>
                     <Input
                       id="cashAmount"
@@ -2487,7 +2489,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div>
                     <Label htmlFor="cardAmount" className="flex items-center space-x-2">
                       <FaCreditCard className="h-4 w-4 text-blue-600" />
-                      <span>Card Amount (AED)</span>
+                      <span>Card Amount ({currencyCode})</span>
                     </Label>
                     <Input
                       id="cardAmount"
@@ -2518,7 +2520,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         ? 'text-green-600' 
                         : 'text-red-600'
                     }`}>
-                      {(splitPayment.cash + splitPayment.card).toFixed(2)} AED
+                      <CurrencyGlyph /> {(splitPayment.cash + splitPayment.card).toFixed(2)}
                     </span>
                     {validateSplitPayment() ? (
                       <Badge className="bg-green-100 text-green-800">
@@ -2537,7 +2539,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {!validateSplitPayment() && (
                   <p className="text-sm text-red-600 flex items-center space-x-1">
                     <FaXmark className="h-4 w-4" />
-                    <span>Split amounts must equal the final amount of {getFinalPrice().toFixed(2)} AED</span>
+                    <span>Split amounts must equal the final amount of <CurrencyGlyph /> {getFinalPrice().toFixed(2)}</span>
                   </p>
                 )}
               </div>
@@ -2556,7 +2558,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div>
                     <Label htmlFor="paidAmount" className="flex items-center space-x-2">
                       <FaDollarSign className="h-4 w-4 text-green-600" />
-                      <span>Paid Amount (AED)</span>
+                      <span>Paid Amount ({currencyCode})</span>
                       <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -2576,7 +2578,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </p>
                     )}
                     <p className="text-xs text-green-600 mt-1">
-                      Minimum required: {getFinalPrice().toFixed(2)} AED
+                      Minimum required: <CurrencyGlyph /> {getFinalPrice().toFixed(2)}
                     </p>
                   </div>
 
@@ -2584,7 +2586,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div>
                     <Label className="flex items-center space-x-2">
                       <FaArrowsLeftRight className="h-4 w-4 text-green-600" />
-                      <span>Pay Back Amount (AED)</span>
+                      <span>Pay Back Amount ({currencyCode})</span>
                     </Label>
                     <div className="mt-1 px-3 py-2 bg-green-100 border border-green-300 rounded-md min-h-[40px] flex items-center">
                       <span className="font-semibold text-green-800">
@@ -2608,23 +2610,23 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Final Amount:</span>
-                        <span className="font-semibold">{getFinalPrice().toFixed(2)} AED</span>
+                        <span className="font-semibold"><CurrencyGlyph /> {getFinalPrice().toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Paid Amount:</span>
                         <span className="font-semibold text-blue-600">
-                          {parseFloat(paymentData.paidAmount || '0').toFixed(2)} AED
+                          <CurrencyGlyph /> {parseFloat(paymentData.paidAmount || '0').toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Pay Back:</span>
                         <span className="font-semibold text-green-600">
-                          {(() => {
+                          <CurrencyGlyph /> {(() => {
                             const paidAmount = parseFloat(paymentData.paidAmount || '0');
                             const invoiceAmount = getFinalPrice();
                             const payBack = Math.max(0, paidAmount - invoiceAmount);
                             return payBack.toFixed(2);
-                          })()} AED
+                          })()}
                         </span>
                       </div>
                     </div>
@@ -2637,7 +2639,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       if (payBack > 0) {
                         return (
                           <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
-                            <strong>Cash Return Required:</strong> Return {payBack.toFixed(2)} AED to customer
+                            <strong>Cash Return Required:</strong> Return <CurrencyGlyph /> {payBack.toFixed(2)} to customer
                           </div>
                         );
                       } else if (paidAmount === invoiceAmount && paidAmount > 0) {
@@ -2666,7 +2668,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div>
                     <Label htmlFor="receivedAmount" className="flex items-center space-x-2">
                       <FaDollarSign className="h-4 w-4 text-orange-600" />
-                      <span>Received Amount (AED)</span>
+                      <span>Received Amount ({currencyCode})</span>
                     </Label>
                     <Input
                       id="receivedAmount"
@@ -2718,31 +2720,31 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Final Amount:</span>
-                      <span className="font-semibold">{getFinalPrice().toFixed(2)} AED</span>
+                      <span className="font-semibold"><CurrencyGlyph /> {getFinalPrice().toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Received Amount:</span>
                       <span className="font-semibold text-green-600">
-                        {parseFloat(paymentData.receivedAmount || '0').toFixed(2)} AED
+                        <CurrencyGlyph /> {parseFloat(paymentData.receivedAmount || '0').toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Remaining/Due:</span>
                       <span className={`font-semibold ${paymentData.remainingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {paymentData.remainingAmount.toFixed(2)} AED
+                        <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)}
                       </span>
                     </div>
                   </div>
                   
                   {paymentData.remainingAmount > 0 && (
                     <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                      <strong>Note:</strong> Member will have an outstanding balance of {paymentData.remainingAmount.toFixed(2)} AED due by {paymentData.paymentDueDate || '[Date Required]'}
+                      <strong>Note:</strong> Member will have an outstanding balance of <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)} due by {paymentData.paymentDueDate || '[Date Required]'}
                     </div>
                   )}
                   
                   {paymentData.remainingAmount === 0 && paymentData.receivedAmount === '' && (
                     <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-800">
-                      <strong>Full Credit:</strong> Member will have the entire final amount ({getFinalPrice().toFixed(2)} AED) on credit
+                      <strong>Full Credit:</strong> Member will have the entire final amount (<CurrencyGlyph /> {getFinalPrice().toFixed(2)}) on credit
                     </div>
                   )}
                 </div>

@@ -13,6 +13,7 @@ public class ProductRequestDTO {
     private Boolean hasVariants;
     private Boolean hasRecipe;
     private Boolean isManufactured;
+    private Boolean enabledForPos;
     private List<String> imageUrls;
     private String barcode;
     private String barcodeTemplate;
@@ -56,6 +57,9 @@ public class ProductRequestDTO {
 
     public Boolean getIsManufactured() { return isManufactured; }
     public void setIsManufactured(Boolean isManufactured) { this.isManufactured = isManufactured; }
+
+    public Boolean getEnabledForPos() { return enabledForPos; }
+    public void setEnabledForPos(Boolean enabledForPos) { this.enabledForPos = enabledForPos; }
 
     public List<String> getImageUrls() { return imageUrls; }
     public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }

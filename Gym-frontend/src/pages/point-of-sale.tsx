@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useCurrency, CurrencyValue, CurrencyGlyph } from '../utils/currency';
 import { toast } from 'sonner';
 import { posService, PosSession as PosSessionType, SaleTransactionRequest, SaleTransaction } from '../utils/supabase/pos-service';
 import { productsService, Product } from '../utils/supabase/products-service';
 import { membersService } from '../utils/supabase/members-service';
+import { useFavorites } from '../hooks/useFavorites';
+import { POSProductCard } from '../components/shared/POSProductCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -53,7 +57,8 @@ import {
   X,
   Coffee,
   Lock,
-  Unlock
+  Unlock,
+  Heart
 } from 'lucide-react';
 
 interface CashMovement {
@@ -131,6 +136,7 @@ interface POSSession {
 }
 
 export function PointOfSale() {
+  const { currencyCode } = useCurrency();
   const [currentView, setCurrentView] = useState<'dashboard' | 'touch-screen' | 'z-report' | 'x-report' | 'customer' | 'cash-drop'>('dashboard');
   const [currentSession, setCurrentSession] = useState<POSSession | null>(null);
   const [showStartSessionDialog, setShowStartSessionDialog] = useState(false);
@@ -144,6 +150,7 @@ export function PointOfSale() {
   const [memberSearch, setMemberSearch] = useState('');
   const [searchedMembers, setSearchedMembers] = useState<any[]>([]);
   const [selectedMember, setSelectedMember] = useState<{ id: number; name: string; memberId: string } | null>(null);
+  const [walkInSelected, setWalkInSelected] = useState(false);
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const memberSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [customersList, setCustomersList] = useState<any[]>([]);
@@ -161,6 +168,7 @@ export function PointOfSale() {
 
   // Touch screen POS states
   const [selectedCategory, setSelectedCategory] = useState('supplements');
+  const { isFavorite, toggleFavorite, favoriteIds } = useFavorites();
   const [currentInvoice, setCurrentInvoice] = useState<Invoice>({
     items: [],
     subtotal: 0,
@@ -227,7 +235,7 @@ export function PointOfSale() {
   useEffect(() => {
     // Load API products
     setLoadingProducts(true);
-    productsService.getProducts({ size: 200, status: 'ACTIVE' })
+    productsService.getProducts({ size: 200, status: 'ACTIVE', enabledForPos: true })
       .then(res => setApiProducts(res.products))
       .catch(() => {/* fall back to empty – UI shows no items */})
       .finally(() => setLoadingProducts(false));
@@ -288,8 +296,6 @@ export function PointOfSale() {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  const formatCurrency = (amount: number) => `AED ${amount.toFixed(2)}`;
-
   const calculateDenominationTotal = (denom: Record<string, number>) => {
     return Object.entries(denom).reduce((total, [note, count]) => {
       return total + (parseInt(note) * count);
@@ -345,7 +351,7 @@ export function PointOfSale() {
     }
   };
 
-  const addToInvoice = (product: any) => {
+  const addToInvoice = useCallback((product: any) => {
     setCurrentInvoice(prev => {
       const existingItem = prev.items.find(item => item.id === product.id);
       let newItems;
@@ -375,7 +381,8 @@ export function PointOfSale() {
       
       return recalculateInvoice(newItems);
     });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -485,6 +492,7 @@ export function PointOfSale() {
       setShowPaymentDialog(false);
       setReceivedAmount('');
       setSelectedMember(null);
+      setWalkInSelected(false);
       setMemberSearch('');
     } catch (err: any) {
       toast.error(err.message || 'Payment failed');
@@ -557,7 +565,7 @@ export function PointOfSale() {
         }
       );
       if (res.ok) {
-        toast.success(`Cash ${cashDropType === 'in' ? 'drop' : 'out'} recorded: AED ${parseFloat(cashDropAmount).toFixed(2)}`);
+        toast.success(`Cash ${cashDropType === 'in' ? 'drop' : 'out'} recorded: ${currencyCode} ${parseFloat(cashDropAmount).toFixed(2)}`);
         setCashDropAmount('');
         setCashDropDescription('');
         setShowCashDropDialog(false);
@@ -588,7 +596,7 @@ export function PointOfSale() {
 
   const printReceipt = (txn: SaleTransaction) => {
     const items = (txn.items || []).map(item =>
-      `<tr><td>${item.productName}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:right">AED ${Number(item.unitPrice).toFixed(2)}</td><td style="text-align:right">AED ${Number(item.totalAmount).toFixed(2)}</td></tr>`
+      `<tr><td>${item.productName}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:right">${currencyCode} ${Number(item.unitPrice).toFixed(2)}</td><td style="text-align:right">${currencyCode} ${Number(item.totalAmount).toFixed(2)}</td></tr>`
     ).join('');
     const w = window.open('', '_blank', 'width=420,height=650');
     if (!w) return;
@@ -597,9 +605,9 @@ export function PointOfSale() {
       <body><h2>GYM PRO</h2><p style="text-align:center">Sales Receipt</p><hr>
       <p>TXN: ${txn.transactionNumber}</p><p>Date: ${new Date(txn.createdAt).toLocaleString()}</p><p>Customer: ${txn.memberName}</p><p>Status: ${txn.status}</p><hr>
       <table><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>${items}</tbody></table><hr>
-      <p class="right">Subtotal: AED ${Number(txn.subtotal).toFixed(2)}</p>
-      <p class="right">VAT (5%): AED ${Number(txn.taxAmount).toFixed(2)}</p>
-      <p class="right" style="font-size:15px;font-weight:bold">TOTAL: AED ${Number(txn.totalAmount).toFixed(2)}</p>
+      <p class="right">Subtotal: ${currencyCode} ${Number(txn.subtotal).toFixed(2)}</p>
+      <p class="right">VAT (5%): ${currencyCode} ${Number(txn.taxAmount).toFixed(2)}</p>
+      <p class="right" style="font-size:15px;font-weight:bold">TOTAL: ${currencyCode} ${Number(txn.totalAmount).toFixed(2)}</p>
       <p>Payment: ${txn.paymentMethod}</p><p style="text-align:center;margin-top:20px">Thank you for your visit!</p>
       </body></html>`);
     w.document.close();
@@ -640,7 +648,7 @@ export function PointOfSale() {
     const customer = customersList.find(c => String(c.id) === statementCustomerId);
     if (!customer || statementTransactions.length === 0) { toast.error('No statement data to print'); return; }
     const rows = statementTransactions.map(t =>
-      `<tr><td>${t.transactionNumber}</td><td>${new Date(t.createdAt).toLocaleDateString()}</td><td>${t.memberName}</td><td>${t.paymentMethod}</td><td style="text-align:right">AED ${Number(t.totalAmount).toFixed(2)}</td></tr>`
+      `<tr><td>${t.transactionNumber}</td><td>${new Date(t.createdAt).toLocaleDateString()}</td><td>${t.memberName}</td><td>${t.paymentMethod}</td><td style="text-align:right">${currencyCode} ${Number(t.totalAmount).toFixed(2)}</td></tr>`
     ).join('');
     const total = statementTransactions.reduce((sum, t) => sum + Number(t.totalAmount), 0);
     const w = window.open('', '_blank');
@@ -649,7 +657,7 @@ export function PointOfSale() {
       <style>body{font-family:Arial,sans-serif;margin:20px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #ddd}th{background:#f9fafb}.total{font-weight:bold;font-size:15px}</style></head>
       <body><h2>Customer Statement</h2><p><strong>Customer:</strong> ${customer.name}</p><p><strong>Member ID:</strong> ${customer.member_id || '-'}</p><hr>
       <table><thead><tr><th>Transaction</th><th>Date</th><th>Customer</th><th>Method</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="total">Total: AED ${total.toFixed(2)}</p></body></html>`);
+      <p class="total">Total: ${currencyCode} ${total.toFixed(2)}</p></body></html>`);
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 300);
@@ -658,27 +666,44 @@ export function PointOfSale() {
   const handleRecordPayment = () => {
     const customer = customersList.find(c => String(c.id) === recordPayCustomerId);
     if (!customer || !recordPayAmount) { toast.error('Please select a customer and enter amount'); return; }
-    toast.success(`Payment of AED ${parseFloat(recordPayAmount).toFixed(2)} recorded for ${customer.name}`);
+    toast.success(`Payment of ${currencyCode} ${parseFloat(recordPayAmount).toFixed(2)} recorded for ${customer.name}`);
     setRecordPayCustomerId(''); setRecordPayAmount(''); setRecordPayMethod('cash'); setRecordPayNotes('');
   };
 
   const handleReceiveAdvance = () => {
     const customer = customersList.find(c => String(c.id) === advanceCustomerId);
     if (!customer || !advanceAmount) { toast.error('Please select a customer and enter amount'); return; }
-    toast.success(`Advance of AED ${parseFloat(advanceAmount).toFixed(2)} received from ${customer.name}`);
+    toast.success(`Advance of ${currencyCode} ${parseFloat(advanceAmount).toFixed(2)} received from ${customer.name}`);
     setAdvanceCustomerId(''); setAdvanceAmount(''); setAdvanceMethod('cash'); setAdvancePurpose('');
   };
 
-  const filteredProducts = apiProducts.filter(product => {
-    const catMatch = selectedCategory === 'all' ||
-      (product.categoryName?.toLowerCase().includes(selectedCategory.toLowerCase()));
-    const searchMatch = !searchQuery || product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return catMatch && searchMatch && product.isActive;
-  });
+  // Base pool: only products actually sellable in POS, regardless of category/search/favorites.
+  const posEligibleProducts = useMemo(
+    () => apiProducts.filter(p => p.isActive && p.enabledForPos),
+    [apiProducts]
+  );
+
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return posEligibleProducts.filter(product => {
+      const categoryMatch = selectedCategory === 'favorites'
+        ? favoriteIds.has(product.id)
+        : selectedCategory === 'all' || product.categoryName?.toLowerCase().includes(selectedCategory.toLowerCase());
+      const searchMatch = !q || product.name.toLowerCase().includes(q);
+      return categoryMatch && searchMatch;
+    });
+  }, [posEligibleProducts, selectedCategory, searchQuery, favoriteIds]);
 
   // Count products per category for the sidebar display
-  const productCountByCategory = (catId: string) =>
-    apiProducts.filter(p => p.categoryName?.toLowerCase().includes(catId.toLowerCase()) && p.isActive).length;
+  const productCountByCategory = useCallback(
+    (catId: string) => posEligibleProducts.filter(p => p.categoryName?.toLowerCase().includes(catId.toLowerCase())).length,
+    [posEligibleProducts]
+  );
+
+  const favoritesInPosCount = useMemo(
+    () => posEligibleProducts.filter(p => favoriteIds.has(p.id)).length,
+    [posEligibleProducts, favoriteIds]
+  );
 
   // Dashboard View
   const renderDashboard = () => {
@@ -755,7 +780,7 @@ export function PointOfSale() {
           <CardContent>
             {currentSession?.status === 'active' && (
               <div className="text-sm space-y-1">
-                <p className="text-gray-600">Opening Cash: {formatCurrency(currentSession.openingCash)}</p>
+                <p className="text-gray-600">Opening Cash: <CurrencyValue amount={currentSession.openingCash} /></p>
                 <p className="text-gray-600">Started: {new Date(currentSession.startTime).toLocaleTimeString()}</p>
               </div>
             )}
@@ -862,7 +887,7 @@ export function PointOfSale() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Today's Sales</p>
-                <p className="text-2xl mt-1 text-[#1E293B]">{formatCurrency(todaysSales)}</p>
+                <p className="text-2xl mt-1 text-[#1E293B]"><CurrencyValue amount={todaysSales} /></p>
               </div>
               <TrendingUp className="h-8 w-8 text-[#2B7A78]" />
             </div>
@@ -886,7 +911,7 @@ export function PointOfSale() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Cash in Drawer</p>
-                <p className="text-2xl mt-1 text-[#1E293B]">{formatCurrency(cashInDrawer)}</p>
+                <p className="text-2xl mt-1 text-[#1E293B]"><CurrencyValue amount={cashInDrawer} /></p>
               </div>
               <Wallet className="h-8 w-8 text-[#2B7A78]" />
             </div>
@@ -911,7 +936,11 @@ export function PointOfSale() {
 
   // Touch Screen POS Interface
   const renderTouchScreen = () => (
-    <div className="h-screen flex flex-col bg-[#F9FAFB]">
+    // Body is rendered at `zoom: 0.9` app-wide (see src/styles/index.css), which shrinks
+    // raw viewport units visually. A plain 100dvh box would then only fill ~90% of the
+    // screen, leaving a blank gap at the bottom. Compensate the same way the sidebar does
+    // (`calc(100svh / 0.9)` in index.css) so this root always fills the true viewport.
+    <div className="flex flex-col bg-[#F9FAFB] overflow-hidden" style={{ height: 'calc(100dvh / 0.9)' }}>
       {/* Top Bar */}
       <div className="bg-white/95 backdrop-blur border-b border-gray-200 px-6 py-4 flex-shrink-0 sticky top-0 z-20">
         <div className="flex items-center justify-between">
@@ -1002,7 +1031,7 @@ export function PointOfSale() {
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Panel - Categories */}
         <div className="w-56 bg-white border-r border-gray-200 flex-shrink-0 overflow-y-auto">
           <div className="p-4 border-b">
@@ -1010,11 +1039,38 @@ export function PointOfSale() {
             <div className="flex items-center justify-between mt-1">
               <p className="text-sm font-semibold text-[#1E293B]">All Products</p>
               <Badge variant="outline" className="border-[#2B7A78] text-[#2B7A78]">
-                {apiProducts.filter(p => p.isActive).length}
+                {posEligibleProducts.length}
               </Badge>
             </div>
           </div>
           <div className="p-3 space-y-2">
+            <Button
+              key="favorites-category-button"
+              onClick={() => setSelectedCategory('favorites')}
+              variant="ghost"
+              className={`w-full justify-start h-auto py-3 border-l-4 ${
+                selectedCategory === 'favorites'
+                  ? 'border-l-[#b91c1c]'
+                  : 'text-[#1E293B] hover:text-[#1E293B] border-l-transparent hover:border-l-[#EF4444]'
+              }`}
+              style={
+                selectedCategory === 'favorites'
+                  ? { backgroundColor: '#EF4444', color: '#ffffff' }
+                  : undefined
+              }
+            >
+              <Heart
+                className="h-5 w-5 mr-2 shrink-0"
+                fill={selectedCategory === 'favorites' ? '#ffffff' : '#EF4444'}
+                color={selectedCategory === 'favorites' ? '#ffffff' : '#EF4444'}
+              />
+              <div className="text-left flex-1 min-w-0">
+                <div className="text-sm block whitespace-nowrap overflow-hidden text-ellipsis">Favorites</div>
+                <div className="text-xs opacity-75 block whitespace-nowrap overflow-hidden text-ellipsis">
+                  {favoritesInPosCount} items
+                </div>
+              </div>
+            </Button>
             <Button
               onClick={() => setSelectedCategory('all')}
               variant="ghost"
@@ -1028,7 +1084,7 @@ export function PointOfSale() {
               <div className="text-left">
                 <div className="text-sm">All Items</div>
                 <div className="text-xs opacity-75">
-                  {apiProducts.filter(p => p.isActive).length} items
+                  {posEligibleProducts.length} items
                 </div>
               </div>
             </Button>
@@ -1056,7 +1112,7 @@ export function PointOfSale() {
         </div>
 
         {/* Center Panel - Products */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           {/* Search */}
           <div className="bg-white border-b border-gray-200 p-4">
             <div className="relative">
@@ -1071,49 +1127,49 @@ export function PointOfSale() {
           </div>
 
           {/* Product Grid */}
-          <div className="flex-1 p-4 overflow-y-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map((product) => {
-                const imageUrl = product.imageUrls?.[0] || (product as any).imageUrl || (product as any).image_url;
-                return (
-                  <Card 
-                    key={product.id}
-                    className="group cursor-pointer border border-transparent bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#2B7A78] hover:shadow-lg"
-                    onClick={() => addToInvoice(product)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="aspect-square bg-gradient-to-br from-[#F9FAFB] to-white rounded-lg mb-3 flex items-center justify-center border-2 border-gray-100 overflow-hidden">
-                        {imageUrl ? (
-                          <img src={imageUrl} alt={product.name} className="h-full w-full object-cover" />
-                        ) : (
-                          <Package className="h-12 w-12 text-[#2B7A78] opacity-30" />
-                        )}
-                      </div>
-                      <h3 className="text-sm mb-2 line-clamp-2 text-[#1E293B]">{product.name}</h3>
-                      <p className="text-xs text-gray-500 mb-2">
-                        {(product.sku || (product as any).code || 'SKU N/A')} • {product.categoryName || 'General'}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <p className="text-lg font-semibold text-[#2B7A78]">
-                          {formatCurrency(product.sellingPrice ?? (product as any).price ?? 0)}
-                        </p>
-                        <Badge
-                          variant={(product.totalStock ?? (product as any).stock ?? 0) > 10 ? 'default' : 'destructive'}
-                          className={(product.totalStock ?? (product as any).stock ?? 0) > 10 ? 'bg-[#2B7A78]/10 text-[#2B7A78]' : ''}
-                        >
-                          {product.totalStock ?? (product as any).stock ?? 0}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+          <div className="flex-1 min-h-0 w-full h-full overflow-y-auto">
+            <AnimatePresence mode="wait" initial={false}>
+              {filteredProducts.length === 0 && selectedCategory === 'favorites' ? (
+                <motion.div
+                  key="favorites-empty"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                  className="flex h-full flex-col items-center justify-center py-12 text-center text-gray-500"
+                >
+                  <Heart className="h-16 w-16 mb-3 text-gray-300" strokeWidth={1.5} />
+                  <p className="text-sm font-medium text-gray-600">No favorite products yet</p>
+                  <p className="mt-1 max-w-xs text-xs text-gray-400">
+                    Tap the heart icon on products to add them here.
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={`${selectedCategory}-${searchQuery}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-4 pb-10"
+                >
+                  {filteredProducts.map((product) => (
+                    <POSProductCard
+                      key={product.id}
+                      product={product}
+                      isFavorite={isFavorite(product.id)}
+                      onToggleFavorite={toggleFavorite}
+                      onAddToCart={addToInvoice}
+                    />
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
         {/* Right Panel - Cart */}
-        <div className="w-96 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
+        <div className="w-96 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 min-h-0">
           {/* Customer Selection */}
           <div className="p-4 border-b border-gray-200 relative">
             <Label className="text-[#1E293B]">Customer</Label>
@@ -1132,20 +1188,35 @@ export function PointOfSale() {
                   <X className="h-3 w-3" />
                 </Button>
               </div>
+            ) : walkInSelected ? (
+              <div className="mt-2 flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-300">
+                <div>
+                  <p className="text-sm text-[#1E293B]">Walk-in Customer</p>
+                  <p className="text-xs text-gray-500">No membership</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setWalkInSelected(false)}
+                  className="h-6 w-6 p-0 text-gray-400"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
             ) : (
               <div className="relative mt-2">
                 <Input
                   placeholder="Search member or Walk-in..."
                   value={memberSearch}
                   onChange={e => setMemberSearch(e.target.value)}
-                  onFocus={() => memberSearch && setShowMemberDropdown(true)}
+                  onFocus={() => setShowMemberDropdown(true)}
                   className="pr-8"
                 />
-                {showMemberDropdown && searchedMembers.length > 0 && (
+                {showMemberDropdown && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto">
                     <div
                       className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 text-gray-600 border-b"
-                      onClick={() => { setSelectedMember(null); setMemberSearch(''); setShowMemberDropdown(false); }}
+                      onClick={() => { setSelectedMember(null); setMemberSearch(''); setShowMemberDropdown(false); setWalkInSelected(true); }}
                     >
                       Walk-in Customer
                     </div>
@@ -1163,6 +1234,9 @@ export function PointOfSale() {
                         <p className="text-xs text-gray-500">{m.member_id || m.phone}</p>
                       </div>
                     ))}
+                    {memberSearch.trim() && searchedMembers.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-gray-400">No matching members</div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1170,7 +1244,7 @@ export function PointOfSale() {
           </div>
 
           {/* Cart Items */}
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h3 className="text-[#1E293B]">Current Sale</h3>
@@ -1230,7 +1304,7 @@ export function PointOfSale() {
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <span className="text-sm text-gray-600">{formatCurrency(item.price)}</span>
+                        <span className="text-sm text-gray-600"><CurrencyValue amount={item.price} /></span>
                       </div>
                       
                       <div className="flex items-center justify-between">
@@ -1246,7 +1320,7 @@ export function PointOfSale() {
                             max="100"
                           />
                         </div>
-                        <span className="text-[#2B7A78]">{formatCurrency(item.total)}</span>
+                        <span className="text-[#2B7A78]"><CurrencyValue amount={item.total} /></span>
                       </div>
                     </div>
                   ))}
@@ -1255,52 +1329,54 @@ export function PointOfSale() {
             </ScrollArea>
           </div>
 
+          {/* Held Invoices Recall — always visible when any exist, regardless of
+              whether the current cart happens to be empty (e.g. right after
+              holding one, which clears the cart by design). */}
+          {heldInvoices.length > 0 && (
+            <div className="p-4 border-t border-gray-200">
+              <Label className="text-xs text-gray-600 mb-2 block">Held Invoices</Label>
+              <div className="flex gap-2 flex-wrap">
+                {heldInvoices.map((_, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => recallInvoice(index)}
+                    className="border-[#2B7A78] text-[#2B7A78]"
+                  >
+                    Recall #{index + 1}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Totals and Payment */}
           {currentInvoice.items.length > 0 && (
             <>
               <div className="p-4 border-t border-gray-200 space-y-2 bg-gradient-to-br from-white to-[#F0FAF9]">
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>Subtotal:</span>
-                  <span>{formatCurrency(currentInvoice.subtotal)}</span>
+                  <span><CurrencyValue amount={currentInvoice.subtotal} /></span>
                 </div>
                 {currentInvoice.totalDiscount > 0 && (
                   <div className="flex justify-between text-sm text-[#E63946]">
                     <span>Discount:</span>
-                    <span>-{formatCurrency(currentInvoice.totalDiscount)}</span>
+                    <span>-<CurrencyValue amount={currentInvoice.totalDiscount} /></span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>VAT (5%):</span>
-                  <span>{formatCurrency(currentInvoice.tax)}</span>
+                  <span><CurrencyValue amount={currentInvoice.tax} /></span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg text-[#1E293B]">
                   <span>Total:</span>
-                  <span>{formatCurrency(currentInvoice.total)}</span>
+                  <span><CurrencyValue amount={currentInvoice.total} /></span>
                 </div>
               </div>
 
               <div className="p-4 border-t border-gray-200 space-y-3">
-                {/* Held Invoices Recall */}
-                {heldInvoices.length > 0 && (
-                  <div>
-                    <Label className="text-xs text-gray-600 mb-2 block">Held Invoices</Label>
-                    <div className="flex gap-2 flex-wrap">
-                      {heldInvoices.map((_, index) => (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => recallInvoice(index)}
-                          className="border-[#2B7A78] text-[#2B7A78]"
-                        >
-                          Recall #{index + 1}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 <div className="grid grid-cols-2 gap-2">
                   <Button 
                     variant="outline"
@@ -1325,7 +1401,7 @@ export function PointOfSale() {
                   className="w-full h-12 rounded-xl bg-[#2B7A78] hover:bg-[#236862] text-white shadow-md hover:shadow-lg"
                 >
                   <CreditCard className="h-5 w-5 mr-2" />
-                  Payment ({formatCurrency(currentInvoice.total)})
+                  Payment (<CurrencyValue amount={currentInvoice.total} />)
                 </Button>
               </div>
             </>
@@ -1377,7 +1453,7 @@ export function PointOfSale() {
             <CardTitle className="text-[#1E293B]">Total Net Sales</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl text-[#2B7A78]">{formatCurrency(sessionReport?.netSales ?? 0)}</p>
+            <p className="text-3xl text-[#2B7A78]"><CurrencyValue amount={sessionReport?.netSales ?? 0} /></p>
             <p className="text-sm text-gray-600 mt-1">Across all sessions</p>
           </CardContent>
         </Card>
@@ -1387,7 +1463,7 @@ export function PointOfSale() {
             <CardTitle className="text-[#1E293B]">Total Returns</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl text-[#E63946]">{formatCurrency(sessionReport?.totalReturns ?? 0)}</p>
+            <p className="text-3xl text-[#E63946]"><CurrencyValue amount={sessionReport?.totalReturns ?? 0} /></p>
             <p className="text-sm text-gray-600 mt-1">{sessionReport?.returnCount ?? 0} return transactions</p>
           </CardContent>
         </Card>
@@ -1432,13 +1508,13 @@ export function PointOfSale() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">{pb.transactionCount}</TableCell>
-                  <TableCell className="text-right text-[#2B7A78]">{formatCurrency(pb.totalAmount)}</TableCell>
+                  <TableCell className="text-right text-[#2B7A78]"><CurrencyValue amount={pb.totalAmount} /></TableCell>
                 </TableRow>
               ))}
               <TableRow className="bg-[#F9FAFB]">
                 <TableCell className="text-[#1E293B]">Total</TableCell>
                 <TableCell className="text-right">{sessionReport?.transactionCount ?? 0}</TableCell>
-                <TableCell className="text-right text-[#1E293B]">{formatCurrency(sessionReport?.netSales ?? 0)}</TableCell>
+                <TableCell className="text-right text-[#1E293B]"><CurrencyValue amount={sessionReport?.netSales ?? 0} /></TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -1463,7 +1539,7 @@ export function PointOfSale() {
                 <TableRow key={cb.categoryName}>
                   <TableCell className="text-[#1E293B]">{cb.categoryName}</TableCell>
                   <TableCell className="text-right">{cb.unitsSold}</TableCell>
-                  <TableCell className="text-right text-[#2B7A78]">{formatCurrency(cb.totalAmount)}</TableCell>
+                  <TableCell className="text-right text-[#2B7A78]"><CurrencyValue amount={cb.totalAmount} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -1479,15 +1555,15 @@ export function PointOfSale() {
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Total Cash Drops (IN)</span>
-              <span className="text-[#2B7A78]">{formatCurrency(sessionReport?.totalCashDrops ?? 0)}</span>
+              <span className="text-[#2B7A78]"><CurrencyValue amount={sessionReport?.totalCashDrops ?? 0} /></span>
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Total Cash Out (Expenses)</span>
-              <span className="text-[#E63946]">{formatCurrency(sessionReport?.totalCashOuts ?? 0)}</span>
+              <span className="text-[#E63946]"><CurrencyValue amount={sessionReport?.totalCashOuts ?? 0} /></span>
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Expected Cash Balance</span>
-              <span className="text-[#1E293B]">{formatCurrency(sessionReport?.expectedCash ?? 0)}</span>
+              <span className="text-[#1E293B]"><CurrencyValue amount={sessionReport?.expectedCash ?? 0} /></span>
             </div>
           </div>
         </CardContent>
@@ -1537,7 +1613,7 @@ export function PointOfSale() {
             <CardTitle className="text-[#1E293B]">Opening Cash</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl text-[#1E293B]">{formatCurrency(currentSession?.openingCash || 0)}</p>
+            <p className="text-3xl text-[#1E293B]"><CurrencyValue amount={currentSession?.openingCash || 0} /></p>
             <p className="text-sm text-gray-600 mt-1">
               {new Date(currentSession?.startTime || '').toLocaleString()}
             </p>
@@ -1549,7 +1625,7 @@ export function PointOfSale() {
             <CardTitle className="text-[#1E293B]">Total Sales</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl text-[#2B7A78]">{formatCurrency(sessionReport?.totalSales ?? 0)}</p>
+            <p className="text-3xl text-[#2B7A78]"><CurrencyValue amount={sessionReport?.totalSales ?? 0} /></p>
             <p className="text-sm text-gray-600 mt-1">{sessionReport?.transactionCount ?? 0} transactions</p>
           </CardContent>
         </Card>
@@ -1560,7 +1636,7 @@ export function PointOfSale() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl text-[#1E293B]">
-              {formatCurrency(sessionReport?.expectedCash ?? (currentSession?.openingCash ?? 0))}
+              <CurrencyValue amount={sessionReport?.expectedCash ?? (currentSession?.openingCash ?? 0)} />
             </p>
             <p className="text-sm text-gray-600 mt-1">Expected cash balance</p>
           </CardContent>
@@ -1591,7 +1667,7 @@ export function PointOfSale() {
                   <TableCell>{txn.memberName}</TableCell>
                   <TableCell className="text-right">{txn.items?.length ?? 0}</TableCell>
                   <TableCell className="text-right text-[#2B7A78]">
-                    {formatCurrency(txn.totalAmount)}
+                    <CurrencyValue amount={txn.totalAmount} />
                   </TableCell>
                   <TableCell>
                     <Badge className={txn.paymentMethod === 'CASH' ? 'bg-[#2B7A78]' : 'bg-blue-500'}>
@@ -1614,7 +1690,7 @@ export function PointOfSale() {
             {(sessionReport?.categoryBreakdown ?? []).map((cb) => (
               <div key={cb.categoryName} className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
                 <span className="text-[#1E293B]">{cb.categoryName}</span>
-                <span className="text-[#2B7A78]">{formatCurrency(cb.totalAmount)} ({cb.unitsSold} units)</span>
+                <span className="text-[#2B7A78]"><CurrencyValue amount={cb.totalAmount} /> ({cb.unitsSold} units)</span>
               </div>
             ))}
           </div>
@@ -1629,40 +1705,40 @@ export function PointOfSale() {
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Opening Cash</span>
-              <span className="text-[#1E293B]">{formatCurrency(currentSession?.openingCash || 0)}</span>
+              <span className="text-[#1E293B]"><CurrencyValue amount={currentSession?.openingCash || 0} /></span>
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Total Cash Sales</span>
-              <span className="text-[#2B7A78]">{formatCurrency(sessionReport?.cashSales ?? 0)}</span>
+              <span className="text-[#2B7A78]"><CurrencyValue amount={sessionReport?.cashSales ?? 0} /></span>
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Cash Drops (IN)</span>
-              <span className="text-[#2B7A78]">{formatCurrency(sessionReport?.totalCashDrops ?? 0)}</span>
+              <span className="text-[#2B7A78]"><CurrencyValue amount={sessionReport?.totalCashDrops ?? 0} /></span>
             </div>
             <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
               <span className="text-[#1E293B]">Cash Out (Expenses)</span>
-              <span className="text-[#E63946]">{formatCurrency(sessionReport?.totalCashOuts ?? 0)}</span>
+              <span className="text-[#E63946]"><CurrencyValue amount={sessionReport?.totalCashOuts ?? 0} /></span>
             </div>
             <Separator />
             <div className="flex justify-between items-center p-3 bg-[#2B7A78] text-white rounded">
               <span className="">Expected Cash Balance</span>
               <span className="">
-                {formatCurrency(expectedCash)}
+                <CurrencyValue amount={expectedCash} />
               </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-100 rounded">
               <span className="text-[#1E293B]">Actual Cash (From Denomination Count)</span>
               <span className="text-[#1E293B]">
-                {formatCurrency(calculateDenominationTotal(closingDenominations))}
+                <CurrencyValue amount={calculateDenominationTotal(closingDenominations)} />
               </span>
             </div>
             {calculateDenominationTotal(closingDenominations) !== expectedCash && (
               <div className="flex justify-between items-center p-3 bg-red-50 rounded border border-[#E63946]">
                 <span className="text-[#E63946]">Variance</span>
                 <span className="text-[#E63946]">
-                  {formatCurrency(
+                  <CurrencyValue amount={
                     calculateDenominationTotal(closingDenominations) - expectedCash
-                  )}
+                  } />
                 </span>
               </div>
             )}
@@ -1742,7 +1818,7 @@ export function PointOfSale() {
                       <TableCell>{customer.phone || '-'}</TableCell>
                       <TableCell className="text-right">
                         <span className={(customer.outstanding_balance ?? 0) > 0 ? 'text-[#2B7A78]' : ''}>
-                          {formatCurrency(customer.outstanding_balance ?? 0)}
+                          <CurrencyValue amount={customer.outstanding_balance ?? 0} />
                         </span>
                       </TableCell>
                       <TableCell>
@@ -1781,7 +1857,7 @@ export function PointOfSale() {
                   <SelectContent>
                     {customersList.map((customer) => (
                       <SelectItem key={customer.id} value={String(customer.id)}>
-                        {customer.name} - Balance: {formatCurrency(customer.outstanding_balance ?? 0)}
+                        {customer.name} - Balance: <CurrencyValue amount={customer.outstanding_balance ?? 0} />
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1790,7 +1866,7 @@ export function PointOfSale() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-[#1E293B]">Payment Amount (AED)</Label>
+                  <Label className="text-[#1E293B]">Payment Amount ({currencyCode})</Label>
                   <Input type="number" placeholder="0.00" value={recordPayAmount} onChange={e => setRecordPayAmount(e.target.value)} />
                 </div>
                 <div>
@@ -1846,7 +1922,7 @@ export function PointOfSale() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-[#1E293B]">Advance Amount (AED)</Label>
+                  <Label className="text-[#1E293B]">Advance Amount ({currencyCode})</Label>
                   <Input type="number" placeholder="0.00" value={advanceAmount} onChange={e => setAdvanceAmount(e.target.value)} />
                 </div>
                 <div>
@@ -1917,7 +1993,7 @@ export function PointOfSale() {
                 <div className="mt-4">
                   <h4 className="text-sm text-[#1E293B] mb-2">
                     {statementTransactions.length} transactions found
-                    &nbsp;| Total: {formatCurrency(statementTransactions.reduce((s, t) => s + Number(t.totalAmount), 0))}
+                    &nbsp;| Total: <CurrencyValue amount={statementTransactions.reduce((s, t) => s + Number(t.totalAmount), 0)} />
                   </h4>
                   <Table>
                     <TableHeader>
@@ -1935,7 +2011,7 @@ export function PointOfSale() {
                           <TableCell className="text-[#1E293B]">{t.transactionNumber}</TableCell>
                           <TableCell>{new Date(t.createdAt).toLocaleDateString()}</TableCell>
                           <TableCell>{t.paymentMethod}</TableCell>
-                          <TableCell className="text-right text-[#2B7A78]">{formatCurrency(Number(t.totalAmount))}</TableCell>
+                          <TableCell className="text-right text-[#2B7A78]"><CurrencyValue amount={Number(t.totalAmount)} /></TableCell>
                           <TableCell>
                             <Badge className={t.status === 'COMPLETED' ? 'bg-[#2B7A78]' : 'bg-[#E63946]'}>{t.status}</Badge>
                           </TableCell>
@@ -1989,7 +2065,7 @@ export function PointOfSale() {
               <div className="grid grid-cols-2 gap-3">
                 {Object.keys(denominations).map((note) => (
                   <div key={note} className="flex items-center space-x-3">
-                    <Label className="w-24 text-[#1E293B]">AED {note}:</Label>
+                    <Label className="w-24 text-[#1E293B]"><CurrencyGlyph /> {note}:</Label>
                     <Input
                       type="number"
                       min="0"
@@ -2003,7 +2079,7 @@ export function PointOfSale() {
                       className="flex-1"
                     />
                     <span className="w-24 text-right text-sm text-gray-600">
-                      = AED {(parseInt(note) * denominations[note as keyof typeof denominations]).toFixed(2)}
+                      = <CurrencyGlyph /> {(parseInt(note) * denominations[note as keyof typeof denominations]).toFixed(2)}
                     </span>
                   </div>
                 ))}
@@ -2014,7 +2090,7 @@ export function PointOfSale() {
               <div className="flex justify-between items-center">
                 <span>Total Opening Cash:</span>
                 <span className="text-2xl">
-                  {formatCurrency(calculateDenominationTotal(denominations))}
+                  <CurrencyValue amount={calculateDenominationTotal(denominations)} />
                 </span>
               </div>
             </div>
@@ -2055,7 +2131,7 @@ export function PointOfSale() {
               <div className="grid grid-cols-2 gap-3">
                 {Object.keys(closingDenominations).map((note) => (
                   <div key={note} className="flex items-center space-x-3">
-                    <Label className="w-24 text-[#1E293B]">AED {note}:</Label>
+                    <Label className="w-24 text-[#1E293B]"><CurrencyGlyph /> {note}:</Label>
                     <Input
                       type="number"
                       min="0"
@@ -2069,7 +2145,7 @@ export function PointOfSale() {
                       className="flex-1"
                     />
                     <span className="w-24 text-right text-sm text-gray-600">
-                      = AED {(parseInt(note) * closingDenominations[note as keyof typeof closingDenominations]).toFixed(2)}
+                      = <CurrencyGlyph /> {(parseInt(note) * closingDenominations[note as keyof typeof closingDenominations]).toFixed(2)}
                     </span>
                   </div>
                 ))}
@@ -2080,22 +2156,22 @@ export function PointOfSale() {
               <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
                 <span className="text-[#1E293B]">Expected Cash:</span>
                 <span className="text-[#1E293B]">
-                  {formatCurrency(sessionReport?.expectedCash ?? ((currentSession?.openingCash ?? 0) + (sessionReport?.cashSales ?? 0) + (sessionReport?.totalCashDrops ?? 0) - (sessionReport?.totalCashOuts ?? 0)))}
+                  <CurrencyValue amount={sessionReport?.expectedCash ?? ((currentSession?.openingCash ?? 0) + (sessionReport?.cashSales ?? 0) + (sessionReport?.totalCashDrops ?? 0) - (sessionReport?.totalCashOuts ?? 0))} />
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
                 <span className="text-[#1E293B]">Actual Cash (Counted):</span>
                 <span className="text-[#2B7A78]">
-                  {formatCurrency(calculateDenominationTotal(closingDenominations))}
+                  <CurrencyValue amount={calculateDenominationTotal(closingDenominations)} />
                 </span>
               </div>
               {calculateDenominationTotal(closingDenominations) !== (sessionReport?.expectedCash ?? ((currentSession?.openingCash ?? 0) + (sessionReport?.cashSales ?? 0) + (sessionReport?.totalCashDrops ?? 0) - (sessionReport?.totalCashOuts ?? 0))) && (
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded border border-[#E63946]">
                   <span className="text-[#E63946]">Variance:</span>
                   <span className="text-[#E63946]">
-                    {formatCurrency(
+                    <CurrencyValue amount={
                       calculateDenominationTotal(closingDenominations) - (sessionReport?.expectedCash ?? ((currentSession?.openingCash ?? 0) + (sessionReport?.cashSales ?? 0) + (sessionReport?.totalCashDrops ?? 0) - (sessionReport?.totalCashOuts ?? 0)))
-                    )}
+                    } />
                   </span>
                 </div>
               )}
@@ -2127,7 +2203,7 @@ export function PointOfSale() {
           <DialogHeader>
             <DialogTitle className="text-[#1E293B]">Process Payment</DialogTitle>
             <DialogDescription>
-              Total Amount: {formatCurrency(currentInvoice.total)}
+              Total Amount: <CurrencyValue amount={currentInvoice.total} />
             </DialogDescription>
           </DialogHeader>
           
@@ -2173,7 +2249,7 @@ export function PointOfSale() {
                 {parseFloat(receivedAmount) > currentInvoice.total && (
                   <div className="mt-2 p-2 bg-green-50 rounded">
                     <p className="text-sm text-green-700">
-                      Change: {formatCurrency(parseFloat(receivedAmount) - currentInvoice.total)}
+                      Change: <CurrencyValue amount={parseFloat(receivedAmount) - currentInvoice.total} />
                     </p>
                   </div>
                 )}
@@ -2202,7 +2278,7 @@ export function PointOfSale() {
 
       {/* Sales Return / Handle Returns Dialog */}
       <Dialog open={showSalesReturnDialog} onOpenChange={setShowSalesReturnDialog}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="sm:max-w-3xl w-[95vw]">
           <DialogHeader>
             <DialogTitle className="text-[#1E293B]">Sales Return / Refund</DialogTitle>
             <DialogDescription>Select a completed transaction to refund. Stock will be restored automatically.</DialogDescription>
@@ -2213,52 +2289,69 @@ export function PointOfSale() {
               value={returnFilter}
               onChange={e => setReturnFilter(e.target.value)}
             />
-            <ScrollArea className="h-80">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#F9FAFB]">
-                    <TableHead>Transaction</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {realTransactions
-                    .filter(t => {
-                      const q = returnFilter.toLowerCase();
-                      return !q || t.transactionNumber.toLowerCase().includes(q) || t.memberName.toLowerCase().includes(q);
-                    })
-                    .map(txn => (
-                    <TableRow key={txn.id}>
-                      <TableCell className="text-[#1E293B]">{txn.transactionNumber}</TableCell>
-                      <TableCell>{new Date(txn.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</TableCell>
-                      <TableCell>{txn.memberName}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(txn.totalAmount)}</TableCell>
-                      <TableCell>
-                        <Badge className={txn.status === 'COMPLETED' ? 'bg-[#2B7A78]' : 'bg-gray-400'}>{txn.status}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {txn.status === 'COMPLETED' && (
-                          <Button size="sm" className="bg-[#E63946] hover:bg-[#d32f3d] text-white"
-                            disabled={refundingId === txn.id}
-                            onClick={() => handleRefundTransaction(txn.id, txn.transactionNumber)}>
-                            <RotateCcw className="h-3 w-3 mr-1" />
-                            {refundingId === txn.id ? 'Refunding...' : 'Refund'}
-                          </Button>
-                        )}
-                        {txn.status === 'REFUNDED' && <span className="text-sm text-gray-400">Already refunded</span>}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {realTransactions.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-gray-500 py-8">No transactions in current session</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <ScrollArea className="h-80">
+                <div className="overflow-x-auto">
+                  <table className="w-full caption-bottom text-sm table-fixed min-w-[600px]">
+                    <colgroup>
+                      <col className="w-[28%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[14%]" />
+                    </colgroup>
+                    <thead className="[&_tr]:border-b">
+                      <tr className="bg-[#F9FAFB] border-b border-slate-50">
+                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium">Transaction</th>
+                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium">Time</th>
+                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium">Customer</th>
+                        <th className="text-foreground h-10 px-2 text-right align-middle font-medium">Amount</th>
+                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium">Status</th>
+                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="[&_tr:last-child]:border-0">
+                      {realTransactions
+                        .filter(t => {
+                          const q = returnFilter.toLowerCase();
+                          return !q || t.transactionNumber.toLowerCase().includes(q) || t.memberName.toLowerCase().includes(q);
+                        })
+                        .map(txn => (
+                        <tr key={txn.id} className="border-b border-slate-50 transition-colors hover:bg-[#F0FAF9]">
+                          <td className="p-2 align-middle text-[#1E293B] truncate" title={txn.transactionNumber}>{txn.transactionNumber}</td>
+                          <td className="p-2 align-middle whitespace-nowrap">{new Date(txn.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</td>
+                          <td className="p-2 align-middle truncate" title={txn.memberName}>{txn.memberName}</td>
+                          <td className="p-2 align-middle text-right whitespace-nowrap"><CurrencyValue amount={txn.totalAmount} /></td>
+                          <td className="p-2 align-middle">
+                            <Badge className={txn.status === 'COMPLETED' ? 'bg-[#2B7A78]' : 'bg-gray-400'}>{txn.status}</Badge>
+                          </td>
+                          <td className="p-2 align-middle">
+                            {txn.status === 'COMPLETED' && (
+                              <Button size="sm" className="bg-[#E63946] hover:bg-[#d32f3d] text-white"
+                                disabled={refundingId === txn.id}
+                                onClick={() => handleRefundTransaction(txn.id, txn.transactionNumber)}>
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                                {refundingId === txn.id ? 'Refunding...' : 'Refund'}
+                              </Button>
+                            )}
+                            {txn.status === 'REFUNDED' && <span className="text-sm text-gray-400">Refunded</span>}
+                          </td>
+                        </tr>
+                      ))}
+                      {realTransactions.length === 0 && (
+                        <tr className="border-b border-slate-50">
+                          <td colSpan={6} className="p-2 py-12 text-center text-gray-500">
+                            <Receipt className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                            <p>No transactions in current session</p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </ScrollArea>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSalesReturnDialog(false)}>Close</Button>
@@ -2268,7 +2361,7 @@ export function PointOfSale() {
 
       {/* Reprint Invoice Dialog */}
       <Dialog open={showReprintDialog} onOpenChange={setShowReprintDialog}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="sm:max-w-3xl w-[95vw]">
           <DialogHeader>
             <DialogTitle className="text-[#1E293B]">Reprint Invoice</DialogTitle>
             <DialogDescription>Select a transaction to print its receipt.</DialogDescription>
@@ -2279,46 +2372,63 @@ export function PointOfSale() {
               value={reprintFilter}
               onChange={e => setReprintFilter(e.target.value)}
             />
-            <ScrollArea className="h-80">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#F9FAFB]">
-                    <TableHead>Transaction</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {realTransactions
-                    .filter(t => {
-                      const q = reprintFilter.toLowerCase();
-                      return !q || t.transactionNumber.toLowerCase().includes(q) || t.memberName.toLowerCase().includes(q);
-                    })
-                    .map(txn => (
-                    <TableRow key={txn.id}>
-                      <TableCell className="text-[#1E293B]">{txn.transactionNumber}</TableCell>
-                      <TableCell>{new Date(txn.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</TableCell>
-                      <TableCell>{txn.memberName}</TableCell>
-                      <TableCell>{txn.items?.length ?? 0}</TableCell>
-                      <TableCell className="text-right text-[#2B7A78]">{formatCurrency(txn.totalAmount)}</TableCell>
-                      <TableCell>
-                        <Button size="sm" className="bg-[#2B7A78] hover:bg-[#236862] text-white"
-                          onClick={() => { printReceipt(txn); setShowReprintDialog(false); }}>
-                          <Printer className="h-3 w-3 mr-1" />
-                          Print
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {realTransactions.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-gray-500 py-8">No transactions in current session</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <ScrollArea className="h-80">
+                <div className="overflow-x-auto">
+                  <table className="w-full caption-bottom text-sm table-fixed min-w-[600px]">
+                    <colgroup>
+                      <col className="w-[28%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[16%]" />
+                      <col className="w-[14%]" />
+                    </colgroup>
+                    <thead className="[&_tr]:border-b">
+                      <tr className="bg-[#F9FAFB] border-b border-slate-50">
+                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium">Transaction</th>
+                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium">Time</th>
+                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium">Customer</th>
+                        <th className="text-foreground h-10 px-2 text-center align-middle font-medium">Items</th>
+                        <th className="text-foreground h-10 px-2 text-right align-middle font-medium">Amount</th>
+                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="[&_tr:last-child]:border-0">
+                      {realTransactions
+                        .filter(t => {
+                          const q = reprintFilter.toLowerCase();
+                          return !q || t.transactionNumber.toLowerCase().includes(q) || t.memberName.toLowerCase().includes(q);
+                        })
+                        .map(txn => (
+                        <tr key={txn.id} className="border-b border-slate-50 transition-colors hover:bg-[#F0FAF9]">
+                          <td className="p-2 align-middle text-[#1E293B] truncate" title={txn.transactionNumber}>{txn.transactionNumber}</td>
+                          <td className="p-2 align-middle whitespace-nowrap">{new Date(txn.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</td>
+                          <td className="p-2 align-middle truncate" title={txn.memberName}>{txn.memberName}</td>
+                          <td className="p-2 align-middle text-center">{txn.items?.length ?? 0}</td>
+                          <td className="p-2 align-middle text-right text-[#2B7A78] whitespace-nowrap"><CurrencyValue amount={txn.totalAmount} /></td>
+                          <td className="p-2 align-middle">
+                            <Button size="sm" className="bg-[#2B7A78] hover:bg-[#236862] text-white"
+                              onClick={() => { printReceipt(txn); setShowReprintDialog(false); }}>
+                              <Printer className="h-3 w-3 mr-1" />
+                              Print
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                      {realTransactions.length === 0 && (
+                        <tr className="border-b border-slate-50">
+                          <td colSpan={6} className="p-2 py-12 text-center text-gray-500">
+                            <Printer className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                            <p>No transactions in current session</p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </ScrollArea>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowReprintDialog(false)}>Close</Button>
@@ -2363,7 +2473,7 @@ export function PointOfSale() {
                       <TableCell className="text-[#1E293B]">{p.name}</TableCell>
                       <TableCell className="text-gray-500">{p.sku ?? '-'}</TableCell>
                       <TableCell>{p.categoryName ?? '-'}</TableCell>
-                      <TableCell className="text-right text-[#2B7A78]">{formatCurrency(p.sellingPrice ?? (p as any).price ?? 0)}</TableCell>
+                      <TableCell className="text-right text-[#2B7A78]"><CurrencyValue amount={p.sellingPrice ?? (p as any).price ?? 0} /></TableCell>
                       <TableCell className="text-right">
                         <Badge className={(p.totalStock ?? 0) > 10 ? 'bg-[#2B7A78]' : 'bg-[#E63946]'}>
                           {p.totalStock ?? 0}
@@ -2426,7 +2536,7 @@ export function PointOfSale() {
               <Separator />
               <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded">
                 <span className="text-[#1E293B]">Outstanding Balance</span>
-                <span className="text-[#2B7A78]">{formatCurrency(viewingCustomer.outstanding_balance ?? 0)}</span>
+                <span className="text-[#2B7A78]"><CurrencyValue amount={viewingCustomer.outstanding_balance ?? 0} /></span>
               </div>
             </div>
           )}
@@ -2479,7 +2589,7 @@ export function PointOfSale() {
             </div>
 
             <div>
-              <Label className="text-[#1E293B]">Amount (AED)</Label>
+              <Label className="text-[#1E293B]">Amount ({currencyCode})</Label>
               <Input
                 type="number"
                 value={cashDropAmount}

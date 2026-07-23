@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CurrencyGlyph } from '../../utils/currency';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -24,7 +25,7 @@ interface MemberDraftModalProps {
 }
 
 export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDraft }: MemberDraftModalProps) {
-  const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState({
     // Identity & Registration
     memberId: '',
     nationalId: '',
@@ -145,7 +146,7 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
                   <p className="text-sm opacity-90">{selectedPlan.duration}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold">AED {selectedPlan.price}</div>
+                  <div className="text-2xl font-bold"><CurrencyGlyph /> {selectedPlan.price}</div>
                   <p className="text-xs opacity-90">Total Amount</p>
                 </div>
               </div>

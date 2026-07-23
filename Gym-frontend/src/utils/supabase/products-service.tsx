@@ -44,6 +44,7 @@ export interface Product {
   hasVariants: boolean;
   hasRecipe: boolean;
   isManufactured: boolean;
+  enabledForPos: boolean;
   imageUrls: string[];
   barcode?: string;
   barcodeTemplate?: string;
@@ -79,6 +80,7 @@ export interface ProductRequest {
   hasVariants: boolean;
   hasRecipe: boolean;
   isManufactured: boolean;
+  enabledForPos: boolean;
   imageUrls: string[];
   barcode?: string;
   barcodeTemplate?: string;
@@ -180,6 +182,7 @@ function mapProduct(r: any): Product {
     hasVariants: r.has_variants ?? r.hasVariants ?? false,
     hasRecipe: r.has_recipe ?? r.hasRecipe ?? false,
     isManufactured: r.is_manufactured ?? r.isManufactured ?? false,
+    enabledForPos: r.enabled_for_pos ?? r.enabledForPos ?? false,
     imageUrls,
     barcode: r.barcode,
     barcodeTemplate: r.barcode_template ?? r.barcodeTemplate,
@@ -219,6 +222,7 @@ function toRequestBody(data: ProductRequest): Record<string, any> {
     has_variants: data.hasVariants,
     has_recipe: data.hasRecipe,
     is_manufactured: data.isManufactured,
+    enabled_for_pos: data.enabledForPos,
     image_urls: data.imageUrls,
     barcode: data.barcode,
     barcode_template: data.barcodeTemplate,
@@ -345,15 +349,17 @@ class ProductsService {
     search?: string;
     categoryId?: number;
     status?: string;
+    enabledForPos?: boolean;
     page?: number;
     size?: number;
   }): Promise<ProductsPage> {
     const params = new URLSearchParams();
-    if (filters?.search)     params.append('search',     filters.search);
-    if (filters?.categoryId) params.append('categoryId', String(filters.categoryId));
-    if (filters?.status)     params.append('status',     filters.status);
-    if (filters?.page)       params.append('page',       String(filters.page));
-    if (filters?.size)       params.append('size',       String(filters.size));
+    if (filters?.search)        params.append('search',        filters.search);
+    if (filters?.categoryId)    params.append('categoryId',    String(filters.categoryId));
+    if (filters?.status)        params.append('status',        filters.status);
+    if (filters?.enabledForPos) params.append('enabledForPos', String(filters.enabledForPos));
+    if (filters?.page)          params.append('page',          String(filters.page));
+    if (filters?.size)          params.append('size',          String(filters.size));
 
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products?${params.toString()}`);
     if (!res.ok) throw new Error(`Failed to fetch products: ${res.status}`);

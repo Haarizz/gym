@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -152,6 +153,7 @@ interface PromotionAnalytics {
 }
 
 export function PromotionsCampaign() {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
   const [activeView, setActiveView] = useState<'grid' | 'table'>('grid');
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -769,7 +771,7 @@ export function PromotionsCampaign() {
     if (promotion.discountType === 'percentage') {
       return `${promotion.discountValue}% OFF`;
     } else if (promotion.discountType === 'fixed') {
-      return `${promotion.discountValue} AED OFF`;
+      return `${currencyCode} ${promotion.discountValue} OFF`;
     } else {
       return 'FREE';
     }
@@ -934,7 +936,7 @@ export function PromotionsCampaign() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Revenue</p>
-                <p className="text-2xl font-bold text-green-600">{analytics.totalRevenue.toLocaleString()} AED</p>
+                <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {analytics.totalRevenue.toLocaleString()}</p>
               </div>
               <DollarSign className="h-6 w-6 text-green-600" />
             </div>
@@ -946,7 +948,7 @@ export function PromotionsCampaign() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Savings</p>
-                <p className="text-2xl font-bold text-orange-600">{analytics.totalSavings.toLocaleString()} AED</p>
+                <p className="text-2xl font-bold text-orange-600"><CurrencyGlyph /> {analytics.totalSavings.toLocaleString()}</p>
               </div>
               <Sparkles className="h-6 w-6 text-orange-600" />
             </div>
@@ -1249,7 +1251,7 @@ export function PromotionsCampaign() {
 
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Revenue:</span>
-                        <span className="font-medium text-green-600">{promotion.totalRevenue.toLocaleString()} AED</span>
+                        <span className="font-medium text-green-600"><CurrencyGlyph /> {promotion.totalRevenue.toLocaleString()}</span>
                       </div>
                     </div>
 
@@ -1377,7 +1379,7 @@ export function PromotionsCampaign() {
                       </TableCell>
                       <TableCell>
                         <span className="font-medium text-green-600">
-                          {promotion.totalRevenue.toLocaleString()} AED
+                          <CurrencyGlyph /> {promotion.totalRevenue.toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -1510,7 +1512,7 @@ export function PromotionsCampaign() {
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Minimum Purchase</Label>
-                        <p className="font-medium">{selectedPromotion.minimumPurchase ? `${selectedPromotion.minimumPurchase} AED` : 'None'}</p>
+                        <p className="font-medium">{selectedPromotion.minimumPurchase ? `${currencyCode} ${selectedPromotion.minimumPurchase}` : 'None'}</p>
                       </div>
                     </div>
 
@@ -1535,11 +1537,11 @@ export function PromotionsCampaign() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label className="text-sm text-muted-foreground">Total Revenue</Label>
-                        <p className="font-medium text-2xl text-green-600">{selectedPromotion.totalRevenue.toLocaleString()} AED</p>
+                        <p className="font-medium text-2xl text-green-600"><CurrencyGlyph /> {selectedPromotion.totalRevenue.toLocaleString()}</p>
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Total Savings</Label>
-                        <p className="font-medium text-2xl text-orange-600">{selectedPromotion.totalSavings.toLocaleString()} AED</p>
+                        <p className="font-medium text-2xl text-orange-600"><CurrencyGlyph /> {selectedPromotion.totalSavings.toLocaleString()}</p>
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Conversion Rate</Label>
@@ -1547,7 +1549,7 @@ export function PromotionsCampaign() {
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Avg Order Value</Label>
-                        <p className="font-medium text-xl">{selectedPromotion.averageOrderValue} AED</p>
+                        <p className="font-medium text-xl"><CurrencyGlyph /> {selectedPromotion.averageOrderValue}</p>
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Click Count</Label>
@@ -1822,7 +1824,7 @@ export function PromotionsCampaign() {
                 )}
                 
                 <div>
-                  <Label htmlFor="minimumPurchase">Minimum Purchase (AED)</Label>
+                  <Label htmlFor="minimumPurchase">Minimum Purchase ({currencyCode})</Label>
                   <Input
                     id="minimumPurchase"
                     type="number"
@@ -1832,7 +1834,7 @@ export function PromotionsCampaign() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="maximumDiscount">Maximum Discount (AED)</Label>
+                  <Label htmlFor="maximumDiscount">Maximum Discount ({currencyCode})</Label>
                   <Input
                     id="maximumDiscount"
                     type="number"

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -51,6 +51,54 @@ import {
   Users as UsersIcon,
   Bell
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { aiService, type AIInsight, type GymDataContext } from '../utils/ai-service';
+import { attendanceService } from '../utils/supabase/attendance-service';
+import { expensesService } from '../utils/supabase/expenses-service';
+import { financialAnalyticsService } from '../utils/supabase/financial-analytics-service';
+import { membersService } from '../utils/supabase/members-service';
+import { useCurrency, CurrencyValue, CurrencyGlyph } from '../utils/currency';
+
+type RevenueChartPoint = {
+  month: string;
+  revenue: number;
+  target: number;
+};
+
+type MemberChartPoint = {
+  month: string;
+  members: number;
+  retention: number;
+  churn: number;
+};
+
+type RevenueSourcePoint = {
+  source: string;
+  amount: number;
+  percentage: number;
+  color: string;
+};
+
+type PerformanceMetricPoint = {
+  metric: string;
+  current: number;
+  target: number;
+  trend: 'up' | 'down' | 'neutral';
+  change: number;
+};
+
+type BenchmarkPoint = {
+  metric: string;
+  value: number;
+  industry: number;
+  performance: 'above' | 'below' | 'equal';
+};
+
+type MemberSegmentPoint = {
+  segment: string;
+  count: number;
+  percentage: number;
+};
 
 // Sample data for top-level KPIs
 const topKPIs = {
@@ -61,7 +109,7 @@ const topKPIs = {
 };
 
 // Sample data for revenue trends
-const revenueData = [
+const revenueData: RevenueChartPoint[] = [
   { month: 'Jan', revenue: 98500, target: 95000 },
   { month: 'Feb', revenue: 105200, target: 100000 },
   { month: 'Mar', revenue: 112800, target: 110000 },
@@ -70,7 +118,7 @@ const revenueData = [
   { month: 'Jun', revenue: 132100, target: 125000 }
 ];
 
-const membershipData = [
+const membershipData: MemberChartPoint[] = [
   { month: 'Jan', members: 789, retention: 87.2, churn: 12.8 },
   { month: 'Feb', members: 801, retention: 88.1, churn: 11.9 },
   { month: 'Mar', members: 823, retention: 89.5, churn: 10.5 },
@@ -79,7 +127,7 @@ const membershipData = [
   { month: 'Jun', members: 862, retention: 90.2, churn: 9.8 }
 ];
 
-const revenueBySource = [
+const revenueBySource: RevenueSourcePoint[] = [
   { source: 'Memberships', amount: 85200, percentage: 67.8, color: '#3b82f6' },
   { source: 'Personal Training', amount: 22400, percentage: 17.8, color: '#10b981' },
   { source: 'Group Classes', amount: 12300, percentage: 9.8, color: '#f59e0b' },
@@ -87,14 +135,14 @@ const revenueBySource = [
   { source: 'Other Services', amount: 1000, percentage: 0.8, color: '#8b5cf6' }
 ];
 
-const performanceMetrics = [
+const performanceMetrics: PerformanceMetricPoint[] = [
   { metric: 'Daily Check-ins', current: 245, target: 280, trend: 'up', change: 8.2 },
   { metric: 'Class Occupancy', current: 78, target: 85, trend: 'up', change: 5.1 },
   { metric: 'Staff Efficiency', current: 92, target: 90, trend: 'up', change: 2.3 },
   { metric: 'Equipment Utilization', current: 67, target: 75, trend: 'down', change: -3.4 }
 ];
 
-const predictiveInsights = [
+const predictiveInsights: AIInsight[] = [
   {
     insight: 'Member Churn Risk',
     prediction: '23 members at high risk',
@@ -136,7 +184,7 @@ const memberAnalytics = [
   { segment: 'Student Members', count: 89, engagement: 72, ltv: 1200 }
 ];
 
-const benchmarkData = [
+const benchmarkData: BenchmarkPoint[] = [
   { metric: 'Revenue per Member', value: 148.5, industry: 135.2, performance: 'above' },
   { metric: 'Member Retention', value: 89.5, industry: 82.1, performance: 'above' },
   { metric: 'Class Utilization', value: 78.2, industry: 74.8, performance: 'above' },
@@ -199,7 +247,244 @@ const recentExports = [
   }
 ];
 
+const REVENUE_SOURCE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+const INDUSTRY_BENCHMARKS = {
+  revenuePerMember: 135.2,
+  memberRetention: 82.1,
+  classUtilization: 74.8,
+  staffEfficiency: 88.5,
+  operatingMargin: 26.4
+};
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const calculateGrowthRate = (current: number, previous: number) => {
+  if (previous <= 0) {
+    return 0;
+  }
+
+  return Number((((current - previous) / previous) * 100).toFixed(1));
+};
+
+const formatSignedPercent = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+
+const getMetricState = (
+  current: number,
+  target: number
+): Pick<PerformanceMetricPoint, 'trend' | 'change'> => {
+  if (target <= 0) {
+    return { trend: 'neutral', change: 0 };
+  }
+
+  const change = Number((((current - target) / target) * 100).toFixed(1));
+
+  if (change === 0) {
+    return { trend: 'neutral', change };
+  }
+
+  return {
+    trend: change > 0 ? 'up' : 'down',
+    change
+  };
+};
+
+const getBenchmarkPerformance = (value: number, industry: number): BenchmarkPoint['performance'] => {
+  if (Math.abs(value - industry) < 0.1) {
+    return 'equal';
+  }
+
+  return value > industry ? 'above' : 'below';
+};
+
+const parseDateValue = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+const getRollingMonths = (count: number) => {
+  const now = new Date();
+
+  return Array.from({ length: count }, (_, index) => {
+    const month = new Date(now.getFullYear(), now.getMonth() - (count - index - 1), 1);
+    const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    return {
+      label: month.toLocaleDateString('en-GB', { month: 'short' }),
+      end
+    };
+  });
+};
+
+const formatSegmentLabel = (value: string) =>
+  `${value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (match) => match.toUpperCase())} Segment`;
+
 export function BiOS() {
+  const { formatCurrency, currencyCode } = useCurrency();
+  const [gymData, setGymData] = useState<GymDataContext | null>(null);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [revenueChartData, setRevenueChartData] = useState<RevenueChartPoint[]>(revenueData);
+  const [memberChartData, setMemberChartData] = useState<MemberChartPoint[]>(membershipData);
+  const [aiPredictions, setAiPredictions] = useState<AIInsight[]>(predictiveInsights);
+  const [predictionsLoading, setPredictionsLoading] = useState(false);
+  const [revenueSourceData, setRevenueSourceData] = useState<RevenueSourcePoint[]>(revenueBySource);
+
+  const loadRealData = useCallback(async () => {
+    setDataLoading(true);
+
+    try {
+      const [membersResp, attStats, finDash, monthlyTrend, revBySource, expStats] = await Promise.all([
+        membersService.getMembers({}, { page: 1, limit: 5000 }).catch(() => ({
+          members: [],
+          pagination: { page: 1, limit: 5000, total: 0, totalPages: 0 }
+        })),
+        attendanceService.getAttendanceStats().catch(() => null),
+        financialAnalyticsService.getDashboard().catch(() => null),
+        financialAnalyticsService.getMonthlyTrend(6).catch(() => []),
+        financialAnalyticsService.getRevenueBySource().catch(() => []),
+        expensesService.getStats().catch(() => null)
+      ]);
+
+      const memberList = membersResp.members;
+      const currentMonthKey = getMonthKey(new Date());
+
+      const membershipTypes = memberList.reduce<Record<string, number>>((accumulator, member) => {
+        const membershipType = member.membership_type || 'Unknown';
+        accumulator[membershipType] = (accumulator[membershipType] || 0) + 1;
+        return accumulator;
+      }, {});
+
+      const recentJoins = memberList.filter((member) => {
+        const joinedAt = parseDateValue(member.join_date || member.membership_start_date || member.created_at);
+        return joinedAt ? getMonthKey(joinedAt) === currentMonthKey : false;
+      }).length;
+
+      const context: GymDataContext = {
+        totalRevenue: finDash?.totalRevenue ?? 0,
+        totalExpenses: finDash?.totalExpenses ?? 0,
+        netIncome: finDash?.netIncome ?? 0,
+        profitMargin: finDash?.profitMargin ?? 0,
+        monthlyTrend: monthlyTrend.map((point) => ({
+          month: point.month,
+          revenue: point.revenue,
+          expenses: point.expenses,
+          profit: point.profit
+        })),
+        revenueBySource: revBySource.map((entry) => ({
+          source: entry.source,
+          amount: entry.amount
+        })),
+        totalMembers: memberList.length,
+        activeMembers: memberList.filter((member) => member.membership_status === 'active').length,
+        expiredMembers: memberList.filter((member) => member.membership_status === 'expired').length,
+        overdueMembers: memberList.filter((member) => member.payment_status === 'overdue').length,
+        suspendedMembers: memberList.filter((member) => member.membership_status === 'suspended').length,
+        membershipTypes,
+        recentJoins,
+        todayCheckIns: attStats?.totalToday ?? 0,
+        avgSessionMinutes: attStats?.averageDuration ?? 0,
+        peakHours: attStats?.peakHours ?? {},
+        expensesByCategory: expStats?.byCategory ?? {},
+        currencyCode
+      };
+
+      setGymData(context);
+
+      const rollingMonths = getRollingMonths(6);
+      const liveRevenueChart = monthlyTrend.length > 0
+        ? monthlyTrend.map((point) => ({
+            month: point.month,
+            revenue: Math.round(point.revenue),
+            target: Math.round(point.revenue * 0.92)
+          }))
+        : rollingMonths.map(({ label }) => ({
+            month: label,
+            revenue: 0,
+            target: 0
+          }));
+
+      setRevenueChartData(liveRevenueChart);
+
+      const liveMemberChart = rollingMonths.map(({ label, end }) => {
+        const membersInPeriod = memberList.filter((member) => {
+          const joinedAt = parseDateValue(member.join_date || member.membership_start_date || member.created_at);
+          return joinedAt ? joinedAt <= end : false;
+        });
+
+        const activeMembersInPeriod = membersInPeriod.filter((member) => member.membership_status === 'active').length;
+        const retention = membersInPeriod.length > 0
+          ? Number(((activeMembersInPeriod / membersInPeriod.length) * 100).toFixed(1))
+          : 0;
+
+        return {
+          month: label,
+          members: membersInPeriod.length,
+          retention,
+          churn: Number((100 - retention).toFixed(1))
+        };
+      });
+
+      setMemberChartData(liveMemberChart);
+
+      const sortedRevenueSources = [...revBySource].sort((first, second) => second.amount - first.amount);
+      const liveRevenueSources = (sortedRevenueSources.length > 0
+        ? sortedRevenueSources
+        : revenueBySource.map((entry) => ({ source: entry.source, amount: 0 }))).map((entry, index) => ({
+          source: entry.source,
+          amount: entry.amount,
+          percentage: context.totalRevenue > 0
+            ? Number(((entry.amount / context.totalRevenue) * 100).toFixed(1))
+            : 0,
+          color: REVENUE_SOURCE_COLORS[index % REVENUE_SOURCE_COLORS.length]
+        }));
+
+      setRevenueSourceData(liveRevenueSources);
+    } catch {
+      toast.error('Failed to load BiOS data');
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRealData();
+  }, [loadRealData]);
+
+  const handlePredict = async () => {
+    if (!gymData) {
+      return;
+    }
+
+    setPredictionsLoading(true);
+
+    try {
+      const insights = await aiService.generatePredictiveInsights(gymData);
+
+      if (insights.length === 0) {
+        toast.error('Prediction update failed');
+        return;
+      }
+
+      setAiPredictions(insights);
+      toast.success('Predictions updated');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Prediction update failed';
+      toast.error(message);
+    } finally {
+      setPredictionsLoading(false);
+    }
+  };
+
   const getCurrentPeriod = () => {
     return new Date().toLocaleDateString('en-GB', { 
       month: 'long', 
@@ -207,24 +492,11 @@ export function BiOS() {
     });
   };
 
-  const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString()} AED`;
-  };
-
   const getTrendIcon = (trend: string) => {
     switch (trend) {
       case 'up': return <TrendingUp className="h-4 w-4 text-green-500" />;
       case 'down': return <TrendingDown className="h-4 w-4 text-red-500" />;
       default: return <Minus className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'High': return 'bg-red-100 text-red-800';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800';
-      case 'Low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -236,6 +508,207 @@ export function BiOS() {
       default: return 'text-gray-600';
     }
   };
+
+  const hasGymData = gymData !== null;
+  const totalRevenue = gymData?.totalRevenue ?? topKPIs.totalRevenue;
+  const activeMembers = gymData?.activeMembers ?? topKPIs.activeMembers;
+  const totalMembers = hasGymData ? gymData.totalMembers : topKPIs.activeMembers;
+  const retentionRate = hasGymData
+    ? (gymData.totalMembers > 0
+        ? Number(((gymData.activeMembers / gymData.totalMembers) * 100).toFixed(1))
+        : 0)
+    : topKPIs.retentionRate;
+
+  const lastRevenuePoint = hasGymData && revenueChartData.length > 0 ? revenueChartData[revenueChartData.length - 1] : null;
+  const previousRevenuePoint = hasGymData && revenueChartData.length > 1 ? revenueChartData[revenueChartData.length - 2] : null;
+  const revenueGrowthRate = hasGymData
+    ? (lastRevenuePoint && previousRevenuePoint
+        ? calculateGrowthRate(lastRevenuePoint.revenue, previousRevenuePoint.revenue)
+        : 0)
+    : topKPIs.monthlyGrowth;
+
+  const lastMemberPoint = hasGymData && memberChartData.length > 0 ? memberChartData[memberChartData.length - 1] : null;
+  const previousMemberPoint = hasGymData && memberChartData.length > 1 ? memberChartData[memberChartData.length - 2] : null;
+  const memberGrowthRate = hasGymData
+    ? (lastMemberPoint && previousMemberPoint
+        ? calculateGrowthRate(lastMemberPoint.members, previousMemberPoint.members)
+        : 0)
+    : 8.7;
+  const retentionDelta = hasGymData
+    ? (lastMemberPoint && previousMemberPoint
+        ? Number((lastMemberPoint.retention - previousMemberPoint.retention).toFixed(1))
+        : 0)
+    : 2.1;
+
+  const revenueTrendPositive = revenueGrowthRate >= 0;
+  const memberGrowthPositive = memberGrowthRate >= 0;
+  const retentionDeltaPositive = retentionDelta >= 0;
+  const recentJoinText = hasGymData ? `+${gymData.recentJoins} new this month` : '+15 new this week';
+  const dataSourceCount = hasGymData ? 6 : 8;
+
+  const sortedPeakHours = hasGymData
+    ? Object.entries(gymData.peakHours).sort((first, second) => second[1] - first[1])
+    : [];
+  const topPeakHour = sortedPeakHours[0]?.[0] ?? 'N/A';
+
+  const todayCheckIns = gymData?.todayCheckIns ?? 0;
+  const avgSessionMinutes = gymData?.avgSessionMinutes ?? 0;
+  const peakHourCounts = hasGymData ? Object.values(gymData.peakHours) : [];
+  const peakHourShare = peakHourCounts.length > 0 && todayCheckIns > 0
+    ? Number(((Math.max(...peakHourCounts) / todayCheckIns) * 100).toFixed(1))
+    : 0;
+  const classOccupancy = hasGymData && totalMembers > 0
+    ? Number(((todayCheckIns / totalMembers) * 100).toFixed(1))
+    : 0;
+  const sessionEfficiency = hasGymData
+    ? Number(clamp((avgSessionMinutes / 60) * 100, 0, 100).toFixed(1))
+    : 0;
+  const todayCheckInTarget = hasGymData
+    ? Math.max(1, Math.round((gymData.activeMembers || 1) * 0.33))
+    : performanceMetrics[0].target;
+
+  const livePerformanceMetrics: PerformanceMetricPoint[] = hasGymData
+    ? [
+        {
+          metric: 'Daily Check-ins',
+          current: todayCheckIns,
+          target: todayCheckInTarget,
+          ...getMetricState(todayCheckIns, todayCheckInTarget)
+        },
+        {
+          metric: 'Class Occupancy',
+          current: classOccupancy,
+          target: performanceMetrics[1].target,
+          ...getMetricState(classOccupancy, performanceMetrics[1].target)
+        },
+        {
+          metric: 'Staff Efficiency',
+          current: sessionEfficiency,
+          target: performanceMetrics[2].target,
+          ...getMetricState(sessionEfficiency, performanceMetrics[2].target)
+        },
+        {
+          metric: 'Equipment Utilization',
+          current: peakHourShare,
+          target: performanceMetrics[3].target,
+          ...getMetricState(peakHourShare, performanceMetrics[3].target)
+        }
+      ]
+    : performanceMetrics;
+
+  const performanceScore = hasGymData
+    ? clamp(
+        Math.round(
+          (livePerformanceMetrics.reduce((total, metric) => (
+            total + (metric.target > 0 ? metric.current / metric.target : 0)
+          ), 0) / Math.max(livePerformanceMetrics.length, 1)) * 100
+        ),
+        0,
+        100
+      )
+    : 82;
+
+  const liveSegments = hasGymData
+    ? Object.entries(gymData.membershipTypes)
+        .sort((first, second) => second[1] - first[1])
+        .slice(0, 3)
+        .map(([type, count]) => ({
+          segment: formatSegmentLabel(type),
+          count,
+          percentage: gymData.totalMembers > 0 ? Math.round((count / gymData.totalMembers) * 100) : 0
+        }))
+    : [];
+
+  const displayMemberSegments: MemberSegmentPoint[] = hasGymData
+    ? (liveSegments.length > 0
+        ? liveSegments
+        : memberAnalytics.slice(0, 3).map((segment) => ({
+            segment: segment.segment,
+            count: 0,
+            percentage: 0
+          })))
+    : memberAnalytics.slice(0, 3).map((segment) => ({
+        segment: segment.segment,
+        count: segment.count,
+        percentage: Math.round((segment.count / topKPIs.activeMembers) * 100)
+      }));
+
+  const revenuePerMember = hasGymData
+    ? (gymData.activeMembers > 0 ? Number((gymData.totalRevenue / gymData.activeMembers).toFixed(1)) : 0)
+    : benchmarkData[0].value;
+
+  const liveBenchmarks: BenchmarkPoint[] = hasGymData
+    ? [
+        {
+          metric: 'Revenue per Member',
+          value: revenuePerMember,
+          industry: INDUSTRY_BENCHMARKS.revenuePerMember,
+          performance: getBenchmarkPerformance(revenuePerMember, INDUSTRY_BENCHMARKS.revenuePerMember)
+        },
+        {
+          metric: 'Member Retention',
+          value: retentionRate,
+          industry: INDUSTRY_BENCHMARKS.memberRetention,
+          performance: getBenchmarkPerformance(retentionRate, INDUSTRY_BENCHMARKS.memberRetention)
+        },
+        {
+          metric: 'Class Utilization',
+          value: classOccupancy,
+          industry: INDUSTRY_BENCHMARKS.classUtilization,
+          performance: getBenchmarkPerformance(classOccupancy, INDUSTRY_BENCHMARKS.classUtilization)
+        },
+        {
+          metric: 'Staff Efficiency',
+          value: sessionEfficiency,
+          industry: INDUSTRY_BENCHMARKS.staffEfficiency,
+          performance: getBenchmarkPerformance(sessionEfficiency, INDUSTRY_BENCHMARKS.staffEfficiency)
+        },
+        {
+          metric: 'Operating Margin',
+          value: Number((gymData.profitMargin ?? 0).toFixed(1)),
+          industry: INDUSTRY_BENCHMARKS.operatingMargin,
+          performance: getBenchmarkPerformance(gymData.profitMargin ?? 0, INDUSTRY_BENCHMARKS.operatingMargin)
+        }
+      ]
+    : benchmarkData;
+
+  const aboveBenchmarkCount = liveBenchmarks.filter((benchmark) => benchmark.performance === 'above').length;
+  const benchmarkBadgeClass = hasGymData
+    ? (aboveBenchmarkCount >= 3 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')
+    : 'bg-green-100 text-green-800';
+  const benchmarkBadgeText = hasGymData
+    ? (aboveBenchmarkCount >= 3 ? 'Above Average' : 'Needs Review')
+    : 'Above Average';
+
+  const confidenceAverage = Number(
+    (
+      aiPredictions.reduce((sum, insight) => sum + insight.confidence, 0) /
+      Math.max(aiPredictions.length, 1)
+    ).toFixed(1)
+  );
+
+  const overallHealthScore = hasGymData
+    ? clamp(
+        Math.round(
+          retentionRate * 0.5 +
+          clamp((gymData.profitMargin ?? 0) * 2.2, 0, 100) * 0.3 +
+          clamp(revenueGrowthRate * 4 + 50, 0, 100) * 0.2
+        ),
+        0,
+        100
+      )
+    : 89;
+  const overallHealthLabel = overallHealthScore >= 85
+    ? 'Excellent'
+    : overallHealthScore >= 70
+      ? 'Good'
+      : 'Needs Attention';
+
+  const displayExports = hasGymData
+    ? recentExports.map((exportItem, index) => (
+        index === 0 ? { ...exportItem, records: gymData.totalMembers } : exportItem
+      ))
+    : recentExports;
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -256,8 +729,8 @@ export function BiOS() {
             <Download className="h-4 w-4 mr-2" />
             Export Dashboard
           </Button>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={loadRealData} disabled={dataLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${dataLoading ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
         </div>
@@ -271,11 +744,17 @@ export function BiOS() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(topKPIs.totalRevenue)}
+                  <CurrencyValue amount={totalRevenue} />
                 </p>
                 <div className="flex items-center mt-2">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">+{topKPIs.monthlyGrowth}% this month</span>
+                  {revenueTrendPositive ? (
+                    <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
+                  )}
+                  <span className={`text-sm ${revenueTrendPositive ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatSignedPercent(revenueGrowthRate)} this month
+                  </span>
                 </div>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
@@ -291,11 +770,11 @@ export function BiOS() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Members</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {topKPIs.activeMembers.toLocaleString()}
+                  {activeMembers.toLocaleString()}
                 </p>
                 <div className="flex items-center mt-2">
                   <Users className="h-4 w-4 text-blue-500 mr-1" />
-                  <span className="text-sm text-blue-600">+15 new this week</span>
+                  <span className="text-sm text-blue-600">{recentJoinText}</span>
                 </div>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
@@ -311,11 +790,13 @@ export function BiOS() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Retention Rate</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {topKPIs.retentionRate}%
+                  {retentionRate}%
                 </p>
                 <div className="flex items-center mt-2">
                   <UserCheck className="h-4 w-4 text-purple-500 mr-1" />
-                  <span className="text-sm text-purple-600">+2.1% vs last month</span>
+                  <span className={`text-sm ${retentionDeltaPositive ? 'text-purple-600' : 'text-red-600'}`}>
+                    {formatSignedPercent(retentionDelta)} vs last month
+                  </span>
                 </div>
               </div>
               <div className="p-3 bg-purple-100 rounded-lg">
@@ -330,12 +811,12 @@ export function BiOS() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Monthly Growth</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  +{topKPIs.monthlyGrowth}%
+                <p className={`text-2xl font-bold ${revenueTrendPositive ? 'text-orange-600' : 'text-red-600'}`}>
+                  {formatSignedPercent(revenueGrowthRate)}
                 </p>
                 <div className="flex items-center mt-2">
-                  <TrendingIcon className="h-4 w-4 text-orange-500 mr-1" />
-                  <span className="text-sm text-orange-600">Revenue increase</span>
+                  <TrendingIcon className={`h-4 w-4 mr-1 ${revenueTrendPositive ? 'text-orange-500' : 'text-red-500'}`} />
+                  <span className={`text-sm ${revenueTrendPositive ? 'text-orange-600' : 'text-red-600'}`}>Revenue increase</span>
                 </div>
               </div>
               <div className="p-3 bg-orange-100 rounded-lg">
@@ -363,18 +844,22 @@ export function BiOS() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Revenue Growth</span>
-                <span className="font-semibold text-green-600">+12.3%</span>
+                <span className={`font-semibold ${revenueTrendPositive ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatSignedPercent(revenueGrowthRate)}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Member Growth</span>
-                <span className="font-semibold text-blue-600">+8.7%</span>
+                <span className={`font-semibold ${memberGrowthPositive ? 'text-blue-600' : 'text-red-600'}`}>
+                  {formatSignedPercent(memberGrowthRate)}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Profit Margin</span>
-                <span className="font-semibold text-purple-600">23.8%</span>
+                <span className="font-semibold text-purple-600">{hasGymData ? gymData.profitMargin.toFixed(1) : '23.8'}%</span>
               </div>
-              <Progress value={89} className="h-2" />
-              <p className="text-xs text-gray-500">Overall business health: Excellent</p>
+              <Progress value={overallHealthScore} className="h-2" />
+              <p className="text-xs text-gray-500">Overall business health: {overallHealthLabel}</p>
               <div className="flex justify-between pt-2">
                 <Button variant="ghost" size="sm">
                   <BarChart3 className="h-4 w-4 mr-1" />
@@ -404,20 +889,28 @@ export function BiOS() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Data Sources</span>
-                <Badge className="bg-green-100 text-green-800">8 Active</Badge>
+                <Badge className="bg-green-100 text-green-800">{dataSourceCount} Active</Badge>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Latest Insights</span>
-                <span className="text-sm">2 hours ago</span>
+                <span className="text-sm">{hasGymData ? 'Just refreshed' : '2 hours ago'}</span>
               </div>
               <div className="space-y-2">
                 <div className="text-sm p-2 bg-blue-50 rounded">
-                  <div className="font-medium text-blue-800">Peak Hours Identified</div>
-                  <div className="text-blue-600 text-xs">6-8 PM shows 40% higher engagement</div>
+                  <div className="font-medium text-blue-800">
+                    {hasGymData ? `Peak Hours: ${topPeakHour}` : 'Peak Hours Identified'}
+                  </div>
+                  <div className="text-blue-600 text-xs">
+                    {hasGymData ? `${todayCheckIns} check-ins today` : '6-8 PM shows 40% higher engagement'}
+                  </div>
                 </div>
                 <div className="text-sm p-2 bg-green-50 rounded">
-                  <div className="font-medium text-green-800">Revenue Opportunity</div>
-                  <div className="text-green-600 text-xs">Personal training has 25% growth potential</div>
+                  <div className="font-medium text-green-800">{hasGymData ? 'Revenue Health' : 'Revenue Opportunity'}</div>
+                  <div className="text-green-600 text-xs">
+                    {hasGymData
+                      ? `Net income ${formatCurrency(gymData.netIncome)} - ${gymData.profitMargin.toFixed(1)}% margin`
+                      : 'Personal training has 25% growth potential'}
+                  </div>
                 </div>
               </div>
               <div className="flex justify-between pt-2">
@@ -447,7 +940,7 @@ export function BiOS() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {performanceMetrics.slice(0, 3).map((metric, index) => (
+              {livePerformanceMetrics.slice(0, 3).map((metric, index) => (
                 <div key={index} className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">{metric.metric}</span>
                   <div className="flex items-center space-x-2">
@@ -459,9 +952,9 @@ export function BiOS() {
               <div className="pt-2">
                 <div className="flex justify-between text-xs text-gray-500 mb-1">
                   <span>Overall Performance</span>
-                  <span>82%</span>
+                  <span>{performanceScore}%</span>
                 </div>
-                <Progress value={82} className="h-2" />
+                <Progress value={performanceScore} className="h-2" />
               </div>
               <div className="flex justify-between pt-2">
                 <Button variant="ghost" size="sm">
@@ -485,17 +978,19 @@ export function BiOS() {
                 <TrendingUpDown className="h-5 w-5 text-orange-600" />
                 <CardTitle>Predictive Analytics</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Predict</Button>
+              <Button variant="outline" size="sm" onClick={handlePredict} disabled={predictionsLoading || !gymData}>
+                {predictionsLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Predict'}
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">AI Predictions</span>
-                <Badge className="bg-blue-100 text-blue-800">4 Active</Badge>
+                <Badge className="bg-blue-100 text-blue-800">{aiPredictions.length} Active</Badge>
               </div>
               <div className="space-y-2">
-                {predictiveInsights.slice(0, 2).map((insight, index) => (
+                {aiPredictions.slice(0, 2).map((insight, index) => (
                   <div key={index} className="text-sm p-2 bg-orange-50 rounded">
                     <div className="font-medium text-orange-800">{insight.insight}</div>
                     <div className="text-orange-600 text-xs">{insight.prediction}</div>
@@ -504,9 +999,9 @@ export function BiOS() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Confidence Avg.</span>
-                <span className="text-sm font-medium">89.5%</span>
+                <span className="text-sm font-medium">{confidenceAverage}%</span>
               </div>
-              <Progress value={89.5} className="h-2" />
+              <Progress value={confidenceAverage} className="h-2" />
               <div className="flex justify-between pt-2">
                 <Button variant="ghost" size="sm">
                   <Zap className="h-4 w-4 mr-1" />
@@ -536,27 +1031,27 @@ export function BiOS() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Monthly Revenue</span>
-                <span className="font-semibold text-green-600">{formatCurrency(topKPIs.totalRevenue)}</span>
+                <span className="font-semibold text-green-600"><CurrencyValue amount={totalRevenue} /></span>
               </div>
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Memberships</span>
-                  <span>67.8%</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Personal Training</span>
-                  <span>17.8%</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Group Classes</span>
-                  <span>9.8%</span>
-                </div>
+                {revenueSourceData.slice(0, 3).map((source, index) => (
+                  <div key={`${source.source}-${index}`} className="flex justify-between text-sm">
+                    <span>{source.source}</span>
+                    <span>{source.percentage}%</span>
+                  </div>
+                ))}
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Growth Rate</span>
                 <div className="flex items-center">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">+12.3%</span>
+                  {revenueTrendPositive ? (
+                    <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
+                  )}
+                  <span className={`text-sm ${revenueTrendPositive ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatSignedPercent(revenueGrowthRate)}
+                  </span>
                 </div>
               </div>
               <div className="flex justify-between pt-2">
@@ -588,25 +1083,19 @@ export function BiOS() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Total Members</span>
-                <span className="font-semibold text-blue-600">{topKPIs.activeMembers}</span>
+                <span className="font-semibold text-blue-600">{totalMembers.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Retention Rate</span>
-                <span className="font-semibold text-green-600">{topKPIs.retentionRate}%</span>
+                <span className="font-semibold text-green-600">{retentionRate}%</span>
               </div>
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Premium Segment</span>
-                  <span>156 (18%)</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Regular Segment</span>
-                  <span>423 (50%)</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Basic Segment</span>
-                  <span>268 (32%)</span>
-                </div>
+                {displayMemberSegments.map((segment, index) => (
+                  <div key={`${segment.segment}-${index}`} className="flex justify-between text-sm">
+                    <span>{segment.segment}</span>
+                    <span>{segment.count} ({segment.percentage}%)</span>
+                  </div>
+                ))}
               </div>
               <div className="flex justify-between pt-2">
                 <Button variant="ghost" size="sm">
@@ -680,20 +1169,26 @@ export function BiOS() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Industry Comparison</span>
-                <Badge className="bg-green-100 text-green-800">Above Average</Badge>
+                <Badge className={benchmarkBadgeClass}>{benchmarkBadgeText}</Badge>
               </div>
               <div className="space-y-2">
-                {benchmarkData.slice(0, 3).map((benchmark, index) => (
+                {liveBenchmarks.slice(0, 3).map((benchmark, index) => (
                   <div key={index} className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">{benchmark.metric}</span>
                     <div className="flex items-center">
                       {benchmark.performance === 'above' ? (
                         <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
-                      ) : (
+                      ) : benchmark.performance === 'below' ? (
                         <ArrowDown className="h-4 w-4 text-red-500 mr-1" />
+                      ) : (
+                        <Minus className="h-4 w-4 text-blue-500 mr-1" />
                       )}
                       <span className={`text-sm ${getPerformanceColor(benchmark.performance)}`}>
-                        {benchmark.value}{benchmark.metric.includes('Revenue') ? ' AED' : '%'}
+                        {benchmark.metric.includes('Revenue') ? (
+                          <><CurrencyGlyph />{benchmark.value}</>
+                        ) : (
+                          `${benchmark.value}%`
+                        )}
                       </span>
                     </div>
                   </div>
@@ -732,10 +1227,10 @@ export function BiOS() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Total Records</span>
-                <span className="font-semibold">2,417</span>
+                <span className="font-semibold">{hasGymData ? gymData.totalMembers.toLocaleString() : '2,417'}</span>
               </div>
               <div className="space-y-2">
-                {recentExports.slice(0, 2).map((export_, index) => (
+                {displayExports.slice(0, 2).map((export_, index) => (
                   <div key={index} className="text-sm p-2 bg-gray-50 rounded">
                     <div className="font-medium text-gray-800">{export_.dataset}</div>
                     <div className="text-gray-600 text-xs">{export_.format} • {export_.size} • {export_.records} records</div>
@@ -778,11 +1273,11 @@ export function BiOS() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={revenueData}>
+              <LineChart data={revenueChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`${(value/1000).toFixed(0)}K AED`, '']} />
+                <Tooltip formatter={(value: number) => [`${(value/1000).toFixed(0)}K ${currencyCode}`, '']} />
                 <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="#10b981" name="Actual Revenue" strokeWidth={2} />
                 <Line type="monotone" dataKey="target" stroke="#6b7280" name="Target" strokeDasharray="5 5" />
@@ -810,7 +1305,7 @@ export function BiOS() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={membershipData}>
+              <AreaChart data={memberChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -864,4 +1359,6 @@ export function BiOS() {
     </div>
   );
 }
+
+
 

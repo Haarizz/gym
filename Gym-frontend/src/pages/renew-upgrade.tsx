@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -111,7 +112,7 @@ interface RenewUpgradeProps {
 }
 
 export function RenewUpgrade({ onNavigate }: RenewUpgradeProps) {
-  const [selectedMember, setSelectedMember] = useState<any>(null);
+    const [selectedMember, setSelectedMember] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchFilter, setSearchFilter] = useState("all"); // all, name, id, phone, email
   const [statusFilter, setStatusFilter] = useState("all");
@@ -371,7 +372,7 @@ export function RenewUpgrade({ onNavigate }: RenewUpgradeProps) {
             <TrendingUp className="h-5 w-5 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">AED 8,640</div>
+            <div className="text-3xl font-bold text-green-600"><CurrencyGlyph /> 8,640</div>
             <p className="text-xs text-gray-600 mt-1">From renewals</p>
           </CardContent>
         </Card>

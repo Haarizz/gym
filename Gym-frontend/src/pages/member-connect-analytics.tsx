@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -151,7 +152,8 @@ interface CampaignAnalytics {
 }
 
 export function MemberConnectAnalytics() {
-  const [activeTab, setActiveTab] = useState('overview');  
+  const { currencyCode } = useCurrency();
+  const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('month');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedPlan, setSelectedPlan] = useState('all');
@@ -764,12 +766,12 @@ export function MemberConnectAnalytics() {
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: number) => [`AED ${value.toLocaleString()}`, '']}
+                      formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
                       content={<CustomTooltip />}
                     />
                     <Legend />
-                    <Bar dataKey="revenue" fill="#10b981" name="Revenue (AED)" />
-                    <Bar dataKey="acquisitionCost" fill="#f59e0b" name="Acquisition Cost (AED)" />
+                    <Bar dataKey="revenue" fill="#10b981" name={`Revenue (${currencyCode})`} />
+                    <Bar dataKey="acquisitionCost" fill="#f59e0b" name={`Acquisition Cost (${currencyCode})`} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -811,11 +813,11 @@ export function MemberConnectAnalytics() {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">AED {analytics.avgAcquisitionCost.toFixed(0)}</p>
+                    <p className="text-2xl font-bold text-blue-600"><CurrencyGlyph /> {analytics.avgAcquisitionCost.toFixed(0)}</p>
                     <p className="text-sm text-muted-foreground">Avg Cost per Acquisition</p>
                   </div>
                   <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">AED {analytics.avgLTV.toFixed(0)}</p>
+                    <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {analytics.avgLTV.toFixed(0)}</p>
                     <p className="text-sm text-muted-foreground">Avg Lifetime Value</p>
                   </div>
                 </div>
@@ -881,7 +883,7 @@ export function MemberConnectAnalytics() {
                       <Badge className="bg-blue-100 text-blue-800">Referral</Badge>
                     </TableCell>
                     <TableCell>{format(new Date(), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell>AED 2,400</TableCell>
+                    <TableCell><CurrencyGlyph /> 2,400</TableCell>
                     <TableCell>
                       <Badge className="bg-green-100 text-green-800">Active</Badge>
                     </TableCell>
@@ -905,7 +907,7 @@ export function MemberConnectAnalytics() {
                       <Badge className="bg-green-100 text-green-800">Online</Badge>
                     </TableCell>
                     <TableCell>{format(subDays(new Date(), 1), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell>AED 250</TableCell>
+                    <TableCell><CurrencyGlyph /> 250</TableCell>
                     <TableCell>
                       <Badge className="bg-green-100 text-green-800">Active</Badge>
                     </TableCell>
@@ -929,7 +931,7 @@ export function MemberConnectAnalytics() {
                       <Badge className="bg-purple-100 text-purple-800">Walk-in</Badge>
                     </TableCell>
                     <TableCell>{format(subDays(new Date(), 2), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell>AED 180</TableCell>
+                    <TableCell><CurrencyGlyph /> 180</TableCell>
                     <TableCell>
                       <Badge className="bg-yellow-100 text-yellow-800">Trial</Badge>
                     </TableCell>
@@ -1312,11 +1314,11 @@ export function MemberConnectAnalytics() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Cost</span>
-                      <span className="font-medium">AED {campaign.cost.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {campaign.cost.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Revenue</span>
-                      <span className="font-medium text-green-600">AED {campaign.revenue.toLocaleString()}</span>
+                      <span className="font-medium text-green-600"><CurrencyGlyph /> {campaign.revenue.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="font-medium">ROI</span>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -238,7 +239,7 @@ interface GymOSProps {
 }
 
 export function GymOS({ onNavigate }: GymOSProps = {}) {
-  const [catalogSettings, setCatalogSettings] = useState(catalogOptions);
+    const [catalogSettings, setCatalogSettings] = useState(catalogOptions);
   const [roleAssignments, setRoleAssignments] = useState(userRoles);
   const [showCatalogConfig, setShowCatalogConfig] = useState(false);
   const [showPOSConfig, setShowPOSConfig] = useState(false);
@@ -1504,7 +1505,7 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <Calculator className="h-5 w-5 text-purple-600" />
                   </div>
                   <p className="text-sm text-purple-600">Total Commission</p>
-                  <p className="text-2xl font-bold text-purple-700">AED 1,540</p>
+                  <p className="text-2xl font-bold text-purple-700"><CurrencyGlyph /> 1,540</p>
                 </div>
               </div>
             </CardContent>
@@ -1581,7 +1582,7 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <div>
                       <label className="text-sm text-gray-600 block mb-2">Default Transfer Fee</label>
                       <div className="flex items-center">
-                        <span className="text-gray-600 mr-2">AED</span>
+                        <span className="text-gray-600 mr-2"><CurrencyGlyph /></span>
                         <input
                           type="number"
                           defaultValue="100"

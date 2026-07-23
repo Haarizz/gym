@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { CurrencyGlyph } from "../utils/currency";
 import { CreatePostModal } from "./community";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -173,7 +174,7 @@ const fmtDate = (iso: string | null | undefined): string => {
 };
 
 export function MemberHub({ onNavigate }: MemberHubProps = {}) {
-  const [searchQuery, setSearchQuery] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
   const [isFABOpen, setIsFABOpen] = useState(false);
 
   // Live member info state
@@ -1367,7 +1368,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                     </div>
                     <div>
                       <p className="text-sm font-medium">Protein Shake</p>
-                      <p className="text-xs text-muted-foreground">AED 25</p>
+                      <p className="text-xs text-muted-foreground"><CurrencyGlyph /> 25</p>
                     </div>
                   </div>
                   <Button size="sm" variant="outline" className="h-7">
@@ -1381,7 +1382,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                     </div>
                     <div>
                       <p className="text-sm font-medium">Gym Towel</p>
-                      <p className="text-xs text-muted-foreground">AED 15</p>
+                      <p className="text-xs text-muted-foreground"><CurrencyGlyph /> 15</p>
                     </div>
                   </div>
                   <Button size="sm" variant="outline" className="h-7">

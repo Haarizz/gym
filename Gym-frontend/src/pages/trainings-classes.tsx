@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -100,6 +101,7 @@ interface ClassItem {
 }
 
 export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
+  const { currencyCode } = useCurrency();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
@@ -147,7 +149,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     return `${parts[0].padStart(2, "0")}:00`;
   };
 
-  const formatPrice = (price: number) => `${price} AED`;
+  const formatPrice = (price: number) => `${currencyCode} ${price}`;
 
   const getExperienceLabel = (joinDate?: string) => {
     if (!joinDate) return "Trainer";
@@ -1239,7 +1241,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   onChange={(e) => setNewClassData((prev) => ({ ...prev, price: e.target.value }))}
                   className="border-primary/20 focus:border-primary"
                 />
-                <span className="text-sm font-medium text-gray-500">AED</span>
+                <span className="text-sm font-medium text-gray-500"><CurrencyGlyph /></span>
               </div>
             </div>
           </div>

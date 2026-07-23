@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -102,6 +103,7 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 export function Products({ onNavigate }: ProductsProps) {
+  const { currencyCode } = useCurrency();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("inventory");
   const [searchQuery, setSearchQuery] = useState("");
@@ -128,9 +130,12 @@ export function Products({ onNavigate }: ProductsProps) {
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
   const [warehouseForm, setWarehouseForm] = useState({ name: '', type: 'BRANCH', location: '', isActive: true });
   const [isSavingWarehouse, setIsSavingWarehouse] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
 
-  const loadData = useCallback(async (filters?: { search?: string; categoryId?: number; status?: string }) => {
-    setLoading(true);
+  const loadData = useCallback(async (filters?: { search?: string; categoryId?: number; status?: string }, silent = false) => {
+    if (!silent) setLoading(true);
+    else setIsFiltering(true);
     try {
       const [productsPage, statsData, categoriesData] = await Promise.all([
         productsService.getProducts({
@@ -159,7 +164,8 @@ export function Products({ onNavigate }: ProductsProps) {
       console.error('Failed to load products data:', error);
       toast.error('Failed to load products. Please try again.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      else setIsFiltering(false);
     }
   }, []);
 
@@ -172,7 +178,7 @@ export function Products({ onNavigate }: ProductsProps) {
     const timer = setTimeout(() => {
       const categoryId = selectedCategoryId !== 'all' ? Number(selectedCategoryId) : undefined;
       const status = selectedStatus !== 'all' ? selectedStatus : undefined;
-      loadData({ search: searchQuery || undefined, categoryId, status });
+      loadData({ search: searchQuery || undefined, categoryId, status }, true);
     }, 400);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -357,7 +363,7 @@ export function Products({ onNavigate }: ProductsProps) {
 
   const handleStockReportDownload = () => {
     if (products.length === 0) { toast.error('No products to export'); return; }
-    const header = ['SKU', 'Product Name', 'Category', 'Selling Price (AED)', 'Cost Price (AED)', 'Unit', 'Total Stock', 'Reorder Level', 'Stock Status', 'Inventory Value (AED)', 'Supplier'];
+    const header = ['SKU', 'Product Name', 'Category', `Selling Price (${currencyCode})`, `Cost Price (${currencyCode})`, 'Unit', 'Total Stock', 'Reorder Level', 'Stock Status', `Inventory Value (${currencyCode})`, 'Supplier'];
     const rows = products.map(p => [
       p.sku,
       `"${p.name.replace(/"/g, '""')}"`,
@@ -393,7 +399,7 @@ export function Products({ onNavigate }: ProductsProps) {
         <div style="font-size:11px;font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</div>
         <div style="font-family:monospace;font-size:15px;letter-spacing:2px;border:1px solid #333;padding:6px;background:#f9f9f9;border-radius:3px;">${p.barcode || p.sku}</div>
         <div style="font-size:10px;color:#666;margin-top:4px;">SKU: ${p.sku}</div>
-        <div style="font-size:10px;color:#444;font-weight:500;">AED ${p.sellingPrice.toFixed(2)}</div>
+        <div style="font-size:10px;color:#444;font-weight:500;">${currencyCode} ${p.sellingPrice.toFixed(2)}</div>
       </div>`).join('');
     printWindow.document.write(`<html><head><title>Barcode List — GymBios</title>
       <style>@media print { body { margin: 10px; } button { display: none; } }</style>
@@ -495,7 +501,7 @@ export function Products({ onNavigate }: ProductsProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">AED {stats.totalInventoryValue.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-emerald-600"><CurrencyGlyph /> {stats.totalInventoryValue.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">Total stock valuation</p>
             </CardContent>
           </Card>
@@ -589,16 +595,62 @@ export function Products({ onNavigate }: ProductsProps) {
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardContent className="pt-6">
               <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
+                <div className="flex-1 relative">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
-                      placeholder="Search products by name or SKU..."
+                      placeholder="Search products by name, SKU, category, etc..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => setIsSearchFocused(true)}
+                      onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                       className="pl-10"
                     />
                   </div>
+                  
+                  {isSearchFocused && searchQuery && (
+                    <div className="absolute z-50 mt-1 w-full bg-white rounded-md border shadow-lg max-h-[300px] overflow-y-auto">
+                      {isFiltering ? (
+                        <div className="p-4 text-center text-sm text-muted-foreground">Searching...</div>
+                      ) : products.length > 0 ? (
+                        <div className="py-2">
+                          {products.slice(0, 8).map(product => (
+                            <div 
+                              key={product.id}
+                              className="px-4 py-2 hover:bg-slate-50 cursor-pointer flex items-center gap-3"
+                              onClick={() => {
+                                setSearchQuery(product.sku || product.name);
+                                setIsSearchFocused(false);
+                              }}
+                            >
+                              <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center shrink-0 overflow-hidden">
+                                {product.imageUrls?.[0] ? (
+                                  <img src={product.imageUrls[0]} alt={product.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Package className="h-5 w-5 text-gray-400" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0 text-left">
+                                <div className="font-medium text-sm truncate text-gray-900">{product.name}</div>
+                                <div className="text-xs text-muted-foreground flex gap-2">
+                                  <span>{product.sku}</span>
+                                  <span>•</span>
+                                  <span className="truncate">{product.categoryName}</span>
+                                </div>
+                              </div>
+                              <div className="text-sm font-medium text-gray-900">
+                                <CurrencyGlyph /> {product.sellingPrice.toFixed(2)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          No products found for "{searchQuery}"
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
                   <SelectTrigger className="w-full md:w-48">
@@ -666,6 +718,7 @@ export function Products({ onNavigate }: ProductsProps) {
                         <TableHead>Price</TableHead>
                         <TableHead>Stock</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>POS</TableHead>
                         <TableHead>Value</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -697,7 +750,7 @@ export function Products({ onNavigate }: ProductsProps) {
                           </TableCell>
                           <TableCell className="font-mono text-sm">{product.sku}</TableCell>
                           <TableCell>{product.categoryName}</TableCell>
-                          <TableCell>AED {product.sellingPrice.toFixed(2)}</TableCell>
+                          <TableCell><CurrencyGlyph /> {product.sellingPrice.toFixed(2)}</TableCell>
                           <TableCell>
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
@@ -710,7 +763,14 @@ export function Products({ onNavigate }: ProductsProps) {
                             </div>
                           </TableCell>
                           <TableCell>{getStatusBadge(product)}</TableCell>
-                          <TableCell>AED {product.inventoryValue.toLocaleString()}</TableCell>
+                          <TableCell>
+                            {product.enabledForPos ? (
+                              <Badge className="bg-success">Visible</Badge>
+                            ) : (
+                              <Badge variant="secondary">Hidden</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell><CurrencyGlyph /> {product.inventoryValue.toLocaleString()}</TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -782,7 +842,7 @@ export function Products({ onNavigate }: ProductsProps) {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium">AED {product.inventoryValue.toLocaleString()}</p>
+                          <p className="font-medium"><CurrencyGlyph /> {product.inventoryValue.toLocaleString()}</p>
                           <p className="text-sm text-muted-foreground">{product.totalStock} units</p>
                         </div>
                       </div>

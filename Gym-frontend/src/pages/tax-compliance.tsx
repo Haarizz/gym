@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { taxComplianceService, TaxComplianceItem, TaxComplianceCreateRequest } from '../utils/supabase/tax-compliance-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -98,6 +99,7 @@ const initialTaxTypeConfigs = [
 ];
 
 export function TaxCompliance() {
+  const { currencyCode } = useCurrency();
   const [filings, setFilings] = useState<TaxComplianceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -314,7 +316,7 @@ export function TaxCompliance() {
             <div className="bg-emerald-50 p-2 rounded-lg"><DollarSign className="h-4 w-4 text-emerald-600" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-700">AED {totalPendingAmount.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-emerald-700"><CurrencyGlyph /> {totalPendingAmount.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">Across all tax types</p>
           </CardContent>
         </Card>
@@ -418,7 +420,7 @@ export function TaxCompliance() {
                       <div>
                         <div className="text-sm text-muted-foreground mb-1">Pending Amount</div>
                         <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
-                          AED {totalOwed.toLocaleString()}
+                          <CurrencyGlyph /> {totalOwed.toLocaleString()}
                         </div>
                       </div>
 
@@ -477,7 +479,7 @@ export function TaxCompliance() {
                           <div className="flex items-center gap-4">
                             <div className="text-right">
                               <div className="text-sm font-medium">
-                                {f.filingAmount != null ? `AED ${f.filingAmount.toLocaleString()}` : '—'}
+                                {f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 Due: {format(new Date(f.dueDate), "dd MMM yyyy")}
@@ -574,10 +576,10 @@ export function TaxCompliance() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Revenue</span><span className="font-medium">AED 1,850,000</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Deductions</span><span className="font-medium">AED 1,344,440</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxable Profit</span><span className="font-medium">AED 505,560</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Tax Payable (9%)</span><span className="font-bold" style={{ color: '#2B7A78' }}>AED 45,500</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Revenue</span><span className="font-medium"><CurrencyGlyph /> 1,850,000</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Deductions</span><span className="font-medium"><CurrencyGlyph /> 1,344,440</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxable Profit</span><span className="font-medium"><CurrencyGlyph /> 505,560</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Tax Payable (9%)</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 45,500</span></div>
                 </div>
                 <div className="flex gap-2">
                   <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
@@ -596,9 +598,9 @@ export function TaxCompliance() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Output VAT (5%)</span><span className="font-medium">AED 92,500</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Input VAT (5%)</span><span className="font-medium">AED 80,200</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Net VAT Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}>AED 12,300</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Output VAT (5%)</span><span className="font-medium"><CurrencyGlyph /> 92,500</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Input VAT (5%)</span><span className="font-medium"><CurrencyGlyph /> 80,200</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Net VAT Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 12,300</span></div>
                 </div>
                 <div className="flex gap-2">
                   <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
@@ -617,9 +619,9 @@ export function TaxCompliance() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Excisable Goods Value</span><span className="font-medium">AED 17,800</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Excisable Goods Value</span><span className="font-medium"><CurrencyGlyph /> 17,800</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax Rate</span><span className="font-medium">50%</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Excise Tax Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}>AED 8,900</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Excise Tax Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 8,900</span></div>
                 </div>
                 <div className="flex gap-2">
                   <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
@@ -671,7 +673,7 @@ export function TaxCompliance() {
                         <TableCell>{f.taxPeriod}</TableCell>
                         <TableCell>{format(new Date(f.dueDate), "dd MMM yyyy")}</TableCell>
                         <TableCell>{f.filedDate ? format(new Date(f.filedDate), "dd MMM yyyy") : '—'}</TableCell>
-                        <TableCell>{f.filingAmount != null ? `AED ${f.filingAmount.toLocaleString()}` : '—'}</TableCell>
+                        <TableCell>{f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}</TableCell>
                         <TableCell>{f.filingReference ?? '—'}</TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(f.status)}>
@@ -777,7 +779,7 @@ export function TaxCompliance() {
                                 <div>
                                   <span className="text-muted-foreground">Amount:</span>
                                   <div className="font-medium" style={{ color: '#2B7A78' }}>
-                                    {f.filingAmount != null ? `AED ${f.filingAmount.toLocaleString()}` : '—'}
+                                    {f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}
                                   </div>
                                 </div>
                                 <div>
@@ -848,7 +850,7 @@ export function TaxCompliance() {
               <Input type="date" value={filingForm.dueDate} onChange={e => setFilingForm(f => ({ ...f, dueDate: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label>Filing Amount (AED)</Label>
+              <Label>Filing Amount ({currencyCode})</Label>
               <Input type="number" placeholder="0.00" value={filingForm.filingAmount} onChange={e => setFilingForm(f => ({ ...f, filingAmount: e.target.value }))} />
             </div>
             <div className="space-y-2">
@@ -894,7 +896,7 @@ export function TaxCompliance() {
               <Input type="date" value={markFiledForm.filedDate} onChange={e => setMarkFiledForm(f => ({ ...f, filedDate: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label>Filing Amount (AED)</Label>
+              <Label>Filing Amount ({currencyCode})</Label>
               <Input type="number" placeholder="0.00" value={markFiledForm.filingAmount} onChange={e => setMarkFiledForm(f => ({ ...f, filingAmount: e.target.value }))} />
             </div>
             <div className="space-y-2">

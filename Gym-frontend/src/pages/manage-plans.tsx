@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { plansService, Plan } from '../utils/supabase/plans-service';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -148,6 +149,7 @@ const availableCampaigns = [
 
 
 export function ManagePlans() {
+  const { currencyCode } = useCurrency();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -588,7 +590,7 @@ export function ManagePlans() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              AED {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
+              <CurrencyGlyph /> {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
             </div>
             <p className="text-xs text-muted-foreground">Across all plans</p>
           </CardContent>
@@ -705,7 +707,7 @@ export function ManagePlans() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium">AED {plan.price}</div>
+                      <div className="font-medium"><CurrencyGlyph /> {plan.price}</div>
                       {plan.discount > 0 && (
                         <div className="text-sm text-green-600">{plan.discount}% off</div>
                       )}
@@ -894,7 +896,7 @@ export function ManagePlans() {
                 </div>
                 <div className="p-3 rounded-lg border bg-white">
                   <p className="text-xs text-muted-foreground">Price</p>
-                  <p className="font-semibold text-primary">AED {viewingPlan.price}</p>
+                  <p className="font-semibold text-primary"><CurrencyGlyph /> {viewingPlan.price}</p>
                 </div>
                 <div className="p-3 rounded-lg border bg-white">
                   <p className="text-xs text-muted-foreground">Discount</p>
@@ -1081,7 +1083,7 @@ export function ManagePlans() {
             {/* Price and Discount */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="price">Price (AED) *</Label>
+                <Label htmlFor="price">Price ({currencyCode}) *</Label>
                 <Input
                   id="price"
                   type="number"
@@ -1668,7 +1670,7 @@ export function ManagePlans() {
                   <div className="space-y-2">
                     <Label htmlFor="chargePerExtraDay">
                       Charge for Extra Days
-                      <span className="text-xs text-muted-foreground ml-2">(AED per day)</span>
+                      <span className="text-xs text-muted-foreground ml-2">({currencyCode} per day)</span>
                     </Label>
                     <Input
                       id="chargePerExtraDay"
@@ -1721,7 +1723,7 @@ export function ManagePlans() {
                     </div>
                     <div>
                       <span className="text-gray-600">Extra Day Charge:</span>
-                      <span className="ml-2 font-medium text-[#E63946]">AED {formData.chargePerExtraDay || "0"}</span>
+                      <span className="ml-2 font-medium text-[#E63946]"><CurrencyGlyph /> {formData.chargePerExtraDay || "0"}</span>
                     </div>
                     <div className="col-span-2">
                       <span className="text-gray-600">Auto Unfreeze:</span>

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -119,6 +120,7 @@ const monthNames = [
 ];
 
 export function Payroll({ onNavigate }: PayrollProps) {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [payrollCycles, setPayrollCycles] = useState<PayrollCycle[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -559,7 +561,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                       <div className="flex-1">
                         <div className="font-medium">{cycle.period}</div>
                         <div className="text-sm text-muted-foreground">
-                          {cycle.totalEmployees} employees • AED {cycle.netSalary.toLocaleString()}
+                          {cycle.totalEmployees} employees • <CurrencyGlyph /> {cycle.netSalary.toLocaleString()}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -595,7 +597,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => `AED ${value.toLocaleString()}`} />
+                  <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                   <Line type="monotone" dataKey="amount" stroke="#2B7A78" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
@@ -638,7 +640,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                         <div className="text-center">
                           <div className="text-sm text-muted-foreground mb-1">Gross Salary</div>
                           <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
-                            AED {selectedCycle.grossSalary.toLocaleString()}
+                            <CurrencyGlyph /> {selectedCycle.grossSalary.toLocaleString()}
                           </div>
                         </div>
                       </CardContent>
@@ -648,7 +650,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                         <div className="text-center">
                           <div className="text-sm text-muted-foreground mb-1">Total Deductions</div>
                           <div className="text-2xl font-bold text-red-600">
-                            AED {selectedCycle.totalDeductions.toLocaleString()}
+                            <CurrencyGlyph /> {selectedCycle.totalDeductions.toLocaleString()}
                           </div>
                         </div>
                       </CardContent>
@@ -658,7 +660,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                         <div className="text-center">
                           <div className="text-sm text-muted-foreground mb-1">Net Payable</div>
                           <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
-                            AED {selectedCycle.netSalary.toLocaleString()}
+                            <CurrencyGlyph /> {selectedCycle.netSalary.toLocaleString()}
                           </div>
                         </div>
                       </CardContent>
@@ -731,16 +733,16 @@ export function Payroll({ onNavigate }: PayrollProps) {
                               <div className="text-muted-foreground">{payroll.overtimeHours}h OT</div>
                             </div>
                           </TableCell>
-                          <TableCell>AED {payroll.basicSalary.toLocaleString()}</TableCell>
+                          <TableCell><CurrencyGlyph /> {payroll.basicSalary.toLocaleString()}</TableCell>
                           <TableCell className="text-green-600">+{payroll.allowances.toLocaleString()}</TableCell>
                           <TableCell className="text-green-600">+{payroll.overtimePay.toLocaleString()}</TableCell>
                           <TableCell>
-                            <span className="font-medium">AED {payroll.grossSalary.toLocaleString()}</span>
+                            <span className="font-medium"><CurrencyGlyph /> {payroll.grossSalary.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-red-600">-{payroll.deductions.toLocaleString()}</TableCell>
                           <TableCell>
                             <span className="font-bold" style={{ color: '#2B7A78' }}>
-                              AED {payroll.netSalary.toLocaleString()}
+                              <CurrencyGlyph /> {payroll.netSalary.toLocaleString()}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -845,11 +847,11 @@ export function Payroll({ onNavigate }: PayrollProps) {
                         <div className="font-medium">{cycle.period}</div>
                       </TableCell>
                       <TableCell>{cycle.totalEmployees}</TableCell>
-                      <TableCell>AED {cycle.grossSalary.toLocaleString()}</TableCell>
+                      <TableCell><CurrencyGlyph /> {cycle.grossSalary.toLocaleString()}</TableCell>
                       <TableCell className="text-red-600">-{cycle.totalDeductions.toLocaleString()}</TableCell>
                       <TableCell>
                         <span className="font-medium" style={{ color: '#2B7A78' }}>
-                          AED {cycle.netSalary.toLocaleString()}
+                          <CurrencyGlyph /> {cycle.netSalary.toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -910,7 +912,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => `AED ${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                     </RechartsPie>
                   </ResponsiveContainer>
                 ) : (
@@ -937,7 +939,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip formatter={(value: number) => `AED ${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                       <Bar dataKey="value" fill="#E63946" />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1166,20 +1168,20 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Basic Salary</span>
-                      <span className="font-medium">AED {selectedEmployee.basicSalary.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.basicSalary.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Allowances</span>
-                      <span className="font-medium">AED {selectedEmployee.allowances.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.allowances.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Overtime Pay</span>
-                      <span className="font-medium">AED {selectedEmployee.overtimePay.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.overtimePay.toLocaleString()}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-bold">
                       <span>Gross Salary</span>
-                      <span>AED {selectedEmployee.grossSalary.toLocaleString()}</span>
+                      <span><CurrencyGlyph /> {selectedEmployee.grossSalary.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -1189,16 +1191,16 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Late Arrivals</span>
-                      <span className="font-medium">AED {selectedEmployee.lateArrivalDeduction.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.lateArrivalDeduction.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Absences</span>
-                      <span className="font-medium">AED {selectedEmployee.absenceDeduction.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedEmployee.absenceDeduction.toLocaleString()}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-bold">
                       <span>Total Deductions</span>
-                      <span>AED {selectedEmployee.deductions.toLocaleString()}</span>
+                      <span><CurrencyGlyph /> {selectedEmployee.deductions.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -1211,7 +1213,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <span className="text-lg">Net Payable Amount:</span>
-                    <span className="text-3xl font-bold">AED {selectedEmployee.netSalary.toLocaleString()}</span>
+                    <span className="text-3xl font-bold"><CurrencyGlyph /> {selectedEmployee.netSalary.toLocaleString()}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1256,16 +1258,16 @@ export function Payroll({ onNavigate }: PayrollProps) {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Gross Amount:</span>
-                      <span className="font-medium">AED {selectedCycle.grossSalary.toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {selectedCycle.grossSalary.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Deductions:</span>
-                      <span className="font-medium text-red-600">-AED {selectedCycle.totalDeductions.toLocaleString()}</span>
+                      <span className="font-medium text-red-600">-<CurrencyGlyph /> {selectedCycle.totalDeductions.toLocaleString()}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-bold">
                       <span>Net Payable:</span>
-                      <span style={{ color: '#2B7A78' }}>AED {selectedCycle.netSalary.toLocaleString()}</span>
+                      <span style={{ color: '#2B7A78' }}><CurrencyGlyph /> {selectedCycle.netSalary.toLocaleString()}</span>
                     </div>
                   </div>
                 </CardContent>

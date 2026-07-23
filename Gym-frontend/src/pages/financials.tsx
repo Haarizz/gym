@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useCurrency, CurrencyValue } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -33,6 +34,7 @@ import { ledgersService, LedgerTransaction } from '../utils/supabase/ledgers-ser
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
 
 export function Financials() {
+  const { currencyCode } = useCurrency();
   // ── Live data state ────────────────────────────────────────────────────────
   const [kpiData, setKpiData] = useState({
     totalIncome: 0,
@@ -117,8 +119,6 @@ export function Financials() {
   const getCurrentPeriod = () =>
     new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
-  const formatCurrency = (amount: number) => `${amount.toLocaleString()} AED`;
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Completed': return 'bg-green-100 text-green-800';
@@ -168,7 +168,7 @@ export function Financials() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Income</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(kpiData.totalIncome)}
+                  <CurrencyValue amount={kpiData.totalIncome} />
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
@@ -188,7 +188,7 @@ export function Financials() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Expenses</p>
                 <p className="text-2xl font-bold text-red-600">
-                  {formatCurrency(kpiData.totalExpenses)}
+                  <CurrencyValue amount={kpiData.totalExpenses} />
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="h-4 w-4 text-red-500 mr-1" />
@@ -208,7 +208,7 @@ export function Financials() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Gross Profit</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(kpiData.grossProfit)}
+                  <CurrencyValue amount={kpiData.grossProfit} />
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="h-4 w-4 text-blue-500 mr-1" />
@@ -228,7 +228,7 @@ export function Financials() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Net Balance</p>
                 <p className="text-2xl font-bold text-cyan-600">
-                  {formatCurrency(kpiData.netBalance)}
+                  <CurrencyValue amount={kpiData.netBalance} />
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="h-4 w-4 text-cyan-500 mr-1" />
@@ -268,7 +268,7 @@ export function Financials() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Outstanding Payments</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {formatCurrency(kpiData.outstandingPayments)}
+                  <CurrencyValue amount={kpiData.outstandingPayments} />
                 </p>
                 <div className="flex items-center mt-2">
                   <Calendar className="h-4 w-4 text-purple-500 mr-1" />
@@ -308,7 +308,7 @@ export function Financials() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`${value.toLocaleString()} AED`, '']} />
+                <Tooltip formatter={(value) => [`${currencyCode} ${value.toLocaleString()}`, '']} />
                 <Legend />
                 <Line 
                   type="monotone" 
@@ -370,7 +370,7 @@ export function Financials() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`${value.toLocaleString()} AED`, '']} />
+                <Tooltip formatter={(value) => [`${currencyCode} ${value.toLocaleString()}`, '']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -439,7 +439,7 @@ export function Financials() {
                             ? 'text-green-600 font-semibold' 
                             : 'text-red-600 font-semibold'
                         }>
-                          {transaction.amount > 0 ? '+' : ''}{formatCurrency(Math.abs(transaction.amount))}
+                          {transaction.amount > 0 ? '+' : ''}<CurrencyValue amount={Math.abs(transaction.amount)} />
                         </span>
                       </TableCell>
                       <TableCell>
@@ -504,7 +504,7 @@ export function Financials() {
                             ? 'text-green-600' 
                             : 'text-red-600'
                         }>
-                          {recon.difference >= 0 ? '+' : ''}{formatCurrency(Math.abs(recon.difference))}
+                          {recon.difference >= 0 ? '+' : ''}<CurrencyValue amount={Math.abs(recon.difference)} />
                         </span>
                       </TableCell>
                       <TableCell>
@@ -560,7 +560,7 @@ export function Financials() {
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">{payment.vendor}</TableCell>
                       <TableCell>{payment.description}</TableCell>
-                      <TableCell>{formatCurrency(payment.amount)}</TableCell>
+                      <TableCell><CurrencyValue amount={payment.amount} /></TableCell>
                       <TableCell>
                         {new Date(payment.dueDate).toLocaleDateString('en-GB')}
                       </TableCell>

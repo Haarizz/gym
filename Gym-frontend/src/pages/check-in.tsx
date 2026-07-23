@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -94,6 +95,7 @@ function staffToPerson(s: Staff): PersonEntry {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CheckIn() {
+  const { currencyCode } = useCurrency();
   // ── Data state ──────────────────────────────────────────────────────────────
   const [people, setPeople]               = useState<PersonEntry[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceRecord[]>([]);
@@ -320,7 +322,7 @@ export function CheckIn() {
     setTimeout(() => {
       setPaymentDone(true);
       setProcessingPayment(false);
-      toast.success(`Payment of AED ${selectedPlanDetails?.price} collected via ${paymentMethod}`);
+      toast.success(`Payment of ${currencyCode} ${selectedPlanDetails?.price} collected via ${paymentMethod}`);
     }, 1200);
   };
 
@@ -333,7 +335,7 @@ export function CheckIn() {
         session_type: selectedPlanDetails?.name || 'gym',
         payment_status: 'paid',
         device_id: 'WEB',
-        notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${paymentMethod}, Amount: AED ${selectedPlanDetails?.price}`,
+        notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${paymentMethod}, Amount: ${currencyCode} ${selectedPlanDetails?.price}`,
       };
       await checkInService.walkInCheckIn(req);
 
@@ -671,7 +673,7 @@ export function CheckIn() {
                         <SelectContent>
                           {dailyPlans.map(p => (
                             <SelectItem key={p.id} value={p.id.toString()}>
-                              {p.name} — AED {p.price} ({p.duration})
+                              {p.name} — <CurrencyGlyph /> {p.price} ({p.duration})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -696,7 +698,7 @@ export function CheckIn() {
                     <div className="p-4 bg-gradient-light border border-primary/20 rounded-lg flex items-center justify-between">
                       <div>
                         <p className="text-sm text-muted-foreground">Total Charge</p>
-                        <p className="text-2xl font-bold text-primary">AED {selectedPlanDetails?.price}</p>
+                        <p className="text-2xl font-bold text-primary"><CurrencyGlyph /> {selectedPlanDetails?.price}</p>
                         <p className="text-xs text-muted-foreground mt-1">Valid for {selectedPlanDetails?.duration}</p>
                       </div>
                       {paymentDone ? (
@@ -767,7 +769,7 @@ export function CheckIn() {
                         <div className="space-y-1 text-xs text-muted-foreground ml-12">
                           <div className="flex justify-between"><span>Plan:</span><span className="font-medium text-primary">{v.membership}</span></div>
                           <div className="flex justify-between"><span>Check-in:</span><span className="font-medium">{v.checkInTime}</span></div>
-                          <div className="flex justify-between"><span>Amount:</span><span className="font-medium text-green-600">AED {v.amount}</span></div>
+                          <div className="flex justify-between"><span>Amount:</span><span className="font-medium text-green-600"><CurrencyGlyph /> {v.amount}</span></div>
                           <div className="flex justify-between"><span>Mobile:</span><span className="font-medium">{v.mobile}</span></div>
                         </div>
                       </div>

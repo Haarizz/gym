@@ -42,6 +42,10 @@ public class Product extends BaseEntity {
     @Column(name = "is_manufactured")
     private Boolean isManufactured = false;
 
+    // Whether this product should appear in the Point of Sale product grid
+    @Column(name = "enabled_for_pos")
+    private Boolean enabledForPos = false;
+
     @Convert(converter = JsonStringListConverter.class)
     @Column(name = "image_urls", columnDefinition = "TEXT")
     private List<String> imageUrls;
@@ -101,6 +105,9 @@ public class Product extends BaseEntity {
 
     public Boolean getIsManufactured() { return isManufactured; }
     public void setIsManufactured(Boolean isManufactured) { this.isManufactured = isManufactured; }
+
+    public Boolean getEnabledForPos() { return enabledForPos; }
+    public void setEnabledForPos(Boolean enabledForPos) { this.enabledForPos = enabledForPos; }
 
     public List<String> getImageUrls() { return imageUrls; }
     public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }

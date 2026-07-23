@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -269,7 +270,7 @@ interface JoinClassProps {
 }
 
 export function JoinClass({ onNavigate }: JoinClassProps = {}) {
-  const [viewMode, setViewMode] = useState<'discover' | 'my-classes'>('discover');
+    const [viewMode, setViewMode] = useState<'discover' | 'my-classes'>('discover');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedIntensity, setSelectedIntensity] = useState<string>('all');
@@ -742,7 +743,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
                                 ) : (
                                   <div>
                                     <p className="text-2xl font-bold text-[#327F74]">
-                                      AED {classItem.price}
+                                      <CurrencyGlyph /> {classItem.price}
                                     </p>
                                     <p className="text-xs text-gray-500">per session</p>
                                   </div>
@@ -1097,7 +1098,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
                           <Wallet className="h-5 w-5 text-[#327F74]" />
                           <div>
                             <p className="font-semibold">Wallet</p>
-                            <p className="text-sm text-gray-600">Balance: AED 500</p>
+                            <p className="text-sm text-gray-600">Balance: <CurrencyGlyph /> 500</p>
                           </div>
                         </div>
                         {paymentMethod === 'wallet' && (
@@ -1117,7 +1118,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
                           <CreditCard className="h-5 w-5 text-[#327F74]" />
                           <div>
                             <p className="font-semibold">Credit/Debit Card</p>
-                            <p className="text-sm text-gray-600">Pay AED {selectedClass.price}</p>
+                            <p className="text-sm text-gray-600">Pay <CurrencyGlyph /> {selectedClass.price}</p>
                           </div>
                         </div>
                         {paymentMethod === 'card' && (

@@ -10,6 +10,7 @@ import com.company.project.entities.ProductStock;
 import com.company.project.entities.Supplier;
 import com.company.project.entities.SupplierBill;
 import com.company.project.entities.SupplierBillItem;
+import com.company.project.entities.Warehouse;
 import com.company.project.repositories.ProductStockRepository;
 import com.company.project.repositories.SupplierBillItemRepository;
 import com.company.project.repositories.SupplierBillRepository;
@@ -146,6 +147,14 @@ public class SupplierBillService {
             throw new RuntimeException("Only DRAFT bills can be confirmed. Current status: " + bill.getStatus());
         }
 
+        // Bills created before warehouse selection existed on the purchase form (or where the
+        // user just left it unset) would otherwise silently skip the stock-in below — fall back
+        // to a real warehouse instead, and persist it so cancel/backfill see the same value.
+        Long warehouseId = resolveWarehouseId(bill);
+        if (warehouseId != null && !warehouseId.equals(bill.getWarehouseId())) {
+            bill.setWarehouseId(warehouseId);
+        }
+
         bill.setStatus("CONFIRMED");
         bill = supplierBillRepository.save(bill);
 
@@ -155,27 +164,38 @@ public class SupplierBillService {
         // Increment stock for each item
         List<SupplierBillItem> items = supplierBillItemRepository.findByBillId(bill.getId());
         for (SupplierBillItem item : items) {
-            if (item.getProductId() != null && bill.getWarehouseId() != null) {
-                Optional<ProductStock> stockOpt = productStockRepository
-                        .findByProductIdAndWarehouseId(item.getProductId(), bill.getWarehouseId());
-                if (stockOpt.isPresent()) {
-                    ProductStock stock = stockOpt.get();
-                    stock.setCurrentStock((stock.getCurrentStock() == null ? 0 : stock.getCurrentStock())
-                            + (item.getQuantity() != null ? item.getQuantity() : 0));
-                    productStockRepository.save(stock);
-                } else {
-                    ProductStock newStock = new ProductStock();
-                    newStock.setProductId(item.getProductId());
-                    newStock.setWarehouseId(bill.getWarehouseId());
-                    newStock.setCurrentStock(item.getQuantity() != null ? item.getQuantity() : 0);
-                    newStock.setOpeningStock(0);
-                    newStock.setReorderLevel(0);
-                    productStockRepository.save(newStock);
-                }
+            if (item.getProductId() != null && warehouseId != null) {
+                applyStockIncrement(item.getProductId(), warehouseId, item.getQuantity() != null ? item.getQuantity() : 0);
             }
         }
 
         return SupplierBillResponseDTO.fromEntity(bill, items);
+    }
+
+    /**
+     * One-time self-heal for bills that were confirmed before the purchase form had a warehouse
+     * field (so their stock-in never applied). Safe to call on every startup: it only touches
+     * CONFIRMED bills that still have a null warehouseId, and stamps a resolved one on each so
+     * it's never reprocessed.
+     */
+    public void backfillMissingWarehouseStock() {
+        List<SupplierBill> orphaned = supplierBillRepository.findAll().stream()
+                .filter(b -> "CONFIRMED".equals(b.getStatus()) && b.getWarehouseId() == null)
+                .collect(Collectors.toList());
+
+        for (SupplierBill bill : orphaned) {
+            Long warehouseId = resolveWarehouseId(bill);
+            if (warehouseId == null) continue; // no warehouse exists anywhere yet — nothing to backfill into
+
+            List<SupplierBillItem> items = supplierBillItemRepository.findByBillId(bill.getId());
+            for (SupplierBillItem item : items) {
+                if (item.getProductId() == null) continue;
+                applyStockIncrement(item.getProductId(), warehouseId, item.getQuantity() != null ? item.getQuantity() : 0);
+            }
+
+            bill.setWarehouseId(warehouseId);
+            supplierBillRepository.save(bill);
+        }
     }
 
     public SupplierBillResponseDTO cancelBill(Long id) {
@@ -275,6 +295,35 @@ public class SupplierBillService {
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /** Bill's own warehouse if set, else the first active warehouse, else the first warehouse of any kind. */
+    private Long resolveWarehouseId(SupplierBill bill) {
+        if (bill.getWarehouseId() != null) return bill.getWarehouseId();
+
+        List<Warehouse> active = warehouseRepository.findByIsActiveTrue();
+        if (!active.isEmpty()) return active.get(0).getId();
+
+        List<Warehouse> all = warehouseRepository.findAll();
+        return all.isEmpty() ? null : all.get(0).getId();
+    }
+
+    private void applyStockIncrement(Long productId, Long warehouseId, int quantity) {
+        Optional<ProductStock> stockOpt = productStockRepository
+                .findByProductIdAndWarehouseId(productId, warehouseId);
+        if (stockOpt.isPresent()) {
+            ProductStock stock = stockOpt.get();
+            stock.setCurrentStock((stock.getCurrentStock() == null ? 0 : stock.getCurrentStock()) + quantity);
+            productStockRepository.save(stock);
+        } else {
+            ProductStock newStock = new ProductStock();
+            newStock.setProductId(productId);
+            newStock.setWarehouseId(warehouseId);
+            newStock.setCurrentStock(quantity);
+            newStock.setOpeningStock(0);
+            newStock.setReorderLevel(0);
+            productStockRepository.save(newStock);
+        }
+    }
 
     private SupplierBillItem buildItem(Long billId, SupplierBillItemDTO dto) {
         SupplierBillItem item = new SupplierBillItem();

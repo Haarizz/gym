@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { staffService, StaffTarget } from '../utils/supabase/staff-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -85,6 +86,7 @@ interface TargetsOverviewProps {
 }
 
 export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
+  const { currencyCode } = useCurrency();
   const [dateFilter, setDateFilter] = useState("month");
   const [customDate, setCustomDate] = useState<Date | undefined>(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState("all");
@@ -295,7 +297,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Commission</p>
-                <p className="text-2xl font-bold text-foreground">AED {totalCommission.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-foreground"><CurrencyGlyph /> {totalCommission.toLocaleString()}</p>
               </div>
               <div className="p-3 rounded-full bg-primary/10">
                 <Wallet className="h-6 w-6 text-primary" />
@@ -370,19 +372,19 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Monthly Target</span>
                   <span className="font-bold text-foreground">
-                    AED {instTarget.monthly.toLocaleString()}
+                    <CurrencyGlyph /> {instTarget.monthly.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Achieved</span>
                   <span className="font-bold text-primary">
-                    AED {instTarget.achieved.toLocaleString()}
+                    <CurrencyGlyph /> {instTarget.achieved.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Remaining</span>
                   <span className="font-bold text-error">
-                    AED {instTarget.remaining.toLocaleString()}
+                    <CurrencyGlyph /> {instTarget.remaining.toLocaleString()}
                   </span>
                 </div>
                 <Separator />
@@ -393,7 +395,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Daily Required</span>
                   <span className="font-medium text-warning">
-                    AED {instTarget.dailyRequired.toLocaleString()}
+                    <CurrencyGlyph /> {instTarget.dailyRequired.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -464,8 +466,8 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                   <TableHead className="w-[50px]"></TableHead>
                   <TableHead>Staff</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Target (AED)</TableHead>
-                  <TableHead>Achieved (AED)</TableHead>
+                  <TableHead>Target ({currencyCode})</TableHead>
+                  <TableHead>Achieved ({currencyCode})</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>Commission</TableHead>
                   <TableHead>Status</TableHead>
@@ -531,11 +533,11 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">AED {(t.revenue_target || 0).toLocaleString()}</span>
+                          <span className="font-medium"><CurrencyGlyph /> {(t.revenue_target || 0).toLocaleString()}</span>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <span className="font-medium">AED {achieved.toLocaleString()}</span>
+                            <span className="font-medium"><CurrencyGlyph /> {achieved.toLocaleString()}</span>
                             {t.trend === "up" ? (
                               <ArrowUp className="h-4 w-4 text-success" />
                             ) : (
@@ -561,7 +563,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                         </TableCell>
                         <TableCell>
                           <span className="font-medium text-foreground">
-                            AED {commission.toLocaleString()}
+                            <CurrencyGlyph /> {commission.toLocaleString()}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -686,7 +688,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <XAxis dataKey="date" stroke="#666" />
                 <YAxis stroke="#666" />
                 <Tooltip 
-                  formatter={(value: number) => [`AED ${value.toLocaleString()}`, '']}
+                  formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
                 />
                 <Legend />
                 <Line 
@@ -733,7 +735,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <XAxis dataKey="department" stroke="#666" />
                 <YAxis stroke="#666" />
                 <Tooltip 
-                  formatter={(value: number) => [`AED ${value.toLocaleString()}`, '']}
+                  formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
                 />
                 <Legend />
                 <Bar dataKey="target" fill={COLORS.muted} name="Target" />
@@ -760,7 +762,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Revenue Generated</p>
-                    <p className="text-2xl font-bold text-foreground">AED {totalRevenue.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-foreground"><CurrencyGlyph /> {totalRevenue.toLocaleString()}</p>
                   </div>
                   <div className="p-3 rounded-full bg-primary/10">
                     <DollarSign className="h-6 w-6 text-primary" />
@@ -774,7 +776,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Commission Payable</p>
-                    <p className="text-2xl font-bold text-foreground">AED {totalCommission.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-foreground"><CurrencyGlyph /> {totalCommission.toLocaleString()}</p>
                   </div>
                   <div className="p-3 rounded-full bg-orange-50">
                     <Wallet className="h-6 w-6 text-orange-500" />
@@ -788,7 +790,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Net Revenue</p>
-                    <p className="text-2xl font-bold text-foreground">AED {(totalRevenue - totalCommission).toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-foreground"><CurrencyGlyph /> {(totalRevenue - totalCommission).toLocaleString()}</p>
                   </div>
                   <div className="p-3 rounded-full bg-green-50">
                     <TrendingUp className="h-6 w-6 text-green-600" />

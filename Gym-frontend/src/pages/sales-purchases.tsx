@@ -1,96 +1,98 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { ShoppingCart, Package, CreditCard, TrendingUp, Plus, Filter, Download } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-
-const salesData = [
-  { month: 'Jan', sales: 28000, purchases: 15000 },
-  { month: 'Feb', sales: 35000, purchases: 18000 },
-  { month: 'Mar', sales: 32000, purchases: 16500 },
-  { month: 'Apr', sales: 42000, purchases: 22000 },
-  { month: 'May', sales: 38000, purchases: 19000 },
-  { month: 'Jun', sales: 45000, purchases: 24000 },
-];
-
-const recentSales = [
-  {
-    id: 1,
-    date: "2024-09-24",
-    customer: "Sarah Johnson",
-    item: "Premium Membership",
-    amount: 150,
-    status: "completed",
-    method: "Credit Card"
-  },
-  {
-    id: 2,
-    date: "2024-09-24", 
-    customer: "Mike Chen",
-    item: "Personal Training Package",
-    amount: 400,
-    status: "completed",
-    method: "Bank Transfer"
-  },
-  {
-    id: 3,
-    date: "2024-09-23",
-    customer: "Emily Rodriguez", 
-    item: "Protein Powder + Supplements",
-    amount: 85,
-    status: "pending",
-    method: "Cash"
-  }
-];
-
-const inventory = [
-  {
-    id: 1,
-    name: "Whey Protein Powder",
-    category: "Supplements",
-    stock: 45,
-    price: 49.99,
-    supplier: "NutriCorp",
-    lastOrdered: "2024-09-15"
-  },
-  {
-    id: 2,
-    name: "Gym Towels",
-    category: "Accessories", 
-    stock: 120,
-    price: 12.99,
-    supplier: "FitTex",
-    lastOrdered: "2024-09-10"
-  },
-  {
-    id: 3,
-    name: "Resistance Bands Set",
-    category: "Equipment",
-    stock: 28,
-    price: 24.99,
-    supplier: "FlexFit",
-    lastOrdered: "2024-09-08"
-  }
-];
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { ShoppingCart, Package, CreditCard, TrendingUp, Filter, Download, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { receiptsService, Receipt } from '../utils/supabase/receipts-service';
+import { purchaseService, PurchaseOrder } from '../utils/supabase/purchase-service';
 
 export function SalesPurchases() {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed": return "bg-green-100 text-green-800";
-      case "pending": return "bg-yellow-100 text-yellow-800";
-      case "cancelled": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
+  const { currencyCode } = useCurrency();
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const getStockStatus = (stock: number) => {
-    if (stock < 20) return "bg-red-100 text-red-800";
-    if (stock < 50) return "bg-yellow-100 text-yellow-800";
-    return "bg-green-100 text-green-800";
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [receiptsResp, poResp] = await Promise.all([
+        receiptsService.getReceipts({}, { page: 1, limit: 5000 }).catch(() => ({ receipts: [] as Receipt[], pagination: {} as any })),
+        purchaseService.getOrders({ size: 500 }).catch(() => ({ orders: [] as PurchaseOrder[], pagination: {} as any })),
+      ]);
+      setReceipts((receiptsResp as any).receipts ?? []);
+      setPurchaseOrders(poResp.orders ?? []);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  // Last 6 months of sales vs purchases
+  const monthlyData = useMemo(() => {
+    const months: { label: string; key: string }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleString(undefined, { month: 'short' });
+      months.push({ label, key });
+    }
+    return months.map(({ label, key }) => {
+      const sales = receipts
+        .filter(r => (r.transaction_date || '').split('T')[0].startsWith(key))
+        .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      const purchases = purchaseOrders
+        .filter(po => (po.orderDate || '').split('T')[0].startsWith(key))
+        .reduce((s, po) => s + (Number(po.totalAmount) || 0), 0);
+      return { month: label, sales: Math.round(sales), purchases: Math.round(purchases), profit: Math.round(sales - purchases) };
+    });
+  }, [receipts, purchaseOrders]);
+
+  // KPIs for current month
+  const kpis = useMemo(() => {
+    const monthReceipts = receipts.filter(r => (r.transaction_date || '').split('T')[0].startsWith(currentMonthKey));
+    const monthlySales = monthReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const monthlyPurchases = purchaseOrders
+      .filter(po => (po.orderDate || '').split('T')[0].startsWith(currentMonthKey))
+      .reduce((s, po) => s + (Number(po.totalAmount) || 0), 0);
+    const grossProfit = monthlySales - monthlyPurchases;
+    const avgTransaction = monthReceipts.length > 0 ? monthlySales / monthReceipts.length : 0;
+    return { monthlySales, monthlyPurchases, grossProfit, avgTransaction };
+  }, [receipts, purchaseOrders, currentMonthKey]);
+
+  // Recent sales (latest 20 receipts sorted by date)
+  const recentSales = useMemo(() => {
+    return [...receipts]
+      .sort((a, b) => new Date(b.transaction_date || b.created_at).getTime() - new Date(a.transaction_date || a.created_at).getTime())
+      .slice(0, 20);
+  }, [receipts]);
+
+  // Recent purchase orders (latest 20)
+  const recentPOs = useMemo(() => {
+    return [...purchaseOrders]
+      .sort((a, b) => new Date(b.orderDate || b.createdAt).getTime() - new Date(a.orderDate || a.createdAt).getTime())
+      .slice(0, 20);
+  }, [purchaseOrders]);
+
+  const getStatusColor = (status: string) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'completed' || s === 'paid' || s === 'received') return 'bg-green-100 text-green-800';
+    if (s === 'pending' || s === 'pending_approval' || s === 'approved' || s === 'ordered') return 'bg-yellow-100 text-yellow-800';
+    if (s === 'cancelled' || s === 'refunded') return 'bg-red-100 text-red-800';
+    if (s === 'partially_received' || s === 'partial') return 'bg-blue-100 text-blue-800';
+    return 'bg-gray-100 text-gray-800';
   };
 
   return (
@@ -98,16 +100,16 @@ export function SalesPurchases() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Sales & Purchases</h1>
-          <p className="text-muted-foreground">Manage sales transactions and inventory purchases.</p>
+          <p className="text-muted-foreground">Real-time sales transactions and purchase orders.</p>
         </div>
         <div className="flex space-x-2">
+          <Button variant="outline" onClick={loadData} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button variant="outline">
             <Filter className="mr-2 h-4 w-4" />
             Filter
-          </Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Sale
           </Button>
         </div>
       </div>
@@ -120,10 +122,8 @@ export function SalesPurchases() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">AED 45,000</div>
-            <p className="text-xs text-muted-foreground">
-              +18% from last month
-            </p>
+            <div className="text-2xl font-bold"><CurrencyGlyph /> {Math.round(kpis.monthlySales).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">This month</p>
           </CardContent>
         </Card>
 
@@ -133,10 +133,8 @@ export function SalesPurchases() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">AED 24,000</div>
-            <p className="text-xs text-muted-foreground">
-              +12% from last month
-            </p>
+            <div className="text-2xl font-bold"><CurrencyGlyph /> {Math.round(kpis.monthlyPurchases).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Purchase orders this month</p>
           </CardContent>
         </Card>
 
@@ -146,10 +144,10 @@ export function SalesPurchases() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">AED 21,000</div>
-            <p className="text-xs text-muted-foreground">
-              +25% from last month
-            </p>
+            <div className={`text-2xl font-bold ${kpis.grossProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+              <CurrencyGlyph /> {Math.round(kpis.grossProfit).toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">Sales minus purchases</p>
           </CardContent>
         </Card>
 
@@ -159,10 +157,8 @@ export function SalesPurchases() {
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">AED 156</div>
-            <p className="text-xs text-muted-foreground">
-              +8% from last month
-            </p>
+            <div className="text-2xl font-bold"><CurrencyGlyph /> {Math.round(kpis.avgTransaction).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Per receipt this month</p>
           </CardContent>
         </Card>
       </div>
@@ -171,8 +167,7 @@ export function SalesPurchases() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="sales">Sales</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          <TabsTrigger value="purchases">Purchases</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -184,11 +179,12 @@ export function SalesPurchases() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={salesData}>
+                  <BarChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip />
+                    <Tooltip formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`} />
+                    <Legend />
                     <Bar dataKey="sales" fill="#8884d8" name="Sales" />
                     <Bar dataKey="purchases" fill="#82ca9d" name="Purchases" />
                   </BarChart>
@@ -203,12 +199,12 @@ export function SalesPurchases() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={salesData.map(item => ({ ...item, profit: item.sales - item.purchases }))}>
+                  <LineChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="profit" stroke="#8884d8" strokeWidth={2} />
+                    <Tooltip formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`} />
+                    <Line type="monotone" dataKey="profit" stroke="#8884d8" strokeWidth={2} name="Profit" />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -222,7 +218,7 @@ export function SalesPurchases() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Recent Sales</CardTitle>
-                  <CardDescription>Latest sales transactions</CardDescription>
+                  <CardDescription>Latest sales transactions ({receipts.length.toLocaleString()} total)</CardDescription>
                 </div>
                 <Button variant="outline" size="sm">
                   <Download className="mr-2 h-4 w-4" />
@@ -231,124 +227,93 @@ export function SalesPurchases() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Payment Method</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentSales.map((sale) => (
-                    <TableRow key={sale.id}>
-                      <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
-                      <TableCell className="font-medium">{sale.customer}</TableCell>
-                      <TableCell>{sale.item}</TableCell>
-                      <TableCell>{sale.method}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(sale.status)}>
-                          {sale.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        AED {sale.amount}
-                      </TableCell>
+              {loading ? (
+                <div className="py-8 text-center text-muted-foreground">Loading...</div>
+              ) : recentSales.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">No sales records found.</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Receipt No.</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Plan / Item</TableHead>
+                      <TableHead>Payment Method</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {recentSales.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>{r.transaction_date ? r.transaction_date.split('T')[0] : '—'}</TableCell>
+                        <TableCell className="font-medium">{r.receipt_no || r.id.slice(0, 8)}</TableCell>
+                        <TableCell>{r.member_name || '—'}</TableCell>
+                        <TableCell>{r.plan_name || r.transaction_type || '—'}</TableCell>
+                        <TableCell>{r.payment_method || '—'}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(r.status || '')}>{r.status || '—'}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium"><CurrencyGlyph /> {Number(r.amount).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="inventory" className="space-y-6">
+        <TabsContent value="purchases" className="space-y-6">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Inventory Management</CardTitle>
-                  <CardDescription>Track stock levels and manage products</CardDescription>
+                  <CardTitle>Recent Purchase Orders</CardTitle>
+                  <CardDescription>Latest purchase orders from suppliers ({purchaseOrders.length.toLocaleString()} total)</CardDescription>
                 </div>
-                <div className="flex space-x-2">
-                  <Select defaultValue="all">
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      <SelectItem value="supplements">Supplements</SelectItem>
-                      <SelectItem value="accessories">Accessories</SelectItem>
-                      <SelectItem value="equipment">Equipment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Product
-                  </Button>
-                </div>
+                <Button variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Stock Level</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Last Ordered</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {inventory.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{item.category}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <span>{item.stock}</span>
-                          <Badge className={getStockStatus(item.stock)}>
-                            {item.stock < 20 ? "Low" : item.stock < 50 ? "Medium" : "Good"}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>AED {item.price}</TableCell>
-                      <TableCell>{item.supplier}</TableCell>
-                      <TableCell>{new Date(item.lastOrdered).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button variant="outline" size="sm">Reorder</Button>
-                          <Button variant="outline" size="sm">Edit</Button>
-                        </div>
-                      </TableCell>
+              {loading ? (
+                <div className="py-8 text-center text-muted-foreground">Loading...</div>
+              ) : recentPOs.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">No purchase orders found.</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>PO Number</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Total Amount</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="suppliers" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Supplier Management</CardTitle>
-              <CardDescription>Manage relationships with product suppliers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <Package className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium mb-2">Supplier Management</h3>
-                <p>Manage your supplier relationships and purchase orders. This section is under development.</p>
-              </div>
+                  </TableHeader>
+                  <TableBody>
+                    {recentPOs.map((po) => (
+                      <TableRow key={po.id}>
+                        <TableCell>{po.orderDate ? po.orderDate.split('T')[0] : '—'}</TableCell>
+                        <TableCell className="font-medium">{po.poNumber}</TableCell>
+                        <TableCell>{po.supplierName}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{po.priority}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(po.status)}>{po.status.replace(/_/g, ' ')}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium"><CurrencyGlyph /> {Number(po.totalAmount).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -356,4 +321,3 @@ export function SalesPurchases() {
     </div>
   );
 }
-

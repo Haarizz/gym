@@ -87,6 +87,7 @@ import {
   Gauge
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, isYesterday } from 'date-fns';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 
 // Types
 interface QuickAction {
@@ -138,6 +139,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps = {}) {
+  const { currencyCode } = useCurrency();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today');
   const [showMemberResults, setShowMemberResults] = useState(false);
@@ -476,8 +478,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           <p className="font-medium">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.dataKey}: {entry.dataKey.includes('revenue') || entry.dataKey.includes('amount') 
-                ? `AED ${entry.value.toLocaleString()}` 
+              {entry.dataKey}: {entry.dataKey.includes('revenue') || entry.dataKey.includes('amount')
+                ? <><CurrencyGlyph />{entry.value.toLocaleString()}</>
                 : entry.value.toLocaleString()
               }
             </p>
@@ -736,7 +738,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                                    dateFilter === 'week' ? 'This Week' :
                                    dateFilter === 'month' ? 'This Month' : 'Last Month'}
                   </p>
-                  <p className="text-3xl font-bold">AED {kpiData.revenue.toLocaleString()}</p>
+                  <p className="text-3xl font-bold"><CurrencyGlyph />{kpiData.revenue.toLocaleString()}</p>
                   <div className="flex items-center mt-2">
                     {kpiData.revenueChange >= 0 ? (
                       <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
@@ -905,7 +907,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     fill="#3b82f6" 
                     fillOpacity={0.1}
                     strokeWidth={3}
-                    name="Revenue (AED)"
+                    name={`Revenue (${currencyCode})`}
                   />
                   <Area 
                     type="monotone" 
@@ -914,7 +916,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     fill="transparent"
                     strokeDasharray="5 5"
                     strokeWidth={2}
-                    name="Target (AED)"
+                    name={`Target (${currencyCode})`}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -974,7 +976,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium">{item.value} members</p>
-                        <p className="text-xs text-muted-foreground">AED {item.amount.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground"><CurrencyGlyph />{item.amount.toLocaleString()}</p>
                       </div>
                     </div>
                   ))}

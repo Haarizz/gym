@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { CurrencyGlyph } from '../utils/currency';
 import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -219,7 +220,7 @@ interface MembershipRenewalProps {
 }
 
 export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
-  const location = useLocation();
+    const location = useLocation();
   const navMemberId: number | null = (location.state as any)?.memberId ?? null;
   const [mainTab, setMainTab] = useState<'details' | 'renewal' | 'payments' | 'history'>('details');
   const [showRenewalSheet, setShowRenewalSheet] = useState(false);
@@ -725,15 +726,15 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
 
                         <div className="text-center mb-4">
                           {plan.discount > 0 && (
-                            <p className="text-sm text-gray-500 line-through">AED {plan.price}</p>
+                            <p className="text-sm text-gray-500 line-through"><CurrencyGlyph /> {plan.price}</p>
                           )}
                           <p className="text-3xl font-bold text-[#327F74]">
-                            AED {plan.finalPrice}
+                            <CurrencyGlyph /> {plan.finalPrice}
                           </p>
                           {plan.savings > 0 && (
                             <Badge className="mt-2 bg-green-100 text-green-800">
                               <Tag className="h-3 w-3 mr-1" />
-                              Save AED {plan.savings}
+                              Save <CurrencyGlyph /> {plan.savings}
                             </Badge>
                           )}
                         </div>
@@ -792,7 +793,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                         <div>
                           <p className="text-sm text-orange-900 mb-1">Total Due Amount</p>
                           <p className="text-3xl font-bold text-orange-600">
-                            AED {data.totalDue.toFixed(2)}
+                            <CurrencyGlyph /> {data.totalDue.toFixed(2)}
                           </p>
                         </div>
                         <AlertCircle className="h-12 w-12 text-orange-600 opacity-20" />
@@ -833,7 +834,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                                   </span>
                                   <span className="flex items-center gap-1 font-bold text-orange-600">
                                     <DollarSign className="h-4 w-4" />
-                                    AED {due.amount}
+                                    <CurrencyGlyph /> {due.amount}
                                   </span>
                                 </div>
                               </div>
@@ -850,7 +851,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                       disabled={selectedDues.length === 0}
                     >
                       <Wallet className="h-5 w-5 mr-2" />
-                      Pay Selected Dues (AED {totalSelectedDueAmount})
+                      Pay Selected Dues (<CurrencyGlyph /> {totalSelectedDueAmount})
                     </Button>
                   </>
                 ) : (
@@ -891,7 +892,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                                 </div>
                               </div>
                               <p className="text-lg font-bold text-[#327F74] ml-14">
-                                AED {item.amount.toFixed(2)}
+                                <CurrencyGlyph /> {item.amount.toFixed(2)}
                               </p>
                             </div>
                             <div className="flex gap-2">
@@ -998,12 +999,12 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                                   <div className="text-sm">
                                     {item.discount > 0 && (
                                       <p className="text-gray-500">
-                                        Original: AED {item.amount + item.discount} • 
-                                        Discount: AED {item.discount}
+                                        Original: <CurrencyGlyph /> {item.amount + item.discount} • 
+                                        Discount: <CurrencyGlyph /> {item.discount}
                                       </p>
                                     )}
                                     <p className="font-bold text-[#327F74]">
-                                      Amount: AED {item.amount.toFixed(2)}
+                                      Amount: <CurrencyGlyph /> {item.amount.toFixed(2)}
                                     </p>
                                   </div>
                                   <Button 
@@ -1047,10 +1048,10 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                   <div className="flex items-end gap-2">
                     {selectedPlan.discount > 0 && (
                       <span className="text-lg text-white/70 line-through">
-                        AED {selectedPlan.price}
+                        <CurrencyGlyph /> {selectedPlan.price}
                       </span>
                     )}
-                    <span className="text-4xl font-bold">AED {selectedPlan.finalPrice}</span>
+                    <span className="text-4xl font-bold"><CurrencyGlyph /> {selectedPlan.finalPrice}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1063,7 +1064,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                       <Tag className="h-8 w-8 text-green-600" />
                       <div>
                         <p className="font-semibold text-green-900">Discount Applied</p>
-                        <p className="text-sm text-green-700">You save AED {selectedPlan.savings}</p>
+                        <p className="text-sm text-green-700">You save <CurrencyGlyph /> {selectedPlan.savings}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -1106,18 +1107,18 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Plan Price</span>
-                    <span>AED {selectedPlan.price}</span>
+                    <span><CurrencyGlyph /> {selectedPlan.price}</span>
                   </div>
                   {selectedPlan.discount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
-                      <span>- AED {selectedPlan.discount}</span>
+                      <span>- <CurrencyGlyph /> {selectedPlan.discount}</span>
                     </div>
                   )}
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total Payable</span>
-                    <span className="text-[#327F74]">AED {selectedPlan.finalPrice}</span>
+                    <span className="text-[#327F74]"><CurrencyGlyph /> {selectedPlan.finalPrice}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1159,7 +1160,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
               <CardContent className="p-6">
                 <p className="text-sm text-gray-600 mb-1">Total Amount</p>
                 <p className="text-4xl font-bold text-purple-600">
-                  AED {totalSelectedDueAmount.toFixed(2)}
+                  <CurrencyGlyph /> {totalSelectedDueAmount.toFixed(2)}
                 </p>
               </CardContent>
             </Card>
@@ -1199,7 +1200,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                       <Wallet className="h-5 w-5 text-[#327F74]" />
                       <div>
                         <p className="font-semibold">Wallet</p>
-                        <p className="text-sm text-gray-600">Balance: AED 1,200</p>
+                        <p className="text-sm text-gray-600">Balance: <CurrencyGlyph /> 1,200</p>
                       </div>
                     </div>
                     {paymentMethod === 'wallet' && <CheckCircle2 className="h-5 w-5 text-[#327F74]" />}
@@ -1216,7 +1217,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
               disabled={selectedDues.length === 0}
             >
               <Wallet className="h-5 w-5 mr-2" />
-              Pay AED {totalSelectedDueAmount.toFixed(2)}
+              Pay <CurrencyGlyph /> {totalSelectedDueAmount.toFixed(2)}
             </Button>
           </div>
         </SheetContent>

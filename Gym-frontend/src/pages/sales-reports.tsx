@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useCurrency } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -36,88 +37,195 @@ import {
   CalendarDays,
   ArrowUpRight,
 } from "lucide-react";
+import { toast } from "sonner";
+import { receiptsService, Receipt as ReceiptType } from "../utils/supabase/receipts-service";
 
-type SalesRow = {
-  id: string;
-  invoice: string;
-  date: string;
-  customer: string;
-  channel: string;
-  payment: string;
-  status: "paid" | "partial" | "refunded" | "pending";
-  amount: number;
-};
+type StatusType = "paid" | "partial" | "refunded" | "pending";
 
-const salesTrend = [
-  { day: "Mon", sales: 12450, orders: 64, refunds: 320 },
-  { day: "Tue", sales: 13890, orders: 71, refunds: 280 },
-  { day: "Wed", sales: 15220, orders: 79, refunds: 410 },
-  { day: "Thu", sales: 17180, orders: 88, refunds: 350 },
-  { day: "Fri", sales: 19640, orders: 102, refunds: 520 },
-  { day: "Sat", sales: 21430, orders: 112, refunds: 610 },
-  { day: "Sun", sales: 16810, orders: 84, refunds: 300 },
-];
-
-const categoryMix = [
-  { name: "Memberships", value: 42, revenue: 68400, color: "#2563eb" },
-  { name: "PT Sessions", value: 22, revenue: 35650, color: "#16a34a" },
-  { name: "Supplements", value: 18, revenue: 28400, color: "#f97316" },
-  { name: "Merchandise", value: 10, revenue: 15800, color: "#7c3aed" },
-  { name: "Cafe", value: 8, revenue: 12400, color: "#0891b2" },
-];
-
-const paymentMix = [
-  { method: "Card", value: 82400 },
-  { method: "Cash", value: 29650 },
-  { method: "Bank", value: 18500 },
-  { method: "Wallet", value: 12200 },
-];
-
-const hourlySales = [
-  { hour: "6-9", sales: 8200 },
-  { hour: "9-12", sales: 14600 },
-  { hour: "12-3", sales: 12850 },
-  { hour: "3-6", sales: 16720 },
-  { hour: "6-9", sales: 21480 },
-  { hour: "9-12", sales: 10240 },
-];
-
-const salesRegister: SalesRow[] = [
-  { id: "1", invoice: "INV-20482", date: "2026-03-17", customer: "Aisha Patel", channel: "POS", payment: "Card", status: "paid", amount: 640 },
-  { id: "2", invoice: "INV-20483", date: "2026-03-17", customer: "Rahul Singh", channel: "Online", payment: "Wallet", status: "paid", amount: 320 },
-  { id: "3", invoice: "INV-20484", date: "2026-03-17", customer: "Emily Rogers", channel: "POS", payment: "Cash", status: "partial", amount: 410 },
-  { id: "4", invoice: "INV-20485", date: "2026-03-16", customer: "Mohamed Saeed", channel: "Corporate", payment: "Bank", status: "paid", amount: 2100 },
-  { id: "5", invoice: "INV-20486", date: "2026-03-16", customer: "Kavya Nair", channel: "POS", payment: "Card", status: "refunded", amount: 180 },
-  { id: "6", invoice: "INV-20487", date: "2026-03-15", customer: "Liam Brown", channel: "Online", payment: "Card", status: "pending", amount: 520 },
-];
-
-const topProducts = [
-  { name: "Premium Membership", category: "Membership", units: 84, revenue: 75600, margin: 62 },
-  { name: "PT Starter Pack", category: "Training", units: 36, revenue: 28800, margin: 48 },
-  { name: "Whey Protein 2kg", category: "Supplements", units: 102, revenue: 21420, margin: 34 },
-  { name: "Performance Shaker", category: "Merchandise", units: 140, revenue: 9800, margin: 55 },
-];
-
-const statusBadge = (status: SalesRow["status"]) => {
-  const map: Record<SalesRow["status"], string> = {
+const statusBadge = (status: StatusType) => {
+  const map: Record<StatusType, string> = {
     paid: "bg-green-100 text-green-800",
     partial: "bg-yellow-100 text-yellow-800",
     refunded: "bg-red-100 text-red-800",
     pending: "bg-gray-100 text-gray-800",
   };
-  return <Badge className={map[status]}>{status}</Badge>;
+  return <Badge className={map[status] ?? "bg-gray-100 text-gray-800"}>{status}</Badge>;
 };
 
-const formatAED = (value: number) => `AED ${value.toLocaleString()}`;
+const CATEGORY_COLORS: Record<string, string> = {
+  Memberships: "#2563eb",
+  "PT Sessions": "#16a34a",
+  Classes: "#f97316",
+  Merchandise: "#7c3aed",
+  Other: "#0891b2",
+};
+
+function categorizeReceipt(r: ReceiptType): string {
+  const t = (r.transaction_type || "").toLowerCase();
+  const plan = (r.plan_name || "").toLowerCase();
+  if (t.includes("new member") || t.includes("renew") || t.includes("upgrade") || plan.includes("membership")) return "Memberships";
+  if (t.includes("training") || plan.includes("pt") || plan.includes("personal")) return "PT Sessions";
+  if (t.includes("class") || plan.includes("class")) return "Classes";
+  if (t.includes("pos") || t.includes("product") || plan.includes("product") || plan.includes("merchandise")) return "Merchandise";
+  return "Other";
+}
+
+function normalizeStatus(s: string | undefined): StatusType {
+  const lower = (s || "").toLowerCase();
+  if (lower === "paid" || lower === "completed") return "paid";
+  if (lower === "partial") return "partial";
+  if (lower === "refunded") return "refunded";
+  if (lower === "pending") return "pending";
+  return "paid";
+}
 
 export function SalesReports() {
-  const totals = useMemo(() => {
-    const totalSales = salesRegister.reduce((sum, row) => sum + row.amount, 0);
-    const paidCount = salesRegister.filter(r => r.status === "paid").length;
-    const refundTotal = salesRegister.filter(r => r.status === "refunded").reduce((sum, row) => sum + row.amount, 0);
-    const avgOrder = totalSales / Math.max(salesRegister.length, 1);
-    return { totalSales, paidCount, refundTotal, avgOrder };
+  const { currencyCode } = useCurrency();
+  const formatAED = (value: number) => `${currencyCode} ${value.toLocaleString()}`;
+  const [receipts, setReceipts] = useState<ReceiptType[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateRange, setDateRange] = useState("last-7");
+  const [statusFilter, setStatusFilter] = useState("all-status");
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await receiptsService.getReceipts({}, { page: 1, limit: 5000 });
+      setReceipts(resp.receipts ?? []);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to load receipts");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const now = new Date();
+
+  // Date filter cutoff
+  const dateCutoff = useMemo(() => {
+    if (dateRange === "today") return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (dateRange === "last-7") return new Date(now.getTime() - 7 * 86400000);
+    if (dateRange === "last-30") return new Date(now.getTime() - 30 * 86400000);
+    if (dateRange === "this-month") return new Date(now.getFullYear(), now.getMonth(), 1);
+    return new Date(0);
+  }, [dateRange]);
+
+  // Filtered receipts by date + status + search
+  const filteredReceipts = useMemo(() => {
+    return receipts.filter(r => {
+      const d = r.transaction_date ? new Date(r.transaction_date) : null;
+      if (d && d < dateCutoff) return false;
+      if (statusFilter !== "all-status" && normalizeStatus(r.status) !== statusFilter) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (
+          !(r.member_name || "").toLowerCase().includes(q) &&
+          !(r.receipt_no || "").toLowerCase().includes(q) &&
+          !(r.plan_name || "").toLowerCase().includes(q) &&
+          !(r.member_id || "").toLowerCase().includes(q)
+        ) return false;
+      }
+      return true;
+    });
+  }, [receipts, dateCutoff, statusFilter, searchQuery]);
+
+  // Weekly sales trend (last 7 days)
+  const salesTrend = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() - (6 - i));
+      const ds = d.toISOString().split("T")[0];
+      const label = d.toLocaleString(undefined, { weekday: "short" });
+      const dayRows = receipts.filter(r => (r.transaction_date || "").split("T")[0] === ds);
+      const sales = dayRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      const orders = dayRows.length;
+      const refunds = dayRows.filter(r => normalizeStatus(r.status) === "refunded").reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      return { day: label, sales: Math.round(sales), orders, refunds: Math.round(refunds) };
+    });
+  }, [receipts]);
+
+  // Category mix
+  const categoryMix = useMemo(() => {
+    const cats: Record<string, number> = {};
+    filteredReceipts.forEach(r => {
+      const cat = categorizeReceipt(r);
+      cats[cat] = (cats[cat] || 0) + (Number(r.amount) || 0);
+    });
+    const total = Object.values(cats).reduce((s, v) => s + v, 0);
+    return Object.entries(cats)
+      .map(([name, revenue]) => ({
+        name,
+        value: total > 0 ? Math.round((revenue / total) * 100) : 0,
+        revenue: Math.round(revenue),
+        color: CATEGORY_COLORS[name] ?? "#64748b",
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+  }, [filteredReceipts]);
+
+  // Payment methods
+  const paymentMix = useMemo(() => {
+    const methods: Record<string, number> = {};
+    filteredReceipts.forEach(r => {
+      const m = r.payment_method || "Other";
+      methods[m] = (methods[m] || 0) + (Number(r.amount) || 0);
+    });
+    return Object.entries(methods)
+      .map(([method, value]) => ({ method, value: Math.round(value) }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredReceipts]);
+
+  // Sales register (latest 50 from filtered set)
+  const salesRegister = useMemo(() => {
+    return [...filteredReceipts]
+      .sort((a, b) => new Date(b.transaction_date || b.created_at).getTime() - new Date(a.transaction_date || a.created_at).getTime())
+      .slice(0, 50)
+      .map(r => ({
+        id: r.id,
+        invoice: r.receipt_no || r.id.slice(0, 8).toUpperCase(),
+        date: r.transaction_date ? r.transaction_date.split("T")[0] : "—",
+        customer: r.member_name || "—",
+        channel: r.transaction_type || "POS",
+        payment: r.payment_method || "—",
+        status: normalizeStatus(r.status),
+        amount: Number(r.amount) || 0,
+      }));
+  }, [filteredReceipts]);
+
+  // Top products/plans by revenue
+  const topProducts = useMemo(() => {
+    const plans: Record<string, { units: number; revenue: number; category: string }> = {};
+    filteredReceipts.forEach(r => {
+      const name = r.plan_name || r.transaction_type || "Unknown";
+      if (!plans[name]) plans[name] = { units: 0, revenue: 0, category: categorizeReceipt(r) };
+      plans[name].units += 1;
+      plans[name].revenue += Number(r.amount) || 0;
+    });
+    return Object.entries(plans)
+      .map(([name, v]) => ({ name, category: v.category, units: v.units, revenue: Math.round(v.revenue) }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+  }, [filteredReceipts]);
+
+  // Summary totals
+  const totals = useMemo(() => {
+    const totalSales = filteredReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const paidCount = filteredReceipts.filter(r => normalizeStatus(r.status) === "paid").length;
+    const refundTotal = filteredReceipts.filter(r => normalizeStatus(r.status) === "refunded").reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const avgOrder = filteredReceipts.length > 0 ? totalSales / filteredReceipts.length : 0;
+    const uniqueMembers = new Set(filteredReceipts.map(r => r.member_id).filter(Boolean)).size;
+    return { totalSales, paidCount, refundTotal, avgOrder, uniqueMembers };
+  }, [filteredReceipts]);
+
+  const periodLabel =
+    dateRange === "today" ? "1 Day" :
+    dateRange === "last-7" ? "7 Days" :
+    dateRange === "last-30" ? "30 Days" :
+    "This Month";
 
   return (
     <div className="p-6 space-y-6">
@@ -130,13 +238,9 @@ export function SalesReports() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-9">
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" className="h-9" onClick={loadData} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
-          </Button>
-          <Button variant="outline" size="sm" className="h-9">
-            <Download className="mr-2 h-4 w-4" />
-            Export
           </Button>
           <Button size="sm" className="h-9">
             <Filter className="mr-2 h-4 w-4" />
@@ -161,11 +265,13 @@ export function SalesReports() {
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex-1 min-w-[220px] relative">
               <Input
-                placeholder="Search invoices, customers, or products..."
+                placeholder="Search invoices, customers, or plans..."
                 className="h-10"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
               />
             </div>
-            <Select defaultValue="last-7">
+            <Select value={dateRange} onValueChange={setDateRange}>
               <SelectTrigger className="w-[140px] h-9">
                 <SelectValue placeholder="Date Range" />
               </SelectTrigger>
@@ -176,29 +282,7 @@ export function SalesReports() {
                 <SelectItem value="this-month">This Month</SelectItem>
               </SelectContent>
             </Select>
-            <Select defaultValue="all-branches">
-              <SelectTrigger className="w-[150px] h-9">
-                <SelectValue placeholder="Branch" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all-branches">All Branches</SelectItem>
-                <SelectItem value="downtown">Downtown</SelectItem>
-                <SelectItem value="marina">Marina</SelectItem>
-                <SelectItem value="al-barsha">Al Barsha</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select defaultValue="all-channels">
-              <SelectTrigger className="w-[140px] h-9">
-                <SelectValue placeholder="Channel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all-channels">All Channels</SelectItem>
-                <SelectItem value="pos">POS</SelectItem>
-                <SelectItem value="online">Online</SelectItem>
-                <SelectItem value="corporate">Corporate</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select defaultValue="all-status">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[140px] h-9">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -224,8 +308,8 @@ export function SalesReports() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-700">{formatAED(totals.totalSales)}</div>
-            <p className="text-xs text-muted-foreground mt-1">+12.4% vs last period</p>
+            <div className="text-2xl font-bold text-green-700">{formatAED(Math.round(totals.totalSales))}</div>
+            <p className="text-xs text-muted-foreground mt-1">{filteredReceipts.length} transactions</p>
           </CardContent>
         </Card>
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
@@ -248,8 +332,10 @@ export function SalesReports() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-700">{formatAED(totals.refundTotal)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Refund rate 2.1%</p>
+            <div className="text-2xl font-bold text-red-700">{formatAED(Math.round(totals.refundTotal))}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {totals.totalSales > 0 ? `${((totals.refundTotal / totals.totalSales) * 100).toFixed(1)}% refund rate` : "No refunds"}
+            </p>
           </CardContent>
         </Card>
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
@@ -266,14 +352,14 @@ export function SalesReports() {
         </Card>
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">New Customers</CardTitle>
+            <CardTitle className="text-sm font-medium text-primary">Unique Members</CardTitle>
             <div className="bg-amber-50 p-2 rounded-lg">
               <Users className="h-4 w-4 text-amber-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-700">128</div>
-            <p className="text-xs text-muted-foreground mt-1">+18 this week</p>
+            <div className="text-2xl font-bold text-amber-700">{totals.uniqueMembers}</div>
+            <p className="text-xs text-muted-foreground mt-1">Members with transactions</p>
           </CardContent>
         </Card>
       </div>
@@ -283,7 +369,7 @@ export function SalesReports() {
         <Card className="xl:col-span-2 border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle>Weekly Sales Trend</CardTitle>
-            <CardDescription>Sales, orders, and refunds by day</CardDescription>
+            <CardDescription>Sales, orders, and refunds by day (last 7 days)</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -297,11 +383,11 @@ export function SalesReports() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip formatter={(v: number, name: string) => name === "sales" ? `${currencyCode} ${v.toLocaleString()}` : v} />
                 <Legend />
-                <Area type="monotone" dataKey="sales" stroke="#2563eb" fill="url(#salesFill)" name="Sales" />
+                <Area type="monotone" dataKey="sales" stroke="#2563eb" fill="url(#salesFill)" name={`Sales (${currencyCode})`} />
                 <Line type="monotone" dataKey="orders" stroke="#16a34a" strokeWidth={2} name="Orders" />
-                <Line type="monotone" dataKey="refunds" stroke="#dc2626" strokeWidth={2} name="Refunds" />
+                <Line type="monotone" dataKey="refunds" stroke="#dc2626" strokeWidth={2} name={`Refunds (${currencyCode})`} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
@@ -310,20 +396,24 @@ export function SalesReports() {
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle>Category Mix</CardTitle>
-            <CardDescription>Revenue share by product category</CardDescription>
+            <CardDescription>Revenue share by type</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie data={categoryMix} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={2}>
-                  {categoryMix.map(entry => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number, name: string, props: any) => [`${value}%`, name]} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {categoryMix.length === 0 ? (
+              <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">No data available.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={categoryMix} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={2}>
+                    {categoryMix.map(entry => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number, name: string) => [`${value}%`, name]} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -336,35 +426,23 @@ export function SalesReports() {
             <CardDescription>Revenue by payment type</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={paymentMix}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="method" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill="#6366f1" name="Revenue" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {paymentMix.length === 0 ? (
+              <div className="h-[260px] flex items-center justify-center text-sm text-muted-foreground">No data available.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={paymentMix}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="method" />
+                  <YAxis />
+                  <Tooltip formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`} />
+                  <Bar dataKey="value" fill="#6366f1" name="Revenue" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle>Peak Hours</CardTitle>
-            <CardDescription>Sales volume by time slot</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={hourlySales}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="hour" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="sales" fill="#0ea5e9" name="Sales" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow xl:col-span-2">
           <CardHeader>
             <CardTitle>Reporting Snapshot</CardTitle>
             <CardDescription>Key highlights for this period</CardDescription>
@@ -375,28 +453,32 @@ export function SalesReports() {
                 <CalendarDays className="h-4 w-4" />
                 Period Coverage
               </div>
-              <span className="text-sm font-semibold">7 Days</span>
+              <span className="text-sm font-semibold">{periodLabel}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <ShoppingCart className="h-4 w-4" />
                 Orders Processed
               </div>
-              <span className="text-sm font-semibold">490</span>
+              <span className="text-sm font-semibold">{filteredReceipts.length.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CreditCard className="h-4 w-4" />
-                Payment Success
+                Payment Success Rate
               </div>
-              <span className="text-sm font-semibold">98.2%</span>
+              <span className="text-sm font-semibold">
+                {filteredReceipts.length > 0
+                  ? `${(((filteredReceipts.length - filteredReceipts.filter(r => normalizeStatus(r.status) === "pending").length) / filteredReceipts.length) * 100).toFixed(1)}%`
+                  : "—"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <ArrowUpRight className="h-4 w-4" />
-                Sales Growth
+                Total Revenue
               </div>
-              <span className="text-sm font-semibold text-green-600">+9.6%</span>
+              <span className="text-sm font-semibold text-green-600">{formatAED(Math.round(totals.totalSales))}</span>
             </div>
           </CardContent>
         </Card>
@@ -408,7 +490,7 @@ export function SalesReports() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Sales Register</CardTitle>
-              <CardDescription>Detailed transaction listing</CardDescription>
+              <CardDescription>Detailed transaction listing ({salesRegister.length} shown)</CardDescription>
             </div>
             <Button variant="outline" size="sm">
               <Download className="mr-2 h-4 w-4" />
@@ -417,32 +499,38 @@ export function SalesReports() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Invoice</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Channel</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {salesRegister.map(row => (
-                <TableRow key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                  <TableCell className="font-medium">{row.invoice}</TableCell>
-                  <TableCell>{row.date}</TableCell>
-                  <TableCell>{row.customer}</TableCell>
-                  <TableCell>{row.channel}</TableCell>
-                  <TableCell>{row.payment}</TableCell>
-                  <TableCell>{statusBadge(row.status)}</TableCell>
-                  <TableCell className="text-right font-semibold">{formatAED(row.amount)}</TableCell>
+          {loading ? (
+            <div className="py-8 text-center text-muted-foreground">Loading transactions...</div>
+          ) : salesRegister.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">No transactions found for the selected period.</div>
+          ) : (
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Plan / Type</TableHead>
+                  <TableHead>Payment</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {salesRegister.map(row => (
+                  <TableRow key={row.id} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="font-medium">{row.invoice}</TableCell>
+                    <TableCell>{row.date}</TableCell>
+                    <TableCell>{row.customer}</TableCell>
+                    <TableCell>{row.channel}</TableCell>
+                    <TableCell>{row.payment}</TableCell>
+                    <TableCell>{statusBadge(row.status)}</TableCell>
+                    <TableCell className="text-right font-semibold">{formatAED(row.amount)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -451,8 +539,8 @@ export function SalesReports() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Top Products and Services</CardTitle>
-              <CardDescription>Best performers by revenue and margin</CardDescription>
+              <CardTitle>Top Plans and Services</CardTitle>
+              <CardDescription>Best performers by revenue</CardDescription>
             </div>
             <Button variant="ghost" size="sm">
               <FileText className="mr-2 h-4 w-4" />
@@ -461,32 +549,30 @@ export function SalesReports() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Product</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-center">Units</TableHead>
-                <TableHead className="text-right">Revenue</TableHead>
-                <TableHead className="text-right">Margin</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {topProducts.map(product => (
-                <TableRow key={product.name} className="hover:bg-slate-50/50 transition-colors">
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell className="text-center">{product.units}</TableCell>
-                  <TableCell className="text-right font-semibold">{formatAED(product.revenue)}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="outline" className="border-green-200 text-green-700">
-                      {product.margin}%
-                    </Badge>
-                  </TableCell>
+          {topProducts.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">No product data available.</div>
+          ) : (
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Plan / Service</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-center">Transactions</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {topProducts.map(product => (
+                  <TableRow key={product.name} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>{product.category}</TableCell>
+                    <TableCell className="text-center">{product.units}</TableCell>
+                    <TableCell className="text-right font-semibold">{formatAED(product.revenue)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

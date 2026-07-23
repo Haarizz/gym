@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
@@ -6,6 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Badge } from "../components/ui/badge";
 import { Progress } from "../components/ui/progress";
 import { Separator } from "../components/ui/separator";
+import { toast } from "sonner";
+import { staffService } from "../utils/supabase/staff-service";
+import { membersService, Member as MemberApi } from "../utils/supabase/members-service";
+import { receiptsService, Receipt } from "../utils/supabase/receipts-service";
+import { financialAnalyticsService } from "../utils/supabase/financial-analytics-service";
+import { attendanceService } from "../utils/supabase/attendance-service";
+import { bookingService } from "../utils/supabase/booking-service";
 import {
   BarChart3,
   TrendingUp,
@@ -167,20 +175,217 @@ const COLORS = {
 };
 
 export function CommunityAnalytics() {
+  const { currencyCode } = useCurrency();
   const [dateFilter, setDateFilter] = useState("today");
   const [staffFilter, setStaffFilter] = useState("all");
   const [activeCollectionTab, setActiveCollectionTab] = useState("today");
+  const [data, setData] = useState(mockData);
+  const [members, setMembers] = useState<MemberApi[]>([]);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const refreshData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const todayStr = now.toISOString().split("T")[0];
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split("T")[0];
+      const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+
+      const [targets, membersResp, receiptsResp, monthlyTrend, att, bookings] = await Promise.all([
+        staffService.getTargets(year, month).catch(() => []),
+        membersService.getMembers({}, { page: 1, limit: 3000 }).catch(() => ({ members: [] as MemberApi[] } as any)),
+        receiptsService.getReceipts({}, { page: 1, limit: 5000 }).catch(() => ({ receipts: [] as Receipt[] } as any)),
+        financialAnalyticsService.getMonthlyTrend(6).catch(() => []),
+        attendanceService.getAttendanceStats().catch(() => null),
+        bookingService.getBookings({
+          type: "class",
+          startDate: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0],
+          endDate: todayStr,
+        }).catch(() => []),
+      ]);
+
+      const memberList = (membersResp as any)?.members ?? [];
+      const receiptList = (receiptsResp as any)?.receipts ?? [];
+      setMembers(memberList);
+      setReceipts(receiptList);
+
+      const institution = (targets as any[]).find((t) => t.scope === "institution");
+      const assigned = institution?.revenue_target ?? 0;
+      const achieved = institution?.revenue_achieved ?? 0;
+      const progress = institution?.percentage ?? (assigned > 0 ? (achieved / assigned) * 100 : 0);
+
+      const categorizeReceipt = (r: Receipt): "membership" | "addons" | "pos" => {
+        const t = (r.transaction_type || "").toLowerCase();
+        const plan = (r.plan_name || "").toLowerCase();
+        if (t.includes("new member") || t.includes("renew") || t.includes("upgrade") || plan.includes("membership")) return "membership";
+        if (t.includes("pos") || plan.includes("pos") || t.includes("product") || plan.includes("product")) return "pos";
+        return "addons";
+      };
+
+      const sumCollections = (datePredicate: (d: string) => boolean) => {
+        const out = { membership: 0, addons: 0, pos: 0, total: 0 };
+        receiptList.forEach((r) => {
+          const dateStr = (r.transaction_date || "").split("T")[0];
+          if (!dateStr || !datePredicate(dateStr)) return;
+          const amount = Number(r.amount) || 0;
+          const cat = categorizeReceipt(r);
+          out[cat] += amount;
+          out.total += amount;
+        });
+        return out;
+      };
+
+      const collections = {
+        today: sumCollections((d) => d === todayStr),
+        yesterday: sumCollections((d) => d === yesterdayStr),
+        thisMonth: sumCollections((d) => d.startsWith(monthKey)),
+      };
+
+      const daily = Array.from({ length: 7 }).map((_, idx) => {
+        const d = new Date(now);
+        d.setDate(now.getDate() - (6 - idx));
+        const ds = d.toISOString().split("T")[0];
+        const label = d.toLocaleString(undefined, { weekday: "short" });
+        const revenue = receiptList
+          .filter((r) => (r.transaction_date || "").split("T")[0] === ds)
+          .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+        const newMembers = memberList.filter((m) => {
+          const raw = m.join_date || m.created_at;
+          const ms = raw ? String(raw).split("T")[0] : "";
+          return ms === ds;
+        }).length;
+        return { date: label, revenue: Math.round(revenue), members: newMembers };
+      });
+
+      const monthly = (monthlyTrend as any[]).map((p: any) => ({
+        month: p.month,
+        revenue: Math.round(p.revenue || 0),
+        target: Math.round(p.revenue || 0),
+      }));
+
+      const targetsByStaff = new Map<string, number>();
+      (targets as any[]).filter((t) => t.scope === "individual").forEach((t) => {
+        if (!t.staff_name) return;
+        targetsByStaff.set(t.staff_name, (targetsByStaff.get(t.staff_name) || 0) + (t.revenue_target || 0));
+      });
+
+      const staffSales = new Map<string, number>();
+      receiptList.forEach((r) => {
+        const dateStr = (r.transaction_date || "").split("T")[0];
+        if (!dateStr.startsWith(monthKey)) return;
+        const staffName = r.processed_by || "Unknown";
+        staffSales.set(staffName, (staffSales.get(staffName) || 0) + (Number(r.amount) || 0));
+      });
+
+      const staffPerformance = Array.from(staffSales.entries())
+        .map(([name, sales]) => {
+          const target = targetsByStaff.get(name) || 0;
+          const achievement = target > 0 ? (sales / target) * 100 : 0;
+          return { name, sales: Math.round(sales), target: Math.round(target), achievement: Number(achievement.toFixed(1)) };
+        })
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 8);
+
+      const newSignupsThisMonth = memberList.filter((m) => {
+        const raw = m.join_date || m.created_at;
+        const ds = raw ? String(raw).split("T")[0] : "";
+        return ds.startsWith(monthKey);
+      }).length;
+      const activeMembers = memberList.filter((m) => m.membership_status === "active").length;
+      const renewalsThisMonth = receiptList.filter((r) => {
+        const ds = (r.transaction_date || "").split("T")[0];
+        return ds.startsWith(monthKey) && (r.transaction_type || "").toLowerCase().includes("renew");
+      }).length;
+
+      const retentionFunnel = [
+        { name: "New Signups", value: newSignupsThisMonth, color: COLORS.primary },
+        { name: "Active Members", value: activeMembers, color: COLORS.secondary },
+        { name: "Renewals", value: renewalsThisMonth, color: COLORS.success },
+      ];
+
+      const churnCandidates = memberList.filter((m) =>
+        m.payment_status === "overdue" ||
+        m.membership_status === "expired" ||
+        m.membership_status === "suspended"
+      );
+      const churnPrediction = churnCandidates.slice(0, 8).map((m) => {
+        const risk = m.payment_status === "overdue" || m.membership_status === "expired" ? "High" : "Medium";
+        const probability = risk === "High" ? 82 : 60;
+        return {
+          name: m.name,
+          risk,
+          lastVisit: "—",
+          membership: m.membership_type,
+          probability,
+        };
+      });
+
+      const trainerMap = new Map<string, { classes: number; attended: number; revenue: number }>();
+      (bookings as any[]).forEach((b) => {
+        const trainer = (b.trainerName || "Unknown") as string;
+        const rec = trainerMap.get(trainer) || { classes: 0, attended: 0, revenue: 0 };
+        rec.classes += 1;
+        if (b.status === "checked-in" || b.status === "confirmed") rec.attended += 1;
+        rec.revenue += Number(b.price) || 0;
+        trainerMap.set(trainer, rec);
+      });
+      const trainerPerformance = Array.from(trainerMap.entries())
+        .map(([name, v]) => ({
+          name,
+          classes: v.classes,
+          attendance: v.classes > 0 ? Math.round((v.attended / v.classes) * 100) : 0,
+          revenue: Math.round(v.revenue),
+          rating: 0,
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 6);
+
+      setData((prev) => ({
+        ...prev,
+        targets: { assigned, achieved, progress },
+        collections,
+        trends: { daily, monthly },
+        staffPerformance: staffPerformance.length > 0 ? staffPerformance : prev.staffPerformance,
+        retentionFunnel,
+        churnPrediction,
+        trainerPerformance,
+        engagementAnalytics: {
+          communityFeatures: [],
+          correlationData: [],
+        },
+      }));
+
+      if (!att) {
+        // no-op
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to load analytics data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   // KPI Cards Data
   const kpiData = useMemo(() => {
-    const { assigned, achieved, progress } = mockData.targets;
-    const collections = mockData.collections[activeCollectionTab as keyof typeof mockData.collections];
+    const { assigned, achieved, progress } = data.targets;
+    const collections = data.collections[activeCollectionTab as keyof typeof data.collections];
+    const activeMembers = members.filter((m) => m.membership_status === "active").length;
+    const retention = members.length > 0 ? (activeMembers / members.length) * 100 : 0;
     
     return [
       {
         title: "Target Progress",
-        value: `AED ${achieved.toLocaleString()}`,
-        target: `AED ${assigned.toLocaleString()}`,
+        value: <><CurrencyGlyph /> {achieved.toLocaleString()}</>,
+        target: <><CurrencyGlyph /> {assigned.toLocaleString()}</>,
         progress: progress,
         change: progress >= 100 ? `+${(progress - 100).toFixed(1)}%` : `-${(100 - progress).toFixed(1)}%`,
         trend: progress >= 100 ? "up" : "down",
@@ -189,40 +394,40 @@ export function CommunityAnalytics() {
       },
       {
         title: "Total Collections",
-        value: `AED ${collections.total.toLocaleString()}`,
+        value: <><CurrencyGlyph /> {collections.total.toLocaleString()}</>,
         subtitle: activeCollectionTab.charAt(0).toUpperCase() + activeCollectionTab.slice(1),
-        change: "+12.5%",
+        change: "",
         trend: "up",
         icon: DollarSign,
         color: "primary"
       },
       {
         title: "Active Members",
-        value: "1,247",
-        change: "+3.2%",
+        value: activeMembers.toLocaleString(),
+        change: "",
         trend: "up",
         icon: Users,
         color: "secondary"
       },
       {
         title: "Member Retention",
-        value: "89.5%",
-        change: "+2.1%",
+        value: `${retention.toFixed(1)}%`,
+        change: "",
         trend: "up",
         icon: Repeat,
         color: "success"
       }
     ];
-  }, [activeCollectionTab]);
+  }, [activeCollectionTab, data, members]);
 
   const collectionBreakdownData = useMemo(() => {
-    const collections = mockData.collections[activeCollectionTab as keyof typeof mockData.collections];
+    const collections = data.collections[activeCollectionTab as keyof typeof data.collections];
     return [
       { name: "Membership", value: collections.membership, color: COLORS.primary },
       { name: "Add-ons", value: collections.addons, color: COLORS.secondary },
       { name: "POS Sales", value: collections.pos, color: COLORS.success }
     ];
-  }, [activeCollectionTab]);
+  }, [activeCollectionTab, data]);
 
   const getRiskColor = (risk: string) => {
     switch (risk.toLowerCase()) {
@@ -291,8 +496,14 @@ export function CommunityAnalytics() {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="shadow-sm hover:shadow-md transition-all"
+            onClick={refreshData}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
 
@@ -377,13 +588,13 @@ export function CommunityAnalytics() {
             {/* Horizontal Bar Chart */}
             <div className="space-y-4">
               {collectionBreakdownData.map((item, index) => {
-                const percentage = (item.value / mockData.collections[activeCollectionTab as keyof typeof mockData.collections].total) * 100;
+                const percentage = (item.value / data.collections[activeCollectionTab as keyof typeof data.collections].total) * 100;
                 return (
                   <div key={index} className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-foreground">{item.name}</span>
                       <span className="text-sm font-bold text-foreground">
-                        AED {item.value.toLocaleString()}
+                        <CurrencyGlyph /> {item.value.toLocaleString()}
                       </span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-3">
@@ -421,7 +632,7 @@ export function CommunityAnalytics() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value: number) => [`AED ${value.toLocaleString()}`, 'Revenue']}
+                    formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, 'Revenue']}
                   />
                   <Legend />
                 </RechartsPieChart>
@@ -441,14 +652,14 @@ export function CommunityAnalytics() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart data={mockData.trends.daily}>
+              <ComposedChart data={data.trends.daily}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis dataKey="date" stroke="#666" />
                 <YAxis yAxisId="left" stroke="#666" />
                 <YAxis yAxisId="right" orientation="right" stroke="#666" />
                 <Tooltip 
                   formatter={(value, name) => [
-                    name === 'revenue' ? `AED ${value.toLocaleString()}` : value,
+                    name === 'revenue' ? `${currencyCode} ${value.toLocaleString()}` : value,
                     name === 'revenue' ? 'Revenue' : 'New Members'
                   ]}
                 />
@@ -475,12 +686,12 @@ export function CommunityAnalytics() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <RechartsBarChart data={mockData.trends.monthly}>
+              <RechartsBarChart data={data.trends.monthly}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis dataKey="month" stroke="#666" />
                 <YAxis stroke="#666" />
                 <Tooltip 
-                  formatter={(value) => [`AED ${value.toLocaleString()}`, '']}
+                  formatter={(value) => [`${currencyCode} ${value.toLocaleString()}`, '']}
                 />
                 <Legend />
                 <Bar dataKey="target" fill={COLORS.muted} name="Target" />
@@ -501,7 +712,7 @@ export function CommunityAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockData.staffPerformance.map((staff, index) => (
+              {data.staffPerformance.map((staff, index) => (
                 <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 rounded-full bg-primary/10">
@@ -510,7 +721,7 @@ export function CommunityAnalytics() {
                     <div>
                       <p className="font-medium">{staff.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        AED {staff.sales.toLocaleString()} / AED {staff.target.toLocaleString()}
+                        <CurrencyGlyph /> {staff.sales.toLocaleString()} / <CurrencyGlyph /> {staff.target.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -546,8 +757,8 @@ export function CommunityAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockData.retentionFunnel.map((stage, index) => {
-                const percentage = index === 0 ? 100 : (stage.value / mockData.retentionFunnel[0].value) * 100;
+              {data.retentionFunnel.map((stage, index) => {
+                const percentage = index === 0 ? 100 : (stage.value / (data.retentionFunnel[0]?.value || 1)) * 100;
                 return (
                   <div key={index} className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -603,7 +814,7 @@ export function CommunityAnalytics() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockData.churnPrediction.map((member, index) => (
+                  {data.churnPrediction.map((member, index) => (
                     <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-4">
                         <div className="p-2 rounded-full bg-destructive/10">
@@ -661,7 +872,7 @@ export function CommunityAnalytics() {
               <CardContent>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    {mockData.trainerPerformance.map((trainer, index) => (
+                    {data.trainerPerformance.map((trainer, index) => (
                       <div key={index} className="p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                         <div className="flex justify-between items-start mb-3">
                           <div>
@@ -672,7 +883,7 @@ export function CommunityAnalytics() {
                             </div>
                           </div>
                           <Badge variant="default">
-                            AED {trainer.revenue.toLocaleString()}
+                            <CurrencyGlyph /> {trainer.revenue.toLocaleString()}
                           </Badge>
                         </div>
                         
@@ -692,12 +903,12 @@ export function CommunityAnalytics() {
                   
                   <div>
                     <ResponsiveContainer width="100%" height={300}>
-                      <RechartsBarChart data={mockData.trainerPerformance}>
+                      <RechartsBarChart data={data.trainerPerformance}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                         <XAxis dataKey="name" stroke="#666" />
                         <YAxis stroke="#666" />
                         <Tooltip 
-                          formatter={(value) => [`AED ${value.toLocaleString()}`, 'Revenue']}
+                          formatter={(value) => [`${currencyCode} ${value.toLocaleString()}`, 'Revenue']}
                         />
                         <Bar dataKey="revenue" fill={COLORS.primary} />
                       </RechartsBarChart>
@@ -718,7 +929,7 @@ export function CommunityAnalytics() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {mockData.engagementAnalytics.communityFeatures.map((feature, index) => (
+                    {data.engagementAnalytics.communityFeatures.map((feature, index) => (
                       <div key={index} className="space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium">{feature.feature}</span>
@@ -760,7 +971,7 @@ export function CommunityAnalytics() {
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <RechartsLineChart data={mockData.engagementAnalytics.correlationData}>
+                    <RechartsLineChart data={data.engagementAnalytics.correlationData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                       <XAxis dataKey="engagement" stroke="#666" label={{ value: 'Engagement %', position: 'insideBottom', offset: -5 }} />
                       <YAxis stroke="#666" label={{ value: 'Renewal Rate %', angle: -90, position: 'insideLeft' }} />
@@ -792,16 +1003,16 @@ export function CommunityAnalytics() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Total Revenue</span>
-                      <span className="font-bold">AED 325,000</span>
+                      <span className="font-bold"><CurrencyGlyph /> 325,000</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Operating Costs</span>
-                      <span className="font-medium">AED 180,000</span>
+                      <span className="font-medium"><CurrencyGlyph /> 180,000</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Net Profit</span>
-                      <span className="font-bold text-success">AED 145,000</span>
+                      <span className="font-bold text-success"><CurrencyGlyph /> 145,000</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Profit Margin</span>
@@ -828,7 +1039,7 @@ export function CommunityAnalytics() {
                         <span className="text-sm text-muted-foreground">{cost.name}</span>
                         <div className="text-right">
                           <span className="text-sm font-medium">
-                            AED {cost.amount.toLocaleString()}
+                            <CurrencyGlyph /> {cost.amount.toLocaleString()}
                           </span>
                           <p className="text-xs text-muted-foreground">{cost.percentage}%</p>
                         </div>
@@ -845,9 +1056,9 @@ export function CommunityAnalytics() {
                 <CardContent>
                   <div className="space-y-4">
                     {[
-                      { label: "Revenue per Member", value: "AED 260", trend: "up" },
-                      { label: "Customer Lifetime Value", value: "AED 2,850", trend: "up" },
-                      { label: "Acquisition Cost", value: "AED 285", trend: "down" },
+                      { label: "Revenue per Member", value: <><CurrencyGlyph /> 260</>, trend: "up" },
+                      { label: "Customer Lifetime Value", value: <><CurrencyGlyph /> 2,850</>, trend: "up" },
+                      { label: "Acquisition Cost", value: <><CurrencyGlyph /> 285</>, trend: "down" },
                       { label: "Churn Rate", value: "10.5%", trend: "down" }
                     ].map((ratio, index) => (
                       <div key={index} className="flex justify-between items-center">

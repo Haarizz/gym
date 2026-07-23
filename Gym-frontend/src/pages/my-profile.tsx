@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -250,6 +251,7 @@ const currentTargets: Target[] = [
 ];
 
 export function MyProfile({ onNavigate }: MyProfileProps) {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState("personal");
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState(userProfile);
@@ -928,7 +930,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                               transaction.type === 'purchase' ? 'text-red-600' : 'text-green-600'
                             }`}>
                               {transaction.type === 'purchase' ? '-' : '+'}
-                              {transaction.amount.toLocaleString()} AED
+                              <CurrencyGlyph /> {transaction.amount.toLocaleString()}
                             </div>
                           )}
                           <Badge className={`text-xs ${
@@ -950,7 +952,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                 <Card className={panelCardShell}>
                   <CardContent className="p-4 text-center">
                     <div className="text-2xl font-bold text-green-600 mb-1">4,785</div>
-                    <div className="text-sm text-gray-600">Total Earnings (AED)</div>
+                    <div className="text-sm text-gray-600">Total Earnings ({currencyCode})</div>
                     <div className="text-xs text-green-600">This month</div>
                   </CardContent>
                 </Card>
