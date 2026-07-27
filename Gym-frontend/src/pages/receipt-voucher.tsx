@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useCurrency, CurrencyValue } from '../utils/currency';
 import { toast } from 'sonner';
 import { receiptVoucherService, type ReceiptVoucher as RVType } from '../utils/supabase/receipt-voucher-service';
+import { SplitPaymentFields, isSplitPaymentValid, buildSplitPaymentBreakdown } from '../components/shared/split-payment-fields';
+import type { SplitPaymentValue } from '../components/shared/split-payment-fields';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -83,7 +85,9 @@ import {
   Utensils,
   Car,
   Home,
-  BookOpen
+  BookOpen,
+  FileCheck,
+  Split
 } from 'lucide-react';
 
 
@@ -173,6 +177,7 @@ export function ReceiptVoucher() {
         memberId: rv.memberId ? String(rv.memberId) : '',
         amount: rv.amount,
         paymentMode: rv.paymentMode,
+        paymentBreakdown: rv.paymentBreakdown ?? [],
         status: rv.status,
         branch: rv.branch,
         reference: rv.reference,
@@ -232,6 +237,12 @@ export function ReceiptVoucher() {
   // Edit receipt form state
   const [editForm, setEditForm] = useState({ ...emptyForm });
 
+  // Mixed payment split state (shared between Add and Edit dialogs)
+  const [newReceiptSplit, setNewReceiptSplit] = useState<SplitPaymentValue>({ cash: 0, card: 0, cheque: 0 });
+  const [newReceiptChequeRef, setNewReceiptChequeRef] = useState('');
+  const [editReceiptSplit, setEditReceiptSplit] = useState<SplitPaymentValue>({ cash: 0, card: 0, cheque: 0 });
+  const [editReceiptChequeRef, setEditReceiptChequeRef] = useState('');
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat(undefined, {
       style: 'currency',
@@ -264,6 +275,10 @@ export function ReceiptVoucher() {
         return <CreditCard className="h-4 w-4 text-blue-600" />;
       case 'Online Transfer':
         return <Smartphone className="h-4 w-4 text-purple-600" />;
+      case 'Cheque':
+        return <FileCheck className="h-4 w-4 text-gray-600" />;
+      case 'Mixed':
+        return <Split className="h-4 w-4 text-orange-600" />;
       default:
         return <Wallet className="h-4 w-4 text-gray-600" />;
     }
@@ -357,14 +372,22 @@ export function ReceiptVoucher() {
       toast.error('Please fill in all required fields');
       return;
     }
+    const amount = parseFloat(newReceipt.amount);
+    if (newReceipt.paymentMode === 'Mixed' && !isSplitPaymentValid(newReceiptSplit, amount)) {
+      toast.error('Split payment amounts must add up to the total amount');
+      return;
+    }
     try {
       await receiptVoucherService.createReceiptVoucher({
         date: newReceipt.date,
         source: newReceipt.source,
         sourceCategory: newReceipt.sourceCategory,
         memberName: newReceipt.member,
-        amount: parseFloat(newReceipt.amount),
+        amount,
         paymentMode: newReceipt.paymentMode,
+        paymentBreakdown: newReceipt.paymentMode === 'Mixed'
+          ? buildSplitPaymentBreakdown(newReceiptSplit, newReceiptChequeRef || undefined)
+          : undefined,
         status: newReceipt.status || 'completed',
         branch: newReceipt.branch,
         reference: newReceipt.reference,
@@ -377,6 +400,8 @@ export function ReceiptVoucher() {
       await loadReceipts();
       setShowAddReceipt(false);
       setNewReceipt({ ...emptyForm });
+      setNewReceiptSplit({ cash: 0, card: 0, cheque: 0 });
+      setNewReceiptChequeRef('');
     } catch (err: any) {
       toast.error(err.message || 'Failed to create receipt voucher');
     }
@@ -397,6 +422,14 @@ export function ReceiptVoucher() {
       approvedBy: receipt.approvedBy || '',
       status: receipt.status,
     });
+    const legs: { method: string; amount: number; reference?: string }[] = receipt.paymentBreakdown || [];
+    const chequeLeg = legs.find(l => l.method === 'Cheque');
+    setEditReceiptSplit({
+      cash: legs.find(l => l.method === 'Cash')?.amount || 0,
+      card: legs.find(l => l.method === 'Card')?.amount || 0,
+      cheque: chequeLeg?.amount || 0,
+    });
+    setEditReceiptChequeRef(chequeLeg?.reference || '');
     setSelectedReceipt(receipt);
     setShowEditReceipt(true);
   };
@@ -407,14 +440,22 @@ export function ReceiptVoucher() {
       return;
     }
     if (!selectedReceipt?._dbId) return;
+    const editAmount = parseFloat(editForm.amount);
+    if (editForm.paymentMode === 'Mixed' && !isSplitPaymentValid(editReceiptSplit, editAmount)) {
+      toast.error('Split payment amounts must add up to the total amount');
+      return;
+    }
     try {
       await receiptVoucherService.updateReceiptVoucher(selectedReceipt._dbId, {
         date: editForm.date,
         source: editForm.source,
         sourceCategory: editForm.sourceCategory,
         memberName: editForm.member,
-        amount: parseFloat(editForm.amount),
+        amount: editAmount,
         paymentMode: editForm.paymentMode,
+        paymentBreakdown: editForm.paymentMode === 'Mixed'
+          ? buildSplitPaymentBreakdown(editReceiptSplit, editReceiptChequeRef || undefined)
+          : undefined,
         status: editForm.status,
         branch: editForm.branch,
         reference: editForm.reference,
@@ -934,6 +975,8 @@ export function ReceiptVoucher() {
                     <SelectItem value="all">All Payments</SelectItem>
                     <SelectItem value="Cash">Cash</SelectItem>
                     <SelectItem value="Card">Card</SelectItem>
+                    <SelectItem value="Cheque">Cheque</SelectItem>
+                    <SelectItem value="Mixed">Mixed</SelectItem>
                     <SelectItem value="Online Transfer">Online Transfer</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1073,12 +1116,35 @@ export function ReceiptVoucher() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(receipt.status)}>
-                          <div className="flex items-center space-x-1">
-                            {getStatusIcon(receipt.status)}
-                            <span className="capitalize">{receipt.status.replace('-', ' ')}</span>
-                          </div>
-                        </Badge>
+                        <div className="flex items-center space-x-1">
+                          <Badge className={getStatusColor(receipt.status)}>
+                            <div className="flex items-center space-x-1">
+                              {getStatusIcon(receipt.status)}
+                              <span className="capitalize">{receipt.status.replace('-', ' ')}</span>
+                            </div>
+                          </Badge>
+                          {receipt.status === 'completed' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    receipt.journalVoucherId
+                                      ? "text-xs text-green-700 border-green-300"
+                                      : "text-xs text-amber-700 border-amber-300"
+                                  }
+                                >
+                                  {receipt.journalVoucherId ? "Posted" : "Not posted"}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {receipt.journalVoucherId
+                                  ? `Posted to the general ledger (JV #${receipt.journalVoucherId})`
+                                  : "Completed before ledger posting was enabled for Receipt Vouchers — not reflected in account balances or reports."}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
@@ -1267,10 +1333,33 @@ export function ReceiptVoucher() {
                           <span>Online Transfer</span>
                         </div>
                       </SelectItem>
+                      <SelectItem value="Cheque">
+                        <div className="flex items-center space-x-2">
+                          <FileCheck className="h-4 w-4 text-gray-600" />
+                          <span>Cheque</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Mixed">
+                        <div className="flex items-center space-x-2">
+                          <Split className="h-4 w-4 text-orange-600" />
+                          <span>Mixed</span>
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
+              {newReceipt.paymentMode === 'Mixed' && (
+                <SplitPaymentFields
+                  total={parseFloat(newReceipt.amount) || 0}
+                  value={newReceiptSplit}
+                  onChange={setNewReceiptSplit}
+                  chequeReference={newReceiptChequeRef}
+                  onChequeReferenceChange={setNewReceiptChequeRef}
+                  currencyCode={currencyCode}
+                />
+              )}
 
               <div className="space-y-2">
                 <Label>Reference / Description *</Label>
@@ -1413,10 +1502,24 @@ export function ReceiptVoucher() {
                       <SelectItem value="Cash"><div className="flex items-center space-x-2"><Banknote className="h-4 w-4 text-green-600" /><span>Cash</span></div></SelectItem>
                       <SelectItem value="Card"><div className="flex items-center space-x-2"><CreditCard className="h-4 w-4 text-blue-600" /><span>Card</span></div></SelectItem>
                       <SelectItem value="Online Transfer"><div className="flex items-center space-x-2"><Smartphone className="h-4 w-4 text-purple-600" /><span>Online Transfer</span></div></SelectItem>
+                      <SelectItem value="Cheque"><div className="flex items-center space-x-2"><FileCheck className="h-4 w-4 text-gray-600" /><span>Cheque</span></div></SelectItem>
+                      <SelectItem value="Mixed"><div className="flex items-center space-x-2"><Split className="h-4 w-4 text-orange-600" /><span>Mixed</span></div></SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
+              {editForm.paymentMode === 'Mixed' && (
+                <SplitPaymentFields
+                  total={parseFloat(editForm.amount) || 0}
+                  value={editReceiptSplit}
+                  onChange={setEditReceiptSplit}
+                  chequeReference={editReceiptChequeRef}
+                  onChequeReferenceChange={setEditReceiptChequeRef}
+                  currencyCode={currencyCode}
+                />
+              )}
+
               <div className="space-y-2">
                 <Label>Reference / Description *</Label>
                 <Input placeholder="Reference or description" value={editForm.reference} onChange={(e) => setEditForm({...editForm, reference: e.target.value})} />
@@ -1516,6 +1619,13 @@ export function ReceiptVoucher() {
                           </div>
                         </Badge>
                         <div className="text-sm text-gray-600 mt-1">Status</div>
+                        {selectedReceipt.status === 'completed' && (
+                          <div className={`text-xs mt-1 ${selectedReceipt.journalVoucherId ? 'text-green-700' : 'text-amber-700'}`}>
+                            {selectedReceipt.journalVoucherId
+                              ? `Posted to ledger (JV #${selectedReceipt.journalVoucherId})`
+                              : 'Not posted to ledger'}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>

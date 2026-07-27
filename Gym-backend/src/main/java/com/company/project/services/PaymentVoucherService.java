@@ -5,6 +5,7 @@ import com.company.project.dto.PaymentVoucherRequestDTO;
 import com.company.project.dto.PaymentVoucherResponseDTO;
 import com.company.project.entities.PaymentVoucher;
 import com.company.project.entities.PaymentVoucherBill;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.PaymentVoucherBillRepository;
 import com.company.project.repositories.PaymentVoucherRepository;
 import org.springframework.stereotype.Service;
@@ -15,7 +16,6 @@ import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,28 +25,16 @@ public class PaymentVoucherService {
     private final PaymentVoucherRepository paymentVoucherRepository;
     private final PaymentVoucherBillRepository billRepository;
     private final FinancialEventService financialEventService;
+    private final VoucherNumberService voucherNumberService;
 
     public PaymentVoucherService(PaymentVoucherRepository paymentVoucherRepository,
                                  PaymentVoucherBillRepository billRepository,
-                                 FinancialEventService financialEventService) {
+                                 FinancialEventService financialEventService,
+                                 VoucherNumberService voucherNumberService) {
         this.paymentVoucherRepository = paymentVoucherRepository;
         this.billRepository           = billRepository;
         this.financialEventService    = financialEventService;
-    }
-
-    private synchronized String generateVoucherNo() {
-        int year = LocalDate.now().getYear();
-        String prefix = "PV-" + year + "-";
-        Optional<PaymentVoucher> last = paymentVoucherRepository
-                .findTopByVoucherNoStartingWithOrderByVoucherNoDesc(prefix);
-        int seq = last.map(pv -> {
-            try {
-                return Integer.parseInt(pv.getVoucherNo().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                return 1;
-            }
-        }).orElse(1);
-        return String.format("%s%05d", prefix, seq);
+        this.voucherNumberService     = voucherNumberService;
     }
 
     public List<PaymentVoucherResponseDTO> getPaymentVouchers(
@@ -74,14 +62,14 @@ public class PaymentVoucherService {
 
     public PaymentVoucherResponseDTO getPaymentVoucherById(Long id) {
         PaymentVoucher pv = paymentVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Payment Voucher not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Payment Voucher not found: " + id));
         List<PaymentVoucherBill> bills = billRepository.findByPaymentVoucherId(id);
         return PaymentVoucherResponseDTO.fromEntity(pv, bills);
     }
 
     public PaymentVoucherResponseDTO createPaymentVoucher(PaymentVoucherRequestDTO req) {
         PaymentVoucher pv = new PaymentVoucher();
-        pv.setVoucherNo(generateVoucherNo());
+        pv.setVoucherNo(voucherNumberService.next("PV"));
         applyRequest(pv, req);
         pv.setStatus(req.getStatus() != null && !req.getStatus().isBlank() ? req.getStatus() : "Pending");
         PaymentVoucher saved = paymentVoucherRepository.save(pv);
@@ -91,7 +79,7 @@ public class PaymentVoucherService {
 
     public PaymentVoucherResponseDTO updatePaymentVoucher(Long id, PaymentVoucherRequestDTO req) {
         PaymentVoucher pv = paymentVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Payment Voucher not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Payment Voucher not found: " + id));
         applyRequest(pv, req);
         if (req.getStatus() != null && !req.getStatus().isBlank()) {
             pv.setStatus(req.getStatus());
@@ -105,7 +93,7 @@ public class PaymentVoucherService {
 
     public PaymentVoucherResponseDTO updateStatus(Long id, String status) {
         PaymentVoucher pv = paymentVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Payment Voucher not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Payment Voucher not found: " + id));
         pv.setStatus(status);
         PaymentVoucher saved = paymentVoucherRepository.save(pv);
 
@@ -121,7 +109,7 @@ public class PaymentVoucherService {
 
     public void deletePaymentVoucher(Long id) {
         PaymentVoucher pv = paymentVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Payment Voucher not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Payment Voucher not found: " + id));
         billRepository.deleteByPaymentVoucherId(id);
         paymentVoucherRepository.delete(pv);
     }
@@ -143,7 +131,7 @@ public class PaymentVoucherService {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
 
         PaymentVoucher pv = new PaymentVoucher();
-        pv.setVoucherNo(generateVoucherNo());
+        pv.setVoucherNo(voucherNumberService.next("PV"));
         pv.setSupplierName(supplierName);
         pv.setSupplierType(supplierType != null ? supplierType : "Employee");
         pv.setBillNo(billNo);
@@ -165,6 +153,7 @@ public class PaymentVoucherService {
         pv.setPaymentDate(req.getPaymentDate() != null ? req.getPaymentDate() : LocalDate.now());
         pv.setAmount(req.getAmount() != null ? req.getAmount() : BigDecimal.ZERO);
         pv.setPaymentMethod(req.getPaymentMethod());
+        pv.setPaymentBreakdown(req.getPaymentBreakdown());
         pv.setDescription(req.getDescription());
         pv.setBankAccount(req.getBankAccount());
         pv.setChequeNo(req.getChequeNo());

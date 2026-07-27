@@ -5,6 +5,7 @@ import com.company.project.entities.ReceiptVoucher;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class ReceiptVoucherResponseDTO {
 
@@ -17,6 +18,7 @@ public class ReceiptVoucherResponseDTO {
     private String memberName;
     private BigDecimal amount;
     private String paymentMode;
+    private List<PaymentSplitDTO> paymentBreakdown;
     private String status;
     private String branch;
     private String reference;
@@ -26,11 +28,22 @@ public class ReceiptVoucherResponseDTO {
     private String voucherType;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long journalVoucherId;
 
     public ReceiptVoucherResponseDTO() {}
 
     public static ReceiptVoucherResponseDTO fromEntity(ReceiptVoucher rv) {
+        return fromEntity(rv, null);
+    }
+
+    /**
+     * @param journalVoucherId the posted ledger entry this voucher generated, or
+     *                         null if it has not (yet) been posted — see
+     *                         ReceiptVoucherService.postToLedgerIfNeeded().
+     */
+    public static ReceiptVoucherResponseDTO fromEntity(ReceiptVoucher rv, Long journalVoucherId) {
         ReceiptVoucherResponseDTO dto = new ReceiptVoucherResponseDTO();
+        dto.setJournalVoucherId(journalVoucherId);
         dto.setId(rv.getId());
         dto.setVoucherNo(rv.getVoucherNo());
         dto.setDate(rv.getDate());
@@ -40,6 +53,7 @@ public class ReceiptVoucherResponseDTO {
         dto.setMemberName(rv.getMemberName());
         dto.setAmount(rv.getAmount());
         dto.setPaymentMode(rv.getPaymentMode());
+        dto.setPaymentBreakdown(rv.getPaymentBreakdown());
         dto.setStatus(rv.getStatus());
         dto.setBranch(rv.getBranch());
         dto.setReference(rv.getReference());
@@ -79,6 +93,9 @@ public class ReceiptVoucherResponseDTO {
     public String getPaymentMode() { return paymentMode; }
     public void setPaymentMode(String paymentMode) { this.paymentMode = paymentMode; }
 
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
@@ -105,4 +122,7 @@ public class ReceiptVoucherResponseDTO {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getJournalVoucherId() { return journalVoucherId; }
+    public void setJournalVoucherId(Long journalVoucherId) { this.journalVoucherId = journalVoucherId; }
 }

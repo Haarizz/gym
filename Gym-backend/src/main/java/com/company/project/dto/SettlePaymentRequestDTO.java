@@ -10,11 +10,12 @@ import java.util.List;
 public class SettlePaymentRequestDTO {
 
     private Long memberDbId;
-    private String paymentMethod;   // "Cash" | "Card" | "Online" | "Bank Transfer"
+    private String paymentMethod;   // "Cash" | "Card" | "Cheque" | "Mixed"
     private String paymentDate;     // ISO date string (optional, defaults to now)
     private String transactionRef;  // optional reference number
     private String remarks;
     private List<BillPayment> billPayments;
+    private List<PaymentSplitDTO> paymentBreakdown; // legs when paymentMethod == "Mixed"
 
     public static class BillPayment {
         private Long receiptId;
@@ -45,4 +46,7 @@ public class SettlePaymentRequestDTO {
 
     public List<BillPayment> getBillPayments()           { return billPayments; }
     public void setBillPayments(List<BillPayment> billPayments) { this.billPayments = billPayments; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown()   { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 }

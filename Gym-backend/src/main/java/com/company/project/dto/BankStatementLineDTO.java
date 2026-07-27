@@ -15,6 +15,7 @@ public class BankStatementLineDTO {
     private String reference;
     private Boolean isMatched;
     private String matchedVoucherNo;
+    private Long matchedJournalVoucherId;
 
     public BankStatementLineDTO() {}
 
@@ -29,6 +30,7 @@ public class BankStatementLineDTO {
         dto.setReference(line.getReference());
         dto.setIsMatched(line.getIsMatched());
         dto.setMatchedVoucherNo(line.getMatchedVoucherNo());
+        dto.setMatchedJournalVoucherId(line.getMatchedJournalVoucherId());
         return dto;
     }
 
@@ -58,4 +60,7 @@ public class BankStatementLineDTO {
 
     public String getMatchedVoucherNo() { return matchedVoucherNo; }
     public void setMatchedVoucherNo(String matchedVoucherNo) { this.matchedVoucherNo = matchedVoucherNo; }
+
+    public Long getMatchedJournalVoucherId() { return matchedJournalVoucherId; }
+    public void setMatchedJournalVoucherId(Long matchedJournalVoucherId) { this.matchedJournalVoucherId = matchedJournalVoucherId; }
 }

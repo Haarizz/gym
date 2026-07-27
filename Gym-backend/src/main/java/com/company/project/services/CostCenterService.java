@@ -47,6 +47,9 @@ public class CostCenterService {
                 .collect(Collectors.toList());
     }
 
+    /** Auto-generated codes retry on collision instead of failing the whole request. */
+    private static final int CODE_GENERATION_MAX_ATTEMPTS = 5;
+
     public CostCenterResponseDTO create(CostCenterRequestDTO req) {
         // Auto-generate code if not provided
         if (req.getCode() == null || req.getCode().isBlank()) {
@@ -54,7 +57,20 @@ public class CostCenterService {
                     ? req.getName().replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT)
                     : "CC";
             if (base.length() > 6) base = base.substring(0, 6);
-            String candidate = base + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
+
+            String candidate = null;
+            for (int attempt = 0; attempt < CODE_GENERATION_MAX_ATTEMPTS; attempt++) {
+                String tryCode = base + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
+                if (costCenterRepository.findByCode(tryCode).isEmpty()) {
+                    candidate = tryCode;
+                    break;
+                }
+            }
+            if (candidate == null) {
+                throw new IllegalStateException(
+                        "Could not generate a unique cost center code after "
+                        + CODE_GENERATION_MAX_ATTEMPTS + " attempts — please provide one explicitly.");
+            }
             req.setCode(candidate);
         }
         if (costCenterRepository.findByCode(req.getCode()).isPresent()) {

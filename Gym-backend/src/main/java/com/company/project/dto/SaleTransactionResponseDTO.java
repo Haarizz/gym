@@ -16,6 +16,7 @@ public class SaleTransactionResponseDTO {
     private Long memberId;
     private String memberName;
     private String paymentMethod;
+    private List<PaymentSplitDTO> paymentBreakdown;
     private BigDecimal subtotal;
     private BigDecimal discountAmount;
     private BigDecimal taxAmount;
@@ -38,6 +39,7 @@ public class SaleTransactionResponseDTO {
         dto.setMemberId(t.getMemberId());
         dto.setMemberName(t.getMemberName());
         dto.setPaymentMethod(t.getPaymentMethod());
+        dto.setPaymentBreakdown(t.getPaymentBreakdown());
         dto.setSubtotal(t.getSubtotal());
         dto.setDiscountAmount(t.getDiscountAmount());
         dto.setTaxAmount(t.getTaxAmount());
@@ -71,6 +73,9 @@ public class SaleTransactionResponseDTO {
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 
     public BigDecimal getSubtotal() { return subtotal; }
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }

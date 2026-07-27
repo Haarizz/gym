@@ -7,6 +7,8 @@ import { productsService, Product } from '../utils/supabase/products-service';
 import { membersService } from '../utils/supabase/members-service';
 import { useFavorites } from '../hooks/useFavorites';
 import { POSProductCard } from '../components/shared/POSProductCard';
+import { SplitPaymentFields, isSplitPaymentValid, buildSplitPaymentBreakdown } from '../components/shared/split-payment-fields';
+import type { SplitPaymentValue } from '../components/shared/split-payment-fields';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -58,7 +60,9 @@ import {
   Coffee,
   Lock,
   Unlock,
-  Heart
+  Heart,
+  FileCheck,
+  Split
 } from 'lucide-react';
 
 interface CashMovement {
@@ -180,6 +184,8 @@ export function PointOfSale() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash');
   const [selectedCustomer, setSelectedCustomer] = useState('c1');
   const [receivedAmount, setReceivedAmount] = useState('');
+  const [splitPayment, setSplitPayment] = useState<SplitPaymentValue>({ cash: 0, card: 0, cheque: 0 });
+  const [splitChequeRef, setSplitChequeRef] = useState('');
   const [heldInvoices, setHeldInvoices] = useState<Invoice[]>([]);
 
   // Cash drop/out states
@@ -459,19 +465,28 @@ export function PointOfSale() {
 
   const processPayment = async () => {
     if (currentInvoice.items.length === 0) return;
+    if (selectedPaymentMethod === 'mixed' && !isSplitPaymentValid(splitPayment, currentInvoice.total)) {
+      toast.error('Split payment amounts must add up to the total amount');
+      return;
+    }
     setProcessingPayment(true);
     try {
-      const paymentMethodMap: Record<string, 'CASH' | 'CARD' | 'ONLINE' | 'WALLET'> = {
+      const paymentMethodMap: Record<string, 'CASH' | 'CARD' | 'ONLINE' | 'WALLET' | 'CHEQUE' | 'MIXED'> = {
         cash: 'CASH',
         card: 'CARD',
         digital: 'WALLET',
         online: 'ONLINE',
+        cheque: 'CHEQUE',
+        mixed: 'MIXED',
       };
       const req: SaleTransactionRequest = {
         posSessionId: currentSession?.apiId,
         memberId: selectedMember?.id,
         memberName: selectedMember?.name || 'Walk-in Customer',
         paymentMethod: paymentMethodMap[selectedPaymentMethod] || 'CASH',
+        paymentBreakdown: selectedPaymentMethod === 'mixed'
+          ? buildSplitPaymentBreakdown(splitPayment, splitChequeRef || undefined)
+          : undefined,
         items: currentInvoice.items.map(item => ({
           productId: item.productId ?? 0,
           productName: item.name,
@@ -491,6 +506,8 @@ export function PointOfSale() {
       clearInvoice();
       setShowPaymentDialog(false);
       setReceivedAmount('');
+      setSplitPayment({ cash: 0, card: 0, cheque: 0 });
+      setSplitChequeRef('');
       setSelectedMember(null);
       setWalkInSelected(false);
       setMemberSearch('');
@@ -2233,9 +2250,32 @@ export function PointOfSale() {
                       Digital Wallet
                     </div>
                   </SelectItem>
+                  <SelectItem value="cheque">
+                    <div className="flex items-center">
+                      <FileCheck className="h-4 w-4 mr-2" />
+                      Cheque
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="mixed">
+                    <div className="flex items-center">
+                      <Split className="h-4 w-4 mr-2" />
+                      Mixed
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {selectedPaymentMethod === 'mixed' && (
+              <SplitPaymentFields
+                total={currentInvoice.total}
+                value={splitPayment}
+                onChange={setSplitPayment}
+                chequeReference={splitChequeRef}
+                onChequeReferenceChange={setSplitChequeRef}
+                currencyCode={currencyCode}
+              />
+            )}
 
             {selectedPaymentMethod === 'cash' && (
               <div>
@@ -2266,7 +2306,7 @@ export function PointOfSale() {
             </Button>
             <Button
               onClick={processPayment}
-              disabled={processingPayment}
+              disabled={processingPayment || (selectedPaymentMethod === 'mixed' && !isSplitPaymentValid(splitPayment, currentInvoice.total))}
               className="bg-[#2B7A78] hover:bg-[#236862] text-white"
             >
               <CheckCircle className="h-4 w-4 mr-2" />

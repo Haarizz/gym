@@ -21,6 +21,7 @@ import {
   TrendingUp,
   Users,
   RefreshCcw,
+  ArrowLeft,
 } from 'lucide-react';
 import { toast } from "sonner";
 import { receiptsService, Receipt } from '../utils/supabase/receipts-service';
@@ -67,7 +68,7 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
   const { currencyCode } = useCurrency();
   const panelCardShell = "bg-white border-0 shadow-sm rounded-2xl overflow-hidden";
 
-  const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'custom'>('today');
+  const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all' | 'custom'>('month');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,18 +91,32 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
       .finally(() => setLoading(false));
   }, []);
 
-  // Get today and yesterday dates
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  // Get today/yesterday dates using local calendar day (not UTC, which can be off by a day near midnight)
+  const toLocalDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = toLocalDateStr(new Date());
+  const yesterday = toLocalDateStr(new Date(Date.now() - 86400000));
 
   // Filter data based on date range
   const filteredByDate = useMemo(() => {
+    if (dateRange === 'all') return reportData;
+
     let startDate = today;
     let endDate = today;
 
     if (dateRange === 'yesterday') {
       startDate = yesterday;
       endDate = yesterday;
+    } else if (dateRange === 'week') {
+      const d = new Date();
+      d.setDate(d.getDate() - 6);
+      startDate = toLocalDateStr(d);
+      endDate = today;
+    } else if (dateRange === 'month') {
+      const d = new Date();
+      d.setDate(d.getDate() - 29);
+      startDate = toLocalDateStr(d);
+      endDate = today;
     } else if (dateRange === 'custom') {
       startDate = customStartDate || today;
       endDate = customEndDate || today;
@@ -210,7 +225,21 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
   const getRangeLabel = () => {
     if (dateRange === "today") return today;
     if (dateRange === "yesterday") return yesterday;
+    if (dateRange === "week") return "last_7_days";
+    if (dateRange === "month") return "last_30_days";
+    if (dateRange === "all") return "all_time";
     return `${customStartDate || today}_to_${customEndDate || today}`;
+  };
+
+  const getRangeDisplayLabel = () => {
+    switch (dateRange) {
+      case 'today': return 'Today';
+      case 'yesterday': return 'Yesterday';
+      case 'week': return 'Last 7 Days';
+      case 'month': return 'Last 30 Days';
+      case 'all': return 'All Time';
+      default: return 'Custom Range';
+    }
   };
 
   const handleExportCSV = () => {
@@ -343,6 +372,15 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
       <div className="mb-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-2 -ml-2 text-gray-600 hover:text-gray-900"
+          onClick={() => onNavigate?.('reports')}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Reports
+        </Button>
         <h1 className="text-3xl font-bold text-gray-900">Custom Reports</h1>
         <p className="text-gray-600 mt-1">
           Generate detailed membership reports with custom date ranges
@@ -377,6 +415,30 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
               >
                 <Calendar className="h-4 w-4 mr-2" />
                 Yesterday
+              </Button>
+              <Button
+                variant={dateRange === 'week' ? 'default' : 'outline'}
+                className={dateRange === 'week' ? 'btn-primary' : 'border-primary/20'}
+                onClick={() => setDateRange('week')}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Last 7 Days
+              </Button>
+              <Button
+                variant={dateRange === 'month' ? 'default' : 'outline'}
+                className={dateRange === 'month' ? 'btn-primary' : 'border-primary/20'}
+                onClick={() => setDateRange('month')}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Last 30 Days
+              </Button>
+              <Button
+                variant={dateRange === 'all' ? 'default' : 'outline'}
+                className={dateRange === 'all' ? 'btn-primary' : 'border-primary/20'}
+                onClick={() => setDateRange('all')}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                All Time
               </Button>
               <Button
                 variant={dateRange === 'custom' ? 'default' : 'outline'}
@@ -434,7 +496,7 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-900 flex items-center">
                 <DollarSign className="h-5 w-5 text-primary mr-2" />
-                Summary ({dateRange === 'today' ? 'Today' : dateRange === 'yesterday' ? 'Yesterday' : 'Custom Range'})
+                Summary ({getRangeDisplayLabel()})
               </h3>
               <Button
                 variant="ghost"
@@ -623,7 +685,13 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                         <div className="flex flex-col items-center justify-center text-gray-500">
                           <FileText className="h-12 w-12 mb-3 text-gray-300" />
                           <p className="font-medium">No records found</p>
-                          <p className="text-sm">Try adjusting your filters or date range</p>
+                          <p className="text-sm">
+                            {filteredByDate.length === 0 && reportData.length > 0
+                              ? `${reportData.length} record(s) exist outside "${getRangeDisplayLabel()}" — try "All Time" or a wider range`
+                              : filteredByType.length === 0 && filteredByDate.length > 0
+                              ? 'No records match this date range for the selected type — try "All Types"'
+                              : 'Try adjusting your search'}
+                          </p>
                         </div>
                       </TableCell>
                     </TableRow>

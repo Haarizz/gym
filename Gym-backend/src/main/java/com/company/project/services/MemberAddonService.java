@@ -97,7 +97,8 @@ public class MemberAddonService {
                 saved.getPaymentMode(),
                 saved.getTransactionId(),
                 saved.getTransactionId(),
-                saved.getNotes()
+                saved.getNotes(),
+                null
         );
 
         return MemberAddonResponseDTO.fromEntity(saved);
