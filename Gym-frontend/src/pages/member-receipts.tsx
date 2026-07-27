@@ -60,12 +60,13 @@ import { receiptsService, Receipt as ApiReceipt } from "../utils/supabase/receip
 
 interface MemberReceiptsProps {
   onNavigate?: (section: string) => void;
+  embedded?: boolean;
 }
 
 // Use the API Receipt type directly
 type Receipt = ApiReceipt;
 
-export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
+export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
   const { currencyCode } = useCurrency();
   const [allReceipts, setAllReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,33 +192,35 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={embedded ? "" : "min-h-screen bg-background"}>
       {/* Header Section */}
-      <div className="border-b bg-white">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-[#0047ab] to-[#00c5cb]">
-                  <FileText className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl text-foreground">Member Receipts</h1>
-                  <p className="text-muted-foreground">
-                    View and manage all payment receipts
-                  </p>
+      <div className={embedded ? "" : "border-b bg-white"}>
+        <div className={embedded ? "" : "p-6"}>
+          {!embedded && (
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-gradient-to-r from-[#0047ab] to-[#00c5cb]">
+                    <FileText className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl text-foreground">Member Receipts</h1>
+                    <p className="text-muted-foreground">
+                      View and manage all payment receipts
+                    </p>
+                  </div>
                 </div>
               </div>
+              <Button
+                variant="outline"
+                onClick={() => onNavigate && onNavigate("members")}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Members
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => onNavigate && onNavigate("members")}
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Members
-            </Button>
-          </div>
+          )}
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

@@ -113,6 +113,18 @@ public class ReceiptService {
     }
 
     /**
+     * Normalizes payment method casing (e.g. "cash" -> "Cash") so downstream
+     * consumers can rely on consistent capitalization regardless of source casing.
+     */
+    private String normalizePaymentMethod(String paymentMethod) {
+        if (paymentMethod == null || paymentMethod.isBlank()) {
+            return "Cash";
+        }
+        String trimmed = paymentMethod.trim();
+        return Character.toUpperCase(trimmed.charAt(0)) + trimmed.substring(1).toLowerCase();
+    }
+
+    /**
      * Called from MemberService after creating or renewing a member.
      */
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus) {
@@ -124,7 +136,7 @@ public class ReceiptService {
         r.setMemberPhone(member.getPhone());
         r.setTransactionType(transactionType);
         r.setAmount(member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO);
-        r.setPaymentMethod(member.getPaymentMethodUsed() != null ? member.getPaymentMethodUsed() : "Cash");
+        r.setPaymentMethod(normalizePaymentMethod(member.getPaymentMethodUsed()));
         boolean isPaid = "paid".equalsIgnoreCase(paymentStatus);
         r.setStatus(isPaid ? "Paid" : "Pending");
         r.setPaidAmount(isPaid ? r.getAmount() : BigDecimal.ZERO);
@@ -175,6 +187,8 @@ public class ReceiptService {
         member.setPaymentMethodUsed(req.getPaymentMethod());
         if (member.getOutstandingBalance().compareTo(BigDecimal.ZERO) == 0) {
             member.setPaymentStatus("paid");
+        } else if (totalPaid.compareTo(BigDecimal.ZERO) > 0) {
+            member.setPaymentStatus("partial");
         }
         memberRepository.save(member);
 
@@ -188,7 +202,7 @@ public class ReceiptService {
         settlement.setTransactionType("Payment");
         settlement.setAmount(totalPaid);
         settlement.setPaidAmount(totalPaid);
-        settlement.setPaymentMethod(req.getPaymentMethod());
+        settlement.setPaymentMethod(normalizePaymentMethod(req.getPaymentMethod()));
         settlement.setStatus("Paid");
         settlement.setPlanName(member.getMembershipPlan());
         settlement.setValidFrom(member.getMembershipStartDate());
