@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -58,6 +59,7 @@ interface SalaryAdvancesProps {
 }
 
 export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState("requests");
   const [advances, setAdvances] = useState<SalaryAdvance[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -348,7 +350,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">AED {totalOutstandingAmount.toLocaleString()}</div>
+            <div className="text-2xl font-bold"><CurrencyGlyph /> {totalOutstandingAmount.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Total balance across all advances
             </p>
@@ -485,12 +487,12 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">AED {advance.requestedAmount.toLocaleString()}</span>
+                        <span className="font-medium"><CurrencyGlyph /> {advance.requestedAmount.toLocaleString()}</span>
                       </TableCell>
                       <TableCell>
                         {advance.approvedAmount > 0 ? (
                           <span className="font-medium" style={{ color: '#2B7A78' }}>
-                            AED {advance.approvedAmount.toLocaleString()}
+                            <CurrencyGlyph /> {advance.approvedAmount.toLocaleString()}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -580,8 +582,8 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                         </div>
                         <Progress value={progress} className="h-3" />
                         <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
-                          <span>AED {advance.totalDeducted.toLocaleString()} paid</span>
-                          <span>AED {advance.balance.toLocaleString()} remaining</span>
+                          <span><CurrencyGlyph /> {advance.totalDeducted.toLocaleString()} paid</span>
+                          <span><CurrencyGlyph /> {advance.balance.toLocaleString()} remaining</span>
                         </div>
                       </div>
 
@@ -590,13 +592,13 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                         <div>
                           <div className="text-sm text-muted-foreground mb-1">Total Amount</div>
                           <div className="text-lg font-bold" style={{ color: '#2B7A78' }}>
-                            AED {advance.approvedAmount.toLocaleString()}
+                            <CurrencyGlyph /> {advance.approvedAmount.toLocaleString()}
                           </div>
                         </div>
                         <div>
                           <div className="text-sm text-muted-foreground mb-1">Installment Amount</div>
                           <div className="text-lg font-bold">
-                            AED {advance.installmentAmount.toLocaleString()}
+                            <CurrencyGlyph /> {advance.installmentAmount.toLocaleString()}
                           </div>
                         </div>
                         <div>
@@ -625,7 +627,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="font-medium">AED {advance.installmentAmount.toLocaleString()}</div>
+                              <div className="font-medium"><CurrencyGlyph /> {advance.installmentAmount.toLocaleString()}</div>
                               <div className="text-sm text-muted-foreground">
                                 {advance.autoDeduct ? "Auto-deduct enabled" : "Manual payment"}
                               </div>
@@ -675,7 +677,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total Amount Disbursed</span>
                     <span className="font-medium">
-                      AED {advances.filter(a => a.approvalStatus === "Approved").reduce((sum, a) => sum + a.approvedAmount, 0).toLocaleString()}
+                      <CurrencyGlyph /> {advances.filter(a => a.approvalStatus === "Approved").reduce((sum, a) => sum + a.approvedAmount, 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -703,7 +705,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total Deducted</span>
                     <span className="font-medium">
-                      AED {advances.reduce((sum, a) => sum + a.totalDeducted, 0).toLocaleString()}
+                      <CurrencyGlyph /> {advances.reduce((sum, a) => sum + a.totalDeducted, 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -735,13 +737,13 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Outstanding Balance</span>
                     <span className="font-medium" style={{ color: '#E63946' }}>
-                      AED {totalOutstandingAmount.toLocaleString()}
+                      <CurrencyGlyph /> {totalOutstandingAmount.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Avg. Deduction/Month</span>
                     <span className="font-medium">
-                      AED {(advances.filter(a => a.status === "Active").reduce((sum, a) => sum + a.installmentAmount, 0) / Math.max(advances.filter(a => a.status === "Active").length, 1)).toFixed(0)}
+                      <CurrencyGlyph /> {(advances.filter(a => a.status === "Active").reduce((sum, a) => sum + a.installmentAmount, 0) / Math.max(advances.filter(a => a.status === "Active").length, 1)).toFixed(0)}
                     </span>
                   </div>
                 </div>
@@ -792,11 +794,11 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">AED {totalAmount.toLocaleString()}</span>
+                          <span className="font-medium"><CurrencyGlyph /> {totalAmount.toLocaleString()}</span>
                         </TableCell>
                         <TableCell>
                           <span className="font-medium" style={{ color: '#E63946' }}>
-                            AED {outstanding.toLocaleString()}
+                            <CurrencyGlyph /> {outstanding.toLocaleString()}
                           </span>
                         </TableCell>
                       </TableRow>
@@ -898,7 +900,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="requestedAmount">Requested Amount (AED) *</Label>
+              <Label htmlFor="requestedAmount">Requested Amount ({currencyCode}) *</Label>
               <Input
                 id="requestedAmount"
                 type="number"
@@ -970,7 +972,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
               <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Requested Amount:</span>
-                  <span className="font-medium">AED {selectedAdvance.requestedAmount.toLocaleString()}</span>
+                  <span className="font-medium"><CurrencyGlyph /> {selectedAdvance.requestedAmount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Request Date:</span>
@@ -1004,7 +1006,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             {approvalFormData.approvalStatus === "Approved" && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="approvedAmount">Approved Amount (AED) *</Label>
+                  <Label htmlFor="approvedAmount">Approved Amount ({currencyCode}) *</Label>
                   <Input
                     id="approvedAmount"
                     type="number"
@@ -1029,7 +1031,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="space-y-2">
                     <Label>Installment Amount</Label>
                     <div className="flex items-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
-                      AED {approvalFormData.approvedAmount && approvalFormData.installmentCount 
+                      <CurrencyGlyph /> {approvalFormData.approvedAmount && approvalFormData.installmentCount 
                         ? (parseFloat(approvalFormData.approvedAmount) / parseInt(approvalFormData.installmentCount)).toFixed(2)
                         : "0.00"}
                     </div>
@@ -1135,7 +1137,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">Approved Amount</div>
                       <div className="text-xl font-bold" style={{ color: '#2B7A78' }}>
-                        AED {selectedAdvance.approvedAmount.toLocaleString()}
+                        <CurrencyGlyph /> {selectedAdvance.approvedAmount.toLocaleString()}
                       </div>
                     </div>
                   </CardContent>
@@ -1145,7 +1147,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">Deducted</div>
                       <div className="text-xl font-bold">
-                        AED {selectedAdvance.totalDeducted.toLocaleString()}
+                        <CurrencyGlyph /> {selectedAdvance.totalDeducted.toLocaleString()}
                       </div>
                     </div>
                   </CardContent>
@@ -1155,7 +1157,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">Balance</div>
                       <div className="text-xl font-bold" style={{ color: '#E63946' }}>
-                        AED {selectedAdvance.balance.toLocaleString()}
+                        <CurrencyGlyph /> {selectedAdvance.balance.toLocaleString()}
                       </div>
                     </div>
                   </CardContent>
@@ -1223,7 +1225,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">Installment Amount:</span>
-                      <div className="font-medium">AED {selectedAdvance.installmentAmount.toLocaleString()}</div>
+                      <div className="font-medium"><CurrencyGlyph /> {selectedAdvance.installmentAmount.toLocaleString()}</div>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Total Installments:</span>
@@ -1296,7 +1298,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             </div>
             <div className="text-muted-foreground mt-2">Requested Amount</div>
             <div className="font-medium">
-              AED {deleteConfirmAdvance?.requestedAmount?.toLocaleString()}
+              <CurrencyGlyph /> {deleteConfirmAdvance?.requestedAmount?.toLocaleString()}
             </div>
           </div>
           <DialogFooter>

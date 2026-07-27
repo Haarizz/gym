@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useCurrency, CurrencyValue } from '../utils/currency';
 import { toast } from 'sonner';
 import { ledgersService, AccountHead as ApiAccountHead, CostCenter as ApiCostCenter, LedgerTransaction } from '../utils/supabase/ledgers-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -95,6 +96,7 @@ import {
 // Mock data removed
 
 export function Ledgers() {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('chart-of-accounts');
   
   // Chart of Accounts state
@@ -274,15 +276,6 @@ export function Ledgers() {
     }
   }, [selectedGLAccount, glDateFrom, glDateTo, loadLedgerEntries]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-AE', {
-      style: 'currency',
-      currency: 'AED',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const getGroupIcon = (group: string) => {
     switch (group) {
       case 'Assets':
@@ -324,7 +317,7 @@ export function Ledgers() {
     return (
       <div className={`font-medium ${colorClass} flex items-center space-x-1`}>
         {isCredit ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
-        <span>{formatCurrency(account.currentBalance)} {account.balanceType}</span>
+        <span><CurrencyValue amount={account.currentBalance} /> {account.balanceType}</span>
       </div>
     );
   };
@@ -595,7 +588,7 @@ export function Ledgers() {
                 </CardHeader>
                 <CardContent>
                   <div className={`text-2xl font-bold ${groupText}`}>
-                    {formatCurrency(Math.abs(totalBalance))}
+                    <CurrencyValue amount={Math.abs(totalBalance)} />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {groupAccounts.filter(acc => acc.status === 'active').length} active accounts
@@ -928,7 +921,7 @@ export function Ledgers() {
                               <div className="flex items-center justify-end space-x-1">
                                 <ArrowUp className="h-3 w-3 text-green-600" />
                                 <span className="font-medium text-green-600">
-                                  {formatCurrency(entry.debit)}
+                                  <CurrencyValue amount={entry.debit} />
                                 </span>
                               </div>
                             )}
@@ -938,14 +931,14 @@ export function Ledgers() {
                               <div className="flex items-center justify-end space-x-1">
                                 <ArrowDown className="h-3 w-3 text-red-600" />
                                 <span className="font-medium text-red-600">
-                                  {formatCurrency(entry.credit)}
+                                  <CurrencyValue amount={entry.credit} />
                                 </span>
                               </div>
                             )}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className={`font-medium ${entry.balanceType === 'Dr' ? 'text-green-600' : 'text-red-600'}`}>
-                              {formatCurrency(entry.runningBalance)} {entry.balanceType}
+                              <CurrencyValue amount={entry.runningBalance} /> {entry.balanceType}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1016,11 +1009,11 @@ export function Ledgers() {
                       <div className="flex justify-between text-sm">
                         <div>
                           <div className="text-gray-600">Spent</div>
-                          <div className="font-medium text-orange-600">{formatCurrency(costCenter.spent)}</div>
+                          <div className="font-medium text-orange-600"><CurrencyValue amount={costCenter.spent} /></div>
                         </div>
                         <div className="text-right">
                           <div className="text-gray-600">Budget</div>
-                          <div className="font-medium">{formatCurrency(costCenter.budget)}</div>
+                          <div className="font-medium"><CurrencyValue amount={costCenter.budget} /></div>
                         </div>
                       </div>
                     </div>
@@ -1169,12 +1162,12 @@ export function Ledgers() {
                             <TableCell className="text-sm max-w-xs truncate">{tx.description ?? '-'}</TableCell>
                             <TableCell className="text-right">
                               {tx.debit > 0 && (
-                                <span className="font-medium text-red-600">{formatCurrency(tx.debit)}</span>
+                                <span className="font-medium text-red-600"><CurrencyValue amount={tx.debit} /></span>
                               )}
                             </TableCell>
                             <TableCell className="text-right">
                               {tx.credit > 0 && (
-                                <span className="font-medium text-green-600">{formatCurrency(tx.credit)}</span>
+                                <span className="font-medium text-green-600"><CurrencyValue amount={tx.credit} /></span>
                               )}
                             </TableCell>
                             <TableCell className="text-sm">{tx.branch ?? '-'}</TableCell>
@@ -1411,7 +1404,7 @@ export function Ledgers() {
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Budget Amount (AED)</Label>
+                  <Label>Budget Amount ({currencyCode})</Label>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -1539,7 +1532,7 @@ export function Ledgers() {
                     <Input value={editingCostCenter.manager ?? ''} onChange={(e) => setEditingCostCenter({...editingCostCenter, manager: e.target.value})} />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label>Budget (AED)</Label>
+                    <Label>Budget ({currencyCode})</Label>
                     <Input type="number" value={editingCostCenter.budget} onChange={(e) => setEditingCostCenter({...editingCostCenter, budget: e.target.value})} />
                   </div>
                 </div>
@@ -1582,7 +1575,7 @@ export function Ledgers() {
                     </Card>
                     <Card className="bg-white border-0 shadow-sm">
                       <CardContent className="p-4 text-center">
-                        <div className="text-2xl font-bold">{formatCurrency(selectedAccount.currentBalance)}</div>
+                        <div className="text-2xl font-bold"><CurrencyValue amount={selectedAccount.currentBalance} /></div>
                         <div className="text-sm text-gray-600">Current Balance</div>
                       </CardContent>
                     </Card>

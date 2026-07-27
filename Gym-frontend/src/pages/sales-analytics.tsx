@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -23,9 +23,9 @@ import {
   Activity,
   ArrowUpRight,
   BarChart3,
-  Brain,
   Download,
   LineChart as LineChartIcon,
+  RefreshCw,
   Sparkles,
   Target,
   TrendingUp,
@@ -34,64 +34,179 @@ import {
   BadgeCheck,
   Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
+import { receiptsService, Receipt } from "../utils/supabase/receipts-service";
+import { membersService, Member } from "../utils/supabase/members-service";
+import { financialAnalyticsService } from "../utils/supabase/financial-analytics-service";
 
-const monthlyPerformance = [
-  { month: "Oct", revenue: 120000, target: 112000, orders: 620 },
-  { month: "Nov", revenue: 128500, target: 118000, orders: 680 },
-  { month: "Dec", revenue: 142800, target: 125000, orders: 720 },
-  { month: "Jan", revenue: 151200, target: 132000, orders: 760 },
-  { month: "Feb", revenue: 162400, target: 140000, orders: 820 },
-  { month: "Mar", revenue: 174600, target: 150000, orders: 860 },
-];
+import { useCurrency } from "../utils/currency";
 
-const customerMix = [
-  { month: "Oct", newCustomers: 210, returning: 410 },
-  { month: "Nov", newCustomers: 240, returning: 440 },
-  { month: "Dec", newCustomers: 260, returning: 460 },
-  { month: "Jan", newCustomers: 280, returning: 480 },
-  { month: "Feb", newCustomers: 300, returning: 520 },
-  { month: "Mar", newCustomers: 320, returning: 540 },
-];
+const CATEGORY_COLORS: Record<string, string> = {
+  Memberships: "#2563eb",
+  "PT Sessions": "#16a34a",
+  Classes: "#f97316",
+  Merchandise: "#7c3aed",
+  Other: "#0891b2",
+};
 
-const productPerformance = [
-  { name: "Memberships", revenue: 68400, growth: 12.4, margin: 68 },
-  { name: "PT Packages", revenue: 35650, growth: 9.1, margin: 52 },
-  { name: "Supplements", revenue: 28400, growth: 6.8, margin: 34 },
-  { name: "Merchandise", revenue: 15800, growth: 4.2, margin: 46 },
-  { name: "Cafe", revenue: 12400, growth: 7.6, margin: 29 },
-];
-
-const channelPerformance = [
-  { channel: "POS", revenue: 82400, conversion: 4.8, orders: 410 },
-  { channel: "Online", revenue: 29650, conversion: 3.6, orders: 188 },
-  { channel: "Corporate", revenue: 18500, conversion: 5.4, orders: 72 },
-  { channel: "Referrals", revenue: 12200, conversion: 6.1, orders: 68 },
-];
-
-const heatmapDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const heatmapHours = ["6-9", "9-12", "12-3", "3-6", "6-9", "9-12"];
-const heatmapValues = [
-  [18, 34, 28, 42, 55, 24],
-  [22, 36, 30, 45, 58, 26],
-  [20, 32, 29, 40, 60, 28],
-  [24, 38, 32, 48, 64, 30],
-  [28, 44, 36, 52, 72, 34],
-  [30, 46, 40, 56, 78, 38],
-  [26, 40, 34, 50, 66, 32],
-];
-
-const formatAED = (value: number) => `AED ${value.toLocaleString()}`;
+function categorizeReceipt(r: Receipt): string {
+  const t = (r.transaction_type || "").toLowerCase();
+  const plan = (r.plan_name || "").toLowerCase();
+  if (t.includes("new member") || t.includes("renew") || t.includes("upgrade") || plan.includes("membership")) return "Memberships";
+  if (t.includes("training") || plan.includes("pt") || plan.includes("personal")) return "PT Sessions";
+  if (t.includes("class") || plan.includes("class")) return "Classes";
+  if (t.includes("pos") || t.includes("product") || plan.includes("product") || plan.includes("merchandise")) return "Merchandise";
+  return "Other";
+}
 
 export function SalesAnalytics() {
-  const totals = useMemo(() => {
-    const totalRevenue = monthlyPerformance.reduce((sum, m) => sum + m.revenue, 0);
-    const totalOrders = monthlyPerformance.reduce((sum, m) => sum + m.orders, 0);
-    return {
-      totalRevenue,
-      totalOrders,
-      avgOrderValue: Math.round(totalRevenue / Math.max(totalOrders, 1)),
-    };
+  const { currencyCode } = useCurrency();
+  const formatAED = (value: number) => `${currencyCode} ${value.toLocaleString()}`;
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [monthlyTrend, setMonthlyTrend] = useState<{ month: string; revenue: number; expenses: number; profit: number }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [receiptsResp, membersResp, trend] = await Promise.all([
+        receiptsService.getReceipts({}, { page: 1, limit: 5000 }).catch(() => ({ receipts: [] as Receipt[], pagination: {} as any })),
+        membersService.getMembers({}, { page: 1, limit: 3000 }).catch(() => ({ members: [] as Member[] } as any)),
+        financialAnalyticsService.getMonthlyTrend(6).catch(() => [] as any[]),
+      ]);
+      setReceipts((receiptsResp as any).receipts ?? []);
+      setMembers((membersResp as any).members ?? []);
+      setMonthlyTrend(Array.isArray(trend) ? trend : []);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to load analytics data");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const now = new Date();
+
+  // Build last-6-months skeleton for receipts-based charts
+  const last6Months = useMemo(() => {
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      return {
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        month: d.toLocaleString(undefined, { month: "short" }),
+      };
+    });
+  }, []);
+
+  // Monthly performance: prefer API trend data, fall back to receipts
+  const monthlyPerformance = useMemo(() => {
+    if (monthlyTrend.length > 0) {
+      return monthlyTrend.slice(-6).map(p => ({
+        month: p.month,
+        revenue: Math.round(p.revenue),
+        target: Math.round(p.revenue * 0.9), // 90% of actual as indicative target if no target data
+        orders: receipts
+          .filter(r => (r.transaction_date || "").startsWith(p.month))
+          .length,
+      }));
+    }
+    // Compute from receipts
+    return last6Months.map(({ month, key }) => {
+      const monthReceipts = receipts.filter(r => (r.transaction_date || "").split("T")[0].startsWith(key));
+      const revenue = monthReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      return { month, revenue: Math.round(revenue), target: Math.round(revenue * 0.9), orders: monthReceipts.length };
+    });
+  }, [monthlyTrend, receipts, last6Months]);
+
+  // Customer mix: new vs returning by month (based on join date vs repeat transaction)
+  const customerMix = useMemo(() => {
+    return last6Months.map(({ month, key }) => {
+      const newMembers = members.filter(m => {
+        const raw = m.join_date || m.created_at;
+        return raw ? String(raw).split("T")[0].startsWith(key) : false;
+      }).length;
+      // "Returning" = members who had a transaction this month but joined before this month
+      const monthStart = new Date(parseInt(key.split("-")[0]), parseInt(key.split("-")[1]) - 1, 1);
+      const transactingIds = new Set(
+        receipts
+          .filter(r => (r.transaction_date || "").split("T")[0].startsWith(key))
+          .map(r => r.member_id)
+          .filter(Boolean)
+      );
+      const returning = members.filter(m => {
+        if (!transactingIds.has(m.id)) return false;
+        const raw = m.join_date || m.created_at;
+        if (!raw) return false;
+        return new Date(String(raw)) < monthStart;
+      }).length;
+      return { month, newCustomers: newMembers, returning };
+    });
+  }, [last6Months, members, receipts]);
+
+  // Product/category performance
+  const productPerformance = useMemo(() => {
+    const cats: Record<string, number> = {};
+    receipts.forEach(r => {
+      const cat = categorizeReceipt(r);
+      cats[cat] = (cats[cat] || 0) + (Number(r.amount) || 0);
+    });
+    const sorted = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+    const maxRevenue = sorted[0]?.[1] ?? 1;
+    return sorted.map(([name, revenue]) => ({
+      name,
+      revenue: Math.round(revenue),
+      growth: 0, // would need prior period data
+      margin: 0,
+      color: CATEGORY_COLORS[name] ?? "#64748b",
+      share: Math.round((revenue / Math.max(receipts.reduce((s, r) => s + (Number(r.amount) || 0), 0), 1)) * 100),
+    }));
+  }, [receipts]);
+
+  // Channel performance: payment methods as proxy for channels
+  const channelPerformance = useMemo(() => {
+    const channels: Record<string, { revenue: number; orders: number }> = {};
+    receipts.forEach(r => {
+      const ch = r.payment_method || "Other";
+      if (!channels[ch]) channels[ch] = { revenue: 0, orders: 0 };
+      channels[ch].revenue += Number(r.amount) || 0;
+      channels[ch].orders += 1;
+    });
+    return Object.entries(channels)
+      .map(([channel, v]) => ({ channel, revenue: Math.round(v.revenue), orders: v.orders, conversion: 0 }))
+      .sort((a, b) => b.revenue - a.revenue);
+  }, [receipts]);
+
+  // Summary KPIs
+  const totals = useMemo(() => {
+    const totalRevenue = receipts.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const totalOrders = receipts.length;
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    // Repeat rate: members with more than 1 transaction
+    const memberTxCounts: Record<string, number> = {};
+    receipts.forEach(r => {
+      if (r.member_id) memberTxCounts[r.member_id] = (memberTxCounts[r.member_id] || 0) + 1;
+    });
+    const uniqueMembers = Object.keys(memberTxCounts).length;
+    const repeatMembers = Object.values(memberTxCounts).filter(c => c > 1).length;
+    const repeatRate = uniqueMembers > 0 ? (repeatMembers / uniqueMembers) * 100 : 0;
+    return { totalRevenue, totalOrders, avgOrderValue, repeatRate };
+  }, [receipts]);
+
+  // Conversion funnel: leads vs members (use members data)
+  const funnel = useMemo(() => {
+    const total = members.length;
+    const active = members.filter(m => m.membership_status === "active").length;
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const newThisMonth = members.filter(m => {
+      const raw = m.join_date || m.created_at;
+      return raw ? String(raw).split("T")[0].startsWith(currentMonthKey) : false;
+    }).length;
+    return { total, active, newThisMonth };
+  }, [members]);
 
   return (
     <div className="p-6 space-y-6">
@@ -104,6 +219,10 @@ export function SalesAnalytics() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-9" onClick={loadData} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           <Button variant="outline" size="sm" className="h-9">
             <Download className="mr-2 h-4 w-4" />
             Export
@@ -126,7 +245,7 @@ export function SalesAnalytics() {
       `}</style>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 analytics-panel">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 analytics-panel">
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Total Revenue</CardTitle>
@@ -135,8 +254,8 @@ export function SalesAnalytics() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-700">{formatAED(totals.totalRevenue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">+11.2% growth</p>
+            <div className="text-2xl font-bold text-green-700">{formatAED(Math.round(totals.totalRevenue))}</div>
+            <p className="text-xs text-muted-foreground mt-1">All time from receipts</p>
           </CardContent>
         </Card>
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
@@ -147,8 +266,8 @@ export function SalesAnalytics() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-700">{totals.totalOrders}</div>
-            <p className="text-xs text-muted-foreground mt-1">+8.9% increase</p>
+            <div className="text-2xl font-bold text-blue-700">{totals.totalOrders.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">Total transactions</p>
           </CardContent>
         </Card>
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
@@ -159,8 +278,8 @@ export function SalesAnalytics() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-700">{formatAED(totals.avgOrderValue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Stable across channels</p>
+            <div className="text-2xl font-bold text-purple-700">{formatAED(Math.round(totals.avgOrderValue))}</div>
+            <p className="text-xs text-muted-foreground mt-1">Per transaction</p>
           </CardContent>
         </Card>
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
@@ -171,20 +290,8 @@ export function SalesAnalytics() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-700">62%</div>
-            <p className="text-xs text-muted-foreground mt-1">Return customers</p>
-          </CardContent>
-        </Card>
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Conversion Rate</CardTitle>
-            <div className="bg-indigo-50 p-2 rounded-lg">
-              <Target className="h-4 w-4 text-indigo-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-indigo-700">5.2%</div>
-            <p className="text-xs text-muted-foreground mt-1">Lead to sale</p>
+            <div className="text-2xl font-bold text-amber-700">{totals.repeatRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground mt-1">Members with multiple receipts</p>
           </CardContent>
         </Card>
       </div>
@@ -202,26 +309,32 @@ export function SalesAnalytics() {
             <Card className="xl:col-span-2 border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Revenue vs Target</CardTitle>
-                <CardDescription>Monthly performance against goals</CardDescription>
+                <CardDescription>Monthly performance over last 6 months</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={monthlyPerformance}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="revenue" fill="#2563eb" name="Revenue" radius={[6, 6, 0, 0]} />
-                    <Line type="monotone" dataKey="target" stroke="#f97316" strokeWidth={2} name="Target" />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                {monthlyPerformance.every(m => m.revenue === 0) ? (
+                  <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                    No revenue data available.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ComposedChart data={monthlyPerformance}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(v: number, name: string) => [formatAED(v), name]} />
+                      <Legend />
+                      <Bar dataKey="revenue" fill="#2563eb" name="Revenue" radius={[6, 6, 0, 0]} />
+                      <Line type="monotone" dataKey="target" stroke="#f97316" strokeWidth={2} name="Target" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Customer Mix</CardTitle>
-                <CardDescription>New vs returning revenue</CardDescription>
+                <CardDescription>New vs returning members by month</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -241,7 +354,7 @@ export function SalesAnalytics() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Area type="monotone" dataKey="newCustomers" stroke="#6366f1" fill="url(#newFill)" name="New" />
+                    <Area type="monotone" dataKey="newCustomers" stroke="#6366f1" fill="url(#newFill)" name="New Members" />
                     <Area type="monotone" dataKey="returning" stroke="#22c55e" fill="url(#returnFill)" name="Returning" />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -253,7 +366,7 @@ export function SalesAnalytics() {
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Sales Velocity</CardTitle>
-                <CardDescription>Orders growth and trend line</CardDescription>
+                <CardDescription>Orders growth over last 6 months</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={260}>
@@ -262,40 +375,40 @@ export function SalesAnalytics() {
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="orders" stroke="#0ea5e9" strokeWidth={3} />
+                    <Line type="monotone" dataKey="orders" stroke="#0ea5e9" strokeWidth={3} name="Orders" />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
-                <CardTitle>Conversion Funnel</CardTitle>
-                <CardDescription>Lead to membership conversion</CardDescription>
+                <CardTitle>Member Funnel</CardTitle>
+                <CardDescription>Total, active, and new members</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div>
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Leads Captured</span>
-                    <span className="font-semibold">2,480</span>
+                    <span className="text-muted-foreground">Total Members</span>
+                    <span className="font-semibold">{funnel.total.toLocaleString()}</span>
                   </div>
                   <Progress value={100} className="h-2" />
                 </div>
                 <div>
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Trials Booked</span>
-                    <span className="font-semibold">1,420</span>
+                    <span className="text-muted-foreground">Active Members</span>
+                    <span className="font-semibold">{funnel.active.toLocaleString()}</span>
                   </div>
-                  <Progress value={57} className="h-2" />
+                  <Progress value={funnel.total > 0 ? (funnel.active / funnel.total) * 100 : 0} className="h-2" />
                 </div>
                 <div>
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Converted to Members</span>
-                    <span className="font-semibold">842</span>
+                    <span className="text-muted-foreground">New This Month</span>
+                    <span className="font-semibold">{funnel.newThisMonth.toLocaleString()}</span>
                   </div>
-                  <Progress value={34} className="h-2" />
+                  <Progress value={funnel.total > 0 ? (funnel.newThisMonth / funnel.total) * 100 : 0} className="h-2" />
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Conversion rate improved by 1.6% compared to last quarter.
+                  Active rate: {funnel.total > 0 ? ((funnel.active / funnel.total) * 100).toFixed(1) : 0}% of all members.
                 </div>
               </CardContent>
             </Card>
@@ -306,32 +419,21 @@ export function SalesAnalytics() {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
-                <CardTitle>Customer Activity Heatmap</CardTitle>
-                <CardDescription>Sales intensity by day and hour</CardDescription>
+                <CardTitle>Monthly Member Acquisition</CardTitle>
+                <CardDescription>New members joined each month</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-[70px_repeat(6,1fr)] gap-2 text-xs">
-                  <div />
-                  {heatmapHours.map(hour => (
-                    <div key={hour} className="text-center text-muted-foreground">{hour}</div>
-                  ))}
-                  {heatmapDays.map((day, dayIndex) => (
-                    <React.Fragment key={day}>
-                      <div className="text-muted-foreground flex items-center">{day}</div>
-                      {heatmapValues[dayIndex].map((value, idx) => {
-                        const intensity = Math.min(1, value / 80);
-                        return (
-                          <div
-                            key={`${day}-${idx}`}
-                            className="h-8 rounded-md"
-                            style={{ backgroundColor: `rgba(37, 99, 235, ${0.15 + intensity * 0.6})` }}
-                            title={`${value} sales`}
-                          />
-                        );
-                      })}
-                    </React.Fragment>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={customerMix}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="newCustomers" fill="#6366f1" name="New Members" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="returning" fill="#22c55e" name="Returning" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
@@ -341,35 +443,35 @@ export function SalesAnalytics() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-start gap-3">
-                  <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
                     <Users className="h-4 w-4 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="font-semibold">High retention cohort</p>
+                    <p className="font-semibold">Active membership base</p>
                     <p className="text-sm text-muted-foreground">
-                      Members acquired in Q4 show 74% repeat purchase rate.
+                      {funnel.active.toLocaleString()} active members out of {funnel.total.toLocaleString()} total ({funnel.total > 0 ? ((funnel.active / funnel.total) * 100).toFixed(1) : 0}% retention).
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
                     <ArrowUpRight className="h-4 w-4 text-blue-600" />
                   </div>
                   <div>
-                    <p className="font-semibold">Upsell opportunity</p>
+                    <p className="font-semibold">Repeat transaction rate</p>
                     <p className="text-sm text-muted-foreground">
-                      32% of online buyers have not tried PT services.
+                      {totals.repeatRate.toFixed(1)}% of members have made more than one purchase.
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
                     <Activity className="h-4 w-4 text-amber-600" />
                   </div>
                   <div>
-                    <p className="font-semibold">Peak engagement</p>
+                    <p className="font-semibold">New members this month</p>
                     <p className="text-sm text-muted-foreground">
-                      Evening slots drive 42% of daily revenue.
+                      {funnel.newThisMonth} new members joined this month.
                     </p>
                   </div>
                 </div>
@@ -381,31 +483,35 @@ export function SalesAnalytics() {
         <TabsContent value="products" className="space-y-6">
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
-              <CardTitle>Product Performance</CardTitle>
-              <CardDescription>Revenue, growth, and margins by category</CardDescription>
+              <CardTitle>Product/Service Performance</CardTitle>
+              <CardDescription>Revenue breakdown by category</CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
-                {productPerformance.map(product => (
-                  <div key={product.name} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold">{product.name}</p>
-                      <Badge variant="outline" className="border-green-200 text-green-700">
-                        +{product.growth}%
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">Revenue</p>
-                    <p className="text-lg font-bold">{formatAED(product.revenue)}</p>
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                        <span>Margin</span>
-                        <span>{product.margin}%</span>
+            <CardContent>
+              {productPerformance.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">No product data available.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {productPerformance.map(product => (
+                    <div key={product.name} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold">{product.name}</p>
+                        <Badge variant="outline" className="border-blue-200 text-blue-700">
+                          {product.share}%
+                        </Badge>
                       </div>
-                      <Progress value={product.margin} className="h-2" />
+                      <p className="text-sm text-muted-foreground mt-1">Revenue</p>
+                      <p className="text-lg font-bold">{formatAED(product.revenue)}</p>
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                          <span>Revenue share</span>
+                          <span>{product.share}%</span>
+                        </div>
+                        <Progress value={product.share} className="h-2" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -415,38 +521,48 @@ export function SalesAnalytics() {
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Channel Performance</CardTitle>
-                <CardDescription>Revenue and conversion by channel</CardDescription>
+                <CardDescription>Revenue by payment method</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={channelPerformance}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="channel" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="revenue" fill="#7c3aed" name="Revenue" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {channelPerformance.length === 0 ? (
+                  <div className="h-[280px] flex items-center justify-center text-sm text-muted-foreground">No data available.</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={channelPerformance}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="channel" />
+                      <YAxis />
+                      <Tooltip formatter={(v: number) => formatAED(v)} />
+                      <Bar dataKey="revenue" fill="#7c3aed" name="Revenue" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
-                <CardTitle>Channel Conversion</CardTitle>
-                <CardDescription>Order volume and conversion rate</CardDescription>
+                <CardTitle>Channel Breakdown</CardTitle>
+                <CardDescription>Order volume and revenue by payment type</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {channelPerformance.map(channel => (
-                  <div key={channel.channel} className="flex items-center justify-between border rounded-lg px-4 py-3">
-                    <div>
-                      <p className="font-semibold">{channel.channel}</p>
-                      <p className="text-xs text-muted-foreground">{channel.orders} orders</p>
+                {channelPerformance.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground">No data available.</div>
+                ) : (
+                  channelPerformance.slice(0, 6).map(channel => (
+                    <div key={channel.channel} className="flex items-center justify-between border rounded-lg px-4 py-3">
+                      <div>
+                        <p className="font-semibold">{channel.channel}</p>
+                        <p className="text-xs text-muted-foreground">{channel.orders} orders</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{formatAED(channel.revenue)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {totals.totalRevenue > 0 ? `${((channel.revenue / totals.totalRevenue) * 100).toFixed(1)}% share` : "—"}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{formatAED(channel.revenue)}</p>
-                      <p className="text-xs text-muted-foreground">Conversion {channel.conversion}%</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>
@@ -456,35 +572,35 @@ export function SalesAnalytics() {
       {/* Insights Footer */}
       <Card className="analytics-panel border-primary/10 shadow-md hover:shadow-lg transition-shadow">
         <CardHeader>
-          <CardTitle>Actionable Insights</CardTitle>
-          <CardDescription>Key recommendations based on current trends</CardDescription>
+          <CardTitle>Key Metrics Summary</CardTitle>
+          <CardDescription>Derived from live transaction and membership data</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <div className="border rounded-lg p-4">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <LineChartIcon className="h-4 w-4 text-blue-600" />
-              Lift weekday performance
+              Revenue performance
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              Tuesday and Wednesday sales lag 8% behind the weekly average. Run bundle offers on those days.
+              Total of {formatAED(Math.round(totals.totalRevenue))} across {totals.totalOrders.toLocaleString()} transactions with an average of {formatAED(Math.round(totals.avgOrderValue))} per order.
             </p>
           </div>
           <div className="border rounded-lg p-4">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <BarChart3 className="h-4 w-4 text-green-600" />
-              Focus on memberships
+              Membership health
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              Membership upgrades contribute 41% of revenue growth. Promote annual plans in POS flow.
+              {funnel.active.toLocaleString()} active members ({funnel.total > 0 ? ((funnel.active / funnel.total) * 100).toFixed(1) : 0}% active rate). {funnel.newThisMonth} joined this month.
             </p>
           </div>
           <div className="border rounded-lg p-4">
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <Activity className="h-4 w-4 text-purple-600" />
-              Improve conversion
+              <Target className="h-4 w-4 text-purple-600" />
+              Repeat business
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              Corporate leads convert at 6.1%. Expand outbound follow-ups to boost pipeline velocity.
+              {totals.repeatRate.toFixed(1)}% of members have made multiple purchases, indicating strong customer loyalty.
             </p>
           </div>
         </CardContent>

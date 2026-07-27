@@ -1,4 +1,5 @@
 ﻿import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -75,7 +76,7 @@ import {
   SupplierBillRequest,
 } from '../utils/supabase/supplier-bill-service';
 import { purchaseService, Supplier } from '../utils/supabase/purchase-service';
-import { productsService, Product } from '../utils/supabase/products-service';
+import { productsService, Product, Warehouse } from '../utils/supabase/products-service';
 
 // â”€â”€ Default bill form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -132,6 +133,7 @@ const getPaymentBadge = (status: string) => {
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
+  const { currencyCode } = useCurrency();
   if (active && payload && payload.length) {
     return (
       <div className="bg-card border rounded-lg p-3 shadow-lg">
@@ -139,7 +141,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
             {entry.name}: {typeof entry.value === 'number'
-              ? `AED ${entry.value.toLocaleString()}`
+              ? `${currencyCode} ${entry.value.toLocaleString()}`
               : entry.value}
           </p>
         ))}
@@ -152,9 +154,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 // â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function Purchase() {
+  const { currencyCode } = useCurrency();
   // â”€â”€ Data state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [bills, setBills]             = useState<SupplierBill[]>([]);
   const [suppliers, setSuppliers]     = useState<Supplier[]>([]);
+  const [warehouses, setWarehouses]   = useState<Warehouse[]>([]);
   const [loading, setLoading]         = useState(true);
   const [saving, setSaving]           = useState(false);
   const [page, setPage]               = useState(1);
@@ -198,7 +202,7 @@ export function Purchase() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [billsPage, suppliersData, productsData] = await Promise.all([
+      const [billsPage, suppliersData, productsData, warehousesData] = await Promise.all([
         supplierBillService.getBills({
           page,
           size: 20,
@@ -207,12 +211,14 @@ export function Purchase() {
         }),
         purchaseService.getAllSuppliers(),
         productsService.getProducts({ size: 200 }),
+        productsService.getActiveWarehouses(),
       ]);
       setBills(billsPage.bills);
       setTotalPages(billsPage.pagination.totalPages);
       setTotalBills(billsPage.pagination.total);
       setSuppliers(suppliersData);
       setApiProducts(productsData.products ?? []);
+      setWarehouses(warehousesData);
     } catch (err: any) {
       toast.error(err.message || 'Failed to load data');
     } finally {
@@ -281,6 +287,10 @@ export function Purchase() {
   const handleSaveBill = async () => {
     if (!billForm.supplierId) {
       toast.error('Please select a supplier');
+      return;
+    }
+    if (!billForm.warehouseId) {
+      toast.error('Please select a warehouse');
       return;
     }
     if (billForm.items.length === 0) {
@@ -451,20 +461,20 @@ export function Purchase() {
             <td>${i.productName}</td>
             <td>${i.productSku ?? ''}</td>
             <td>${i.quantity} ${i.unitOfMeasure ?? ''}</td>
-            <td>AED ${i.unitPrice.toFixed(2)}</td>
+            <td>${currencyCode} ${i.unitPrice.toFixed(2)}</td>
             <td>${i.discountPercent}%</td>
             <td>${i.taxPercent}%</td>
-            <td>AED ${i.totalAmount.toFixed(2)}</td>
+            <td>${currencyCode} ${i.totalAmount.toFixed(2)}</td>
           </tr>`).join('')}
         </tbody>
       </table>
       <div class="totals">
-        <p>Subtotal: AED ${bill.subtotal.toFixed(2)}</p>
-        ${bill.discountAmount > 0 ? `<p>Discount: -AED ${bill.discountAmount.toFixed(2)}</p>` : ''}
-        <p>Tax: AED ${bill.taxAmount.toFixed(2)}</p>
-        <p>Shipping: AED ${bill.shippingCost.toFixed(2)}</p>
+        <p>Subtotal: ${currencyCode} ${bill.subtotal.toFixed(2)}</p>
+        ${bill.discountAmount > 0 ? `<p>Discount: -${currencyCode} ${bill.discountAmount.toFixed(2)}</p>` : ''}
+        <p>Tax: ${currencyCode} ${bill.taxAmount.toFixed(2)}</p>
+        <p>Shipping: ${currencyCode} ${bill.shippingCost.toFixed(2)}</p>
         <hr/>
-        <p><strong>Total: AED ${bill.totalAmount.toFixed(2)}</strong></p>
+        <p><strong>Total: ${currencyCode} ${bill.totalAmount.toFixed(2)}</strong></p>
       </div>
       </body></html>
     `);
@@ -678,7 +688,7 @@ export function Purchase() {
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold text-green-700">
-              AED {extraStats.monthlySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <CurrencyGlyph /> {extraStats.monthlySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground mt-1">This month</p>
           </CardContent>
@@ -707,7 +717,7 @@ export function Purchase() {
           <CardContent>
             <div className="text-sm font-bold text-blue-700 truncate">{extraStats.topSupplier}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              AED {extraStats.topAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              <CurrencyGlyph /> {extraStats.topAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </p>
           </CardContent>
         </Card>
@@ -811,7 +821,7 @@ export function Purchase() {
                   <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
                   <p className="font-medium">No purchases found</p>
                   <p className="text-sm mb-4">Create your first purchase to get started</p>
-                  <Button onClick={() => { setEditingBill(null); setBillForm(defaultBillForm()); setShowBillForm(true); }}>
+                  <Button onClick={() => { setEditingBill(null); setBillForm({ ...defaultBillForm(), warehouseId: warehouses[0]?.id }); setShowBillForm(true); }}>
                     <Plus className="mr-2 h-4 w-4" /> New Purchase
                   </Button>
                 </div>
@@ -891,7 +901,7 @@ export function Purchase() {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <p className="font-medium text-sm">AED {bill.totalAmount.toFixed(2)}</p>
+                                <p className="font-medium text-sm"><CurrencyGlyph /> {bill.totalAmount.toFixed(2)}</p>
                                 <p className="text-xs text-muted-foreground">{bill.items.length} item{bill.items.length !== 1 ? 's' : ''}</p>
                               </div>
                             </TableCell>
@@ -1064,7 +1074,7 @@ export function Purchase() {
               <Button
                 className="w-full justify-start bg-emerald-600 hover:bg-emerald-700 text-white"
                 size="sm"
-                onClick={() => { setEditingBill(null); setBillForm(defaultBillForm()); setShowBillForm(true); }}
+                onClick={() => { setEditingBill(null); setBillForm({ ...defaultBillForm(), warehouseId: warehouses[0]?.id }); setShowBillForm(true); }}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 New Purchase
@@ -1250,6 +1260,29 @@ export function Purchase() {
               </Select>
             </div>
 
+            {/* Warehouse */}
+            <div>
+              <Label className="text-xs text-muted-foreground">Warehouse *</Label>
+              <Select
+                value={billForm.warehouseId ? String(billForm.warehouseId) : ''}
+                onValueChange={v => setBillForm(prev => ({ ...prev, warehouseId: Number(v) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select warehouse..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map(w => (
+                    <SelectItem key={w.id} value={String(w.id)}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Stock from confirmed items in this bill will be added to the selected warehouse.
+              </p>
+            </div>
+
             {/* Purchase Items */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -1323,7 +1356,7 @@ export function Purchase() {
                               </span>
                             </div>
                             <div className="flex items-center gap-2 ml-3 shrink-0">
-                              <span className="text-sm font-semibold">AED {(p.costPrice ?? 0).toFixed(0)}</span>
+                              <span className="text-sm font-semibold"><CurrencyGlyph /> {(p.costPrice ?? 0).toFixed(0)}</span>
                               {p.stockStatus === 'OUT_OF_STOCK' && (
                                 <Badge className="text-[10px] px-1 py-0 bg-red-100 text-red-700">Out of Stock</Badge>
                               )}
@@ -1418,7 +1451,7 @@ export function Purchase() {
                           />
                         </div>
                         <div>
-                          <Label className="text-[10px] text-muted-foreground">Unit Price (AED) *</Label>
+                          <Label className="text-[10px] text-muted-foreground">Unit Price ({currencyCode}) *</Label>
                           <Input
                             type="number"
                             min="0"
@@ -1454,7 +1487,7 @@ export function Purchase() {
                         </div>
                       </div>
                       <div className="mt-2 text-right text-xs font-semibold text-primary">
-                        Line Total: AED {(
+                        Line Total: <CurrencyGlyph /> {(
                           item.quantity * item.unitPrice
                           * (1 - item.discountPercent / 100)
                           * (1 + item.taxPercent / 100)
@@ -1504,24 +1537,24 @@ export function Purchase() {
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span>AED {billTotals.subtotal.toFixed(2)}</span>
+                      <span><CurrencyGlyph /> {billTotals.subtotal.toFixed(2)}</span>
                     </div>
                     {billTotals.discountAmount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>Discount</span>
-                        <span>-AED {billTotals.discountAmount.toFixed(2)}</span>
+                        <span>-<CurrencyGlyph /> {billTotals.discountAmount.toFixed(2)}</span>
                       </div>
                     )}
                     {billTotals.taxAmount > 0 && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Tax</span>
-                        <span>AED {billTotals.taxAmount.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {billTotals.taxAmount.toFixed(2)}</span>
                       </div>
                     )}
                     <Separator />
                     <div className="flex justify-between font-semibold">
                       <span>Total</span>
-                      <span className="text-primary">AED {billTotals.total.toFixed(2)}</span>
+                      <span className="text-primary"><CurrencyGlyph /> {billTotals.total.toFixed(2)}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -1618,7 +1651,7 @@ export function Purchase() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">Amount Paid: </span>
-                        <span className="font-medium text-green-600">AED {selectedBill.amountPaid.toFixed(2)}</span>
+                        <span className="font-medium text-green-600"><CurrencyGlyph /> {selectedBill.amountPaid.toFixed(2)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -1651,10 +1684,10 @@ export function Purchase() {
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">{item.productSku ?? 'â€”'}</TableCell>
                             <TableCell>{item.quantity} {item.unitOfMeasure ?? ''}</TableCell>
-                            <TableCell>AED {item.unitPrice.toFixed(2)}</TableCell>
+                            <TableCell><CurrencyGlyph /> {item.unitPrice.toFixed(2)}</TableCell>
                             <TableCell>{item.discountPercent}%</TableCell>
                             <TableCell>{item.taxPercent}%</TableCell>
-                            <TableCell className="font-medium">AED {item.totalAmount.toFixed(2)}</TableCell>
+                            <TableCell className="font-medium"><CurrencyGlyph /> {item.totalAmount.toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1671,34 +1704,34 @@ export function Purchase() {
                     <div className="space-y-1 text-sm max-w-xs ml-auto">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Subtotal</span>
-                        <span>AED {selectedBill.subtotal.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {selectedBill.subtotal.toFixed(2)}</span>
                       </div>
                       {selectedBill.discountAmount > 0 && (
                         <div className="flex justify-between text-green-600">
                           <span>Discount</span>
-                          <span>-AED {selectedBill.discountAmount.toFixed(2)}</span>
+                          <span>-<CurrencyGlyph /> {selectedBill.discountAmount.toFixed(2)}</span>
                         </div>
                       )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Tax</span>
-                        <span>AED {selectedBill.taxAmount.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {selectedBill.taxAmount.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Shipping</span>
-                        <span>AED {selectedBill.shippingCost.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {selectedBill.shippingCost.toFixed(2)}</span>
                       </div>
                       <Separator />
                       <div className="flex justify-between font-semibold">
                         <span>Total</span>
-                        <span>AED {selectedBill.totalAmount.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {selectedBill.totalAmount.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-green-600">
                         <span>Paid</span>
-                        <span>AED {selectedBill.amountPaid.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {selectedBill.amountPaid.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between font-semibold text-orange-600">
                         <span>Balance Due</span>
-                        <span>AED {(selectedBill.totalAmount - selectedBill.amountPaid).toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {(selectedBill.totalAmount - selectedBill.amountPaid).toFixed(2)}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -1779,13 +1812,13 @@ export function Purchase() {
               Record Payment
             </DialogTitle>
             <DialogDescription>
-              {payingBill && `Bill ${payingBill.billNumber} â€” Balance: AED ${(payingBill.totalAmount - payingBill.amountPaid).toFixed(2)}`}
+              {payingBill && `Bill ${payingBill.billNumber} â€” Balance: ${currencyCode} ${(payingBill.totalAmount - payingBill.amountPaid).toFixed(2)}`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <Label>Amount (AED) *</Label>
+              <Label>Amount ({currencyCode}) *</Label>
               <Input
                 type="number"
                 min="0.01"
@@ -1938,7 +1971,7 @@ export function Purchase() {
                 </Select>
               </div>
               <div>
-                <Label>Credit Limit (AED)</Label>
+                <Label>Credit Limit ({currencyCode})</Label>
                 <Input
                   type="number"
                   min="0"

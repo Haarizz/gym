@@ -23,18 +23,19 @@ public class ProductController {
     }
 
     /**
-     * GET /api/products?search=&categoryId=&status=&page=1&size=20
+     * GET /api/products?search=&categoryId=&status=&enabledForPos=&page=1&size=20
      */
     @GetMapping
     public ResponseEntity<ProductsPageResponseDTO> getProducts(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean enabledForPos,
             @RequestParam(defaultValue = "1")  int page,
             @RequestParam(defaultValue = "20") int size) {
 
         return ResponseEntity.ok(
-                productService.getProducts(search, categoryId, status, page, size)
+                productService.getProducts(search, categoryId, status, enabledForPos, page, size)
         );
     }
 

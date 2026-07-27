@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useCurrency } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -253,6 +254,7 @@ interface AddChallengeProps {
 }
 
 export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
+  const { currencyCode } = useCurrency();
   const [mainTab, setMainTab] = useState<'explore' | 'my-challenges' | 'create' | 'leaderboard'>('explore');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -687,7 +689,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                                     handleJoinChallenge(challenge);
                                   }}
                                 >
-                                  {challenge.price > 0 ? `Join - AED ${challenge.price}` : 'Join Free'}
+                                  {challenge.price > 0 ? `Join - ${currencyCode} ${challenge.price}` : 'Join Free'}
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -1351,7 +1353,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                 disabled={!agreedToRules}
               >
                 <CheckCircle2 className="h-5 w-5 mr-2" />
-                {selectedChallenge.price > 0 ? `Join & Pay AED ${selectedChallenge.price}` : 'Join Challenge'}
+                {selectedChallenge.price > 0 ? `Join & Pay ${currencyCode} ${selectedChallenge.price}` : 'Join Challenge'}
               </Button>
             </div>
           </SheetContent>

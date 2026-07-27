@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   Search,
   Filter,
@@ -59,12 +60,14 @@ import { receiptsService, Receipt as ApiReceipt } from "../utils/supabase/receip
 
 interface MemberReceiptsProps {
   onNavigate?: (section: string) => void;
+  embedded?: boolean;
 }
 
 // Use the API Receipt type directly
 type Receipt = ApiReceipt;
 
-export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
+export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
+  const { currencyCode } = useCurrency();
   const [allReceipts, setAllReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -189,33 +192,35 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={embedded ? "" : "min-h-screen bg-background"}>
       {/* Header Section */}
-      <div className="border-b bg-white">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-[#0047ab] to-[#00c5cb]">
-                  <FileText className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl text-foreground">Member Receipts</h1>
-                  <p className="text-muted-foreground">
-                    View and manage all payment receipts
-                  </p>
+      <div className={embedded ? "" : "border-b bg-white"}>
+        <div className={embedded ? "" : "p-6"}>
+          {!embedded && (
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-gradient-to-r from-[#0047ab] to-[#00c5cb]">
+                    <FileText className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl text-foreground">Member Receipts</h1>
+                    <p className="text-muted-foreground">
+                      View and manage all payment receipts
+                    </p>
+                  </div>
                 </div>
               </div>
+              <Button
+                variant="outline"
+                onClick={() => onNavigate && onNavigate("members")}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Members
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => onNavigate && onNavigate("members")}
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Members
-            </Button>
-          </div>
+          )}
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -270,7 +275,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Collected</p>
-                    <p className="text-2xl mt-1">AED {totalCollected}</p>
+                    <p className="text-2xl mt-1"><CurrencyGlyph /> {totalCollected}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-purple-100">
                     <DollarSign className="h-6 w-6 text-purple-600" />
@@ -287,7 +292,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                 <DollarSign className="h-6 w-6" />
                 <div>
                   <p className="text-sm opacity-90">Total Collected (Current Filter)</p>
-                  <p className="text-2xl">AED {totalCollected.toLocaleString()}</p>
+                  <p className="text-2xl"><CurrencyGlyph /> {totalCollected.toLocaleString()}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -379,7 +384,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                     <TableHead className="font-semibold">Receipt No.</TableHead>
                     <TableHead className="font-semibold">Member Name / ID</TableHead>
                     <TableHead className="font-semibold">Transaction Type</TableHead>
-                    <TableHead className="font-semibold">Amount (AED)</TableHead>
+                    <TableHead className="font-semibold">Amount ({currencyCode})</TableHead>
                     <TableHead className="font-semibold">Payment Method</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold text-right">Actions</TableHead>
@@ -562,7 +567,7 @@ export function MemberReceipts({ onNavigate }: MemberReceiptsProps) {
                       <div>
                         <Label className="text-sm text-muted-foreground">Amount</Label>
                         <p className="mt-1 text-xl text-[#0047ab]">
-                          AED {Number(selectedReceipt.amount).toLocaleString()}
+                          <CurrencyGlyph /> {Number(selectedReceipt.amount).toLocaleString()}
                         </p>
                       </div>
                       <div>

@@ -159,9 +159,10 @@ export function calculateRewardAmount(
 export async function sendWhatsAppNotification(
   phone: string,
   referrerName: string,
-  rewardAmount: number
+  rewardAmount: number,
+  currencyCode: string = 'AED'
 ): Promise<boolean> {
-  const message = `🎉 Congratulations ${referrerName}! You've earned a reward of AED ${rewardAmount} for your successful referral. You can redeem it on your next membership renewal or add-on purchase. Valid for 90 days.`;
+  const message = `🎉 Congratulations ${referrerName}! You've earned a reward of ${currencyCode} ${rewardAmount} for your successful referral. You can redeem it on your next membership renewal or add-on purchase. Valid for 90 days.`;
   
   console.log(`[WhatsApp] Sending to ${phone}: ${message}`);
   
@@ -176,13 +177,14 @@ export async function sendWhatsAppNotification(
 export async function sendEmailNotification(
   email: string,
   referrerName: string,
-  rewardAmount: number
+  rewardAmount: number,
+  currencyCode: string = 'AED'
 ): Promise<boolean> {
   const subject = '🎁 You\'ve Earned a Referral Reward!';
   const body = `
     Hi ${referrerName},
-    
-    Great news! You've earned a reward of AED ${rewardAmount} for successfully referring a new member to our gym.
+
+    Great news! You've earned a reward of ${currencyCode} ${rewardAmount} for successfully referring a new member to our gym.
     
     Your reward is now available and can be redeemed on your next:
     • Membership renewal

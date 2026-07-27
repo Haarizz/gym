@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -60,6 +61,7 @@ const statusColors: Record<string, string> = {
 };
 
 export function JournalVoucherPage() {
+  const { currencyCode } = useCurrency();
   const [vouchers, setVouchers] = useState<JournalVoucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -272,7 +274,7 @@ export function JournalVoucherPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-700">{totalDebit.toFixed(2)} AED</div>
+            <div className="text-2xl font-bold text-blue-700"><CurrencyGlyph /> {totalDebit.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground mt-1">All vouchers</p>
           </CardContent>
         </Card>
@@ -285,7 +287,7 @@ export function JournalVoucherPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-700">{totalCredit.toFixed(2)} AED</div>
+            <div className="text-2xl font-bold text-emerald-700"><CurrencyGlyph /> {totalCredit.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground mt-1">All vouchers</p>
           </CardContent>
         </Card>
@@ -521,8 +523,8 @@ export function JournalVoucherPage() {
                     <TableRow>
                       <TableHead>Account Code</TableHead>
                       <TableHead>Account Name</TableHead>
-                      <TableHead className="text-right">Debit (AED)</TableHead>
-                      <TableHead className="text-right">Credit (AED)</TableHead>
+                      <TableHead className="text-right">Debit ({currencyCode})</TableHead>
+                      <TableHead className="text-right">Credit ({currencyCode})</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Cost Center</TableHead>
                       <TableHead className="w-10"></TableHead>
@@ -640,11 +642,11 @@ export function JournalVoucherPage() {
               {/* Balance indicator */}
               <div className="flex items-center justify-between p-3 rounded-md bg-white border border-gray-100 shadow-sm">
                 <div className="flex items-center gap-6 text-sm">
-                  <span>Total Debit: <strong>{formTotalDebit.toFixed(2)} AED</strong></span>
-                  <span>Total Credit: <strong>{formTotalCredit.toFixed(2)} AED</strong></span>
+                  <span>Total Debit: <strong><CurrencyGlyph /> {formTotalDebit.toFixed(2)}</strong></span>
+                  <span>Total Credit: <strong><CurrencyGlyph /> {formTotalCredit.toFixed(2)}</strong></span>
                   <span>
                     Difference: <strong className={isBalanced ? "text-green-600" : "text-red-600"}>
-                      {Math.abs(formTotalDebit - formTotalCredit).toFixed(2)} AED
+                      <CurrencyGlyph /> {Math.abs(formTotalDebit - formTotalCredit).toFixed(2)}
                     </strong>
                   </span>
                 </div>

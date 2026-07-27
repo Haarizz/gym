@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -77,6 +78,7 @@ const emptyForm = () => ({
 });
 
 export function Facilities({ onNavigate }: FacilitiesProps) {
+  const { currencyCode } = useCurrency();
   const [facilities, setFacilities] = useState<FacilityApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -454,7 +456,7 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
                           {Object.entries(facility.rates).map(([rateType, rate]) => (
                             <div key={rateType} className="flex justify-between text-sm">
                               <span className="text-muted-foreground">{rateType}:</span>
-                              <span className="font-medium">AED {rate}</span>
+                              <span className="font-medium"><CurrencyGlyph /> {rate}</span>
                             </div>
                           ))}
                         </div>
@@ -584,7 +586,7 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
                     </div>
                     {formData.selectedRateTypes.includes(rateType) && (
                       <div className="flex items-center gap-2">
-                        <Label className="text-sm text-muted-foreground whitespace-nowrap">Rate (AED):</Label>
+                        <Label className="text-sm text-muted-foreground whitespace-nowrap">Rate ({currencyCode}):</Label>
                         <Input
                           type="text"
                           placeholder="0.00"

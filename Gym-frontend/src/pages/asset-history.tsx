@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { statusColors, categoryIcons } from "./manage-assets";
 import { assetsService, Asset, AssetEvent } from "../utils/supabase/assets-service";
+import { CurrencyValue } from "../utils/currency";
 import {
   History,
   CalendarDays,
@@ -33,8 +34,6 @@ import {
   XOctagon,
   Info,
 } from "lucide-react";
-
-const formatCurrency = (amount: number) => `${amount.toLocaleString()} AED`;
 
 const getCategoryIcon = (category: string) => {
   const Icon = categoryIcons[category as keyof typeof categoryIcons] || FileText;
@@ -284,14 +283,14 @@ export function AssetHistoryPage() {
 
                   <div className="flex flex-col items-center text-center gap-2 lg:col-span-1">
                     <div className="text-2xl font-bold text-teal-800">
-                      {formatCurrency(selectedHistoryAsset.purchasePrice)}
+                      <CurrencyValue amount={selectedHistoryAsset.purchasePrice} />
                     </div>
                     <div className="text-xs text-teal-600">Purchase Price</div>
                   </div>
 
                   <div className="flex flex-col items-center text-center gap-2 lg:col-span-1">
                     <div className="text-2xl font-bold text-blue-800">
-                      {formatCurrency(selectedHistoryAsset.currentValue)}
+                      <CurrencyValue amount={selectedHistoryAsset.currentValue} />
                     </div>
                     <div className="text-xs text-blue-600">Current Value</div>
                   </div>
@@ -361,7 +360,7 @@ export function AssetHistoryPage() {
                                         }`}
                                       >
                                         {event.amount > 0 ? "+" : ""}
-                                        {formatCurrency(Math.abs(event.amount))}
+                                        <CurrencyValue amount={Math.abs(event.amount)} />
                                       </div>
                                     )}
                                     <div className="flex items-center space-x-1">
@@ -448,7 +447,7 @@ export function AssetHistoryPage() {
                                   }`}
                                 >
                                   {event.amount > 0 ? "+" : ""}
-                                  {formatCurrency(Math.abs(event.amount))}
+                                  <CurrencyValue amount={Math.abs(event.amount)} />
                                 </span>
                               )}
                             </TableCell>
@@ -499,11 +498,11 @@ export function AssetHistoryPage() {
               <Card className="bg-gradient-to-r from-orange-50 to-orange-100 border-0 shadow-md hover:shadow-lg transition-shadow">
                 <CardContent className="p-4 text-center">
                   <div className="text-2xl font-bold text-orange-800">
-                    {formatCurrency(
+                    <CurrencyValue amount={
                       events
                         .filter((e) => e.type === "maintenance")
                         .reduce((sum, e) => sum + (e.amount || 0), 0)
-                    )}
+                    } />
                   </div>
                   <div className="text-sm text-orange-600">Maintenance Costs</div>
                 </CardContent>
@@ -595,7 +594,7 @@ export function AssetHistoryPage() {
                       }`}
                     >
                       {selectedHistoryEvent.amount > 0 ? "+" : ""}
-                      {formatCurrency(Math.abs(selectedHistoryEvent.amount))}
+                      <CurrencyValue amount={Math.abs(selectedHistoryEvent.amount)} />
                     </div>
                   </div>
                 )}

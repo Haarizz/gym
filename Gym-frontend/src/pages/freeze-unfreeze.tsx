@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { membersService, Member } from '../utils/supabase/members-service';
+import { CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -137,7 +138,7 @@ const freezeHistory = [
 ];
 
 export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [freezeStartDate, setFreezeStartDate] = useState<Date | undefined>(undefined);
   const [freezeEndDate, setFreezeEndDate] = useState<Date | undefined>(undefined);
@@ -651,7 +652,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                       <TableCell className="text-sm">{record.reason}</TableCell>
                       <TableCell>
                         {record.chargedAmount > 0 ? (
-                          <span className="text-sm font-medium text-red-600">AED {record.chargedAmount}</span>
+                          <span className="text-sm font-medium text-red-600"><CurrencyGlyph /> {record.chargedAmount}</span>
                         ) : (
                           <span className="text-sm text-muted-foreground">Free</span>
                         )}

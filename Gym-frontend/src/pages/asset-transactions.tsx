@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useCurrency, CurrencyValue } from '../utils/currency';
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -326,6 +327,7 @@ const createDocumentAttachmentForm = (): DocumentAttachmentFormState => ({
 });
 
 export function AssetTransactions() {
+  const { currencyCode } = useCurrency();
   const [transactions, setTransactions] = useState<AssetTransactionRecord[]>(assetTransactionsData);
   const [selectedTransaction, setSelectedTransaction] = useState<AssetTransactionRecord | null>(null);
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
@@ -353,15 +355,6 @@ export function AssetTransactions() {
   const [newTransaction, setNewTransaction] = useState<TransactionFormState>(createTransactionFormState());
   const [editTransactionForm, setEditTransactionForm] = useState<TransactionFormState>(createTransactionFormState());
   const [documentForm, setDocumentForm] = useState<DocumentAttachmentFormState>(createDocumentAttachmentForm());
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-AE', {
-      style: 'currency',
-      currency: 'AED',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -781,11 +774,11 @@ export function AssetTransactions() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(
+                <CurrencyValue amount={
                   transactions
                     .filter(t => t.type === 'purchase' && t.status === 'completed')
                     .reduce((sum, t) => sum + t.value, 0)
-                )}
+                } />
               </div>
               <p className="text-xs text-muted-foreground">Completed acquisition value</p>
             </CardContent>
@@ -800,11 +793,11 @@ export function AssetTransactions() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-amber-600">
-                {formatCurrency(
+                <CurrencyValue amount={
                   transactions
                     .filter(t => t.type === 'maintenance' && t.status === 'completed')
                     .reduce((sum, t) => sum + t.value, 0)
-                )}
+                } />
               </div>
               <p className="text-xs text-muted-foreground">Closed service transactions</p>
             </CardContent>
@@ -1048,7 +1041,7 @@ export function AssetTransactions() {
                       <TableCell>
                         {transaction.value !== 0 && (
                           <span className={`font-medium ${transaction.value > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {transaction.value > 0 ? '+' : ''}{formatCurrency(Math.abs(transaction.value))}
+                            {transaction.value > 0 ? '+' : ''}<CurrencyValue amount={Math.abs(transaction.value)} />
                           </span>
                         )}
                       </TableCell>
@@ -1201,7 +1194,7 @@ export function AssetTransactions() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Value (AED)</Label>
+                  <Label>Value ({currencyCode})</Label>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -1439,7 +1432,7 @@ export function AssetTransactions() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Value (AED)</Label>
+                  <Label>Value ({currencyCode})</Label>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -1595,7 +1588,7 @@ export function AssetTransactions() {
                       <CardContent className="p-4">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Transaction Value</p>
                         <p className="mt-2 text-lg font-semibold">
-                          {reportTransaction.value === 0 ? 'No financial impact' : formatCurrency(Math.abs(reportTransaction.value))}
+                          {reportTransaction.value === 0 ? 'No financial impact' : <CurrencyValue amount={Math.abs(reportTransaction.value)} />}
                         </p>
                       </CardContent>
                     </Card>
@@ -1966,7 +1959,7 @@ export function AssetTransactions() {
                           <div className="text-2xl font-bold text-gray-800">
                             {selectedTransaction.value !== 0 ? (
                               <span className={selectedTransaction.value > 0 ? 'text-green-600' : 'text-red-600'}>
-                                {selectedTransaction.value > 0 ? '+' : ''}{formatCurrency(Math.abs(selectedTransaction.value))}
+                                {selectedTransaction.value > 0 ? '+' : ''}<CurrencyValue amount={Math.abs(selectedTransaction.value)} />
                               </span>
                             ) : '—'}
                           </div>

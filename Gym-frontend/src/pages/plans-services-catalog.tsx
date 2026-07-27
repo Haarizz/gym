@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -266,7 +267,7 @@ const classes = [
 ];
 
 export function PlansServicesCatalog() {
-  const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
   const [showInquiryForm, setShowInquiryForm] = useState(false);
   const [showOnboardForm, setShowOnboardForm] = useState(false);
@@ -959,7 +960,7 @@ export function PlansServicesCatalog() {
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <h4 className="font-semibold text-sm mb-2 text-yellow-800">Important Notes:</h4>
                   <ul className="text-xs text-yellow-700 space-y-1">
-                    <li>• All prices are in AED and inclusive of VAT</li>
+                    <li>• All prices are in <CurrencyGlyph /> and inclusive of VAT</li>
                     <li>• Membership starts from the date of registration</li>
                     <li>• No refunds on early cancellation</li>
                     <li>• Photo ID required for registration</li>

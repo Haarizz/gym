@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCurrency, CurrencyGlyph } from '../../utils/currency';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -58,6 +59,7 @@ export function MemberApprovalModal({
   onApprove, 
   onReject 
 }: MemberApprovalModalProps) {
+  const { currencyCode } = useCurrency();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [paymentData, setPaymentData] = useState({
@@ -94,8 +96,8 @@ export function MemberApprovalModal({
       discount = paymentData.amount * 0.2; // 20% off
       toast.success('Discount code applied: 20% off');
     } else if (code === 'SPECIAL50') {
-      discount = 50; // Flat AED 50 off
-      toast.success('Discount code applied: AED 50 off');
+      discount = 50; // Flat ${currencyCode} 50 off
+      toast.success(`Discount code applied: ${currencyCode} 50 off`);
     } else if (code) {
       toast.error('Invalid discount code');
       return;
@@ -325,7 +327,7 @@ export function MemberApprovalModal({
                   <p className="text-sm opacity-90">{draftData.planDuration}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold">AED {draftData.planPrice}</div>
+                  <div className="text-2xl font-bold"><CurrencyGlyph /> {draftData.planPrice}</div>
                 </div>
               </div>
             </div>
@@ -396,7 +398,7 @@ export function MemberApprovalModal({
                 {paymentData.discountAmount > 0 && (
                   <p className="text-sm text-green-600 mt-2 flex items-center">
                     <CheckCircle className="h-4 w-4 mr-1" />
-                    Discount applied: AED {paymentData.discountAmount.toFixed(2)}
+                    Discount applied: <CurrencyGlyph /> {paymentData.discountAmount.toFixed(2)}
                   </p>
                 )}
               </div>
@@ -406,13 +408,13 @@ export function MemberApprovalModal({
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Plan Amount:</span>
-                    <span className="font-medium">AED {paymentData.amount.toFixed(2)}</span>
+                    <span className="font-medium"><CurrencyGlyph /> {paymentData.amount.toFixed(2)}</span>
                   </div>
                   
                   {paymentData.discountAmount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Discount:</span>
-                      <span className="font-medium">- AED {paymentData.discountAmount.toFixed(2)}</span>
+                      <span className="font-medium">- <CurrencyGlyph /> {paymentData.discountAmount.toFixed(2)}</span>
                     </div>
                   )}
                   
@@ -422,7 +424,7 @@ export function MemberApprovalModal({
                     <span className="text-[#1E293B]">Final Amount:</span>
                     <span className="text-[#2B7A78]">
                       <DollarSign className="inline h-5 w-5 mb-1" />
-                      AED {paymentData.finalAmount.toFixed(2)}
+                      <CurrencyGlyph /> {paymentData.finalAmount.toFixed(2)}
                     </span>
                   </div>
                 </div>

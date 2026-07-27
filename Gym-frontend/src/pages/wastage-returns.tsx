@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -99,6 +100,7 @@ function fmt(n: number) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function WastageReturns() {
+  const { currencyCode } = useCurrency();
   // ── data state ─────────────────────────────────────────────────────────────
   const [vouchers, setVouchers]   = useState<WastageReturn[]>([]);
   const [stats, setStats]         = useState<WastageReturnStats | null>(null);
@@ -439,7 +441,7 @@ export function WastageReturns() {
       </tr>`).join('')}</tbody>
       </table>
       <p style="margin-top:12px"><b>Total Items:</b> ${v.totalItems} &nbsp;&nbsp;
-      <b>Total Value:</b> AED ${fmt(v.totalValue)}</p>
+      <b>Total Value:</b> ${currencyCode} ${fmt(v.totalValue)}</p>
       ${v.notes ? `<p><b>Notes:</b> ${v.notes}</p>` : ''}
       </body></html>
     `);
@@ -547,9 +549,9 @@ export function WastageReturns() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">AED {fmt(stats?.totalWastageValue ?? 0)}</div>
+            <div className="text-2xl font-bold text-orange-600"><CurrencyGlyph /> {fmt(stats?.totalWastageValue ?? 0)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              This month: AED {fmt(stats?.monthlyWastage ?? 0)}
+              This month: <CurrencyGlyph /> {fmt(stats?.monthlyWastage ?? 0)}
             </p>
           </CardContent>
         </Card>
@@ -561,9 +563,9 @@ export function WastageReturns() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">AED {fmt(stats?.totalReturnValue ?? 0)}</div>
+            <div className="text-2xl font-bold text-purple-600"><CurrencyGlyph /> {fmt(stats?.totalReturnValue ?? 0)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              This month: AED {fmt(stats?.monthlyReturns ?? 0)}
+              This month: <CurrencyGlyph /> {fmt(stats?.monthlyReturns ?? 0)}
             </p>
           </CardContent>
         </Card>
@@ -658,7 +660,7 @@ export function WastageReturns() {
                     <TableHead>Type</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead className="text-right">Items</TableHead>
-                    <TableHead className="text-right">Value (AED)</TableHead>
+                    <TableHead className="text-right">Value ({currencyCode})</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Recorded By</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -771,7 +773,7 @@ export function WastageReturns() {
                           <span className="text-sm font-medium">{p.name}</span>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold">AED {fmt(p.value)}</p>
+                          <p className="text-sm font-semibold"><CurrencyGlyph /> {fmt(p.value)}</p>
                           <p className="text-xs text-muted-foreground">{p.quantity} units</p>
                         </div>
                       </div>
@@ -800,7 +802,7 @@ export function WastageReturns() {
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold">{r.count} cases</p>
-                          <p className="text-xs text-muted-foreground">AED {fmt(r.value)}</p>
+                          <p className="text-xs text-muted-foreground"><CurrencyGlyph /> {fmt(r.value)}</p>
                         </div>
                       </div>
                     ))}
@@ -985,7 +987,7 @@ export function WastageReturns() {
                     </div>
                     <div className="flex justify-between gap-8">
                       <span className="text-muted-foreground">Total Value</span>
-                      <span className="font-bold">AED {fmt(formTotalValue)}</span>
+                      <span className="font-bold"><CurrencyGlyph /> {fmt(formTotalValue)}</span>
                     </div>
                   </div>
                 </div>
@@ -1053,7 +1055,7 @@ export function WastageReturns() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Stock: {p.totalStock}</p>
-                      <p className="text-xs font-medium">AED {fmt(p.costPrice)}</p>
+                      <p className="text-xs font-medium"><CurrencyGlyph /> {fmt(p.costPrice)}</p>
                     </div>
                   </div>
                 ))
@@ -1073,7 +1075,7 @@ export function WastageReturns() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Unit Cost (AED)</Label>
+                    <Label className="text-xs">Unit Cost ({currencyCode})</Label>
                     <Input
                       type="number" min={0} step="0.01"
                       value={productUnitCost}
@@ -1092,7 +1094,7 @@ export function WastageReturns() {
                 <Alert className="py-2">
                   <Info className="h-4 w-4" />
                   <AlertDescription className="text-xs">
-                    Total cost: AED {fmt(productQty * productUnitCost)}
+                    Total cost: <CurrencyGlyph /> {fmt(productQty * productUnitCost)}
                   </AlertDescription>
                 </Alert>
               </div>
@@ -1178,7 +1180,7 @@ export function WastageReturns() {
                   </div>
                   <div className="flex justify-between gap-8">
                     <span className="text-muted-foreground">Total Value</span>
-                    <span className="font-bold">AED {fmt(viewingVoucher.totalValue)}</span>
+                    <span className="font-bold"><CurrencyGlyph /> {fmt(viewingVoucher.totalValue)}</span>
                   </div>
                 </div>
               </div>
@@ -1230,7 +1232,7 @@ export function WastageReturns() {
             <div className="space-y-4 pt-2">
               <p className="text-sm text-muted-foreground">
                 Voucher <span className="font-medium text-foreground">{approvingVoucher.voucherNumber}</span>
-                {' '}— Total value: <span className="font-medium text-foreground">AED {fmt(approvingVoucher.totalValue)}</span>
+                {' '}— Total value: <span className="font-medium text-foreground"><CurrencyGlyph /> {fmt(approvingVoucher.totalValue)}</span>
               </p>
 
               <div className="border rounded-lg p-3 space-y-1.5 text-sm bg-muted/30">

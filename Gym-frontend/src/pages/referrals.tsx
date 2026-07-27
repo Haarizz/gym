@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { referralService, type ReferralResponse, type RewardRuleResponse } from '../utils/supabase/referral-service';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -109,6 +110,7 @@ interface ReferralReward {
 }
 
 export function Referrals() {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedMember, setSelectedMember] = useState<string>('');
   const [showAddRule, setShowAddRule] = useState(false);
@@ -126,13 +128,13 @@ export function Referrals() {
   // New referral form state
   const [newReferral, setNewReferral] = useState({ referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '' });
   // New rule form state
-  const [newRule, setNewRule] = useState({ name: '', type: 'credit', value: '', unit: 'AED', eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
+  const [newRule, setNewRule] = useState({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
   const [editingReferral, setEditingReferral] = useState<ReferralResponse | null>(null);
   const [showEditReferral, setShowEditReferral] = useState(false);
   const [editReferral, setEditReferral] = useState({ referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: '', status: 'pending', notes: '' });
   const [editingRule, setEditingRule] = useState<RewardRuleResponse | null>(null);
   const [showEditRule, setShowEditRule] = useState(false);
-  const [editRule, setEditRule] = useState({ name: '', type: 'credit', value: '', unit: 'AED', eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
+  const [editRule, setEditRule] = useState({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
   const [viewingReferral, setViewingReferral] = useState<ReferralResponse | null>(null);
   const [showViewReferral, setShowViewReferral] = useState(false);
 
@@ -341,7 +343,7 @@ export function Referrals() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{referralStats.totalRewards} AED</div>
+            <div className="text-2xl font-bold text-orange-600"><CurrencyGlyph /> {referralStats.totalRewards}</div>
             <p className="text-xs text-muted-foreground">Rewards distributed</p>
           </CardContent>
         </Card>
@@ -367,7 +369,7 @@ export function Referrals() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-teal-600">{referralStats.avgRewardValue} AED</div>
+            <div className="text-2xl font-bold text-teal-600"><CurrencyGlyph /> {referralStats.avgRewardValue}</div>
             <p className="text-xs text-muted-foreground">Average per referral</p>
           </CardContent>
         </Card>
@@ -459,7 +461,7 @@ export function Referrals() {
                           {activity.status}
                         </Badge>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {activity.rewardAmount} AED
+                          <CurrencyGlyph /> {activity.rewardAmount}
                         </p>
                       </div>
                     </div>
@@ -626,11 +628,11 @@ export function Referrals() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="text-center p-2 bg-purple-50 rounded-lg">
                       <p className="text-[11px] text-muted-foreground">Total Earned</p>
-                      <p className="text-sm font-bold text-purple-600">{member.totalRewardsEarned} AED</p>
+                      <p className="text-sm font-bold text-purple-600"><CurrencyGlyph /> {member.totalRewardsEarned}</p>
                     </div>
                     <div className="text-center p-2 bg-blue-50 rounded-lg">
                       <p className="text-[11px] text-muted-foreground">Balance</p>
-                      <p className="text-sm font-bold text-blue-600">{member.rewardBalance} AED</p>
+                      <p className="text-sm font-bold text-blue-600"><CurrencyGlyph /> {member.rewardBalance}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -711,7 +713,7 @@ export function Referrals() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">{activity.rewardAmount} AED</span>
+                        <span className="font-medium"><CurrencyGlyph /> {activity.rewardAmount}</span>
                       </TableCell>
                       <TableCell>
                         {activity.signupDate || '-'}
@@ -878,14 +880,14 @@ export function Referrals() {
                     </div>
                     <div className="text-center p-4 bg-purple-50 rounded-lg">
                       <p className="text-sm text-muted-foreground">Rewards Paid</p>
-                      <p className="text-2xl font-bold text-purple-600">2,250 AED</p>
+                      <p className="text-2xl font-bold text-purple-600"><CurrencyGlyph /> 2,250</p>
                       <p className="text-xs text-green-600">+8% from last month</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <p className="text-sm text-muted-foreground">Avg. Value</p>
-                      <p className="text-2xl font-bold text-green-600">50 AED</p>
+                      <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> 50</p>
                       <p className="text-xs text-gray-600">per referral</p>
                     </div>
                     <div className="text-center p-4 bg-orange-50 rounded-lg">
@@ -922,7 +924,7 @@ export function Referrals() {
                 <Alert>
                   <Gift className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Reward Optimization:</strong> 50 AED credit shows highest conversion rate.
+                    <strong>Reward Optimization:</strong> <CurrencyGlyph /> 50 credit shows highest conversion rate.
                   </AlertDescription>
                 </Alert>
               </div>
@@ -983,7 +985,7 @@ export function Referrals() {
                   <div>
                     <Label htmlFor="maxRewards">Maximum Rewards per Member</Label>
                     <Input id="maxRewards" type="number" defaultValue="1000" className="mt-1" />
-                    <p className="text-sm text-muted-foreground mt-1">Monthly limit in AED</p>
+                    <p className="text-sm text-muted-foreground mt-1">Monthly limit in <CurrencyGlyph /></p>
                   </div>
 
                   <div>
@@ -995,7 +997,7 @@ export function Referrals() {
                   <div>
                     <Label htmlFor="minAmount">Minimum Transaction Amount</Label>
                     <Input id="minAmount" type="number" defaultValue="100" className="mt-1" />
-                    <p className="text-sm text-muted-foreground mt-1">Minimum AED amount to trigger rewards</p>
+                    <p className="text-sm text-muted-foreground mt-1">Minimum <CurrencyGlyph /> amount to trigger rewards</p>
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -1068,7 +1070,7 @@ export function Referrals() {
                 <div><Label className="text-xs text-muted-foreground">Email</Label><p className="text-sm">{viewingReferral.refereeEmail || '—'}</p></div>
                 <div><Label className="text-xs text-muted-foreground">Phone</Label><p className="text-sm">{viewingReferral.refereePhone || '—'}</p></div>
                 <div><Label className="text-xs text-muted-foreground">Status</Label><Badge className={getStatusColor(viewingReferral.status)}>{viewingReferral.status}</Badge></div>
-                <div><Label className="text-xs text-muted-foreground">Reward</Label><p className="font-medium">{viewingReferral.rewardAmount || 0} AED</p></div>
+                <div><Label className="text-xs text-muted-foreground">Reward</Label><p className="font-medium"><CurrencyGlyph /> {viewingReferral.rewardAmount || 0}</p></div>
                 <div><Label className="text-xs text-muted-foreground">Referral Code</Label><p className="text-sm font-mono">{viewingReferral.referralCode}</p></div>
                 <div><Label className="text-xs text-muted-foreground">Date</Label><p className="text-sm">{viewingReferral.date || viewingReferral.createdAt}</p></div>
               </div>
@@ -1248,7 +1250,7 @@ export function Referrals() {
             </div>
             <div>
               <Label>Unit</Label>
-              <Input placeholder="AED / % / session" className="mt-1" value={newRule.unit} onChange={e => setNewRule(p => ({ ...p, unit: e.target.value }))} />
+              <Input placeholder={`${currencyCode} / % / session`} className="mt-1" value={newRule.unit} onChange={e => setNewRule(p => ({ ...p, unit: e.target.value }))} />
             </div>
             <div>
               <Label>Eligibility</Label>
@@ -1288,7 +1290,7 @@ export function Referrals() {
                 try {
                   await referralService.createRule({ name: newRule.name, type: newRule.type, value: Number(newRule.value), unit: newRule.unit, eligibility: newRule.eligibility, conditionTrigger: newRule.conditionTrigger, expiryDays: Number(newRule.expiryDays), isActive: true });
                   toast.success('Reward Rule Created!', { description: 'The new reward rule has been added.' });
-                  setNewRule({ name: '', type: 'credit', value: '', unit: 'AED', eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
+                  setNewRule({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
                   setShowAddRule(false);
                   await loadData();
                 } catch { toast.error('Failed to create rule'); }

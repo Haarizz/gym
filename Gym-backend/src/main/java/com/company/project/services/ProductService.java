@@ -111,8 +111,8 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public ProductsPageResponseDTO getProducts(String search, Long categoryId, String status,
-                                               int page, int size) {
-        Specification<Product> spec = buildSpec(search, categoryId, status);
+                                               Boolean enabledForPos, int page, int size) {
+        Specification<Product> spec = buildSpec(search, categoryId, status, enabledForPos);
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Product> productPage = productRepository.findAll(spec, pageable);
 
@@ -295,6 +295,7 @@ public class ProductService {
         copy.setHasVariants(original.getHasVariants());
         copy.setHasRecipe(original.getHasRecipe());
         copy.setIsManufactured(original.getIsManufactured());
+        copy.setEnabledForPos(original.getEnabledForPos());
         copy.setImageUrls(original.getImageUrls());
         copy.setBarcode(original.getBarcode());
         copy.setBarcodeTemplate(original.getBarcodeTemplate());
@@ -336,6 +337,7 @@ public class ProductService {
         if (req.getHasVariants() != null) product.setHasVariants(req.getHasVariants());
         if (req.getHasRecipe() != null) product.setHasRecipe(req.getHasRecipe());
         if (req.getIsManufactured() != null) product.setIsManufactured(req.getIsManufactured());
+        if (req.getEnabledForPos() != null) product.setEnabledForPos(req.getEnabledForPos());
         if (req.getImageUrls() != null) product.setImageUrls(req.getImageUrls());
         if (req.getBarcode() != null) product.setBarcode(req.getBarcode());
         if (req.getBarcodeTemplate() != null) product.setBarcodeTemplate(req.getBarcodeTemplate());
@@ -392,7 +394,7 @@ public class ProductService {
         return false;
     }
 
-    private Specification<Product> buildSpec(String search, Long categoryId, String status) {
+    private Specification<Product> buildSpec(String search, Long categoryId, String status, Boolean enabledForPos) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -416,6 +418,10 @@ public class ProductService {
                     predicates.add(cb.isFalse(root.get("isActive")));
                 }
                 // out-of-stock filtering is done post-query via stock data
+            }
+
+            if (Boolean.TRUE.equals(enabledForPos)) {
+                predicates.add(cb.isTrue(root.get("enabledForPos")));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

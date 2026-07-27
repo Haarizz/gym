@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { CurrencyGlyph } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -163,7 +164,7 @@ interface FollowUpReport {
 }
 
 export function MemberConnectReports() {
-  const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('month');
   const [selectedCampaignType, setSelectedCampaignType] = useState('all');
   const [selectedChannel, setSelectedChannel] = useState('all');
@@ -892,11 +893,11 @@ export function MemberConnectReports() {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">AED {analytics.totalRevenue.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {analytics.totalRevenue.toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground">Total Revenue</p>
                   </div>
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">AED {analytics.totalCost.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-blue-600"><CurrencyGlyph /> {analytics.totalCost.toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground">Total Cost</p>
                   </div>
                 </div>
@@ -1261,12 +1262,12 @@ export function MemberConnectReports() {
               <CardContent>
                 <div className="text-center">
                   <p className="text-3xl font-bold text-purple-600">
-                    AED {referralReports.reduce((sum, r) => sum + r.rewardGiven, 0)}
+                    <CurrencyGlyph /> {referralReports.reduce((sum, r) => sum + r.rewardGiven, 0)}
                   </p>
                   <p className="text-sm text-muted-foreground">Total rewards</p>
                   <div className="mt-4">
                     <p className="text-sm">
-                      <span className="font-medium">AED {referralReports.reduce((sum, r) => sum + r.membershipValue, 0).toLocaleString()}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {referralReports.reduce((sum, r) => sum + r.membershipValue, 0).toLocaleString()}</span>
                       <span className="text-muted-foreground"> revenue generated</span>
                     </p>
                   </div>
@@ -1316,7 +1317,7 @@ export function MemberConnectReports() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">AED {referral.rewardGiven}</span>
+                        <span className="font-medium"><CurrencyGlyph /> {referral.rewardGiven}</span>
                       </TableCell>
                       <TableCell>
                         {referral.conversionDate ? (
@@ -1326,7 +1327,7 @@ export function MemberConnectReports() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">AED {referral.membershipValue.toLocaleString()}</span>
+                        <span className="font-medium"><CurrencyGlyph /> {referral.membershipValue.toLocaleString()}</span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1594,11 +1595,11 @@ export function MemberConnectReports() {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="text-center p-4 bg-red-50 dark:bg-red-950 rounded-lg">
-                        <p className="text-2xl font-bold text-red-600">AED {selectedCampaign.cost}</p>
+                        <p className="text-2xl font-bold text-red-600"><CurrencyGlyph /> {selectedCampaign.cost}</p>
                         <p className="text-sm text-muted-foreground">Total Cost</p>
                       </div>
                       <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-                        <p className="text-2xl font-bold text-green-600">AED {selectedCampaign.revenue}</p>
+                        <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {selectedCampaign.revenue}</p>
                         <p className="text-sm text-muted-foreground">Revenue Generated</p>
                       </div>
                       <div className="text-center p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCurrency, CurrencyValue } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -224,15 +225,12 @@ const highValueAssets = [
 ];
 
 export function Assets() {
+  const { currencyCode } = useCurrency();
   const getCurrentPeriod = () => {
-    return new Date().toLocaleDateString('en-GB', { 
-      month: 'long', 
-      year: 'numeric' 
+    return new Date().toLocaleDateString('en-GB', {
+      month: 'long',
+      year: 'numeric'
     });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString()} AED`;
   };
 
   const getStatusColor = (status: string) => {
@@ -310,7 +308,7 @@ export function Assets() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Asset Value</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(kpiData.totalAssetValue)}
+                  <CurrencyValue amount={kpiData.totalAssetValue} />
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
@@ -432,7 +430,7 @@ export function Assets() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({name, value}) => `${name}: ${(value/1000).toFixed(0)}K AED`}
+                  label={({name, value}) => `${name}: ${(value/1000).toFixed(0)}K ${currencyCode}`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
@@ -441,7 +439,7 @@ export function Assets() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`${(value/1000).toFixed(0)}K AED`, 'Value']} />
+                <Tooltip formatter={(value) => [`${(value/1000).toFixed(0)}K ${currencyCode}`, 'Value']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -547,7 +545,7 @@ export function Assets() {
                       <TableCell>
                         {new Date(asset.date).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell>{formatCurrency(asset.value)}</TableCell>
+                      <TableCell><CurrencyValue amount={asset.value} /></TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(asset.status)}>
                           {asset.status}
@@ -618,7 +616,7 @@ export function Assets() {
                       <TableCell>
                         {new Date(transaction.requestedDate).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell>{formatCurrency(transaction.estimatedValue)}</TableCell>
+                      <TableCell><CurrencyValue amount={transaction.estimatedValue} /></TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(transaction.status)}>
                           {transaction.status}
@@ -693,7 +691,7 @@ export function Assets() {
                       <TableCell>
                         {new Date(maintenance.lastMaintenance).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell>{formatCurrency(maintenance.cost)}</TableCell>
+                      <TableCell><CurrencyValue amount={maintenance.cost} /></TableCell>
                       <TableCell>
                         <Badge className={getPriorityColor(maintenance.priority)}>
                           {maintenance.priority}
@@ -764,9 +762,9 @@ export function Assets() {
                       <TableCell>
                         {new Date(asset.purchaseDate).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell>{formatCurrency(asset.originalValue)}</TableCell>
+                      <TableCell><CurrencyValue amount={asset.originalValue} /></TableCell>
                       <TableCell className="font-semibold text-green-600">
-                        {formatCurrency(asset.currentValue)}
+                        <CurrencyValue amount={asset.currentValue} />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">

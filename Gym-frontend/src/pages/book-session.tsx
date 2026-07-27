@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import { CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -247,7 +248,7 @@ interface BookSessionProps {
 }
 
 export function BookSession({ onNavigate }: BookSessionProps = {}) {
-  const location = useLocation();
+    const location = useLocation();
   const navMemberId: number | null = (location.state as any)?.memberId ?? null;
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -720,7 +721,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                               </div>
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-600">Price:</span>
-                                <span className="font-semibold">AED {trainer.price}/session</span>
+                                <span className="font-semibold"><CurrencyGlyph /> {trainer.price}/session</span>
                               </div>
                             </div>
                           </div>
@@ -747,7 +748,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                           <p className="text-sm text-gray-600">{selectedTrainer.specialization}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold">AED {selectedTrainer.price}</p>
+                          <p className="font-semibold"><CurrencyGlyph /> {selectedTrainer.price}</p>
                           <p className="text-sm text-gray-600">per session</p>
                         </div>
                       </div>
@@ -894,7 +895,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                           <DollarSign className="h-5 w-5 text-[#327F74] mt-0.5" />
                           <div>
                             <p className="text-sm text-gray-600">Price</p>
-                            <p className="font-semibold">AED {selectedSlot?.price ?? selectedTrainer?.price ?? "—"}</p>
+                            <p className="font-semibold"><CurrencyGlyph /> {selectedSlot?.price ?? selectedTrainer?.price ?? "—"}</p>
                           </div>
                         </div>
                       </div>
@@ -939,7 +940,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                               <Wallet className="h-5 w-5 text-[#327F74]" />
                               <div>
                                 <p className="font-semibold">Wallet</p>
-                                <p className="text-sm text-gray-600">Balance: AED 500</p>
+                                <p className="text-sm text-gray-600">Balance: <CurrencyGlyph /> 500</p>
                               </div>
                             </div>
                             {paymentMethod === 'wallet' && (
@@ -959,7 +960,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                               <CreditCard className="h-5 w-5 text-[#327F74]" />
                               <div>
                                 <p className="font-semibold">Credit/Debit Card</p>
-                                <p className="text-sm text-gray-600">Pay AED {selectedTrainer.price}</p>
+                                <p className="text-sm text-gray-600">Pay <CurrencyGlyph /> {selectedTrainer.price}</p>
                               </div>
                             </div>
                             {paymentMethod === 'card' && (
@@ -1053,7 +1054,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                               </div>
                               <div className="flex items-center gap-2 text-sm">
                                 <DollarSign className="h-4 w-4 text-gray-500" />
-                                <span>AED {session.price}</span>
+                                <span><CurrencyGlyph /> {session.price}</span>
                               </div>
                             </div>
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { useLocation } from "react-router-dom";
 import { staffService, Staff, StaffTarget } from '../utils/supabase/staff-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -67,6 +68,7 @@ interface SetTargetsProps {
 }
 
 export function SetTargets({ onNavigate }: SetTargetsProps) {
+  const { currencyCode } = useCurrency();
   const location = useLocation();
   const preselectedStaffId: string | undefined = (location.state as any)?.staffId;
 
@@ -430,11 +432,11 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                 <DollarSign className="h-5 w-5 mr-2 text-primary" />
                 Revenue Target
               </CardTitle>
-              <CardDescription>Set the revenue target amount in AED</CardDescription>
+              <CardDescription>Set the revenue target amount in <CurrencyGlyph /></CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <Label>Target Amount (AED)</Label>
+                <Label>Target Amount ({currencyCode})</Label>
                 <Input
                   type="number"
                   placeholder="e.g. 10000"
@@ -597,7 +599,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                 <div className="flex items-center space-x-2 mt-1">
                   <DollarSign className="h-4 w-4 text-primary" />
                   <span className="font-medium text-lg">
-                    AED {formData.revenueTarget.toLocaleString()}
+                    <CurrencyGlyph /> {formData.revenueTarget.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -657,8 +659,8 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                         </Badge>
                       </div>
                       <div className="text-xs text-muted-foreground flex justify-between">
-                        <span>Target: AED {(t.revenue_target || 0).toLocaleString()}</span>
-                        <span>Achieved: AED {(t.revenue_achieved || 0).toLocaleString()}</span>
+                        <span>Target: <CurrencyGlyph /> {(t.revenue_target || 0).toLocaleString()}</span>
+                        <span>Achieved: <CurrencyGlyph /> {(t.revenue_achieved || 0).toLocaleString()}</span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-1.5">
                         <div

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useCurrency } from "../utils/currency";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -123,13 +124,14 @@ const riskClassMap: Record<RiskAsset["risk"], string> = {
   low: "bg-emerald-100 text-emerald-800 border-emerald-200",
 };
 
-const formatAED = (value: number) =>
-  new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 }).format(value);
+const formatAmount = (value: number, currencyCode: string) =>
+  new Intl.NumberFormat(undefined, { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(value);
 
-const formatCompactAED = (value: number) =>
-  `AED ${Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value)}`;
+const formatCompactAmount = (value: number, currencyCode: string) =>
+  `${currencyCode} ${Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value)}`;
 
 export function AssetAnalytics() {
+  const { currencyCode } = useCurrency();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -407,7 +409,7 @@ export function AssetAnalytics() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-700">{formatCompactAED(stats.maintenanceSpend)}</div>
+            <div className="text-2xl font-bold text-amber-700">{formatCompactAmount(stats.maintenanceSpend, currencyCode)}</div>
             <p className="text-xs text-muted-foreground">Current run-rate for visible branches</p>
           </CardContent>
         </Card>
@@ -467,7 +469,7 @@ export function AssetAnalytics() {
                     <XAxis dataKey="month" />
                     <YAxis yAxisId="left" tickFormatter={(value) => `${Math.round(value / 1000000)}M`} />
                     <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${Math.round(value / 1000)}K`} />
-                    <Tooltip formatter={(value: number) => formatAED(value)} />
+                    <Tooltip formatter={(value: number) => formatAmount(value, currencyCode)} />
                     <Legend />
                     <Area yAxisId="left" type="monotone" dataKey="bookValue" stroke="#2563eb" fill="url(#bookValueFill)" name="Book Value" />
                     <Line yAxisId="left" type="monotone" dataKey="replacementValue" stroke="#22c55e" strokeWidth={2.5} name="Replacement Value" />
@@ -588,7 +590,7 @@ export function AssetAnalytics() {
                     </div>
                     <div className="rounded-lg bg-slate-50 p-3">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Spend</p>
-                      <p className="mt-1 font-semibold">{formatCompactAED(item.maintenanceCost)}</p>
+                      <p className="mt-1 font-semibold">{formatCompactAmount(item.maintenanceCost, currencyCode)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -621,7 +623,7 @@ export function AssetAnalytics() {
                       <TableCell>{item.utilization}%</TableCell>
                       <TableCell>{item.roi}%</TableCell>
                       <TableCell>{item.downtime}%</TableCell>
-                      <TableCell>{formatAED(item.maintenanceCost)}</TableCell>
+                      <TableCell>{formatAmount(item.maintenanceCost, currencyCode)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -746,7 +748,7 @@ export function AssetAnalytics() {
                     </div>
                     <div className="rounded-lg bg-slate-50 p-3">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Maintenance</p>
-                      <p className="mt-1 text-lg font-semibold">{formatCompactAED(branch.maintenanceCost)}</p>
+                      <p className="mt-1 text-lg font-semibold">{formatCompactAmount(branch.maintenanceCost, currencyCode)}</p>
                     </div>
                     <div className="rounded-lg bg-slate-50 p-3">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Incidents</p>

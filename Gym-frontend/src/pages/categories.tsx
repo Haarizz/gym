@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -90,7 +91,7 @@ function typeBadge(type: string) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function Categories() {
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
+    const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
   const [search, setSearch]         = useState("");
@@ -140,7 +141,7 @@ export function Categories() {
     return matchSearch && matchType;
   }), [categories, search, typeFilter]);
 
-  const typeUnique = Array.from(new Set(categories.map(c => c.categoryType)));
+  const typeUnique = Array.from(new Set(categories.map(c => c.categoryType).filter(t => t && t.trim() !== "")));
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -527,7 +528,7 @@ export function Categories() {
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate">{p.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{p.sku}</p>
-                      <p className="text-xs text-muted-foreground">AED {p.sellingPrice.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground"><CurrencyGlyph /> {p.sellingPrice.toFixed(2)}</p>
                     </div>
                   </div>
                 ))}

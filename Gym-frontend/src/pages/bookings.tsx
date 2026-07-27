@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -70,6 +71,7 @@ interface Booking {
 
 
 export function Bookings({ onNavigate }: BookingsProps) {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -402,7 +404,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
       `Time: ${booking.time}`,
       `Type: ${booking.type}`,
       `Status: ${booking.status}`,
-      `Price: ${booking.price} AED`,
+      `Price: ${currencyCode} ${booking.price}`,
       `Code: ${booking.qrCode || booking.id}`,
     ];
     if (booking.isGuest && booking.guestDetails) {
@@ -654,7 +656,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold text-lg" style={{ color: '#2B7A78' }}>{cls.price} AED</div>
+                            <div className="font-semibold text-lg" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {cls.price}</div>
                           </div>
                         </div>
                       </div>
@@ -709,7 +711,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                         </div>
                         <div className="flex justify-between items-center border-t pt-3">
                           <span className="font-medium">Total Amount:</span>
-                          <span className="text-xl font-bold" style={{ color: '#2B7A78' }}>{selectedClass.price} AED</span>
+                          <span className="text-xl font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {selectedClass.price}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -1260,7 +1262,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     </div>
                     
                     <div className="flex items-center justify-between pt-3 border-t">
-                      <span className="text-xl font-bold text-primary">{cls.price} AED</span>
+                      <span className="text-xl font-bold text-primary"><CurrencyGlyph /> {cls.price}</span>
                       <Button 
                         size="sm" 
                         className="btn-primary"
@@ -1379,7 +1381,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                           </div>
                         </td>
                         <td className="px-3 py-2">
-                          <span className="text-sm font-medium text-primary">{booking.price} AED</span>
+                          <span className="text-sm font-medium text-primary"><CurrencyGlyph /> {booking.price}</span>
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-col gap-1">

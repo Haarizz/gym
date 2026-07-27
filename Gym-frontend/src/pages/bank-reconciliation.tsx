@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   bankReconciliationService,
   BankReconciliation as ApiReconciliation,
   BankReconciliationCreateRequest,
   BankStatementLine,
 } from "../utils/supabase/bank-reconciliation-service";
-import { accountHeadsService, AccountHead as ApiAccountHead } from "../utils/supabase/account-heads-service";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -69,8 +69,8 @@ interface BankTransaction {
 interface BankAccount {
   id: string;
   name: string;
-  code: string;
-  currentBalance: number;
+  accountNumber: string;
+  bank: string;
 }
 
 interface LineForm {
@@ -91,7 +91,11 @@ interface ReconciliationForm {
   lines: LineForm[];
 }
 
-const FALLBACK_ACCOUNT: BankAccount = { id: "1001", name: "Cash at Bank", code: "1001", currentBalance: 0 };
+const PREDEFINED_ACCOUNTS: BankAccount[] = [
+  { id: "BANK001", name: "Emirates NBD Current", accountNumber: "****-4521", bank: "Emirates NBD" },
+  { id: "BANK002", name: "ADCB Business Account", accountNumber: "****-8967", bank: "ADCB" },
+  { id: "BANK003", name: "FAB Operational Account", accountNumber: "****-1234", bank: "FAB" },
+];
 
 const emptyLine: LineForm = {
   transactionDate: new Date().toISOString().split("T")[0],
@@ -102,7 +106,7 @@ const emptyLine: LineForm = {
 };
 
 const emptyForm: ReconciliationForm = {
-  bankAccountName: "",
+  bankAccountName: PREDEFINED_ACCOUNTS[0].name,
   statementDate: new Date().toISOString().split("T")[0],
   openingBalance: "",
   closingBalance: "",
@@ -119,8 +123,8 @@ function formatDate(dateStr?: string) {
 }
 
 export function BankReconciliation() {
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<BankAccount>(FALLBACK_ACCOUNT);
+  const { currencyCode } = useCurrency();
+  const [selectedAccount, setSelectedAccount] = useState<BankAccount>(PREDEFINED_ACCOUNTS[0]);
   const [allReconciliations, setAllReconciliations] = useState<ApiReconciliation[]>([]);
   const [currentReconciliation, setCurrentReconciliation] = useState<ApiReconciliation | null>(null);
   const [allTransactions, setAllTransactions] = useState<BankTransaction[]>([]);
@@ -168,25 +172,6 @@ export function BankReconciliation() {
       matchedBy: line.matchedVoucherNo ? "System" : undefined,
       matchedDate: line.isMatched ? line.transactionDate : undefined,
     }));
-
-  // Load real bank/cash account heads on mount
-  useEffect(() => {
-    accountHeadsService.getBankAccounts().then(accounts => {
-      if (accounts.length === 0) return;
-      const mapped: BankAccount[] = accounts.map(a => ({
-        id: a.code,
-        name: a.name,
-        code: a.code,
-        currentBalance: a.currentBalance ?? 0,
-      }));
-      setBankAccounts(mapped);
-      setSelectedAccount(mapped[0]);
-      // Pre-fill systemBalance in form with the first account's live balance
-      setForm(f => ({ ...f, bankAccountName: mapped[0].name, systemBalance: String(mapped[0].currentBalance) }));
-    }).catch(() => {
-      // If account heads aren't set up yet, continue without them
-    });
-  }, []);
 
   const loadReconciliations = useCallback(async () => {
     setLoadingData(true);
@@ -340,31 +325,8 @@ export function BankReconciliation() {
     }
   };
 
-  const handleAutoMatch = async () => {
-    if (!currentReconciliation) { toast.error("No active reconciliation selected"); return; }
-    const unmatched = currentReconciliation.lines.filter(l => !l.isMatched);
-    if (unmatched.length === 0) { toast.info("All lines are already matched"); return; }
-
-    let matched = 0;
-    for (const line of unmatched) {
-      // Match by reference if it looks like a voucher number
-      const ref = line.reference?.trim();
-      if (ref && (ref.startsWith("JV-") || ref.startsWith("RV-") || ref.startsWith("PV-") || ref.startsWith("RCPT-") || ref.startsWith("TXN-"))) {
-        try {
-          await bankReconciliationService.matchLine(currentReconciliation.id, line.id, ref);
-          matched++;
-        } catch {
-          // Skip lines that fail to match
-        }
-      }
-    }
-
-    if (matched > 0) {
-      toast.success(`Auto-matched ${matched} transaction${matched > 1 ? "s" : ""} by reference`);
-      await loadReconciliations();
-    } else {
-      toast.info("No transactions could be auto-matched. Use manual matching with voucher numbers.");
-    }
+  const handleAutoMatch = () => {
+    toast.info("Auto-match requires manual review of individual transactions");
   };
 
   const handleExport = (format: string) => {
@@ -391,11 +353,7 @@ export function BankReconciliation() {
   };
 
   const openCreate = () => {
-    setForm({
-      ...emptyForm,
-      bankAccountName: selectedAccount.name,
-      systemBalance: String(selectedAccount.currentBalance),
-    });
+    setForm({ ...emptyForm, bankAccountName: selectedAccount.name });
     setShowCreateDialog(true);
   };
 
@@ -518,18 +476,11 @@ export function BankReconciliation() {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Bank Account Name *</Label>
-          <Select value={form.bankAccountName} onValueChange={v => {
-            const acct = bankAccounts.find(a => a.name === v);
-            setForm(f => ({
-              ...f,
-              bankAccountName: v,
-              systemBalance: acct ? String(acct.currentBalance) : f.systemBalance,
-            }));
-          }}>
-            <SelectTrigger className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20"><SelectValue placeholder="Select bank account" /></SelectTrigger>
+          <Select value={form.bankAccountName} onValueChange={v => setForm(f => ({ ...f, bankAccountName: v }))}>
+            <SelectTrigger className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {bankAccounts.map(a => (
-                <SelectItem key={a.id} value={a.name}>{a.code} — {a.name}</SelectItem>
+              {PREDEFINED_ACCOUNTS.map(a => (
+                <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -550,8 +501,8 @@ export function BankReconciliation() {
           <Input type="number" step="0.01" value={form.closingBalance} onChange={e => setForm(f => ({ ...f, closingBalance: e.target.value }))} placeholder="0.00" className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
         </div>
         <div className="space-y-2">
-          <Label>System / Ledger Balance <span className="text-xs text-muted-foreground">(from account head)</span></Label>
-          <Input type="number" step="0.01" value={form.systemBalance} readOnly className="border-0 bg-muted/40 cursor-not-allowed" title="Auto-populated from the selected account head's current balance" />
+          <Label>System / Ledger Balance</Label>
+          <Input type="number" step="0.01" value={form.systemBalance} onChange={e => setForm(f => ({ ...f, systemBalance: e.target.value }))} placeholder="0.00" className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
         </div>
       </div>
 
@@ -709,16 +660,16 @@ export function BankReconciliation() {
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gymbios-primary">Bank Account</Label>
               <Select value={selectedAccount.id} onValueChange={(value) => {
-                const account = bankAccounts.find(acc => acc.id === value);
+                const account = PREDEFINED_ACCOUNTS.find(acc => acc.id === value);
                 if (account) setSelectedAccount(account);
               }}>
                 <SelectTrigger className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20">
-                  <SelectValue placeholder={bankAccounts.length === 0 ? "Loading accounts..." : "Select account"} />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {bankAccounts.map((account) => (
+                  {PREDEFINED_ACCOUNTS.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.code} — {account.name}
+                      {account.name} • {account.accountNumber}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -824,7 +775,7 @@ export function BankReconciliation() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
-                AED {currentReconciliation ? currentReconciliation.closingBalance.toFixed(2) : "0.00"}
+                <CurrencyGlyph /> {currentReconciliation ? currentReconciliation.closingBalance.toFixed(2) : "0.00"}
               </div>
               <p className="text-xs text-gray-500 mt-1">Bank statement</p>
             </CardContent>
@@ -839,7 +790,7 @@ export function BankReconciliation() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
-                AED {currentReconciliation ? currentReconciliation.systemBalance.toFixed(2) : "0.00"}
+                <CurrencyGlyph /> {currentReconciliation ? currentReconciliation.systemBalance.toFixed(2) : "0.00"}
               </div>
               <p className="text-xs text-gray-500 mt-1">Accounting records</p>
             </CardContent>
@@ -870,7 +821,7 @@ export function BankReconciliation() {
                   ? "—"
                   : Math.abs(currentReconciliation.difference) < 0.01
                     ? "Balanced ✓"
-                    : `AED ${Math.abs(currentReconciliation.difference).toFixed(2)}`}
+                    : `${currencyCode} ${Math.abs(currentReconciliation.difference).toFixed(2)}`}
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 {!currentReconciliation ? "No reconciliation" :
@@ -994,7 +945,7 @@ export function BankReconciliation() {
                             "font-mono font-bold",
                             transaction.type === "Credit" ? "text-green-600" : "text-red-600"
                           )}>
-                            {transaction.type === "Credit" ? "+" : "-"}AED {Math.abs(transaction.bankAmount).toFixed(2)}
+                            {transaction.type === "Credit" ? "+" : "-"}<CurrencyGlyph /> {Math.abs(transaction.bankAmount).toFixed(2)}
                           </div>
                         </TableCell>
                         <TableCell className="px-6 py-4">
@@ -1102,14 +1053,14 @@ export function BankReconciliation() {
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-700 font-medium mb-1">Total Debits</p>
                 <p className="text-2xl font-bold text-blue-900 font-mono">
-                  AED {filteredAndSortedTransactions.filter(t => t.type === "Debit").reduce((s, t) => s + t.bankAmount, 0).toFixed(2)}
+                  <CurrencyGlyph /> {filteredAndSortedTransactions.filter(t => t.type === "Debit").reduce((s, t) => s + t.bankAmount, 0).toFixed(2)}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">{filteredAndSortedTransactions.filter(t => t.type === "Debit").length} transactions</p>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <p className="text-sm text-green-700 font-medium mb-1">Total Credits</p>
                 <p className="text-2xl font-bold text-green-900 font-mono">
-                  AED {filteredAndSortedTransactions.filter(t => t.type === "Credit").reduce((s, t) => s + t.bankAmount, 0).toFixed(2)}
+                  <CurrencyGlyph /> {filteredAndSortedTransactions.filter(t => t.type === "Credit").reduce((s, t) => s + t.bankAmount, 0).toFixed(2)}
                 </p>
                 <p className="text-xs text-green-600 mt-1">{filteredAndSortedTransactions.filter(t => t.type === "Credit").length} transactions</p>
               </div>
@@ -1204,7 +1155,7 @@ export function BankReconciliation() {
                           "text-lg font-bold font-mono mt-1",
                           selectedTransaction.type === "Credit" ? "text-green-600" : "text-red-600"
                         )}>
-                          {selectedTransaction.type === "Credit" ? "+" : "-"}AED {Math.abs(selectedTransaction.bankAmount).toFixed(2)}
+                          {selectedTransaction.type === "Credit" ? "+" : "-"}<CurrencyGlyph /> {Math.abs(selectedTransaction.bankAmount).toFixed(2)}
                         </div>
                       </div>
                       <div>

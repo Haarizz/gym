@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -66,6 +67,7 @@ function emptyRecipeForm(): RecipeRequest & { _items: IngredientRow[] } {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ProductionRecipe() {
+  const { currencyCode } = useCurrency();
   // data
   const [recipes, setRecipes]           = useState<Recipe[]>([]);
   const [orders, setOrders]             = useState<ProductionOrder[]>([]);
@@ -374,7 +376,7 @@ export function ProductionRecipe() {
     <tbody>${r.items.map(i => `<tr><td>${i.productName}</td><td>${i.sku}</td>
     <td>${i.quantity} ${i.unit}</td><td>${fmt(i.unitCost)}</td>
     <td>${fmt(i.quantity * i.unitCost)}</td></tr>`).join('')}</tbody></table>
-    <p><b>Estimated Cost:</b> AED ${fmt(r.estimatedCost)}</p>
+    <p><b>Estimated Cost:</b> ${currencyCode} ${fmt(r.estimatedCost)}</p>
     </body></html>`);
     win.document.close(); win.print();
   }
@@ -394,7 +396,7 @@ export function ProductionRecipe() {
     <table><thead><tr><th>Product</th><th>SKU</th><th>Required Qty</th><th>Unit</th></tr></thead>
     <tbody>${o.ingredients.map(i => `<tr><td>${i.productName}</td><td>${i.sku}</td>
     <td>${i.quantity}</td><td>${i.unit}</td></tr>`).join('')}</tbody></table>
-    <p><b>Total Ingredient Cost:</b> AED ${fmt(o.totalIngredientCost)}</p>
+    <p><b>Total Ingredient Cost:</b> ${currencyCode} ${fmt(o.totalIngredientCost)}</p>
     </body></html>`);
     win.document.close(); win.print();
   }
@@ -617,7 +619,7 @@ export function ProductionRecipe() {
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Est. Cost</p>
-                        <p className="font-medium text-orange-600">AED {fmt(r.estimatedCost)}</p>
+                        <p className="font-medium text-orange-600"><CurrencyGlyph /> {fmt(r.estimatedCost)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Ingredients</p>
@@ -702,7 +704,7 @@ export function ProductionRecipe() {
                     <TableHead>Recipe</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead>Scheduled</TableHead>
-                    <TableHead className="text-right">Cost (AED)</TableHead>
+                    <TableHead className="text-right">Cost ({currencyCode})</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Output Product</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -925,7 +927,7 @@ export function ProductionRecipe() {
                   <div className="bg-muted rounded-lg px-4 py-2 text-sm">
                     <div className="flex justify-between gap-8">
                       <span className="text-muted-foreground">Estimated Cost (per batch)</span>
-                      <span className="font-bold">AED {fmt(formEstimatedCost)}</span>
+                      <span className="font-bold"><CurrencyGlyph /> {fmt(formEstimatedCost)}</span>
                     </div>
                   </div>
                 </div>
@@ -980,7 +982,7 @@ export function ProductionRecipe() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">Stock: {p.totalStock}</p>
-                    <p className="text-xs font-medium">AED {fmt(p.costPrice)}</p>
+                    <p className="text-xs font-medium"><CurrencyGlyph /> {fmt(p.costPrice)}</p>
                   </div>
                 </div>
               ))}
@@ -999,7 +1001,7 @@ export function ProductionRecipe() {
                     <Input value={ingUnit} onChange={e => setIngUnit(e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Unit Cost (AED)</Label>
+                    <Label className="text-xs">Unit Cost ({currencyCode})</Label>
                     <Input type="number" min={0} step="0.01" value={ingUnitCost}
                       onChange={e => setIngUnitCost(Number(e.target.value))} />
                   </div>
@@ -1065,7 +1067,7 @@ export function ProductionRecipe() {
                 <div className="bg-muted rounded-lg px-4 py-2 text-sm">
                   <div className="flex justify-between gap-8">
                     <span className="text-muted-foreground">Estimated Cost per Batch</span>
-                    <span className="font-bold text-orange-600">AED {fmt(viewingRecipe.estimatedCost)}</span>
+                    <span className="font-bold text-orange-600"><CurrencyGlyph /> {fmt(viewingRecipe.estimatedCost)}</span>
                   </div>
                 </div>
               </div>
@@ -1106,7 +1108,7 @@ export function ProductionRecipe() {
               <div className="bg-muted/50 border rounded-lg p-3 text-sm space-y-1">
                 <p className="font-medium">{selectedRecipeForOrder.name}</p>
                 <p className="text-muted-foreground">Base batch: {selectedRecipeForOrder.outputQuantity} {selectedRecipeForOrder.outputUnit} · {selectedRecipeForOrder.items.length} ingredients</p>
-                <p className="text-muted-foreground">Est. cost per batch: AED {fmt(selectedRecipeForOrder.estimatedCost)}</p>
+                <p className="text-muted-foreground">Est. cost per batch: <CurrencyGlyph /> {fmt(selectedRecipeForOrder.estimatedCost)}</p>
               </div>
             )}
 
@@ -1149,7 +1151,7 @@ export function ProductionRecipe() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
                 <p className="font-medium text-blue-800 mb-1">Estimated cost for this run</p>
                 <p className="text-blue-700 font-bold">
-                  AED {fmt(
+                  <CurrencyGlyph /> {fmt(
                     selectedRecipeForOrder.estimatedCost *
                     (orderForm.quantityToProduce / selectedRecipeForOrder.outputQuantity)
                   )}
@@ -1227,7 +1229,7 @@ export function ProductionRecipe() {
                 <div className="bg-muted rounded-lg px-4 py-2 text-sm">
                   <div className="flex justify-between gap-8">
                     <span className="text-muted-foreground">Total Ingredient Cost</span>
-                    <span className="font-bold">AED {fmt(viewingOrder.totalIngredientCost)}</span>
+                    <span className="font-bold"><CurrencyGlyph /> {fmt(viewingOrder.totalIngredientCost)}</span>
                   </div>
                 </div>
               </div>

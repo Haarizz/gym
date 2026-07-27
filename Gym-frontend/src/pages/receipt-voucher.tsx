@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useCurrency, CurrencyValue } from '../utils/currency';
 import { toast } from 'sonner';
 import { receiptVoucherService, type ReceiptVoucher as RVType } from '../utils/supabase/receipt-voucher-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -151,6 +152,7 @@ const membersData = [
 ];
 
 export function ReceiptVoucher() {
+  const { currencyCode } = useCurrency();
   const [receipts, setReceipts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -231,9 +233,9 @@ export function ReceiptVoucher() {
   const [editForm, setEditForm] = useState({ ...emptyForm });
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-AE', {
+    return new Intl.NumberFormat(undefined, {
       style: 'currency',
-      currency: 'AED',
+      currency: currencyCode,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -624,7 +626,7 @@ export function ReceiptVoucher() {
         </div>
 
         <div className="print-amount">
-          {selectedReceipt ? formatCurrency(selectedReceipt.amount) : 'AED 0'}
+          {selectedReceipt ? formatCurrency(selectedReceipt.amount) : `${currencyCode} 0`}
         </div>
 
         <div className="print-card">
@@ -720,7 +722,7 @@ export function ReceiptVoucher() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-700">{formatCurrency(todayTotal)}</div>
+              <div className="text-2xl font-bold text-blue-700"><CurrencyValue amount={todayTotal} /></div>
               <p className="text-xs text-muted-foreground mt-1">{completedToday} transactions</p>
             </CardContent>
           </Card>
@@ -733,7 +735,7 @@ export function ReceiptVoucher() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-700">{formatCurrency(thisMonthTotal)}</div>
+              <div className="text-2xl font-bold text-green-700"><CurrencyValue amount={thisMonthTotal} /></div>
               <p className="text-xs text-muted-foreground mt-1">
                 {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
               </p>
@@ -748,7 +750,7 @@ export function ReceiptVoucher() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-amber-700">{formatCurrency(pendingAmount)}</div>
+              <div className="text-2xl font-bold text-amber-700"><CurrencyValue amount={pendingAmount} /></div>
               <p className="text-xs text-muted-foreground mt-1">Awaiting payment</p>
             </CardContent>
           </Card>
@@ -787,7 +789,7 @@ export function ReceiptVoucher() {
                         <IconComponent className={`h-6 w-6 ${source.iconColor}`} />
                       </div>
                       <div className="text-sm font-medium">{source.name}</div>
-                      <div className="text-lg font-bold">{formatCurrency(sourceTotal)}</div>
+                      <div className="text-lg font-bold"><CurrencyValue amount={sourceTotal} /></div>
                       <div className="text-xs text-gray-600">{sourceReceipts.length} receipts</div>
                     </div>
                   );
@@ -997,7 +999,7 @@ export function ReceiptVoucher() {
                     <TableHead>Date</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Member</TableHead>
-                    <TableHead className="text-right">Amount (AED)</TableHead>
+                    <TableHead className="text-right">Amount ({currencyCode})</TableHead>
                     <TableHead>Payment Mode</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
@@ -1061,7 +1063,7 @@ export function ReceiptVoucher() {
                       </TableCell>
                       <TableCell className="text-right">
                         <span className="font-medium text-green-600">
-                          {formatCurrency(receipt.amount)}
+                          <CurrencyValue amount={receipt.amount} />
                         </span>
                       </TableCell>
                       <TableCell>
@@ -1231,7 +1233,7 @@ export function ReceiptVoucher() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Amount (AED) *</Label>
+                  <Label>Amount ({currencyCode}) *</Label>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -1400,7 +1402,7 @@ export function ReceiptVoucher() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Amount (AED) *</Label>
+                  <Label>Amount ({currencyCode}) *</Label>
                   <Input type="number" placeholder="0.00" value={editForm.amount} onChange={(e) => setEditForm({...editForm, amount: e.target.value})} />
                 </div>
                 <div className="space-y-2">
@@ -1500,7 +1502,7 @@ export function ReceiptVoucher() {
                   <div className="grid grid-cols-2 gap-4">
                     <Card className="border-primary/10 shadow-sm">
                       <CardContent className="p-4 text-center">
-                        <div className="text-2xl font-bold text-green-600">{formatCurrency(selectedReceipt.amount)}</div>
+                        <div className="text-2xl font-bold text-green-600"><CurrencyValue amount={selectedReceipt.amount} /></div>
                         <div className="text-sm text-gray-600">Receipt Amount</div>
                       </CardContent>
                     </Card>

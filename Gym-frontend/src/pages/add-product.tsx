@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   Card,
   CardContent,
@@ -126,6 +127,7 @@ interface AddProductProps {
 }
 
 export function AddProduct({ onNavigate }: AddProductProps) {
+  const { currencyCode } = useCurrency();
   const location = useLocation();
   const navigate = useNavigate();
   const productId = (location.state as { productId?: number } | null)?.productId;
@@ -142,6 +144,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   const [selectedBrand, setSelectedBrand] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [enabledForPos, setEnabledForPos] = useState(false);
 
   // Product Images
   const [productImages, setProductImages] = useState<string[]>([]);
@@ -151,6 +154,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(null);
 
   // Barcode Settings
   const [barcodeTemplate, setBarcodeTemplate] = useState("");
@@ -259,6 +263,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         setSelectedBrand(product.brand || "");
         setDescription(product.description || "");
         setIsActive(product.isActive ?? true);
+        setEnabledForPos(product.enabledForPos ?? false);
         setProductImages(product.imageUrls || []);
         setBarcodeTemplate(product.barcodeTemplate || (product.barcode ? "Code 128" : ""));
         setGeneratedBarcode(product.barcode || "");
@@ -648,6 +653,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     setSelectedBrand("");
     setDescription("");
     setIsActive(true);
+    setEnabledForPos(false);
     setProductImages([]);
     setBarcodeTemplate("");
     setGeneratedBarcode("");
@@ -710,6 +716,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         brand: selectedBrand || undefined,
         description: description || undefined,
         isActive,
+        enabledForPos,
         hasVariants,
         hasRecipe: recipeIngredients.length > 0,
         isManufactured,
@@ -957,6 +964,18 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                     {isActive ? "Active" : "Inactive"}
                   </Badge>
                 </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="enabled-for-pos"
+                    checked={enabledForPos}
+                    onCheckedChange={setEnabledForPos}
+                  />
+                  <Label htmlFor="enabled-for-pos">Enable for POS</Label>
+                  <Badge variant={enabledForPos ? "default" : "secondary"} className={enabledForPos ? "bg-success" : ""}>
+                    {enabledForPos ? "Visible in POS" : "Hidden from POS"}
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1036,7 +1055,12 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                         {productImages.map((image, index) => {
                           const resolvedImage = resolveImageUrl(image);
                           return (
-                          <div key={index} className="relative group">
+                          <div
+                            key={index}
+                            className="relative group"
+                            onMouseEnter={() => setHoveredImageIndex(index)}
+                            onMouseLeave={() => setHoveredImageIndex((prev) => (prev === index ? null : prev))}
+                          >
                             <div className="w-full h-20 rounded-lg border shadow-sm bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden">
                               {(!resolvedImage || imageErrors[index]) ? (
                                 <ImageIcon className="h-6 w-6" />
@@ -1049,8 +1073,14 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                                 />
                               )}
                             </div>
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all duration-200 flex items-center justify-center">
-                              <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div
+                              className="absolute inset-0 rounded-lg transition-all duration-200 flex items-center justify-center"
+                              style={{ backgroundColor: hoveredImageIndex === index ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0)" }}
+                            >
+                              <div
+                                className="flex space-x-2 transition-opacity"
+                                style={{ opacity: hoveredImageIndex === index ? 1 : 0 }}
+                              >
                                 <Button
                                   size="sm"
                                   variant="secondary"
@@ -1264,7 +1294,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="default-price">Selling Price (AED) *</Label>
+                    <Label htmlFor="default-price">Selling Price ({currencyCode}) *</Label>
                     <Input
                       id="default-price"
                       type="number"
@@ -1277,7 +1307,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="cost-price">Cost Price (AED)</Label>
+                    <Label htmlFor="cost-price">Cost Price ({currencyCode})</Label>
                     <Input
                       id="cost-price"
                       type="number"
@@ -1321,8 +1351,8 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                           <TableRow>
                             <TableHead className="table-header">Unit</TableHead>
                             <TableHead className="table-header">Conversion Factor</TableHead>
-                            <TableHead className="table-header">Cost Price (AED)</TableHead>
-                            <TableHead className="table-header">Selling Price (AED)</TableHead>
+                            <TableHead className="table-header">Cost Price ({currencyCode})</TableHead>
+                            <TableHead className="table-header">Selling Price ({currencyCode})</TableHead>
                             <TableHead className="table-header">Barcode</TableHead>
                             <TableHead className="table-header">Actions</TableHead>
                           </TableRow>
@@ -1442,7 +1472,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                               <TableHead className="table-header">Ingredient (Product)</TableHead>
                               <TableHead className="table-header">Quantity</TableHead>
                               <TableHead className="table-header">Unit</TableHead>
-                              <TableHead className="table-header">Cost Impact (AED)</TableHead>
+                              <TableHead className="table-header">Cost Impact ({currencyCode})</TableHead>
                               <TableHead className="table-header">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -1513,7 +1543,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Total Recipe Cost:</span>
                         <span className="text-lg font-semibold text-primary">
-                          {totalCost.toFixed(2)} AED
+                          <CurrencyGlyph /> {totalCost.toFixed(2)}
                         </span>
                       </div>
                     </div>
@@ -1648,7 +1678,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                                 <TableHead className="table-header">Variant</TableHead>
                                 <TableHead className="table-header">SKU</TableHead>
                                 <TableHead className="table-header">Barcode</TableHead>
-                                <TableHead className="table-header">Price (AED)</TableHead>
+                                <TableHead className="table-header">Price ({currencyCode})</TableHead>
                                 <TableHead className="table-header">Stock</TableHead>
                                 <TableHead className="table-header">Actions</TableHead>
                               </TableRow>

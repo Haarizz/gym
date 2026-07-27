@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -46,6 +47,7 @@ interface CreateReceiptProps {
 }
 
 export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProps) {
+  const { currencyCode } = useCurrency();
   const isModal = layout === "modal";
   const panelCardClass = "border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-white";
   const location = useLocation();
@@ -183,7 +185,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
     }
 
     setPaymentAmounts(newPayments);
-    toast.success(`AED ${amountToApply.toFixed(2)} auto-applied using FIFO method`, {
+    toast.success(`${currencyCode} ${amountToApply.toFixed(2)} auto-applied using FIFO method`, {
       description: "Amount distributed to oldest bills first"
     });
   };
@@ -226,7 +228,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
       setReceiptGenerated(true);
       setShowReceiptModal(true);
       toast.success("Receipt Generated Successfully!", {
-        description: `Receipt ${result.receipt_no} created for AED ${calculateTotalPayment().toFixed(2)}`
+        description: `Receipt ${result.receipt_no} created for ${currencyCode} ${calculateTotalPayment().toFixed(2)}`
       });
     } catch (err: any) {
       toast.error("Failed to generate receipt", { description: err?.message });
@@ -249,7 +251,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
       <tr>
         <td><strong>${b.plan_name ?? b.transaction_type}</strong><br/><small>Transaction Type: ${b.transaction_type}</small></td>
         <td>${b.transaction_type}</td>
-        <td style="text-align:right"><strong>AED ${parseFloat(paymentAmounts[b.id]).toFixed(2)}</strong></td>
+        <td style="text-align:right"><strong>${currencyCode} ${parseFloat(paymentAmounts[b.id]).toFixed(2)}</strong></td>
       </tr>`).join("");
 
     const html = `<!DOCTYPE html>
@@ -367,12 +369,12 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
   <hr class="thin"/>
 
   <div class="totals">
-    <div class="row"><span>Subscription Total (Incl. VAT):</span><span>AED ${totalPaid.toFixed(2)}</span></div>
-    <div class="row bold" style="color:#c00">Discount: <span>- AED 0.00</span></div>
-    <div class="row bold"><span>Gross Total:</span><span>AED ${totalPaid.toFixed(2)}</span></div>
-    <div class="row"><span>VAT (5%):</span><span>AED ${vatAmount.toFixed(2)}</span></div>
-    <div class="row total-final"><span>Invoice Amount:</span><span>AED ${totalPaid.toFixed(2)}</span></div>
-    <div class="row total-paid"><span>TOTAL PAID:</span><span>AED ${totalPaid.toFixed(2)}</span></div>
+    <div class="row"><span>Subscription Total (Incl. VAT):</span><span>${currencyCode} ${totalPaid.toFixed(2)}</span></div>
+    <div class="row bold" style="color:#c00">Discount: <span>- ${currencyCode} 0.00</span></div>
+    <div class="row bold"><span>Gross Total:</span><span>${currencyCode} ${totalPaid.toFixed(2)}</span></div>
+    <div class="row"><span>VAT (5%):</span><span>${currencyCode} ${vatAmount.toFixed(2)}</span></div>
+    <div class="row total-final"><span>Invoice Amount:</span><span>${currencyCode} ${totalPaid.toFixed(2)}</span></div>
+    <div class="row total-paid"><span>TOTAL PAID:</span><span>${currencyCode} ${totalPaid.toFixed(2)}</span></div>
   </div>
 
   <hr class="thin"/>
@@ -648,12 +650,12 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                                   {bill.transaction_date ? new Date(bill.transaction_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                                 </td>
                                 <td className="py-3 px-2 text-sm">{bill.transaction_type}</td>
-                                <td className="py-3 px-2 text-right text-sm">AED {Number(bill.amount).toFixed(2)}</td>
+                                <td className="py-3 px-2 text-right text-sm"><CurrencyGlyph /> {Number(bill.amount).toFixed(2)}</td>
                                 <td className="py-3 px-2 text-right text-sm text-green-600">
-                                  AED {Number(bill.paid_amount ?? 0).toFixed(2)}
+                                  <CurrencyGlyph /> {Number(bill.paid_amount ?? 0).toFixed(2)}
                                 </td>
                                 <td className="py-3 px-2 text-right text-sm">
-                                  AED {Number(bill.due_amount ?? 0).toFixed(2)}
+                                  <CurrencyGlyph /> {Number(bill.due_amount ?? 0).toFixed(2)}
                                 </td>
                                 <td className="py-3 px-2 text-center">
                                   <Badge variant={isOverdue ? "destructive" : "secondary"} className="text-xs">
@@ -679,7 +681,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                             <td colSpan={7} className="py-3 px-2 text-right text-sm">Total to Pay Now:</td>
                             <td className="py-3 px-2 text-right">
                               <span className="text-lg" style={{ color: '#2B7A78' }}>
-                                AED {calculateTotalPayment().toFixed(2)}
+                                <CurrencyGlyph /> {calculateTotalPayment().toFixed(2)}
                               </span>
                             </td>
                           </tr>
@@ -805,16 +807,16 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                   <div className="space-y-3">
                     <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded-lg">
                       <span className="text-muted-foreground">Total Outstanding:</span>
-                      <span className="text-lg">AED {calculateTotalDue().toFixed(2)}</span>
+                      <span className="text-lg"><CurrencyGlyph /> {calculateTotalDue().toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-[#DFF5F4] rounded-lg">
                       <span>Receipt Total:</span>
-                      <span className="text-xl" style={{ color: '#2B7A78' }}>AED {calculateTotalPayment().toFixed(2)}</span>
+                      <span className="text-xl" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {calculateTotalPayment().toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded-lg">
                       <span className="text-muted-foreground">Balance Remaining:</span>
                       <span className={`text-lg ${calculateBalanceRemaining() > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                        AED {calculateBalanceRemaining().toFixed(2)}
+                        <CurrencyGlyph /> {calculateBalanceRemaining().toFixed(2)}
                       </span>
                     </div>
                     {calculateBalanceRemaining() < 0 && (
@@ -993,7 +995,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                         <span className="font-medium">{bill.receipt_no}</span>
                         <span className="text-muted-foreground ml-2">- {bill.transaction_type}</span>
                       </div>
-                      <span className="font-medium">AED {parseFloat(amount).toFixed(2)}</span>
+                      <span className="font-medium"><CurrencyGlyph /> {parseFloat(amount).toFixed(2)}</span>
                     </div>
                   );
                 })}
@@ -1005,7 +1007,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                 <div className="flex justify-between items-center">
                   <span className="text-lg">Total Amount Paid:</span>
                   <span className="text-2xl" style={{ color: '#2B7A78' }}>
-                    AED {calculateTotalPayment().toFixed(2)}
+                    <CurrencyGlyph /> {calculateTotalPayment().toFixed(2)}
                   </span>
                 </div>
               </CardContent>
@@ -1049,7 +1051,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount:</span>
                     <span className="font-medium" style={{ color: '#2B7A78' }}>
-                      AED {calculateTotalPayment().toFixed(2)}
+                      <CurrencyGlyph /> {calculateTotalPayment().toFixed(2)}
                     </span>
                   </div>
                 </div>

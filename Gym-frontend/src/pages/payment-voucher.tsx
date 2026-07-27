@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { paymentVoucherService, type PaymentVoucher as PVApiType, type PaymentVoucherCreateRequest } from "../utils/supabase/payment-voucher-service";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -126,6 +127,7 @@ const emptyForm: PVForm = {
 };
 
 export function PaymentVoucher() {
+  const { currencyCode } = useCurrency();
   const [allVouchers, setAllVouchers] = useState<PaymentVoucher[]>([]);
   const [loadingVouchers, setLoadingVouchers] = useState(true);
 
@@ -492,7 +494,7 @@ export function PaymentVoucher() {
           />
         </div>
         <div className="space-y-2">
-          <Label>Amount (AED) *</Label>
+          <Label>Amount ({currencyCode}) *</Label>
           <Input
             type="number"
             min="0"
@@ -852,7 +854,7 @@ export function PaymentVoucher() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground whitespace-nowrap">Paid This Month</p>
-                      <p className="font-bold text-lg">AED {summaryData.totalPaidThisMonth.toFixed(2)}</p>
+                      <p className="font-bold text-lg"><CurrencyGlyph /> {summaryData.totalPaidThisMonth.toFixed(2)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -866,7 +868,7 @@ export function PaymentVoucher() {
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-wide text-amber-700">Total Pending</p>
-                      <p className="font-bold text-lg">AED {summaryData.totalPending.toFixed(2)}</p>
+                      <p className="font-bold text-lg"><CurrencyGlyph /> {summaryData.totalPending.toFixed(2)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -996,7 +998,7 @@ export function PaymentVoucher() {
                               </TableCell>
                               <TableCell>{formatDate(voucher.paymentDate)}</TableCell>
                               <TableCell className="text-right font-semibold text-gymbios-primary">
-                                AED {voucher.amount.toFixed(2)}
+                                <CurrencyGlyph /> {voucher.amount.toFixed(2)}
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center space-x-2">
@@ -1125,7 +1127,7 @@ export function PaymentVoucher() {
                       </div>
                       <div>
                         <Label className="form-label">Amount</Label>
-                        <p className="font-bold text-lg text-gymbios-primary">AED {selectedVoucher.amount.toFixed(2)}</p>
+                        <p className="font-bold text-lg text-gymbios-primary"><CurrencyGlyph /> {selectedVoucher.amount.toFixed(2)}</p>
                       </div>
                       <div>
                         <Label className="form-label">Payment Method</Label>
@@ -1194,15 +1196,15 @@ export function PaymentVoucher() {
                             <div className="grid grid-cols-3 gap-4 text-sm">
                               <div>
                                 <Label className="text-xs text-muted-foreground">Original Amount</Label>
-                                <p className="font-medium">AED {bill.originalAmount.toFixed(2)}</p>
+                                <p className="font-medium"><CurrencyGlyph /> {bill.originalAmount.toFixed(2)}</p>
                               </div>
                               <div>
                                 <Label className="text-xs text-muted-foreground">Paid Amount</Label>
-                                <p className="font-medium text-gymbios-success">AED {bill.paidAmount.toFixed(2)}</p>
+                                <p className="font-medium text-gymbios-success"><CurrencyGlyph /> {bill.paidAmount.toFixed(2)}</p>
                               </div>
                               <div>
                                 <Label className="text-xs text-muted-foreground">Remaining</Label>
-                                <p className="font-medium text-gymbios-warning">AED {bill.remainingBalance.toFixed(2)}</p>
+                                <p className="font-medium text-gymbios-warning"><CurrencyGlyph /> {bill.remainingBalance.toFixed(2)}</p>
                               </div>
                             </div>
                           </div>
@@ -1248,19 +1250,19 @@ export function PaymentVoucher() {
               <div className="text-center space-y-2 min-w-[150px]">
                 <p className="text-xs uppercase tracking-wide text-emerald-700">Total Paid</p>
                 <p className="font-bold text-emerald-700 text-lg">
-                  AED {allVouchers.filter(v => v.status === "Paid").reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
+                  <CurrencyGlyph /> {allVouchers.filter(v => v.status === "Paid").reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
                 </p>
               </div>
               <div className="text-center space-y-2 min-w-[150px]">
                 <p className="text-xs uppercase tracking-wide text-amber-700">Total Pending</p>
                 <p className="font-bold text-amber-700 text-lg">
-                  AED {summaryData.totalPending.toFixed(2)}
+                  <CurrencyGlyph /> {summaryData.totalPending.toFixed(2)}
                 </p>
               </div>
               <div className="text-center space-y-2 min-w-[150px]">
                 <p className="text-xs uppercase tracking-wide text-blue-700">Total Amount</p>
                 <p className="font-bold text-blue-700 text-lg">
-                  AED {allVouchers.reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
+                  <CurrencyGlyph /> {allVouchers.reduce((sum, v) => sum + v.amount, 0).toFixed(2)}
                 </p>
               </div>
             </div>

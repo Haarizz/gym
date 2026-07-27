@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -56,6 +57,7 @@ import {
 } from "lucide-react";
 
 export function POSMode() {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState("retail");
   const [retailCart, setRetailCart] = useState([]);
   const [fnbCart, setFnbCart] = useState([]);
@@ -302,7 +304,7 @@ export function POSMode() {
     if (cart.length === 0) return;
 
     // Mock payment processing
-    alert(`Payment processed successfully! Total: AED ${calculateTotal(cart).toFixed(2)}`);
+    alert(`Payment processed successfully! Total: ${currencyCode} ${calculateTotal(cart).toFixed(2)}`);
     clearCart(isRetail);
     setDiscountValue(0);
     setSelectedCustomer("walk-in");
@@ -391,7 +393,7 @@ export function POSMode() {
                           <h4 className="font-medium text-sm mb-1 leading-tight">{product.name}</h4>
                           <p className="text-xs text-gray-500 mb-2">{product.category}</p>
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-green-600">AED {product.price}</span>
+                            <span className="font-bold text-green-600"><CurrencyGlyph /> {product.price}</span>
                             <Badge variant="secondary" className="text-xs">
                               {product.stock}
                             </Badge>
@@ -441,7 +443,7 @@ export function POSMode() {
                           <div key={item.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                             <div className="flex-1">
                               <p className="font-medium text-sm">{item.name}</p>
-                              <p className="text-xs text-gray-500">AED {item.price} each</p>
+                              <p className="text-xs text-gray-500"><CurrencyGlyph /> {item.price} each</p>
                             </div>
                             <div className="flex items-center space-x-2">
                               <Button
@@ -506,7 +508,7 @@ export function POSMode() {
                   </Select>
                   {selectedCustomer !== "walk-in" && (
                     <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-                      <p>Credit Balance: AED {customers.find(c => c.id === selectedCustomer)?.credit || 0}</p>
+                      <p>Credit Balance: <CurrencyGlyph /> {customers.find(c => c.id === selectedCustomer)?.credit || 0}</p>
                     </div>
                   )}
                 </CardContent>
@@ -532,7 +534,7 @@ export function POSMode() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="percent">%</SelectItem>
-                            <SelectItem value="fixed">AED</SelectItem>
+                            <SelectItem value="fixed"><CurrencyGlyph /></SelectItem>
                           </SelectContent>
                         </Select>
                         <Input
@@ -550,22 +552,22 @@ export function POSMode() {
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span>Subtotal:</span>
-                        <span>AED {calculateSubtotal(retailCart).toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {calculateSubtotal(retailCart).toFixed(2)}</span>
                       </div>
                       {discountValue > 0 && (
                         <div className="flex justify-between text-sm text-red-600">
                           <span>Discount:</span>
-                          <span>-AED {calculateDiscount(calculateSubtotal(retailCart)).toFixed(2)}</span>
+                          <span>-<CurrencyGlyph /> {calculateDiscount(calculateSubtotal(retailCart)).toFixed(2)}</span>
                         </div>
                       )}
                       <div className="flex justify-between text-sm">
                         <span>Tax ({taxRate}%):</span>
-                        <span>AED {calculateTax(calculateSubtotal(retailCart) - calculateDiscount(calculateSubtotal(retailCart))).toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {calculateTax(calculateSubtotal(retailCart) - calculateDiscount(calculateSubtotal(retailCart))).toFixed(2)}</span>
                       </div>
                       <Separator />
                       <div className="flex justify-between font-bold">
                         <span>Total:</span>
-                        <span>AED {calculateTotal(retailCart).toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {calculateTotal(retailCart).toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -682,7 +684,7 @@ export function POSMode() {
                           <h4 className="font-medium text-sm mb-1">{product.name}</h4>
                           <p className="text-xs text-gray-500 mb-1">{product.category}</p>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="font-bold text-green-600">AED {product.price}</span>
+                            <span className="font-bold text-green-600"><CurrencyGlyph /> {product.price}</span>
                             <Badge variant="outline" className="text-xs">
                               <Clock className="h-3 w-3 mr-1" />
                               {product.prepTime}
@@ -743,7 +745,7 @@ export function POSMode() {
                               </Button>
                             </div>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-gray-500">AED {item.price} each</span>
+                              <span className="text-xs text-gray-500"><CurrencyGlyph /> {item.price} each</span>
                               <div className="flex items-center space-x-2">
                                 <Button
                                   variant="outline"
@@ -837,16 +839,16 @@ export function POSMode() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>Subtotal:</span>
-                          <span>AED {calculateSubtotal(fnbCart).toFixed(2)}</span>
+                          <span><CurrencyGlyph /> {calculateSubtotal(fnbCart).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Tax ({taxRate}%):</span>
-                          <span>AED {calculateTax(calculateSubtotal(fnbCart)).toFixed(2)}</span>
+                          <span><CurrencyGlyph /> {calculateTax(calculateSubtotal(fnbCart)).toFixed(2)}</span>
                         </div>
                         <Separator />
                         <div className="flex justify-between font-bold">
                           <span>Total:</span>
-                          <span>AED {calculateTotal(fnbCart).toFixed(2)}</span>
+                          <span><CurrencyGlyph /> {calculateTotal(fnbCart).toFixed(2)}</span>
                         </div>
                       </div>
 

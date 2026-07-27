@@ -4,9 +4,11 @@ import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.SaleTransactionPageResponseDTO;
 import com.company.project.dto.SaleTransactionRequestDTO;
 import com.company.project.dto.SaleTransactionResponseDTO;
+import com.company.project.entities.FinancialSetting;
 import com.company.project.entities.ProductStock;
 import com.company.project.entities.SaleTransaction;
 import com.company.project.entities.SaleTransactionItem;
+import com.company.project.repositories.FinancialSettingRepository;
 import com.company.project.repositories.ProductStockRepository;
 import com.company.project.repositories.SaleTransactionItemRepository;
 import com.company.project.repositories.SaleTransactionRepository;
@@ -29,29 +31,44 @@ import java.util.stream.Collectors;
 @Transactional
 public class SaleTransactionService {
 
+    private static final String STOCK_CHECK_SETTING_KEY = "stock_check_enabled";
+
     private final SaleTransactionRepository saleTransactionRepository;
     private final SaleTransactionItemRepository saleTransactionItemRepository;
     private final ProductStockRepository productStockRepository;
     private final FinancialEventService financialEventService;
     private final ReceiptVoucherService receiptVoucherService;
+    private final FinancialSettingRepository financialSettingRepository;
 
     public SaleTransactionService(SaleTransactionRepository saleTransactionRepository,
                                   SaleTransactionItemRepository saleTransactionItemRepository,
                                   ProductStockRepository productStockRepository,
                                   FinancialEventService financialEventService,
-                                  ReceiptVoucherService receiptVoucherService) {
+                                  ReceiptVoucherService receiptVoucherService,
+                                  FinancialSettingRepository financialSettingRepository) {
         this.saleTransactionRepository     = saleTransactionRepository;
         this.saleTransactionItemRepository = saleTransactionItemRepository;
         this.productStockRepository        = productStockRepository;
         this.financialEventService         = financialEventService;
         this.receiptVoucherService         = receiptVoucherService;
+        this.financialSettingRepository    = financialSettingRepository;
+    }
+
+    /** Sales Settings → "Stock Check". Defaults to ON (existing behavior) until explicitly turned off. */
+    private boolean isStockCheckEnabled() {
+        return financialSettingRepository.findBySettingKey(STOCK_CHECK_SETTING_KEY)
+                .map(FinancialSetting::getSettingValue)
+                .map(value -> !"false".equalsIgnoreCase(value))
+                .orElse(true);
     }
 
     // ── Write ────────────────────────────────────────────────────────────────
 
     public SaleTransactionResponseDTO createTransaction(SaleTransactionRequestDTO req) {
-        // Validate stock for each item
-        if (req.getItems() != null) {
+        boolean stockCheckEnabled = isStockCheckEnabled();
+
+        // Validate stock for each item — skipped entirely when Stock Check is off
+        if (stockCheckEnabled && req.getItems() != null) {
             for (SaleTransactionRequestDTO.SaleItemRequest itemReq : req.getItems()) {
                 List<ProductStock> stocks = productStockRepository.findByProductId(itemReq.getProductId());
                 int totalStock = stocks.stream().mapToInt(s -> s.getCurrentStock() == null ? 0 : s.getCurrentStock()).sum();
@@ -111,8 +128,10 @@ public class SaleTransactionService {
 
                 saleTransactionItemRepository.save(item);
 
-                // Deduct stock — use warehouse with most stock first
-                deductStock(itemReq.getProductId(), itemReq.getQuantity());
+                // Deduct stock — use warehouse with most stock first (skipped when Stock Check is off)
+                if (stockCheckEnabled) {
+                    deductStock(itemReq.getProductId(), itemReq.getQuantity());
+                }
             }
         }
 
@@ -151,10 +170,14 @@ public class SaleTransactionService {
         transaction.setStatus("REFUNDED");
         transaction = saleTransactionRepository.save(transaction);
 
-        // Restore stock for all items
+        // Restore stock for all items — skipped when Stock Check is off, for symmetry with
+        // createTransaction (a sale made while Stock Check was off never touched stock, so
+        // its refund shouldn't add stock back either).
         List<SaleTransactionItem> items = saleTransactionItemRepository.findByTransactionId(id);
-        for (SaleTransactionItem item : items) {
-            restoreStock(item.getProductId(), item.getQuantity());
+        if (isStockCheckEnabled()) {
+            for (SaleTransactionItem item : items) {
+                restoreStock(item.getProductId(), item.getQuantity());
+            }
         }
 
         // Generate reversal journal entry: DR Sales Revenue, DR Tax Payable, CR Cash/Bank

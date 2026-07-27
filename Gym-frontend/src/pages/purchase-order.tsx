@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { purchaseService, Supplier as SupplierType, PurchaseOrder as POType, PurchaseOrderRequest, ReceiveItemRequest } from '../utils/supabase/purchase-service';
 import { productsService, Product as APIProduct } from '../utils/supabase/products-service';
 import { Button } from "../components/ui/button";
@@ -171,6 +172,7 @@ interface Product {
 }
 
 export function PurchaseOrder() {
+  const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('orders');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -698,7 +700,7 @@ export function PurchaseOrder() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">AED {analytics.totalSpendThisMonth.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {analytics.totalSpendThisMonth.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">This month</p>
           </CardContent>
         </Card>
@@ -1013,7 +1015,7 @@ export function PurchaseOrder() {
                       <TableCell>{getPriorityBadge(order.priority)}</TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">AED {order.totalAmount.toLocaleString()}</p>
+                          <p className="font-medium"><CurrencyGlyph /> {order.totalAmount.toLocaleString()}</p>
                           <p className="text-sm text-muted-foreground">
                             {order.items.length} item{order.items.length !== 1 ? 's' : ''}
                           </p>
@@ -1224,7 +1226,7 @@ export function PurchaseOrder() {
                     </div>
                     <div className="flex items-center gap-2">
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-semibold">AED {order.totalAmount.toLocaleString()}</span>
+                      <span className="font-semibold"><CurrencyGlyph /> {order.totalAmount.toLocaleString()}</span>
                     </div>
                   </div>
 
@@ -1686,7 +1688,7 @@ export function PurchaseOrder() {
                               <div className="flex-1">
                                 <p className="font-medium">{product.name}</p>
                                 <p className="text-sm text-muted-foreground">{product.sku} - {product.categoryName}</p>
-                                <p className="text-sm font-medium">AED {product.costPrice}</p>
+                                <p className="text-sm font-medium"><CurrencyGlyph /> {product.costPrice}</p>
                               </div>
                               <div className="text-right">
                                 <p className="text-sm text-muted-foreground">Stock: {product.totalStock}</p>
@@ -1725,7 +1727,7 @@ export function PurchaseOrder() {
                                   />
                                 </div>
                                 <div>
-                                  <Label className="text-xs">Unit Price (AED)</Label>
+                                  <Label className="text-xs">Unit Price ({currencyCode})</Label>
                                   <Input
                                     type="number"
                                     step="0.01"
@@ -1734,7 +1736,7 @@ export function PurchaseOrder() {
                                   />
                                 </div>
                                 <div>
-                                  <Label className="text-xs">Discount (AED)</Label>
+                                  <Label className="text-xs">Discount ({currencyCode})</Label>
                                   <Input
                                     type="number"
                                     step="0.01"
@@ -1744,7 +1746,7 @@ export function PurchaseOrder() {
                                 </div>
                                 <div>
                                   <Label className="text-xs">Total</Label>
-                                  <p className="font-medium p-2">AED {item.totalAmount.toFixed(2)}</p>
+                                  <p className="font-medium p-2"><CurrencyGlyph /> {item.totalAmount.toFixed(2)}</p>
                                 </div>
                               </div>
 
@@ -1824,17 +1826,17 @@ export function PurchaseOrder() {
                     <CardContent className="space-y-3">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>
-                        <span>AED {orderTotals.subtotal.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {orderTotals.subtotal.toFixed(2)}</span>
                       </div>
                       {orderTotals.discountAmount > 0 && (
                         <div className="flex justify-between text-green-600">
                           <span>Discount:</span>
-                          <span>-AED {orderTotals.discountAmount.toFixed(2)}</span>
+                          <span>-<CurrencyGlyph /> {orderTotals.discountAmount.toFixed(2)}</span>
                         </div>
                       )}
                       <div className="flex justify-between">
                         <span>Tax:</span>
-                        <span>AED {orderTotals.taxAmount.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {orderTotals.taxAmount.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span>Shipping:</span>
@@ -1849,7 +1851,7 @@ export function PurchaseOrder() {
                       <Separator />
                       <div className="flex justify-between font-bold text-lg">
                         <span>Total:</span>
-                        <span>AED {orderTotals.totalAmount.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {orderTotals.totalAmount.toFixed(2)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -2055,13 +2057,13 @@ export function PurchaseOrder() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell>AED {Number(item.unitPrice).toFixed(2)}</TableCell>
+                            <TableCell><CurrencyGlyph /> {Number(item.unitPrice).toFixed(2)}</TableCell>
                             <TableCell>
                               {(item.discountPercent || item.discount || 0) > 0
                                 ? `${(item.discountPercent || item.discount || 0)}%`
                                 : '-'}
                             </TableCell>
-                            <TableCell className="font-medium">AED {Number(item.totalAmount).toFixed(2)}</TableCell>
+                            <TableCell className="font-medium"><CurrencyGlyph /> {Number(item.totalAmount).toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -2078,26 +2080,26 @@ export function PurchaseOrder() {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>
-                        <span>AED {selectedOrderForDetail.subtotal.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {selectedOrderForDetail.subtotal.toFixed(2)}</span>
                       </div>
                       {selectedOrderForDetail.discountAmount > 0 && (
                         <div className="flex justify-between text-green-600">
                           <span>Discount:</span>
-                          <span>-AED {selectedOrderForDetail.discountAmount.toFixed(2)}</span>
+                          <span>-<CurrencyGlyph /> {selectedOrderForDetail.discountAmount.toFixed(2)}</span>
                         </div>
                       )}
                       <div className="flex justify-between">
                         <span>Tax:</span>
-                        <span>AED {selectedOrderForDetail.taxAmount.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {selectedOrderForDetail.taxAmount.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Shipping:</span>
-                        <span>AED {selectedOrderForDetail.shippingCost.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {selectedOrderForDetail.shippingCost.toFixed(2)}</span>
                       </div>
                       <Separator />
                       <div className="flex justify-between font-medium text-lg">
                         <span>Total Amount:</span>
-                        <span>AED {selectedOrderForDetail.totalAmount.toFixed(2)}</span>
+                        <span><CurrencyGlyph /> {selectedOrderForDetail.totalAmount.toFixed(2)}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -2148,7 +2150,7 @@ export function PurchaseOrder() {
                       const po = selectedOrderForDetail;
                       if (!po) return;
                       const subject = encodeURIComponent(`Purchase Order ${po.poNumber}`);
-                      const body = encodeURIComponent(`Dear ${po.paymentTerms ? 'Supplier' : 'Team'},\n\nPlease find attached Purchase Order ${po.poNumber} for ${po.items.length} item(s) totalling AED ${po.totalAmount.toFixed(2)}.\n\nDelivery expected by: ${po.expectedDeliveryDate || 'TBD'}\n\nThank you.`);
+                      const body = encodeURIComponent(`Dear ${po.paymentTerms ? 'Supplier' : 'Team'},\n\nPlease find attached Purchase Order ${po.poNumber} for ${po.items.length} item(s) totalling ${currencyCode} ${po.totalAmount.toFixed(2)}.\n\nDelivery expected by: ${po.expectedDeliveryDate || 'TBD'}\n\nThank you.`);
                       window.open(`mailto:?subject=${subject}&body=${body}`);
                     }}>
                       <Mail className="mr-2 h-4 w-4" />
@@ -2327,7 +2329,7 @@ export function PurchaseOrder() {
                 </Select>
               </div>
               <div>
-                <Label>Credit Limit (AED)</Label>
+                <Label>Credit Limit ({currencyCode})</Label>
                 <Input
                   type="number"
                   value={supplierForm.creditLimit}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { financialAnalyticsService, AnalyticsDashboard, MonthlyTrendPoint, RevenueBySource, ExpenseByCategory } from "../utils/supabase/financial-analytics-service";
 import {
   Card,
@@ -144,6 +145,7 @@ const tabContentShell = "space-y-6 animate-in fade-in-0 zoom-in-95 duration-200"
 
 // Components
 const KPICard: React.FC<{ kpi: KPICard }> = ({ kpi }) => {
+  const { currencyCode } = useCurrency();
   const changePercentage = kpi.previousValue === 0
     ? 0
     : ((kpi.value - kpi.previousValue) / kpi.previousValue * 100);
@@ -152,7 +154,7 @@ const KPICard: React.FC<{ kpi: KPICard }> = ({ kpi }) => {
   const formatValue = (value: number) => {
     switch (kpi.format) {
       case "currency":
-        return `${value.toLocaleString()} AED`;
+        return `${currencyCode} ${value.toLocaleString()}`;
       case "percentage":
         return `${value.toFixed(1)}%`;
       case "number":
@@ -219,6 +221,7 @@ const KPICard: React.FC<{ kpi: KPICard }> = ({ kpi }) => {
 };
 
 const InsightCard: React.FC<{ insight: Insight }> = ({ insight }) => {
+  const { currencyCode } = useCurrency();
   const typeConfig = {
     success: { color: "bg-green-100 text-green-800", icon: TrendingUp },
     warning: { color: "bg-yellow-100 text-yellow-800", icon: AlertCircle },
@@ -242,7 +245,7 @@ const InsightCard: React.FC<{ insight: Insight }> = ({ insight }) => {
               <Badge variant="secondary" className={cn(
                 insight.impact > 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
               )}>
-                {insight.impact > 0 ? "+" : ""}{Math.abs(insight.impact).toLocaleString()} AED
+                {insight.impact > 0 ? "+" : ""}<CurrencyGlyph /> {Math.abs(insight.impact).toLocaleString()}
               </Badge>
             </div>
             <p className="text-sm text-gray-600 mb-2">{insight.description}</p>
@@ -261,6 +264,7 @@ const InsightCard: React.FC<{ insight: Insight }> = ({ insight }) => {
 };
 
 export function FinancialAnalytics() {
+  const { currencyCode } = useCurrency();
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [selectedPeriod, setSelectedPeriod] = useState("current-month");
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -544,7 +548,7 @@ export function FinancialAnalytics() {
                   <XAxis dataKey="month" stroke="#666" />
                   <YAxis stroke="#666" tickFormatter={(value) => `${value/1000}K`} />
                   <Tooltip 
-                    formatter={(value: number) => [`${value.toLocaleString()} AED`, '']}
+                    formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
                     labelFormatter={(label) => `Month: ${label}`}
                   />
                   <Legend />
@@ -592,7 +596,7 @@ export function FinancialAnalytics() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => `${value.toLocaleString()} AED`} />
+                  <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -612,7 +616,7 @@ export function FinancialAnalytics() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis type="number" stroke="#666" tickFormatter={(value) => `${value/1000}K`} />
                   <YAxis dataKey="category" type="category" stroke="#666" width={100} />
-                  <Tooltip formatter={(value: number) => `${value.toLocaleString()} AED`} />
+                  <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
                   <Bar dataKey="amount" fill="#009688" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -692,7 +696,7 @@ export function FinancialAnalytics() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {transaction.amount.toLocaleString()} AED
+                          <CurrencyGlyph /> {transaction.amount.toLocaleString()}
                         </TableCell>
                         <TableCell>{transaction.branch}</TableCell>
                         <TableCell>{transaction.paymentMethod}</TableCell>

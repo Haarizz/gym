@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -16,6 +17,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu";
 import { MemberApprovalModal } from "../components/shared/member-approval-modal";
 import { MemberAddons } from "./member-addons";
+import { MemberReceipts } from "./member-receipts";
 import { 
   Plus, 
   Search, 
@@ -112,6 +114,7 @@ interface MembersProps {
 
 export function Members({ onNavigate, initialTab = "members" }: MembersProps = {}) {
   const navigate = useNavigate();
+  const { currencyCode } = useCurrency();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -354,8 +357,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         plan: r.plan_name || '—',
         amount: Number(r.amount || 0),
         mode: r.payment_method || '—',
-        cash: r.payment_method === 'Cash' ? Number(r.amount || 0) : 0,
-        card: r.payment_method === 'Card' ? Number(r.amount || 0) : 0,
+        cash: r.payment_method?.toLowerCase() === 'cash' ? Number(r.amount || 0) : 0,
+        card: r.payment_method?.toLowerCase() === 'card' ? Number(r.amount || 0) : 0,
         due: r.status === 'Pending' ? Number(r.amount || 0) : 0,
         dueDate: r.status === 'Pending' && r.transaction_date ? new Date(r.transaction_date).toLocaleDateString('en-GB') : '—',
       }));
@@ -1001,7 +1004,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           <TableCell>
                             <div className="font-medium">{getMembershipPlan(member)}</div>
                             <div className="text-sm text-muted-foreground">
-                              AED {getMembershipFee(member)}
+                              <CurrencyGlyph /> {getMembershipFee(member)}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1066,7 +1069,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                 amountDue > 0 ? 'text-red-600' : 'text-emerald-600'
                               }`}
                             >
-                              {amountDue > 0 ? `AED ${amountDue.toFixed(2)}` : 'AED 0.00'}
+                              {amountDue > 0 ? `${currencyCode} ${amountDue.toFixed(2)}` : `${currencyCode} 0.00`}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -1219,7 +1222,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Membership Fee</Label>
-                          <p className="text-sm font-medium">AED {getMembershipFee(profileMember)}</p>
+                          <p className="text-sm font-medium"><CurrencyGlyph /> {getMembershipFee(profileMember)}</p>
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Payment Status</Label>
@@ -1520,10 +1523,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
                           <div className="mb-4">
                             <div className="text-3xl font-bold text-primary">
-                              {discountedPrice.toFixed(2)} <span className="text-base font-normal text-muted-foreground">AED</span>
+                              {discountedPrice.toFixed(2)} <span className="text-base font-normal text-muted-foreground"><CurrencyGlyph /></span>
                             </div>
                             {plan.discount > 0 && (
-                              <p className="text-xs text-muted-foreground line-through">{plan.price} AED</p>
+                              <p className="text-xs text-muted-foreground line-through"><CurrencyGlyph /> {plan.price}</p>
                             )}
                           </div>
 
@@ -1602,17 +1605,17 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 <div className="bg-gradient-light p-4 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-muted-foreground">Plan Amount:</span>
-                    <span className="text-2xl font-bold text-primary">{selectedNewPlan.price} AED</span>
+                    <span className="text-2xl font-bold text-primary"><CurrencyGlyph /> {selectedNewPlan.price}</span>
                   </div>
                   {discountAmount && parseFloat(discountAmount) > 0 && (
                     <>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-muted-foreground">Discount:</span>
-                        <span className="text-lg font-semibold text-green-600">- {discountAmount} AED</span>
+                        <span className="text-lg font-semibold text-green-600">- <CurrencyGlyph /> {discountAmount}</span>
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t">
                         <span className="font-semibold">Total Amount:</span>
-                        <span className="text-2xl font-bold text-primary">{calculateTotalAmount()} AED</span>
+                        <span className="text-2xl font-bold text-primary"><CurrencyGlyph /> {calculateTotalAmount()}</span>
                       </div>
                     </>
                   )}
@@ -1621,7 +1624,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 {/* Discount & Coupon */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="discount">Apply Discount (AED)</Label>
+                    <Label htmlFor="discount">Apply Discount ({currencyCode})</Label>
                     <Input
                       id="discount"
                       type="number"
@@ -1695,7 +1698,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 {splitPayment && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gradient-light rounded-lg">
                     <div>
-                      <Label htmlFor="cash-amount">Cash Amount (AED)</Label>
+                      <Label htmlFor="cash-amount">Cash Amount ({currencyCode})</Label>
                       <Input
                         id="cash-amount"
                         type="number"
@@ -1706,7 +1709,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="card-amount">Card Amount (AED)</Label>
+                      <Label htmlFor="card-amount">Card Amount ({currencyCode})</Label>
                       <Input
                         id="card-amount"
                         type="number"
@@ -1718,7 +1721,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     </div>
                     <div className="col-span-2">
                       <p className="text-sm text-muted-foreground">
-                        Total Split: {(parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0)} AED
+                        Total Split: <CurrencyGlyph /> {(parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0)}
                         {((parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0)) === calculateTotalAmount() && (
                           <span className="text-green-600 ml-2">✓ Payment complete</span>
                         )}
@@ -1781,7 +1784,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     </div>
                     <div className="col-span-2">
                       <Label className="text-xs text-muted-foreground">Total Amount</Label>
-                      <p className="text-2xl font-bold text-primary">{calculateTotalAmount()} AED</p>
+                      <p className="text-2xl font-bold text-primary"><CurrencyGlyph /> {calculateTotalAmount()}</p>
                     </div>
                   </div>
                   
@@ -1825,7 +1828,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       New Plan: <span className="font-semibold text-primary">{selectedNewPlan?.name}</span>
                     </div>
                     <div className="text-sm">
-                      Amount Paid: <span className="font-semibold text-primary">{calculateTotalAmount()} AED</span>
+                      Amount Paid: <span className="font-semibold text-primary"><CurrencyGlyph /> {calculateTotalAmount()}</span>
                     </div>
                     <div className="pt-3 border-t mt-3">
                       <div className="text-xs text-muted-foreground">
@@ -1861,7 +1864,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     {apiPlans.map((plan) => (
                       <TableRow key={plan.id} className="hover:bg-slate-50/50 transition-colors">
                         <TableCell className="font-semibold">{plan.name}</TableCell>
-                        <TableCell className="font-bold text-primary">{plan.price} AED</TableCell>
+                        <TableCell className="font-bold text-primary"><CurrencyGlyph /> {plan.price}</TableCell>
                         <TableCell>{plan.duration || `${plan.durationValue} ${plan.durationType}`}</TableCell>
                         <TableCell>
                           <span className="text-sm text-muted-foreground">{plan.description || '—'}</span>
@@ -1894,16 +1897,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           <MemberAddons embedded />
         </TabsContent>
 
-        <TabsContent value="receipts" className="space-y-6">
-          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle>Member Receipts</CardTitle>
-              <CardDescription>View and manage payment receipts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Feature coming soon...</p>
-            </CardContent>
-          </Card>
+        <TabsContent value="receipts">
+          <MemberReceipts embedded />
         </TabsContent>
 
         <TabsContent value="freeze" className="space-y-6">
@@ -2229,22 +2224,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
                     <DollarSign className="h-3.5 w-3.5 text-green-600 shrink-0" />
                     <span className="text-muted-foreground whitespace-nowrap">Total Amount</span>
-                    <span className="font-bold text-green-600 ml-1">AED {reportSummary.totalAmount.toLocaleString()}</span>
+                    <span className="font-bold text-green-600 ml-1"><CurrencyGlyph /> {reportSummary.totalAmount.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
                     <Banknote className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                     <span className="text-muted-foreground whitespace-nowrap">Total Cash</span>
-                    <span className="font-bold text-emerald-600 ml-1">AED {reportSummary.totalCash.toLocaleString()}</span>
+                    <span className="font-bold text-emerald-600 ml-1"><CurrencyGlyph /> {reportSummary.totalCash.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
                     <CreditCard className="h-3.5 w-3.5 text-sky-600 shrink-0" />
                     <span className="text-muted-foreground whitespace-nowrap">Total Card</span>
-                    <span className="font-bold text-sky-600 ml-1">AED {reportSummary.totalCard.toLocaleString()}</span>
+                    <span className="font-bold text-sky-600 ml-1"><CurrencyGlyph /> {reportSummary.totalCard.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
                     <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                     <span className="text-muted-foreground whitespace-nowrap">Total Due</span>
-                    <span className="font-bold text-amber-600 ml-1">AED {reportSummary.totalDue.toLocaleString()}</span>
+                    <span className="font-bold text-amber-600 ml-1"><CurrencyGlyph /> {reportSummary.totalDue.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -2308,7 +2303,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                               </Badge>
                             </TableCell>
                             <TableCell>{row.plan}</TableCell>
-                            <TableCell className="font-semibold">{row.amount.toLocaleString()} AED</TableCell>
+                            <TableCell className="font-semibold"><CurrencyGlyph /> {row.amount.toLocaleString()}</TableCell>
                             <TableCell>
                               <Badge className={getPayModeBadge(row.mode)}>
                                 {row.mode}
