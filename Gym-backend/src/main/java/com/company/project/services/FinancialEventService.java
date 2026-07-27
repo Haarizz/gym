@@ -201,6 +201,38 @@ public class FinancialEventService {
     }
 
     /**
+     * SERVICE — Member add-on purchased (Training, Nutrition, Spa, Classes, ...).
+     * DR  Cash/Bank                    (amount)
+     * CR  Service / Add-on Revenue     (amount)
+     */
+    public void onAddonPaymentReceived(MemberAddon addon) {
+        if (alreadyJournaled("MemberAddon", addon.getId())) return;
+
+        BigDecimal amount = safe(addon.getAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for MemberAddon id={}: amount {} is not positive", addon.getId(), amount);
+            return;
+        }
+
+        List<JvLine> lines = new ArrayList<>(buildMoneyLines(
+                addon.getPaymentMode(), null, amount, true,
+                "Add-on purchase — " + addon.getMemberName()));
+        lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", amount,
+                "Revenue recognition — " + addon.getAddonName()));
+
+        LocalDate date = addon.getPurchaseDate() != null
+                ? addon.getPurchaseDate().toLocalDate() : LocalDate.now();
+
+        JournalVoucher jv = createAndPost(
+                "Add-on: " + (addon.getAddonName() != null ? addon.getAddonName() : "Add-on")
+                + " — " + addon.getMemberName()
+                + " | " + addon.getTransactionId(),
+                date, lines, "ADDONS");
+
+        registerSource("MemberAddon", addon.getId(), "ADDONS", jv.getId());
+    }
+
+    /**
      * EXPENSES — Operational expense approved.
      * DR  [Expense Category Account]   (amount excl. tax)
      * DR  GST Input Credit             (taxAmount)   — only if tax > 0
