@@ -1,0 +1,1121 @@
+<title>GymBios Financial Module — Production Readiness Roadmap</title>
+<style>
+  :root{
+    --bg:#f3f4ef;
+    --surface:#ffffff;
+    --surface-2:#eceee7;
+    --text:#1f241f;
+    --text-muted:#5b6259;
+    --border:#dde0d6;
+    --accent:#2f6f4f;
+    --accent-strong:#204d37;
+    --accent-soft:#e4efe8;
+    --critical:#b3392c;
+    --critical-soft:#f7e6e3;
+    --high:#a8631e;
+    --high-soft:#f6ead9;
+    --medium:#8a7420;
+    --medium-soft:#f1ecd6;
+    --low:#3d647d;
+    --low-soft:#e3ecf1;
+    --code-bg:#eef0ea;
+    --shadow: 0 1px 2px rgba(31,36,31,0.06), 0 6px 20px rgba(31,36,31,0.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12140f;
+      --surface:#181c15;
+      --surface-2:#1f2419;
+      --text:#e8ece3;
+      --text-muted:#9aa393;
+      --border:#2b3125;
+      --accent:#6bb98a;
+      --accent-strong:#8fd1ab;
+      --accent-soft:#1c2b20;
+      --critical:#e2887a;
+      --critical-soft:#33201d;
+      --high:#e0ab6e;
+      --high-soft:#332a19;
+      --medium:#d8c479;
+      --medium-soft:#2e2b19;
+      --low:#8db9d1;
+      --low-soft:#1b2830;
+      --code-bg:#1c2018;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12140f; --surface:#181c15; --surface-2:#1f2419; --text:#e8ece3; --text-muted:#9aa393;
+    --border:#2b3125; --accent:#6bb98a; --accent-strong:#8fd1ab; --accent-soft:#1c2b20;
+    --critical:#e2887a; --critical-soft:#33201d; --high:#e0ab6e; --high-soft:#332a19;
+    --medium:#d8c479; --medium-soft:#2e2b19; --low:#8db9d1; --low-soft:#1b2830; --code-bg:#1c2018;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"]{
+    --bg:#f3f4ef; --surface:#ffffff; --surface-2:#eceee7; --text:#1f241f; --text-muted:#5b6259;
+    --border:#dde0d6; --accent:#2f6f4f; --accent-strong:#204d37; --accent-soft:#e4efe8;
+    --critical:#b3392c; --critical-soft:#f7e6e3; --high:#a8631e; --high-soft:#f6ead9;
+    --medium:#8a7420; --medium-soft:#f1ecd6; --low:#3d647d; --low-soft:#e3ecf1; --code-bg:#eef0ea;
+    --shadow: 0 1px 2px rgba(31,36,31,0.06), 0 6px 20px rgba(31,36,31,0.05);
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+    line-height:1.65; font-size:16px;
+  }
+  h1,h2,h3,h4{
+    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+    text-wrap:balance; color:var(--text); font-weight:600; letter-spacing:-0.01em;
+  }
+  code, .mono, .path, .kbd{
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Consolas", monospace;
+    font-size:0.86em;
+  }
+  .mono, code{ background:var(--code-bg); padding:0.1em 0.4em; border-radius:4px; color:var(--accent-strong); }
+  table{ font-variant-numeric: tabular-nums; }
+
+  a{ color:var(--accent-strong); }
+
+  .layout{ display:flex; max-width:1400px; margin:0 auto; align-items:flex-start; }
+
+  nav.toc{
+    position:sticky; top:0; align-self:flex-start; height:100vh; overflow-y:auto;
+    width:264px; flex:0 0 264px; padding:2rem 1.25rem 2rem 1.75rem; border-right:1px solid var(--border);
+  }
+  nav.toc .brand{ font-family: ui-serif, Georgia, serif; font-size:1.05rem; font-weight:700; margin-bottom:0.15rem; }
+  nav.toc .brand small{ display:block; font-family:inherit; font-weight:400; font-size:0.72rem; color:var(--text-muted); letter-spacing:0.04em; text-transform:uppercase; margin-top:0.3rem;}
+  nav.toc ol{ list-style:none; margin:1.5rem 0 0; padding:0; counter-reset:toc; }
+  nav.toc li{ counter-increment:toc; margin-bottom:0.55rem; }
+  nav.toc a{
+    display:block; text-decoration:none; color:var(--text-muted); font-size:0.86rem;
+    border-left:2px solid transparent; padding-left:0.7rem; transition:color .15s, border-color .15s;
+  }
+  nav.toc a:hover{ color:var(--accent-strong); border-color:var(--accent); }
+  nav.toc .toc-group-label{ font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin:1.1rem 0 0.4rem; font-weight:600;}
+
+  main{ flex:1; min-width:0; padding:3rem 3.5rem 6rem; max-width:900px; }
+
+  header.masthead{ margin-bottom:2.5rem; border-bottom:1px solid var(--border); padding-bottom:1.75rem; }
+  header.masthead .eyebrow{ font-size:0.78rem; text-transform:uppercase; letter-spacing:0.09em; color:var(--accent-strong); font-weight:700; }
+  header.masthead h1{ font-size:2.15rem; margin:0.35rem 0 0.6rem; }
+  header.masthead p.dek{ color:var(--text-muted); font-size:1.05rem; max-width:62ch; margin:0; }
+  .meta-row{ display:flex; gap:1.5rem; margin-top:1.25rem; flex-wrap:wrap; }
+  .meta-item{ font-size:0.82rem; color:var(--text-muted); }
+  .meta-item b{ color:var(--text); font-weight:600; display:block; font-family: ui-serif, Georgia, serif; font-size:1.1rem; }
+
+  section.block{ margin-bottom:3rem; }
+  section.block > h2{ font-size:1.55rem; margin:0 0 0.25rem; scroll-margin-top:1.5rem; }
+  section.block > p.lede{ color:var(--text-muted); margin:0 0 1.5rem; max-width:68ch; }
+
+  .scope-note{
+    background:var(--accent-soft); border:1px solid var(--border); border-left:3px solid var(--accent);
+    padding:0.9rem 1.1rem; border-radius:6px; font-size:0.92rem; margin-bottom:2rem;
+  }
+  .scope-note b{ color:var(--accent-strong); }
+
+  /* priority badges */
+  .badge{
+    display:inline-flex; align-items:center; gap:0.35rem; font-size:0.72rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.04em; padding:0.25rem 0.6rem; border-radius:99px;
+    white-space:nowrap;
+  }
+  .badge.critical{ background:var(--critical-soft); color:var(--critical); }
+  .badge.high{ background:var(--high-soft); color:var(--high); }
+  .badge.medium{ background:var(--medium-soft); color:var(--medium); }
+  .badge.low{ background:var(--low-soft); color:var(--low); }
+  .chip{
+    display:inline-block; font-size:0.72rem; padding:0.2rem 0.55rem; border-radius:5px;
+    background:var(--surface-2); color:var(--text-muted); border:1px solid var(--border); font-weight:600;
+  }
+
+  /* issue card */
+  .issue{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:1.75rem 2rem; margin-bottom:1.75rem; box-shadow:var(--shadow); scroll-margin-top:1.5rem;
+  }
+  .issue-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:0.9rem; flex-wrap:wrap; }
+  .issue-head h3{ font-size:1.28rem; margin:0.3rem 0 0; }
+  .issue-id{ font-family: ui-monospace, monospace; font-size:0.78rem; color:var(--text-muted); }
+  .badges-row{ display:flex; gap:0.4rem; flex-wrap:wrap; }
+
+  .issue p{ margin:0.6rem 0; }
+  .issue .why{ color:var(--text-muted); font-size:0.95rem; }
+
+  .impact-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:0.9rem; margin:1.1rem 0; }
+  .impact-cell{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:0.75rem 0.9rem; }
+  .impact-cell .label{ font-size:0.68rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); font-weight:700; margin-bottom:0.3rem; display:block;}
+  .impact-cell .value{ font-size:0.88rem; }
+
+  .file-list{ list-style:none; padding:0; margin:0.5rem 0; }
+  .file-list li{ font-size:0.86rem; padding:0.15rem 0; }
+  .file-list li::before{ content:"›"; color:var(--accent); margin-right:0.45rem; font-weight:700; }
+
+  .solution-grid{ display:grid; grid-template-columns:1fr 1fr; gap:0.9rem 1.4rem; margin:0.75rem 0 1.25rem; }
+  .solution-grid .sg-label{ font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--accent-strong); font-weight:700; margin-bottom:0.25rem; }
+  .solution-grid ul{ margin:0.25rem 0 0; padding-left:1.1rem; font-size:0.9rem; }
+  .solution-grid li{ margin-bottom:0.25rem; }
+  @media (max-width:640px){ .solution-grid{ grid-template-columns:1fr; } }
+
+  details{ border-top:1px solid var(--border); margin-top:1.1rem; padding-top:0.9rem; }
+  details + details{ border-top:1px solid var(--border); }
+  summary{
+    cursor:pointer; font-weight:700; font-size:0.88rem; color:var(--accent-strong);
+    list-style:none; display:flex; align-items:center; gap:0.45rem;
+  }
+  summary::-webkit-details-marker{ display:none; }
+  summary::before{ content:"▸"; transition:transform .15s; font-size:0.75em; }
+  details[open] summary::before{ transform:rotate(90deg); }
+  details .details-body{ padding:0.9rem 0 0.4rem 1.2rem; font-size:0.9rem; }
+
+  .phase{ margin-bottom:1rem; padding-left:0.9rem; border-left:2px solid var(--border); }
+  .phase h5{ margin:0 0 0.4rem; font-size:0.92rem; font-family:inherit; font-weight:700; }
+  .phase dl{ display:grid; grid-template-columns:auto 1fr; gap:0.15rem 0.7rem; margin:0; font-size:0.85rem; }
+  .phase dt{ color:var(--text-muted); font-weight:600; }
+  .phase dd{ margin:0; }
+
+  table.plan-table{ width:100%; border-collapse:collapse; font-size:0.86rem; margin:0.5rem 0 1rem; }
+  table.plan-table th, table.plan-table td{ text-align:left; padding:0.5rem 0.7rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  table.plan-table th{ font-size:0.7rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); }
+
+  .risk-row{ display:flex; align-items:center; gap:0.6rem; margin-bottom:0.4rem; }
+  .risk-row .badge{ min-width:70px; justify-content:center; }
+
+  .dep-flags{ display:flex; gap:0.5rem; flex-wrap:wrap; margin:0.5rem 0; }
+  .dep-flags .flag{ font-size:0.78rem; padding:0.3rem 0.65rem; border-radius:6px; background:var(--surface-2); border:1px solid var(--border); }
+  .dep-flags .flag.yes{ color:var(--critical); border-color:var(--critical-soft); }
+  .dep-flags .flag.no{ color:var(--accent-strong); }
+
+  .priority-divider{
+    display:flex; align-items:center; gap:0.75rem; margin:3.5rem 0 1.5rem;
+    font-family: ui-serif, Georgia, serif; font-size:1.6rem; font-weight:700;
+  }
+  .priority-divider .line{ flex:1; height:1px; background:var(--border); }
+  .priority-divider.crit{ color:var(--critical); }
+  .priority-divider.hi{ color:var(--high); }
+  .priority-divider.med{ color:var(--medium); }
+  .priority-divider.lo{ color:var(--low); }
+
+  .roadmap-item{ display:flex; gap:1rem; padding:0.85rem 0; border-bottom:1px solid var(--border); align-items:baseline; }
+  .roadmap-item:last-child{ border-bottom:none; }
+  .roadmap-item .rid{ font-family:ui-monospace,monospace; font-size:0.8rem; color:var(--text-muted); flex:0 0 34px; }
+  .roadmap-item .rtitle{ font-weight:600; flex:1; }
+  .roadmap-item .rcomplex{ flex:0 0 auto; }
+
+  pre.mermaid{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1.5rem; overflow-x:auto; }
+
+  .milestone{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow);
+    padding:1.75rem 2rem; margin-bottom:1.75rem; position:relative;
+  }
+  .milestone .mnum{
+    font-family:ui-serif, Georgia, serif; font-size:2.2rem; color:var(--accent); font-weight:700;
+    position:absolute; top:1.5rem; right:1.75rem; opacity:0.35;
+  }
+  .milestone h3{ font-size:1.3rem; margin:0 0 0.2rem; max-width:80%; }
+  .milestone .msub{ color:var(--text-muted); font-size:0.88rem; margin-bottom:1.1rem; }
+  .msection{ margin-bottom:0.9rem; }
+  .msection .mlabel{ font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--accent-strong); font-weight:700; margin-bottom:0.3rem; }
+  .msection ul{ margin:0.2rem 0; padding-left:1.1rem; font-size:0.89rem; }
+  .msection li{ margin-bottom:0.2rem; }
+  .milestone-footer{ display:flex; gap:1.5rem; flex-wrap:wrap; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border); }
+  .milestone-footer .mf-item{ font-size:0.82rem; }
+  .milestone-footer .mf-item b{ display:block; color:var(--text); font-size:0.95rem; }
+
+  .timeline-connector{ width:2px; height:1.5rem; background:var(--border); margin:0 auto; }
+
+  footer.doc-footer{ margin-top:4rem; padding-top:1.5rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:0.82rem; }
+
+  @media (max-width: 900px){
+    nav.toc{ display:none; }
+    main{ padding:2rem 1.25rem 4rem; }
+  }
+</style>
+
+<div class="layout">
+  <nav class="toc">
+    <div class="brand">GymBios Financials<small>Production Readiness Roadmap</small></div>
+    <div class="toc-group-label">🔴 Critical</div>
+    <ol style="counter-reset:none;">
+      <li><a href="#c1">C1 · Receipt Voucher ledger bypass</a></li>
+      <li><a href="#c2">C2 · Missing FK constraints</a></li>
+      <li><a href="#c3">C3 · No migration tooling</a></li>
+    </ol>
+    <div class="toc-group-label">🟠 High</div>
+    <ol>
+      <li><a href="#h1">H1 · Balance mutation duplication</a></li>
+      <li><a href="#h2">H2 · Voucher numbering race</a></li>
+      <li><a href="#h3">H3 · Hard-delete of vouchers</a></li>
+    </ol>
+    <div class="toc-group-label">🟡 Medium</div>
+    <ol>
+      <li><a href="#m1">M1 · In-memory filtering / no paging</a></li>
+      <li><a href="#m2">M2 · No exception strategy</a></li>
+      <li><a href="#m3">M3 · Silent no-op on bad amounts</a></li>
+      <li><a href="#m4">M4 · GET mutates tax status</a></li>
+    </ol>
+    <div class="toc-group-label">🟢 Low</div>
+    <ol>
+      <li><a href="#l1">L1 · Settings have no validation</a></li>
+      <li><a href="#l2">L2 · Cost-center code collision</a></li>
+    </ol>
+    <div class="toc-group-label">Roadmap</div>
+    <ol>
+      <li><a href="#priority-roadmap">Priority roadmap</a></li>
+      <li><a href="#dependency-graph">Dependency graph</a></li>
+      <li><a href="#milestones">Milestones 1–5</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="masthead">
+      <div class="eyebrow">Solution Architecture · Implementation Plan</div>
+      <h1>Financial Module — Production Readiness Roadmap</h1>
+      <p class="dek">A phased remediation plan for the double-entry accounting subsystem (Journal Vouchers, Payment/Receipt Vouchers, Bank Reconciliation, Expenses, Tax Compliance, Reports &amp; Analytics), built exclusively from the verified findings of the prior code audit.</p>
+      <div class="meta-row">
+        <div class="meta-item"><b>12</b>Verified issues</div>
+        <div class="meta-item"><b>3 / 3 / 4 / 2</b>Critical / High / Medium / Low</div>
+        <div class="meta-item"><b>5</b>Delivery milestones</div>
+        <div class="meta-item"><b>Gym-backend · Gym-frontend</b>Repositories in scope</div>
+      </div>
+    </header>
+
+    <div class="scope-note">
+      <b>Scope discipline.</b> Every issue below traces back to a finding confirmed line-by-line against source in the audit verification pass. No recommendation compares GymBios to another codebase, and no unverified assumption is presented as fact — where a recommendation reaches beyond what was audited (e.g. authentication/authorization), it is labelled <em>“Not verified — recommended as defensive practice only.”</em>
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="priority-divider crit"><span>🔴 Critical — must fix before production</span><div class="line"></div></div>
+
+    <!-- C1 -->
+    <section class="issue" id="c1">
+      <div class="issue-head">
+        <div><span class="issue-id">C1</span><h3>Receipt Vouchers bypass the general ledger entirely</h3></div>
+        <div class="badges-row"><span class="badge critical">Critical</span><span class="chip">Major Feature</span></div>
+      </div>
+
+      <p><b>Issue summary.</b> A Receipt Voucher created through the manual UI/API path (<code>POST /api/receipt-vouchers</code>) is saved and shown to the accountant as a ledger document, but it never creates a Journal Voucher and never updates any <code>AccountHead.currentBalance</code>. It matters because the Ledgers screen displays it next to genuinely posted entries with no visual distinction, so an accountant can mistake an unposted document for money that has actually hit the books.</p>
+
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">Manually entered receipts are invisible to the trial balance, Income Statement, and Balance Sheet, which read only <code>journal_voucher_lines</code>.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">Accountant sees a “Receipt Voucher” row in Ledgers and reasonably assumes it is posted — it is not.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value">Financial Reports / Analytics dashboards will under-report cash inflows recorded this way.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">Two parallel “truths” exist: the ReceiptVoucher table and the JournalVoucher ledger, with no reconciliation between them.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">An auditor reviewing account_heads balances would not find the cash reflected — a real books-don’t-match risk.</span></div>
+      </div>
+
+      <p><b>Current implementation.</b> <code>ReceiptVoucherController.createReceiptVoucher()</code> (<span class="path">ReceiptVoucherController.java:43-47</span>) calls <code>ReceiptVoucherService.createReceiptVoucher()</code> (<span class="path">ReceiptVoucherService.java:76-92</span>), which only calls <code>receiptVoucherRepository.save()</code> and <code>notificationService.notifyRoles()</code> — no <code>FinancialEventService</code> call exists anywhere in that method. This is a documented design choice: <span class="path">LedgerTransactionService.java:26-29</span> states Receipt Vouchers are “informational” business documents, while member payments post through <code>ReceiptService.settlePayment → FinancialEventService</code> instead (a different code path, entity, and table). <code>FinancialReportService.getIncomeStatement()</code> (<span class="path">FinancialReportService.java:65-95</span>) and <code>FinancialAnalyticsService.getDashboard()</code> confirm reports read exclusively from <code>journal_voucher_lines</code> joined to <code>account_heads</code> — so this gap is real, not a report bug.</p>
+      <p class="why">Affected modules: Ledgers, Receipt Voucher, Financial Reports, Financial Analytics. Affected files: <code>ReceiptVoucherController.java</code>, <code>ReceiptVoucherService.java</code>, <code>LedgerTransactionService.java</code>, <code>FinancialReportService.java</code>, <code>FinancialAnalyticsService.java</code>.</p>
+
+      <p><b>Root cause.</b> Two independent recording mechanisms were built for the same real-world event (money received): an automatic one driven by <code>FinancialEventService</code> for known system entities (<code>Receipt</code>, <code>SaleTransaction</code>, …), and a manual document-entry one (<code>ReceiptVoucher</code>) for anything an accountant types in directly. The second was never wired to the first.</p>
+
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul>
+          <li>On <code>createReceiptVoucher()</code>, when the voucher’s status is a postable state (e.g. <code>"completed"</code>/<code>"Paid"</code>), call a new <code>FinancialEventService.onManualReceiptVoucherPosted(ReceiptVoucher)</code> that debits Cash/Bank and credits the account implied by <code>sourceCategory</code>, mirroring the pattern already used by <code>onMemberPaymentReceived</code>.</li>
+          <li>Add the same idempotency guard already used elsewhere (<code>JournalEntrySourceRepository.existsBySourceEntityTypeAndSourceEntityId("ReceiptVoucher", id)</code>) so edits/re-saves cannot double-post.</li>
+          <li>Reject a status transition to a postable state when the accountant hasn’t picked a target account head.</li>
+        </ul></div>
+        <div><div class="sg-label">Frontend</div><ul>
+          <li>On the Receipt Voucher screen, make the “posted to ledger” state explicit (e.g. a status pill) instead of implying it via the Ledgers table row alone.</li>
+          <li>On the Ledgers screen, visually separate “business document, not yet posted” rows from “System Journal” rows (the backend already tags JV rows this way — see <code>LedgerTransactionService.java:128</code>).</li>
+        </ul></div>
+        <div><div class="sg-label">Database</div><ul>
+          <li>No new tables. Reuses <code>journal_vouchers</code>, <code>journal_voucher_lines</code>, <code>journal_entry_sources</code>, <code>account_heads</code>.</li>
+        </ul></div>
+        <div><div class="sg-label">API</div><ul>
+          <li><code>POST /api/receipt-vouchers</code> and <code>PATCH /{id}/status</code> responses should include the linked <code>journalVoucherId</code> once posted, so the frontend can link out to the JV.</li>
+        </ul></div>
+        <div><div class="sg-label">Validation</div><ul>
+          <li>Require <code>sourceCategory</code> (mapped to a revenue/receivable account) before allowing a postable status.</li>
+          <li>Balance check: DR Cash/Bank must equal CR target account for every auto-generated entry (same invariant already enforced in <code>FinancialEventService.createAndPost()</code>).</li>
+        </ul></div>
+        <div><div class="sg-label">Security</div><ul>
+          <li>Not verified in the audit — no authorization gap was confirmed for this endpoint. Recommend restricting the postable-status transition to ACCOUNTANT/ADMIN roles as defensive practice, consistent with the roles already used in <code>notificationService.notifyRoles()</code> calls in this file.</li>
+        </ul></div>
+      </div>
+
+      <details>
+        <summary>Implementation plan</summary>
+        <div class="details-body">
+          <div class="phase">
+            <h5>Phase 1 — Wire posting logic</h5>
+            <dl>
+              <dt>New</dt><dd><code>FinancialEventService.onManualReceiptVoucherPosted(ReceiptVoucher)</code></dd>
+              <dt>Modify</dt><dd><code>ReceiptVoucherService.java</code> (createReceiptVoucher, updateStatus)</dd>
+              <dt>DB</dt><dd>None — reuses existing tables</dd>
+              <dt>API</dt><dd>Response DTO gains <code>journalVoucherId</code> (nullable)</dd>
+              <dt>Testing</dt><dd>Unit test: posting a receipt voucher creates exactly one POSTED JV with balanced lines; re-saving does not duplicate it</dd>
+            </dl>
+          </div>
+          <div class="phase">
+            <h5>Phase 2 — Category → account mapping</h5>
+            <dl>
+              <dt>Modify</dt><dd><code>ReceiptVoucherRequestDTO</code> validation, <code>FinancialEventService</code> account-code mapping table</dd>
+              <dt>UI</dt><dd>Receipt Voucher form requires a source category before save when status is postable</dd>
+              <dt>Testing</dt><dd>Integration test: unmapped category rejected with a clear validation error, not a 500</dd>
+            </dl>
+          </div>
+          <div class="phase">
+            <h5>Phase 3 — UI reconciliation</h5>
+            <dl>
+              <dt>Modify</dt><dd><code>pages/ledgers.tsx</code>, <code>ledgers-service.tsx</code>, <code>pages/receipt-voucher.tsx</code></dd>
+              <dt>Testing</dt><dd>UI test: posted vs. unposted receipt vouchers are visually distinguishable in Ledgers</dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Dependencies, risk &amp; delivery</summary>
+        <div class="details-body">
+          <div class="dep-flags">
+            <span class="flag no">Independently deployable</span>
+            <span class="flag no">No schema migration required</span>
+            <span class="flag yes">Requires backfill decision for existing rows</span>
+          </div>
+          <p><b>Depends on:</b> none technically, but should be sequenced with H2 (voucher numbering) since this change increases call volume through the shared numbering path.</p>
+          <div class="risk-row"><span class="badge high">Medium-High</span><span>Historical Receipt Vouchers already in the table won’t retroactively have a JV. Decide explicitly: leave history as-is (documented gap) or run a one-time backfill job that posts a JV per historical row dated at its original voucher date.</span></div>
+          <table class="plan-table">
+            <tr><th>Complexity</th><td>Medium (Half day – 2 days) for the posting logic; Large if a historical backfill job is required</td></tr>
+          </table>
+          <p><b>Testing checklist</b></p>
+          <ul>
+            <li><b>Unit:</b> balanced DR/CR on post; idempotency on duplicate save; rejects when category unmapped.</li>
+            <li><b>Integration:</b> full create → post → verify <code>account_heads.current_balance</code> changed by exact amount.</li>
+            <li><b>API:</b> response includes <code>journalVoucherId</code>; unposted vouchers show <code>null</code>.</li>
+            <li><b>UI:</b> Ledgers row visually marks posted vs. unposted.</li>
+            <li><b>Edge cases:</b> zero/negative amount; missing category; rapid double-submit from the form.</li>
+            <li><b>Regression:</b> Financial Reports/Analytics totals unchanged for vouchers that were already flowing through <code>Receipt</code>/<code>SaleTransaction</code>.</li>
+          </ul>
+          <p><b>Deployment.</b> Zero-downtime rolling deploy — additive logic only. Feature-flag the auto-posting behind a setting in <code>financial_settings</code> so it can be toggled off instantly if a mapping error surfaces in production. Rollback = disable the flag; no data is destroyed by rolling back since JV creation is additive.</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- C2 -->
+    <section class="issue" id="c2">
+      <div class="issue-head">
+        <div><span class="issue-id">C2</span><h3>No database-level foreign keys anywhere in the financial schema</h3></div>
+        <div class="badges-row"><span class="badge critical">Critical</span><span class="chip">Large</span></div>
+      </div>
+
+      <p><b>Issue summary.</b> Every parent/child relationship in the financial schema — journal line → journal header, payment-voucher-bill → payment voucher, bank-statement-line → reconciliation, account head → parent account head — is stored as a bare <code>Long</code> column with no <code>@ManyToOne</code>/<code>@JoinColumn</code> mapping and therefore no foreign-key constraint in Postgres. It matters because nothing at the database layer prevents an orphaned line, a dangling reference, or a bad delete from silently corrupting the ledger.</p>
+
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">A JV header could be deleted (see H3) while its lines remain, permanently unbalancing the ledger with no DB error.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">No user-visible symptom until a report is wrong — the failure mode is silent.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value">Orphaned <code>journal_voucher_lines</code> rows would be summed by <code>FinancialReportService</code> against a JV ID that no longer resolves to a status, skewing totals.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">Confirmed by grep across all 16 financial entities — none use <code>@ManyToOne</code>/<code>@JoinColumn</code>/<code>@OneToMany</code>, unlike non-financial entities such as <code>Asset.java</code> which do.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">Referential integrity is a baseline expectation for any auditable ledger.</span></div>
+      </div>
+
+      <p><b>Current implementation.</b> <span class="path">JournalVoucherLine.java:14-15</span> declares <code>@Column(name = "journal_voucher_id", nullable = false) private Long journalVoucherId;</code> with no relationship annotation. The same pattern repeats for <code>AccountHead.parentId</code> (<span class="path">AccountHead.java:26-27</span>), <code>BankStatementLine.reconciliationId</code>, <code>PaymentVoucherBill.paymentVoucherId</code>, and <code>SupplierBillItem</code>. Because <code>spring.jpa.hibernate.ddl-auto=update</code> (see C3), Hibernate only ever creates the column, never a constraint, for a plain <code>Long</code> field.</p>
+      <p class="why">Affected modules: Ledgers, Journal Voucher, Payment Voucher, Bank Reconciliation, Chart of Accounts. Affected files: all 16 financial entity classes under <code>com.company.project.entities</code>.</p>
+
+      <p><b>Root cause.</b> The financial entities were modelled with IDs-as-plain-columns rather than JPA object relationships — likely to keep queries simple and avoid N+1 fetch behavior — but this traded away the safety net a relational database is meant to provide.</p>
+
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul>
+          <li>Introduce explicit <code>@ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "...", foreignKey = @ForeignKey(name = "fk_..."))</code> only where a true parent/child relationship exists (JV line → JV header; bill item → bill; statement line → reconciliation). Keep <code>AccountHead.parentId</code> as a nullable self-referencing FK with <code>ON DELETE SET NULL</code>.</li>
+          <li>Where introducing a JPA relationship would risk unwanted cascade/fetch behavior in already-shipped code, add the FK constraint directly via migration SQL (see C3) without changing the Java field type.</li>
+        </ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>No frontend change — this is purely a persistence-layer integrity fix.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul>
+          <li><code>ALTER TABLE journal_voucher_lines ADD CONSTRAINT fk_jvl_header FOREIGN KEY (journal_voucher_id) REFERENCES journal_vouchers(id) ON DELETE RESTRICT;</code></li>
+          <li>Equivalent constraints for <code>payment_voucher_bills</code>, <code>bank_statement_lines</code>, <code>supplier_bill_items</code>, and a self-referencing FK on <code>account_heads.parent_id</code>.</li>
+          <li>Add supporting indexes on every FK column (see M1 — these same columns are also the ones being filtered on today).</li>
+        </ul></div>
+        <div><div class="sg-label">API</div><ul><li>No contract change. A delete that would now violate a constraint should surface as HTTP 409 rather than a raw 500 — ties into M2.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>Before adding constraints, run an orphan-row audit query per table and resolve any pre-existing orphans (manually or via a cleanup script) so the migration doesn’t fail on deploy.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not verified in the audit — no security finding applies here; this is a data-integrity fix.</li></ul></div>
+      </div>
+
+      <details>
+        <summary>Implementation plan</summary>
+        <div class="details-body">
+          <div class="phase">
+            <h5>Phase 1 — Orphan audit (pre-migration, non-destructive)</h5>
+            <dl><dt>New</dt><dd>One-off SQL audit script (not committed as app code)</dd>
+            <dt>Testing</dt><dd>Run against a staging copy of the DB; confirm zero orphans or produce a remediation list</dd></dl>
+          </div>
+          <div class="phase">
+            <h5>Phase 2 — Add constraints via migration</h5>
+            <dl><dt>DB</dt><dd>FK constraints + indexes, gated behind the migration tool introduced in C3</dd>
+            <dt>Modify</dt><dd><code>JournalVoucherLine.java</code>, <code>PaymentVoucherBill.java</code>, <code>BankStatementLine.java</code>, <code>SupplierBillItem.java</code>, <code>AccountHead.java</code> (add relationship annotations where safe)</dd>
+            <dt>Testing</dt><dd>Integration test: deleting a JV header with existing lines is now rejected (currently succeeds silently)</dd></dl>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Dependencies, risk &amp; delivery</summary>
+        <div class="details-body">
+          <div class="dep-flags">
+            <span class="flag yes">Depends on C3 (migration tooling)</span>
+            <span class="flag yes">Requires schema migration</span>
+            <span class="flag yes">May require one-time data cleanup</span>
+          </div>
+          <div class="risk-row"><span class="badge critical">High</span><span>If any orphaned rows already exist in a live database, the migration will fail on apply. Mitigate with the Phase 1 audit before writing the constraint migration.</span></div>
+          <table class="plan-table"><tr><th>Complexity</th><td>Large (several days, including the audit and staged rollout)</td></tr></table>
+          <p><b>Testing checklist</b></p>
+          <ul>
+            <li><b>Unit:</b> entity mapping changes compile and persist correctly.</li>
+            <li><b>Integration:</b> cascade/restrict behavior verified for each new FK.</li>
+            <li><b>Regression:</b> full existing test suite for Journal/Payment/Receipt/BankReconciliation still passes.</li>
+            <li><b>Edge cases:</b> delete-parent-with-children, insert-child-with-invalid-parent-id.</li>
+          </ul>
+          <p><b>Deployment.</b> Requires a maintenance-window-free but carefully staged migration: run the orphan audit in staging first, apply constraints in a low-traffic window, monitor for constraint-violation errors post-deploy. Rollback = drop the constraints (fast, safe) if unexpected violations appear in production traffic.</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- C3 -->
+    <section class="issue" id="c3">
+      <div class="issue-head">
+        <div><span class="issue-id">C3</span><h3>No schema migration tooling — Hibernate auto-DDL manages the production schema</h3></div>
+        <div class="badges-row"><span class="badge critical">Critical</span><span class="chip">Medium</span></div>
+      </div>
+
+      <p><b>Issue summary.</b> There are no Flyway/Liquibase migration files anywhere in the repository. The schema is generated by <code>spring.jpa.hibernate.ddl-auto=update</code>. It matters because every future schema change (including C2’s foreign keys) currently has no reviewable, versioned, repeatable path to production — it depends on whatever Hibernate infers from entity annotations at boot time.</p>
+
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">No direct accounting impact today, but blocks safely applying C2’s integrity fixes.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">None directly visible, but an unreviewed auto-DDL change on deploy could alter a column type/nullability unexpectedly.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value">None directly.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value"><code>ddl-auto=update</code> never removes columns/constraints and cannot add FK constraints for plain-Long fields — it can only grow the schema, never safely reconcile it.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">No audit trail of schema changes over time — a real gap for any financial system expected to demonstrate change control.</span></div>
+      </div>
+
+      <p><b>Current implementation.</b> <span class="path">application.properties:10</span> sets <code>spring.jpa.hibernate.ddl-auto=update</code>; <span class="path">application.properties:9</span> is the preceding comment header. A repository-wide search found no migration files under <code>Gym-backend/src/main/resources</code> or anywhere else.</p>
+      <p class="why">Affected modules: entire backend/database layer. Affected files: <code>application.properties</code>; all entity classes indirectly.</p>
+
+      <p><b>Root cause.</b> The project was likely bootstrapped for speed of iteration with auto-DDL and never transitioned to managed migrations as the schema (and its correctness requirements) grew.</p>
+
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul>
+          <li>Introduce Flyway (simplest fit for a straightforward Postgres/Spring Boot stack), add <code>flyway-core</code> dependency, and generate a baseline migration (<code>V1__baseline.sql</code>) from the current live schema.</li>
+          <li>Set <code>spring.jpa.hibernate.ddl-auto=validate</code> once Flyway is in place, so Hibernate only checks the schema matches the entities rather than mutating it.</li>
+        </ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>All future changes (including C2) become versioned <code>V__*.sql</code> files applied in order and tracked in a <code>flyway_schema_history</code> table.</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>CI step that fails the build if a new entity field has no corresponding migration (process control, not code).</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not verified in the audit. General practice: restrict who can run migrations in production to a controlled deploy pipeline.</li></ul></div>
+      </div>
+
+      <details>
+        <summary>Implementation plan</summary>
+        <div class="details-body">
+          <div class="phase">
+            <h5>Phase 1 — Baseline</h5>
+            <dl><dt>Modify</dt><dd><code>pom.xml</code> (add Flyway dependency), <code>application.properties</code></dd>
+            <dt>New</dt><dd><code>src/main/resources/db/migration/V1__baseline.sql</code> generated from current schema</dd>
+            <dt>Testing</dt><dd>Boot the app against a clean database and confirm Flyway applies the baseline cleanly</dd></dl>
+          </div>
+          <div class="phase">
+            <h5>Phase 2 — Switch Hibernate to validate-only</h5>
+            <dl><dt>Modify</dt><dd><code>application.properties</code>: <code>ddl-auto=validate</code></dd>
+            <dt>Testing</dt><dd>Full regression suite against a Flyway-managed staging database</dd></dl>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Dependencies, risk &amp; delivery</summary>
+        <div class="details-body">
+          <div class="dep-flags">
+            <span class="flag no">Independently deployable</span>
+            <span class="flag yes">Blocks C2 from being done safely</span>
+            <span class="flag no">No data migration required (schema only)</span>
+          </div>
+          <div class="risk-row"><span class="badge high">Medium</span><span>If the generated baseline doesn’t exactly match the live schema, first boot after the switch could fail validation. Mitigate by diffing the generated baseline against the live schema before switching <code>ddl-auto</code>.</span></div>
+          <table class="plan-table"><tr><th>Complexity</th><td>Medium (half day – 2 days)</td></tr></table>
+          <p><b>Deployment.</b> Zero-downtime: Flyway runs its baseline against the existing schema as a no-op if it already matches. Rollback = revert <code>ddl-auto</code> to <code>update</code> and disable Flyway; no data is touched.</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ============================================================ -->
+    <div class="priority-divider hi"><span>🟠 High Priority</span><div class="line"></div></div>
+
+    <!-- H1 -->
+    <section class="issue" id="h1">
+      <div class="issue-head">
+        <div><span class="issue-id">H1</span><h3>Account balance is mutated imperatively from three separate call sites</h3></div>
+        <div class="badges-row"><span class="badge high">High</span><span class="chip">Medium</span></div>
+      </div>
+      <p><b>Issue summary.</b> <code>AccountHead.currentBalance</code> is a stored, mutable value updated independently in <code>JournalVoucherService.postJournalVoucher()</code>, <code>JournalVoucherService.reverseJournalVoucher()</code>, and <code>FinancialEventService.updateAccountBalance()</code>. It matters because any new code path that posts a journal entry without going through one of these exact call sites (as already happened with Receipt Vouchers — see C1) silently desyncs the stored balance from the true sum of posted lines.</p>
+
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">Balance sheet figures sourced from <code>current_balance</code> can drift from what <code>journal_voucher_lines</code> actually sums to.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">An accountant trusting the displayed running balance has no way to know it might be stale.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value"><code>FinancialReportService</code>/<code>FinancialAnalyticsService</code> already avoid this by recomputing from JV lines directly — but any screen reading <code>current_balance</code> directly is exposed.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">Three independent mutation points for one derived value is a correctness hazard by construction.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">A stored balance that can’t be proven to equal the sum of its postings is an auditability weakness.</span></div>
+      </div>
+
+      <p><b>Current implementation.</b> <span class="path">JournalVoucherService.java:156-163</span> loops posted lines and calls <code>financialEventService.updateAccountBalance()</code> during <code>postJournalVoucher()</code>; <span class="path">JournalVoucherService.java:220-227</span> does the same during <code>reverseJournalVoucher()</code>; <code>FinancialEventService.updateAccountBalance()</code> itself (<span class="path">FinancialEventService.java:421-437</span>) does <code>current = current.add(debit).subtract(credit)</code> and saves. It is also invoked from inside <code>FinancialEventService.createAndPost()</code> for every automatic entry.</p>
+      <p class="why">Affected modules: Journal Voucher, Ledgers, Chart of Accounts. Affected files: <code>JournalVoucherService.java</code>, <code>FinancialEventService.java</code>, <code>AccountHead.java</code>.</p>
+
+      <p><b>Root cause.</b> <code>currentBalance</code> was implemented as a cached/denormalized column for read performance, but no single choke point owns writing to it — every new poster of a journal entry must remember to call it.</p>
+
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul>
+          <li>Consolidate all balance mutation behind one method: <code>FinancialEventService.updateAccountBalance()</code> already exists as that single point for auto-entries — extend <code>JournalVoucherService</code> to call it exclusively (already does), and ensure C1’s new manual-posting path also routes through it (already planned).</li>
+          <li>Add a scheduled reconciliation job that recomputes <code>SUM(debit-credit)</code> from <code>journal_voucher_lines</code> per account and compares to <code>current_balance</code>, logging/alerting on drift — a safety net, not a replacement for point 1.</li>
+        </ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>No change required.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>No schema change; optional: add a nightly materialized check, not a live constraint (balance is inherently a running total).</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>Reconciliation job surfaces mismatches as a monitored metric, not a blocking validation.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not verified in the audit.</li></ul></div>
+      </div>
+
+      <details>
+        <summary>Implementation plan</summary>
+        <div class="details-body">
+          <div class="phase"><h5>Phase 1 — Reconciliation job</h5>
+            <dl><dt>New</dt><dd><code>AccountBalanceReconciliationService</code> (scheduled job, mirrors existing <code>@Scheduled</code> pattern used by <code>AttendanceScheduler</code>/<code>NotificationScheduler</code>)</dd>
+            <dt>Testing</dt><dd>Unit test with intentionally desynced fixture data to confirm the drift is detected and logged</dd></dl>
+          </div>
+        </div>
+      </details>
+      <details>
+        <summary>Dependencies, risk &amp; delivery</summary>
+        <div class="details-body">
+          <div class="dep-flags"><span class="flag no">Independently deployable</span><span class="flag yes">Benefits from being sequenced after C1</span><span class="flag no">No schema migration</span></div>
+          <div class="risk-row"><span class="badge medium">Low-Medium</span><span>The reconciliation job is read-only and additive; risk is limited to noisy false-positive alerts if run before C1 is fixed.</span></div>
+          <table class="plan-table"><tr><th>Complexity</th><td>Medium (half day – 2 days)</td></tr></table>
+          <p><b>Deployment.</b> Zero downtime, purely additive scheduled job. Rollback = disable the schedule.</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- H2 -->
+    <section class="issue" id="h2">
+      <div class="issue-head">
+        <div><span class="issue-id">H2</span><h3>Voucher-number generation is duplicated four times with weak concurrency safety</h3></div>
+        <div class="badges-row"><span class="badge high">High</span><span class="chip">Medium</span></div>
+      </div>
+      <p><b>Issue summary.</b> The same “read the last voucher number, increment, format” logic is independently implemented in four places, each guarded only by a JVM-level <code>synchronized</code> method — not a database-level lock or sequence. It matters because under concurrent requests (or any future multi-instance deployment), two requests can read the same “last” voucher number before either saves, producing duplicate numbers that only fail at save-time via the <code>unique=true</code> constraint, surfacing as an unhandled exception rather than a graceful retry.</p>
+
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">A failed save due to a duplicate voucher number loses the user’s work with no automatic retry.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">Accountant sees a generic error on an occasional concurrent submit and must re-enter the voucher.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value">No direct effect once a voucher is successfully saved.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value"><code>synchronized</code> only protects against concurrent threads inside one JVM instance — it does nothing across multiple app instances.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">Voucher numbering gaps/collisions undermine sequential-numbering expectations common in financial audit trails.</span></div>
+      </div>
+
+      <p><b>Current implementation.</b> Identical logic appears at <span class="path">JournalVoucherService.java:42-55</span>, <span class="path">FinancialEventService.java:454-467</span>, <span class="path">PaymentVoucherService.java:37-50</span>, and <span class="path">ReceiptVoucherService.java:30-43</span> — each queries <code>findTopByVoucherNoStartingWithOrderByVoucherNoDesc(prefix)</code>, parses the numeric suffix, increments, and formats. Each method is declared <code>private synchronized</code>.</p>
+      <p class="why">Affected modules: Journal Voucher, Payment Voucher, Receipt Voucher, auto-journaling engine. Affected files: <code>JournalVoucherService.java</code>, <code>FinancialEventService.java</code>, <code>PaymentVoucherService.java</code>, <code>ReceiptVoucherService.java</code>.</p>
+
+      <p><b>Root cause.</b> The numbering logic was copy-pasted per voucher type instead of extracted into a shared, database-backed sequence generator.</p>
+
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul>
+          <li>Extract a single <code>VoucherNumberService.next(String voucherType)</code> backed by a dedicated Postgres sequence per prefix (or a single <code>voucher_sequences(prefix, last_value)</code> table updated via <code>SELECT ... FOR UPDATE</code>), removing all four duplicated methods.</li>
+          <li>On unique-constraint violation at save time, catch and retry once with a freshly generated number rather than surfacing a raw exception (belt-and-braces alongside the sequence fix).</li>
+        </ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>New table or Postgres <code>SEQUENCE</code> per voucher prefix (JV, PV, RV) — a small, purpose-built migration once C3 is in place.</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li>No contract change.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>None beyond existing uniqueness.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not verified in the audit.</li></ul></div>
+      </div>
+
+      <details>
+        <summary>Implementation plan</summary>
+        <div class="details-body">
+          <div class="phase"><h5>Phase 1 — Shared service</h5>
+            <dl><dt>New</dt><dd><code>VoucherNumberService</code></dd>
+            <dt>Modify</dt><dd><code>JournalVoucherService.java</code>, <code>FinancialEventService.java</code>, <code>PaymentVoucherService.java</code>, <code>ReceiptVoucherService.java</code> (remove local generators, inject shared service)</dd>
+            <dt>DB</dt><dd><code>voucher_sequences</code> table, seeded from the current max per prefix</dd>
+            <dt>Testing</dt><dd>Concurrency test: N parallel requests each get a unique number with no gaps or collisions</dd></dl>
+          </div>
+        </div>
+      </details>
+      <details>
+        <summary>Dependencies, risk &amp; delivery</summary>
+        <div class="details-body">
+          <div class="dep-flags"><span class="flag no">Independently deployable</span><span class="flag yes">Should precede C1’s increased call volume</span><span class="flag yes">Requires small schema migration</span></div>
+          <div class="risk-row"><span class="badge medium">Medium</span><span>Seeding the new sequence table incorrectly could produce a collision with an already-issued number. Mitigate by seeding from <code>MAX(numeric suffix) + 1</code> per prefix at migration time.</span></div>
+          <table class="plan-table"><tr><th>Complexity</th><td>Medium (half day – 2 days)</td></tr></table>
+          <p><b>Deployment.</b> Rolling deploy; seed migration runs once. Rollback = revert to the per-service generators (keep the old methods in place, dark, for one release as a safety net before deleting).</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- H3 -->
+    <section class="issue" id="h3">
+      <div class="issue-head">
+        <div><span class="issue-id">H3</span><h3>Journal Vouchers can be permanently hard-deleted</h3></div>
+        <div class="badges-row"><span class="badge high">High</span><span class="chip">Small</span></div>
+      </div>
+      <p><b>Issue summary.</b> <code>JournalVoucherService.deleteJournalVoucher()</code> performs a real <code>repository.delete()</code> on DRAFT or CANCELLED vouchers. It matters because once deleted, all record of that voucher having existed is gone beyond the generic <code>createdBy</code>/<code>updatedBy</code> audit columns on <code>BaseEntity</code> — there is no trace left for review.</p>
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">No POSTED voucher can be deleted (guarded), so ledger correctness itself is protected — this is about audit-trail completeness for drafts.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">An accountant who deletes a draft by mistake cannot recover it.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value">No effect on POSTED-only reports.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">Combined with C2 (no FK), a delete could also orphan its lines if the guard were ever bypassed by a direct repository call.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">Financial audit trails typically expect “nothing is truly deleted” for anything that ever existed as a financial document, even a draft.</span></div>
+      </div>
+      <p><b>Current implementation.</b> <span class="path">JournalVoucherService.java:252-260</span>: checks status is DRAFT or CANCELLED, then <code>lineRepository.deleteByJournalVoucherId(id)</code> followed by <code>journalVoucherRepository.delete(jv)</code> — a genuine hard delete of both header and lines.</p>
+      <p class="why">Affected modules: Journal Voucher. Affected files: <code>JournalVoucherService.java</code>.</p>
+      <p><b>Root cause.</b> No soft-delete convention exists anywhere in the financial entities (no <code>deletedAt</code>/<code>isDeleted</code> column on <code>BaseEntity</code>), so deletion defaults to a hard delete.</p>
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul><li>Add a soft-delete flag (e.g. <code>deletedAt</code>) to <code>JournalVoucher</code>/<code>BaseEntity</code>, change <code>deleteJournalVoucher()</code> to set it instead of calling <code>repository.delete()</code>, and filter it out of all list queries.</li></ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>No visible change — delete still appears to remove the voucher from view.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>New nullable <code>deleted_at TIMESTAMP</code> column on <code>journal_vouchers</code> (and optionally on other voucher tables for consistency).</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li>No contract change.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>Ensure every existing <code>findAll...()</code> query used by list/report endpoints excludes soft-deleted rows.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not verified in the audit.</li></ul></div>
+      </div>
+      <details><summary>Implementation plan</summary><div class="details-body">
+        <div class="phase"><h5>Phase 1 — Soft delete</h5>
+          <dl><dt>Modify</dt><dd><code>JournalVoucher.java</code> (add field), <code>JournalVoucherService.deleteJournalVoucher()</code>, <code>JournalVoucherRepository</code> queries</dd>
+          <dt>DB</dt><dd><code>ALTER TABLE journal_vouchers ADD COLUMN deleted_at TIMESTAMP;</code></dd>
+          <dt>Testing</dt><dd>Deleted voucher no longer appears in list/get, but row still exists in DB for audit query</dd></dl>
+        </div>
+      </div></details>
+      <details><summary>Dependencies, risk &amp; delivery</summary><div class="details-body">
+        <div class="dep-flags"><span class="flag no">Independently deployable</span><span class="flag no">No dependency on other tasks</span><span class="flag yes">Requires small schema migration</span></div>
+        <div class="risk-row"><span class="badge low">Low</span><span>Additive column, no behavior change for POSTED/REVERSED vouchers which were never deletable.</span></div>
+        <table class="plan-table"><tr><th>Complexity</th><td>Small (1–2 hours) for the column + guard; Small–Medium including query updates</td></tr></table>
+        <p><b>Deployment.</b> Zero downtime, additive column with a default of <code>NULL</code>. Rollback = revert code to hard-delete (column can remain unused).</p>
+      </div></details>
+    </section>
+
+    <!-- ============================================================ -->
+    <div class="priority-divider med"><span>🟡 Medium Priority</span><div class="line"></div></div>
+
+    <!-- M1 -->
+    <section class="issue" id="m1">
+      <div class="issue-head">
+        <div><span class="issue-id">M1</span><h3>List endpoints load entire tables and filter in application memory</h3></div>
+        <div class="badges-row"><span class="badge medium">Medium</span><span class="chip">Medium</span></div>
+      </div>
+      <p><b>Issue summary.</b> <code>JournalVoucherService.getJournalVouchers()</code>, <code>ReceiptVoucherService.getReceiptVouchers()</code>, and <code>LedgerTransactionService.getTransactions()</code> all call an unfiltered <code>findAll...()</code> and then run <code>.stream().filter()</code> in Java, with no pagination on the corresponding controllers. It matters because response time and memory use will scale linearly with total ledger history rather than with the page the user is actually viewing.</p>
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">No correctness impact — purely a performance concern.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">Ledgers/Journal Voucher screens will get slower every month as history accumulates.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value"><code>LedgerTransactionService.getTransactions()</code> loads all three source tables (receipt vouchers, payment vouchers, journal vouchers) fully on every call.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">No integrity impact.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">No compliance impact.</span></div>
+      </div>
+      <p><b>Current implementation.</b> <code>JournalVoucherService.getJournalVouchers()</code> (<span class="path">JournalVoucherService.java:57-74</span>) and <code>ReceiptVoucherService.getReceiptVouchers()</code> (<span class="path">ReceiptVoucherService.java:45-68</span>) both call a <code>findAllByOrderBy...Desc()</code> repository method with no <code>Pageable</code> parameter, then filter with Java streams. <code>LedgerTransactionService.getTransactions()</code> (<span class="path">LedgerTransactionService.java:62-154</span>) does the same across three repositories at once. By contrast, <code>SupplierBillService</code> already uses Spring Data’s <code>Pageable</code>/<code>Specification</code> (imports at <span class="path">SupplierBillService.java:19-23</span>), proving the pattern is available in this codebase.</p>
+      <p class="why">Affected modules: Journal Voucher, Receipt Voucher, Ledgers. Affected files: <code>JournalVoucherService.java</code>, <code>ReceiptVoucherService.java</code>, <code>LedgerTransactionService.java</code>, their controllers.</p>
+      <p><b>Root cause.</b> These services were written before <code>SupplierBillService</code>’s <code>Specification</code>-based pattern existed, or simply weren’t migrated to it afterward.</p>
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul><li>Convert each <code>findAll...()</code> + Java filter to a <code>Specification</code>/<code>Pageable</code> query, mirroring <code>SupplierBillService</code>. Add <code>page</code>/<code>size</code>/<code>sort</code> params to the controllers.</li></ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>Ledgers/Journal Voucher/Receipt Voucher screens adopt paginated table controls instead of client-side scroll of a full list.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>Indexes on the columns actually filtered/sorted on (<code>date</code>, <code>status</code>, <code>voucher_no</code>) — naturally paired with C2’s FK-column indexes.</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li><code>GET /api/journal-vouchers</code>, <code>/api/receipt-vouchers</code>, <code>/api/ledger-transactions</code> gain <code>page</code>/<code>size</code> query params and a paged response envelope, matching the existing <code>SupplierBillsPageResponseDTO</code> shape.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>Cap max page size server-side to prevent a client from requesting the whole table anyway.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not verified in the audit.</li></ul></div>
+      </div>
+      <details><summary>Implementation plan</summary><div class="details-body">
+        <div class="phase"><h5>Phase 1 — Journal &amp; Receipt Vouchers</h5>
+          <dl><dt>Modify</dt><dd><code>JournalVoucherService.java</code>, <code>JournalVoucherController.java</code>, <code>ReceiptVoucherService.java</code>, <code>ReceiptVoucherController.java</code></dd>
+          <dt>New</dt><dd>Paged response DTOs (pattern already exists: <code>SupplierBillsPageResponseDTO</code>)</dd>
+          <dt>UI</dt><dd><code>journal-voucher.tsx</code>, <code>receipt-voucher.tsx</code> pagination controls</dd>
+          <dt>Testing</dt><dd>Load test with a large seeded dataset; verify response time and payload size scale with page size, not table size</dd></dl>
+        </div>
+        <div class="phase"><h5>Phase 2 — Ledgers combined view</h5>
+          <dl><dt>Modify</dt><dd><code>LedgerTransactionService.java</code>, <code>LedgerTransactionController.java</code>, <code>ledgers.tsx</code></dd>
+          <dt>Testing</dt><dd>Verify combined pagination across three underlying sources remains correctly ordered by date</dd></dl>
+        </div>
+      </div></details>
+      <details><summary>Dependencies, risk &amp; delivery</summary><div class="details-body">
+        <div class="dep-flags"><span class="flag no">Independently deployable</span><span class="flag yes">Benefits from C2’s indexes</span><span class="flag no">No data migration</span></div>
+        <div class="risk-row"><span class="badge medium">Medium</span><span>Combining three sources into one paginated feed (Ledgers) is the trickiest part — mitigate by paginating per-source first, then merging client-side if a true cross-source page proves complex.</span></div>
+        <table class="plan-table"><tr><th>Complexity</th><td>Medium–Large (2–4 days total across both phases)</td></tr></table>
+        <p><b>Deployment.</b> Zero downtime; old non-paginated endpoints can stay live behind a version bump until the frontend cutover is confirmed, then removed. Rollback = revert controller/service changes; no data risk.</p>
+      </div></details>
+    </section>
+
+    <!-- M2 -->
+    <section class="issue" id="m2">
+      <div class="issue-head">
+        <div><span class="issue-id">M2</span><h3>No centralized exception handling — generic <code>RuntimeException</code> everywhere</h3></div>
+        <div class="badges-row"><span class="badge medium">Medium</span><span class="chip">Medium</span></div>
+      </div>
+      <p><b>Issue summary.</b> Every “not found” or business-rule violation in <code>JournalVoucherService.java</code> (and its siblings) throws a plain <code>RuntimeException</code> with a message string. It matters because the frontend cannot reliably distinguish “voucher not found” (should be a 404) from “only DRAFT vouchers can be posted” (should be a 400/409) without parsing message text.</p>
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">No accounting impact.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">Errors likely surface as a generic failure/toast rather than a specific, actionable message.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value">No reporting impact.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">No integrity impact — this is an API/UX consistency issue.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">No compliance impact.</span></div>
+      </div>
+      <p><b>Current implementation.</b> Confirmed at <span class="path">JournalVoucherService.java:78, 107, 138, 178, 239, 254</span> — every not-found case is <code>throw new RuntimeException("... not found: " + id)</code>. The same pattern is used in <code>ReceiptVoucherService.java</code> and <code>PaymentVoucherService.java</code>. The audit did not find a <code>@ControllerAdvice</code> in the controllers reviewed, though an exhaustive project-wide search for one was not performed.</p>
+      <p class="why">Affected modules: Journal Voucher, Payment Voucher, Receipt Voucher (and likely others following the same pattern). Affected files: <code>JournalVoucherService.java</code>, <code>ReceiptVoucherService.java</code>, <code>PaymentVoucherService.java</code>.</p>
+      <p><b>Root cause.</b> No domain exception hierarchy or global exception mapper was established early in the project, so each service defaulted to the simplest available exception type.</p>
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul>
+          <li>Introduce <code>EntityNotFoundException</code> and <code>BusinessRuleViolationException</code> (or similar), and one <code>@RestControllerAdvice</code> mapping the former to 404 and the latter to 409/400 with a structured error body.</li>
+          <li>Replace <code>RuntimeException</code> throws in the financial services with the new typed exceptions, starting with Journal/Payment/Receipt Voucher services.</li>
+        </ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>Update fetch wrappers (e.g. <code>journal-voucher-service.tsx</code>) to branch on HTTP status/structured error body rather than assuming a generic failure.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li>Error response body gains a stable shape (e.g. <code>{ "error": "NOT_FOUND", "message": "..." }</code>) instead of a raw stack-trace-driven 500.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>N/A.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Ensure the global handler does not leak stack traces or internal messages in production responses — general practice, not a verified finding.</li></ul></div>
+      </div>
+      <details><summary>Implementation plan</summary><div class="details-body">
+        <div class="phase"><h5>Phase 1 — Exception hierarchy + global handler</h5>
+          <dl><dt>New</dt><dd><code>EntityNotFoundException</code>, <code>BusinessRuleViolationException</code>, <code>GlobalExceptionHandler</code> (<code>@RestControllerAdvice</code>)</dd>
+          <dt>Testing</dt><dd>Unit test each exception maps to the intended HTTP status</dd></dl>
+        </div>
+        <div class="phase"><h5>Phase 2 — Migrate financial services</h5>
+          <dl><dt>Modify</dt><dd><code>JournalVoucherService.java</code>, <code>ReceiptVoucherService.java</code>, <code>PaymentVoucherService.java</code> (swap thrown types)</dd>
+          <dt>Testing</dt><dd>API test: not-found now returns 404 with structured body; balance-violation returns 409</dd></dl>
+        </div>
+      </div></details>
+      <details><summary>Dependencies, risk &amp; delivery</summary><div class="details-body">
+        <div class="dep-flags"><span class="flag no">Independently deployable</span><span class="flag no">No other task depends on it, but improves error handling for C1/H1/H3 work done afterward</span><span class="flag no">No schema migration</span></div>
+        <div class="risk-row"><span class="badge low">Low</span><span>Purely additive; risk is limited to frontend code that may currently parse raw error message text and would need updating alongside.</span></div>
+        <table class="plan-table"><tr><th>Complexity</th><td>Medium (half day – 2 days)</td></tr></table>
+        <p><b>Deployment.</b> Zero downtime. Roll out backend first (old plain-text error bodies still parse as failures on the frontend), then update frontend error handling. Rollback = revert the controller advice; services still function, just with less specific status codes.</p>
+      </div></details>
+    </section>
+
+    <!-- M3 -->
+    <section class="issue" id="m3">
+      <div class="issue-head">
+        <div><span class="issue-id">M3</span><h3>Zero/negative-amount events are silently dropped with no logging</h3></div>
+        <div class="badges-row"><span class="badge medium">Medium</span><span class="chip">Small</span></div>
+      </div>
+      <p><b>Issue summary.</b> <code>FinancialEventService.onMemberPaymentReceived</code>, <code>onSaleCompleted</code>, and <code>onExpenseApproved</code> each start with <code>if (amount.compareTo(BigDecimal.ZERO) &lt;= 0) return;</code> and produce no journal entry and no log line. It matters because a data-entry error producing a zero/negative amount leaves no trace that an event was even considered and skipped.</p>
+      <p><b>Current implementation.</b> Confirmed at <span class="path">FinancialEventService.java:106</span> (onMemberPaymentReceived), <span class="path">:139</span> (onSaleCompleted), <span class="path">:203</span> (onExpenseApproved).</p>
+      <p class="why">Affected modules: Billing, Sales, Expenses (auto-journaling). Affected files: <code>FinancialEventService.java</code>.</p>
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">A legitimate small transaction that resolves to zero after some upstream calculation error would vanish with no record.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">No visible symptom to the user — that’s the problem.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value">No effect on totals (correctly excludes zero), but no diagnostic trail if it happens unexpectedly.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">Makes root-causing “why didn’t this sale/expense post a JV” difficult after the fact.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">Absence of an event log for a skipped financial event is a minor audit-trail gap.</span></div>
+      </div>
+      <p><b>Root cause.</b> The guard clause was written defensively to avoid posting no-op zero-value entries, but without an accompanying log statement.</p>
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul><li>Add a structured log (e.g. <code>log.warn("Skipped auto-journal: {} amount<=0 for entityId={}", ...)</code>) at each of the three guard clauses, plus the same guard pattern used elsewhere in the class (payroll, asset purchase, supplier bill).</li></ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>None — logging only, no behavior change to the skip itself.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not applicable.</li></ul></div>
+      </div>
+      <details><summary>Implementation plan</summary><div class="details-body">
+        <div class="phase"><h5>Phase 1 — Add logging</h5>
+          <dl><dt>Modify</dt><dd><code>FinancialEventService.java</code> (all <code>onXxx</code> guard clauses)</dd>
+          <dt>Testing</dt><dd>Unit test asserting a log line is emitted (via a test log appender) when amount ≤ 0</dd></dl>
+        </div>
+      </div></details>
+      <details><summary>Dependencies, risk &amp; delivery</summary><div class="details-body">
+        <div class="dep-flags"><span class="flag no">Independently deployable</span><span class="flag no">No dependencies</span><span class="flag no">No migration</span></div>
+        <div class="risk-row"><span class="badge low">Low</span><span>Logging-only change; no behavioral risk.</span></div>
+        <table class="plan-table"><tr><th>Complexity</th><td>Small (1–2 hours)</td></tr></table>
+        <p><b>Deployment.</b> Zero downtime, no rollback concerns beyond reverting the log statements.</p>
+      </div></details>
+    </section>
+
+    <!-- M4 -->
+    <section class="issue" id="m4">
+      <div class="issue-head">
+        <div><span class="issue-id">M4</span><h3>A read (GET) endpoint mutates tax-compliance status as a side effect</h3></div>
+        <div class="badges-row"><span class="badge medium">Medium</span><span class="chip">Small</span></div>
+      </div>
+      <p><b>Issue summary.</b> <code>TaxComplianceService.getAll()</code> flips any PENDING record past its due date to OVERDUE and persists it, inside what is otherwise a list-fetch operation. It matters because a GET request causing a database write violates REST semantics and means simply loading the Tax Compliance screen changes stored state.</p>
+      <p><b>Current implementation.</b> <span class="path">TaxComplianceService.java:37-44</span>: <code>all.forEach(t -> { if (PENDING &amp;&amp; overdue) { t.setStatus("OVERDUE"); taxComplianceRepository.save(t); } });</code> — the class is annotated class-level <code>@Transactional</code> (read-write), so this write actually commits.</p>
+      <p class="why">Affected modules: Tax Compliance, Financial Analytics (its dashboard counts pending+overdue tax obligations). Affected files: <code>TaxComplianceService.java</code>.</p>
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">No monetary impact — status metadata only.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">Two users viewing the list around a due-date boundary could see the write happen mid-session, with no explicit action taken by either.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value"><code>FinancialAnalyticsService.getDashboard()</code>’s “pending_tax_obligations” count depends on this status field being current, so the side effect is currently load-bearing for that metric.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">Not a correctness bug today, but fragile: any future caching or read-replica routing of GET traffic would break the OVERDUE transition silently.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">No compliance impact.</span></div>
+      </div>
+      <p><b>Root cause.</b> The overdue check was implemented inline in the list method for convenience rather than as an independent scheduled process.</p>
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul><li>Move the PENDING→OVERDUE transition into a small daily <code>@Scheduled</code> job (matching the existing scheduler pattern already used elsewhere in the codebase), and make <code>getAll()</code> purely read-only.</li></ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li>No contract change.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>None.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not applicable.</li></ul></div>
+      </div>
+      <details><summary>Implementation plan</summary><div class="details-body">
+        <div class="phase"><h5>Phase 1 — Extract to scheduled job</h5>
+          <dl><dt>New</dt><dd><code>TaxComplianceOverdueScheduler</code></dd>
+          <dt>Modify</dt><dd><code>TaxComplianceService.getAll()</code> — remove the mutation, mark method <code>@Transactional(readOnly = true)</code></dd>
+          <dt>Testing</dt><dd>Unit test the scheduler transitions PENDING→OVERDUE; integration test confirms GET no longer writes</dd></dl>
+        </div>
+      </div></details>
+      <details><summary>Dependencies, risk &amp; delivery</summary><div class="details-body">
+        <div class="dep-flags"><span class="flag no">Independently deployable</span><span class="flag no">No dependencies</span><span class="flag no">No migration</span></div>
+        <div class="risk-row"><span class="badge low">Low</span><span>Behavior becomes daily-granularity instead of on-every-view — acceptable for a due-date status field. Mitigate by also running the check once on app startup.</span></div>
+        <table class="plan-table"><tr><th>Complexity</th><td>Small (1–2 hours)</td></tr></table>
+        <p><b>Deployment.</b> Zero downtime. Rollback = revert to inline mutation.</p>
+      </div></details>
+    </section>
+
+    <!-- ============================================================ -->
+    <div class="priority-divider lo"><span>🟢 Low Priority</span><div class="line"></div></div>
+
+    <!-- L1 -->
+    <section class="issue" id="l1">
+      <div class="issue-head">
+        <div><span class="issue-id">L1</span><h3>Financial settings accept any value with no type/schema validation</h3></div>
+        <div class="badges-row"><span class="badge low">Low</span><span class="chip">Small</span></div>
+      </div>
+      <p><b>Issue summary.</b> <code>FinancialSettingService.upsertSetting()</code> stores <code>settingValue</code> as a free-form string with no validation against the setting’s expected type or allowed values. It matters because a malformed value (e.g. a non-numeric tax-rate setting) would only fail wherever it’s eventually consumed, far from where it was entered.</p>
+      <p><b>Current implementation.</b> <span class="path">FinancialSettingService.java:36-51</span>: the method maps every field from the request DTO onto the entity and saves — no format or range checks on <code>settingValue</code> for any <code>category</code>.</p>
+      <p class="why">Affected modules: Financial Settings. Affected files: <code>FinancialSettingService.java</code>, <code>FinancialSetting.java</code>.</p>
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">A bad numeric setting (e.g. malformed tax rate) could silently be parsed as zero/NaN wherever consumed.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">No immediate feedback if an invalid value is entered — the error surfaces later, elsewhere.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value">Downstream calculations reading a malformed setting could be silently wrong.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">Low severity given the small scope of the settings table.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">No compliance impact.</span></div>
+      </div>
+      <p><b>Root cause.</b> The key/value settings model is intentionally generic and was never paired with per-category validation rules.</p>
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul><li>Add a small per-category validator (e.g. a <code>Map&lt;String, Predicate&lt;String&gt;&gt;</code> or a switch on <code>category</code>) invoked in <code>upsertSetting()</code> before save.</li></ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li><code>financial-settings.tsx</code> form gains matching client-side validation per known category.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li>Invalid value now returns 400 instead of silently saving.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>Category-specific rules: numeric ranges for rates, enum checks for mode-style settings.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not applicable.</li></ul></div>
+      </div>
+      <details><summary>Implementation plan &amp; delivery</summary><div class="details-body">
+        <div class="phase"><h5>Phase 1 — Category validators</h5>
+          <dl><dt>Modify</dt><dd><code>FinancialSettingService.upsertSetting()</code></dd>
+          <dt>Testing</dt><dd>Unit test each known category rejects an out-of-range/malformed value</dd></dl>
+        </div>
+        <div class="dep-flags"><span class="flag no">Independently deployable</span><span class="flag no">No dependencies</span><span class="flag no">No migration</span></div>
+        <table class="plan-table"><tr><th>Complexity</th><td>Small (1–2 hours)</td></tr></table>
+        <p><b>Deployment.</b> Zero downtime, additive validation only.</p>
+      </div></details>
+    </section>
+
+    <!-- L2 -->
+    <section class="issue" id="l2">
+      <div class="issue-head">
+        <div><span class="issue-id">L2</span><h3>Cost-center code generation throws on collision instead of retrying</h3></div>
+        <div class="badges-row"><span class="badge low">Low</span><span class="chip">Small</span></div>
+      </div>
+      <p><b>Issue summary.</b> <code>CostCenterService.create()</code> generates a code as <code>NAME-XXXX</code> using 4 random UUID characters, and if that exact code already exists, throws <code>IllegalArgumentException</code> rather than generating a new candidate. It matters only in the rare case a collision actually occurs — the user then has to resubmit rather than the system silently retrying.</p>
+      <p><b>Current implementation.</b> <span class="path">CostCenterService.java:57</span> builds the candidate; <span class="path">CostCenterService.java:60-62</span> checks existence and throws if taken.</p>
+      <p class="why">Affected modules: Cost Centers. Affected files: <code>CostCenterService.java</code>.</p>
+      <div class="impact-grid">
+        <div class="impact-cell"><span class="label">Accounting</span><span class="value">No accounting impact.</span></div>
+        <div class="impact-cell"><span class="label">User</span><span class="value">Extremely rare failure requiring a manual resubmit.</span></div>
+        <div class="impact-cell"><span class="label">Reporting</span><span class="value">No impact.</span></div>
+        <div class="impact-cell"><span class="label">Data integrity</span><span class="value">No impact — the uniqueness check itself is correct, just unfriendly.</span></div>
+        <div class="impact-cell"><span class="label">Compliance</span><span class="value">No impact.</span></div>
+      </div>
+      <p><b>Root cause.</b> The auto-generation path assumed collisions would be rare enough not to need a retry loop.</p>
+      <div class="solution-grid">
+        <div><div class="sg-label">Backend</div><ul><li>Wrap candidate generation in a small bounded retry loop (e.g. up to 5 attempts) before falling back to the current explicit error.</li></ul></div>
+        <div><div class="sg-label">Frontend</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Database</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">API</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Validation</div><ul><li>No change.</li></ul></div>
+        <div><div class="sg-label">Security</div><ul><li>Not applicable.</li></ul></div>
+      </div>
+      <details><summary>Implementation plan &amp; delivery</summary><div class="details-body">
+        <div class="phase"><h5>Phase 1 — Retry loop</h5>
+          <dl><dt>Modify</dt><dd><code>CostCenterService.create()</code></dd>
+          <dt>Testing</dt><dd>Unit test forcing a collision confirms a second candidate is generated instead of throwing</dd></dl>
+        </div>
+        <div class="dep-flags"><span class="flag no">Independently deployable</span><span class="flag no">No dependencies</span><span class="flag no">No migration</span></div>
+        <table class="plan-table"><tr><th>Complexity</th><td>Small (1–2 hours)</td></tr></table>
+        <p><b>Deployment.</b> Zero downtime, behavior-only change.</p>
+      </div></details>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="priority-roadmap">
+      <h2>Priority roadmap</h2>
+      <p class="lede">All twelve verified issues, ordered by priority tier and sized for planning.</p>
+
+      <h3 style="font-size:1.05rem; color:var(--critical); margin-bottom:0.25rem;">🔴 Critical — must fix before production</h3>
+      <div class="roadmap-item"><span class="rid">C1</span><span class="rtitle">Receipt Vouchers bypass the general ledger</span><span class="rcomplex chip">Major Feature</span></div>
+      <div class="roadmap-item"><span class="rid">C2</span><span class="rtitle">No database-level foreign keys in the financial schema</span><span class="rcomplex chip">Large</span></div>
+      <div class="roadmap-item"><span class="rid">C3</span><span class="rtitle">No migration tooling — Hibernate auto-DDL manages production schema</span><span class="rcomplex chip">Medium</span></div>
+
+      <h3 style="font-size:1.05rem; color:var(--high); margin:1.75rem 0 0.25rem;">🟠 High Priority</h3>
+      <div class="roadmap-item"><span class="rid">H1</span><span class="rtitle">Account balance mutated from three separate call sites</span><span class="rcomplex chip">Medium</span></div>
+      <div class="roadmap-item"><span class="rid">H2</span><span class="rtitle">Voucher numbering duplicated 4×, weak concurrency safety</span><span class="rcomplex chip">Medium</span></div>
+      <div class="roadmap-item"><span class="rid">H3</span><span class="rtitle">Journal Vouchers can be permanently hard-deleted</span><span class="rcomplex chip">Small</span></div>
+
+      <h3 style="font-size:1.05rem; color:var(--medium); margin:1.75rem 0 0.25rem;">🟡 Medium Priority</h3>
+      <div class="roadmap-item"><span class="rid">M1</span><span class="rtitle">Full-table in-memory filtering, no pagination</span><span class="rcomplex chip">Medium</span></div>
+      <div class="roadmap-item"><span class="rid">M2</span><span class="rtitle">No centralized exception handling</span><span class="rcomplex chip">Medium</span></div>
+      <div class="roadmap-item"><span class="rid">M3</span><span class="rtitle">Silent no-op on non-positive amounts, no logging</span><span class="rcomplex chip">Small</span></div>
+      <div class="roadmap-item"><span class="rid">M4</span><span class="rtitle">GET endpoint mutates tax-compliance status</span><span class="rcomplex chip">Small</span></div>
+
+      <h3 style="font-size:1.05rem; color:var(--low); margin:1.75rem 0 0.25rem;">🟢 Low Priority</h3>
+      <div class="roadmap-item"><span class="rid">L1</span><span class="rtitle">Financial settings accept unvalidated values</span><span class="rcomplex chip">Small</span></div>
+      <div class="roadmap-item"><span class="rid">L2</span><span class="rtitle">Cost-center code collision throws instead of retrying</span><span class="rcomplex chip">Small</span></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="dependency-graph">
+      <h2>Dependency graph</h2>
+      <p class="lede">Recommended implementation order. An arrow means the source should land before the target — either because it changes shared infrastructure (M2, C3) or because it directly increases load on a path the target is fixing (H2 → C1).</p>
+      <pre class="mermaid">
+graph TD
+  C3["C3 · Migration tooling"] --> C2["C2 · Foreign key constraints"]
+  M2["M2 · Centralized exception handling"] --> C1["C1 · Fix Receipt Voucher ledger bypass"]
+  M2 --> H3["H3 · Soft-delete for vouchers"]
+  H2["H2 · Robust voucher numbering"] --> C1
+  C1 --> H1["H1 · Consolidate balance mutation"]
+  C2 --> M1["M1 · Pagination + query-level filtering"]
+  H1 --> M3["M3 · Log skipped auto-journal events"]
+  M4["M4 · Fix Tax Compliance GET side-effect"]
+  L1["L1 · Financial settings validation"]
+  L2["L2 · Cost-center code retry"]
+
+  classDef crit fill:#f7e6e3,stroke:#b3392c,color:#b3392c;
+  classDef high fill:#f6ead9,stroke:#a8631e,color:#a8631e;
+  classDef med fill:#f1ecd6,stroke:#8a7420,color:#8a7420;
+  classDef low fill:#e3ecf1,stroke:#3d647d,color:#3d647d;
+  class C1,C2,C3 crit;
+  class H1,H2,H3 high;
+  class M1,M2,M3,M4 med;
+  class L1,L2 low;
+      </pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="milestones">
+      <h2>Milestone-based roadmap</h2>
+      <p class="lede">Five delivery milestones, sequenced to close the highest-risk accounting gaps first and finish with the operational hardening needed for a confident production launch.</p>
+
+      <div class="milestone">
+        <span class="mnum">01</span>
+        <h3>Financial Data Integrity</h3>
+        <div class="msub">Close the gap between what accountants enter and what the ledger actually reflects.</div>
+        <div class="msection"><div class="mlabel">Objectives</div><ul>
+          <li>Every money-movement document that can be created in the UI results in a posted, balanced journal entry.</li>
+          <li>Every parent/child financial record is protected by a real database constraint.</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Deliverables</div><ul>
+          <li>C1 — Receipt Voucher auto-posting to the ledger</li>
+          <li>C3 — Flyway migration tooling in place</li>
+          <li>C2 — Foreign keys on all financial parent/child relationships</li>
+          <li>H2 — Shared, collision-safe voucher numbering (sequenced here since C1 increases numbering call volume)</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Files affected</div><ul>
+          <li><code>ReceiptVoucherService.java</code>, <code>FinancialEventService.java</code>, all 16 financial entity classes, <code>application.properties</code>, new <code>db/migration/</code> directory, new <code>VoucherNumberService</code></li>
+        </ul></div>
+        <div class="milestone-footer">
+          <div class="mf-item"><b>~2–3 weeks</b>Estimated effort</div>
+          <div class="mf-item"><b>Zero orphaned rows; every receipt voucher traceable to a JV</b>Success criteria</div>
+          <div class="mf-item"><b>Migration failure on undetected orphan rows</b>Primary risk</div>
+        </div>
+      </div>
+      <div class="timeline-connector"></div>
+
+      <div class="milestone">
+        <span class="mnum">02</span>
+        <h3>Ledger Reliability</h3>
+        <div class="msub">Make the posted ledger self-consistent and its history tamper-evident.</div>
+        <div class="msection"><div class="mlabel">Objectives</div><ul>
+          <li>Account balances are provably consistent with posted journal lines at all times.</li>
+          <li>Nothing that was ever entered into the ledger can vanish without a trace.</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Deliverables</div><ul>
+          <li>H1 — Balance reconciliation job across <code>account_heads</code> vs. <code>journal_voucher_lines</code></li>
+          <li>H3 — Soft-delete for Journal Vouchers</li>
+          <li>M3 — Structured logging for skipped auto-journal events</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Files affected</div><ul>
+          <li>New <code>AccountBalanceReconciliationService</code>, <code>JournalVoucher.java</code>, <code>JournalVoucherService.java</code>, <code>FinancialEventService.java</code></li>
+        </ul></div>
+        <div class="milestone-footer">
+          <div class="mf-item"><b>~3–5 days</b>Estimated effort</div>
+          <div class="mf-item"><b>Reconciliation job reports zero drift on a clean dataset; deleted drafts remain queryable</b>Success criteria</div>
+          <div class="mf-item"><b>False-positive drift alerts if run before Milestone 1 completes</b>Primary risk</div>
+        </div>
+      </div>
+      <div class="timeline-connector"></div>
+
+      <div class="milestone">
+        <span class="mnum">03</span>
+        <h3>Reporting Accuracy</h3>
+        <div class="msub">Confirm that fixing Milestone 1 doesn’t regress the reports that were already correctly single-sourced, and remove the one confirmed reporting-adjacent side effect.</div>
+        <div class="msection"><div class="mlabel">Objectives</div><ul>
+          <li>Financial Reports and Analytics continue reading exclusively from posted <code>journal_voucher_lines</code>, now inclusive of manually posted receipt vouchers.</li>
+          <li>No read endpoint mutates state.</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Deliverables</div><ul>
+          <li>M4 — Move Tax Compliance overdue-status transition out of the GET path into a scheduled job</li>
+          <li>Regression verification: Income Statement / Balance Sheet / Dashboard totals reconciled before and after Milestone 1’s C1 change</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Files affected</div><ul>
+          <li><code>TaxComplianceService.java</code>, new <code>TaxComplianceOverdueScheduler</code>, <code>FinancialReportService.java</code> and <code>FinancialAnalyticsService.java</code> (verification only, no functional change expected)</li>
+        </ul></div>
+        <div class="milestone-footer">
+          <div class="mf-item"><b>~2–3 days</b>Estimated effort</div>
+          <div class="mf-item"><b>Dashboard/report totals match manual recalculation from posted JVs; GET requests never write</b>Success criteria</div>
+          <div class="mf-item"><b>Low — mostly verification work</b>Primary risk</div>
+        </div>
+      </div>
+      <div class="timeline-connector"></div>
+
+      <div class="milestone">
+        <span class="mnum">04</span>
+        <h3>Performance &amp; Scalability</h3>
+        <div class="msub">Ensure the ledger stays responsive as transaction history grows.</div>
+        <div class="msection"><div class="mlabel">Objectives</div><ul>
+          <li>List/search endpoints scale with page size, not total table size.</li>
+          <li>Query-layer filtering replaces in-memory filtering for the highest-traffic financial screens.</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Deliverables</div><ul>
+          <li>M1 — Pagination and <code>Specification</code>-based filtering for Journal Voucher, Receipt Voucher, and Ledgers</li>
+          <li>L2 — Cost-center code-generation retry loop (bundled here as a small polish item)</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Files affected</div><ul>
+          <li><code>JournalVoucherService.java</code>, <code>ReceiptVoucherService.java</code>, <code>LedgerTransactionService.java</code> and their controllers; <code>journal-voucher.tsx</code>, <code>receipt-voucher.tsx</code>, <code>ledgers.tsx</code>; <code>CostCenterService.java</code></li>
+        </ul></div>
+        <div class="milestone-footer">
+          <div class="mf-item"><b>~1 week</b>Estimated effort</div>
+          <div class="mf-item"><b>Response time flat as seeded dataset size grows 10×</b>Success criteria</div>
+          <div class="mf-item"><b>Merging three sources into one paginated Ledgers feed is non-trivial</b>Primary risk</div>
+        </div>
+      </div>
+      <div class="timeline-connector"></div>
+
+      <div class="milestone">
+        <span class="mnum">05</span>
+        <h3>Production Readiness</h3>
+        <div class="msub">Round out API consistency and input validation so the module behaves predictably under real operational conditions.</div>
+        <div class="msection"><div class="mlabel">Objectives</div><ul>
+          <li>Errors are typed and mapped to correct HTTP statuses across the financial API surface.</li>
+          <li>Configuration values (financial settings) are validated at the point of entry.</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Deliverables</div><ul>
+          <li>M2 — Domain exception hierarchy + <code>@RestControllerAdvice</code></li>
+          <li>L1 — Category-aware validation for Financial Settings</li>
+          <li>Final end-to-end regression pass across all five milestones</li>
+        </ul></div>
+        <div class="msection"><div class="mlabel">Files affected</div><ul>
+          <li>New <code>EntityNotFoundException</code>, <code>BusinessRuleViolationException</code>, <code>GlobalExceptionHandler</code>; <code>JournalVoucherService.java</code>, <code>ReceiptVoucherService.java</code>, <code>PaymentVoucherService.java</code>; <code>FinancialSettingService.java</code>, <code>financial-settings.tsx</code></li>
+        </ul></div>
+        <div class="milestone-footer">
+          <div class="mf-item"><b>~3–4 days</b>Estimated effort</div>
+          <div class="mf-item"><b>All financial API error responses carry a stable, typed error shape; no invalid setting value can be saved</b>Success criteria</div>
+          <div class="mf-item"><b>Frontend error-handling call sites must be updated in lockstep</b>Primary risk</div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="doc-footer">
+      Every issue, file path, method, and line reference in this roadmap traces to the verified findings from the prior audit pass on <span class="mono">Gym-backend</span> / <span class="mono">Gym-frontend</span>. Recommendations that extend beyond audited evidence (security/authorization notes) are explicitly labelled as such rather than presented as confirmed findings.
+    </footer>
+  </main>
+</div>

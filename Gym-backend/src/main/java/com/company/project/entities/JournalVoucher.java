@@ -3,6 +3,7 @@ package com.company.project.entities;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "journal_vouchers")
@@ -55,6 +56,15 @@ public class JournalVoucher extends BaseEntity {
     @Column(name = "reversed_by_voucher_id")
     private Long reversedByVoucherId;
 
+    /**
+     * Soft-delete marker — set when an accountant deletes a DRAFT/CANCELLED voucher.
+     * The row (and its lines) are never actually removed, so the audit trail is
+     * preserved; deleted vouchers are simply excluded from normal list/get queries.
+     * NULL means not deleted.
+     */
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     public JournalVoucher() {}
 
     public Long getId() { return id; }
@@ -89,4 +99,7 @@ public class JournalVoucher extends BaseEntity {
 
     public Long getReversedByVoucherId() { return reversedByVoucherId; }
     public void setReversedByVoucherId(Long reversedByVoucherId) { this.reversedByVoucherId = reversedByVoucherId; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 }

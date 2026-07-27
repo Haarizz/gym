@@ -111,8 +111,10 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [splitPayment, setSplitPayment] = useState({
     cash: 0,
-    card: 0
+    card: 0,
+    cheque: 0
   });
+  const [splitChequeReference, setSplitChequeReference] = useState('');
   const [showSplitPayment, setShowSplitPayment] = useState(false);
   const [showAppPassword, setShowAppPassword] = useState(false);
   const [existingUserId, setExistingUserId] = useState<number | undefined>();
@@ -643,19 +645,38 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       const totalAmount = getFinalPrice(); // Use discounted price
       setSplitPayment({
         cash: Math.floor(totalAmount / 2),
-        card: Math.ceil(totalAmount / 2)
+        card: Math.ceil(totalAmount / 2),
+        cheque: 0
       });
+      setSplitChequeReference('');
     } else {
       setShowSplitPayment(false);
-      setSplitPayment({ cash: 0, card: 0 });
+      setSplitPayment({ cash: 0, card: 0, cheque: 0 });
+      setSplitChequeReference('');
     }
   };
 
   // Handle split payment validation
   const validateSplitPayment = () => {
-    const total = splitPayment.cash + splitPayment.card;
+    const total = splitPayment.cash + splitPayment.card + splitPayment.cheque;
     const expectedTotal = getFinalPrice(); // Use discounted price
     return Math.abs(total - expectedTotal) < 0.01; // Allow for small floating point differences
+  };
+
+  // Builds the per-leg breakdown sent to the backend so a Mixed payment posts
+  // to the correct cash/bank accounts instead of one lump sum.
+  const buildPaymentBreakdown = () => {
+    const legs: { method: string; amount: number; reference?: string }[] = [];
+    if (splitPayment.cash > 0) legs.push({ method: 'Cash', amount: splitPayment.cash });
+    if (splitPayment.card > 0) legs.push({ method: 'Card', amount: splitPayment.card });
+    if (splitPayment.cheque > 0) {
+      legs.push({
+        method: 'Cheque',
+        amount: splitPayment.cheque,
+        ...(splitChequeReference ? { reference: splitChequeReference } : {})
+      });
+    }
+    return legs;
   };
 
   // Validate cash payment
@@ -835,6 +856,17 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     // End date is computed by the backend from plan duration; use existing value in edit mode
     const endDateStr = isEditMode ? (formData.endDate || '') : '';
 
+    // Map the internal selection value to the canonical label used across every
+    // payment window and stored in the financial records (Cash/Card/Cheque/Mixed).
+    const paymentMethodLabel: Record<string, string> = {
+      cash: 'Cash',
+      card: 'Card',
+      check: 'Cheque',
+      'multi-pay': 'Mixed',
+      credit: 'Credit',
+      'bank-transfer': 'Bank Transfer'
+    };
+
     const memberPayload = {
       name: `${formData.firstName} ${formData.lastName}`.trim(),
       email: formData.email,
@@ -862,7 +894,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       outstanding_balance: (selectedPaymentMethod ? (finalPaymentData as any).outstandingBalance : 0),
       last_payment_date: selectedPaymentMethod ? toIso(new Date().toISOString().split('T')[0]) : undefined,
       next_payment_date: selectedPaymentMethod ? toIso((finalPaymentData as any).paymentDueDate || '') : undefined,
-      payment_method_used: selectedPaymentMethod || undefined,
+      payment_method_used: selectedPaymentMethod ? (paymentMethodLabel[selectedPaymentMethod] || selectedPaymentMethod) : undefined,
+      payment_breakdown: selectedPaymentMethod === 'multi-pay' ? buildPaymentBreakdown() : undefined,
       discount_applied: discountAmount || 0,
       reg_doc_number: formData.regDocNumber,
       reg_doc_date: toIso(formData.regDocDate),
@@ -913,7 +946,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     setPaymentDialogOpen(false);
     setSelectedPaymentMethod('');
     setShowSplitPayment(false);
-    setSplitPayment({ cash: 0, card: 0 });
+    setSplitPayment({ cash: 0, card: 0, cheque: 0 });
+    setSplitChequeReference('');
     setPaymentData({
       paidAmount: '',
       receivedAmount: '',
@@ -2390,8 +2424,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       <FaCalculator className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-purple-900">Multi Pay</h4>
-                      <p className="text-sm text-purple-700">Split payment (Cash + Card)</p>
+                      <h4 className="font-semibold text-purple-900">Mixed Payment</h4>
+                      <p className="text-sm text-purple-700">Split across Cash, Card &amp; Cheque</p>
                     </div>
                   </div>
                   {selectedPaymentMethod === 'multi-pay' && (
@@ -2402,7 +2436,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   )}
                 </div>
 
-                {/* Check Payment */}
+                {/* Cheque Payment */}
                 <div 
                   className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
                     selectedPaymentMethod === 'check'
@@ -2416,8 +2450,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       <FaFileLines className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">Check</h4>
-                      <p className="text-sm text-gray-700">Pay via check</p>
+                      <h4 className="font-semibold text-gray-900">Cheque</h4>
+                      <p className="text-sm text-gray-700">Pay via cheque</p>
                     </div>
                   </div>
                   {selectedPaymentMethod === 'check' && (
@@ -2464,7 +2498,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <span>Split Payment Details</span>
                 </h4>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="cashAmount" className="flex items-center space-x-2">
                       <FaMoneyBillWave className="h-4 w-4 text-green-600" />
@@ -2478,14 +2512,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       value={splitPayment.cash}
                       onChange={(e) => {
                         const cashAmount = parseFloat(e.target.value) || 0;
-                        const cardAmount = getFinalPrice() - cashAmount;
-                        setSplitPayment({ cash: cashAmount, card: Math.max(0, cardAmount) });
+                        setSplitPayment(prev => ({ ...prev, cash: Math.max(0, cashAmount) }));
                       }}
                       className="mt-1"
                       placeholder="0"
                     />
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="cardAmount" className="flex items-center space-x-2">
                       <FaCreditCard className="h-4 w-4 text-blue-600" />
@@ -2499,15 +2532,48 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       value={splitPayment.card}
                       onChange={(e) => {
                         const cardAmount = parseFloat(e.target.value) || 0;
-                        const cashAmount = getFinalPrice() - cardAmount;
-                        setSplitPayment({ cash: Math.max(0, cashAmount), card: cardAmount });
+                        setSplitPayment(prev => ({ ...prev, card: Math.max(0, cardAmount) }));
+                      }}
+                      className="mt-1"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="chequeAmount" className="flex items-center space-x-2">
+                      <FaFileLines className="h-4 w-4 text-gray-600" />
+                      <span>Cheque Amount ({currencyCode})</span>
+                    </Label>
+                    <Input
+                      id="chequeAmount"
+                      type="number"
+                      min="0"
+                      max={getFinalPrice()}
+                      value={splitPayment.cheque}
+                      onChange={(e) => {
+                        const chequeAmount = parseFloat(e.target.value) || 0;
+                        setSplitPayment(prev => ({ ...prev, cheque: Math.max(0, chequeAmount) }));
                       }}
                       className="mt-1"
                       placeholder="0"
                     />
                   </div>
                 </div>
-                
+
+                {splitPayment.cheque > 0 && (
+                  <div>
+                    <Label htmlFor="splitChequeReference">Cheque Reference (optional)</Label>
+                    <Input
+                      id="splitChequeReference"
+                      type="text"
+                      value={splitChequeReference}
+                      onChange={(e) => setSplitChequeReference(e.target.value)}
+                      className="mt-1"
+                      placeholder="Cheque number"
+                    />
+                  </div>
+                )}
+
                 {/* Split Payment Summary */}
                 <div className="flex items-center justify-between p-3 bg-white border border-purple-200 rounded-lg">
                   <div className="flex items-center space-x-2">
@@ -2516,11 +2582,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   <div className="flex items-center space-x-3">
                     <span className={`font-bold ${
-                      validateSplitPayment() 
-                        ? 'text-green-600' 
+                      validateSplitPayment()
+                        ? 'text-green-600'
                         : 'text-red-600'
                     }`}>
-                      <CurrencyGlyph /> {(splitPayment.cash + splitPayment.card).toFixed(2)}
+                      <CurrencyGlyph /> {(splitPayment.cash + splitPayment.card + splitPayment.cheque).toFixed(2)}
                     </span>
                     {validateSplitPayment() ? (
                       <Badge className="bg-green-100 text-green-800">
@@ -2766,7 +2832,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     <p>📝 Payment will be added to the member's account for future settlement.</p>
                   )}
                   {selectedPaymentMethod === 'multi-pay' && (
-                    <p>🔄 Payment will be split between cash and card as specified above.</p>
+                    <p>🔄 Payment will be split across cash, card and cheque as specified above.</p>
                   )}
                   {selectedPaymentMethod === 'check' && (
                     <p>📄 Payment will be accepted via check. Please ensure the check is valid and has sufficient funds.</p>

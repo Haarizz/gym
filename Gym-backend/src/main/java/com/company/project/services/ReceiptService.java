@@ -116,6 +116,11 @@ public class ReceiptService {
      * Called from MemberService after creating or renewing a member.
      */
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus) {
+        return createReceiptForMember(member, transactionType, paymentStatus, null);
+    }
+
+    public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,
+                                          List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown) {
         Receipt r = new Receipt();
         r.setTransactionDate(LocalDateTime.now());
         r.setMemberDbId(member.getId());
@@ -125,6 +130,7 @@ public class ReceiptService {
         r.setTransactionType(transactionType);
         r.setAmount(member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO);
         r.setPaymentMethod(member.getPaymentMethodUsed() != null ? member.getPaymentMethodUsed() : "Cash");
+        r.setPaymentBreakdown(paymentBreakdown);
         boolean isPaid = "paid".equalsIgnoreCase(paymentStatus);
         r.setStatus(isPaid ? "Paid" : "Pending");
         r.setPaidAmount(isPaid ? r.getAmount() : BigDecimal.ZERO);
@@ -189,6 +195,7 @@ public class ReceiptService {
         settlement.setAmount(totalPaid);
         settlement.setPaidAmount(totalPaid);
         settlement.setPaymentMethod(req.getPaymentMethod());
+        settlement.setPaymentBreakdown(req.getPaymentBreakdown());
         settlement.setStatus("Paid");
         settlement.setPlanName(member.getMembershipPlan());
         settlement.setValidFrom(member.getMembershipStartDate());
@@ -215,7 +222,8 @@ public class ReceiptService {
                     req.getPaymentMethod(),
                     saved.getReceiptNo(),
                     saved.getReceiptNo(),
-                    req.getRemarks()
+                    req.getRemarks(),
+                    req.getPaymentBreakdown()
             );
         }
 

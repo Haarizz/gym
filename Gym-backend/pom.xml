@@ -40,7 +40,14 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
-		
+
+		<!-- Flyway: versioned schema migrations (replaces relying solely on
+		     spring.jpa.hibernate.ddl-auto for schema changes going forward) -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+
 		<!-- JWT dependencies -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>

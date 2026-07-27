@@ -28,6 +28,12 @@ export interface MemberDue {
   status: 'Overdue' | 'Due Soon';
 }
 
+export interface PaymentSplitLeg {
+  method: string;
+  amount: number;
+  reference?: string;
+}
+
 export interface SettlePaymentRequest {
   member_db_id: number;
   payment_method: string;
@@ -35,6 +41,7 @@ export interface SettlePaymentRequest {
   transaction_ref?: string;
   remarks?: string;
   bill_payments: { receipt_id: number; pay_amount: number }[];
+  payment_breakdown?: PaymentSplitLeg[];
 }
 
 class BillingService {
@@ -74,6 +81,7 @@ class BillingService {
         receipt_id: bp.receipt_id,
         pay_amount: bp.pay_amount,
       })),
+      payment_breakdown: request.payment_breakdown,
     };
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/billing/settle`,

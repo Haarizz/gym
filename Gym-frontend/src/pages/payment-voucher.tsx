@@ -40,9 +40,12 @@ import {
   ArrowUpDown,
   Calendar as CalendarBig,
   Users,
-  Receipt
+  Receipt,
+  Split
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
+import { SplitPaymentFields, isSplitPaymentValid, buildSplitPaymentBreakdown } from "../components/shared/split-payment-fields";
+import type { SplitPaymentValue } from "../components/shared/split-payment-fields";
 
 interface PaymentVoucher {
   id: string;
@@ -52,7 +55,8 @@ interface PaymentVoucher {
   billNo?: string;
   paymentDate: string;
   amount: number;
-  paymentMethod: "Cash" | "Bank Transfer" | "Cheque" | "Digital Wallet";
+  paymentMethod: "Cash" | "Card" | "Bank Transfer" | "Cheque" | "Digital Wallet" | "Mixed";
+  paymentBreakdown?: { method: string; amount: number; reference?: string }[];
   status: "Paid" | "Pending" | "Overdue" | "Partial";
   description: string;
   createdAt: string;
@@ -143,7 +147,8 @@ export function PaymentVoucher() {
         billNo: v.billNo,
         paymentDate: v.paymentDate,
         amount: v.amount,
-        paymentMethod: v.paymentMethod as "Cash" | "Bank Transfer" | "Cheque" | "Digital Wallet",
+        paymentMethod: v.paymentMethod as "Cash" | "Card" | "Bank Transfer" | "Cheque" | "Digital Wallet" | "Mixed",
+        paymentBreakdown: v.paymentBreakdown,
         status: normalizeStatus(v.status) as any,
         description: v.description,
         createdAt: v.createdAt ?? "",
@@ -192,6 +197,8 @@ export function PaymentVoucher() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PVForm>(emptyForm);
+  const [splitPayment, setSplitPayment] = useState<SplitPaymentValue>({ cash: 0, card: 0, cheque: 0 });
+  const [splitChequeRef, setSplitChequeRef] = useState("");
   const [savingForm, setSavingForm] = useState(false);
   const [deletingVoucher, setDeletingVoucher] = useState(false);
 
@@ -293,6 +300,8 @@ export function PaymentVoucher() {
 
   const openCreate = () => {
     setForm(emptyForm);
+    setSplitPayment({ cash: 0, card: 0, cheque: 0 });
+    setSplitChequeRef("");
     setShowCreateDialog(true);
   };
 
@@ -321,6 +330,13 @@ export function PaymentVoucher() {
         status: b.status,
       })),
     });
+    const legs = voucher.paymentBreakdown ?? [];
+    setSplitPayment({
+      cash: legs.find(l => l.method === "Cash")?.amount || 0,
+      card: legs.find(l => l.method === "Card")?.amount || 0,
+      cheque: legs.find(l => l.method === "Cheque")?.amount || 0,
+    });
+    setSplitChequeRef(legs.find(l => l.method === "Cheque")?.reference || "");
     setShowEditDialog(true);
   };
 
@@ -331,6 +347,9 @@ export function PaymentVoucher() {
     paymentDate: f.paymentDate,
     amount: parseFloat(f.amount) || 0,
     paymentMethod: f.paymentMethod,
+    paymentBreakdown: f.paymentMethod === "Mixed"
+      ? buildSplitPaymentBreakdown(splitPayment, splitChequeRef || undefined)
+      : undefined,
     status: f.status || "Pending",
     description: f.description,
     bankAccount: f.bankAccount || undefined,
@@ -351,6 +370,10 @@ export function PaymentVoucher() {
   const handleCreate = async () => {
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
     if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
+    if (form.paymentMethod === "Mixed" && !isSplitPaymentValid(splitPayment, parseFloat(form.amount) || 0)) {
+      toast.error("Split payment amounts must add up to the total amount");
+      return;
+    }
     setSavingForm(true);
     try {
       await paymentVoucherService.createPaymentVoucher(toRequest(form));
@@ -368,6 +391,10 @@ export function PaymentVoucher() {
     if (!editingId) return;
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
     if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
+    if (form.paymentMethod === "Mixed" && !isSplitPaymentValid(splitPayment, parseFloat(form.amount) || 0)) {
+      toast.error("Split payment amounts must add up to the total amount");
+      return;
+    }
     setSavingForm(true);
     try {
       await paymentVoucherService.updatePaymentVoucher(editingId, toRequest(form));
@@ -453,9 +480,11 @@ export function PaymentVoucher() {
   const getPaymentMethodIcon = (method: string) => {
     const icons: Record<string, any> = {
       "Cash": Banknote,
+      "Card": CreditCard,
       "Bank Transfer": Building2,
       "Cheque": FileText,
       "Digital Wallet": Wallet,
+      "Mixed": Split,
     };
     return icons[method] || CreditCard;
   };
@@ -513,8 +542,10 @@ export function PaymentVoucher() {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="Cash">Cash</SelectItem>
-              <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+              <SelectItem value="Card">Card</SelectItem>
               <SelectItem value="Cheque">Cheque</SelectItem>
+              <SelectItem value="Mixed">Mixed</SelectItem>
+              <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
               <SelectItem value="Digital Wallet">Digital Wallet</SelectItem>
             </SelectContent>
           </Select>
@@ -532,6 +563,17 @@ export function PaymentVoucher() {
           </Select>
         </div>
       </div>
+
+      {form.paymentMethod === "Mixed" && (
+        <SplitPaymentFields
+          total={parseFloat(form.amount) || 0}
+          value={splitPayment}
+          onChange={setSplitPayment}
+          chequeReference={splitChequeRef}
+          onChequeReferenceChange={setSplitChequeRef}
+          currencyCode={currencyCode}
+        />
+      )}
 
       <div className="space-y-2">
         <Label>Bill No</Label>

@@ -1,7 +1,9 @@
 package com.company.project.controllers;
 
+import com.company.project.dto.AutoMatchSuggestionDTO;
 import com.company.project.dto.BankReconciliationRequestDTO;
 import com.company.project.dto.BankReconciliationResponseDTO;
+import com.company.project.dto.MatchCandidateDTO;
 import com.company.project.services.BankReconciliationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -49,8 +51,10 @@ public class BankReconciliationController {
     public ResponseEntity<BankReconciliationResponseDTO> matchLine(
             @PathVariable Long id,
             @PathVariable Long lineId,
-            @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(bankReconciliationService.matchLine(id, lineId, body.get("voucher_no")));
+            @RequestBody Map<String, Object> body) {
+        Object raw = body.get("journal_voucher_id");
+        Long journalVoucherId = raw != null ? Long.valueOf(String.valueOf(raw)) : null;
+        return ResponseEntity.ok(bankReconciliationService.matchLine(id, lineId, journalVoucherId));
     }
 
     @PostMapping("/{id}/lines/{lineId}/unmatch")
@@ -58,6 +62,20 @@ public class BankReconciliationController {
             @PathVariable Long id,
             @PathVariable Long lineId) {
         return ResponseEntity.ok(bankReconciliationService.unmatchLine(id, lineId));
+    }
+
+    /** Real, unmatched, posted vouchers on the bank account that could match this line — for the manual match picker. */
+    @GetMapping("/{id}/lines/{lineId}/candidates")
+    public ResponseEntity<List<MatchCandidateDTO>> getMatchCandidates(
+            @PathVariable Long id,
+            @PathVariable Long lineId) {
+        return ResponseEntity.ok(bankReconciliationService.getMatchCandidates(id, lineId));
+    }
+
+    /** Read-only auto-match suggestions for every unmatched line — nothing is applied until the caller confirms via match(). */
+    @GetMapping("/{id}/auto-match")
+    public ResponseEntity<List<AutoMatchSuggestionDTO>> suggestAutoMatches(@PathVariable Long id) {
+        return ResponseEntity.ok(bankReconciliationService.suggestAutoMatches(id));
     }
 
     @PostMapping("/{id}/complete")

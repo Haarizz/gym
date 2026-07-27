@@ -28,7 +28,9 @@ import {
   Building2,
   Eye,
   Loader2,
-  Printer
+  Printer,
+  FileCheck,
+  Split
 } from 'lucide-react';
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
@@ -40,6 +42,8 @@ import { membersService } from '../utils/supabase/members-service';
 import type { Member } from '../utils/supabase/members-service';
 import { billingService } from '../utils/supabase/billing-service';
 import type { Receipt as ReceiptDTO } from '../utils/supabase/receipts-service';
+import { SplitPaymentFields, isSplitPaymentValid, buildSplitPaymentBreakdown } from '../components/shared/split-payment-fields';
+import type { SplitPaymentValue } from '../components/shared/split-payment-fields';
 
 interface CreateReceiptProps {
   onNavigate?: (section: string) => void;
@@ -70,6 +74,8 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
   const [transactionReference, setTransactionReference] = useState("");
   const [paymentDate, setPaymentDate]         = useState(format(new Date(), "yyyy-MM-dd"));
   const [autoApplyAmount, setAutoApplyAmount] = useState("");
+  const [splitPayment, setSplitPayment]       = useState<SplitPaymentValue>({ cash: 0, card: 0, cheque: 0 });
+  const [splitChequeRef, setSplitChequeRef]   = useState("");
 
   // Receipt result state
   const [submitting, setSubmitting]           = useState(false);
@@ -201,6 +207,10 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
         return false;
       }
     }
+    if (paymentMode === "Mixed" && !isSplitPaymentValid(splitPayment, total)) {
+      toast.error("Split payment amounts must add up to the total payment");
+      return false;
+    }
     return true;
   };
 
@@ -222,6 +232,9 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
         payment_date:    paymentDate,
         transaction_ref: transactionReference || undefined,
         bill_payments:   billPayments,
+        payment_breakdown: paymentMode === "Mixed"
+          ? buildSplitPaymentBreakdown(splitPayment, splitChequeRef || undefined)
+          : undefined,
       });
 
       setGeneratedReceiptNo(result.receipt_no ?? "");
@@ -743,6 +756,8 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                         {[
                           { value: "Cash",          icon: <Wallet className="h-5 w-5" />,        label: "Cash" },
                           { value: "Card",          icon: <CreditCard className="h-5 w-5" />,    label: "Card" },
+                          { value: "Cheque",        icon: <FileCheck className="h-5 w-5" />,     label: "Cheque" },
+                          { value: "Mixed",         icon: <Split className="h-5 w-5" />,         label: "Mixed" },
                           { value: "Bank Transfer", icon: <Building2 className="h-5 w-5" />,     label: "Bank Transfer" },
                           { value: "Online",        icon: <DollarSign className="h-5 w-5" />,    label: "Online" },
                         ].map(opt => (
@@ -762,6 +777,18 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                       </div>
                     </RadioGroup>
                   </div>
+
+                  {/* Mixed Payment Split */}
+                  {paymentMode === "Mixed" && (
+                    <SplitPaymentFields
+                      total={calculateTotalPayment()}
+                      value={splitPayment}
+                      onChange={setSplitPayment}
+                      chequeReference={splitChequeRef}
+                      onChequeReferenceChange={setSplitChequeRef}
+                      currencyCode={currencyCode}
+                    />
+                  )}
 
                   {/* Transaction Reference */}
                   {(paymentMode !== "Cash") && (

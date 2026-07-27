@@ -55,6 +55,7 @@ public class MemberService {
     private final NotificationService notificationService;
     private final AutomationExecutorService automationExecutorService;
     private final ReceiptVoucherService receiptVoucherService;
+    private final FinancialEventService financialEventService;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
@@ -65,7 +66,8 @@ public class MemberService {
                          PasswordEncoder passwordEncoder,
                          NotificationService notificationService,
                          AutomationExecutorService automationExecutorService,
-                         ReceiptVoucherService receiptVoucherService) {
+                         ReceiptVoucherService receiptVoucherService,
+                         FinancialEventService financialEventService) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
         this.receiptService            = receiptService;
@@ -76,6 +78,7 @@ public class MemberService {
         this.notificationService       = notificationService;
         this.automationExecutorService = automationExecutorService;
         this.receiptVoucherService     = receiptVoucherService;
+        this.financialEventService     = financialEventService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -172,10 +175,12 @@ public class MemberService {
         saved = memberRepository.save(saved);
 
         // Auto-create a receipt for the new member
-        receiptService.createReceiptForMember(saved, "New", saved.getPaymentStatus());
+        com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
+                saved, "New", saved.getPaymentStatus(), request.getPaymentBreakdown());
 
         // Post to General Ledger — only when payment was actually made
         if ("paid".equalsIgnoreCase(saved.getPaymentStatus()) && saved.getMembershipFee() != null) {
+            financialEventService.onMemberPaymentReceived(receipt);
             receiptVoucherService.createVoucherFromModule(
                     "Member Registration – " + saved.getName(),
                     "Membership",
@@ -185,7 +190,8 @@ public class MemberService {
                     saved.getPaymentMethodUsed(),
                     saved.getMemberId(),
                     null,
-                    "New member: " + saved.getMembershipPlan()
+                    "New member: " + saved.getMembershipPlan(),
+                    request.getPaymentBreakdown()
             );
         }
 
@@ -371,10 +377,12 @@ public class MemberService {
         Member saved = memberRepository.save(member);
 
         // Auto-create a receipt for the renewal
-        receiptService.createReceiptForMember(saved, "Renewal", "Paid");
+        com.company.project.entities.Receipt receipt =
+                receiptService.createReceiptForMember(saved, "Renewal", "Paid");
 
         // Post to General Ledger
         if (saved.getMembershipFee() != null) {
+            financialEventService.onMemberPaymentReceived(receipt);
             receiptVoucherService.createVoucherFromModule(
                     "Membership Renewal – " + saved.getName(),
                     "Membership",
@@ -384,7 +392,8 @@ public class MemberService {
                     saved.getPaymentMethodUsed(),
                     saved.getMemberId(),
                     null,
-                    "Renewal: " + saved.getMembershipPlan()
+                    "Renewal: " + saved.getMembershipPlan(),
+                    null
             );
         }
 

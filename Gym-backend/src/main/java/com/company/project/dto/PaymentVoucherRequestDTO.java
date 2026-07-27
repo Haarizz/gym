@@ -12,6 +12,7 @@ public class PaymentVoucherRequestDTO {
     private LocalDate paymentDate;
     private BigDecimal amount;
     private String paymentMethod;
+    private List<PaymentSplitDTO> paymentBreakdown; // legs when paymentMethod == "Mixed"
     private String status;
     private String description;
     private String bankAccount;
@@ -39,6 +40,9 @@ public class PaymentVoucherRequestDTO {
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

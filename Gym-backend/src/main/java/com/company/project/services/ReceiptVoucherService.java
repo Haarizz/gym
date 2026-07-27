@@ -3,15 +3,20 @@ package com.company.project.services;
 import com.company.project.dto.ReceiptVoucherRequestDTO;
 import com.company.project.dto.ReceiptVoucherResponseDTO;
 import com.company.project.entities.ReceiptVoucher;
+import com.company.project.exceptions.EntityNotFoundException;
+import com.company.project.repositories.JournalEntrySourceRepository;
 import com.company.project.repositories.ReceiptVoucherRepository;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -20,65 +25,108 @@ public class ReceiptVoucherService {
 
     private final ReceiptVoucherRepository receiptVoucherRepository;
     private final NotificationService notificationService;
+    private final FinancialEventService financialEventService;
+    private final VoucherNumberService voucherNumberService;
+    private final JournalEntrySourceRepository journalEntrySourceRepository;
 
     public ReceiptVoucherService(ReceiptVoucherRepository receiptVoucherRepository,
-                                  NotificationService notificationService) {
+                                  NotificationService notificationService,
+                                  FinancialEventService financialEventService,
+                                  VoucherNumberService voucherNumberService,
+                                  JournalEntrySourceRepository journalEntrySourceRepository) {
         this.receiptVoucherRepository = receiptVoucherRepository;
         this.notificationService = notificationService;
+        this.financialEventService = financialEventService;
+        this.voucherNumberService = voucherNumberService;
+        this.journalEntrySourceRepository = journalEntrySourceRepository;
     }
 
-    private synchronized String generateVoucherNo() {
-        int year = LocalDate.now().getYear();
-        String prefix = "RV-" + year + "-";
-        Optional<ReceiptVoucher> last = receiptVoucherRepository
-                .findTopByVoucherNoStartingWithOrderByVoucherNoDesc(prefix);
-        int seq = last.map(rv -> {
-            try {
-                return Integer.parseInt(rv.getVoucherNo().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                return 1;
-            }
-        }).orElse(1);
-        return String.format("%s%05d", prefix, seq);
+    /**
+     * Posts this voucher to the general ledger when its status is "completed" —
+     * closes the gap where accountant-entered Receipt Vouchers never generated a
+     * journal entry (see docs/gymbios-financial-roadmap.html — C1). Vouchers
+     * created internally via createVoucherFromModule() are NOT routed through this:
+     * those already have their own journal entry posted by the module that called
+     * them (e.g. onSaleCompleted, onMemberPaymentReceived), so posting again here
+     * would double-count the same cash movement.
+     */
+    private void postToLedgerIfNeeded(ReceiptVoucher rv) {
+        if ("completed".equalsIgnoreCase(rv.getStatus())) {
+            financialEventService.onManualReceiptVoucherPosted(rv);
+        }
     }
 
+    /**
+     * Filters at the query level (via Specification) instead of loading the whole
+     * table and filtering with a Java stream (see docs/gymbios-financial-roadmap.html
+     * — M1).
+     */
     public List<ReceiptVoucherResponseDTO> getReceiptVouchers(
             String search, String status, String branch,
             String sourceCategory, LocalDate from, LocalDate to) {
-        List<ReceiptVoucher> all = receiptVoucherRepository.findAllByOrderByDateDesc();
+        Specification<ReceiptVoucher> spec = buildSpec(search, status, branch, sourceCategory, from, to);
+        List<ReceiptVoucher> all = receiptVoucherRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "date"));
         return all.stream()
-                .filter(rv -> {
-                    if (search == null || search.isBlank()) return true;
-                    String s = search.toLowerCase(Locale.ROOT);
-                    return (rv.getVoucherNo() != null && rv.getVoucherNo().toLowerCase(Locale.ROOT).contains(s))
-                            || (rv.getMemberName() != null && rv.getMemberName().toLowerCase(Locale.ROOT).contains(s))
-                            || (rv.getSource() != null && rv.getSource().toLowerCase(Locale.ROOT).contains(s))
-                            || (rv.getReference() != null && rv.getReference().toLowerCase(Locale.ROOT).contains(s));
-                })
-                .filter(rv -> status == null || status.isBlank() || status.equalsIgnoreCase("all")
-                        || (rv.getStatus() != null && rv.getStatus().equalsIgnoreCase(status)))
-                .filter(rv -> branch == null || branch.isBlank()
-                        || (rv.getBranch() != null && rv.getBranch().equalsIgnoreCase(branch)))
-                .filter(rv -> sourceCategory == null || sourceCategory.isBlank() || sourceCategory.equalsIgnoreCase("all")
-                        || (rv.getSourceCategory() != null && rv.getSourceCategory().equalsIgnoreCase(sourceCategory)))
-                .filter(rv -> from == null || (rv.getDate() != null && !rv.getDate().isBefore(from)))
-                .filter(rv -> to == null || (rv.getDate() != null && !rv.getDate().isAfter(to)))
-                .map(ReceiptVoucherResponseDTO::fromEntity)
+                .map(this::toResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    private Specification<ReceiptVoucher> buildSpec(
+            String search, String status, String branch,
+            String sourceCategory, LocalDate from, LocalDate to) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) {
+                predicates.add(cb.equal(cb.lower(root.get("status")), status.toLowerCase(Locale.ROOT)));
+            }
+            if (branch != null && !branch.isBlank()) {
+                predicates.add(cb.equal(cb.lower(root.get("branch")), branch.toLowerCase(Locale.ROOT)));
+            }
+            if (sourceCategory != null && !sourceCategory.isBlank() && !sourceCategory.equalsIgnoreCase("all")) {
+                predicates.add(cb.equal(cb.lower(root.get("sourceCategory")), sourceCategory.toLowerCase(Locale.ROOT)));
+            }
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("date"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("date"), to));
+            }
+            if (search != null && !search.isBlank()) {
+                String like = "%" + search.toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("voucherNo")), like),
+                        cb.like(cb.lower(root.get("memberName")), like),
+                        cb.like(cb.lower(root.get("source")), like),
+                        cb.like(cb.lower(root.get("reference")), like)
+                ));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
     }
 
     public ReceiptVoucherResponseDTO getReceiptVoucherById(Long id) {
         ReceiptVoucher rv = receiptVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Receipt Voucher not found: " + id));
-        return ReceiptVoucherResponseDTO.fromEntity(rv);
+                .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
+        return toResponseDTO(rv);
+    }
+
+    /** Attaches the linked posted journal entry's id, if this voucher has been posted. */
+    private ReceiptVoucherResponseDTO toResponseDTO(ReceiptVoucher rv) {
+        Long journalVoucherId = journalEntrySourceRepository
+                .findBySourceEntityTypeAndSourceEntityId("ReceiptVoucher", rv.getId())
+                .map(source -> source.getJournalVoucherId())
+                .orElse(null);
+        return ReceiptVoucherResponseDTO.fromEntity(rv, journalVoucherId);
     }
 
     public ReceiptVoucherResponseDTO createReceiptVoucher(ReceiptVoucherRequestDTO req) {
         ReceiptVoucher rv = new ReceiptVoucher();
-        rv.setVoucherNo(generateVoucherNo());
+        rv.setVoucherNo(voucherNumberService.next("RV"));
         applyRequest(rv, req);
         rv.setStatus(req.getStatus() != null && !req.getStatus().isBlank() ? req.getStatus() : "draft");
         ReceiptVoucher saved = receiptVoucherRepository.save(rv);
+        postToLedgerIfNeeded(saved);
         notificationService.notifyRoles(
                 List.of("ADMIN", "MANAGER", "ACCOUNTANT"),
                 "Payment Received",
@@ -88,29 +136,33 @@ public class ReceiptVoucherService {
                 saved.getId(), "/receipt-voucher",
                 "RECEIPT_CREATED_" + saved.getId()
         );
-        return ReceiptVoucherResponseDTO.fromEntity(saved);
+        return toResponseDTO(saved);
     }
 
     public ReceiptVoucherResponseDTO updateReceiptVoucher(Long id, ReceiptVoucherRequestDTO req) {
         ReceiptVoucher rv = receiptVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Receipt Voucher not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
         applyRequest(rv, req);
         if (req.getStatus() != null && !req.getStatus().isBlank()) {
             rv.setStatus(req.getStatus());
         }
-        return ReceiptVoucherResponseDTO.fromEntity(receiptVoucherRepository.save(rv));
+        ReceiptVoucher saved = receiptVoucherRepository.save(rv);
+        postToLedgerIfNeeded(saved);
+        return toResponseDTO(saved);
     }
 
     public ReceiptVoucherResponseDTO updateStatus(Long id, String status) {
         ReceiptVoucher rv = receiptVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Receipt Voucher not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
         rv.setStatus(status);
-        return ReceiptVoucherResponseDTO.fromEntity(receiptVoucherRepository.save(rv));
+        ReceiptVoucher saved = receiptVoucherRepository.save(rv);
+        postToLedgerIfNeeded(saved);
+        return toResponseDTO(saved);
     }
 
     public void deleteReceiptVoucher(Long id) {
         ReceiptVoucher rv = receiptVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Receipt Voucher not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
         receiptVoucherRepository.delete(rv);
     }
 
@@ -128,12 +180,13 @@ public class ReceiptVoucherService {
             String paymentMode,
             String reference,
             String transactionId,
-            String notes) {
+            String notes,
+            List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown) {
 
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
 
         ReceiptVoucher rv = new ReceiptVoucher();
-        rv.setVoucherNo(generateVoucherNo());
+        rv.setVoucherNo(voucherNumberService.next("RV"));
         rv.setDate(LocalDate.now());
         rv.setSource(source);
         rv.setSourceCategory(sourceCategory);
@@ -141,6 +194,7 @@ public class ReceiptVoucherService {
         rv.setMemberId(memberId);
         rv.setAmount(amount);
         rv.setPaymentMode(paymentMode != null ? paymentMode : "Cash");
+        rv.setPaymentBreakdown(paymentBreakdown);
         rv.setReference(reference);
         rv.setTransactionId(transactionId);
         rv.setNotes(notes);
@@ -167,6 +221,7 @@ public class ReceiptVoucherService {
         rv.setMemberName(req.getMemberName());
         rv.setAmount(req.getAmount() != null ? req.getAmount() : BigDecimal.ZERO);
         rv.setPaymentMode(req.getPaymentMode());
+        rv.setPaymentBreakdown(req.getPaymentBreakdown());
         rv.setBranch(req.getBranch());
         rv.setReference(req.getReference());
         rv.setNotes(req.getNotes());

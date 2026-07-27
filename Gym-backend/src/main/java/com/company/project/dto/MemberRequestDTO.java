@@ -53,6 +53,7 @@ public class MemberRequestDTO {
     private String lastPaymentDate;
     private String nextPaymentDate;
     private String paymentMethodUsed;
+    private List<PaymentSplitDTO> paymentBreakdown; // legs when paymentMethodUsed == "Mixed"
     private java.math.BigDecimal discountApplied;
 
     // Family plan fields
@@ -177,6 +178,9 @@ public class MemberRequestDTO {
 
     public String getPaymentMethodUsed() { return paymentMethodUsed; }
     public void setPaymentMethodUsed(String paymentMethodUsed) { this.paymentMethodUsed = paymentMethodUsed; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 
     public java.math.BigDecimal getDiscountApplied() { return discountApplied; }
     public void setDiscountApplied(java.math.BigDecimal discountApplied) { this.discountApplied = discountApplied; }

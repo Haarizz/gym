@@ -16,6 +16,7 @@ public class SaleTransactionRequestDTO {
     private BigDecimal totalAmount;
     private BigDecimal receivedAmount;
     private String notes;
+    private List<PaymentSplitDTO> paymentBreakdown; // legs when paymentMethod == "Mixed"
 
     public SaleTransactionRequestDTO() {}
 
@@ -82,4 +83,7 @@ public class SaleTransactionRequestDTO {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 }

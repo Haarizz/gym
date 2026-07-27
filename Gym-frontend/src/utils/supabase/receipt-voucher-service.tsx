@@ -2,6 +2,12 @@ import { authService } from "./auth-service";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
+export interface PaymentSplitLeg {
+  method: string;
+  amount: number;
+  reference?: string;
+}
+
 export interface ReceiptVoucher {
   id: string;
   voucherNo: string;
@@ -12,6 +18,7 @@ export interface ReceiptVoucher {
   memberName: string;
   amount: number;
   paymentMode: string;
+  paymentBreakdown?: PaymentSplitLeg[];
   status: string;
   branch: string;
   reference: string;
@@ -21,6 +28,8 @@ export interface ReceiptVoucher {
   voucherType?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Id of the journal entry this voucher posted to the ledger, or undefined if not yet posted. */
+  journalVoucherId?: string;
 }
 
 export interface ReceiptVoucherCreateRequest {
@@ -31,6 +40,7 @@ export interface ReceiptVoucherCreateRequest {
   memberName: string;
   amount: number;
   paymentMode: string;
+  paymentBreakdown?: PaymentSplitLeg[];
   status?: string;
   branch: string;
   reference: string;
@@ -51,6 +61,7 @@ function mapReceiptVoucher(r: any): ReceiptVoucher {
     memberName: r.member_name ?? r.memberName ?? "",
     amount: Number(r.amount ?? 0),
     paymentMode: r.payment_mode ?? r.paymentMode ?? "",
+    paymentBreakdown: r.payment_breakdown ?? r.paymentBreakdown,
     status: r.status ?? "draft",
     branch: r.branch ?? "",
     reference: r.reference ?? "",
@@ -60,6 +71,8 @@ function mapReceiptVoucher(r: any): ReceiptVoucher {
     voucherType: r.voucher_type ?? r.voucherType,
     createdAt: r.created_at ?? r.createdAt,
     updatedAt: r.updated_at ?? r.updatedAt,
+    journalVoucherId:
+      r.journal_voucher_id != null ? String(r.journal_voucher_id) : undefined,
   };
 }
 
@@ -72,6 +85,7 @@ function toBody(req: ReceiptVoucherCreateRequest) {
     member_name: req.memberName,
     amount: req.amount,
     payment_mode: req.paymentMode,
+    payment_breakdown: req.paymentBreakdown,
     status: req.status,
     branch: req.branch,
     reference: req.reference,

@@ -1,8 +1,11 @@
 package com.company.project.entities;
 
+import com.company.project.converters.PaymentBreakdownConverter;
+import com.company.project.dto.PaymentSplitDTO;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Entity
 @Table(name = "payment_vouchers")
@@ -51,6 +54,11 @@ public class PaymentVoucher extends BaseEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    // Per-leg breakdown when paymentMethod == "Mixed"
+    @Column(name = "payment_breakdown", columnDefinition = "TEXT")
+    @Convert(converter = PaymentBreakdownConverter.class)
+    private List<PaymentSplitDTO> paymentBreakdown;
+
     public PaymentVoucher() {}
 
     public Long getId() { return id; }
@@ -94,4 +102,7 @@ public class PaymentVoucher extends BaseEntity {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 }

@@ -4,6 +4,7 @@ import com.company.project.entities.Receipt;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * Response DTO for Receipt.
@@ -21,6 +22,7 @@ public class ReceiptResponseDTO {
     private String transactionType;
     private BigDecimal amount;
     private String paymentMethod;
+    private List<PaymentSplitDTO> paymentBreakdown;
     private String status;
     private String planName;
     private String validFrom;
@@ -48,6 +50,7 @@ public class ReceiptResponseDTO {
         dto.transactionType = r.getTransactionType();
         dto.amount          = r.getAmount();
         dto.paymentMethod   = r.getPaymentMethod();
+        dto.paymentBreakdown = r.getPaymentBreakdown();
         dto.status          = r.getStatus();
         dto.planName        = r.getPlanName();
         dto.validFrom       = r.getValidFrom() != null ? r.getValidFrom().format(ISO) + "Z" : null;
@@ -76,6 +79,7 @@ public class ReceiptResponseDTO {
     public String getTransactionType() { return transactionType; }
     public BigDecimal getAmount() { return amount; }
     public String getPaymentMethod() { return paymentMethod; }
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public String getStatus() { return status; }
     public String getPlanName() { return planName; }
     public String getValidFrom() { return validFrom; }
