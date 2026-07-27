@@ -366,22 +366,23 @@ public class MemberService {
             member.setNextPaymentDate(endDate);
         }
 
-        // Record payment date on renewal
-        member.setLastPaymentDate(LocalDateTime.now());
-
-        // Clear outstanding balance on renewal if payment status is paid
-        if ("paid".equalsIgnoreCase(member.getPaymentStatus())) {
+        // Record payment date on renewal only when payment was actually made
+        boolean renewalPaid = "paid".equalsIgnoreCase(member.getPaymentStatus());
+        if (renewalPaid) {
+            member.setLastPaymentDate(LocalDateTime.now());
             member.setOutstandingBalance(BigDecimal.ZERO);
+        } else if (member.getMembershipFee() != null) {
+            member.setOutstandingBalance(member.getMembershipFee());
         }
 
         Member saved = memberRepository.save(member);
 
-        // Auto-create a receipt for the renewal
+        // Auto-create a receipt for the renewal, reflecting the actual payment status
         com.company.project.entities.Receipt receipt =
-                receiptService.createReceiptForMember(saved, "Renewal", "Paid");
+                receiptService.createReceiptForMember(saved, "Renewal", saved.getPaymentStatus());
 
-        // Post to General Ledger
-        if (saved.getMembershipFee() != null) {
+        // Post to General Ledger — only when payment was actually made
+        if (renewalPaid && saved.getMembershipFee() != null) {
             financialEventService.onMemberPaymentReceived(receipt);
             receiptVoucherService.createVoucherFromModule(
                     "Membership Renewal – " + saved.getName(),

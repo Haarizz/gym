@@ -17,6 +17,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu";
 import { MemberApprovalModal } from "../components/shared/member-approval-modal";
 import { MemberAddons } from "./member-addons";
+import { MemberReceipts } from "./member-receipts";
 import { 
   Plus, 
   Search, 
@@ -356,8 +357,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         plan: r.plan_name || '—',
         amount: Number(r.amount || 0),
         mode: r.payment_method || '—',
-        cash: r.payment_method === 'Cash' ? Number(r.amount || 0) : 0,
-        card: r.payment_method === 'Card' ? Number(r.amount || 0) : 0,
+        cash: r.payment_method?.toLowerCase() === 'cash' ? Number(r.amount || 0) : 0,
+        card: r.payment_method?.toLowerCase() === 'card' ? Number(r.amount || 0) : 0,
         due: r.status === 'Pending' ? Number(r.amount || 0) : 0,
         dueDate: r.status === 'Pending' && r.transaction_date ? new Date(r.transaction_date).toLocaleDateString('en-GB') : '—',
       }));
@@ -1896,16 +1897,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           <MemberAddons embedded />
         </TabsContent>
 
-        <TabsContent value="receipts" className="space-y-6">
-          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle>Member Receipts</CardTitle>
-              <CardDescription>View and manage payment receipts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Feature coming soon...</p>
-            </CardContent>
-          </Card>
+        <TabsContent value="receipts">
+          <MemberReceipts embedded />
         </TabsContent>
 
         <TabsContent value="freeze" className="space-y-6">
