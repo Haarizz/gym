@@ -102,7 +102,7 @@ public class MemberAddonService {
                 saved.getTransactionId(),
                 saved.getTransactionId(),
                 saved.getNotes(),
-                null
+                saved.getPaymentBreakdown()
         );
 
         return MemberAddonResponseDTO.fromEntity(saved);
@@ -136,6 +136,7 @@ public class MemberAddonService {
         if (r.getStartDate()        != null) a.setStartDate(parseDateTime(r.getStartDate()));
         if (r.getExpiryDate()       != null) a.setExpiryDate(parseDateTime(r.getExpiryDate()));
         if (r.getNotes()            != null) a.setNotes(r.getNotes());
+        if (r.getPaymentBreakdown() != null) a.setPaymentBreakdown(r.getPaymentBreakdown());
     }
 
     private Specification<MemberAddon> buildSpec(String search, String status) {

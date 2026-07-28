@@ -1,6 +1,7 @@
 package com.company.project.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Request DTO for creating a MemberAddon.
@@ -20,6 +21,9 @@ public class MemberAddonRequestDTO {
     private String startDate;    // ISO date-time string, e.g. "2024-01-01T00:00:00Z"
     private String expiryDate;   // ISO date-time string
     private String notes;
+    // Method-specific detail (card type, cheque number, online payment type, ...)
+    // for the payment mode above — single entry, no Mixed support on this module.
+    private List<PaymentSplitDTO> paymentBreakdown;
 
     public MemberAddonRequestDTO() {}
 
@@ -57,4 +61,7 @@ public class MemberAddonRequestDTO {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 }

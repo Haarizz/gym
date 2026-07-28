@@ -156,7 +156,22 @@ public class LedgerTransactionService {
         }
 
         result.sort(Comparator.comparing(LedgerTransactionDTO::getDate,
-                Comparator.nullsLast(Comparator.reverseOrder())));
+                Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing((d1, d2) -> {
+                    Long id1 = extractId(d1.getId());
+                    Long id2 = extractId(d2.getId());
+                    return id2.compareTo(id1);
+                }));
         return result;
+    }
+
+    private Long extractId(String idStr) {
+        if (idStr == null) return 0L;
+        String num = idStr.replaceAll("\\D+", "");
+        try {
+            return num.isEmpty() ? 0L : Long.parseLong(num);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
     }
 }

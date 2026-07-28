@@ -1,8 +1,11 @@
 package com.company.project.entities;
 
+import com.company.project.converters.PaymentBreakdownConverter;
+import com.company.project.dto.PaymentSplitDTO;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Entity
 @Table(name = "supplier_bills")
@@ -69,6 +72,18 @@ public class SupplierBill extends BaseEntity {
     @Column(name = "received_by")
     private String receivedBy;
 
+    // Method used for the most recent recordPayment() call, plus its rich
+    // per-method detail (card type, cheque number, ...) — a bill may receive
+    // several partial payments over time, each potentially via a different
+    // method; this reflects only the latest one, matching amountPaid being a
+    // running total rather than a per-payment ledger.
+    @Column(name = "payment_method")
+    private String paymentMethod;
+
+    @Column(name = "payment_breakdown", columnDefinition = "TEXT")
+    @Convert(converter = PaymentBreakdownConverter.class)
+    private List<PaymentSplitDTO> paymentBreakdown;
+
     public SupplierBill() {}
 
     // ── Getters & Setters ──────────────────────────────────────────────────
@@ -129,4 +144,10 @@ public class SupplierBill extends BaseEntity {
 
     public String getReceivedBy() { return receivedBy; }
     public void setReceivedBy(String receivedBy) { this.receivedBy = receivedBy; }
+
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 }

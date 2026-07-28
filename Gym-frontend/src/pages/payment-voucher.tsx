@@ -44,8 +44,19 @@ import {
   Split
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
-import { SplitPaymentFields, isSplitPaymentValid, buildSplitPaymentBreakdown } from "../components/shared/split-payment-fields";
-import type { SplitPaymentValue } from "../components/shared/split-payment-fields";
+import {
+  SplitPaymentFields, isSplitPaymentValid, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
+  EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
+} from "../components/shared/split-payment-fields";
+import type { SplitPaymentValue, SplitPaymentDetails } from "../components/shared/split-payment-fields";
+import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
+
+// Maps the Payment Method select value to the SplitPaymentValue key so a
+// single (non-Mixed) method's details can be validated/built by reusing the
+// same helpers Mixed Payment legs use.
+const PAYMENT_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
+  Cash: 'cash', Card: 'card', Cheque: 'cheque', 'Bank Transfer': 'bankTransfer', 'Digital Wallet': 'online'
+};
 
 interface PaymentVoucher {
   id: string;
@@ -93,6 +104,12 @@ interface PVForm {
   notes: string;
   bills: BillForm[];
 }
+
+// Method-specific details for Card ("Card") and Digital Wallet ("Digital
+// Wallet", the online-payment equivalent on this page) plus the ledger bank
+// account id backing the freetext Bank Account field for Bank Transfer —
+// reuses the same shape Mixed Payment legs use.
+const emptyMethodDetails: SplitPaymentDetails = { ...EMPTY_SPLIT_DETAILS };
 
 interface BillForm {
   billNo: string;
@@ -197,8 +214,16 @@ export function PaymentVoucher() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PVForm>(emptyForm);
-  const [splitPayment, setSplitPayment] = useState<SplitPaymentValue>({ cash: 0, card: 0, cheque: 0 });
-  const [splitChequeRef, setSplitChequeRef] = useState("");
+  const [splitPayment, setSplitPayment] = useState<SplitPaymentValue>(EMPTY_SPLIT_PAYMENT);
+  const [splitDetails, setSplitDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
+  // Card Type / Digital Wallet details for the top-level (non-Mixed) Payment Method.
+  const [methodDetails, setMethodDetails] = useState<SplitPaymentDetails>(emptyMethodDetails);
+  const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+  useEffect(() => {
+    accountHeadsService.getBankAccounts()
+      .then(setBankAccounts)
+      .catch(err => console.error('Failed to load bank accounts:', err));
+  }, []);
   const [savingForm, setSavingForm] = useState(false);
   const [deletingVoucher, setDeletingVoucher] = useState(false);
 
@@ -300,8 +325,9 @@ export function PaymentVoucher() {
 
   const openCreate = () => {
     setForm(emptyForm);
-    setSplitPayment({ cash: 0, card: 0, cheque: 0 });
-    setSplitChequeRef("");
+    setSplitPayment(EMPTY_SPLIT_PAYMENT);
+    setSplitDetails(EMPTY_SPLIT_DETAILS);
+    setMethodDetails(emptyMethodDetails);
     setShowCreateDialog(true);
   };
 
@@ -335,9 +361,26 @@ export function PaymentVoucher() {
       cash: legs.find(l => l.method === "Cash")?.amount || 0,
       card: legs.find(l => l.method === "Card")?.amount || 0,
       cheque: legs.find(l => l.method === "Cheque")?.amount || 0,
+      bankTransfer: legs.find(l => l.method === "Bank Transfer")?.amount || 0,
+      online: legs.find(l => l.method === "Online Payment")?.amount || 0,
     });
-    setSplitChequeRef(legs.find(l => l.method === "Cheque")?.reference || "");
+    setSplitDetails(EMPTY_SPLIT_DETAILS);
+    setMethodDetails(emptyMethodDetails);
     setShowEditDialog(true);
+  };
+
+  // Builds the payment_breakdown leg(s) for whatever's currently selected —
+  // several legs for Mixed, a single leg carrying the method's rich detail
+  // (card type, online payment type, ...) for Card/Digital Wallet, none for
+  // Cash/Cheque/Bank Transfer (those already have their own scalar fields).
+  const buildBreakdownForSubmit = (f: PVForm) => {
+    if (f.paymentMethod === "Mixed") {
+      return buildSplitPaymentBreakdown(splitPayment, splitDetails, bankAccounts);
+    }
+    const legKey = PAYMENT_METHOD_TO_LEG_KEY[f.paymentMethod];
+    if (legKey !== 'card' && legKey !== 'online') return undefined;
+    const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: parseFloat(f.amount) || 0 };
+    return buildSplitPaymentBreakdown(probe, methodDetails, bankAccounts);
   };
 
   const toRequest = (f: PVForm): PaymentVoucherCreateRequest => ({
@@ -347,9 +390,7 @@ export function PaymentVoucher() {
     paymentDate: f.paymentDate,
     amount: parseFloat(f.amount) || 0,
     paymentMethod: f.paymentMethod,
-    paymentBreakdown: f.paymentMethod === "Mixed"
-      ? buildSplitPaymentBreakdown(splitPayment, splitChequeRef || undefined)
-      : undefined,
+    paymentBreakdown: buildBreakdownForSubmit(f),
     status: f.status || "Pending",
     description: f.description,
     bankAccount: f.bankAccount || undefined,
@@ -367,13 +408,36 @@ export function PaymentVoucher() {
     })),
   });
 
+  // Shared by handleCreate/handleEdit: split-amount validity + required
+  // method-specific fields (Card Type, Online Payment Type, ...).
+  const validatePaymentMethodFields = (f: PVForm) => {
+    const amount = parseFloat(f.amount) || 0;
+    if (f.paymentMethod === "Mixed") {
+      if (!isSplitPaymentValid(splitPayment, amount)) {
+        toast.error("Split payment amounts must add up to the total amount");
+        return false;
+      }
+      if (!isSplitPaymentDetailsValid(splitPayment, splitDetails)) {
+        toast.error("Please fill in the required details for each payment method used in the split");
+        return false;
+      }
+    } else {
+      const legKey = PAYMENT_METHOD_TO_LEG_KEY[f.paymentMethod];
+      if (legKey === 'card' || legKey === 'online') {
+        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: amount };
+        if (!isSplitPaymentDetailsValid(probe, methodDetails)) {
+          toast.error(`Please fill in the required ${f.paymentMethod} details`);
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
   const handleCreate = async () => {
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
     if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
-    if (form.paymentMethod === "Mixed" && !isSplitPaymentValid(splitPayment, parseFloat(form.amount) || 0)) {
-      toast.error("Split payment amounts must add up to the total amount");
-      return;
-    }
+    if (!validatePaymentMethodFields(form)) return;
     setSavingForm(true);
     try {
       await paymentVoucherService.createPaymentVoucher(toRequest(form));
@@ -391,10 +455,7 @@ export function PaymentVoucher() {
     if (!editingId) return;
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
     if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
-    if (form.paymentMethod === "Mixed" && !isSplitPaymentValid(splitPayment, parseFloat(form.amount) || 0)) {
-      toast.error("Split payment amounts must add up to the total amount");
-      return;
-    }
+    if (!validatePaymentMethodFields(form)) return;
     setSavingForm(true);
     try {
       await paymentVoucherService.updatePaymentVoucher(editingId, toRequest(form));
@@ -538,7 +599,10 @@ export function PaymentVoucher() {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Payment Method</Label>
-          <Select value={form.paymentMethod} onValueChange={v => setForm(f => ({ ...f, paymentMethod: v }))}>
+          <Select
+            value={form.paymentMethod}
+            onValueChange={v => { setForm(f => ({ ...f, paymentMethod: v })); setMethodDetails(emptyMethodDetails); }}
+          >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="Cash">Cash</SelectItem>
@@ -564,13 +628,68 @@ export function PaymentVoucher() {
         </div>
       </div>
 
+      {form.paymentMethod === "Card" && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Card Type *</Label>
+            <Select value={methodDetails.cardType} onValueChange={v => setMethodDetails(d => ({ ...d, cardType: v }))}>
+              <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
+              <SelectContent>
+                {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Reference (optional)</Label>
+            <Input
+              value={methodDetails.cardReference}
+              onChange={e => setMethodDetails(d => ({ ...d, cardReference: e.target.value }))}
+              placeholder="Transaction number"
+            />
+          </div>
+        </div>
+      )}
+
+      {form.paymentMethod === "Digital Wallet" && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Payment Type *</Label>
+            <Select value={methodDetails.onlinePaymentType} onValueChange={v => setMethodDetails(d => ({ ...d, onlinePaymentType: v }))}>
+              <SelectTrigger><SelectValue placeholder="Select payment type" /></SelectTrigger>
+              <SelectContent>
+                {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Transaction / Reference ID *</Label>
+            <Input
+              value={methodDetails.onlineReference}
+              onChange={e => setMethodDetails(d => ({ ...d, onlineReference: e.target.value }))}
+              placeholder="Transaction ID"
+            />
+          </div>
+          {methodDetails.onlinePaymentType === 'Other' && (
+            <div className="col-span-2 space-y-2">
+              <Label>Payment Provider Name *</Label>
+              <Input
+                value={methodDetails.onlineProviderName}
+                onChange={e => setMethodDetails(d => ({ ...d, onlineProviderName: e.target.value }))}
+                placeholder="Provider name"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {form.paymentMethod === "Mixed" && (
         <SplitPaymentFields
           total={parseFloat(form.amount) || 0}
           value={splitPayment}
           onChange={setSplitPayment}
-          chequeReference={splitChequeRef}
-          onChequeReferenceChange={setSplitChequeRef}
+          details={splitDetails}
+          onDetailsChange={setSplitDetails}
+          bankAccounts={bankAccounts}
           currencyCode={currencyCode}
         />
       )}
@@ -595,11 +714,33 @@ export function PaymentVoucher() {
 
       <div className="space-y-2">
         <Label>Bank Account</Label>
-        <Input
-          value={form.bankAccount}
-          onChange={e => setForm(f => ({ ...f, bankAccount: e.target.value }))}
-          placeholder="e.g. Emirates NBD Current"
-        />
+        {form.paymentMethod === "Bank Transfer" ? (
+          <>
+            <Select
+              value={bankAccounts.find(a => a.name === form.bankAccount)?.id ? String(bankAccounts.find(a => a.name === form.bankAccount)!.id) : ""}
+              onValueChange={id => {
+                const account = bankAccounts.find(a => String(a.id) === id);
+                setForm(f => ({ ...f, bankAccount: account?.name ?? f.bankAccount }));
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={bankAccounts.length ? 'Select bank account (ledger)' : 'No bank accounts in ledger'} />
+              </SelectTrigger>
+              <SelectContent>
+                {bankAccounts.map(account => (
+                  <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Accounts pulled from the Chart of Accounts (Ledger).</p>
+          </>
+        ) : (
+          <Input
+            value={form.bankAccount}
+            onChange={e => setForm(f => ({ ...f, bankAccount: e.target.value }))}
+            placeholder="e.g. Emirates NBD Current"
+          />
+        )}
       </div>
 
       {form.paymentMethod === "Cheque" && (

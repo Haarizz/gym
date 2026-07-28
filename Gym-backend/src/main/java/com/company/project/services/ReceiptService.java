@@ -3,6 +3,7 @@ package com.company.project.services;
 import com.company.project.dto.BillingStatsDTO;
 import com.company.project.dto.MemberDueDTO;
 import com.company.project.dto.PaginationDTO;
+import com.company.project.dto.PaymentSplitDTO;
 import com.company.project.dto.ReceiptResponseDTO;
 import com.company.project.dto.ReceiptsPageResponseDTO;
 import com.company.project.dto.SettlePaymentRequestDTO;
@@ -128,11 +129,26 @@ public class ReceiptService {
      * Called from MemberService after creating or renewing a member.
      */
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus) {
-        return createReceiptForMember(member, transactionType, paymentStatus, null);
+        return createReceiptForMember(member, transactionType, paymentStatus, null, null, null);
     }
 
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,
                                           List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown) {
+        return createReceiptForMember(member, transactionType, paymentStatus, paymentBreakdown, null, null);
+    }
+
+    /**
+     * Records the invoice total, the amount actually received, and the true
+     * remainder as separate fields — a partial/credit payment (e.g. AED 5 received
+     * against a AED 45 invoice) must show paidAmount=5, not 0 or the full 45.
+     * paidAmount is derived from member.outstandingBalance (invoice − outstanding)
+     * rather than from the coarse paid/pending paymentStatus string, so a partial
+     * amount is captured correctly regardless of which bucket the member's overall
+     * status falls into.
+     */
+    public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,
+                                          List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+                                          String bankAccountCode, String bankAccountName) {
         Receipt r = new Receipt();
         r.setTransactionDate(LocalDateTime.now());
         r.setMemberDbId(member.getId());
@@ -140,13 +156,31 @@ public class ReceiptService {
         r.setMemberName(member.getName());
         r.setMemberPhone(member.getPhone());
         r.setTransactionType(transactionType);
-        r.setAmount(member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO);
+
+        BigDecimal totalAmount = member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO;
+        BigDecimal outstanding = member.getOutstandingBalance() != null ? member.getOutstandingBalance() : BigDecimal.ZERO;
+        BigDecimal paidAmount = totalAmount.subtract(outstanding).max(BigDecimal.ZERO);
+
+        r.setAmount(totalAmount);
+        // The actual method the received portion moved through (Cash/Card/Bank Transfer/
+        // Cheque). "Credit" only ever appears here when nothing has been received yet.
         r.setPaymentMethod(normalizePaymentMethod(member.getPaymentMethodUsed()));
         r.setPaymentBreakdown(paymentBreakdown);
-        boolean isPaid = "paid".equalsIgnoreCase(paymentStatus);
-        r.setStatus(isPaid ? "Paid" : "Pending");
-        r.setPaidAmount(isPaid ? r.getAmount() : BigDecimal.ZERO);
-        r.setDueDate(member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate());
+        r.setPaidAmount(paidAmount);
+        if (paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            r.setStatus("Pending");
+        } else if (paidAmount.compareTo(totalAmount) >= 0) {
+            r.setStatus("Paid");
+        } else {
+            r.setStatus("Partial");
+        }
+        r.setBankAccountCode(bankAccountCode);
+        r.setBankAccountName(bankAccountName);
+        // A pending/partial balance is due on the member's payment due date, not the
+        // membership renewal date — only fall back to the renewal date once fully paid.
+        r.setDueDate(paidAmount.compareTo(totalAmount) < 0 && member.getNextPaymentDate() != null
+                ? member.getNextPaymentDate()
+                : (member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate()));
         r.setPlanName(member.getMembershipPlan());
         r.setValidFrom(member.getMembershipStartDate());
         r.setValidTill(member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate());
@@ -181,6 +215,51 @@ public class ReceiptService {
 
                 BigDecimal fullAmount = existing.getAmount() != null ? existing.getAmount() : BigDecimal.ZERO;
                 existing.setStatus(newPaid.compareTo(fullAmount) >= 0 ? "Paid" : "Partial");
+
+                // A receipt that already had money received against it (e.g. AED 10 via
+                // Cash at registration) and is now being topped up (e.g. AED 35 more via
+                // a settlement) must keep BOTH contributions on record — never silently
+                // fold the earlier amount into a single "45 paid" figure that reads as
+                // if it all arrived in one transaction. This applies even when both
+                // payments used the same method: the top-level paymentMethod label only
+                // becomes "Mixed" when the methods genuinely differ, but the per-leg
+                // breakdown is always extended so the receipt's history is never lost.
+                String settleMethod = req.getPaymentMethod() != null && !req.getPaymentMethod().isBlank()
+                        ? req.getPaymentMethod() : "Cash";
+                String priorMethod = existing.getPaymentMethod();
+                if (currentPaid.compareTo(BigDecimal.ZERO) <= 0) {
+                    // Nothing genuinely received before this (e.g. full Credit) — the
+                    // settlement's method/breakdown IS the real, complete history so far.
+                    existing.setPaymentMethod(settleMethod);
+                    existing.setPaymentBreakdown(req.getPaymentBreakdown());
+                } else {
+                    List<PaymentSplitDTO> merged = new ArrayList<>();
+                    List<PaymentSplitDTO> existingBreakdown = existing.getPaymentBreakdown();
+                    if (existingBreakdown != null && !existingBreakdown.isEmpty()) {
+                        merged.addAll(existingBreakdown);
+                    } else if (priorMethod != null) {
+                        // First time this receipt is being topped up — synthesize the
+                        // leg for what was actually received when it was created.
+                        merged.add(new PaymentSplitDTO(priorMethod, currentPaid, null));
+                    }
+                    if (req.getPaymentBreakdown() != null && !req.getPaymentBreakdown().isEmpty()) {
+                        merged.addAll(req.getPaymentBreakdown());
+                    } else {
+                        String ref = req.getTransactionRef() != null && !req.getTransactionRef().isBlank()
+                                ? req.getTransactionRef() : null;
+                        merged.add(new PaymentSplitDTO(settleMethod, bp.getPayAmount(), ref));
+                    }
+                    existing.setPaymentBreakdown(merged);
+
+                    boolean alreadyMixed = "Mixed".equalsIgnoreCase(priorMethod);
+                    boolean sameMethod = priorMethod != null && priorMethod.equalsIgnoreCase(settleMethod);
+                    if (alreadyMixed || !sameMethod) {
+                        existing.setPaymentMethod("Mixed");
+                    }
+                    // else: identical single method both times — label stays as-is
+                    // (e.g. "Cash"), but the breakdown above still records both legs.
+                }
+
                 receiptRepository.save(existing);
                 totalPaid = totalPaid.add(bp.getPayAmount());
             }
@@ -326,6 +405,10 @@ public class ReceiptService {
         }
         for (Member m : memberRepository.findDueSoonMembers(now, sevenDaysLater)) {
             result.add(buildDueDTO(m, "Due Soon", now, dateFmt));
+        }
+        for (Member m : memberRepository.findPendingMembersWithBalance(now, sevenDaysLater)) {
+            String statusLabel = "partial".equalsIgnoreCase(m.getPaymentStatus()) ? "Partial" : "Pending";
+            result.add(buildDueDTO(m, statusLabel, now, dateFmt));
         }
         return result;
     }

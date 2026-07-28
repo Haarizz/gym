@@ -40,6 +40,8 @@ export interface SupplierBill {
   notes?: string;
   receivedBy?: string;
   createdBy?: string;
+  paymentMethod?: string;
+  paymentBreakdown?: Record<string, any>[];
   createdAt: string;
   updatedAt?: string;
   items: SupplierBillItem[];
@@ -116,6 +118,8 @@ function mapBill(r: any): SupplierBill {
     notes: r.notes,
     receivedBy: r.received_by ?? r.receivedBy,
     createdBy: r.created_by ?? r.createdBy,
+    paymentMethod: r.payment_method ?? r.paymentMethod,
+    paymentBreakdown: r.payment_breakdown ?? r.paymentBreakdown,
     createdAt: r.created_at ?? r.createdAt ?? '',
     updatedAt: r.updated_at ?? r.updatedAt,
     items: (r.items ?? []).map(mapBillItem),
@@ -250,13 +254,14 @@ class SupplierBillService {
     id: number,
     amount: number,
     paymentMethod: string,
-    notes?: string
+    notes?: string,
+    paymentBreakdown?: Record<string, any>[]
   ): Promise<SupplierBill> {
     const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/supplier-bills/${id}/record-payment`,
       {
         method: 'POST',
-        body: JSON.stringify({ amount, payment_method: paymentMethod, notes }),
+        body: JSON.stringify({ amount, payment_method: paymentMethod, notes, payment_breakdown: paymentBreakdown }),
       }
     );
     if (!res.ok) {

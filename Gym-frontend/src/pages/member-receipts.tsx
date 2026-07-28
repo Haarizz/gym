@@ -14,7 +14,9 @@ import {
   FileText,
   User,
   CreditCard,
-  DollarSign,
+  Banknote,
+  Wallet,
+  TrendingUp,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -134,10 +136,10 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
     });
   }, [allReceipts, searchQuery, transactionTypeFilter, statusFilter, dateFilter]);
 
+  // Actual cash collected includes the paid portion of Partial receipts, not
+  // just fully-Paid ones — a partial payment is still real money received.
   const totalCollected = useMemo(() => {
-    return filteredReceipts
-      .filter((r) => r.status === "Paid")
-      .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    return filteredReceipts.reduce((sum, r) => sum + Number(r.paid_amount ?? (r.status === "Paid" ? r.amount : 0)), 0);
   }, [filteredReceipts]);
 
   const handleViewReceipt = (receipt: Receipt) => {
@@ -179,16 +181,37 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
   const getPaymentMethodIcon = (method: string) => {
     switch (method) {
       case "Cash":
-        return <DollarSign className="h-4 w-4" />;
+        return <Banknote className="h-4 w-4" />;
       case "Card":
         return <CreditCard className="h-4 w-4" />;
       case "Online":
         return <CreditCard className="h-4 w-4" />;
       case "Wallet":
-        return <DollarSign className="h-4 w-4" />;
+        return <Wallet className="h-4 w-4" />;
       default:
-        return <DollarSign className="h-4 w-4" />;
+        return <Banknote className="h-4 w-4" />;
     }
+  };
+
+  // A receipt is "Partial" once something has been paid but not the full
+  // amount, and "Pending" only when nothing has been received yet — the
+  // backend already computes this (Receipt.status), so this just renders it
+  // instead of collapsing Partial into Pending like the old binary check did.
+  const getStatusBadge = (status: string) => {
+    if (status === "Paid") {
+      return <Badge className="bg-green-100 text-green-800">✅ Paid</Badge>;
+    }
+    if (status === "Partial") {
+      return <Badge className="bg-amber-100 text-amber-800">◐ Partial</Badge>;
+    }
+    return <Badge className="bg-orange-100 text-orange-800">⏳ Pending</Badge>;
+  };
+
+  const getPaidDue = (receipt: Receipt) => {
+    const amount = Number(receipt.amount || 0);
+    const paid = Number(receipt.paid_amount ?? 0);
+    const due = Number(receipt.due_amount ?? Math.max(0, amount - paid));
+    return { paid, due };
   };
 
   return (
@@ -223,7 +246,7 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
           )}
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -258,6 +281,22 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
+                    <p className="text-sm text-muted-foreground">Partial</p>
+                    <p className="text-2xl mt-1">
+                      {filteredReceipts.filter((r) => r.status === "Partial").length}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-amber-100">
+                    <Clock className="h-6 w-6 text-amber-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
                     <p className="text-sm text-muted-foreground">Pending</p>
                     <p className="text-2xl mt-1">
                       {filteredReceipts.filter((r) => r.status === "Pending").length}
@@ -277,9 +316,6 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
                     <p className="text-sm text-muted-foreground">Total Collected</p>
                     <p className="text-2xl mt-1"><CurrencyGlyph /> {totalCollected}</p>
                   </div>
-                  <div className="p-3 rounded-lg bg-purple-100">
-                    <DollarSign className="h-6 w-6 text-purple-600" />
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -289,7 +325,6 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
           <div className="mb-4">
             <div className="bg-gradient-to-r from-[#0047ab] to-[#00c5cb] text-white p-4 rounded-lg flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <DollarSign className="h-6 w-6" />
                 <div>
                   <p className="text-sm opacity-90">Total Collected (Current Filter)</p>
                   <p className="text-2xl"><CurrencyGlyph /> {totalCollected.toLocaleString()}</p>
@@ -354,6 +389,7 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
               <SelectContent>
                 <SelectItem value="All">All Status</SelectItem>
                 <SelectItem value="Paid">✅ Paid</SelectItem>
+                <SelectItem value="Partial">◐ Partial</SelectItem>
                 <SelectItem value="Pending">⏳ Pending</SelectItem>
               </SelectContent>
             </Select>
@@ -432,24 +468,35 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium">
-                          {Number(receipt.amount).toLocaleString()}
+                          <div>{Number(receipt.amount).toLocaleString()}</div>
+                          {(() => {
+                            const { paid, due } = getPaidDue(receipt);
+                            if (due <= 0) return null;
+                            return (
+                              <div className="text-xs font-normal text-muted-foreground mt-0.5 space-x-2">
+                                <span className="text-green-700">Paid: {paid.toLocaleString()}</span>
+                                <span className="text-amber-700">Due: {due.toLocaleString()}</span>
+                              </div>
+                            );
+                          })()}
+                          {/* A receipt built up from more than one payment (e.g. partial
+                              at registration, completed later via a settlement) must show
+                              that history — otherwise it reads as one lump-sum payment. */}
+                          {receipt.payment_breakdown && receipt.payment_breakdown.length > 1 && (
+                            <div className="text-xs font-normal text-muted-foreground mt-0.5">
+                              Paid in {receipt.payment_breakdown.length} payments: {receipt.payment_breakdown
+                                .map(leg => `${Number(leg.amount).toLocaleString()} (${leg.method})`)
+                                .join(' + ')}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {getPaymentMethodIcon(receipt.payment_method)}
                             <span>{receipt.payment_method}</span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          {receipt.status === "Paid" ? (
-                            <Badge className="bg-green-100 text-green-800">
-                              ✅ Paid
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-orange-100 text-orange-800">
-                              ⏳ Pending
-                            </Badge>
-                          )}
+                          {getStatusBadge(receipt.status)}
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
@@ -569,17 +616,37 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
                         <p className="mt-1 text-xl text-[#0047ab]">
                           <CurrencyGlyph /> {Number(selectedReceipt.amount).toLocaleString()}
                         </p>
+                        {(() => {
+                          const { paid, due } = getPaidDue(selectedReceipt);
+                          if (due <= 0) return null;
+                          return (
+                            <p className="text-xs text-muted-foreground mt-0.5 space-x-2">
+                              <span className="text-green-700">Paid: {paid.toLocaleString()}</span>
+                              <span className="text-amber-700">Due: {due.toLocaleString()}</span>
+                            </p>
+                          );
+                        })()}
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">
                           Payment Method
                         </Label>
                         <p className="mt-1 font-medium flex items-center gap-2">
-                          {getPaymentMethodIcon(selectedReceipt.payment_method)}
                           {selectedReceipt.payment_method}
                         </p>
                       </div>
                     </div>
+                    {selectedReceipt.payment_breakdown && selectedReceipt.payment_breakdown.length > 1 && (
+                      <div className="mt-4 pt-4 border-t space-y-1.5">
+                        <Label className="text-sm text-muted-foreground">Payment History</Label>
+                        {selectedReceipt.payment_breakdown.map((leg, idx) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{leg.method}{leg.reference ? ` — ${leg.reference}` : ''}</span>
+                            <span className="font-medium"><CurrencyGlyph /> {Number(leg.amount).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -659,17 +726,7 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
                     )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Status:</span>
-                      <span>
-                        {selectedReceipt.status === "Paid" ? (
-                          <Badge className="bg-green-100 text-green-800">
-                            ✅ Paid
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-orange-100 text-orange-800">
-                            ⏳ Pending
-                          </Badge>
-                        )}
-                      </span>
+                      <span>{getStatusBadge(selectedReceipt.status)}</span>
                     </div>
                   </CardContent>
                 </Card>
