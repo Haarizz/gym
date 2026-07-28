@@ -14,10 +14,9 @@ import { receiptsService, Receipt } from "../utils/supabase/receipts-service";
 import { financialAnalyticsService } from "../utils/supabase/financial-analytics-service";
 import { attendanceService } from "../utils/supabase/attendance-service";
 import { bookingService } from "../utils/supabase/booking-service";
+import { communityService } from "../utils/supabase/community-service";
 import {
   BarChart3,
-  TrendingUp,
-  TrendingDown,
   Users,
   DollarSign,
   Target,
@@ -54,7 +53,6 @@ import {
   Trophy
 } from "lucide-react";
 import {
-  LineChart as RechartsLineChart,
   Line,
   BarChart as RechartsBarChart,
   Bar,
@@ -75,94 +73,52 @@ import {
   LabelList
 } from "recharts";
 
-// Mock data - In real app, this would come from your backend
-const mockData = {
+// Initial/empty shape — every field is populated from real backend data in
+// refreshData(). No fabricated numbers are ever shown, even before the first
+// load completes.
+type Recommendation = {
+  type: "success" | "warning" | "info";
+  icon: typeof CheckCircle;
+  title: string;
+  message: string;
+  action: string;
+};
+
+const emptyData = {
   targets: {
-    assigned: 85000,
-    achieved: 67500,
-    progress: 79.4
+    assigned: 0,
+    achieved: 0,
+    progress: 0
   },
   collections: {
-    today: {
-      membership: 12500,
-      addons: 3200,
-      pos: 1800,
-      total: 17500
-    },
-    yesterday: {
-      membership: 11800,
-      addons: 2900,
-      pos: 2100,
-      total: 16800
-    },
-    thisMonth: {
-      membership: 245000,
-      addons: 48000,
-      pos: 32000,
-      total: 325000
-    }
+    today: { membership: 0, addons: 0, pos: 0, total: 0 },
+    yesterday: { membership: 0, addons: 0, pos: 0, total: 0 },
+    thisMonth: { membership: 0, addons: 0, pos: 0, total: 0 }
   },
   trends: {
-    daily: [
-      { date: "Mon", revenue: 15200, members: 45 },
-      { date: "Tue", revenue: 18400, members: 52 },
-      { date: "Wed", revenue: 16800, members: 48 },
-      { date: "Thu", revenue: 19200, members: 56 },
-      { date: "Fri", revenue: 22100, members: 64 },
-      { date: "Sat", revenue: 26800, members: 78 },
-      { date: "Sun", revenue: 21300, members: 61 }
-    ],
-    monthly: [
-      { month: "Jan", revenue: 298000, target: 285000 },
-      { month: "Feb", revenue: 312000, target: 295000 },
-      { month: "Mar", revenue: 325000, target: 310000 },
-      { month: "Apr", revenue: 298000, target: 315000 },
-      { month: "May", revenue: 335000, target: 320000 },
-      { month: "Jun", revenue: 358000, target: 340000 }
-    ]
+    daily: [] as { date: string; revenue: number; members: number }[],
+    monthly: [] as { month: string; revenue: number; target: number }[]
   },
-  staffPerformance: [
-    { name: "Ahmed Al-Rashid", sales: 45000, target: 40000, achievement: 112.5 },
-    { name: "Sarah Johnson", sales: 38500, target: 35000, achievement: 110.0 },
-    { name: "Mohamed Hassan", sales: 42000, target: 38000, achievement: 110.5 },
-    { name: "Emma Wilson", sales: 31200, target: 32000, achievement: 97.5 },
-    { name: "Omar Abdullah", sales: 28800, target: 30000, achievement: 96.0 }
-  ],
-  retentionFunnel: [
-    { name: "New Signups", value: 245, color: "#0047AB" },
-    { name: "Active Members", value: 198, color: "#009688" },
-    { name: "Renewals", value: 156, color: "#4CAF50" }
-  ],
-  churnPrediction: [
-    { name: "Layla Al-Mansoori", risk: "High", lastVisit: "15 days ago", membership: "Premium", probability: 85 },
-    { name: "James Miller", risk: "High", lastVisit: "12 days ago", membership: "Basic", probability: 78 },
-    { name: "Fatima Al-Zahra", risk: "Medium", lastVisit: "8 days ago", membership: "Premium", probability: 65 },
-    { name: "Robert Chen", risk: "Medium", lastVisit: "6 days ago", membership: "Basic", probability: 58 },
-    { name: "Aisha Ibrahim", risk: "Low", lastVisit: "2 days ago", membership: "Premium", probability: 25 }
-  ],
-  trainerPerformance: [
-    { name: "Coach Hassan", classes: 45, attendance: 92, revenue: 28500, rating: 4.8 },
-    { name: "Trainer Sarah", classes: 38, attendance: 88, revenue: 24200, rating: 4.6 },
-    { name: "PT Ahmed", classes: 52, attendance: 95, revenue: 32800, rating: 4.9 },
-    { name: "Coach Layla", classes: 34, attendance: 85, revenue: 21600, rating: 4.5 }
-  ],
+  staffPerformance: [] as { name: string; sales: number; target: number; achievement: number }[],
+  retentionFunnel: [] as { name: string; value: number; color: string }[],
+  churnPrediction: [] as { name: string; risk: string; lastVisit: string; membership: string; probability: number }[],
+  trainerPerformance: [] as { name: string; classes: number; attendance: number; revenue: number; rating: number }[],
   engagementAnalytics: {
-    communityFeatures: [
-      { feature: "Group Challenges", usage: 78, engagement: 85 },
-      { feature: "Social Feed", usage: 65, engagement: 72 },
-      { feature: "Member Chat", usage: 45, engagement: 68 },
-      { feature: "Events", usage: 58, engagement: 89 },
-      { feature: "Leaderboards", usage: 38, engagement: 92 }
-    ],
-    correlationData: [
-      { engagement: 20, renewal: 45 },
-      { engagement: 35, renewal: 62 },
-      { engagement: 50, renewal: 78 },
-      { engagement: 68, renewal: 85 },
-      { engagement: 82, renewal: 94 },
-      { engagement: 95, renewal: 98 }
-    ]
-  }
+    communityFeatures: [] as { feature: string; posts: number; likes: number; comments: number; usage: number }[],
+    weeklyActivity: [] as { week: string; posts: number; engagement: number }[]
+  },
+  profitability: {
+    totalRevenue: 0,
+    totalExpenses: 0,
+    netProfit: 0,
+    profitMargin: 0,
+    costBreakdown: [] as { name: string; amount: number; percentage: number }[],
+    revenuePerMember: 0,
+    lifetimeValue: 0,
+    newMembersThisMonth: 0,
+    churnRate: 0
+  },
+  recommendations: [] as Recommendation[]
 };
 
 const COLORS = {
@@ -179,7 +135,7 @@ export function CommunityAnalytics() {
   const [dateFilter, setDateFilter] = useState("today");
   const [staffFilter, setStaffFilter] = useState("all");
   const [activeCollectionTab, setActiveCollectionTab] = useState("today");
-  const [data, setData] = useState(mockData);
+  const [data, setData] = useState(emptyData);
   const [members, setMembers] = useState<MemberApi[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(false);
@@ -196,7 +152,7 @@ export function CommunityAnalytics() {
       const yesterdayStr = yesterday.toISOString().split("T")[0];
       const monthKey = `${year}-${String(month).padStart(2, "0")}`;
 
-      const [targets, membersResp, receiptsResp, monthlyTrend, att, bookings] = await Promise.all([
+      const [targets, membersResp, receiptsResp, monthlyTrend, att, bookings, dashboard, expenseByCategory, communityStats] = await Promise.all([
         staffService.getTargets(year, month).catch(() => []),
         membersService.getMembers({}, { page: 1, limit: 3000 }).catch(() => ({ members: [] as MemberApi[] } as any)),
         receiptsService.getReceipts({}, { page: 1, limit: 5000 }).catch(() => ({ receipts: [] as Receipt[] } as any)),
@@ -207,6 +163,9 @@ export function CommunityAnalytics() {
           startDate: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0],
           endDate: todayStr,
         }).catch(() => []),
+        financialAnalyticsService.getDashboard().catch(() => null),
+        financialAnalyticsService.getExpenseByCategory().catch(() => []),
+        communityService.getEngagementStats().catch(() => null),
       ]);
 
       const memberList = (membersResp as any)?.members ?? [];
@@ -313,17 +272,54 @@ export function CommunityAnalytics() {
         m.membership_status === "expired" ||
         m.membership_status === "suspended"
       );
-      const churnPrediction = churnCandidates.slice(0, 8).map((m) => {
-        const risk = m.payment_status === "overdue" || m.membership_status === "expired" ? "High" : "Medium";
-        const probability = risk === "High" ? 82 : 60;
-        return {
-          name: m.name,
-          risk,
-          lastVisit: "—",
-          membership: m.membership_type,
-          probability,
-        };
-      });
+
+      // Risk score is a deterministic heuristic over real member fields — not a
+      // trained model — but it's grounded in each member's actual situation
+      // instead of a flat constant per risk tier.
+      const daysSince = (iso?: string) => {
+        if (!iso) return null;
+        const ms = now.getTime() - new Date(iso).getTime();
+        return Number.isFinite(ms) ? Math.max(0, Math.floor(ms / 86400000)) : null;
+      };
+
+      const churnPrediction = churnCandidates
+        .map((m) => {
+          let score = 0;
+
+          if (m.payment_status === "overdue") {
+            const fee = Number(m.membership_fee) || 0;
+            const owed = Number(m.outstanding_balance) || 0;
+            score += fee > 0 ? Math.min(35, (owed / fee) * 35) : 25;
+          }
+
+          const expiryRaw = m.membership_end_date || m.expiry_date;
+          const daysExpired = m.membership_status === "expired" ? daysSince(expiryRaw) : null;
+          if (daysExpired !== null) {
+            score += Math.min(35, 15 + daysExpired / 2);
+          } else if (m.membership_status === "suspended") {
+            score += 30;
+          }
+
+          const daysSincePayment = daysSince(m.last_payment_date);
+          if (daysSincePayment !== null) {
+            score += Math.min(20, Math.max(0, daysSincePayment - 30) / 4);
+          } else {
+            score += 10; // no payment on record at all is itself a risk signal
+          }
+
+          const probability = Math.max(20, Math.min(95, Math.round(score)));
+          const risk = probability >= 70 ? "High" : probability >= 45 ? "Medium" : "Low";
+
+          return {
+            name: m.name,
+            risk,
+            lastVisit: "—",
+            membership: m.membership_type,
+            probability,
+          };
+        })
+        .sort((a, b) => b.probability - a.probability)
+        .slice(0, 8);
 
       const trainerMap = new Map<string, { classes: number; attended: number; revenue: number }>();
       (bookings as any[]).forEach((b) => {
@@ -345,6 +341,120 @@ export function CommunityAnalytics() {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 6);
 
+      // ── Profitability — sourced from posted General Ledger entries ──────────
+      const totalRevenue = dashboard?.totalRevenue ?? 0;
+      const totalExpenses = dashboard?.totalExpenses ?? 0;
+      const netProfit = dashboard?.netIncome ?? (totalRevenue - totalExpenses);
+      const profitMargin = dashboard?.profitMargin ?? 0;
+
+      const costBreakdown = (expenseByCategory as any[])
+        .map((e) => ({
+          name: e.category,
+          amount: Math.round(e.amount || 0),
+          percentage: totalExpenses > 0 ? Number((((e.amount || 0) / totalExpenses) * 100).toFixed(1)) : 0,
+        }))
+        .sort((a, b) => b.amount - a.amount);
+
+      const revenuePerMember = memberList.length > 0 ? totalRevenue / memberList.length : 0;
+
+      // Lifetime value: average total amount ever paid, across members with at least one receipt
+      const revenueByMember = new Map<string, number>();
+      receiptList.forEach((r: any) => {
+        const key = r.member_db_id ? String(r.member_db_id) : (r.member_id || r.member_name || "");
+        if (!key) return;
+        revenueByMember.set(key, (revenueByMember.get(key) || 0) + (Number(r.amount) || 0));
+      });
+      const lifetimeValue = revenueByMember.size > 0
+        ? Array.from(revenueByMember.values()).reduce((s, v) => s + v, 0) / revenueByMember.size
+        : 0;
+
+      const churnRate = memberList.length > 0 ? (churnCandidates.length / memberList.length) * 100 : 0;
+
+      // ── Community engagement — real post/like/comment data, no invented features ──
+      const communityFeatures = communityStats
+        ? communityStats.byType.map((t) => ({
+            feature: t.type.charAt(0).toUpperCase() + t.type.slice(1),
+            posts: t.posts,
+            likes: t.likes,
+            comments: t.comments,
+            usage: communityStats.totalPosts > 0
+              ? Number(((t.posts / communityStats.totalPosts) * 100).toFixed(1))
+              : 0,
+          }))
+        : [];
+
+      const weeklyActivity = communityStats
+        ? communityStats.weekly.map((w) => ({
+            week: w.weekLabel,
+            posts: w.posts,
+            engagement: w.likes + w.comments,
+          }))
+        : [];
+
+      // ── Recommendations — generated only when the underlying real data supports them ──
+      const recommendations: Recommendation[] = [];
+
+      const weekendDays = daily.filter((d) => d.date === "Sat" || d.date === "Sun");
+      const weekdayDays = daily.filter((d) => d.date !== "Sat" && d.date !== "Sun");
+      const weekendAvg = weekendDays.length > 0 ? weekendDays.reduce((s, d) => s + d.revenue, 0) / weekendDays.length : 0;
+      const weekdayAvg = weekdayDays.length > 0 ? weekdayDays.reduce((s, d) => s + d.revenue, 0) / weekdayDays.length : 0;
+      if (weekendAvg > 0 && weekdayAvg > 0) {
+        const diffPct = ((weekendAvg - weekdayAvg) / weekdayAvg) * 100;
+        if (Math.abs(diffPct) >= 5) {
+          recommendations.push({
+            type: diffPct > 0 ? "success" : "info",
+            icon: diffPct > 0 ? CheckCircle : Brain,
+            title: diffPct > 0 ? "Strong Weekend Performance" : "Weekday Opportunity",
+            message: diffPct > 0
+              ? `Weekend revenue is ${diffPct.toFixed(0)}% higher than weekdays over the last 7 days. Consider expanding weekend class offerings.`
+              : `Weekday revenue is ${Math.abs(diffPct).toFixed(0)}% higher than weekends over the last 7 days. Consider weekend promotions to balance demand.`,
+            action: "Review Class Schedule",
+          });
+        }
+      }
+
+      const highRiskCount = churnPrediction.filter((c) => c.risk === "High").length;
+      if (highRiskCount > 0) {
+        recommendations.push({
+          type: "warning",
+          icon: AlertTriangle,
+          title: "Attention Needed",
+          message: `${highRiskCount} member${highRiskCount === 1 ? "" : "s"} at high risk of churn (overdue payment or expired membership). Immediate outreach recommended.`,
+          action: "Contact Members",
+        });
+      }
+
+      if (assigned > 0) {
+        recommendations.push(
+          progress >= 100
+            ? {
+                type: "success",
+                icon: Trophy,
+                title: "Target Achieved",
+                message: `You've reached ${progress.toFixed(1)}% of this month's revenue target. Great work team!`,
+                action: "Celebrate Success",
+              }
+            : {
+                type: "info",
+                icon: Target,
+                title: "Target Progress",
+                message: `You're at ${progress.toFixed(1)}% of this month's revenue target, with ${(assigned - achieved).toLocaleString()} remaining.`,
+                action: "Review Sales Pipeline",
+              }
+        );
+      }
+
+      if (communityFeatures.length > 0) {
+        const topType = communityFeatures[0];
+        recommendations.push({
+          type: "info",
+          icon: MessageSquare,
+          title: "Community Engagement",
+          message: `"${topType.feature}" posts make up ${topType.usage.toFixed(0)}% of community activity with ${topType.likes + topType.comments} total interactions. Consider highlighting this content type more.`,
+          action: "Promote Community",
+        });
+      }
+
       setData((prev) => ({
         ...prev,
         targets: { assigned, achieved, progress },
@@ -355,9 +465,21 @@ export function CommunityAnalytics() {
         churnPrediction,
         trainerPerformance,
         engagementAnalytics: {
-          communityFeatures: [],
-          correlationData: [],
+          communityFeatures,
+          weeklyActivity,
         },
+        profitability: {
+          totalRevenue,
+          totalExpenses,
+          netProfit,
+          profitMargin,
+          costBreakdown,
+          revenuePerMember,
+          lifetimeValue,
+          newMembersThisMonth: newSignupsThisMonth,
+          churnRate,
+        },
+        recommendations,
       }));
 
       if (!att) {
@@ -588,7 +710,8 @@ export function CommunityAnalytics() {
             {/* Horizontal Bar Chart */}
             <div className="space-y-4">
               {collectionBreakdownData.map((item, index) => {
-                const percentage = (item.value / data.collections[activeCollectionTab as keyof typeof data.collections].total) * 100;
+                const collectionTotal = data.collections[activeCollectionTab as keyof typeof data.collections].total;
+                const percentage = collectionTotal > 0 ? (item.value / collectionTotal) * 100 : 0;
                 return (
                   <div key={index} className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -657,10 +780,10 @@ export function CommunityAnalytics() {
                 <XAxis dataKey="date" stroke="#666" />
                 <YAxis yAxisId="left" stroke="#666" />
                 <YAxis yAxisId="right" orientation="right" stroke="#666" />
-                <Tooltip 
+                <Tooltip
                   formatter={(value, name) => [
-                    name === 'revenue' ? `${currencyCode} ${value.toLocaleString()}` : value,
-                    name === 'revenue' ? 'Revenue' : 'New Members'
+                    name === 'Revenue' ? `${currencyCode} ${Number(value).toLocaleString()}` : value,
+                    name
                   ]}
                 />
                 <Legend />
@@ -690,8 +813,8 @@ export function CommunityAnalytics() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis dataKey="month" stroke="#666" />
                 <YAxis stroke="#666" />
-                <Tooltip 
-                  formatter={(value) => [`${currencyCode} ${value.toLocaleString()}`, '']}
+                <Tooltip
+                  formatter={(value, name) => [`${currencyCode} ${Number(value).toLocaleString()}`, name]}
                 />
                 <Legend />
                 <Bar dataKey="target" fill={COLORS.muted} name="Target" />
@@ -877,10 +1000,12 @@ export function CommunityAnalytics() {
                         <div className="flex justify-between items-start mb-3">
                           <div>
                             <p className="font-medium">{trainer.name}</p>
-                            <div className="flex items-center space-x-1 mt-1">
-                              <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                              <span className="text-sm text-muted-foreground">{trainer.rating}</span>
-                            </div>
+                            {trainer.rating > 0 && (
+                              <div className="flex items-center space-x-1 mt-1">
+                                <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                                <span className="text-sm text-muted-foreground">{trainer.rating}</span>
+                              </div>
+                            )}
                           </div>
                           <Badge variant="default">
                             <CurrencyGlyph /> {trainer.revenue.toLocaleString()}
@@ -924,68 +1049,89 @@ export function CommunityAnalytics() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className={panelCardShell}>
                 <CardHeader>
-                  <CardTitle className="text-lg">Community Feature Usage</CardTitle>
-                  <CardDescription>Most used community features and engagement rates</CardDescription>
+                  <CardTitle className="text-lg">Community Post Engagement</CardTitle>
+                  <CardDescription>Real post activity by type, and likes + comments earned</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {data.engagementAnalytics.communityFeatures.map((feature, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">{feature.feature}</span>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs text-muted-foreground">{feature.usage}% usage</span>
-                            <span className="text-xs font-medium">{feature.engagement}% engagement</span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="w-full bg-muted rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full transition-all duration-500"
-                              style={{ 
-                                width: `${feature.usage}%`,
-                                backgroundColor: COLORS.primary
-                              }}
-                            />
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full transition-all duration-500"
-                              style={{ 
-                                width: `${feature.engagement}%`,
-                                backgroundColor: COLORS.secondary
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  {data.engagementAnalytics.communityFeatures.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      No community posts yet — this section will populate once members start posting.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {(() => {
+                        const maxInteractions = Math.max(
+                          ...data.engagementAnalytics.communityFeatures.map((f) => f.likes + f.comments),
+                          1
+                        );
+                        return data.engagementAnalytics.communityFeatures.map((feature, index) => {
+                          const interactions = feature.likes + feature.comments;
+                          const relativeInteractions = (interactions / maxInteractions) * 100;
+                          return (
+                            <div key={index} className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium">{feature.feature}</span>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-muted-foreground">{feature.posts} posts ({feature.usage}%)</span>
+                                  <span className="text-xs font-medium">{interactions} interactions</span>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="w-full bg-muted rounded-full h-2">
+                                  <div
+                                    className="h-2 rounded-full transition-all duration-500"
+                                    style={{
+                                      width: `${feature.usage}%`,
+                                      backgroundColor: COLORS.primary
+                                    }}
+                                  />
+                                </div>
+                                <div className="w-full bg-muted rounded-full h-2">
+                                  <div
+                                    className="h-2 rounded-full transition-all duration-500"
+                                    style={{
+                                      width: `${relativeInteractions}%`,
+                                      backgroundColor: COLORS.secondary
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
               <Card className={panelCardShell}>
                 <CardHeader>
-                  <CardTitle className="text-lg">Engagement vs Renewal Correlation</CardTitle>
-                  <CardDescription>Relationship between community engagement and member renewals</CardDescription>
+                  <CardTitle className="text-lg">Weekly Community Activity</CardTitle>
+                  <CardDescription>Posts created and engagement (likes + comments) received, last 8 weeks</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <RechartsLineChart data={data.engagementAnalytics.correlationData}>
+                    <ComposedChart data={data.engagementAnalytics.weeklyActivity}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                      <XAxis dataKey="engagement" stroke="#666" label={{ value: 'Engagement %', position: 'insideBottom', offset: -5 }} />
-                      <YAxis stroke="#666" label={{ value: 'Renewal Rate %', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip 
-                        formatter={(value, name) => [`${value}%`, name === 'renewal' ? 'Renewal Rate' : 'Engagement']}
+                      <XAxis dataKey="week" stroke="#666" />
+                      <YAxis yAxisId="left" stroke="#666" allowDecimals={false} />
+                      <YAxis yAxisId="right" orientation="right" stroke="#666" allowDecimals={false} />
+                      <Tooltip
+                        formatter={(value, name) => [value, name]}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="renewal" 
-                        stroke={COLORS.success} 
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="posts" fill={COLORS.primary} name="Posts" />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="engagement"
+                        stroke={COLORS.success}
                         strokeWidth={3}
                         dot={{ fill: COLORS.success, strokeWidth: 2, r: 4 }}
+                        name="Engagement"
                       />
-                    </RechartsLineChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
@@ -998,25 +1144,30 @@ export function CommunityAnalytics() {
               <Card className={panelCardShell}>
                 <CardHeader>
                   <CardTitle className="text-lg">Revenue Breakdown</CardTitle>
+                  <CardDescription>From posted General Ledger entries, all-time</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Total Revenue</span>
-                      <span className="font-bold"><CurrencyGlyph /> 325,000</span>
+                      <span className="font-bold"><CurrencyGlyph /> {Math.round(data.profitability.totalRevenue).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Operating Costs</span>
-                      <span className="font-medium"><CurrencyGlyph /> 180,000</span>
+                      <span className="font-medium"><CurrencyGlyph /> {Math.round(data.profitability.totalExpenses).toLocaleString()}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Net Profit</span>
-                      <span className="font-bold text-success"><CurrencyGlyph /> 145,000</span>
+                      <span className={`font-bold ${data.profitability.netProfit >= 0 ? "text-success" : "text-destructive"}`}>
+                        <CurrencyGlyph /> {Math.round(data.profitability.netProfit).toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Profit Margin</span>
-                      <Badge variant="default">44.6%</Badge>
+                      <Badge variant={data.profitability.profitMargin >= 0 ? "default" : "destructive"}>
+                        {data.profitability.profitMargin.toFixed(1)}%
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -1024,53 +1175,46 @@ export function CommunityAnalytics() {
 
               <Card className={panelCardShell}>
                 <CardHeader>
-                  <CardTitle className="text-lg">Cost Center Analysis</CardTitle>
+                  <CardTitle className="text-lg">Expense Breakdown</CardTitle>
+                  <CardDescription>By chart-of-accounts expense category, all-time</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {[
-                      { name: "Staff Salaries", amount: 85000, percentage: 47.2 },
-                      { name: "Utilities", amount: 28000, percentage: 15.6 },
-                      { name: "Equipment", amount: 32000, percentage: 17.8 },
-                      { name: "Marketing", amount: 18000, percentage: 10.0 },
-                      { name: "Other", amount: 17000, percentage: 9.4 }
-                    ].map((cost, index) => (
-                      <div key={index} className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">{cost.name}</span>
-                        <div className="text-right">
-                          <span className="text-sm font-medium">
-                            <CurrencyGlyph /> {cost.amount.toLocaleString()}
-                          </span>
-                          <p className="text-xs text-muted-foreground">{cost.percentage}%</p>
+                  {data.profitability.costBreakdown.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">No posted expenses yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {data.profitability.costBreakdown.map((cost, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">{cost.name}</span>
+                          <div className="text-right">
+                            <span className="text-sm font-medium">
+                              <CurrencyGlyph /> {cost.amount.toLocaleString()}
+                            </span>
+                            <p className="text-xs text-muted-foreground">{cost.percentage}%</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
               <Card className={panelCardShell}>
                 <CardHeader>
                   <CardTitle className="text-lg">Key Ratios</CardTitle>
+                  <CardDescription>Current member base and posted ledger totals</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {[
-                      { label: "Revenue per Member", value: <><CurrencyGlyph /> 260</>, trend: "up" },
-                      { label: "Customer Lifetime Value", value: <><CurrencyGlyph /> 2,850</>, trend: "up" },
-                      { label: "Acquisition Cost", value: <><CurrencyGlyph /> 285</>, trend: "down" },
-                      { label: "Churn Rate", value: "10.5%", trend: "down" }
+                      { label: "Revenue per Member (all-time)", value: <><CurrencyGlyph /> {Math.round(data.profitability.revenuePerMember).toLocaleString()}</> },
+                      { label: "Lifetime Value / Paying Member", value: <><CurrencyGlyph /> {Math.round(data.profitability.lifetimeValue).toLocaleString()}</> },
+                      { label: "New Members This Month", value: data.profitability.newMembersThisMonth.toLocaleString() },
+                      { label: "Churn Risk Rate (current)", value: `${data.profitability.churnRate.toFixed(1)}%` }
                     ].map((ratio, index) => (
                       <div key={index} className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">{ratio.label}</span>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium">{ratio.value}</span>
-                          {ratio.trend === "up" ? (
-                            <TrendingUp className="h-4 w-4 text-success" />
-                          ) : (
-                            <TrendingDown className="h-4 w-4 text-success" />
-                          )}
-                        </div>
+                        <span className="font-medium">{ratio.value}</span>
                       </div>
                     ))}
                   </div>
@@ -1093,59 +1237,36 @@ export function CommunityAnalytics() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {[
-              {
-                type: "success",
-                icon: CheckCircle,
-                title: "Strong Performance",
-                message: "Your weekend revenue is 35% higher than weekdays. Consider expanding weekend class offerings.",
-                action: "Schedule More Classes"
-              },
-              {
-                type: "warning",
-                icon: AlertTriangle,
-                title: "Attention Needed",
-                message: "5 high-value members haven't visited in 10+ days. Immediate outreach recommended.",
-                action: "Contact Members"
-              },
-              {
-                type: "info",
-                icon: Brain,
-                title: "Growth Opportunity",
-                message: "Personal training sessions show 89% satisfaction. Consider promoting PT packages more.",
-                action: "Launch PT Campaign"
-              },
-              {
-                type: "success",
-                icon: Trophy,
-                title: "Achievement",
-                message: "You've exceeded your monthly target by 12.5%. Great work team!",
-                action: "Celebrate Success"
-              }
-            ].map((recommendation, index) => (
-              <div key={index} className="flex items-start space-x-3 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                <div className={`p-2 rounded-full ${
-                  recommendation.type === 'success' ? 'bg-success/10' :
-                  recommendation.type === 'warning' ? 'bg-warning/10' :
-                  'bg-primary/10'
-                }`}>
-                  <recommendation.icon className={`h-4 w-4 ${
-                    recommendation.type === 'success' ? 'text-success' :
-                    recommendation.type === 'warning' ? 'text-warning' :
-                    'text-primary'
-                  }`} />
+          {data.recommendations.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              Not enough data yet to generate recommendations.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {data.recommendations.map((recommendation, index) => (
+                <div key={index} className="flex items-start space-x-3 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className={`p-2 rounded-full ${
+                    recommendation.type === 'success' ? 'bg-success/10' :
+                    recommendation.type === 'warning' ? 'bg-warning/10' :
+                    'bg-primary/10'
+                  }`}>
+                    <recommendation.icon className={`h-4 w-4 ${
+                      recommendation.type === 'success' ? 'text-success' :
+                      recommendation.type === 'warning' ? 'text-warning' :
+                      'text-primary'
+                    }`} />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="font-medium">{recommendation.title}</p>
+                    <p className="text-sm text-muted-foreground">{recommendation.message}</p>
+                    <Button size="sm" variant="outline" className="text-xs shadow-sm hover:shadow-md transition-all">
+                      {recommendation.action}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex-1 space-y-2">
-                  <p className="font-medium">{recommendation.title}</p>
-                  <p className="text-sm text-muted-foreground">{recommendation.message}</p>
-                  <Button size="sm" variant="outline" className="text-xs shadow-sm hover:shadow-md transition-all">
-                    {recommendation.action}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

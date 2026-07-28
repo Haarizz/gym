@@ -54,6 +54,10 @@ public class MemberRequestDTO {
     private String nextPaymentDate;
     private String paymentMethodUsed;
     private List<PaymentSplitDTO> paymentBreakdown; // legs when paymentMethodUsed == "Mixed"
+    // Specific ledger bank account (from account_heads) that received a Bank Transfer
+    // payment — null for every other payment method.
+    private String bankAccountCode;
+    private String bankAccountName;
     private java.math.BigDecimal discountApplied;
 
     // Family plan fields
@@ -181,6 +185,12 @@ public class MemberRequestDTO {
 
     public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
+
+    public String getBankAccountCode() { return bankAccountCode; }
+    public void setBankAccountCode(String bankAccountCode) { this.bankAccountCode = bankAccountCode; }
+
+    public String getBankAccountName() { return bankAccountName; }
+    public void setBankAccountName(String bankAccountName) { this.bankAccountName = bankAccountName; }
 
     public java.math.BigDecimal getDiscountApplied() { return discountApplied; }
     public void setDiscountApplied(java.math.BigDecimal discountApplied) { this.discountApplied = discountApplied; }

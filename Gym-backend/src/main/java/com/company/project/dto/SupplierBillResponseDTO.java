@@ -30,6 +30,8 @@ public class SupplierBillResponseDTO {
     private String priority;
     private String notes;
     private String receivedBy;
+    private String paymentMethod;
+    private List<PaymentSplitDTO> paymentBreakdown;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<SupplierBillItemDTO> items;
@@ -57,6 +59,8 @@ public class SupplierBillResponseDTO {
         dto.setPriority(bill.getPriority());
         dto.setNotes(bill.getNotes());
         dto.setReceivedBy(bill.getReceivedBy());
+        dto.setPaymentMethod(bill.getPaymentMethod());
+        dto.setPaymentBreakdown(bill.getPaymentBreakdown());
         dto.setCreatedAt(bill.getCreatedAt());
         dto.setUpdatedAt(bill.getUpdatedAt());
         dto.setItems(items.stream().map(SupplierBillItemDTO::fromEntity).collect(Collectors.toList()));
@@ -121,6 +125,12 @@ public class SupplierBillResponseDTO {
 
     public String getReceivedBy() { return receivedBy; }
     public void setReceivedBy(String receivedBy) { this.receivedBy = receivedBy; }
+
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

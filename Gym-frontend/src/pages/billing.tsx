@@ -14,7 +14,6 @@ import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Separator } from "../components/ui/separator";
 import {
   AlertCircle,
-  DollarSign,
   CreditCard,
   Download,
   Search,
@@ -309,10 +308,12 @@ export function Billing({ onNavigate }: BillingProps = {}) {
 
   const handleExportAllReceipts = () => {
     if (receipts.length === 0) { toast.info('No receipts to export'); return; }
-    const header = 'Receipt No,Member,Member ID,Plan,Type,Amount,Date,Payment Method,Status\n';
-    const rows = receipts.map(r =>
-      `"${r.receipt_no}","${r.member_name}","${r.member_id}","${r.plan_name ?? ''}","${r.transaction_type}","${Number(r.amount).toFixed(2)}","${r.transaction_date ? new Date(r.transaction_date).toLocaleDateString() : ''}","${r.payment_method ?? ''}","${r.status}"`
-    ).join('\n');
+    const header = 'Receipt No,Member,Member ID,Plan,Type,Amount,Paid,Pending,Date,Payment Method,Status\n';
+    const rows = receipts.map(r => {
+      const paid = Number(r.paid_amount ?? 0);
+      const pending = Math.max(0, Number(r.amount) - paid);
+      return `"${r.receipt_no}","${r.member_name}","${r.member_id}","${r.plan_name ?? ''}","${r.transaction_type}","${Number(r.amount).toFixed(2)}","${paid.toFixed(2)}","${pending.toFixed(2)}","${r.transaction_date ? new Date(r.transaction_date).toLocaleDateString() : ''}","${r.payment_method ?? ''}","${r.status}"`;
+    }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -371,7 +372,6 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Collection</CardTitle>
-            <div className="p-2 rounded-lg bg-blue-100"><DollarSign className="h-4 w-4 text-blue-600" /></div>
           </CardHeader>
           <CardContent>
             {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : (
@@ -532,7 +532,28 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         <TableCell>
                           <Badge variant="outline" className="text-xs">{receipt.transaction_type}</Badge>
                         </TableCell>
-                        <TableCell className="font-medium"><CurrencyGlyph /> {Number(receipt.amount).toLocaleString()}</TableCell>
+                        <TableCell className="font-medium">
+                          <div><CurrencyGlyph /> {Number(receipt.amount).toLocaleString()}</div>
+                          {(() => {
+                            const pending = Number(receipt.amount) - Number(receipt.paid_amount ?? 0);
+                            return pending > 0 ? (
+                              <div className="text-xs font-normal text-amber-600">
+                                <CurrencyGlyph /> {pending.toLocaleString()} pending
+                              </div>
+                            ) : null;
+                          })()}
+                          {/* A receipt built up from more than one payment (e.g. AED 10 at
+                              registration + AED 35 via a later settlement) must show that
+                              history — otherwise it reads as if the full amount arrived in
+                              one transaction. */}
+                          {receipt.payment_breakdown && receipt.payment_breakdown.length > 1 && (
+                            <div className="text-xs font-normal text-muted-foreground mt-0.5">
+                              Paid in {receipt.payment_breakdown.length} payments: {receipt.payment_breakdown
+                                .map(leg => `${Number(leg.amount).toLocaleString()} (${leg.method})`)
+                                .join(' + ')}
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {receipt.transaction_date ? new Date(receipt.transaction_date).toLocaleDateString() : '-'}
                         </TableCell>
@@ -615,7 +636,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-3" />
                   <p className="text-lg font-medium mb-1">No Outstanding Dues</p>
                   <p className="text-sm text-muted-foreground">
-                    All members are up to date. Members with <strong>payment_status = 'overdue'</strong> or <strong>next_payment_date</strong> within 7 days will appear here.
+                    All members are up to date. Members who are <strong>overdue</strong>, have a <strong>pending</strong> balance, or a payment due within 7 days will appear here.
                   </p>
                 </div>
               ) : (
@@ -975,6 +996,38 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   <span className="font-medium">Total Amount:</span>
                   <span className="font-bold text-lg"><CurrencyGlyph /> {Number(selectedReceipt.amount).toLocaleString()}</span>
                 </div>
+                {(() => {
+                  const paid = Number(selectedReceipt.paid_amount ?? 0);
+                  const pending = Number(selectedReceipt.amount) - paid;
+                  if (pending <= 0) return null;
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Paid:</span>
+                        <span>
+                          <CurrencyGlyph /> {paid.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-amber-600 font-medium">Pending:</span>
+                        <span className="text-amber-600 font-medium">
+                          <CurrencyGlyph /> {pending.toLocaleString()}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+                {selectedReceipt.payment_breakdown && selectedReceipt.payment_breakdown.length > 1 && (
+                  <div className="space-y-1 pt-1">
+                    <span className="text-sm text-muted-foreground">Payment History:</span>
+                    {selectedReceipt.payment_breakdown.map((leg, idx) => (
+                      <div key={idx} className="flex justify-between text-sm pl-2">
+                        <span className="text-muted-foreground">{leg.method}{leg.reference ? ` — ${leg.reference}` : ''}</span>
+                        <span><CurrencyGlyph /> {Number(leg.amount).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>

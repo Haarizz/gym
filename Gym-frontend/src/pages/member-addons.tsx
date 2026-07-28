@@ -70,6 +70,20 @@ import {
 } from "../utils/referral-rewards";
 import { membersService, Member as ApiMember } from "../utils/supabase/members-service";
 import { addonsService, MemberAddon } from "../utils/supabase/addons-service";
+import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
+import {
+  EMPTY_SPLIT_DETAILS, EMPTY_SPLIT_PAYMENT, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
+  CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
+} from "../components/shared/split-payment-fields";
+import type { SplitPaymentValue, SplitPaymentDetails } from "../components/shared/split-payment-fields";
+
+// Maps this page's Payment Method select value to the SplitPaymentValue key
+// so Card/UPI/Bank Transfer's method-specific details can be validated/built
+// by reusing the same helpers Mixed Payment legs use elsewhere in the app.
+// "UPI" is this page's Online Payment equivalent.
+const ADDON_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
+  Cash: 'cash', Card: 'card', UPI: 'online', 'Bank Transfer': 'bankTransfer'
+};
 
 interface MemberAddonsProps {
   onNavigate?: (section: string) => void;
@@ -213,6 +227,13 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
+  const [methodDetails, setMethodDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
+  const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+  useEffect(() => {
+    accountHeadsService.getBankAccounts()
+      .then(setBankAccounts)
+      .catch(err => console.error('Failed to load bank accounts:', err));
+  }, []);
   const [notes, setNotes] = useState("");
   const [customValidity, setCustomValidity] = useState<number>(30);
   const [customAmount, setCustomAmount] = useState<number>(0);
@@ -328,11 +349,23 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const handleConfirmPurchase = async () => {
     if (!selectedMember || !selectedAddon || !customAmount) return;
 
+    const legKey = ADDON_METHOD_TO_LEG_KEY[paymentMethod];
+    if (legKey && legKey !== 'cash') {
+      const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: customAmount };
+      if (!isSplitPaymentDetailsValid(probe, methodDetails)) {
+        toast.error(`Please fill in the required ${paymentMethod} details`);
+        return;
+      }
+    }
+
     const newExpiry = calculateNewExpiry();
     const startDate = new Date();
 
     try {
       setIsSubmitting(true);
+      const paymentBreakdown = legKey && legKey !== 'cash'
+        ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: customAmount }, methodDetails, bankAccounts)
+        : undefined;
       const created = await addonsService.createAddon({
         member_db_id: Number(selectedMember.id),
         member_id: selectedMember.membershipId,
@@ -345,6 +378,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
         start_date: startDate.toISOString(),
         expiry_date: (newExpiry || startDate).toISOString(),
         notes: notes || undefined,
+        payment_breakdown: paymentBreakdown,
       });
       setTransactions(prev => [created, ...prev]);
       setLastCreatedAddon(created);
@@ -352,6 +386,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       setIsSuccessDialogOpen(true);
       setNotes("");
       setPaymentMethod("Cash");
+      setMethodDetails(EMPTY_SPLIT_DETAILS);
     } catch {
       toast.error("Failed to save add-on purchase. Please try again.");
     } finally {
@@ -814,7 +849,10 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
               {/* Payment Method */}
               <div className="space-y-1.5">
                 <Label htmlFor="payment" className="text-xs font-medium">Payment Method</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <Select
+                  value={paymentMethod}
+                  onValueChange={(v) => { setPaymentMethod(v); setMethodDetails(EMPTY_SPLIT_DETAILS); }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -834,6 +872,66 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                   </SelectContent>
                 </Select>
               </div>
+
+              {paymentMethod === 'Card' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Card Type <span className="text-red-500">*</span></Label>
+                  <Select value={methodDetails.cardType} onValueChange={(v) => setMethodDetails(d => ({ ...d, cardType: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
+                    <SelectContent>
+                      {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {paymentMethod === 'UPI' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Payment Type <span className="text-red-500">*</span></Label>
+                    <Select value={methodDetails.onlinePaymentType} onValueChange={(v) => setMethodDetails(d => ({ ...d, onlinePaymentType: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectContent>
+                        {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Reference ID <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={methodDetails.onlineReference}
+                      onChange={(e) => setMethodDetails(d => ({ ...d, onlineReference: e.target.value }))}
+                      placeholder="Transaction ID"
+                    />
+                  </div>
+                  {methodDetails.onlinePaymentType === 'Other' && (
+                    <div className="col-span-2 space-y-1.5">
+                      <Label className="text-xs font-medium">Payment Provider Name <span className="text-red-500">*</span></Label>
+                      <Input
+                        value={methodDetails.onlineProviderName}
+                        onChange={(e) => setMethodDetails(d => ({ ...d, onlineProviderName: e.target.value }))}
+                        placeholder="Provider name"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {paymentMethod === 'Bank Transfer' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Bank Account (Ledger)</Label>
+                  <Select value={methodDetails.bankTransferAccountId} onValueChange={(v) => setMethodDetails(d => ({ ...d, bankTransferAccountId: v }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map(account => (
+                        <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Notes */}
               <div className="space-y-1.5">

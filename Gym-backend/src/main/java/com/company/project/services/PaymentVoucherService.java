@@ -74,6 +74,7 @@ public class PaymentVoucherService {
         pv.setStatus(req.getStatus() != null && !req.getStatus().isBlank() ? req.getStatus() : "Pending");
         PaymentVoucher saved = paymentVoucherRepository.save(pv);
         List<PaymentVoucherBill> bills = saveBills(saved.getId(), req.getBills());
+        postToLedgerIfPaid(saved);
         return PaymentVoucherResponseDTO.fromEntity(saved, bills);
     }
 
@@ -88,6 +89,7 @@ public class PaymentVoucherService {
         // Replace bills
         billRepository.deleteByPaymentVoucherId(id);
         List<PaymentVoucherBill> bills = saveBills(id, req.getBills());
+        postToLedgerIfPaid(saved);
         return PaymentVoucherResponseDTO.fromEntity(saved, bills);
     }
 
@@ -96,15 +98,23 @@ public class PaymentVoucherService {
                 .orElseThrow(() -> new EntityNotFoundException("Payment Voucher not found: " + id));
         pv.setStatus(status);
         PaymentVoucher saved = paymentVoucherRepository.save(pv);
-
-        // Generate journal entry when payment is marked as Paid:
-        // DR Accounts Payable, CR Cash/Bank
-        if ("Paid".equalsIgnoreCase(status)) {
-            financialEventService.onSupplierPaid(saved);
-        }
+        postToLedgerIfPaid(saved);
 
         List<PaymentVoucherBill> bills = billRepository.findByPaymentVoucherId(id);
         return PaymentVoucherResponseDTO.fromEntity(saved, bills);
+    }
+
+    /**
+     * Generates the journal entry (DR Accounts Payable, CR Cash/Bank) the first
+     * time a voucher's status is "Paid" — regardless of whether that happened via
+     * create, a full update, or the dedicated status-patch endpoint. onSupplierPaid()
+     * is idempotent per voucher id, so calling this on every save is safe even if
+     * the voucher was already posted.
+     */
+    private void postToLedgerIfPaid(PaymentVoucher pv) {
+        if ("Paid".equalsIgnoreCase(pv.getStatus())) {
+            financialEventService.onSupplierPaid(pv);
+        }
     }
 
     public void deletePaymentVoucher(Long id) {

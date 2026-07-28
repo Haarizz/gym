@@ -119,7 +119,8 @@ public class FinancialEventService {
         }
 
         List<JvLine> lines = new ArrayList<>(buildMoneyLines(
-                receipt.getPaymentMethod(), receipt.getPaymentBreakdown(), amount, true,
+                receipt.getPaymentMethod(), receipt.getPaymentBreakdown(),
+                receipt.getBankAccountCode(), receipt.getBankAccountName(), amount, true,
                 "Member payment — " + receipt.getMemberName()));
         lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", amount, "Revenue recognition"));
 
@@ -198,6 +199,38 @@ public class FinancialEventService {
         JournalVoucher jv = createAndPost(
                 "POS Refund: " + sale.getTransactionNumber(), date, lines, "SALES");
         registerSource("SaleTransactionRefund", sale.getId(), "SALES", jv.getId());
+    }
+
+    /**
+     * SERVICE — Member add-on purchased (Training, Nutrition, Spa, Classes, ...).
+     * DR  Cash/Bank                    (amount)
+     * CR  Service / Add-on Revenue     (amount)
+     */
+    public void onAddonPaymentReceived(MemberAddon addon) {
+        if (alreadyJournaled("MemberAddon", addon.getId())) return;
+
+        BigDecimal amount = safe(addon.getAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for MemberAddon id={}: amount {} is not positive", addon.getId(), amount);
+            return;
+        }
+
+        List<JvLine> lines = new ArrayList<>(buildMoneyLines(
+                addon.getPaymentMode(), addon.getPaymentBreakdown(), amount, true,
+                "Add-on purchase — " + addon.getMemberName()));
+        lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", amount,
+                "Revenue recognition — " + addon.getAddonName()));
+
+        LocalDate date = addon.getPurchaseDate() != null
+                ? addon.getPurchaseDate().toLocalDate() : LocalDate.now();
+
+        JournalVoucher jv = createAndPost(
+                "Add-on: " + (addon.getAddonName() != null ? addon.getAddonName() : "Add-on")
+                + " — " + addon.getMemberName()
+                + " | " + addon.getTransactionId(),
+                date, lines, "ADDONS");
+
+        registerSource("MemberAddon", addon.getId(), "ADDONS", jv.getId());
     }
 
     /**
@@ -571,13 +604,28 @@ public class FinancialEventService {
      */
     private static List<JvLine> buildMoneyLines(String paymentMethod, List<PaymentSplitDTO> breakdown,
                                                  BigDecimal totalAmount, boolean debit, String narration) {
+        return buildMoneyLines(paymentMethod, breakdown, null, null, totalAmount, debit, narration);
+    }
+
+    /**
+     * Same as above, but lets the caller pin the "money" leg to a specific ledger
+     * account (e.g. a named bank account picked from Chart of Accounts) instead of
+     * the generic Cash in Hand / Cash at Bank bucket. Used for Bank Transfer receipts
+     * where the user selected exactly which bank account was credited.
+     */
+    private static List<JvLine> buildMoneyLines(String paymentMethod, List<PaymentSplitDTO> breakdown,
+                                                 String overrideAccountCode, String overrideAccountName,
+                                                 BigDecimal totalAmount, boolean debit, String narration) {
         PaymentMethod pm = PaymentMethod.fromString(paymentMethod);
+        boolean hasOverride = overrideAccountCode != null && !overrideAccountCode.isBlank();
 
         if (pm != PaymentMethod.MIXED || breakdown == null || breakdown.isEmpty()) {
-            String code = paymentMethodToAccount(paymentMethod);
+            String code = hasOverride ? overrideAccountCode : paymentMethodToAccount(paymentMethod);
+            String name = hasOverride && overrideAccountName != null && !overrideAccountName.isBlank()
+                    ? overrideAccountName : cashAccountName(code);
             JvLine line = debit
-                    ? dr(code, cashAccountName(code), totalAmount, narration)
-                    : cr(code, cashAccountName(code), totalAmount, narration);
+                    ? dr(code, name, totalAmount, narration)
+                    : cr(code, name, totalAmount, narration);
             return List.of(line);
         }
 
@@ -593,13 +641,16 @@ public class FinancialEventService {
         List<JvLine> lines = new ArrayList<>();
         for (PaymentSplitDTO leg : breakdown) {
             if (leg.getAmount() == null || leg.getAmount().compareTo(BigDecimal.ZERO) <= 0) continue;
-            String code = paymentMethodToAccount(leg.getMethod());
+            boolean legHasOverride = leg.getBankAccountCode() != null && !leg.getBankAccountCode().isBlank();
+            String code = legHasOverride ? leg.getBankAccountCode() : paymentMethodToAccount(leg.getMethod());
+            String name = legHasOverride && leg.getBankAccountName() != null && !leg.getBankAccountName().isBlank()
+                    ? leg.getBankAccountName() : cashAccountName(code);
             String legLabel = leg.getMethod() != null ? leg.getMethod() : "Payment";
             String desc = narration + " — " + legLabel
                     + (leg.getReference() != null && !leg.getReference().isBlank() ? " #" + leg.getReference() : "");
             lines.add(debit
-                    ? dr(code, cashAccountName(code), leg.getAmount(), desc)
-                    : cr(code, cashAccountName(code), leg.getAmount(), desc));
+                    ? dr(code, name, leg.getAmount(), desc)
+                    : cr(code, name, leg.getAmount(), desc));
         }
         return lines;
     }

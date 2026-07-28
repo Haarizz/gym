@@ -25,13 +25,21 @@ export interface MemberDue {
   due_date: string;
   days_overdue: number;
   last_payment: string | null;
-  status: 'Overdue' | 'Due Soon';
+  status: 'Overdue' | 'Due Soon' | 'Pending';
 }
 
 export interface PaymentSplitLeg {
   method: string;
   amount: number;
   reference?: string;
+  card_type?: string;
+  cheque_number?: string;
+  bank_name?: string;
+  cheque_date?: string;
+  bank_account_code?: string;
+  bank_account_name?: string;
+  online_payment_type?: string;
+  provider_name?: string;
 }
 
 export interface SettlePaymentRequest {

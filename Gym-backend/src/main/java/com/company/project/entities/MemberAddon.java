@@ -1,8 +1,11 @@
 package com.company.project.entities;
 
+import com.company.project.converters.PaymentBreakdownConverter;
+import com.company.project.dto.PaymentSplitDTO;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "member_addons")
@@ -56,6 +59,13 @@ public class MemberAddon extends BaseEntity {
 
     private String notes;
 
+    // Per-leg detail (card type, cheque number, online payment type, ...)
+    // describing how the amount was actually received — single entry for a
+    // plain payment mode, unused if this module ever supports Mixed.
+    @Column(name = "payment_breakdown", columnDefinition = "TEXT")
+    @Convert(converter = PaymentBreakdownConverter.class)
+    private List<PaymentSplitDTO> paymentBreakdown;
+
     public MemberAddon() {}
 
     // ── Getters & Setters ────────────────────────────────────────────────────
@@ -104,4 +114,7 @@ public class MemberAddon extends BaseEntity {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 }

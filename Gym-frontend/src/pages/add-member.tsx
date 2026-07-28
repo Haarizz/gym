@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { plansService, Plan as MembershipPlanData } from '../utils/supabase/plans-service';
 import { membersService } from '../utils/supabase/members-service';
+import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -89,6 +90,22 @@ interface AddMemberProps {
   onNavigate?: (section: string) => void;
 }
 
+// Canonical label for each payment-method selection key, used consistently across
+// the "Received Via" select, Mixed Payment breakdown, receipts, and the value sent
+// to the backend as payment_method_used.
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  check: 'Cheque',
+  'bank-transfer': 'Bank Transfer',
+  online: 'Online Payment',
+  'multi-pay': 'Mixed',
+  credit: 'Credit',
+};
+
+const CARD_TYPE_OPTIONS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Maestro', 'Diners Club', 'Other'];
+const ONLINE_PAYMENT_TYPE_OPTIONS = ['Google Pay', 'PhonePe', 'Paytm', 'BHIM', 'Samsung Pay', 'Apple Pay', 'Amazon Pay', 'UPI', 'Other'];
+
 export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { memberId: routeMemberId } = useParams();
   const navigate = useNavigate();
@@ -109,12 +126,28 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   // Payment popup state management
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  // One amount per leg of a Mixed payment. A leg's amount > 0 is what "adds" it to
+  // the mix; setting it back to 0 "removes" it — see splitDetails below for each
+  // leg's method-specific fields (Card Type, Cheque Number, etc).
   const [splitPayment, setSplitPayment] = useState({
     cash: 0,
     card: 0,
-    cheque: 0
+    cheque: 0,
+    bankTransfer: 0,
+    online: 0
   });
-  const [splitChequeReference, setSplitChequeReference] = useState('');
+  const [splitDetails, setSplitDetails] = useState({
+    cardType: '',
+    cardReference: '',
+    chequeNumber: '',
+    chequeBankName: '',
+    chequeDate: '',
+    bankTransferReference: '',
+    bankTransferAccountId: '',
+    onlinePaymentType: '',
+    onlineProviderName: '',
+    onlineReference: ''
+  });
   const [showSplitPayment, setShowSplitPayment] = useState(false);
   const [showAppPassword, setShowAppPassword] = useState(false);
   const [existingUserId, setExistingUserId] = useState<number | undefined>();
@@ -126,16 +159,54 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   
   // New payment method state
   const [paymentData, setPaymentData] = useState({
+    // Amount actually paid now, for Cash/Card/Cheque/Bank Transfer/Online Payment.
+    // Defaults to the full final price for every method except Cash (see
+    // handlePaymentMethodSelect); can be reduced for a partial payment, which
+    // produces a due balance requiring a Payment Due Date.
     paidAmount: '',
+    // Credit only — the amount received now against an otherwise-deferred invoice.
     receivedAmount: '',
     paymentDueDate: '',
-    remainingAmount: 0
+    remainingAmount: 0,
+    // How the received amount was actually paid (Cash/Card/Bank Transfer/Cheque/
+    // Online Payment) — required whenever receivedAmount > 0 so "Credit" never
+    // gets recorded as the payment method for money that was genuinely received.
+    receivedVia: '',
+    // Selected ledger bank account (from Chart of Accounts) when the received-via
+    // or top-level payment method is Bank Transfer.
+    bankAccountId: '',
+    // Card
+    cardType: '',
+    // Generic reference/transaction number — Card (optional), Bank Transfer
+    // (required), Online Payment (required).
+    reference: '',
+    // Cheque
+    chequeNumber: '',
+    bankName: '',
+    chequeDate: '',
+    // Online Payment
+    onlinePaymentType: '',
+    providerName: ''
   });
   const [paymentErrors, setPaymentErrors] = useState({
     paidAmount: '',
     receivedAmount: '',
-    paymentDueDate: ''
+    paymentDueDate: '',
+    receivedVia: '',
+    cardType: '',
+    reference: '',
+    chequeNumber: '',
+    onlinePaymentType: '',
+    providerName: ''
   });
+
+  // Bank accounts pulled from Chart of Accounts (Ledger) for Bank Transfer payments
+  const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+  useEffect(() => {
+    accountHeadsService.getBankAccounts()
+      .then(setBankAccounts)
+      .catch(err => console.error('Failed to load bank accounts:', err));
+  }, []);
   
   // Discount management state
   const [selectedDiscount, setSelectedDiscount] = useState<string>('');
@@ -626,82 +697,241 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   // Handle payment method selection
   const handlePaymentMethodSelect = (method: string) => {
     setSelectedPaymentMethod(method);
-    
-    // Reset payment data and errors when method changes
+    const finalPrice = getFinalPrice();
+
+    // Reset payment data and errors when method changes. Card/Cheque/Bank Transfer/
+    // Online Payment default "Amount Paid" to the full final price — so the common
+    // case (full payment) needs no extra step — leaving it editable for a partial
+    // payment. Cash and Credit intentionally start blank (existing behavior).
+    const prefillsFullAmount = method === 'card' || method === 'check' || method === 'bank-transfer' || method === 'online';
     setPaymentData({
-      paidAmount: '',
+      paidAmount: prefillsFullAmount ? finalPrice.toFixed(2) : '',
       receivedAmount: '',
       paymentDueDate: '',
-      remainingAmount: 0
+      remainingAmount: 0,
+      receivedVia: '',
+      bankAccountId: '',
+      cardType: '',
+      reference: '',
+      chequeNumber: '',
+      bankName: '',
+      chequeDate: '',
+      onlinePaymentType: '',
+      providerName: ''
     });
     setPaymentErrors({
       paidAmount: '',
       receivedAmount: '',
-      paymentDueDate: ''
+      paymentDueDate: '',
+      receivedVia: '',
+      cardType: '',
+      reference: '',
+      chequeNumber: '',
+      onlinePaymentType: '',
+      providerName: ''
     });
-    
+
     if (method === 'multi-pay') {
       setShowSplitPayment(true);
-      const totalAmount = getFinalPrice(); // Use discounted price
       setSplitPayment({
-        cash: Math.floor(totalAmount / 2),
-        card: Math.ceil(totalAmount / 2),
-        cheque: 0
+        cash: Math.floor(finalPrice / 2),
+        card: Math.ceil(finalPrice / 2),
+        cheque: 0,
+        bankTransfer: 0,
+        online: 0
       });
-      setSplitChequeReference('');
+      setSplitDetails({
+        cardType: '', cardReference: '',
+        chequeNumber: '', chequeBankName: '', chequeDate: '',
+        bankTransferReference: '', bankTransferAccountId: '',
+        onlinePaymentType: '', onlineProviderName: '', onlineReference: ''
+      });
     } else {
       setShowSplitPayment(false);
-      setSplitPayment({ cash: 0, card: 0, cheque: 0 });
-      setSplitChequeReference('');
+      setSplitPayment({ cash: 0, card: 0, cheque: 0, bankTransfer: 0, online: 0 });
+      setSplitDetails({
+        cardType: '', cardReference: '',
+        chequeNumber: '', chequeBankName: '', chequeDate: '',
+        bankTransferReference: '', bankTransferAccountId: '',
+        onlinePaymentType: '', onlineProviderName: '', onlineReference: ''
+      });
     }
   };
 
-  // Handle split payment validation
+  // Handle split payment validation — amounts must add up to the final price.
+  // Per-field requiredness (Card Type, Cheque Number, ...) is checked separately
+  // by validateSplitPaymentFields so the "amounts add up" badge stays independent
+  // of "did you fill in the details" feedback.
   const validateSplitPayment = () => {
-    const total = splitPayment.cash + splitPayment.card + splitPayment.cheque;
+    const total = splitPayment.cash + splitPayment.card + splitPayment.cheque + splitPayment.bankTransfer + splitPayment.online;
     const expectedTotal = getFinalPrice(); // Use discounted price
     return Math.abs(total - expectedTotal) < 0.01; // Allow for small floating point differences
   };
 
+  // Every leg with a non-zero amount must have its method-specific required
+  // fields filled in — same rules as the standalone version of that method.
+  const validateSplitPaymentFields = () => {
+    if (splitPayment.card > 0 && !splitDetails.cardType) return false;
+    if (splitPayment.cheque > 0 && !splitDetails.chequeNumber.trim()) return false;
+    if (splitPayment.bankTransfer > 0 && !splitDetails.bankTransferReference.trim()) return false;
+    if (splitPayment.online > 0) {
+      if (!splitDetails.onlinePaymentType) return false;
+      if (splitDetails.onlinePaymentType === 'Other' && !splitDetails.onlineProviderName.trim()) return false;
+      if (!splitDetails.onlineReference.trim()) return false;
+    }
+    return true;
+  };
+
   // Builds the per-leg breakdown sent to the backend so a Mixed payment posts
-  // to the correct cash/bank accounts instead of one lump sum.
+  // to the correct cash/bank accounts instead of one lump sum, carrying each
+  // leg's own method-specific details (card type, cheque number, ...).
+  // NOTE: the backend deserializes every request body — including nested objects
+  // like these breakdown legs — via a globally-configured SNAKE_CASE Jackson
+  // strategy (see application.properties). Multi-word leg fields MUST use
+  // snake_case keys (card_type, not cardType) or they silently fail to bind.
   const buildPaymentBreakdown = () => {
-    const legs: { method: string; amount: number; reference?: string }[] = [];
+    const legs: Record<string, any>[] = [];
     if (splitPayment.cash > 0) legs.push({ method: 'Cash', amount: splitPayment.cash });
-    if (splitPayment.card > 0) legs.push({ method: 'Card', amount: splitPayment.card });
+    if (splitPayment.card > 0) {
+      legs.push({
+        method: 'Card',
+        amount: splitPayment.card,
+        card_type: splitDetails.cardType,
+        ...(splitDetails.cardReference ? { reference: splitDetails.cardReference } : {})
+      });
+    }
     if (splitPayment.cheque > 0) {
       legs.push({
         method: 'Cheque',
         amount: splitPayment.cheque,
-        ...(splitChequeReference ? { reference: splitChequeReference } : {})
+        cheque_number: splitDetails.chequeNumber,
+        ...(splitDetails.chequeBankName ? { bank_name: splitDetails.chequeBankName } : {}),
+        ...(splitDetails.chequeDate ? { cheque_date: splitDetails.chequeDate } : {})
+      });
+    }
+    if (splitPayment.bankTransfer > 0) {
+      const account = splitDetails.bankTransferAccountId
+        ? bankAccounts.find(a => String(a.id) === splitDetails.bankTransferAccountId)
+        : undefined;
+      legs.push({
+        method: 'Bank Transfer',
+        amount: splitPayment.bankTransfer,
+        reference: splitDetails.bankTransferReference,
+        ...(account ? { bank_account_code: account.code, bank_account_name: account.name } : {})
+      });
+    }
+    if (splitPayment.online > 0) {
+      legs.push({
+        method: 'Online Payment',
+        amount: splitPayment.online,
+        online_payment_type: splitDetails.onlinePaymentType,
+        ...(splitDetails.onlinePaymentType === 'Other' ? { provider_name: splitDetails.onlineProviderName } : {}),
+        reference: splitDetails.onlineReference
       });
     }
     return legs;
   };
 
-  // Validate cash payment
-  const validateCashPayment = () => {
-    const paidAmount = parseFloat(paymentData.paidAmount);
-    const invoiceAmount = getFinalPrice(); // Use discounted price
-    
-    if (isNaN(paidAmount) || paidAmount <= 0) {
+  // Builds a single-leg breakdown entry describing how a non-Mixed payment
+  // (top-level method, or Credit's "Received Via") was actually paid, so the
+  // receipt/ledger get the same rich detail (card type, cheque number, ...) that
+  // a Mixed payment's legs carry — not just a bare method name. Keys are
+  // snake_case for the same reason as buildPaymentBreakdown above.
+  const buildSingleMethodLeg = (methodKey: string, amount: number) => {
+    const leg: Record<string, any> = { method: PAYMENT_METHOD_LABELS[methodKey] || methodKey, amount };
+    if (methodKey === 'card') {
+      leg.card_type = paymentData.cardType;
+      if (paymentData.reference) leg.reference = paymentData.reference;
+    } else if (methodKey === 'check') {
+      leg.cheque_number = paymentData.chequeNumber;
+      if (paymentData.bankName) leg.bank_name = paymentData.bankName;
+      if (paymentData.chequeDate) leg.cheque_date = paymentData.chequeDate;
+    } else if (methodKey === 'bank-transfer') {
+      leg.reference = paymentData.reference;
+      const account = paymentData.bankAccountId
+        ? bankAccounts.find(a => String(a.id) === paymentData.bankAccountId)
+        : undefined;
+      if (account) { leg.bank_account_code = account.code; leg.bank_account_name = account.name; }
+    } else if (methodKey === 'online') {
+      leg.online_payment_type = paymentData.onlinePaymentType;
+      if (paymentData.onlinePaymentType === 'Other') leg.provider_name = paymentData.providerName;
+      leg.reference = paymentData.reference;
+    }
+    return [leg];
+  };
+
+  // Generic "amount paid now" check shared by Cash/Card/Cheque/Bank Transfer/
+  // Online Payment. Only Cash may exceed the final price (change is handed back);
+  // every other method caps at the final price — anything less is a partial
+  // payment that produces a due balance.
+  const validateAmountEntry = (amountStr: string, allowOverpay: boolean) => {
+    const amount = parseFloat(amountStr || '0');
+    const invoiceAmount = getFinalPrice();
+    if (!amountStr || isNaN(amount) || amount <= 0) {
+      return { ok: false, error: 'Please enter a valid amount', remaining: invoiceAmount };
+    }
+    if (!allowOverpay && amount > invoiceAmount) {
+      return { ok: false, error: 'Amount cannot exceed the final amount', remaining: 0 };
+    }
+    return { ok: true, error: '', remaining: Math.max(0, invoiceAmount - amount) };
+  };
+
+  // Required-field check for whichever method actually received the money —
+  // used both for a top-level method (Card/Cheque/Bank Transfer/Online Payment)
+  // and for Credit's "Received Via" (same rules apply either way).
+  const validateMethodDetails = (methodKey: string) => {
+    const errs: Partial<typeof paymentErrors> = {};
+    if (methodKey === 'card' && !paymentData.cardType) {
+      errs.cardType = 'Please select a card type';
+    }
+    if (methodKey === 'check' && !paymentData.chequeNumber.trim()) {
+      errs.chequeNumber = 'Cheque number is required';
+    }
+    if (methodKey === 'bank-transfer' && !paymentData.reference.trim()) {
+      errs.reference = 'Reference / transaction ID is required';
+    }
+    if (methodKey === 'online') {
+      if (!paymentData.onlinePaymentType) {
+        errs.onlinePaymentType = 'Please select an online payment type';
+      }
+      if (paymentData.onlinePaymentType === 'Other' && !paymentData.providerName.trim()) {
+        errs.providerName = 'Provider name is required';
+      }
+      if (!paymentData.reference.trim()) {
+        errs.reference = 'Transaction / reference ID is required';
+      }
+    }
+    return { ok: Object.keys(errs).length === 0, errs };
+  };
+
+  // Validates Cash/Card/Cheque/Bank Transfer/Online Payment as the top-level
+  // method: amount, method-specific required fields, and (for a partial amount)
+  // the due date.
+  const validateSingleMethodPayment = (methodKey: string) => {
+    const allowOverpay = methodKey === 'cash';
+    const { ok: amountOk, error: amountErr, remaining } = validateAmountEntry(paymentData.paidAmount, allowOverpay);
+    const { ok: detailsOk, errs: detailErrs } = validateMethodDetails(methodKey);
+
+    setPaymentData(prev => ({ ...prev, remainingAmount: remaining }));
+    setPaymentErrors(prev => ({
+      ...prev,
+      paidAmount: amountOk ? '' : amountErr,
+      cardType: '', chequeNumber: '', reference: '', onlinePaymentType: '', providerName: '',
+      ...detailErrs
+    }));
+
+    let dueDateOk = true;
+    if (remaining > 0 && !paymentData.paymentDueDate) {
+      dueDateOk = false;
       setPaymentErrors(prev => ({
         ...prev,
-        paidAmount: 'Please enter a valid paid amount'
+        paymentDueDate: 'Payment due date is required when there is a remaining balance'
       }));
-      return false;
+    } else {
+      setPaymentErrors(prev => ({ ...prev, paymentDueDate: '' }));
     }
-    
-    if (paidAmount < invoiceAmount) {
-      setPaymentErrors(prev => ({
-        ...prev,
-        paidAmount: 'Received amount cannot be less than invoice amount.'
-      }));
-      return false;
-    }
-    
-    setPaymentErrors(prev => ({ ...prev, paidAmount: '' }));
-    return true;
+
+    return amountOk && detailsOk && dueDateOk;
   };
 
   // Validate credit payment
@@ -709,7 +939,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     const receivedAmount = parseFloat(paymentData.receivedAmount || '0');
     const invoiceAmount = getFinalPrice(); // Use discounted price
     let isValid = true;
-    
+
     if (paymentData.receivedAmount && (isNaN(receivedAmount) || receivedAmount < 0)) {
       setPaymentErrors(prev => ({
         ...prev,
@@ -725,11 +955,35 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     } else {
       setPaymentErrors(prev => ({ ...prev, receivedAmount: '' }));
     }
-    
+
+    // Whenever any amount was actually received, we must know how it was paid —
+    // "Credit" only ever describes the unpaid remainder, never money in hand.
+    if (receivedAmount > 0 && !paymentData.receivedVia) {
+      setPaymentErrors(prev => ({
+        ...prev,
+        receivedVia: 'Please select how the received amount was paid'
+      }));
+      isValid = false;
+    } else {
+      setPaymentErrors(prev => ({ ...prev, receivedVia: '' }));
+    }
+
+    // The chosen "Received Via" method has its own required fields (Card Type,
+    // Cheque Number, ...) — same rules as if that method had been picked directly.
+    if (receivedAmount > 0 && paymentData.receivedVia) {
+      const { ok: detailsOk, errs: detailErrs } = validateMethodDetails(paymentData.receivedVia);
+      setPaymentErrors(prev => ({
+        ...prev,
+        cardType: '', chequeNumber: '', reference: '', onlinePaymentType: '', providerName: '',
+        ...detailErrs
+      }));
+      if (!detailsOk) isValid = false;
+    }
+
     // Calculate remaining amount
     const remainingAmount = invoiceAmount - receivedAmount;
     setPaymentData(prev => ({ ...prev, remainingAmount }));
-    
+
     // Validate due date if there's remaining amount
     if (remainingAmount > 0 && !paymentData.paymentDueDate) {
       setPaymentErrors(prev => ({
@@ -740,36 +994,54 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     } else {
       setPaymentErrors(prev => ({ ...prev, paymentDueDate: '' }));
     }
-    
+
     return isValid;
   };
 
   // Handle payment input changes
   const handlePaymentDataChange = (field: string, value: string) => {
     setPaymentData(prev => ({ ...prev, [field]: value }));
-    
+
+    const singleMethodKeys = ['cash', 'card', 'check', 'bank-transfer', 'online'];
+
     // Real-time validation and calculation
-    if (selectedPaymentMethod === 'cash' && field === 'paidAmount') {
-      const paidAmount = parseFloat(value);
+    if (singleMethodKeys.includes(selectedPaymentMethod) && field === 'paidAmount') {
+      const paidAmount = parseFloat(value || '0');
       const invoiceAmount = getFinalPrice(); // Use discounted price
-      
-      if (!isNaN(paidAmount) && paidAmount >= invoiceAmount) {
+      const allowOverpay = selectedPaymentMethod === 'cash';
+      const remainingAmount = Math.max(0, invoiceAmount - paidAmount);
+
+      setPaymentData(prev => ({ ...prev, remainingAmount }));
+
+      if (!isNaN(paidAmount) && paidAmount > 0 && (allowOverpay || paidAmount <= invoiceAmount)) {
         setPaymentErrors(prev => ({ ...prev, paidAmount: '' }));
       }
     } else if (selectedPaymentMethod === 'credit' && field === 'receivedAmount') {
       const receivedAmount = parseFloat(value || '0');
       const invoiceAmount = getFinalPrice(); // Use discounted price
       const remainingAmount = invoiceAmount - receivedAmount;
-      
+
       setPaymentData(prev => ({ ...prev, remainingAmount }));
-      
+
       if (!isNaN(receivedAmount) && receivedAmount <= invoiceAmount) {
         setPaymentErrors(prev => ({ ...prev, receivedAmount: '' }));
+      }
+
+      // Nothing received anymore — the "Received Via" field disappears, so clear
+      // its value/error rather than leaving a stale, no-longer-visible selection.
+      if (isNaN(receivedAmount) || receivedAmount <= 0) {
+        setPaymentData(prev => ({ ...prev, receivedVia: '', bankAccountId: '' }));
+        setPaymentErrors(prev => ({ ...prev, receivedVia: '' }));
       }
     }
   };
 
   // Handle payment confirmation
+  // Cash/Card/Cheque/Bank Transfer/Online Payment — every method that represents
+  // money actually being received now (as opposed to Credit, which represents
+  // money NOT yet received, or Mixed, which is several of these at once).
+  const SINGLE_METHOD_KEYS = ['cash', 'card', 'check', 'bank-transfer', 'online'];
+
   const handlePaymentConfirm = async () => {
     if (!isEditMode && !selectedPaymentMethod) {
       toast.error('Please select a payment method');
@@ -778,17 +1050,23 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
     // Validate based on payment method
     if (!isEditMode || selectedPaymentMethod) {
-      if (selectedPaymentMethod === 'cash') {
-        if (!validateCashPayment()) {
+      if (SINGLE_METHOD_KEYS.includes(selectedPaymentMethod)) {
+        if (!validateSingleMethodPayment(selectedPaymentMethod)) {
           return;
         }
       } else if (selectedPaymentMethod === 'credit') {
         if (!validateCreditPayment()) {
           return;
         }
-      } else if (selectedPaymentMethod === 'multi-pay' && !validateSplitPayment()) {
-        toast.error('Split payment amounts must equal the total membership fee');
-        return;
+      } else if (selectedPaymentMethod === 'multi-pay') {
+        if (!validateSplitPayment()) {
+          toast.error('Split payment amounts must equal the total membership fee');
+          return;
+        }
+        if (!validateSplitPaymentFields()) {
+          toast.error('Please fill in the required details for each payment method used in the split');
+          return;
+        }
       }
     }
 
@@ -796,7 +1074,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     const membershipDetails = getMembershipDetails();
     const finalPrice = getFinalPrice();
     const selectedDiscountInfo = selectedDiscount ? discountList.find(d => d.id === selectedDiscount) : null;
-    
+    const paidAmountNum = parseFloat(paymentData.paidAmount || '0');
+
     const finalPaymentData = {
       method: selectedPaymentMethod,
       invoiceAmount: membershipDetails.price,
@@ -808,11 +1087,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         amount: discountAmount
       } : null,
       finalAmount: finalPrice,
-      ...(selectedPaymentMethod === 'cash' && {
-        paidAmount: parseFloat(paymentData.paidAmount),
-        payBackAmount: Math.max(0, parseFloat(paymentData.paidAmount) - finalPrice),
-        status: 'Fully Paid',
-        outstandingBalance: 0
+      ...(SINGLE_METHOD_KEYS.includes(selectedPaymentMethod) && {
+        paidAmount: paidAmountNum,
+        payBackAmount: selectedPaymentMethod === 'cash' ? Math.max(0, paidAmountNum - finalPrice) : 0,
+        remainingAmount: paymentData.remainingAmount,
+        paymentDueDate: paymentData.paymentDueDate,
+        status: paymentData.remainingAmount > 0 ? 'Partially Paid' : 'Fully Paid',
+        outstandingBalance: paymentData.remainingAmount
       }),
       ...(selectedPaymentMethod === 'credit' && {
         receivedAmount: parseFloat(paymentData.receivedAmount || '0'),
@@ -821,18 +1102,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         status: paymentData.remainingAmount > 0 ? 'Partially Paid' : 'Fully Paid',
         outstandingBalance: paymentData.remainingAmount
       }),
-      ...(selectedPaymentMethod === 'multi-pay' && { 
+      ...(selectedPaymentMethod === 'multi-pay' && {
         splitPayment,
-        status: 'Fully Paid',
-        outstandingBalance: 0
-      }),
-      ...(selectedPaymentMethod === 'card' && {
-        amount: finalPrice,
-        status: 'Fully Paid',
-        outstandingBalance: 0
-      }),
-      ...(selectedPaymentMethod === 'bank-transfer' && {
-        amount: finalPrice,
         status: 'Fully Paid',
         outstandingBalance: 0
       })
@@ -840,7 +1111,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
     // Determine payment status
     let paymentStatus = 'paid';
-    if (selectedPaymentMethod === 'credit' && paymentData.remainingAmount > 0) {
+    if ((selectedPaymentMethod === 'credit' || SINGLE_METHOD_KEYS.includes(selectedPaymentMethod))
+        && paymentData.remainingAmount > 0) {
       paymentStatus = 'pending';
     }
 
@@ -856,16 +1128,34 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     // End date is computed by the backend from plan duration; use existing value in edit mode
     const endDateStr = isEditMode ? (formData.endDate || '') : '';
 
-    // Map the internal selection value to the canonical label used across every
-    // payment window and stored in the financial records (Cash/Card/Cheque/Mixed).
-    const paymentMethodLabel: Record<string, string> = {
-      cash: 'Cash',
-      card: 'Card',
-      check: 'Cheque',
-      'multi-pay': 'Mixed',
-      credit: 'Credit',
-      'bank-transfer': 'Bank Transfer'
-    };
+    // "Credit" only ever describes the unpaid remainder of an invoice — it is never
+    // the method a real payment moved through. Once anything has actually been
+    // received on a Credit payment, the receipt/ledger must record the real method
+    // (Cash/Card/Bank Transfer/Cheque/Online Payment) the user picked as "Received
+    // Via" instead.
+    const creditReceivedAmount = parseFloat(paymentData.receivedAmount || '0');
+    const effectivePaymentMethodLabel = selectedPaymentMethod === 'credit'
+      ? (creditReceivedAmount > 0
+          ? (PAYMENT_METHOD_LABELS[paymentData.receivedVia] || paymentData.receivedVia)
+          : 'Credit')
+      : (PAYMENT_METHOD_LABELS[selectedPaymentMethod] || selectedPaymentMethod);
+
+    // Ledger bank account selected for a Bank Transfer payment (top-level method or
+    // Credit's "Received Via"), so the journal entry hits that specific account
+    // instead of a generic bucket.
+    const effectiveReceivedVia = selectedPaymentMethod === 'credit' ? paymentData.receivedVia : selectedPaymentMethod;
+    const selectedBankAccount = effectiveReceivedVia === 'bank-transfer' && paymentData.bankAccountId
+      ? bankAccounts.find(a => String(a.id) === paymentData.bankAccountId)
+      : undefined;
+
+    // Per-leg breakdown carrying the method-specific detail (card type, cheque
+    // number, ...) for whichever method(s) actually received money — a single
+    // leg for one method, several for Mixed, none for a $0 Credit.
+    const paymentBreakdownForPayload = selectedPaymentMethod === 'multi-pay'
+      ? buildPaymentBreakdown()
+      : selectedPaymentMethod === 'credit'
+        ? (creditReceivedAmount > 0 ? buildSingleMethodLeg(paymentData.receivedVia, creditReceivedAmount) : undefined)
+        : (SINGLE_METHOD_KEYS.includes(selectedPaymentMethod) ? buildSingleMethodLeg(selectedPaymentMethod, paidAmountNum) : undefined);
 
     const memberPayload = {
       name: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -894,8 +1184,10 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       outstanding_balance: (selectedPaymentMethod ? (finalPaymentData as any).outstandingBalance : 0),
       last_payment_date: selectedPaymentMethod ? toIso(new Date().toISOString().split('T')[0]) : undefined,
       next_payment_date: selectedPaymentMethod ? toIso((finalPaymentData as any).paymentDueDate || '') : undefined,
-      payment_method_used: selectedPaymentMethod ? (paymentMethodLabel[selectedPaymentMethod] || selectedPaymentMethod) : undefined,
-      payment_breakdown: selectedPaymentMethod === 'multi-pay' ? buildPaymentBreakdown() : undefined,
+      payment_method_used: selectedPaymentMethod ? effectivePaymentMethodLabel : undefined,
+      bank_account_code: selectedBankAccount?.code,
+      bank_account_name: selectedBankAccount?.name,
+      payment_breakdown: paymentBreakdownForPayload,
       discount_applied: discountAmount || 0,
       reg_doc_number: formData.regDocNumber,
       reg_doc_date: toIso(formData.regDocDate),
@@ -946,18 +1238,38 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     setPaymentDialogOpen(false);
     setSelectedPaymentMethod('');
     setShowSplitPayment(false);
-    setSplitPayment({ cash: 0, card: 0, cheque: 0 });
-    setSplitChequeReference('');
+    setSplitPayment({ cash: 0, card: 0, cheque: 0, bankTransfer: 0, online: 0 });
+    setSplitDetails({
+      cardType: '', cardReference: '',
+      chequeNumber: '', chequeBankName: '', chequeDate: '',
+      bankTransferReference: '', bankTransferAccountId: '',
+      onlinePaymentType: '', onlineProviderName: '', onlineReference: ''
+    });
     setPaymentData({
       paidAmount: '',
       receivedAmount: '',
       paymentDueDate: '',
-      remainingAmount: 0
+      remainingAmount: 0,
+      receivedVia: '',
+      bankAccountId: '',
+      cardType: '',
+      reference: '',
+      chequeNumber: '',
+      bankName: '',
+      chequeDate: '',
+      onlinePaymentType: '',
+      providerName: ''
     });
     setPaymentErrors({
       paidAmount: '',
       receivedAmount: '',
-      paymentDueDate: ''
+      paymentDueDate: '',
+      receivedVia: '',
+      cardType: '',
+      reference: '',
+      chequeNumber: '',
+      onlinePaymentType: '',
+      providerName: ''
     });
     setSelectedDiscount('');
     setDiscountAmount(0);
@@ -2198,7 +2510,18 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
       {/* Payment Selection Dialog */}
       <Dialog open={paymentDialogOpen} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        {/*
+          onOpenChange is intentionally a no-op (dismiss only via the explicit
+          Cancel/X below), which also means DialogContent's own built-in top-right
+          close button — wired straight to onOpenChange — would do nothing if
+          clicked. The plain <style> tag (not a Tailwind utility class, so it
+          doesn't depend on anything being pre-generated in the project's static
+          stylesheet) hides that non-functional button, leaving the one manually
+          wired to handlePaymentCancel (in the header below) as the only close
+          control.
+        */}
+        <style>{`.payment-selection-dialog > button:last-child { display: none; }`}</style>
+        <DialogContent className="payment-selection-dialog sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader className="space-y-3 pb-4 border-b">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-2xl font-bold flex items-center space-x-3">
@@ -2487,6 +2810,32 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     </div>
                   )}
                 </div>
+
+                {/* Online Payment */}
+                <div
+                  className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                    selectedPaymentMethod === 'online'
+                      ? 'border-red-500 bg-red-50 shadow-lg scale-[1.02]'
+                      : 'border-gray-200 hover:border-red-300 hover:shadow-md bg-white'
+                  }`}
+                  onClick={() => handlePaymentMethodSelect('online')}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center justify-center w-12 h-12 bg-red-500 rounded-xl">
+                      <FaMobileScreen className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-red-900">Online Payment</h4>
+                      <p className="text-sm text-red-700">UPI / mobile wallet / digital payment</p>
+                    </div>
+                  </div>
+                  {selectedPaymentMethod === 'online' && (
+                    <div className="mt-3 flex items-center space-x-2 text-red-600">
+                      <FaCheck className="h-4 w-4" />
+                      <span className="text-sm font-medium">Selected</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2497,82 +2846,234 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <FaCalculator className="h-4 w-4" />
                   <span>Split Payment Details</span>
                 </h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="cashAmount" className="flex items-center space-x-2">
-                      <FaMoneyBillWave className="h-4 w-4 text-green-600" />
-                      <span>Cash Amount ({currencyCode})</span>
-                    </Label>
-                    <Input
-                      id="cashAmount"
-                      type="number"
-                      min="0"
-                      max={getFinalPrice()}
-                      value={splitPayment.cash}
-                      onChange={(e) => {
-                        const cashAmount = parseFloat(e.target.value) || 0;
-                        setSplitPayment(prev => ({ ...prev, cash: Math.max(0, cashAmount) }));
-                      }}
-                      className="mt-1"
-                      placeholder="0"
-                    />
-                  </div>
+                <p className="text-xs text-purple-700">
+                  Enter an amount for each method used. Leave a method at 0 to leave it out of the split.
+                </p>
 
-                  <div>
-                    <Label htmlFor="cardAmount" className="flex items-center space-x-2">
-                      <FaCreditCard className="h-4 w-4 text-blue-600" />
-                      <span>Card Amount ({currencyCode})</span>
-                    </Label>
-                    <Input
-                      id="cardAmount"
-                      type="number"
-                      min="0"
-                      max={getFinalPrice()}
-                      value={splitPayment.card}
-                      onChange={(e) => {
-                        const cardAmount = parseFloat(e.target.value) || 0;
-                        setSplitPayment(prev => ({ ...prev, card: Math.max(0, cardAmount) }));
-                      }}
-                      className="mt-1"
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="chequeAmount" className="flex items-center space-x-2">
-                      <FaFileLines className="h-4 w-4 text-gray-600" />
-                      <span>Cheque Amount ({currencyCode})</span>
-                    </Label>
-                    <Input
-                      id="chequeAmount"
-                      type="number"
-                      min="0"
-                      max={getFinalPrice()}
-                      value={splitPayment.cheque}
-                      onChange={(e) => {
-                        const chequeAmount = parseFloat(e.target.value) || 0;
-                        setSplitPayment(prev => ({ ...prev, cheque: Math.max(0, chequeAmount) }));
-                      }}
-                      className="mt-1"
-                      placeholder="0"
-                    />
-                  </div>
+                {/* Cash leg */}
+                <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
+                  <Label htmlFor="cashAmount" className="flex items-center space-x-2">
+                    <FaMoneyBillWave className="h-4 w-4 text-green-600" />
+                    <span>Cash Amount ({currencyCode})</span>
+                  </Label>
+                  <Input
+                    id="cashAmount"
+                    type="number"
+                    min="0"
+                    max={getFinalPrice()}
+                    value={splitPayment.cash}
+                    onChange={(e) => {
+                      const cashAmount = parseFloat(e.target.value) || 0;
+                      setSplitPayment(prev => ({ ...prev, cash: Math.max(0, cashAmount) }));
+                    }}
+                    placeholder="0"
+                  />
                 </div>
 
-                {splitPayment.cheque > 0 && (
-                  <div>
-                    <Label htmlFor="splitChequeReference">Cheque Reference (optional)</Label>
-                    <Input
-                      id="splitChequeReference"
-                      type="text"
-                      value={splitChequeReference}
-                      onChange={(e) => setSplitChequeReference(e.target.value)}
-                      className="mt-1"
-                      placeholder="Cheque number"
-                    />
-                  </div>
-                )}
+                {/* Card leg */}
+                <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
+                  <Label htmlFor="cardAmount" className="flex items-center space-x-2">
+                    <FaCreditCard className="h-4 w-4 text-blue-600" />
+                    <span>Card Amount ({currencyCode})</span>
+                  </Label>
+                  <Input
+                    id="cardAmount"
+                    type="number"
+                    min="0"
+                    max={getFinalPrice()}
+                    value={splitPayment.card}
+                    onChange={(e) => {
+                      const cardAmount = parseFloat(e.target.value) || 0;
+                      setSplitPayment(prev => ({ ...prev, card: Math.max(0, cardAmount) }));
+                    }}
+                    placeholder="0"
+                  />
+                  {splitPayment.card > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <Label htmlFor="splitCardType" className="text-xs">Card Type <span className="text-red-500">*</span></Label>
+                        <Select value={splitDetails.cardType} onValueChange={(v) => setSplitDetails(prev => ({ ...prev, cardType: v }))}>
+                          <SelectTrigger id="splitCardType" className="mt-1"><SelectValue placeholder="Select card type" /></SelectTrigger>
+                          <SelectContent>
+                            {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="splitCardReference" className="text-xs">Reference (optional)</Label>
+                        <Input
+                          id="splitCardReference"
+                          value={splitDetails.cardReference}
+                          onChange={(e) => setSplitDetails(prev => ({ ...prev, cardReference: e.target.value }))}
+                          className="mt-1"
+                          placeholder="Transaction number"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Cheque leg */}
+                <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
+                  <Label htmlFor="chequeAmount" className="flex items-center space-x-2">
+                    <FaFileLines className="h-4 w-4 text-gray-600" />
+                    <span>Cheque Amount ({currencyCode})</span>
+                  </Label>
+                  <Input
+                    id="chequeAmount"
+                    type="number"
+                    min="0"
+                    max={getFinalPrice()}
+                    value={splitPayment.cheque}
+                    onChange={(e) => {
+                      const chequeAmount = parseFloat(e.target.value) || 0;
+                      setSplitPayment(prev => ({ ...prev, cheque: Math.max(0, chequeAmount) }));
+                    }}
+                    placeholder="0"
+                  />
+                  {splitPayment.cheque > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                      <div>
+                        <Label htmlFor="splitChequeNumber" className="text-xs">Cheque Number <span className="text-red-500">*</span></Label>
+                        <Input
+                          id="splitChequeNumber"
+                          value={splitDetails.chequeNumber}
+                          onChange={(e) => setSplitDetails(prev => ({ ...prev, chequeNumber: e.target.value }))}
+                          className="mt-1"
+                          placeholder="Cheque number"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="splitChequeBank" className="text-xs">Bank Name (optional)</Label>
+                        <Input
+                          id="splitChequeBank"
+                          value={splitDetails.chequeBankName}
+                          onChange={(e) => setSplitDetails(prev => ({ ...prev, chequeBankName: e.target.value }))}
+                          className="mt-1"
+                          placeholder="e.g. SBI"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="splitChequeDate" className="text-xs">Cheque Date (optional)</Label>
+                        <Input
+                          id="splitChequeDate"
+                          type="date"
+                          value={splitDetails.chequeDate}
+                          onChange={(e) => setSplitDetails(prev => ({ ...prev, chequeDate: e.target.value }))}
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bank Transfer leg */}
+                <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
+                  <Label htmlFor="bankTransferAmount" className="flex items-center space-x-2">
+                    <FaBuilding className="h-4 w-4 text-teal-600" />
+                    <span>Bank Transfer Amount ({currencyCode})</span>
+                  </Label>
+                  <Input
+                    id="bankTransferAmount"
+                    type="number"
+                    min="0"
+                    max={getFinalPrice()}
+                    value={splitPayment.bankTransfer}
+                    onChange={(e) => {
+                      const amount = parseFloat(e.target.value) || 0;
+                      setSplitPayment(prev => ({ ...prev, bankTransfer: Math.max(0, amount) }));
+                    }}
+                    placeholder="0"
+                  />
+                  {splitPayment.bankTransfer > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <Label htmlFor="splitBankTransferReference" className="text-xs">Reference <span className="text-red-500">*</span></Label>
+                        <Input
+                          id="splitBankTransferReference"
+                          value={splitDetails.bankTransferReference}
+                          onChange={(e) => setSplitDetails(prev => ({ ...prev, bankTransferReference: e.target.value }))}
+                          className="mt-1"
+                          placeholder="Transaction ID"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="splitBankTransferAccount" className="text-xs">Bank Account (Ledger)</Label>
+                        <Select
+                          value={splitDetails.bankTransferAccountId}
+                          onValueChange={(v) => setSplitDetails(prev => ({ ...prev, bankTransferAccountId: v }))}
+                        >
+                          <SelectTrigger id="splitBankTransferAccount" className="mt-1">
+                            <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {bankAccounts.map(account => (
+                              <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Online Payment leg */}
+                <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
+                  <Label htmlFor="onlineAmount" className="flex items-center space-x-2">
+                    <FaMobileScreen className="h-4 w-4 text-red-600" />
+                    <span>Online Payment Amount ({currencyCode})</span>
+                  </Label>
+                  <Input
+                    id="onlineAmount"
+                    type="number"
+                    min="0"
+                    max={getFinalPrice()}
+                    value={splitPayment.online}
+                    onChange={(e) => {
+                      const amount = parseFloat(e.target.value) || 0;
+                      setSplitPayment(prev => ({ ...prev, online: Math.max(0, amount) }));
+                    }}
+                    placeholder="0"
+                  />
+                  {splitPayment.online > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <Label htmlFor="splitOnlineType" className="text-xs">Payment Type <span className="text-red-500">*</span></Label>
+                        <Select
+                          value={splitDetails.onlinePaymentType}
+                          onValueChange={(v) => setSplitDetails(prev => ({ ...prev, onlinePaymentType: v }))}
+                        >
+                          <SelectTrigger id="splitOnlineType" className="mt-1"><SelectValue placeholder="Select payment type" /></SelectTrigger>
+                          <SelectContent>
+                            {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="splitOnlineReference" className="text-xs">Transaction / Reference ID <span className="text-red-500">*</span></Label>
+                        <Input
+                          id="splitOnlineReference"
+                          value={splitDetails.onlineReference}
+                          onChange={(e) => setSplitDetails(prev => ({ ...prev, onlineReference: e.target.value }))}
+                          className="mt-1"
+                          placeholder="Transaction ID"
+                        />
+                      </div>
+                      {splitDetails.onlinePaymentType === 'Other' && (
+                        <div className="md:col-span-2">
+                          <Label htmlFor="splitOnlineProvider" className="text-xs">Payment Provider Name <span className="text-red-500">*</span></Label>
+                          <Input
+                            id="splitOnlineProvider"
+                            value={splitDetails.onlineProviderName}
+                            onChange={(e) => setSplitDetails(prev => ({ ...prev, onlineProviderName: e.target.value }))}
+                            className="mt-1"
+                            placeholder="Provider name"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Split Payment Summary */}
                 <div className="flex items-center justify-between p-3 bg-white border border-purple-200 rounded-lg">
@@ -2586,7 +3087,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         ? 'text-green-600'
                         : 'text-red-600'
                     }`}>
-                      <CurrencyGlyph /> {(splitPayment.cash + splitPayment.card + splitPayment.cheque).toFixed(2)}
+                      <CurrencyGlyph /> {(splitPayment.cash + splitPayment.card + splitPayment.cheque + splitPayment.bankTransfer + splitPayment.online).toFixed(2)}
                     </span>
                     {validateSplitPayment() ? (
                       <Badge className="bg-green-100 text-green-800">
@@ -2601,11 +3102,18 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     )}
                   </div>
                 </div>
-                
+
                 {!validateSplitPayment() && (
                   <p className="text-sm text-red-600 flex items-center space-x-1">
                     <FaXmark className="h-4 w-4" />
                     <span>Split amounts must equal the final amount of <CurrencyGlyph /> {getFinalPrice().toFixed(2)}</span>
+                  </p>
+                )}
+
+                {validateSplitPayment() && !validateSplitPaymentFields() && (
+                  <p className="text-sm text-red-600 flex items-center space-x-1">
+                    <FaXmark className="h-4 w-4" />
+                    <span>Please fill in the required details (marked *) for each method used</span>
                   </p>
                 )}
               </div>
@@ -2618,7 +3126,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <FaMoneyBillWave className="h-4 w-4" />
                   <span>Cash Payment Details</span>
                 </h4>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Paid Amount Column */}
                   <div>
@@ -2644,7 +3152,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </p>
                     )}
                     <p className="text-xs text-green-600 mt-1">
-                      Minimum required: <CurrencyGlyph /> {getFinalPrice().toFixed(2)}
+                      Final amount: <CurrencyGlyph /> {getFinalPrice().toFixed(2)} — pay less for a partial payment
                     </p>
                   </div>
 
@@ -2669,6 +3177,31 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     </p>
                   </div>
                 </div>
+
+                {/* Due Date — required whenever the cash paid falls short of the final amount */}
+                {paymentData.remainingAmount > 0 && (
+                  <div>
+                    <Label htmlFor="cashPaymentDueDate" className="flex items-center space-x-2">
+                      <FaCalendarDays className="h-4 w-4 text-green-600" />
+                      <span>Payment Due Date</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="cashPaymentDueDate"
+                      type="date"
+                      value={paymentData.paymentDueDate}
+                      onChange={(e) => handlePaymentDataChange('paymentDueDate', e.target.value)}
+                      className={`mt-1 ${paymentErrors.paymentDueDate ? 'border-red-500' : ''}`}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                    {paymentErrors.paymentDueDate && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.paymentDueDate}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Cash Payment Summary */}
                 {paymentData.paidAmount && (
@@ -2696,12 +3229,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         </span>
                       </div>
                     </div>
-                    
+
                     {(() => {
                       const paidAmount = parseFloat(paymentData.paidAmount || '0');
                       const invoiceAmount = getFinalPrice();
                       const payBack = Math.max(0, paidAmount - invoiceAmount);
-                      
+
                       if (payBack > 0) {
                         return (
                           <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
@@ -2714,6 +3247,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                             <strong>Exact Payment:</strong> No change required
                           </div>
                         );
+                      } else if (paymentData.remainingAmount > 0) {
+                        return (
+                          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                            <strong>Partial Payment:</strong> <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)} will be added to the member's outstanding balance, due by {paymentData.paymentDueDate || '[Date Required]'}
+                          </div>
+                        );
                       }
                       return null;
                     })()}
@@ -2722,50 +3261,82 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               </div>
             )}
 
-            {/* Credit Payment Input */}
-            {selectedPaymentMethod === 'credit' && (
-              <div className="space-y-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                <h4 className="font-semibold text-orange-900 flex items-center space-x-2">
-                  <FaWallet className="h-4 w-4" />
-                  <span>Credit Payment Details</span>
+            {/* Card Payment Input */}
+            {selectedPaymentMethod === 'card' && (
+              <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-semibold text-blue-900 flex items-center space-x-2">
+                  <FaCreditCard className="h-4 w-4" />
+                  <span>Card Payment Details</span>
                 </h4>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="receivedAmount" className="flex items-center space-x-2">
-                      <FaDollarSign className="h-4 w-4 text-orange-600" />
-                      <span>Received Amount ({currencyCode})</span>
+                    <Label htmlFor="cardType" className="flex items-center space-x-2">
+                      <FaCreditCard className="h-4 w-4 text-blue-600" />
+                      <span>Card Type</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Select value={paymentData.cardType} onValueChange={(v) => setPaymentData(prev => ({ ...prev, cardType: v }))}>
+                      <SelectTrigger id="cardType" className={`mt-1 ${paymentErrors.cardType ? 'border-red-500' : ''}`}>
+                        <SelectValue placeholder="Select card type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {paymentErrors.cardType && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.cardType}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cardAmountPaid" className="flex items-center space-x-2">
+                      <FaDollarSign className="h-4 w-4 text-blue-600" />
+                      <span>Amount Paid ({currencyCode})</span>
+                      <span className="text-red-500">*</span>
                     </Label>
                     <Input
-                      id="receivedAmount"
+                      id="cardAmountPaid"
                       type="number"
                       min="0"
                       max={getFinalPrice()}
                       step="0.01"
-                      value={paymentData.receivedAmount}
-                      onChange={(e) => handlePaymentDataChange('receivedAmount', e.target.value)}
-                      className={`mt-1 ${paymentErrors.receivedAmount ? 'border-red-500' : ''}`}
-                      placeholder="0.00 (optional for full credit)"
+                      value={paymentData.paidAmount}
+                      onChange={(e) => handlePaymentDataChange('paidAmount', e.target.value)}
+                      className={`mt-1 ${paymentErrors.paidAmount ? 'border-red-500' : ''}`}
                     />
-                    {paymentErrors.receivedAmount && (
+                    {paymentErrors.paidAmount && (
                       <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
                         <FaXmark className="h-4 w-4" />
-                        <span>{paymentErrors.receivedAmount}</span>
+                        <span>{paymentErrors.paidAmount}</span>
                       </p>
                     )}
-                    <p className="text-xs text-orange-600 mt-1">
-                      Leave empty for full credit
-                    </p>
                   </div>
-                  
+                </div>
+
+                <div>
+                  <Label htmlFor="cardReference">Reference / Transaction Number (optional)</Label>
+                  <Input
+                    id="cardReference"
+                    value={paymentData.reference}
+                    onChange={(e) => setPaymentData(prev => ({ ...prev, reference: e.target.value }))}
+                    className="mt-1"
+                    placeholder="Transaction number"
+                  />
+                </div>
+
+                {paymentData.remainingAmount > 0 && (
                   <div>
-                    <Label htmlFor="paymentDueDate" className="flex items-center space-x-2">
-                      <FaCalendarDays className="h-4 w-4 text-orange-600" />
+                    <Label htmlFor="cardPaymentDueDate" className="flex items-center space-x-2">
+                      <FaCalendarDays className="h-4 w-4 text-blue-600" />
                       <span>Payment Due Date</span>
-                      {paymentData.remainingAmount > 0 && <span className="text-red-500">*</span>}
+                      <span className="text-red-500">*</span>
                     </Label>
                     <Input
-                      id="paymentDueDate"
+                      id="cardPaymentDueDate"
                       type="date"
                       value={paymentData.paymentDueDate}
                       onChange={(e) => handlePaymentDataChange('paymentDueDate', e.target.value)}
@@ -2779,8 +3350,381 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </p>
                     )}
                   </div>
+                )}
+
+                <div className="p-3 bg-white border border-blue-200 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Final Amount:</span>
+                      <span className="font-semibold"><CurrencyGlyph /> {getFinalPrice().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Paid Amount:</span>
+                      <span className="font-semibold text-blue-600"><CurrencyGlyph /> {parseFloat(paymentData.paidAmount || '0').toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Remaining/Due:</span>
+                      <span className={`font-semibold ${paymentData.remainingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  {paymentData.remainingAmount > 0 && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                      <strong>Note:</strong> <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)} will be added to the member's outstanding balance, due by {paymentData.paymentDueDate || '[Date Required]'}
+                    </div>
+                  )}
                 </div>
+              </div>
+            )}
+
+            {/* Cheque Payment Input */}
+            {selectedPaymentMethod === 'check' && (
+              <div className="space-y-4 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                <h4 className="font-semibold text-slate-900 flex items-center space-x-2">
+                  <FaFileLines className="h-4 w-4" />
+                  <span>Cheque Payment Details</span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="chequeNumber" className="flex items-center space-x-2">
+                      <FaHashtag className="h-4 w-4 text-slate-600" />
+                      <span>Cheque Number / Reference</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="chequeNumber"
+                      value={paymentData.chequeNumber}
+                      onChange={(e) => setPaymentData(prev => ({ ...prev, chequeNumber: e.target.value }))}
+                      className={`mt-1 ${paymentErrors.chequeNumber ? 'border-red-500' : ''}`}
+                      placeholder="Cheque number"
+                    />
+                    {paymentErrors.chequeNumber && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.chequeNumber}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="chequeBankName">Bank Name (optional)</Label>
+                    <Input
+                      id="chequeBankName"
+                      value={paymentData.bankName}
+                      onChange={(e) => setPaymentData(prev => ({ ...prev, bankName: e.target.value }))}
+                      className="mt-1"
+                      placeholder="e.g. SBI"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="chequeAmountPaid" className="flex items-center space-x-2">
+                      <FaDollarSign className="h-4 w-4 text-slate-600" />
+                      <span>Amount ({currencyCode})</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="chequeAmountPaid"
+                      type="number"
+                      min="0"
+                      max={getFinalPrice()}
+                      step="0.01"
+                      value={paymentData.paidAmount}
+                      onChange={(e) => handlePaymentDataChange('paidAmount', e.target.value)}
+                      className={`mt-1 ${paymentErrors.paidAmount ? 'border-red-500' : ''}`}
+                    />
+                    {paymentErrors.paidAmount && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.paidAmount}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="chequeDate">Cheque Date (optional)</Label>
+                    <Input
+                      id="chequeDate"
+                      type="date"
+                      value={paymentData.chequeDate}
+                      onChange={(e) => setPaymentData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                {paymentData.remainingAmount > 0 && (
+                  <div>
+                    <Label htmlFor="chequePaymentDueDate" className="flex items-center space-x-2">
+                      <FaCalendarDays className="h-4 w-4 text-slate-600" />
+                      <span>Payment Due Date</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="chequePaymentDueDate"
+                      type="date"
+                      value={paymentData.paymentDueDate}
+                      onChange={(e) => handlePaymentDataChange('paymentDueDate', e.target.value)}
+                      className={`mt-1 ${paymentErrors.paymentDueDate ? 'border-red-500' : ''}`}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                    {paymentErrors.paymentDueDate && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.paymentDueDate}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Final Amount:</span>
+                      <span className="font-semibold"><CurrencyGlyph /> {getFinalPrice().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Paid Amount:</span>
+                      <span className="font-semibold text-blue-600"><CurrencyGlyph /> {parseFloat(paymentData.paidAmount || '0').toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Remaining/Due:</span>
+                      <span className={`font-semibold ${paymentData.remainingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  {paymentData.remainingAmount > 0 && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                      <strong>Note:</strong> <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)} will be added to the member's outstanding balance, due by {paymentData.paymentDueDate || '[Date Required]'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Credit Payment Input */}
+            {selectedPaymentMethod === 'credit' && (
+              <div className="space-y-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <h4 className="font-semibold text-orange-900 flex items-center space-x-2">
+                  <FaWallet className="h-4 w-4" />
+                  <span>Credit Payment Details</span>
+                </h4>
                 
+                {(() => {
+                  const receivedAmountNum = parseFloat(paymentData.receivedAmount || '0');
+                  const showReceivedVia = !isNaN(receivedAmountNum) && receivedAmountNum > 0;
+                  return (
+                    <div className={`grid grid-cols-1 gap-4 ${showReceivedVia ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+                      <div>
+                        <Label htmlFor="receivedAmount" className="flex items-center space-x-2">
+                          <FaDollarSign className="h-4 w-4 text-orange-600" />
+                          <span>Received Amount ({currencyCode})</span>
+                        </Label>
+                        <Input
+                          id="receivedAmount"
+                          type="number"
+                          min="0"
+                          max={getFinalPrice()}
+                          step="0.01"
+                          value={paymentData.receivedAmount}
+                          onChange={(e) => handlePaymentDataChange('receivedAmount', e.target.value)}
+                          className={`mt-1 ${paymentErrors.receivedAmount ? 'border-red-500' : ''}`}
+                          placeholder="0.00 (optional for full credit)"
+                        />
+                        {paymentErrors.receivedAmount && (
+                          <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                            <FaXmark className="h-4 w-4" />
+                            <span>{paymentErrors.receivedAmount}</span>
+                          </p>
+                        )}
+                        <p className="text-xs text-orange-600 mt-1">
+                          Leave empty for full credit
+                        </p>
+                      </div>
+
+                      {showReceivedVia && (
+                        <div>
+                          <Label htmlFor="receivedVia" className="flex items-center space-x-2">
+                            <FaWallet className="h-4 w-4 text-orange-600" />
+                            <span>Received Via</span>
+                            <span className="text-red-500">*</span>
+                          </Label>
+                          <Select
+                            value={paymentData.receivedVia}
+                            onValueChange={(value) => setPaymentData(prev => ({
+                              ...prev,
+                              receivedVia: value,
+                              bankAccountId: value === 'bank-transfer' ? prev.bankAccountId : '',
+                              cardType: '', reference: '', chequeNumber: '', bankName: '', chequeDate: '',
+                              onlinePaymentType: '', providerName: ''
+                            }))}
+                          >
+                            <SelectTrigger id="receivedVia" className={`mt-1 ${paymentErrors.receivedVia ? 'border-red-500' : ''}`}>
+                              <SelectValue placeholder="Select payment method" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="card">Card</SelectItem>
+                              <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
+                              <SelectItem value="check">Cheque</SelectItem>
+                              <SelectItem value="online">Online Payment</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {paymentErrors.receivedVia && (
+                            <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                              <FaXmark className="h-4 w-4" />
+                              <span>{paymentErrors.receivedVia}</span>
+                            </p>
+                          )}
+
+                          {paymentData.receivedVia === 'card' && (
+                            <div className="mt-2">
+                              <Select value={paymentData.cardType} onValueChange={(v) => setPaymentData(prev => ({ ...prev, cardType: v }))}>
+                                <SelectTrigger className={paymentErrors.cardType ? 'border-red-500' : ''}>
+                                  <SelectValue placeholder="Select card type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              {paymentErrors.cardType && (
+                                <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                                  <FaXmark className="h-4 w-4" /><span>{paymentErrors.cardType}</span>
+                                </p>
+                              )}
+                              <Input
+                                value={paymentData.reference}
+                                onChange={(e) => setPaymentData(prev => ({ ...prev, reference: e.target.value }))}
+                                className="mt-2"
+                                placeholder="Reference / transaction number (optional)"
+                              />
+                            </div>
+                          )}
+
+                          {paymentData.receivedVia === 'check' && (
+                            <div className="mt-2 space-y-2">
+                              <Input
+                                value={paymentData.chequeNumber}
+                                onChange={(e) => setPaymentData(prev => ({ ...prev, chequeNumber: e.target.value }))}
+                                className={paymentErrors.chequeNumber ? 'border-red-500' : ''}
+                                placeholder="Cheque number *"
+                              />
+                              {paymentErrors.chequeNumber && (
+                                <p className="text-sm text-red-600 flex items-center space-x-1">
+                                  <FaXmark className="h-4 w-4" /><span>{paymentErrors.chequeNumber}</span>
+                                </p>
+                              )}
+                              <Input
+                                value={paymentData.bankName}
+                                onChange={(e) => setPaymentData(prev => ({ ...prev, bankName: e.target.value }))}
+                                placeholder="Bank name (optional)"
+                              />
+                            </div>
+                          )}
+
+                          {paymentData.receivedVia === 'bank-transfer' && (
+                            <div className="mt-2 space-y-2">
+                              <Input
+                                value={paymentData.reference}
+                                onChange={(e) => setPaymentData(prev => ({ ...prev, reference: e.target.value }))}
+                                className={paymentErrors.reference ? 'border-red-500' : ''}
+                                placeholder="Reference / transaction ID *"
+                              />
+                              {paymentErrors.reference && (
+                                <p className="text-sm text-red-600 flex items-center space-x-1">
+                                  <FaXmark className="h-4 w-4" /><span>{paymentErrors.reference}</span>
+                                </p>
+                              )}
+                              <Select
+                                value={paymentData.bankAccountId}
+                                onValueChange={(value) => setPaymentData(prev => ({ ...prev, bankAccountId: value }))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {bankAccounts.map(account => (
+                                    <SelectItem key={account.id} value={String(account.id)}>
+                                      {account.code} — {account.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {paymentData.receivedVia === 'online' && (
+                            <div className="mt-2 space-y-2">
+                              <Select
+                                value={paymentData.onlinePaymentType}
+                                onValueChange={(v) => setPaymentData(prev => ({ ...prev, onlinePaymentType: v }))}
+                              >
+                                <SelectTrigger className={paymentErrors.onlinePaymentType ? 'border-red-500' : ''}>
+                                  <SelectValue placeholder="Select payment type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              {paymentErrors.onlinePaymentType && (
+                                <p className="text-sm text-red-600 flex items-center space-x-1">
+                                  <FaXmark className="h-4 w-4" /><span>{paymentErrors.onlinePaymentType}</span>
+                                </p>
+                              )}
+                              {paymentData.onlinePaymentType === 'Other' && (
+                                <Input
+                                  value={paymentData.providerName}
+                                  onChange={(e) => setPaymentData(prev => ({ ...prev, providerName: e.target.value }))}
+                                  className={paymentErrors.providerName ? 'border-red-500' : ''}
+                                  placeholder="Payment provider name *"
+                                />
+                              )}
+                              <Input
+                                value={paymentData.reference}
+                                onChange={(e) => setPaymentData(prev => ({ ...prev, reference: e.target.value }))}
+                                className={paymentErrors.reference ? 'border-red-500' : ''}
+                                placeholder="Transaction / reference ID *"
+                              />
+                              {paymentErrors.reference && (
+                                <p className="text-sm text-red-600 flex items-center space-x-1">
+                                  <FaXmark className="h-4 w-4" /><span>{paymentErrors.reference}</span>
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div>
+                        <Label htmlFor="paymentDueDate" className="flex items-center space-x-2">
+                          <FaCalendarDays className="h-4 w-4 text-orange-600" />
+                          <span>Payment Due Date</span>
+                          {paymentData.remainingAmount > 0 && <span className="text-red-500">*</span>}
+                        </Label>
+                        <Input
+                          id="paymentDueDate"
+                          type="date"
+                          value={paymentData.paymentDueDate}
+                          onChange={(e) => handlePaymentDataChange('paymentDueDate', e.target.value)}
+                          className={`mt-1 ${paymentErrors.paymentDueDate ? 'border-red-500' : ''}`}
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                        {paymentErrors.paymentDueDate && (
+                          <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                            <FaXmark className="h-4 w-4" />
+                            <span>{paymentErrors.paymentDueDate}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Credit Payment Summary */}
                 <div className="p-3 bg-white border border-orange-200 rounded-lg">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
@@ -2801,16 +3745,306 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </span>
                     </div>
                   </div>
-                  
+
+                  {parseFloat(paymentData.receivedAmount || '0') > 0 && paymentData.receivedVia && (
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
+                      <strong>Received Via:</strong>{' '}
+                      {PAYMENT_METHOD_LABELS[paymentData.receivedVia] || paymentData.receivedVia}
+                      {paymentData.receivedVia === 'bank-transfer' && paymentData.bankAccountId && (
+                        <> — {bankAccounts.find(a => String(a.id) === paymentData.bankAccountId)?.name}</>
+                      )}
+                      . This amount will be recorded as {PAYMENT_METHOD_LABELS[paymentData.receivedVia] || paymentData.receivedVia}, not Credit.
+                    </div>
+                  )}
+
                   {paymentData.remainingAmount > 0 && (
                     <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
                       <strong>Note:</strong> Member will have an outstanding balance of <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)} due by {paymentData.paymentDueDate || '[Date Required]'}
                     </div>
                   )}
-                  
+
                   {paymentData.remainingAmount === 0 && paymentData.receivedAmount === '' && (
                     <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-800">
                       <strong>Full Credit:</strong> Member will have the entire final amount (<CurrencyGlyph /> {getFinalPrice().toFixed(2)}) on credit
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Bank Transfer Details */}
+            {selectedPaymentMethod === 'bank-transfer' && (
+              <div className="space-y-4 p-4 bg-teal-50 border border-teal-200 rounded-lg">
+                <h4 className="font-semibold text-teal-900 flex items-center space-x-2">
+                  <FaBuilding className="h-4 w-4" />
+                  <span>Bank Transfer Details</span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="bankTransferAmountPaid" className="flex items-center space-x-2">
+                      <FaDollarSign className="h-4 w-4 text-teal-600" />
+                      <span>Amount ({currencyCode})</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="bankTransferAmountPaid"
+                      type="number"
+                      min="0"
+                      max={getFinalPrice()}
+                      step="0.01"
+                      value={paymentData.paidAmount}
+                      onChange={(e) => handlePaymentDataChange('paidAmount', e.target.value)}
+                      className={`mt-1 ${paymentErrors.paidAmount ? 'border-red-500' : ''}`}
+                    />
+                    {paymentErrors.paidAmount && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.paidAmount}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bankTransferReference" className="flex items-center space-x-2">
+                      <FaHashtag className="h-4 w-4 text-teal-600" />
+                      <span>Reference / Transaction ID</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="bankTransferReference"
+                      value={paymentData.reference}
+                      onChange={(e) => setPaymentData(prev => ({ ...prev, reference: e.target.value }))}
+                      className={`mt-1 ${paymentErrors.reference ? 'border-red-500' : ''}`}
+                      placeholder="Transaction ID"
+                    />
+                    {paymentErrors.reference && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.reference}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="bankTransferAccount">Bank Account (Ledger, optional)</Label>
+                  <Select
+                    value={paymentData.bankAccountId}
+                    onValueChange={(value) => setPaymentData(prev => ({ ...prev, bankAccountId: value }))}
+                  >
+                    <SelectTrigger id="bankTransferAccount" className="mt-1">
+                      <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map(account => (
+                        <SelectItem key={account.id} value={String(account.id)}>
+                          {account.code} — {account.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-teal-600 mt-1">
+                    Accounts pulled from the Chart of Accounts (Ledger). The amount will be credited to the selected account.
+                  </p>
+                </div>
+
+                {paymentData.remainingAmount > 0 && (
+                  <div>
+                    <Label htmlFor="bankTransferPaymentDueDate" className="flex items-center space-x-2">
+                      <FaCalendarDays className="h-4 w-4 text-teal-600" />
+                      <span>Payment Due Date</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="bankTransferPaymentDueDate"
+                      type="date"
+                      value={paymentData.paymentDueDate}
+                      onChange={(e) => handlePaymentDataChange('paymentDueDate', e.target.value)}
+                      className={`mt-1 ${paymentErrors.paymentDueDate ? 'border-red-500' : ''}`}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                    {paymentErrors.paymentDueDate && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.paymentDueDate}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="p-3 bg-white border border-teal-200 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Final Amount:</span>
+                      <span className="font-semibold"><CurrencyGlyph /> {getFinalPrice().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Paid Amount:</span>
+                      <span className="font-semibold text-blue-600"><CurrencyGlyph /> {parseFloat(paymentData.paidAmount || '0').toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Remaining/Due:</span>
+                      <span className={`font-semibold ${paymentData.remainingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  {paymentData.remainingAmount > 0 && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                      <strong>Note:</strong> <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)} will be added to the member's outstanding balance, due by {paymentData.paymentDueDate || '[Date Required]'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Online Payment Details */}
+            {selectedPaymentMethod === 'online' && (
+              <div className="space-y-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <h4 className="font-semibold text-red-900 flex items-center space-x-2">
+                  <FaMobileScreen className="h-4 w-4" />
+                  <span>Online Payment Details</span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="onlinePaymentType" className="flex items-center space-x-2">
+                      <FaMobileScreen className="h-4 w-4 text-red-600" />
+                      <span>Online Payment Type</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={paymentData.onlinePaymentType}
+                      onValueChange={(v) => setPaymentData(prev => ({ ...prev, onlinePaymentType: v }))}
+                    >
+                      <SelectTrigger id="onlinePaymentType" className={`mt-1 ${paymentErrors.onlinePaymentType ? 'border-red-500' : ''}`}>
+                        <SelectValue placeholder="Select payment type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {paymentErrors.onlinePaymentType && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.onlinePaymentType}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="onlineAmountPaid" className="flex items-center space-x-2">
+                      <FaDollarSign className="h-4 w-4 text-red-600" />
+                      <span>Amount ({currencyCode})</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="onlineAmountPaid"
+                      type="number"
+                      min="0"
+                      max={getFinalPrice()}
+                      step="0.01"
+                      value={paymentData.paidAmount}
+                      onChange={(e) => handlePaymentDataChange('paidAmount', e.target.value)}
+                      className={`mt-1 ${paymentErrors.paidAmount ? 'border-red-500' : ''}`}
+                    />
+                    {paymentErrors.paidAmount && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.paidAmount}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {paymentData.onlinePaymentType === 'Other' && (
+                  <div>
+                    <Label htmlFor="onlineProviderName" className="flex items-center space-x-2">
+                      <span>Payment Provider Name</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="onlineProviderName"
+                      value={paymentData.providerName}
+                      onChange={(e) => setPaymentData(prev => ({ ...prev, providerName: e.target.value }))}
+                      className={`mt-1 ${paymentErrors.providerName ? 'border-red-500' : ''}`}
+                      placeholder="Provider name"
+                    />
+                    {paymentErrors.providerName && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.providerName}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <Label htmlFor="onlineReference" className="flex items-center space-x-2">
+                    <FaHashtag className="h-4 w-4 text-red-600" />
+                    <span>Transaction / Reference ID</span>
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="onlineReference"
+                    value={paymentData.reference}
+                    onChange={(e) => setPaymentData(prev => ({ ...prev, reference: e.target.value }))}
+                    className={`mt-1 ${paymentErrors.reference ? 'border-red-500' : ''}`}
+                    placeholder="Transaction ID"
+                  />
+                  {paymentErrors.reference && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                      <FaXmark className="h-4 w-4" />
+                      <span>{paymentErrors.reference}</span>
+                    </p>
+                  )}
+                </div>
+
+                {paymentData.remainingAmount > 0 && (
+                  <div>
+                    <Label htmlFor="onlinePaymentDueDate" className="flex items-center space-x-2">
+                      <FaCalendarDays className="h-4 w-4 text-red-600" />
+                      <span>Payment Due Date</span>
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="onlinePaymentDueDate"
+                      type="date"
+                      value={paymentData.paymentDueDate}
+                      onChange={(e) => handlePaymentDataChange('paymentDueDate', e.target.value)}
+                      className={`mt-1 ${paymentErrors.paymentDueDate ? 'border-red-500' : ''}`}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                    {paymentErrors.paymentDueDate && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                        <FaXmark className="h-4 w-4" />
+                        <span>{paymentErrors.paymentDueDate}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="p-3 bg-white border border-red-200 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Final Amount:</span>
+                      <span className="font-semibold"><CurrencyGlyph /> {getFinalPrice().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Paid Amount:</span>
+                      <span className="font-semibold text-blue-600"><CurrencyGlyph /> {parseFloat(paymentData.paidAmount || '0').toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Remaining/Due:</span>
+                      <span className={`font-semibold ${paymentData.remainingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  {paymentData.remainingAmount > 0 && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                      <strong>Note:</strong> <CurrencyGlyph /> {paymentData.remainingAmount.toFixed(2)} will be added to the member's outstanding balance, due by {paymentData.paymentDueDate || '[Date Required]'}
                     </div>
                   )}
                 </div>
@@ -2832,13 +4066,16 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     <p>📝 Payment will be added to the member's account for future settlement.</p>
                   )}
                   {selectedPaymentMethod === 'multi-pay' && (
-                    <p>🔄 Payment will be split across cash, card and cheque as specified above.</p>
+                    <p>🔄 Payment will be split across the methods specified above.</p>
                   )}
                   {selectedPaymentMethod === 'check' && (
-                    <p>📄 Payment will be accepted via check. Please ensure the check is valid and has sufficient funds.</p>
+                    <p>📄 Payment will be accepted via cheque. Please ensure the cheque is valid and has sufficient funds.</p>
                   )}
                   {selectedPaymentMethod === 'bank-transfer' && (
-                    <p>🏦 Payment will be made through direct bank transfer. Bank details will be provided after confirmation.</p>
+                    <p>🏦 Payment will be recorded as a direct bank transfer to the account specified above.</p>
+                  )}
+                  {selectedPaymentMethod === 'online' && (
+                    <p>📱 Payment will be recorded via the online/UPI provider specified above.</p>
                   )}
                 </div>
               </div>
@@ -2858,7 +4095,17 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             <Button 
               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
               onClick={handlePaymentConfirm}
-              disabled={!selectedPaymentMethod || (selectedPaymentMethod === 'multi-pay' && !validateSplitPayment())}
+              disabled={
+                !selectedPaymentMethod
+                || (selectedPaymentMethod === 'multi-pay' && (!validateSplitPayment() || !validateSplitPaymentFields()))
+                || (selectedPaymentMethod === 'credit' && parseFloat(paymentData.receivedAmount || '0') > 0 && (
+                    !paymentData.receivedVia || !validateMethodDetails(paymentData.receivedVia).ok
+                ))
+                || (SINGLE_METHOD_KEYS.includes(selectedPaymentMethod) && (
+                    !validateAmountEntry(paymentData.paidAmount, selectedPaymentMethod === 'cash').ok
+                    || !validateMethodDetails(selectedPaymentMethod).ok
+                ))
+              }
             >
               <FaCheck className="h-4 w-4 mr-2" />
               {isEditMode ? 'Update Member' : 'Confirm Payment & Create Member'}

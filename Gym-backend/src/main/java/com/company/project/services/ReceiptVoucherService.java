@@ -65,7 +65,7 @@ public class ReceiptVoucherService {
             String search, String status, String branch,
             String sourceCategory, LocalDate from, LocalDate to) {
         Specification<ReceiptVoucher> spec = buildSpec(search, status, branch, sourceCategory, from, to);
-        List<ReceiptVoucher> all = receiptVoucherRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "date"));
+        List<ReceiptVoucher> all = receiptVoucherRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "date", "id"));
         return all.stream()
                 .map(this::toResponseDTO)
                 .collect(Collectors.toList());

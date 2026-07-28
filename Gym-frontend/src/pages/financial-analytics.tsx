@@ -126,180 +126,17 @@ interface Insight {
 }
 
 // Mock Data
-const kpiData: KPICard[] = [
-  {
-    id: "total-revenue",
-    title: "Total Revenue",
-    value: 189000,
-    previousValue: 168500,
-    format: "currency",
-    icon: DollarSign,
-    trend: "up",
-    sparklineData: [145000, 152000, 148000, 165000, 175000, 189000],
-  },
-  {
-    id: "profit-margin",
-    title: "Profit Margin",
-    value: 24.5,
-    previousValue: 22.1,
-    format: "percentage",
-    icon: Percent,
-    trend: "up",
-    sparklineData: [20.5, 21.2, 19.8, 22.5, 23.1, 24.5],
-  },
-  {
-    id: "outstanding-payments",
-    title: "Outstanding Payments",
-    value: 12500,
-    previousValue: 15200,
-    format: "currency",
-    icon: Receipt,
-    trend: "down",
-    sparklineData: [18000, 16500, 14200, 13800, 14500, 12500],
-  },
-  {
-    id: "active-membership-value",
-    title: "Active Membership Value",
-    value: 425000,
-    previousValue: 398000,
-    format: "currency",
-    icon: Users,
-    trend: "up",
-    sparklineData: [380000, 385000, 392000, 405000, 415000, 425000],
-  },
-  {
-    id: "trainer-revenue",
-    title: "Trainer Revenue",
-    value: 68500,
-    previousValue: 62300,
-    format: "currency",
-    icon: UserCheck,
-    trend: "up",
-    sparklineData: [58000, 59500, 61200, 64800, 66200, 68500],
-  },
-  {
-    id: "total-expenses",
-    title: "Total Expenses",
-    value: 142750,
-    previousValue: 131200,
-    format: "currency",
-    icon: CreditCard,
-    trend: "up",
-    sparklineData: [125000, 128000, 132000, 138000, 140000, 142750],
-  },
-];
+const kpiData: KPICard[] = []; // Mock data removed
 
-const revenueExpenseData = [
-  { month: "Jul", revenue: 145000, expenses: 125000 },
-  { month: "Aug", revenue: 152000, expenses: 128000 },
-  { month: "Sep", revenue: 148000, expenses: 132000 },
-  { month: "Oct", revenue: 165000, expenses: 138000 },
-  { month: "Nov", revenue: 175000, expenses: 140000 },
-  { month: "Dec", revenue: 189000, expenses: 142750 },
-];
+const revenueExpenseData: any[] = [];
 
-const incomeDistributionData = [
-  { name: "Memberships", value: 125000, color: "#0047AB" },
-  { name: "Personal Training", value: 35000, color: "#009688" },
-  { name: "Classes & Drop-ins", value: 18000, color: "#4CAF50" },
-  { name: "Retail & Supplements", value: 8500, color: "#FFC107" },
-  { name: "Other Services", value: 2500, color: "#F44336" },
-];
+const incomeDistributionData: any[] = [];
 
-const expenseBreakdownData = [
-  { category: "Salaries", amount: 65000, percentage: 45.5 },
-  { category: "Rent & Utilities", amount: 28000, percentage: 19.6 },
-  { category: "Equipment & Maintenance", amount: 18500, percentage: 13.0 },
-  { category: "Marketing", amount: 12750, percentage: 8.9 },
-  { category: "Miscellaneous", amount: 18500, percentage: 13.0 },
-];
+const expenseBreakdownData: any[] = [];
 
-const businessInsights: Insight[] = [
-  {
-    id: "1",
-    type: "success",
-    title: "Revenue Growth Acceleration",
-    description: "Revenue grew 12.2% MoM, primarily driven by new premium membership packages and increased personal training sessions.",
-    impact: 20500,
-    recommendation: "Continue promoting premium packages with targeted campaigns",
-  },
-  {
-    id: "2",
-    type: "info",
-    title: "Trainer Performance Excellence",
-    description: "Top trainer Ahmed generated 22% more PT revenue than last month, contributing AED 15,800 in additional income.",
-    impact: 15800,
-  },
-  {
-    id: "3",
-    type: "warning",
-    title: "Equipment Maintenance Increase",
-    description: "Equipment maintenance expenses increased by AED 5,000 due to aging cardio equipment requiring frequent repairs.",
-    impact: -5000,
-    recommendation: "Consider equipment replacement schedule to reduce maintenance costs",
-  },
-  {
-    id: "4",
-    type: "critical",
-    title: "Outstanding Payment Alert",
-    description: "AED 12,500 in outstanding member payments, with 15% aging beyond 30 days. Immediate follow-up required.",
-    impact: -12500,
-    recommendation: "Implement automated payment reminders and follow-up procedures",
-  },
-];
+const businessInsights: Insight[] = []; // TODO: Implement backend API
 
-const transactionData: Transaction[] = [
-  {
-    id: "TXN001",
-    date: "2025-09-30",
-    category: "Membership",
-    amount: 2500,
-    branch: "Downtown",
-    paymentMethod: "Card",
-    status: "completed",
-    description: "Annual Premium Membership - John Smith",
-  },
-  {
-    id: "TXN002",
-    date: "2025-09-30",
-    category: "Personal Training",
-    amount: 350,
-    branch: "Mall Branch",
-    paymentMethod: "Cash",
-    status: "completed",
-    description: "PT Session Package - Sarah Johnson",
-  },
-  {
-    id: "TXN003",
-    date: "2025-09-29",
-    category: "Retail",
-    amount: 150,
-    branch: "Downtown",
-    paymentMethod: "Card",
-    status: "pending",
-    description: "Protein Supplements - Ahmed Ali",
-  },
-  {
-    id: "TXN004",
-    date: "2025-09-29",
-    category: "Classes",
-    amount: 80,
-    branch: "Marina Branch",
-    paymentMethod: "Digital",
-    status: "completed",
-    description: "Yoga Class Package - Maria Garcia",
-  },
-  {
-    id: "TXN005",
-    date: "2025-09-28",
-    category: "Membership",
-    amount: 1800,
-    branch: "Downtown",
-    paymentMethod: "Bank Transfer",
-    status: "failed",
-    description: "Semi-Annual Membership - Kevin Brown",
-  },
-];
+const transactionData: Transaction[] = []; // TODO: Implement backend API for transactions
 
 const panelCardShell = "bg-white border-0 shadow-sm";
 const statCardShell =
@@ -455,9 +292,7 @@ export function FinancialAnalytics() {
       setApiMonthlyTrend(trend);
       setApiRevenueBySource(revSrc);
       setApiExpenseByCategory(expCat);
-    } catch {
-      // fall back to mock data
-    }
+    } catch (e) { console.error("Failed to load analytics", e); }
   }, []);
 
   useEffect(() => { loadAnalytics(); }, [loadAnalytics]);

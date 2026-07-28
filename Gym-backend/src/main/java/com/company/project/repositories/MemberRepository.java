@@ -35,6 +35,15 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
     @Query("SELECT m FROM Member m WHERE m.nextPaymentDate IS NOT NULL AND m.nextPaymentDate >= :now AND m.nextPaymentDate <= :sevenDaysLater AND m.paymentStatus != 'overdue' ORDER BY m.nextPaymentDate ASC")
     List<Member> findDueSoonMembers(@Param("now") LocalDateTime now, @Param("sevenDaysLater") LocalDateTime sevenDaysLater);
 
+    // Members with a real outstanding balance still marked "pending" (e.g. a partial/credit
+    // payment) whose due date isn't already covered by the overdue or due-soon buckets above —
+    // without this, a member who owes money but whose next payment date is null or more than
+    // 7 days out never appears anywhere in Member Due.
+    @Query("SELECT m FROM Member m WHERE m.paymentStatus IN ('pending', 'partial') AND m.outstandingBalance IS NOT NULL AND m.outstandingBalance > 0 " +
+           "AND NOT (m.nextPaymentDate IS NOT NULL AND m.nextPaymentDate >= :now AND m.nextPaymentDate <= :sevenDaysLater) " +
+           "ORDER BY m.nextPaymentDate ASC")
+    List<Member> findPendingMembersWithBalance(@Param("now") LocalDateTime now, @Param("sevenDaysLater") LocalDateTime sevenDaysLater);
+
     @Query("SELECT COUNT(m) FROM Member m WHERE m.paymentStatus = 'overdue'")
     long countOverdueMembers();
 

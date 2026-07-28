@@ -82,6 +82,15 @@ public class Receipt extends BaseEntity {
     @Convert(converter = PaymentBreakdownConverter.class)
     private List<PaymentSplitDTO> paymentBreakdown;
 
+    // Specific ledger bank account (from account_heads) credited for a Bank Transfer
+    // receipt — lets the journal entry hit the exact account instead of the generic
+    // "Cash at Bank" bucket. Null for every other payment method.
+    @Column(name = "bank_account_code")
+    private String bankAccountCode;
+
+    @Column(name = "bank_account_name")
+    private String bankAccountName;
+
     public Receipt() {}
 
     // ── Getters & Setters ────────────────────────────────────────────────────
@@ -145,4 +154,10 @@ public class Receipt extends BaseEntity {
 
     public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
+
+    public String getBankAccountCode() { return bankAccountCode; }
+    public void setBankAccountCode(String bankAccountCode) { this.bankAccountCode = bankAccountCode; }
+
+    public String getBankAccountName() { return bankAccountName; }
+    public void setBankAccountName(String bankAccountName) { this.bankAccountName = bankAccountName; }
 }
