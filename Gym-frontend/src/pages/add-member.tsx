@@ -106,6 +106,23 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 const CARD_TYPE_OPTIONS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Maestro', 'Diners Club', 'Other'];
 const ONLINE_PAYMENT_TYPE_OPTIONS = ['Google Pay', 'PhonePe', 'Paytm', 'BHIM', 'Samsung Pay', 'Apple Pay', 'Amazon Pay', 'UPI', 'Other'];
 
+// Whole-years age as of today, from a "YYYY-MM-DD" date-of-birth string.
+// Returns null for empty/invalid/future-dated input so callers can hide the
+// Age readout instead of showing a nonsense value.
+const calculateAge = (dob: string): number | null => {
+  if (!dob) return null;
+  const birthDate = new Date(dob);
+  if (isNaN(birthDate.getTime())) return null;
+  const today = new Date();
+  if (birthDate > today) return null;
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
 export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { memberId: routeMemberId } = useParams();
   const navigate = useNavigate();
@@ -217,23 +234,292 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   
   // Family members management
   const addFamilyMember = () => {
-    setFamilyMembers([...familyMembers, { id: `family-${Date.now()}`, name: '', relationship: '' }]);
+    setFamilyMembers(prev => [...prev, {
+      id: `family-${Date.now()}`,
+      name: '', relationship: '', isMinor: false,
+      email: '', phone: '', dateOfBirth: '',
+      membershipPlan: '', membershipFee: '',
+      paymentMethod: 'cash', amountPaid: '', receivedVia: '',
+      cardType: '', chequeNumber: '', chequeDate: '', bankName: '', bankAccountId: '',
+      onlinePaymentType: '', providerName: '',
+      minorFee: '',
+      minorPaymentMethod: 'cash', minorAmountPaid: '', minorReceivedVia: '',
+      minorCardType: '', minorChequeNumber: '', minorChequeDate: '', minorBankName: '', minorBankAccountId: '',
+      minorOnlinePaymentType: '', minorProviderName: '',
+    }]);
   };
 
   const removeFamilyMember = (id: string) => {
-    setFamilyMembers(familyMembers.filter(member => member.id !== id));
+    setFamilyMembers(prev => prev.filter(member => member.id !== id));
   };
 
-  const updateFamilyMemberName = (id: string, name: string) => {
-    setFamilyMembers(familyMembers.map(member =>
-      member.id === id ? { ...member, name } : member
+  // Uses the functional setState form so that calling this twice in a row within
+  // the same handler (e.g. updating paymentMethod then amountPaid together) composes
+  // correctly instead of the second call clobbering the first with a stale snapshot
+  // of familyMembers.
+  const updateFamilyMemberField = <K extends keyof FamilyMemberRow>(id: string, field: K, value: FamilyMemberRow[K]) => {
+    setFamilyMembers(prev => prev.map(member =>
+      member.id === id ? { ...member, [field]: value } : member
     ));
   };
 
-  const updateFamilyMemberRelationship = (id: string, relationship: string) => {
-    setFamilyMembers(familyMembers.map(member =>
-      member.id === id ? { ...member, relationship } : member
-    ));
+  // Auto-fills a family member's fee when they select a plan (discount-adjusted,
+  // mirroring getMembershipDetails() for the primary member).
+  const getPlanPriceById = (planId: string) => {
+    const plan = apiPlans.find(p => p.id.toString() === planId);
+    if (!plan) return 0;
+    const discounted = plan.discount && Number(plan.discount) > 0
+      ? Number(plan.price) * (1 - Number(plan.discount) / 100)
+      : Number(plan.price);
+    return Math.round(discounted * 100) / 100;
+  };
+
+  // The selected primary-member plan, and whether it's a Family plan configured
+  // for "family_head" billing — every family member (adult or minor) then folds
+  // into ONE invoice on the head instead of adults billing independently.
+  const getSelectedPrimaryPlan = () => apiPlans.find(p => p.id.toString() === formData.membershipPlan);
+  const isFamilyHeadBillingMode = (): boolean =>
+    formData.membershipType === 'family'
+    && getSelectedPrimaryPlan()?.familyBillingMode === 'family_head';
+
+  // Mirrors MemberService.memberPriceForIndex() on the backend: price_per_member
+  // for members within max_family_members, additional_member_price (falling back
+  // to price_per_member) for every member beyond that cap.
+  const computeFamilyHeadTotal = (plan: MembershipPlanData, totalMembers: number): number => {
+    const perMember = Number(plan.pricePerMember) || 0;
+    const max = plan.maxFamilyMembers != null && Number(plan.maxFamilyMembers) > 0
+      ? Number(plan.maxFamilyMembers) : null;
+    const extra = plan.additionalMemberPrice != null ? Number(plan.additionalMemberPrice) : perMember;
+    let total = 0;
+    for (let i = 0; i < totalMembers; i++) {
+      total += (max !== null && i >= max) ? extra : perMember;
+    }
+    return Math.round(total * 100) / 100;
+  };
+
+  // "Individual" family billing (the non-family_head default): only minor
+  // family members fold onto the head's own invoice/due — adults are billed
+  // fully independently, so they're intentionally excluded from these totals.
+  const getFamilyMinorFeeTotal = (): number => {
+    if (formData.membershipType !== 'family' || isFamilyHeadBillingMode()) return 0;
+    return familyMembers
+      .filter(m => m.isMinor)
+      .reduce((sum, m) => sum + (parseFloat(m.minorFee || '0') || 0), 0);
+  };
+  const getFamilyMinorUnpaidTotal = (): number => {
+    if (formData.membershipType !== 'family' || isFamilyHeadBillingMode()) return 0;
+    return familyMembers
+      .filter(m => m.isMinor)
+      .reduce((sum, m) => {
+        const fee = parseFloat(m.minorFee || '0') || 0;
+        const paid = parseFloat(m.minorAmountPaid || '0') || 0;
+        return sum + Math.max(0, fee - paid);
+      }, 0);
+  };
+
+  // Method-specific detail fields (Card/Cheque/Bank Transfer/Online Payment) shared
+  // by both the adult and minor payment sections of a family member row — mirrors
+  // the primary member's payment dialog fields (cardType/chequeNumber/.../providerName).
+  const renderPaymentMethodDetails = (
+    method: string,
+    values: {
+      cardType: string; chequeNumber: string; chequeDate: string; bankName: string;
+      bankAccountId: string; onlinePaymentType: string; providerName: string;
+    },
+    onChange: (field: string, value: string) => void
+  ) => {
+    if (method === 'card') {
+      return (
+        <div>
+          <Label className="text-sm text-gray-600 mb-1 block">Card Type</Label>
+          <Select value={values.cardType || undefined} onValueChange={(v) => onChange('cardType', v)}>
+            <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select card type" /></SelectTrigger>
+            <SelectContent>
+              {CARD_TYPE_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+    if (method === 'check') {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Cheque Number</Label>
+            <Input value={values.chequeNumber} onChange={(e) => onChange('chequeNumber', e.target.value)} className="border-primary/20" />
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Bank Name</Label>
+            <Input value={values.bankName} onChange={(e) => onChange('bankName', e.target.value)} className="border-primary/20" />
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Cheque Date</Label>
+            <Input type="date" value={values.chequeDate} onChange={(e) => onChange('chequeDate', e.target.value)} className="border-primary/20" />
+          </div>
+        </div>
+      );
+    }
+    if (method === 'bank-transfer') {
+      return (
+        <div>
+          <Label className="text-sm text-gray-600 mb-1 block">Bank Account</Label>
+          <Select value={values.bankAccountId || undefined} onValueChange={(v) => onChange('bankAccountId', v)}>
+            <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select bank account" /></SelectTrigger>
+            <SelectContent>
+              {bankAccounts.length === 0 ? (
+                <div className="px-2 py-1.5 text-sm text-gray-500">No bank accounts found in Chart of Accounts</div>
+              ) : (
+                bankAccounts.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.code} — {a.name}</SelectItem>)
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+    if (method === 'online') {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Online Payment Type</Label>
+            <Select value={values.onlinePaymentType || undefined} onValueChange={(v) => onChange('onlinePaymentType', v)}>
+              <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select type" /></SelectTrigger>
+              <SelectContent>
+                {ONLINE_PAYMENT_TYPE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {values.onlinePaymentType === 'Other' && (
+            <div>
+              <Label className="text-sm text-gray-600 mb-1 block">Provider Name</Label>
+              <Input value={values.providerName} onChange={(e) => onChange('providerName', e.target.value)} className="border-primary/20" />
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Builds a single PaymentSplitDTO-shaped leg for a family member's (adult or
+  // minor) payment, snake_case to match the backend DTO — mirrors buildSingleMethodLeg
+  // for the primary member.
+  const buildFamilyMemberLeg = (methodKey: string, amount: number, vals: {
+    cardType: string; chequeNumber: string; chequeDate: string; bankName: string; onlinePaymentType: string; providerName: string;
+  }) => {
+    const leg: any = { method: PAYMENT_METHOD_LABELS[methodKey] || methodKey, amount };
+    if (methodKey === 'card') {
+      leg.card_type = vals.cardType;
+    } else if (methodKey === 'check') {
+      leg.cheque_number = vals.chequeNumber;
+      if (vals.bankName) leg.bank_name = vals.bankName;
+      if (vals.chequeDate) leg.cheque_date = vals.chequeDate;
+    } else if (methodKey === 'online') {
+      leg.online_payment_type = vals.onlinePaymentType;
+      if (vals.onlinePaymentType === 'Other') leg.provider_name = vals.providerName;
+    }
+    return [leg];
+  };
+
+  // Maps the generic field names used by renderPaymentMethodDetails onto the
+  // minor-prefixed FamilyMemberRow fields, so the same renderer serves both sections.
+  const minorPaymentFieldMap: Record<string, keyof FamilyMemberRow> = {
+    cardType: 'minorCardType',
+    chequeNumber: 'minorChequeNumber',
+    chequeDate: 'minorChequeDate',
+    bankName: 'minorBankName',
+    bankAccountId: 'minorBankAccountId',
+    onlinePaymentType: 'minorOnlinePaymentType',
+    providerName: 'minorProviderName',
+  };
+
+  // Shared payment-capture UI for a family member row (used for both the adult's
+  // own payment and a minor's optional payment) — mirrors the primary member's
+  // payment model: Cash/Card/Cheque/Bank Transfer/Online Payment/Credit as the
+  // method, with Credit additionally exposing "Received Via" + its own sub-details
+  // once some amount is collected against it (matching PAYMENT_METHOD_LABELS).
+  const renderPaymentCapture = (
+    method: string,
+    amountPaid: string,
+    receivedVia: string,
+    feeAmount: string,
+    detailValues: {
+      cardType: string; chequeNumber: string; chequeDate: string; bankName: string;
+      bankAccountId: string; onlinePaymentType: string; providerName: string;
+    },
+    handlers: {
+      onMethodChange: (val: string) => void;
+      onAmountChange: (val: string) => void;
+      onReceivedViaChange: (val: string) => void;
+      onDetailChange: (field: string, value: string) => void;
+    }
+  ) => {
+    const isCredit = method === 'credit';
+    const paidNum = parseFloat(amountPaid || '0');
+    const fullFee = parseFloat(feeAmount || '0');
+    const effectiveMethod = isCredit ? receivedVia : method;
+    return (
+      <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Payment Method</Label>
+            <Select value={method} onValueChange={handlers.onMethodChange}>
+              <SelectTrigger className="border-primary/20"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="card">Card</SelectItem>
+                <SelectItem value="check">Cheque</SelectItem>
+                <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
+                <SelectItem value="online">Online Payment</SelectItem>
+                <SelectItem value="credit">Credit</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">
+              {isCredit ? 'Amount Received Now (optional)' : 'Amount Paid Now'}
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min="0"
+                value={amountPaid}
+                onChange={(e) => handlers.onAmountChange(e.target.value)}
+                placeholder="0.00"
+                className="border-primary/20"
+              />
+              {fullFee > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlers.onAmountChange(feeAmount)}
+                  disabled={paidNum === fullFee}
+                  className="shrink-0 whitespace-nowrap"
+                >
+                  Full Amount
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+        {isCredit && paidNum > 0 && (
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Received Via</Label>
+            <Select value={receivedVia || undefined} onValueChange={handlers.onReceivedViaChange}>
+              <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select method" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="card">Card</SelectItem>
+                <SelectItem value="check">Cheque</SelectItem>
+                <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
+                <SelectItem value="online">Online Payment</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {renderPaymentMethodDetails(effectiveMethod, detailValues, handlers.onDetailChange)}
+      </>
+    );
   };
   
   // Active membership plans from backend
@@ -245,12 +531,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       .catch(err => console.error('Failed to load membership plans:', err));
   }, []);
 
+  // A member's own plan must always match the Membership Type selected above
+  // (Individual/Couple/Family/Corporate) — e.g. an Individual member should
+  // never be offered a Family-only plan. Nothing is excluded until a
+  // membership type is actually chosen.
   const getFilteredMembershipPlans = () => {
-    return apiPlans.filter(plan => {
-      const typeMatch = membershipTypeFilter === 'all' ||
-        plan.planType.toLowerCase() === membershipTypeFilter.toLowerCase();
-      return typeMatch;
-    });
+    if (!formData.membershipType) return apiPlans;
+    return apiPlans.filter(plan => plan.planType.toLowerCase() === formData.membershipType.toLowerCase());
   };
 
   // Initialize Member ID on component mount
@@ -280,7 +567,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
           setFormData(prev => ({
             ...prev,
             memberId: member.member_id || '',
-            membershipType: member.membership_type || '',
+            // Stored values are capitalized ("Couple"/"Family"/"Individual"/"Corporate")
+            // but every card/conditional in this form compares against the lowercase
+            // internal values ('couple'/'family'/...) — without lowercasing here, the
+            // comparison silently fails, no card shows as selected, and re-saving falls
+            // back to the selected plan's own category (e.g. overwriting a linked
+            // Couple/Family member's type with their own plan's "Individual").
+            membershipType: (member.membership_type || '').toLowerCase(),
             firstName: fName,
             lastName: lName,
             email: member.email || '',
@@ -438,12 +731,53 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     appPassword: '',
   });
   
-  // Family members state
-  const [familyMembers, setFamilyMembers] = useState<Array<{ id: string; name: string; relationship: string }>>([]);
-  
+  // Family members state — adults get a fully independent membership (own plan/
+  // fee/payment); minors are billed to the family head instead of carrying their
+  // own balance.
+  type FamilyMemberRow = {
+    id: string;
+    name: string;
+    relationship: string;
+    isMinor: boolean;
+    email: string;
+    phone: string;
+    dateOfBirth: string;
+    membershipPlan: string;   // plan id, adult-only
+    membershipFee: string;    // adult-only
+    // Adult-only payment capture — mirrors the primary member's own payment fields:
+    // paymentMethod is one of cash/card/check/bank-transfer/online/credit; amountPaid
+    // is however much is being collected right now (defaults to the full fee for a
+    // direct method, defaults to 0 for credit); receivedVia is the real method used
+    // when a credit sale has SOME amount collected now.
+    paymentMethod: string;
+    amountPaid: string;
+    receivedVia: string;
+    cardType: string;
+    chequeNumber: string;
+    chequeDate: string;
+    bankName: string;
+    bankAccountId: string;
+    onlinePaymentType: string;
+    providerName: string;
+    minorFee: string;         // minor-only: total amount to bill to the guardian
+    // Minor-only payment capture — same model as the adult section above, but the
+    // amount actually collected (if any) reduces the guardian's due instead of
+    // creating an independent balance for the minor.
+    minorPaymentMethod: string;
+    minorAmountPaid: string;
+    minorReceivedVia: string;
+    minorCardType: string;
+    minorChequeNumber: string;
+    minorChequeDate: string;
+    minorBankName: string;
+    minorBankAccountId: string;
+    minorOnlinePaymentType: string;
+    minorProviderName: string;
+  };
+  const [familyMembers, setFamilyMembers] = useState<FamilyMemberRow[]>([]);
+
   // Membership plan filters
   const [programFilter, setProgramFilter] = useState('all');
-  const [membershipTypeFilter, setMembershipTypeFilter] = useState('all');
 
   // Enhanced camera functionality with better error handling
   const startCamera = async () => {
@@ -611,13 +945,18 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       return;
     }
 
-    // Family membership validation
-    if (formData.membershipType === 'family' && !isEditMode) {
+    // Family / Couple membership validation
+    if ((formData.membershipType === 'family' || formData.membershipType === 'couple') && !isEditMode) {
       if (familyMembers.length === 0) {
-        toast.error('Please add at least one family member', {
-          description: 'Family memberships require at least one additional family member.',
-          duration: 4000
-        });
+        toast.error(
+          formData.membershipType === 'couple' ? 'Please add the connected member' : 'Please add at least one family member',
+          {
+            description: formData.membershipType === 'couple'
+              ? 'Couple memberships require exactly one connected member.'
+              : 'Family memberships require at least one additional family member.',
+            duration: 4000
+          }
+        );
         return;
       }
       const incomplete = familyMembers.find(fm => !fm.name.trim() || !fm.relationship.trim());
@@ -628,6 +967,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         });
         return;
       }
+      // Adult family members can share the primary member's plan by leaving their plan blank
     }
 
     // Open payment selection popup (or skip if edit mode)
@@ -643,6 +983,21 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     const plan = apiPlans.find(p => p.id.toString() === formData.membershipPlan)
       || apiPlans.find(p => p.name === formData.membershipPlan);
     if (!plan) return { name: 'Unknown Plan', price: 0, originalPrice: null, savings: null };
+
+    // Family Head billing: the invoice is the WHOLE family's total (price per
+    // member × current headcount) — not the plan's flat listed price. This is
+    // what actually gets billed/collected via the primary member's payment
+    // section below; family members carry no payment of their own.
+    if (isFamilyHeadBillingMode() && plan.autoCalculateTotal !== false && plan.pricePerMember != null) {
+      const totalMembers = familyMembers.length + 1;
+      return {
+        name: plan.name,
+        price: computeFamilyHeadTotal(plan, totalMembers),
+        originalPrice: null,
+        savings: null,
+      };
+    }
+
     const originalPrice = plan.discount && plan.discount > 0
       ? Number(plan.price)
       : null;
@@ -1157,11 +1512,18 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         ? (creditReceivedAmount > 0 ? buildSingleMethodLeg(paymentData.receivedVia, creditReceivedAmount) : undefined)
         : (SINGLE_METHOD_KEYS.includes(selectedPaymentMethod) ? buildSingleMethodLeg(selectedPaymentMethod, paidAmountNum) : undefined);
 
+    // A Couple registration always links the two members the same way a Family
+    // head links to an adult dependent (own plan/fee/receipt/ledger, just
+    // connected) — send "Couple" as the membership_type regardless of the
+    // selected plan's own planType, so the backend's family-linking logic
+    // (which recognizes both "Family" and "Couple") always kicks in.
+    const effectiveMembershipType = formData.membershipType === 'couple' ? 'Couple' : planType;
+
     const memberPayload = {
       name: `${formData.firstName} ${formData.lastName}`.trim(),
       email: formData.email,
       phone: formData.phone,
-      membership_type: planType,
+      membership_type: effectiveMembershipType,
       membership_status: 'active' as const,
       membership_plan: planName,
       join_date: toIso(formData.joiningDate),
@@ -1197,10 +1559,81 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       height: formData.height ? parseFloat(formData.height) : undefined,
       weight: formData.weight ? parseFloat(formData.weight) : undefined,
       photo_url: formData.profilePhoto || undefined,
-      // Family plan: mark primary member as head and include family members array
-      is_family_head: formData.membershipType === 'family' && familyMembers.length > 0 ? true : undefined,
-      family_members: (!isEditMode && formData.membershipType === 'family' && familyMembers.length > 0)
-        ? familyMembers.map(fm => ({ name: fm.name, relationship: fm.relationship }))
+      // Family/Couple plan: mark primary member as head and include family members array
+      is_family_head: (formData.membershipType === 'family' || formData.membershipType === 'couple') && familyMembers.length > 0 ? true : undefined,
+      family_members: (!isEditMode && (formData.membershipType === 'family' || formData.membershipType === 'couple') && familyMembers.length > 0)
+        ? familyMembers.map(fm => {
+            // Under family_head billing mode EVERY member (adult or minor) folds
+            // into the head's single invoice — reuse the exact same "billed to
+            // head" payload shape minors have always used, just no longer gated
+            // on the isMinor toggle (which stays purely demographic here).
+            if (fm.isMinor || isFamilyHeadBillingMode()) {
+              const minorFeeNum = fm.minorFee ? parseFloat(fm.minorFee) : 0;
+              const minorPaidNow = parseFloat(fm.minorAmountPaid || '0');
+              const minorIsCredit = fm.minorPaymentMethod === 'credit';
+              const minorEffectiveMethod = minorIsCredit ? fm.minorReceivedVia : fm.minorPaymentMethod;
+              const minorAccount = minorEffectiveMethod === 'bank-transfer' && fm.minorBankAccountId
+                ? bankAccounts.find(a => String(a.id) === fm.minorBankAccountId)
+                : undefined;
+              return {
+                name: fm.name,
+                relationship: fm.relationship,
+                is_minor: Boolean(fm.isMinor),
+                date_of_birth: fm.dateOfBirth ? toIso(fm.dateOfBirth) : undefined,
+                minor_fee: minorFeeNum,
+                minor_paid_amount: minorPaidNow,
+                minor_payment_method: minorPaidNow > 0
+                  ? (PAYMENT_METHOD_LABELS[minorEffectiveMethod] || minorEffectiveMethod)
+                  : (minorIsCredit ? 'Credit' : undefined),
+                minor_payment_breakdown: minorPaidNow > 0
+                  ? buildFamilyMemberLeg(minorEffectiveMethod, minorPaidNow, {
+                      cardType: fm.minorCardType, chequeNumber: fm.minorChequeNumber, chequeDate: fm.minorChequeDate,
+                      bankName: fm.minorBankName, onlinePaymentType: fm.minorOnlinePaymentType, providerName: fm.minorProviderName,
+                    })
+                  : undefined,
+                minor_bank_account_code: minorAccount?.code,
+                minor_bank_account_name: minorAccount?.name,
+              };
+            }
+            // Fall back to the primary member's plan when the family member didn't pick one
+            const plan = fm.membershipPlan
+              ? apiPlans.find(p => p.id.toString() === fm.membershipPlan)
+              : null;
+            const primaryPlan = apiPlans.find(p => p.id.toString() === formData.membershipPlan);
+            const effectivePlanName = plan?.name || primaryPlan?.name || planName;
+            const fee = fm.membershipFee && parseFloat(fm.membershipFee) > 0
+              ? parseFloat(fm.membershipFee)
+              : (plan ? getPlanPriceById(plan.id.toString()) : (primaryPlan ? getPlanPriceById(primaryPlan.id.toString()) : finalPrice));
+            const paidNow = parseFloat(fm.amountPaid || '0');
+            const outstanding = Math.max(0, fee - paidNow);
+            const isCredit = fm.paymentMethod === 'credit';
+            const effectiveMethod = isCredit ? fm.receivedVia : fm.paymentMethod;
+            const account = effectiveMethod === 'bank-transfer' && fm.bankAccountId
+              ? bankAccounts.find(a => String(a.id) === fm.bankAccountId)
+              : undefined;
+            return {
+              name: fm.name,
+              relationship: fm.relationship,
+              is_minor: false,
+              email: fm.email || undefined,
+              phone: fm.phone || undefined,
+              membership_plan: effectivePlanName,
+              membership_fee: fee,
+              payment_status: outstanding <= 0 ? 'paid' : (paidNow > 0 ? 'partial' : 'pending'),
+              outstanding_balance: outstanding,
+              payment_method: paidNow > 0
+                ? (PAYMENT_METHOD_LABELS[effectiveMethod] || effectiveMethod)
+                : (isCredit ? 'Credit' : undefined),
+              payment_breakdown: paidNow > 0
+                ? buildFamilyMemberLeg(effectiveMethod, paidNow, {
+                    cardType: fm.cardType, chequeNumber: fm.chequeNumber, chequeDate: fm.chequeDate,
+                    bankName: fm.bankName, onlinePaymentType: fm.onlinePaymentType, providerName: fm.providerName,
+                  })
+                : undefined,
+              bank_account_code: account?.code,
+              bank_account_name: account?.name,
+            };
+          })
         : undefined,
       // App access credentials (only included on create if both are provided)
       ...((!isEditMode && formData.appUsername && formData.appPassword) ? {
@@ -1379,9 +1812,16 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               </CardHeader>
               <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-2">
               
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 {[
                   { value: 'individual', label: 'Individual', sub: 'Single person', icon: <FaUser className="h-5 w-5" />, onClick: () => { setFormData({...formData, membershipType: 'individual'}); setFamilyMembers([]); } },
+                  { value: 'couple', label: 'Couple', sub: 'Two connected members', icon: <FaUsers className="h-5 w-5" />, onClick: () => {
+                      setFormData({...formData, membershipType: 'couple'});
+                      // Couple only ever has one connected member, and it's always an adult
+                      // (independent billing) — normalize any leftover rows from switching
+                      // away from a Family selection.
+                      setFamilyMembers(prev => prev.slice(0, 1).map(fm => ({ ...fm, isMinor: false })));
+                    } },
                   { value: 'family', label: 'Family', sub: 'Multiple members', icon: <FaHeart className="h-5 w-5" />, onClick: () => setFormData({...formData, membershipType: 'family'}) },
                   { value: 'corporate', label: 'Corporate', sub: 'Company-sponsored', icon: <FaBuilding className="h-5 w-5" />, onClick: () => { setFormData({...formData, membershipType: 'corporate'}); setFamilyMembers([]); } },
                 ].map((opt) => (
@@ -1420,6 +1860,9 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     </p>
                     {formData.membershipType === 'family' && (
                       <p className="text-xs text-primary/70 mt-0.5">Add family members in Personal Info below</p>
+                    )}
+                    {formData.membershipType === 'couple' && (
+                      <p className="text-xs text-primary/70 mt-0.5">Add the connected member in Personal Info below</p>
                     )}
                   </div>
                 </div>
@@ -1540,7 +1983,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="gender" className="mb-1.5 block">Gender</Label>
-                <Select value={formData.gender} onValueChange={(v) => setFormData({...formData, gender: v, genderOther: v !== 'other' ? '' : formData.genderOther})}>
+                <Select value={formData.gender || undefined} onValueChange={(v) => setFormData({...formData, gender: v, genderOther: v !== 'other' ? '' : formData.genderOther})}>
                   <SelectTrigger id="gender"><SelectValue placeholder="Select Gender (Optional)" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="male">Male</SelectItem>
@@ -1557,7 +2000,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               </div>
               <div>
                 <Label htmlFor="nationality" className="mb-1.5 block">Nationality</Label>
-                <Select value={formData.nationality} onValueChange={(v) => setFormData({...formData, nationality: v})}>
+                <Select value={formData.nationality || undefined} onValueChange={(v) => setFormData({...formData, nationality: v})}>
                   <SelectTrigger id="nationality"><SelectValue placeholder="Select Country" /></SelectTrigger>
                   <SelectContent className="max-h-60">
                     {COUNTRIES.map((country) => <SelectItem key={country} value={country}>{country}</SelectItem>)}
@@ -1569,52 +2012,128 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               <Label htmlFor="address" className="mb-1.5 block">Address</Label>
               <Textarea id="address" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} placeholder="123 Main St, City" rows={2} />
             </div>
-            
-            {/* Family Members Section */}
-            {formData.membershipType === 'family' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="dateOfBirth" className="mb-1.5 block">Date of Birth</Label>
+                <Input
+                  id="dateOfBirth"
+                  type="date"
+                  max={new Date().toISOString().split('T')[0]}
+                  value={formData.dateOfBirth}
+                  onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label className="mb-1.5 block">Age</Label>
+                <Input
+                  value={calculateAge(formData.dateOfBirth) !== null ? `${calculateAge(formData.dateOfBirth)} years` : ''}
+                  placeholder="Auto-calculated from date of birth"
+                  readOnly
+                  disabled
+                />
+              </div>
+            </div>
+
+            {/* Family / Couple Members Section */}
+            {(formData.membershipType === 'family' || formData.membershipType === 'couple') && (
               <div className="space-y-4 p-4 border-2 border-dashed border-primary/30 rounded-xl bg-gradient-light">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <FaHeart className="h-5 w-5 text-primary" />
                     <div>
-                      <h3 className="font-semibold text-primary">Family Members</h3>
-                      <p className="text-xs text-gray-600">Add additional family members to this membership</p>
+                      <h3 className="font-semibold text-primary">
+                        {formData.membershipType === 'couple' ? 'Connected Member' : 'Family Members'}
+                      </h3>
+                      <p className="text-xs text-gray-600">
+                        {formData.membershipType === 'couple'
+                          ? 'Add the one member connected to this membership — billed independently, linked together'
+                          : 'Add additional family members to this membership'}
+                      </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addFamilyMember}
-                    className="btn-primary"
-                  >
-                    <FaPlus className="h-4 w-4 mr-2" />
-                    Add Family Member
-                  </Button>
+                  {(formData.membershipType === 'family' || familyMembers.length === 0) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addFamilyMember}
+                      className="btn-primary"
+                    >
+                      <FaPlus className="h-4 w-4 mr-2" />
+                      {formData.membershipType === 'couple' ? 'Add Connected Member' : 'Add Family Member'}
+                    </Button>
+                  )}
                 </div>
-                
+
                 {familyMembers.length === 0 ? (
                   <div className="text-center py-6 text-gray-500">
                     <FaUsers className="h-10 w-10 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">No family members added yet</p>
-                    <p className="text-xs">Click "Add Family Member" to get started</p>
+                    <p className="text-sm">
+                      {formData.membershipType === 'couple' ? 'No connected member added yet' : 'No family members added yet'}
+                    </p>
+                    <p className="text-xs">
+                      {formData.membershipType === 'couple'
+                        ? 'Click "Add Connected Member" to get started'
+                        : 'Click "Add Family Member" to get started'}
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {familyMembers.map((member, index) => (
-                      <div key={member.id} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-primary/20">
-                        <div className="flex items-center justify-center w-8 h-8 bg-gradient-light rounded-full flex-shrink-0 mt-6">
-                          <FaUser className="h-4 w-4 text-primary" />
+                    {familyMembers.map((member, index) => {
+                      const headName = `${formData.firstName} ${formData.lastName}`.trim() || 'the family head';
+                      return (
+                      <div key={member.id} className="space-y-3 p-3 bg-white rounded-lg border border-primary/20">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="flex items-center justify-center w-8 h-8 bg-gradient-light rounded-full flex-shrink-0">
+                              <FaUser className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">
+                              {formData.membershipType === 'couple' ? 'Connected Member' : `Family Member ${index + 1}`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {formData.membershipType !== 'couple' && (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={!member.isMinor ? 'default' : 'outline'}
+                                  onClick={() => updateFamilyMemberField(member.id, 'isMinor', false)}
+                                >
+                                  Adult
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={member.isMinor ? 'default' : 'outline'}
+                                  onClick={() => updateFamilyMemberField(member.id, 'isMinor', true)}
+                                >
+                                  Minor
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFamilyMember(member.id)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <FaXmark className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <Label htmlFor={`family-member-${member.id}`} className="text-sm text-gray-600 mb-1 block">
-                              Family Member {index + 1} Name *
+                              Name *
                             </Label>
                             <Input
                               id={`family-member-${member.id}`}
                               value={member.name}
-                              onChange={(e) => updateFamilyMemberName(member.id, e.target.value)}
+                              onChange={(e) => updateFamilyMemberField(member.id, 'name', e.target.value)}
                               placeholder="Enter full name"
                               className="border-primary/20"
                             />
@@ -1624,8 +2143,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                               Relationship *
                             </Label>
                             <Select
-                              value={member.relationship}
-                              onValueChange={(val) => updateFamilyMemberRelationship(member.id, val)}
+                              value={member.relationship || undefined}
+                              onValueChange={(val) => updateFamilyMemberField(member.id, 'relationship', val)}
                             >
                               <SelectTrigger id={`family-rel-${member.id}`} className="border-primary/20">
                                 <SelectValue placeholder="Select relationship" />
@@ -1644,35 +2163,215 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                             </Select>
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFamilyMember(member.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 mt-5"
-                        >
-                          <FaXmark className="h-4 w-4" />
-                        </Button>
+
+                        {isFamilyHeadBillingMode() ? (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-sm text-gray-600 mb-1 block">Date of Birth (optional)</Label>
+                                <Input
+                                  type="date"
+                                  value={member.dateOfBirth}
+                                  onChange={(e) => updateFamilyMemberField(member.id, 'dateOfBirth', e.target.value)}
+                                  className="border-primary/20"
+                                />
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              Billed together with {headName} on the one combined family invoice — no separate payment needed for this member.
+                            </p>
+                          </>
+                        ) : member.isMinor ? (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-sm text-gray-600 mb-1 block">Date of Birth (optional)</Label>
+                                <Input
+                                  type="date"
+                                  value={member.dateOfBirth}
+                                  onChange={(e) => updateFamilyMemberField(member.id, 'dateOfBirth', e.target.value)}
+                                  className="border-primary/20"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm text-gray-600 mb-1 block">
+                                  Fee to bill {headName} ({currencyCode})
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={member.minorFee}
+                                  onChange={(e) => updateFamilyMemberField(member.id, 'minorFee', e.target.value)}
+                                  placeholder="0.00"
+                                  className="border-primary/20"
+                                />
+                              </div>
+                            </div>
+                            {renderPaymentCapture(
+                              member.minorPaymentMethod, member.minorAmountPaid, member.minorReceivedVia, member.minorFee,
+                              {
+                                cardType: member.minorCardType, chequeNumber: member.minorChequeNumber, chequeDate: member.minorChequeDate,
+                                bankName: member.minorBankName, bankAccountId: member.minorBankAccountId,
+                                onlinePaymentType: member.minorOnlinePaymentType, providerName: member.minorProviderName,
+                              },
+                              {
+                                onMethodChange: (val) => {
+                                  updateFamilyMemberField(member.id, 'minorPaymentMethod', val);
+                                  updateFamilyMemberField(member.id, 'minorAmountPaid', val === 'credit' ? '' : (member.minorFee || ''));
+                                },
+                                onAmountChange: (val) => updateFamilyMemberField(member.id, 'minorAmountPaid', val),
+                                onReceivedViaChange: (val) => updateFamilyMemberField(member.id, 'minorReceivedVia', val),
+                                onDetailChange: (field, value) => updateFamilyMemberField(member.id, minorPaymentFieldMap[field], value),
+                              }
+                            )}
+                            <p className="text-xs text-gray-500">
+                              {(() => {
+                                const due = Math.max(0, parseFloat(member.minorFee || '0') - parseFloat(member.minorAmountPaid || '0'));
+                                return due > 0
+                                  ? `${currencyCode} ${due.toFixed(2)} will be added to ${headName}'s due.`
+                                  : `Fully covered now — won't show as a due on ${headName}'s account.`;
+                              })()}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-sm text-gray-600 mb-1 block">Email (optional)</Label>
+                                <Input
+                                  type="email"
+                                  value={member.email}
+                                  onChange={(e) => updateFamilyMemberField(member.id, 'email', e.target.value)}
+                                  className="border-primary/20"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm text-gray-600 mb-1 block">Phone (optional)</Label>
+                                <Input
+                                  value={member.phone}
+                                  onChange={(e) => updateFamilyMemberField(member.id, 'phone', e.target.value)}
+                                  className="border-primary/20"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-sm text-gray-600 mb-1 block">Membership Plan (Optional)</Label>
+                                <Select
+                                  value={member.membershipPlan || undefined}
+                                  onValueChange={(val) => {
+                                    updateFamilyMemberField(member.id, 'membershipPlan', val);
+                                    updateFamilyMemberField(member.id, 'membershipFee', String(getPlanPriceById(val)));
+                                  }}
+                                >
+                                  <SelectTrigger className="border-primary/20">
+                                    <SelectValue placeholder="Select plan" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {apiPlans.map((p) => (
+                                      <SelectItem key={p.id} value={p.id.toString()}>
+                                        {p.name} — {currencyCode} {p.price}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-gray-500 mt-1">Leave blank to share the primary member's plan.</p>
+                              </div>
+                              <div>
+                                <Label className="text-sm text-gray-600 mb-1 block">Fee ({currencyCode})</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={member.membershipFee}
+                                  onChange={(e) => updateFamilyMemberField(member.id, 'membershipFee', e.target.value)}
+                                  className="border-primary/20"
+                                />
+                              </div>
+                            </div>
+                            {renderPaymentCapture(
+                              member.paymentMethod, member.amountPaid, member.receivedVia, member.membershipFee,
+                              {
+                                cardType: member.cardType, chequeNumber: member.chequeNumber, chequeDate: member.chequeDate,
+                                bankName: member.bankName, bankAccountId: member.bankAccountId,
+                                onlinePaymentType: member.onlinePaymentType, providerName: member.providerName,
+                              },
+                              {
+                                onMethodChange: (val) => {
+                                  updateFamilyMemberField(member.id, 'paymentMethod', val);
+                                  updateFamilyMemberField(member.id, 'amountPaid', val === 'credit' ? '' : (member.membershipFee || ''));
+                                },
+                                onAmountChange: (val) => updateFamilyMemberField(member.id, 'amountPaid', val),
+                                onReceivedViaChange: (val) => updateFamilyMemberField(member.id, 'receivedVia', val),
+                                onDetailChange: (field, value) => updateFamilyMemberField(member.id, field as keyof FamilyMemberRow, value),
+                              }
+                            )}
+                            {(() => {
+                              const due = Math.max(0, parseFloat(member.membershipFee || '0') - parseFloat(member.amountPaid || '0'));
+                              return due > 0 ? (
+                                <p className="text-xs text-gray-500">
+                                  {currencyCode} {due.toFixed(2)} will remain as this member's own outstanding balance.
+                                </p>
+                              ) : null;
+                            })()}
+                          </>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                     <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                       <div className="flex items-center space-x-2">
                         <FaUsers className="h-4 w-4 text-blue-600" />
                         <span className="text-sm font-medium text-blue-800">
-                          Total Family Members: {familyMembers.length + 1} (including primary member)
+                          {formData.membershipType === 'couple'
+                            ? 'Total Connected Members: 2'
+                            : `Total Family Members: ${familyMembers.length + 1} (including primary member)`}
                         </span>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={addFamilyMember}
-                        className="border-primary/30 text-primary"
-                      >
-                        <FaPlus className="h-3 w-3 mr-1" />
-                        Add More
-                      </Button>
+                      {formData.membershipType === 'family' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addFamilyMember}
+                          className="border-primary/30 text-primary"
+                        >
+                          <FaPlus className="h-3 w-3 mr-1" />
+                          Add More
+                        </Button>
+                      )}
                     </div>
+                    {isFamilyHeadBillingMode() && (
+                      <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-primary">
+                            Family Head Billing — one combined invoice
+                          </span>
+                          <span className="text-sm font-bold text-primary">
+                            {currencyCode} {(Number(getSelectedPrimaryPlan()?.pricePerMember) || 0)} × {familyMembers.length + 1} ={' '}
+                            {currencyCode} {getSelectedPrimaryPlan() ? computeFamilyHeadTotal(getSelectedPrimaryPlan()!, familyMembers.length + 1).toFixed(2) : '0.00'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-primary/70">
+                          This total is captured once, below, as {`${formData.firstName} ${formData.lastName}`.trim() || 'the primary member'}'s own payment — family members above don't need a separate payment.
+                        </p>
+                      </div>
+                    )}
+                    {getFamilyMinorFeeTotal() > 0 && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-amber-800">
+                            {formData.firstName || 'Primary'}'s own fee + minor family member fees
+                          </span>
+                          <span className="text-sm font-bold text-amber-800">
+                            {currencyCode} {getFinalPrice().toFixed(2)} + {currencyCode} {getFamilyMinorFeeTotal().toFixed(2)} ={' '}
+                            {currencyCode} {(getFinalPrice() + getFamilyMinorFeeTotal()).toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-amber-700 mt-1">
+                          The payment dialog below only collects {formData.firstName || 'the primary member'}'s own fee — minor fees are captured on their own row above and, unless marked paid there, will be added to {formData.firstName || 'the primary member'}'s due.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1696,34 +2395,33 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             {/* Membership Plans Section */}
             <Card className="border-primary/10 shadow-sm">
               <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex items-center justify-center w-8 h-8 bg-purple-600 rounded-lg shrink-0">
-                      <FaCreditCard size={16} className="text-white" />
-                    </div>
-                    <div className="min-w-0">
-                      <CardTitle className="text-base">Choose Membership Plan</CardTitle>
-                      <p className="text-xs text-muted-foreground mt-0.5">Select the right plan for this member</p>
-                    </div>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center justify-center w-8 h-8 bg-purple-600 rounded-lg shrink-0">
+                    <FaCreditCard size={16} className="text-white" />
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Select value={membershipTypeFilter} onValueChange={setMembershipTypeFilter}>
-                      <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All Types" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="individual">Individual</SelectItem>
-                        <SelectItem value="family">Family</SelectItem>
-                        <SelectItem value="corporate">Corporate</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="min-w-0">
+                    <CardTitle className="text-base">
+                      {(formData.membershipType === 'family' || formData.membershipType === 'couple')
+                        ? `Choose Plan for ${(`${formData.firstName} ${formData.lastName}`.trim()) || 'the Primary Member'}`
+                        : 'Choose Membership Plan'}
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {(formData.membershipType === 'family' || formData.membershipType === 'couple')
+                        ? (formData.membershipType === 'couple'
+                            ? 'This is only the primary member\'s own plan — the connected member picks theirs separately below.'
+                            : 'This is only the primary member\'s own plan — each family member picks theirs separately below.')
+                        : 'Select the right plan for this member'}
+                    </p>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-2 space-y-3">
 
-              {apiPlans.length === 0 && (
+              {getFilteredMembershipPlans().length === 0 && (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  No active membership plans found. Please create plans in Manage Plans first.
+                  {apiPlans.length === 0
+                    ? 'No active membership plans found. Please create plans in Manage Plans first.'
+                    : `No active ${formData.membershipType} plans found. Please create one in Manage Plans first.`}
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1930,7 +2628,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     <span>Blood Type</span>
                   </Label>
                   <Select
-                    value={formData.bloodType}
+                    value={formData.bloodType || undefined}
                     onValueChange={(value) => setFormData({...formData, bloodType: value})}
                   >
                     <SelectTrigger id="bloodType">
@@ -2573,6 +3271,33 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                 </div>
                 
+                {/* Family member fees (individual billing mode only — family_head
+                    mode already folds everyone into the price shown above) */}
+                {getFamilyMinorFeeTotal() > 0 && (
+                  <div className="mt-3 pt-3 border-t border-blue-200 text-sm">
+                    <div className="flex items-center justify-between text-blue-800">
+                      <span>{formData.firstName || 'Primary member'}'s own fee</span>
+                      <span className="font-semibold">{currencyCode} {getFinalPrice().toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-blue-800 mt-1">
+                      <span>+ Family member fees ({familyMembers.filter(m => m.isMinor).length})</span>
+                      <span className="font-semibold">{currencyCode} {getFamilyMinorFeeTotal().toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-200">
+                      <span className="font-semibold text-blue-900">Total Amount Due (whole family):</span>
+                      <span className="text-2xl font-bold text-blue-900">
+                        <span className="text-sm">{currencyCode}</span> {(getFinalPrice() + getFamilyMinorFeeTotal()).toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">
+                      The payment method you pick below only collects {formData.firstName || 'the primary member'}'s own {currencyCode} {getFinalPrice().toFixed(2)} — family member fees are captured on their own row below.
+                      {getFamilyMinorUnpaidTotal() > 0
+                        ? ` ${currencyCode} ${getFamilyMinorUnpaidTotal().toFixed(2)} of it isn't marked paid yet and will be added to ${formData.firstName || 'the primary member'}'s due.`
+                        : ' All of it is already marked paid on those rows.'}
+                    </p>
+                  </div>
+                )}
+
                 {/* Discount Applied Badge */}
                 {selectedDiscount && discountAmount > 0 && (
                   <div className="mt-3 pt-3 border-t border-blue-200">

@@ -30,6 +30,15 @@ export interface Plan {
   selectedFacilities: string[];
   selectedPromotions: number[];
   selectedCampaigns: number[];
+  // Family plan settings (only meaningful when planType === "Family")
+  familyBillingMode: string | null;        // "individual" | "family_head"
+  pricePerMember: number | null;
+  maxFamilyMembers: number | null;
+  maxAdultMembers: number | null;
+  maxChildMembers: number | null;
+  allowAdditionalMembers: boolean | null;
+  additionalMemberPrice: number | null;
+  autoCalculateTotal: boolean | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -60,6 +69,15 @@ export interface PlanFormData {
   selectedFacilities: string[];
   selectedPromotions: number[];
   selectedCampaigns: number[];
+  // Family plan settings (only meaningful when planType === "Family")
+  familyBillingMode?: string;
+  pricePerMember?: number | string | null;
+  maxFamilyMembers?: number | string | null;
+  maxAdultMembers?: number | string | null;
+  maxChildMembers?: number | string | null;
+  allowAdditionalMembers?: boolean;
+  additionalMemberPrice?: number | string | null;
+  autoCalculateTotal?: boolean;
 }
 
 class PlansService {

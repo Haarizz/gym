@@ -52,6 +52,45 @@ export interface SettlePaymentRequest {
   payment_breakdown?: PaymentSplitLeg[];
 }
 
+// One line item within a guardian's receipt representing a minor family
+// member's fee folded into that bill — surfaced on the guardian's Statement
+// of Account so it's clear which part of a charge was actually for a dependent.
+export interface StatementMinorCharge {
+  member_id?: string;
+  member_db_id?: number;
+  name: string;
+  amount: number;
+  paid?: boolean;
+}
+
+export interface StatementLine {
+  date: string;
+  receipt_no: string;
+  type: string;
+  description: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  payment_method?: string;
+  status: string;
+  minor_charges?: StatementMinorCharge[];
+}
+
+export interface MemberStatement {
+  member_db_id: string;
+  member_id: string;
+  member_name: string;
+  member_phone?: string;
+  is_minor: boolean;
+  billed_to_head?: boolean;
+  family_head_name?: string;
+  opening_balance: number;
+  total_billed: number;
+  total_paid: number;
+  closing_balance: number;
+  lines: StatementLine[];
+}
+
 class BillingService {
 
   async getStats(): Promise<BillingStats> {
@@ -75,6 +114,18 @@ class BillingService {
       `${backendBaseUrl}/billing/member/${memberDbId}/pending-bills`
     );
     if (!response.ok) throw new Error(`Failed to fetch pending bills: ${response.status}`);
+    return response.json();
+  }
+
+  async getMemberStatement(memberDbId: number, from?: string, to?: string): Promise<MemberStatement> {
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to)   params.append('to', to);
+    const qs = params.toString();
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/billing/member/${memberDbId}/statement${qs ? `?${qs}` : ''}`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch member statement: ${response.status}`);
     return response.json();
   }
 

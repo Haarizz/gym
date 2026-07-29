@@ -43,6 +43,15 @@ export interface Receipt {
   bank_account_name?: string;
   payment_breakdown?: ReceiptPaymentLeg[];
   membership_type?: string;
+  // Cumulative amount paid toward this specific bill across its whole lifecycle
+  // (this row's own paid_amount plus any later settlements applied against it).
+  // Only meaningful on bill rows — null on settlement/"Payment" rows.
+  total_paid_to_date?: number;
+  // Snapshot of the member's overall outstanding balance immediately after this
+  // transaction posted — an immutable "remaining due after this payment" fact.
+  balance_after?: number;
+  // If this row is itself a settlement, the bill (receipt id) it paid down.
+  linked_bill_id?: string;
   created_at: string;
   updated_at: string;
 }

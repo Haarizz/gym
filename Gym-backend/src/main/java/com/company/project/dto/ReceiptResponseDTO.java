@@ -35,6 +35,10 @@ public class ReceiptResponseDTO {
     private String dueDate;
     private String bankAccountCode;
     private String bankAccountName;
+    private List<MinorChargeDTO> minorCharges;
+    private java.math.BigDecimal totalPaidToDate;
+    private java.math.BigDecimal balanceAfter;
+    private String linkedBillId;
     private String createdAt;
     private String updatedAt;
 
@@ -62,10 +66,19 @@ public class ReceiptResponseDTO {
         dto.membershipType  = r.getMembershipType();
         java.math.BigDecimal totalAmt = r.getAmount() != null ? r.getAmount() : java.math.BigDecimal.ZERO;
         dto.paidAmount      = r.getPaidAmount() != null ? r.getPaidAmount() : java.math.BigDecimal.ZERO;
-        dto.dueAmount       = totalAmt.subtract(dto.paidAmount).max(java.math.BigDecimal.ZERO);
+        // How much is still owed on THIS bill specifically — uses the live
+        // totalPaidToDate rollup (which keeps advancing as later settlements pay it
+        // down) rather than the frozen paidAmount, so it stays accurate even after
+        // the bill has been topped up by separate settlement transactions.
+        java.math.BigDecimal cumulativePaid = r.getTotalPaidToDate() != null ? r.getTotalPaidToDate() : dto.paidAmount;
+        dto.dueAmount       = totalAmt.subtract(cumulativePaid).max(java.math.BigDecimal.ZERO);
         dto.dueDate         = r.getDueDate() != null ? r.getDueDate().format(ISO) + "Z" : null;
         dto.bankAccountCode = r.getBankAccountCode();
         dto.bankAccountName = r.getBankAccountName();
+        dto.minorCharges    = r.getMinorCharges();
+        dto.totalPaidToDate = r.getTotalPaidToDate();
+        dto.balanceAfter    = r.getBalanceAfter();
+        dto.linkedBillId    = r.getLinkedBillId() != null ? String.valueOf(r.getLinkedBillId()) : null;
         dto.createdAt       = r.getCreatedAt() != null ? r.getCreatedAt().format(ISO) + "Z" : null;
         dto.updatedAt       = r.getUpdatedAt() != null ? r.getUpdatedAt().format(ISO) + "Z" : null;
         return dto;
@@ -96,6 +109,10 @@ public class ReceiptResponseDTO {
     public String getDueDate() { return dueDate; }
     public String getBankAccountCode() { return bankAccountCode; }
     public String getBankAccountName() { return bankAccountName; }
+    public List<MinorChargeDTO> getMinorCharges() { return minorCharges; }
+    public java.math.BigDecimal getTotalPaidToDate() { return totalPaidToDate; }
+    public java.math.BigDecimal getBalanceAfter() { return balanceAfter; }
+    public String getLinkedBillId() { return linkedBillId; }
     public String getCreatedAt() { return createdAt; }
     public String getUpdatedAt() { return updatedAt; }
 }

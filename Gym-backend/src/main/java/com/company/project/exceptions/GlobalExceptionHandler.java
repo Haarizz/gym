@@ -1,5 +1,7 @@
 package com.company.project.exceptions;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -29,6 +31,8 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(EntityNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
@@ -47,6 +51,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
         return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
+    }
+
+    /**
+     * Catch-all for anything not already mapped above (plain RuntimeException,
+     * NullPointerException, etc.). Without this, an uncaught exception falls
+     * through to Spring Boot's default /error page, which sits outside the
+     * permitAll("/api/**") security rule and comes back as an empty 403 —
+     * masking the real error and making failures like a broken renewal look
+     * like an auth problem instead of showing what actually went wrong.
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleUnexpected(Exception ex) {
+        log.error("Unhandled exception", ex);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR",
+                ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());
     }
 
     private ResponseEntity<Map<String, Object>> build(HttpStatus status, String error, String message) {

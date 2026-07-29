@@ -61,7 +61,21 @@ import { membersService, Member } from '../utils/supabase/members-service';
 import { plansService, Plan } from '../utils/supabase/plans-service';
 import { authService } from '../utils/supabase/auth-service';
 import { receiptsService, Receipt as ApiReceipt } from '../utils/supabase/receipts-service';
+import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
+import {
+  SplitPaymentFields, isSplitPaymentValid, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
+  EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
+} from '../components/shared/split-payment-fields';
+import type { SplitPaymentValue, SplitPaymentDetails } from '../components/shared/split-payment-fields';
 import { FaPlus } from 'react-icons/fa6';
+
+// Maps the renewal panel's top-level payment method to the SplitPaymentValue
+// key so its rich detail fields (card type, online payment type, ...) can be
+// validated/built by reusing the same helpers Mixed/Split legs use — a single
+// top-level method is just a split with one active leg.
+const RENEWAL_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
+  cash: 'cash', card: 'card', online: 'online',
+};
 
 const membershipPlans = [
   { 
@@ -160,6 +174,49 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // API Plans for Renewals tab
   const [apiPlans, setApiPlans] = useState<Plan[]>([]);
 
+  // Renew Family dialog (family_head billing mode — one invoice for the whole
+  // family, recalculated from the plan's price-per-member × current headcount)
+  const [familyRenewalHead, setFamilyRenewalHead] = useState<Member | null>(null);
+  const [familyRenewalCount, setFamilyRenewalCount] = useState<number | null>(null);
+  const [familyRenewalPaymentStatus, setFamilyRenewalPaymentStatus] = useState<'paid' | 'pending'>('paid');
+  const [familyRenewalPaymentMethod, setFamilyRenewalPaymentMethod] = useState('cash');
+  const [isRenewingFamily, setIsRenewingFamily] = useState(false);
+
+  const openFamilyRenewalDialog = async (head: Member) => {
+    setFamilyRenewalHead(head);
+    setFamilyRenewalCount(null);
+    setFamilyRenewalPaymentStatus('paid');
+    setFamilyRenewalPaymentMethod('cash');
+    try {
+      // Numeric database id, not the display "MBR-..." member_id — see the note
+      // on the analogous fix in handleProcessRenewalUpgrade.
+      const group = await membersService.getFamilyGroup(head.id);
+      setFamilyRenewalCount(1 + group.members.length);
+    } catch (e) {
+      console.error('Failed to load family group', e);
+    }
+  };
+
+  const handleRenewFamily = async () => {
+    if (!familyRenewalHead) return;
+    setIsRenewingFamily(true);
+    try {
+      await membersService.renewFamily(familyRenewalHead.id, {
+        payment_status: familyRenewalPaymentStatus,
+        payment_method: familyRenewalPaymentMethod,
+      });
+      toast.success('Family renewed', {
+        description: `${familyRenewalHead.name}'s family membership has been renewed.`,
+      });
+      setFamilyRenewalHead(null);
+      loadMembers();
+    } catch (e: any) {
+      toast.error('Failed to renew family', { description: e?.message || 'Please try again.' });
+    } finally {
+      setIsRenewingFamily(false);
+    }
+  };
+
   // Renewals & Upgrades states
   const [renewalSearchTerm, setRenewalSearchTerm] = useState("");
   const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
@@ -169,8 +226,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [operationType, setOperationType] = useState<"renewal" | "upgrade" | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [splitPayment, setSplitPayment] = useState(false);
-  const [cashAmount, setCashAmount] = useState("");
-  const [cardAmount, setCardAmount] = useState("");
+  // Rich per-method detail (card type, online payment type, ...) for whichever
+  // single top-level method is selected — reuses the same shape/helpers as the
+  // Split/Mixed legs below so validation and payload-building stay consistent.
+  const [renewalMethodDetails, setRenewalMethodDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
+  const [splitLegs, setSplitLegs] = useState<SplitPaymentValue>(EMPTY_SPLIT_PAYMENT);
+  const [splitLegDetails, setSplitLegDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
+  const [renewalBankAccounts, setRenewalBankAccounts] = useState<AccountHead[]>([]);
+  // "Credit" — renews the membership now but defers some/all of the fee as an
+  // outstanding due, mirroring the Add Member credit flow: an optional amount
+  // received now (via a real method), with the remainder left as Member.outstandingBalance.
+  const [creditAmountReceived, setCreditAmountReceived] = useState("");
+  const [creditReceivedVia, setCreditReceivedVia] = useState("cash");
+  const [creditMethodDetails, setCreditMethodDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
   const [discountAmount, setDiscountAmount] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -247,6 +315,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // Load active plans for Renewals tab
   useEffect(() => {
     plansService.getPlans('Active').then(setApiPlans).catch(() => {});
+  }, []);
+
+  // Bank accounts for the Renewals & Upgrades payment panel's Bank Transfer leg
+  useEffect(() => {
+    accountHeadsService.getBankAccounts().then(setRenewalBankAccounts).catch(() => {});
   }, []);
 
   // Load pending members from sessionStorage
@@ -352,15 +425,17 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         memberName: r.member_name || '—',
         photo: null,
         mobile: r.member_phone || '—',
-        membershipType: '—',
+        membershipType: r.membership_type || '—',
         transactionType: r.transaction_type || '—',
         plan: r.plan_name || '—',
         amount: Number(r.amount || 0),
         mode: r.payment_method || '—',
-        cash: r.payment_method?.toLowerCase() === 'cash' ? Number(r.amount || 0) : 0,
-        card: r.payment_method?.toLowerCase() === 'card' ? Number(r.amount || 0) : 0,
-        due: r.status === 'Pending' ? Number(r.amount || 0) : 0,
-        dueDate: r.status === 'Pending' && r.transaction_date ? new Date(r.transaction_date).toLocaleDateString('en-GB') : '—',
+        // Actual money collected via that method for this specific transaction —
+        // NOT the bill's full invoice amount, which may still be partially unpaid.
+        cash: r.payment_method?.toLowerCase() === 'cash' ? Number(r.paid_amount ?? r.amount ?? 0) : 0,
+        card: r.payment_method?.toLowerCase() === 'card' ? Number(r.paid_amount ?? r.amount ?? 0) : 0,
+        due: Math.max(0, Number(r.due_amount ?? (Number(r.amount || 0) - Number(r.paid_amount || 0)))),
+        dueDate: Number(r.due_amount ?? (Number(r.amount || 0) - Number(r.paid_amount || 0))) > 0 && r.transaction_date ? new Date(r.transaction_date).toLocaleDateString('en-GB') : '—',
       }));
 
       setReportData(data);
@@ -475,9 +550,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     return { plan, addons: [] as string[] };
   };
 
-  // Helper function to get amount due
+  // Helper function to get amount due. Minors are billed to their family head and
+  // never carry their own balance — callers should check isBilledToGuardian first
+  // and show "Billed to: {head}" instead of calling this.
   const getAmountDue = (member: Member): number => {
-    if (member.outstanding_balance !== undefined) {
+    if (member.outstanding_balance != null) {
       return member.outstanding_balance;
     }
     if (member.payment_status === 'overdue') {
@@ -488,6 +565,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }
     return 0;
   };
+
+  // Members billed to their family head don't carry their own balance — every
+  // minor, plus any adult dependent under a family_head-billing-mode Family plan.
+  const isBilledToGuardian = (member: Member): boolean =>
+    Boolean((member as any).is_minor || (member as any).billed_to_head);
 
   // Helper function to get payment due date
   const getPaymentDueDate = (member: Member): string => {
@@ -578,7 +660,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const handleRenewalSearch = (value: string) => {
     setRenewalSearchTerm(value);
 
-    if (value.length > 1) {
+    if (value.trim().length > 0) {
       membersService.searchMembers(value)
         .then(results => {
           setSearchSuggestions(results.slice(0, 5));
@@ -633,17 +715,49 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }
 
     const totalAmount = calculateTotalAmount();
+    const isCredit = paymentMethod === 'credit' && !splitPayment;
 
     // Validate payment
     if (splitPayment) {
-      const cash = parseFloat(cashAmount) || 0;
-      const card = parseFloat(cardAmount) || 0;
-
-      if (cash + card < totalAmount) {
-        toast.error('Insufficient Payment', {
-          description: 'Total payment must equal the plan amount.',
+      if (!isSplitPaymentValid(splitLegs, totalAmount)) {
+        toast.error('Split Payment Error', {
+          description: `Split amounts must add up to the total amount (${totalAmount}).`,
         });
         return;
+      }
+      if (!isSplitPaymentDetailsValid(splitLegs, splitLegDetails)) {
+        toast.error('Missing Payment Details', {
+          description: 'Please fill in the required details for each method used in the split.',
+        });
+        return;
+      }
+    } else if (isCredit) {
+      const received = parseFloat(creditAmountReceived) || 0;
+      if (received > totalAmount) {
+        toast.error('Invalid Amount', {
+          description: 'Amount received now cannot exceed the total amount.',
+        });
+        return;
+      }
+      if (received > 0) {
+        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [creditReceivedVia as keyof SplitPaymentValue]: received };
+        if (!isSplitPaymentDetailsValid(probe, creditMethodDetails)) {
+          toast.error('Missing Payment Details', {
+            description: `Please fill in the required details for ${creditReceivedVia}.`,
+          });
+          return;
+        }
+      }
+    } else {
+      const legKey = RENEWAL_METHOD_TO_LEG_KEY[paymentMethod];
+      if (legKey && legKey !== 'cash') {
+        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: totalAmount };
+        if (!isSplitPaymentDetailsValid(probe, renewalMethodDetails)) {
+          toast.error('Missing Payment Details', {
+            description: `Please fill in the required ${paymentMethod} details.`,
+          });
+          return;
+        }
       }
     }
 
@@ -666,17 +780,73 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       selectedNewPlan.durationType || ''
     );
 
-    // Call backend
+    // How much is actually being collected now, the real method(s) it moved
+    // through, and the per-leg detail (card type, online payment type, ...).
+    // "Credit" itself is never sent as a real payment method — it's only the
+    // absence of one; any amount received now always carries its real method.
+    let amountReceived = totalAmount;
+    let effectivePaymentMethod = paymentMethod === 'card' ? 'Card' : paymentMethod === 'online' ? 'Online Payment' : 'Cash';
+    let paymentBreakdown: any[] | undefined;
+    let bankAccountCode: string | undefined;
+    let bankAccountName: string | undefined;
+
+    if (splitPayment) {
+      effectivePaymentMethod = 'Mixed';
+      paymentBreakdown = buildSplitPaymentBreakdown(splitLegs, splitLegDetails, renewalBankAccounts);
+    } else if (isCredit) {
+      amountReceived = parseFloat(creditAmountReceived) || 0;
+      if (amountReceived > 0) {
+        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [creditReceivedVia as keyof SplitPaymentValue]: amountReceived };
+        const legs = buildSplitPaymentBreakdown(probe, creditMethodDetails, renewalBankAccounts);
+        paymentBreakdown = legs;
+        effectivePaymentMethod = legs[0]?.method || 'Cash';
+        if (creditReceivedVia === 'bankTransfer') {
+          const account = renewalBankAccounts.find(a => String(a.id) === creditMethodDetails.bankTransferAccountId);
+          bankAccountCode = account?.code;
+          bankAccountName = account?.name;
+        }
+      } else {
+        effectivePaymentMethod = 'Credit';
+      }
+    } else {
+      const legKey = RENEWAL_METHOD_TO_LEG_KEY[paymentMethod];
+      if (legKey && legKey !== 'cash') {
+        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: totalAmount };
+        paymentBreakdown = buildSplitPaymentBreakdown(probe, renewalMethodDetails, renewalBankAccounts);
+      }
+    }
+
+    // Call backend — a member billed to their family head (minor, or an adult
+    // under family_head billing mode) doesn't carry their own renewal/receipt,
+    // so route through the dedicated endpoint.
     try {
-      const memberId = getMemberId(selectedMemberForRenewal);
-      await membersService.renewMember(String(memberId), {
-        planName: selectedNewPlan.name,
-        membershipEndDate: newEndDate,
-        membershipFee: totalAmount,
-        paymentStatus: 'paid',
-        membershipType: selectedNewPlan.planType,
-        membershipStatus: 'active',
-      });
+      // The backend's /renew endpoints take the internal numeric database id
+      // (Long), not the human-readable "MBR-..." member_id — getMemberId()
+      // prefers the latter for display purposes, so it can't be used here.
+      const memberId = selectedMemberForRenewal.id;
+      if (isBilledToGuardian(selectedMemberForRenewal)) {
+        // TODO: the family-minor renewal endpoint doesn't yet accept rich
+        // payment fields or Credit — always renews as fully paid.
+        await membersService.renewFamilyMinor(String(memberId), {
+          plan_name: selectedNewPlan.name,
+          fee: totalAmount,
+          payment_status: 'paid',
+        });
+      } else {
+        await membersService.renewMember(String(memberId), {
+          plan_name: selectedNewPlan.name,
+          membership_end_date: newEndDate,
+          membership_fee: totalAmount,
+          payment_status: amountReceived >= totalAmount ? 'paid' : (amountReceived > 0 ? 'partial' : 'pending'),
+          membership_type: selectedNewPlan.planType,
+          membership_status: 'active',
+          amount_received: amountReceived,
+          payment_method: effectivePaymentMethod,
+          payment_breakdown: paymentBreakdown,
+          bank_account_code: bankAccountCode,
+          bank_account_name: bankAccountName,
+        });
+      }
       // Refresh member list
       loadMembers();
     } catch (err) {
@@ -696,8 +866,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       setRenewalSearchTerm("");
       setPaymentMethod("cash");
       setSplitPayment(false);
-      setCashAmount("");
-      setCardAmount("");
+      setRenewalMethodDetails(EMPTY_SPLIT_DETAILS);
+      setSplitLegs(EMPTY_SPLIT_PAYMENT);
+      setSplitLegDetails(EMPTY_SPLIT_DETAILS);
+      setCreditAmountReceived("");
+      setCreditReceivedVia("cash");
+      setCreditMethodDetails(EMPTY_SPLIT_DETAILS);
       setDiscountAmount("");
       setCouponCode("");
     }, 3000);
@@ -1064,13 +1238,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                               new Date(getMembershipEndDate(member)).toLocaleDateString('en-GB') : '—'}
                           </TableCell>
                           <TableCell>
-                            <span
-                              className={`font-medium ${
-                                amountDue > 0 ? 'text-red-600' : 'text-emerald-600'
-                              }`}
-                            >
-                              {amountDue > 0 ? `${currencyCode} ${amountDue.toFixed(2)}` : `${currencyCode} 0.00`}
-                            </span>
+                            {isBilledToGuardian(member) ? (
+                              <span className="text-xs text-slate-500 italic">
+                                Billed to: {(member as any).family_head_name || member.family_head_id || 'guardian'}
+                              </span>
+                            ) : (
+                              <span
+                                className={`font-medium ${
+                                  amountDue > 0 ? 'text-red-600' : 'text-emerald-600'
+                                }`}
+                              >
+                                {amountDue > 0 ? `${currencyCode} ${amountDue.toFixed(2)}` : `${currencyCode} 0.00`}
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell>
                             {paymentDueDate ? paymentDueDate : '—'}
@@ -1145,6 +1325,15 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                       <FaPlus className="h-4 w-4 mr-2" />
                                       Edit Member
                                     </DropdownMenuItem>
+                                    {member.is_family_head && (
+                                      <DropdownMenuItem
+                                        className="cursor-pointer"
+                                        onClick={() => openFamilyRenewalDialog(member)}
+                                      >
+                                        <FaArrowsRotate className="h-4 w-4 mr-2" />
+                                        Renew Family
+                                      </DropdownMenuItem>
+                                    )}
                                   </>
                                 )}
                               </DropdownMenuContent>
@@ -1172,6 +1361,62 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       />
                     )}
                   </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Renew Family Dialog — family_head billing mode: one invoice for
+                  the whole family, recalculated from price-per-member × headcount */}
+              <Dialog open={!!familyRenewalHead} onOpenChange={(open) => { if (!open) setFamilyRenewalHead(null); }}>
+                <DialogContent className="sm:max-w-[420px]">
+                  <DialogHeader>
+                    <DialogTitle>Renew Family</DialogTitle>
+                    <DialogDescription>
+                      {familyRenewalHead?.name}'s family membership — one combined invoice for every member.
+                    </DialogDescription>
+                  </DialogHeader>
+                  {familyRenewalHead && (
+                    <div className="space-y-4 mt-2">
+                      <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                        <span className="text-muted-foreground">Family members: </span>
+                        <span className="font-semibold">
+                          {familyRenewalCount !== null ? familyRenewalCount : '…'}
+                        </span>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          The renewal amount is calculated automatically from the plan's price per member.
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Payment Status</Label>
+                        <Select value={familyRenewalPaymentStatus} onValueChange={(v: any) => setFamilyRenewalPaymentStatus(v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="paid">Paid Now</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {familyRenewalPaymentStatus === 'paid' && (
+                        <div className="space-y-2">
+                          <Label>Payment Method</Label>
+                          <Select value={familyRenewalPaymentMethod} onValueChange={setFamilyRenewalPaymentMethod}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="card">Card</SelectItem>
+                              <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
+                              <SelectItem value="online">Online Payment</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" onClick={() => setFamilyRenewalHead(null)}>Cancel</Button>
+                        <Button onClick={handleRenewFamily} disabled={isRenewingFamily}>
+                          {isRenewingFamily ? 'Renewing…' : 'Confirm Renewal'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </DialogContent>
               </Dialog>
 
@@ -1428,7 +1673,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                         Clear
                       </Button>
                     </div>
-                    
+
+                    {isBilledToGuardian(selectedMemberForRenewal) && (
+                      <div className="mt-4 px-3 py-2 rounded-lg bg-blue-50 text-sm text-blue-800">
+                        This renewal will be billed to {(selectedMemberForRenewal as any).family_head_name || 'the family head'}'s account — {selectedMemberForRenewal.name} will not get an independent balance.
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
                       <div>
                         <Label className="text-xs text-muted-foreground">Active Plan</Label>
@@ -1649,39 +1900,50 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 {/* Payment Method */}
                 <div>
                   <Label>Payment Method</Label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-2">
                     <Button
-                      variant={paymentMethod === 'cash' ? 'default' : 'outline'}
+                      variant={!splitPayment && paymentMethod === 'cash' ? 'default' : 'outline'}
                       onClick={() => {
                         setPaymentMethod('cash');
                         setSplitPayment(false);
                       }}
-                      className={paymentMethod === 'cash' ? 'bg-gradient-primary' : ''}
+                      className={!splitPayment && paymentMethod === 'cash' ? 'bg-gradient-primary' : ''}
                     >
                       <Banknote className="mr-2 h-4 w-4" />
                       Cash
                     </Button>
                     <Button
-                      variant={paymentMethod === 'card' ? 'default' : 'outline'}
+                      variant={!splitPayment && paymentMethod === 'card' ? 'default' : 'outline'}
                       onClick={() => {
                         setPaymentMethod('card');
                         setSplitPayment(false);
                       }}
-                      className={paymentMethod === 'card' ? 'bg-gradient-primary' : ''}
+                      className={!splitPayment && paymentMethod === 'card' ? 'bg-gradient-primary' : ''}
                     >
                       <CreditCard className="mr-2 h-4 w-4" />
                       Card
                     </Button>
                     <Button
-                      variant={paymentMethod === 'online' ? 'default' : 'outline'}
+                      variant={!splitPayment && paymentMethod === 'online' ? 'default' : 'outline'}
                       onClick={() => {
                         setPaymentMethod('online');
                         setSplitPayment(false);
                       }}
-                      className={paymentMethod === 'online' ? 'bg-gradient-primary' : ''}
+                      className={!splitPayment && paymentMethod === 'online' ? 'bg-gradient-primary' : ''}
                     >
                       <Wallet className="mr-2 h-4 w-4" />
                       Online
+                    </Button>
+                    <Button
+                      variant={!splitPayment && paymentMethod === 'credit' ? 'default' : 'outline'}
+                      onClick={() => {
+                        setPaymentMethod('credit');
+                        setSplitPayment(false);
+                      }}
+                      className={!splitPayment && paymentMethod === 'credit' ? 'bg-gradient-primary' : ''}
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      Credit
                     </Button>
                     <Button
                       variant={splitPayment ? 'default' : 'outline'}
@@ -1693,41 +1955,242 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     </Button>
                   </div>
                 </div>
-                
-                {/* Split Payment Fields */}
-                {splitPayment && (
+
+                {/* Card details */}
+                {!splitPayment && paymentMethod === 'card' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gradient-light rounded-lg">
                     <div>
-                      <Label htmlFor="cash-amount">Cash Amount ({currencyCode})</Label>
-                      <Input
-                        id="cash-amount"
-                        type="number"
-                        placeholder="0"
-                        value={cashAmount}
-                        onChange={(e) => setCashAmount(e.target.value)}
-                        className="mt-2"
-                      />
+                      <Label className="text-xs">Card Type <span className="text-red-500">*</span></Label>
+                      <Select
+                        value={renewalMethodDetails.cardType}
+                        onValueChange={(v) => setRenewalMethodDetails({ ...renewalMethodDetails, cardType: v })}
+                      >
+                        <SelectTrigger className="mt-1"><SelectValue placeholder="Select card type" /></SelectTrigger>
+                        <SelectContent>
+                          {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
-                      <Label htmlFor="card-amount">Card Amount ({currencyCode})</Label>
+                      <Label className="text-xs">Reference (optional)</Label>
                       <Input
-                        id="card-amount"
-                        type="number"
-                        placeholder="0"
-                        value={cardAmount}
-                        onChange={(e) => setCardAmount(e.target.value)}
-                        className="mt-2"
+                        value={renewalMethodDetails.cardReference}
+                        onChange={(e) => setRenewalMethodDetails({ ...renewalMethodDetails, cardReference: e.target.value })}
+                        className="mt-1"
+                        placeholder="Transaction number"
                       />
                     </div>
-                    <div className="col-span-2">
-                      <p className="text-sm text-muted-foreground">
-                        Total Split: <CurrencyGlyph /> {(parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0)}
-                        {((parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0)) === calculateTotalAmount() && (
-                          <span className="text-green-600 ml-2">✓ Payment complete</span>
-                        )}
-                      </p>
-                    </div>
                   </div>
+                )}
+
+                {/* Online Payment details */}
+                {!splitPayment && paymentMethod === 'online' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gradient-light rounded-lg">
+                    <div>
+                      <Label className="text-xs">Payment Type <span className="text-red-500">*</span></Label>
+                      <Select
+                        value={renewalMethodDetails.onlinePaymentType}
+                        onValueChange={(v) => setRenewalMethodDetails({ ...renewalMethodDetails, onlinePaymentType: v })}
+                      >
+                        <SelectTrigger className="mt-1"><SelectValue placeholder="Select payment type" /></SelectTrigger>
+                        <SelectContent>
+                          {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Transaction / Reference ID <span className="text-red-500">*</span></Label>
+                      <Input
+                        value={renewalMethodDetails.onlineReference}
+                        onChange={(e) => setRenewalMethodDetails({ ...renewalMethodDetails, onlineReference: e.target.value })}
+                        className="mt-1"
+                        placeholder="Transaction ID"
+                      />
+                    </div>
+                    {renewalMethodDetails.onlinePaymentType === 'Other' && (
+                      <div className="md:col-span-2">
+                        <Label className="text-xs">Payment Provider Name <span className="text-red-500">*</span></Label>
+                        <Input
+                          value={renewalMethodDetails.onlineProviderName}
+                          onChange={(e) => setRenewalMethodDetails({ ...renewalMethodDetails, onlineProviderName: e.target.value })}
+                          className="mt-1"
+                          placeholder="Provider name"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Credit details */}
+                {!splitPayment && paymentMethod === 'credit' && (
+                  <div className="space-y-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <p className="text-xs text-orange-700">
+                      Membership renews now; anything not received today stays as the member's outstanding due.
+                    </p>
+                    <div>
+                      <Label className="text-xs">Amount Received Now (optional)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0"
+                        value={creditAmountReceived}
+                        onChange={(e) => setCreditAmountReceived(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    {(parseFloat(creditAmountReceived) || 0) > 0 && (
+                      <>
+                        <div>
+                          <Label className="text-xs">Received Via <span className="text-red-500">*</span></Label>
+                          <Select value={creditReceivedVia} onValueChange={setCreditReceivedVia}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="card">Card</SelectItem>
+                              <SelectItem value="cheque">Cheque</SelectItem>
+                              <SelectItem value="bankTransfer">Bank Transfer</SelectItem>
+                              <SelectItem value="online">Online Payment</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {creditReceivedVia === 'card' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-xs">Card Type <span className="text-red-500">*</span></Label>
+                              <Select
+                                value={creditMethodDetails.cardType}
+                                onValueChange={(v) => setCreditMethodDetails({ ...creditMethodDetails, cardType: v })}
+                              >
+                                <SelectTrigger className="mt-1"><SelectValue placeholder="Select card type" /></SelectTrigger>
+                                <SelectContent>
+                                  {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Reference (optional)</Label>
+                              <Input
+                                value={creditMethodDetails.cardReference}
+                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, cardReference: e.target.value })}
+                                className="mt-1"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {creditReceivedVia === 'cheque' && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <Label className="text-xs">Cheque Number <span className="text-red-500">*</span></Label>
+                              <Input
+                                value={creditMethodDetails.chequeNumber}
+                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, chequeNumber: e.target.value })}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Bank Name (optional)</Label>
+                              <Input
+                                value={creditMethodDetails.chequeBankName}
+                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, chequeBankName: e.target.value })}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Cheque Date (optional)</Label>
+                              <Input
+                                type="date"
+                                value={creditMethodDetails.chequeDate}
+                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, chequeDate: e.target.value })}
+                                className="mt-1"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {creditReceivedVia === 'bankTransfer' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-xs">Reference <span className="text-red-500">*</span></Label>
+                              <Input
+                                value={creditMethodDetails.bankTransferReference}
+                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, bankTransferReference: e.target.value })}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Bank Account (Ledger)</Label>
+                              <Select
+                                value={creditMethodDetails.bankTransferAccountId}
+                                onValueChange={(v) => setCreditMethodDetails({ ...creditMethodDetails, bankTransferAccountId: v })}
+                              >
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue placeholder={renewalBankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {renewalBankAccounts.map(account => (
+                                    <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+                        {creditReceivedVia === 'online' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-xs">Payment Type <span className="text-red-500">*</span></Label>
+                              <Select
+                                value={creditMethodDetails.onlinePaymentType}
+                                onValueChange={(v) => setCreditMethodDetails({ ...creditMethodDetails, onlinePaymentType: v })}
+                              >
+                                <SelectTrigger className="mt-1"><SelectValue placeholder="Select payment type" /></SelectTrigger>
+                                <SelectContent>
+                                  {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Transaction / Reference ID <span className="text-red-500">*</span></Label>
+                              <Input
+                                value={creditMethodDetails.onlineReference}
+                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, onlineReference: e.target.value })}
+                                className="mt-1"
+                              />
+                            </div>
+                            {creditMethodDetails.onlinePaymentType === 'Other' && (
+                              <div className="md:col-span-2">
+                                <Label className="text-xs">Payment Provider Name <span className="text-red-500">*</span></Label>
+                                <Input
+                                  value={creditMethodDetails.onlineProviderName}
+                                  onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, onlineProviderName: e.target.value })}
+                                  className="mt-1"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <p className="text-sm font-medium">
+                      Due after renewal:{' '}
+                      <span className="text-orange-700">
+                        <CurrencyGlyph /> {Math.max(0, calculateTotalAmount() - (parseFloat(creditAmountReceived) || 0)).toLocaleString()}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Split Payment Fields */}
+                {splitPayment && (
+                  <SplitPaymentFields
+                    total={calculateTotalAmount()}
+                    value={splitLegs}
+                    onChange={setSplitLegs}
+                    details={splitLegDetails}
+                    onDetailsChange={setSplitLegDetails}
+                    bankAccounts={renewalBankAccounts}
+                    currencyCode={currencyCode}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -1779,13 +2242,27 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <div>
                       <Label className="text-xs text-muted-foreground">Payment Method</Label>
                       <p className="font-semibold capitalize">
-                        {splitPayment ? 'Split Payment' : paymentMethod}
+                        {splitPayment ? 'Split Payment' : paymentMethod === 'credit' ? 'Credit' : paymentMethod}
                       </p>
                     </div>
                     <div className="col-span-2">
                       <Label className="text-xs text-muted-foreground">Total Amount</Label>
                       <p className="text-2xl font-bold text-primary"><CurrencyGlyph /> {calculateTotalAmount()}</p>
                     </div>
+                    {!splitPayment && paymentMethod === 'credit' && (
+                      <div className="col-span-2 pt-1 border-t">
+                        <div className="flex justify-between text-sm mt-2">
+                          <span className="text-muted-foreground">Received Now</span>
+                          <span className="font-medium"><CurrencyGlyph /> {(parseFloat(creditAmountReceived) || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-orange-700 font-medium">Due After Renewal</span>
+                          <span className="text-orange-700 font-medium">
+                            <CurrencyGlyph /> {Math.max(0, calculateTotalAmount() - (parseFloat(creditAmountReceived) || 0)).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
                   <Button
