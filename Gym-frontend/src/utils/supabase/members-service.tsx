@@ -1,4 +1,5 @@
 import { authService } from './auth-service';
+import { PaymentSplitLeg } from './billing-service';
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -52,10 +53,49 @@ export interface Member {
   family_head_id?: string;
   family_head_name?: string;
   relationship_to_head?: string;
+  is_minor?: boolean;
+  // True when this member's charges/renewals are folded into the family head's
+  // single invoice — always true for is_minor, also true for an adult dependent
+  // under a family_head-billing-mode Family plan.
+  billed_to_head?: boolean;
   // App authentication fields
   user_id?: number;
   app_username?: string;
   app_access_enabled?: boolean;
+}
+
+// One row in the Add Member "Family Members" section, or the payload for
+// POST /members/{headId}/family-members. Adults get an independent membership
+// (own plan/fee/payment); minors are billed to the family head via minor_fee.
+export interface FamilyMemberInput {
+  name: string;
+  relationship: string;
+  is_minor: boolean;
+  date_of_birth?: string;
+  // Adult-only
+  email?: string;
+  phone?: string;
+  membership_plan?: string;
+  membership_fee?: number;
+  payment_status?: string;
+  outstanding_balance?: number;
+  payment_method?: string;
+  payment_breakdown?: PaymentSplitLeg[];
+  bank_account_code?: string;
+  bank_account_name?: string;
+  // Minor-only: amount added to the guardian's invoice, and however much of it
+  // (if any) was collected now — that portion never becomes the guardian's due.
+  minor_fee?: number;
+  minor_paid_amount?: number;
+  minor_payment_method?: string;
+  minor_payment_breakdown?: PaymentSplitLeg[];
+  minor_bank_account_code?: string;
+  minor_bank_account_name?: string;
+}
+
+export interface FamilyGroup {
+  head: Member;
+  members: Member[];
 }
 
 export interface MemberFilters {
@@ -155,12 +195,17 @@ class MembersService {
   }
 
   async renewMember(id: string, data: {
-    planName: string;
-    membershipEndDate: string;
-    membershipFee: number;
-    paymentStatus: string;
-    membershipType?: string;
-    membershipStatus?: string;
+    plan_name: string;
+    membership_end_date: string;
+    membership_fee: number;
+    payment_status: string;
+    membership_type?: string;
+    membership_status?: string;
+    amount_received?: number;
+    payment_method?: string;
+    payment_breakdown?: PaymentSplitLeg[];
+    bank_account_code?: string;
+    bank_account_name?: string;
   }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/renew`,
@@ -176,6 +221,52 @@ class MembersService {
       { method: 'POST', body: JSON.stringify(data) }
     );
     if (!response.ok) throw new Error(`Failed to freeze member: ${response.status}`);
+    return response.json();
+  }
+
+  async renewFamilyMinor(id: string, data: {
+    plan_name?: string;
+    fee?: number;
+    payment_status: string;
+  }): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/renew-minor`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(`Failed to renew family member: ${response.status}`);
+    return response.json();
+  }
+
+  async renewFamily(headId: string, data: {
+    plan_name?: string;
+    payment_status: string;
+    payment_method?: string;
+    payment_breakdown?: PaymentSplitLeg[];
+    bank_account_code?: string;
+    bank_account_name?: string;
+  }): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${headId}/renew-family`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(`Failed to renew family: ${response.status}`);
+    return response.json();
+  }
+
+  async getFamilyGroup(id: string): Promise<FamilyGroup> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/family`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch family group: ${response.status}`);
+    return response.json();
+  }
+
+  async addFamilyMember(headId: string, data: FamilyMemberInput): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${headId}/family-members`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(`Failed to add family member: ${response.status}`);
     return response.json();
   }
 

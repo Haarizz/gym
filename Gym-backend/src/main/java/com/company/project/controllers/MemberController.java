@@ -109,6 +109,51 @@ public class MemberController {
     }
 
     /**
+     * POST /api/members/{id}/renew-minor
+     * Renews a minor family member — bills the charge to their guardian's
+     * account instead of creating an independent balance for the minor.
+     */
+    @PostMapping("/{id}/renew-minor")
+    public ResponseEntity<MemberResponseDTO> renewFamilyMinor(
+            @PathVariable Long id,
+            @RequestBody com.company.project.dto.MinorRenewalRequestDTO request) {
+        return ResponseEntity.ok(memberService.renewFamilyMinor(id, request));
+    }
+
+    /**
+     * POST /api/members/{headId}/renew-family
+     * Renews an entire family together in ONE invoice under family_head billing
+     * mode — recalculates pricePerMember × current headcount and extends every
+     * member's membership dates in sync.
+     */
+    @PostMapping("/{headId}/renew-family")
+    public ResponseEntity<MemberResponseDTO> renewFamily(
+            @PathVariable Long headId,
+            @RequestBody com.company.project.dto.FamilyRenewalRequestDTO request) {
+        return ResponseEntity.ok(memberService.renewFamily(headId, request));
+    }
+
+    /**
+     * GET /api/members/{id}/family
+     * Returns the family head plus all linked family members (adults + minors).
+     */
+    @GetMapping("/{id}/family")
+    public ResponseEntity<com.company.project.dto.FamilyGroupResponseDTO> getFamilyGroup(@PathVariable Long id) {
+        return ResponseEntity.ok(memberService.getFamilyGroup(id));
+    }
+
+    /**
+     * POST /api/members/{headId}/family-members
+     * Adds a new adult or minor family member to an existing family head.
+     */
+    @PostMapping("/{headId}/family-members")
+    public ResponseEntity<MemberResponseDTO> addFamilyMember(
+            @PathVariable Long headId,
+            @RequestBody com.company.project.dto.FamilyMemberDTO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(memberService.addFamilyMember(headId, request));
+    }
+
+    /**
      * POST /api/members/{id}/freeze
      */
     @PostMapping("/{id}/freeze")

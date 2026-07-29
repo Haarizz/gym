@@ -27,6 +27,9 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     List<Member> findAllByMemberIdIn(List<String> memberIds);
 
+    // All family members (adults and minors) linked to a given family head's business id
+    List<Member> findByFamilyHeadId(String familyHeadId);
+
     // Members with overdue payment status
     @Query("SELECT m FROM Member m WHERE m.paymentStatus = 'overdue' ORDER BY m.nextPaymentDate ASC")
     List<Member> findOverdueMembers();

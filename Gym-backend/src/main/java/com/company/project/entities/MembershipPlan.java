@@ -29,6 +29,35 @@ public class MembershipPlan extends BaseEntity {
     @Column(name = "plan_type")
     private String planType;
 
+    // ── Family plan settings (only meaningful when planType == "Family") ──────
+
+    /** "individual" (default — adults bill independently, minors fold into the
+     *  head's invoice, same as every existing Family/Couple plan) or "family_head"
+     *  (every family member, adult or minor, folds into ONE invoice on the head). */
+    @Column(name = "family_billing_mode")
+    private String familyBillingMode = "individual";
+
+    @Column(name = "price_per_member", precision = 10, scale = 2)
+    private BigDecimal pricePerMember;
+
+    @Column(name = "max_family_members")
+    private Integer maxFamilyMembers;
+
+    @Column(name = "max_adult_members")
+    private Integer maxAdultMembers;
+
+    @Column(name = "max_child_members")
+    private Integer maxChildMembers;
+
+    @Column(name = "allow_additional_members")
+    private Boolean allowAdditionalMembers = true;
+
+    @Column(name = "additional_member_price", precision = 10, scale = 2)
+    private BigDecimal additionalMemberPrice;
+
+    @Column(name = "auto_calculate_total")
+    private Boolean autoCalculateTotal = true;
+
     /** Monthly / Annual / Sessions / Weekly / Quarterly */
     @Column(name = "duration_type")
     private String durationType;
@@ -138,6 +167,30 @@ public class MembershipPlan extends BaseEntity {
 
     public String getPlanType() { return planType; }
     public void setPlanType(String planType) { this.planType = planType; }
+
+    public String getFamilyBillingMode() { return familyBillingMode; }
+    public void setFamilyBillingMode(String familyBillingMode) { this.familyBillingMode = familyBillingMode; }
+
+    public BigDecimal getPricePerMember() { return pricePerMember; }
+    public void setPricePerMember(BigDecimal pricePerMember) { this.pricePerMember = pricePerMember; }
+
+    public Integer getMaxFamilyMembers() { return maxFamilyMembers; }
+    public void setMaxFamilyMembers(Integer maxFamilyMembers) { this.maxFamilyMembers = maxFamilyMembers; }
+
+    public Integer getMaxAdultMembers() { return maxAdultMembers; }
+    public void setMaxAdultMembers(Integer maxAdultMembers) { this.maxAdultMembers = maxAdultMembers; }
+
+    public Integer getMaxChildMembers() { return maxChildMembers; }
+    public void setMaxChildMembers(Integer maxChildMembers) { this.maxChildMembers = maxChildMembers; }
+
+    public Boolean getAllowAdditionalMembers() { return allowAdditionalMembers; }
+    public void setAllowAdditionalMembers(Boolean allowAdditionalMembers) { this.allowAdditionalMembers = allowAdditionalMembers; }
+
+    public BigDecimal getAdditionalMemberPrice() { return additionalMemberPrice; }
+    public void setAdditionalMemberPrice(BigDecimal additionalMemberPrice) { this.additionalMemberPrice = additionalMemberPrice; }
+
+    public Boolean getAutoCalculateTotal() { return autoCalculateTotal; }
+    public void setAutoCalculateTotal(Boolean autoCalculateTotal) { this.autoCalculateTotal = autoCalculateTotal; }
 
     public String getDurationType() { return durationType; }
     public void setDurationType(String durationType) { this.durationType = durationType; }

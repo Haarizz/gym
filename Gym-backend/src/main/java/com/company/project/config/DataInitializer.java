@@ -1,17 +1,20 @@
 package com.company.project.config;
 
 import com.company.project.dto.ProductRequestDTO;
+import com.company.project.entities.AccountHead;
 import com.company.project.entities.ProductCategory;
 import com.company.project.entities.Role;
 import com.company.project.entities.User;
 import com.company.project.entities.UserRole;
 import com.company.project.entities.Warehouse;
+import com.company.project.repositories.AccountHeadRepository;
 import com.company.project.repositories.ProductCategoryRepository;
 import com.company.project.repositories.ProductRepository;
 import com.company.project.repositories.RoleRepository;
 import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
 import com.company.project.repositories.WarehouseRepository;
+import com.company.project.services.AddonPlanService;
 import com.company.project.services.ProductService;
 import com.company.project.services.SupplierBillService;
 import com.company.project.services.SupplierService;
@@ -41,6 +44,8 @@ public class DataInitializer implements CommandLineRunner {
     private final WarehouseRepository warehouseRepository;
     private final ProductService productService;
     private final SupplierBillService supplierBillService;
+    private final AccountHeadRepository accountHeadRepository;
+    private final AddonPlanService addonPlanService;
 
     public DataInitializer(
             RoleRepository roleRepository,
@@ -54,7 +59,9 @@ public class DataInitializer implements CommandLineRunner {
             ProductCategoryRepository productCategoryRepository,
             WarehouseRepository warehouseRepository,
             ProductService productService,
-            SupplierBillService supplierBillService
+            SupplierBillService supplierBillService,
+            AccountHeadRepository accountHeadRepository,
+            AddonPlanService addonPlanService
     ) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
@@ -68,6 +75,8 @@ public class DataInitializer implements CommandLineRunner {
         this.warehouseRepository = warehouseRepository;
         this.productService = productService;
         this.supplierBillService = supplierBillService;
+        this.accountHeadRepository = accountHeadRepository;
+        this.addonPlanService = addonPlanService;
     }
 
     @Override
@@ -109,6 +118,18 @@ public class DataInitializer implements CommandLineRunner {
         // Seed default Suppliers
         supplierService.initDefaultSuppliers();
 
+        // Seed the full Chart of Accounts (see FinancialEventService's account-code
+        // table) — previously only the codes some transaction had already touched
+        // existed (auto-bootstrapped lazily in FinancialEventService.updateAccountBalance),
+        // so e.g. Accounts Receivable/Fixed Assets/Salary Expense were invisible in
+        // the Chart of Accounts screen until their first posting.
+        seedDefaultAccountHeads();
+
+        // Seed the Add-on Plan catalog ("Purchase An Add-On" screen) — previously
+        // a hardcoded array in member-addons.tsx, now an editable Chart-of-Accounts-
+        // style catalog the admin can create/edit/delete from the UI.
+        addonPlanService.initDefaultAddonPlans();
+
         // Salary Payments & Advances are now user-generated only (no seed data).
 
         // Seed sample POS-ready products (idempotent: skips any name already present)
@@ -117,6 +138,50 @@ public class DataInitializer implements CommandLineRunner {
         // Self-heal: apply stock-in for any CONFIRMED supplier bill that predates the purchase
         // form's warehouse field (idempotent — only touches bills still missing a warehouseId).
         supplierBillService.backfillMissingWarehouseStock();
+    }
+
+    // ── Chart of Accounts ───────────────────────────────────────────────────────
+
+    private record DefaultAccount(String code, String name, String type) {}
+
+    /**
+     * The standard account codes FinancialEventService already posts against
+     * (see its class-level doc comment) — kept in sync with that list. Idempotent:
+     * only inserts codes that don't exist yet, so it never touches balances on
+     * accounts a real transaction has already posted to.
+     */
+    private void seedDefaultAccountHeads() {
+        List<DefaultAccount> defaults = List.of(
+            new DefaultAccount("1000", "Cash in Hand", "ASSET"),
+            new DefaultAccount("1001", "Cash at Bank", "ASSET"),
+            new DefaultAccount("1100", "Accounts Receivable", "ASSET"),
+            new DefaultAccount("1400", "Salary Advance Receivable", "ASSET"),
+            new DefaultAccount("1500", "Fixed Assets", "ASSET"),
+            new DefaultAccount("1600", "Accumulated Depreciation", "ASSET"),
+            new DefaultAccount("2000", "Accounts Payable", "LIABILITY"),
+            new DefaultAccount("2100", "Tax / GST Payable", "LIABILITY"),
+            new DefaultAccount("2200", "GST Input Credit", "LIABILITY"),
+            new DefaultAccount("2300", "Deferred Revenue", "LIABILITY"),
+            new DefaultAccount("4000", "Membership Revenue", "REVENUE"),
+            new DefaultAccount("4100", "POS Sales Revenue", "REVENUE"),
+            new DefaultAccount("4200", "Service / Add-on Revenue", "REVENUE"),
+            new DefaultAccount("5000", "Salary Expense", "EXPENSE"),
+            new DefaultAccount("5100", "Maintenance Expense", "EXPENSE"),
+            new DefaultAccount("5200", "Purchase / COGS", "EXPENSE"),
+            new DefaultAccount("5700", "Miscellaneous Expense", "EXPENSE")
+        );
+
+        for (DefaultAccount d : defaults) {
+            if (accountHeadRepository.findByCode(d.code()).isPresent()) continue;
+            AccountHead a = new AccountHead();
+            a.setCode(d.code());
+            a.setName(d.name());
+            a.setType(d.type());
+            a.setOpeningBalance(BigDecimal.ZERO);
+            a.setCurrentBalance(BigDecimal.ZERO);
+            a.setIsActive(true);
+            accountHeadRepository.save(a);
+        }
     }
 
     // ── Sample products (POS demo) ─────────────────────────────────────────────

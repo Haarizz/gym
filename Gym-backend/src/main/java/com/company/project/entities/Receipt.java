@@ -1,6 +1,8 @@
 package com.company.project.entities;
 
+import com.company.project.converters.MinorChargeBreakdownConverter;
 import com.company.project.converters.PaymentBreakdownConverter;
+import com.company.project.dto.MinorChargeDTO;
 import com.company.project.dto.PaymentSplitDTO;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -91,6 +93,37 @@ public class Receipt extends BaseEntity {
     @Column(name = "bank_account_name")
     private String bankAccountName;
 
+    // Itemized minor family members' fees folded into this receipt when it belongs
+    // to their guardian, e.g. [{name:"Alex Doe", amount:50}]. Empty/null otherwise.
+    @Column(name = "minor_charges", columnDefinition = "TEXT")
+    @Convert(converter = MinorChargeBreakdownConverter.class)
+    private List<MinorChargeDTO> minorCharges;
+
+    // Cumulative amount paid toward THIS bill across its whole lifecycle (this
+    // receipt's own paidAmount plus every later settlement applied against it).
+    // A live rollup — unlike paidAmount/paymentMethod/paymentBreakdown (which stay
+    // frozen as the immutable record of what this specific transaction received),
+    // this field is allowed to keep advancing as later settlements pay the bill
+    // down further, exactly like Member.outstandingBalance. Null on settlement/
+    // "Payment" rows, which aren't themselves payable bills.
+    @Column(name = "total_paid_to_date", precision = 10, scale = 2)
+    private BigDecimal totalPaidToDate;
+
+    // Snapshot of the member's overall outstanding balance immediately after this
+    // transaction posted — captured once at creation and never touched again, so
+    // every receipt/payment row carries its own immutable "remaining due after
+    // this payment" fact for the receipt list and audit trail.
+    @Column(name = "balance_after", precision = 10, scale = 2)
+    private BigDecimal balanceAfter;
+
+    // When this row is itself a settlement/"Payment" transaction, the bill
+    // (Receipt.id) it paid down — lets consumers attribute it precisely instead
+    // of guessing from transaction dates. Null for bill rows, and for a
+    // settlement that legitimately spans more than one bill in a single
+    // checkout (rare in practice for this app's usage).
+    @Column(name = "linked_bill_id")
+    private Long linkedBillId;
+
     public Receipt() {}
 
     // ── Getters & Setters ────────────────────────────────────────────────────
@@ -160,4 +193,16 @@ public class Receipt extends BaseEntity {
 
     public String getBankAccountName() { return bankAccountName; }
     public void setBankAccountName(String bankAccountName) { this.bankAccountName = bankAccountName; }
+
+    public List<MinorChargeDTO> getMinorCharges() { return minorCharges; }
+    public void setMinorCharges(List<MinorChargeDTO> minorCharges) { this.minorCharges = minorCharges; }
+
+    public BigDecimal getTotalPaidToDate() { return totalPaidToDate; }
+    public void setTotalPaidToDate(BigDecimal totalPaidToDate) { this.totalPaidToDate = totalPaidToDate; }
+
+    public BigDecimal getBalanceAfter() { return balanceAfter; }
+    public void setBalanceAfter(BigDecimal balanceAfter) { this.balanceAfter = balanceAfter; }
+
+    public Long getLinkedBillId() { return linkedBillId; }
+    public void setLinkedBillId(Long linkedBillId) { this.linkedBillId = linkedBillId; }
 }

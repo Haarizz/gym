@@ -30,6 +30,16 @@ public class MembershipPlanResponseDTO {
     private Integer maxSessions;
     private List<String> assignableTrainers;
 
+    // Family plan settings (only meaningful when planType == "Family")
+    private String familyBillingMode;
+    private BigDecimal pricePerMember;
+    private Integer maxFamilyMembers;
+    private Integer maxAdultMembers;
+    private Integer maxChildMembers;
+    private Boolean allowAdditionalMembers;
+    private BigDecimal additionalMemberPrice;
+    private Boolean autoCalculateTotal;
+
     // Capacity
     private String membershipCapacity;
     private Integer maxCapacity;
@@ -71,6 +81,14 @@ public class MembershipPlanResponseDTO {
         dto.description         = p.getDescription();
         dto.maxSessions         = p.getMaxSessions();
         dto.assignableTrainers  = p.getAssignableTrainers();
+        dto.familyBillingMode   = p.getFamilyBillingMode();
+        dto.pricePerMember      = p.getPricePerMember();
+        dto.maxFamilyMembers    = p.getMaxFamilyMembers();
+        dto.maxAdultMembers     = p.getMaxAdultMembers();
+        dto.maxChildMembers     = p.getMaxChildMembers();
+        dto.allowAdditionalMembers = p.getAllowAdditionalMembers();
+        dto.additionalMemberPrice  = p.getAdditionalMemberPrice();
+        dto.autoCalculateTotal     = p.getAutoCalculateTotal();
         dto.membershipCapacity  = p.getMembershipCapacity();
         dto.maxCapacity         = p.getMaxCapacity();
         dto.attendanceLimit     = p.getAttendanceLimit();
@@ -105,6 +123,14 @@ public class MembershipPlanResponseDTO {
     public String getDescription() { return description; }
     public Integer getMaxSessions() { return maxSessions; }
     public List<String> getAssignableTrainers() { return assignableTrainers; }
+    public String getFamilyBillingMode() { return familyBillingMode; }
+    public BigDecimal getPricePerMember() { return pricePerMember; }
+    public Integer getMaxFamilyMembers() { return maxFamilyMembers; }
+    public Integer getMaxAdultMembers() { return maxAdultMembers; }
+    public Integer getMaxChildMembers() { return maxChildMembers; }
+    public Boolean getAllowAdditionalMembers() { return allowAdditionalMembers; }
+    public BigDecimal getAdditionalMemberPrice() { return additionalMemberPrice; }
+    public Boolean getAutoCalculateTotal() { return autoCalculateTotal; }
     public String getMembershipCapacity() { return membershipCapacity; }
     public Integer getMaxCapacity() { return maxCapacity; }
     public String getAttendanceLimit() { return attendanceLimit; }

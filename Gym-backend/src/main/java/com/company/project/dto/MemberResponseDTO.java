@@ -63,6 +63,8 @@ public class MemberResponseDTO {
     private String familyHeadId;
     private String familyHeadName;
     private String relationshipToHead;
+    private Boolean isMinor;
+    private Boolean billedToHead;
 
     // App authentication fields
     private Long userId;
@@ -121,6 +123,8 @@ public class MemberResponseDTO {
         dto.isFamilyHead        = m.getIsFamilyHead();
         dto.familyHeadId        = m.getFamilyHeadId();
         dto.relationshipToHead  = m.getRelationshipToHead();
+        dto.isMinor              = m.getIsMinor();
+        dto.billedToHead         = m.getBilledToHead();
         dto.userId              = m.getUserId();
         dto.appUsername         = m.getAppUsername();
         dto.appAccessEnabled    = m.getAppAccessEnabled();
@@ -179,6 +183,8 @@ public class MemberResponseDTO {
     public void setFamilyHeadName(String familyHeadName) { this.familyHeadName = familyHeadName; }
     public String getFamilyHeadName() { return familyHeadName; }
     public String getRelationshipToHead() { return relationshipToHead; }
+    public Boolean getIsMinor() { return isMinor; }
+    public Boolean getBilledToHead() { return billedToHead; }
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
     public String getAppUsername() { return appUsername; }
