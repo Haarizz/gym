@@ -1,5 +1,5 @@
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing } from '@/core/theme';
 import { Surface } from '@/shared/components/Surface';
@@ -9,18 +9,41 @@ interface ScreenLayoutProps {
   scrollable?: boolean;
 }
 
+// Keep these in sync with the floating tab bar defined in RoleTabsLayout,
+// so scrollable content is never hidden behind it.
+const TAB_BAR_HEIGHT = 74;
+const TAB_BAR_BOTTOM_OFFSET = 20;
+const TAB_BAR_BREATHING_ROOM = 24;
+
 export function ScreenLayout({ children, scrollable = false }: ScreenLayoutProps) {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+
+  const bottomPadding =
+    TAB_BAR_HEIGHT +
+    TAB_BAR_BOTTOM_OFFSET +
+    Spacing.one +
+    insets.bottom;
+
   const content = scrollable ? (
-    <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPadding }]}
+      keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
   ) : (
     children
   );
+  
+  const shouldCapWidth = Platform.OS !== 'web' || width >= 900;
 
   return (
     <Surface background="backgroundElement" style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          shouldCapWidth && styles.contentCapped,
+        ]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboard}>
@@ -37,8 +60,10 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    maxWidth: MaxContentWidth,
     width: '100%',
+  },
+  contentCapped: {
+    maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
   keyboard: {
@@ -46,6 +71,5 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: Spacing.four,
   },
 });

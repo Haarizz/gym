@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -9,11 +9,15 @@ interface StatCardProps {
   value: string;
   iconName: keyof typeof Feather.glyphMap;
   color: string;
+  /** When omitted the card is rendered as non-interactive (disabled state). */
+  onPress?: () => void;
 }
 
-export function StatCard({ label, value, iconName, color }: StatCardProps) {
-  return (
-    <View style={styles.card}>
+export function StatCard({ label, value, iconName, color, onPress }: StatCardProps) {
+  const cardStyle = [styles.card, !onPress && styles.cardInactive];
+
+  const content = (
+    <>
       <View style={[styles.icon, { backgroundColor: color }]}>
         <Feather name={iconName} size={20} color="#ffffff" />
       </View>
@@ -23,8 +27,22 @@ export function StatCard({ label, value, iconName, color }: StatCardProps) {
       <Typography variant="caption" color="textSecondary">
         {label}
       </Typography>
-    </View>
+    </>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        style={({ pressed }) => [cardStyle, pressed && styles.cardPressed]}
+        onPress={onPress}
+        accessibilityRole="button"
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return <View style={cardStyle}>{content}</View>;
 }
 
 export function PlaceholderPanel({ title, description }: { title: string; description: string }) {
@@ -50,6 +68,14 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
+  },
+  /** Subtle visual cue that this card does not yet have an interactive report. */
+  cardInactive: {
+    opacity: 0.55,
+  },
+  /** Brief press-in feedback. */
+  cardPressed: {
+    opacity: 0.75,
   },
   icon: {
     width: 40,

@@ -7,3 +7,4 @@ export { Badge, type BadgeProps } from './Badge';
 export { RoleModeCard, ComingSoonCard } from './RoleModeCard';
 export { AppHeader, BrandHeader } from './AppHeader';
 export { StatCard, PlaceholderPanel } from './StatCard';
+export * from './ReportComponents';

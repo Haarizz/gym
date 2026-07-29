@@ -11,6 +11,12 @@ export const BrandColors = {
   textSecondary: '#49587a',
   screenBackground: '#f9fafe',
   screenBackgroundAlt: '#eef7f6',
+  surface: '#FFFFFF',
+  neutral: {
+    900: '#1e293b',
+    500: '#49587a',
+    200: '#eef7f6',
+  },
 } as const;
 
 export const Colors = {
