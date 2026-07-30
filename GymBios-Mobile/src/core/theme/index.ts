@@ -17,6 +17,8 @@ export const BrandColors = {
     500: '#49587a',
     200: '#eef7f6',
   },
+  white: '#FFFFFF',
+  black: '#000000',
 } as const;
 
 export const Colors = {
@@ -84,6 +86,7 @@ export const Spacing = {
   half: 2,
   one: 4,
   two: 8,
+  md: 12,
   three: 16,
   four: 24,
   five: 32,
