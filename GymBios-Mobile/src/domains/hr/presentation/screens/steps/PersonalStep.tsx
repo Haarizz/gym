@@ -4,6 +4,7 @@ import { Spacing } from '@/core/theme';
 import { Input } from '@/shared/components/Input';
 import { FormSection } from '@/shared/components/FormSection';
 import type { StaffWizardData } from '../../hooks/useStaffWizard';
+import { StaffAvatarPicker } from '../../components/wizard/StaffAvatarPicker';
 
 interface PersonalStepProps {
   data: StaffWizardData;
@@ -16,6 +17,15 @@ interface PersonalStepProps {
 export function PersonalStep({ data, updateField }: PersonalStepProps) {
   return (
     <View style={styles.container}>
+      <StaffAvatarPicker
+        photoUri={data.photoUri}
+        photoUrl={data.photoUrl}
+        name={data.name}
+        onChangePhoto={(uri) => {
+          updateField('photoUri', uri);
+          updateField('photoUrl', uri || '');
+        }}
+      />
       <FormSection title="Personal Information">
         <Input
           label="Full Name *"
@@ -52,6 +62,6 @@ export function PersonalStep({ data, updateField }: PersonalStepProps) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    gap: Spacing.two,
   },
 });

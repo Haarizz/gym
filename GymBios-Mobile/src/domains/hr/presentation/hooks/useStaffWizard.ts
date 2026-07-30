@@ -10,6 +10,7 @@ export interface StaffWizardData {
   phone: string;
   address: string;
   photoUrl: string;
+  photoUri?: string;
   role: string;
   department: string;
   branch: string;
@@ -71,6 +72,7 @@ function mapStaffToWizardData(staff?: Staff): StaffWizardData {
     phone: staff?.phone ?? '',
     address: staff?.address ?? '',
     photoUrl: staff?.photoUrl ?? '',
+    photoUri: staff?.photoUrl || undefined,
     role: staff?.role ?? '',
     department: staff?.department ?? '',
     branch: staff?.branch ?? '',
@@ -92,7 +94,7 @@ function buildCreateRequest(data: StaffWizardData): CreateStaffRequest {
     email: data.email,
     phone: data.phone,
     address: data.address,
-    photoUrl: data.photoUrl || undefined,
+    photoUrl: data.photoUri || data.photoUrl || undefined,
     role: data.role,
     department: data.department,
     branch: data.branch,
