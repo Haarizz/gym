@@ -1,0 +1,32 @@
+---
+description: GymBios Mobile DDD + Clean Architecture rules
+alwaysApply: true
+---
+
+# GymBios Mobile Architecture
+
+Feature-first domains under `src/domains/`. Each domain has: `application/`, `domain/`, `infrastructure/`, `presentation/`, `store/`, `index.ts`.
+
+## Dependency flow
+
+Presentation → Application → Domain ← Infrastructure
+
+- Presentation never imports Infrastructure or Axios
+- Domain is pure TypeScript (no React/RN/Expo)
+- Wire dependencies in domain `index.ts` (composition root)
+- `app/` routes only re-export domain screens
+
+## State
+
+- Zustand: client/UI state only
+- TanStack Query: server state only
+
+## Modules
+
+- `core/platform/`: OS integrations (storage, API client, notifications)
+- `shared/`: generic UI only (Button, Input, Typography)
+- Business components stay inside their domain
+
+## Reference
+
+Copy patterns from `src/domains/auth/` for new domains.
