@@ -29,11 +29,14 @@ public class MemberAddonService {
 
     private final MemberAddonRepository memberAddonRepository;
     private final ReceiptVoucherService receiptVoucherService;
+    private final FinancialEventService financialEventService;
 
     public MemberAddonService(MemberAddonRepository memberAddonRepository,
-                               ReceiptVoucherService receiptVoucherService) {
+                               ReceiptVoucherService receiptVoucherService,
+                               FinancialEventService financialEventService) {
         this.memberAddonRepository = memberAddonRepository;
         this.receiptVoucherService = receiptVoucherService;
+        this.financialEventService = financialEventService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -88,6 +91,7 @@ public class MemberAddonService {
         saved = memberAddonRepository.save(saved);
 
         // Post to General Ledger
+        financialEventService.onAddonPaymentReceived(saved);
         receiptVoucherService.createVoucherFromModule(
                 "Add-on Purchase – " + (saved.getAddonName() != null ? saved.getAddonName() : "Add-on"),
                 "Add-on",
@@ -97,7 +101,8 @@ public class MemberAddonService {
                 saved.getPaymentMode(),
                 saved.getTransactionId(),
                 saved.getTransactionId(),
-                saved.getNotes()
+                saved.getNotes(),
+                saved.getPaymentBreakdown()
         );
 
         return MemberAddonResponseDTO.fromEntity(saved);
@@ -131,6 +136,7 @@ public class MemberAddonService {
         if (r.getStartDate()        != null) a.setStartDate(parseDateTime(r.getStartDate()));
         if (r.getExpiryDate()       != null) a.setExpiryDate(parseDateTime(r.getExpiryDate()));
         if (r.getNotes()            != null) a.setNotes(r.getNotes());
+        if (r.getPaymentBreakdown() != null) a.setPaymentBreakdown(r.getPaymentBreakdown());
     }
 
     private Specification<MemberAddon> buildSpec(String search, String status) {

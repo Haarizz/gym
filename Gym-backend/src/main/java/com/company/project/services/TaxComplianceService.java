@@ -22,6 +22,13 @@ public class TaxComplianceService {
         this.taxComplianceRepository = taxComplianceRepository;
     }
 
+    /**
+     * Read-only: PENDING items past their due date are no longer flipped to
+     * OVERDUE here. A GET request causing a write violated REST semantics — see
+     * TaxComplianceOverdueScheduler, which now runs that transition on a schedule
+     * instead (docs/gymbios-financial-roadmap.html — M4).
+     */
+    @Transactional(readOnly = true)
     public List<TaxComplianceResponseDTO> getAll(String taxType, String status) {
         List<TaxCompliance> all;
         if (taxType != null && !taxType.isBlank()) {
@@ -33,15 +40,6 @@ public class TaxComplianceService {
         } else {
             all = taxComplianceRepository.findAllByOrderByDueDateDesc();
         }
-        // Auto-mark overdue
-        all.forEach(t -> {
-            if ("PENDING".equalsIgnoreCase(t.getStatus())
-                    && t.getDueDate() != null
-                    && LocalDate.now().isAfter(t.getDueDate())) {
-                t.setStatus("OVERDUE");
-                taxComplianceRepository.save(t);
-            }
-        });
         return all.stream().map(TaxComplianceResponseDTO::fromEntity).collect(Collectors.toList());
     }
 

@@ -4,6 +4,7 @@ import com.company.project.entities.Receipt;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * Response DTO for Receipt.
@@ -21,6 +22,7 @@ public class ReceiptResponseDTO {
     private String transactionType;
     private BigDecimal amount;
     private String paymentMethod;
+    private List<PaymentSplitDTO> paymentBreakdown;
     private String status;
     private String planName;
     private String validFrom;
@@ -31,6 +33,12 @@ public class ReceiptResponseDTO {
     private java.math.BigDecimal paidAmount;
     private java.math.BigDecimal dueAmount;
     private String dueDate;
+    private String bankAccountCode;
+    private String bankAccountName;
+    private List<MinorChargeDTO> minorCharges;
+    private java.math.BigDecimal totalPaidToDate;
+    private java.math.BigDecimal balanceAfter;
+    private String linkedBillId;
     private String createdAt;
     private String updatedAt;
 
@@ -48,6 +56,7 @@ public class ReceiptResponseDTO {
         dto.transactionType = r.getTransactionType();
         dto.amount          = r.getAmount();
         dto.paymentMethod   = r.getPaymentMethod();
+        dto.paymentBreakdown = r.getPaymentBreakdown();
         dto.status          = r.getStatus();
         dto.planName        = r.getPlanName();
         dto.validFrom       = r.getValidFrom() != null ? r.getValidFrom().format(ISO) + "Z" : null;
@@ -57,8 +66,19 @@ public class ReceiptResponseDTO {
         dto.membershipType  = r.getMembershipType();
         java.math.BigDecimal totalAmt = r.getAmount() != null ? r.getAmount() : java.math.BigDecimal.ZERO;
         dto.paidAmount      = r.getPaidAmount() != null ? r.getPaidAmount() : java.math.BigDecimal.ZERO;
-        dto.dueAmount       = totalAmt.subtract(dto.paidAmount).max(java.math.BigDecimal.ZERO);
+        // How much is still owed on THIS bill specifically — uses the live
+        // totalPaidToDate rollup (which keeps advancing as later settlements pay it
+        // down) rather than the frozen paidAmount, so it stays accurate even after
+        // the bill has been topped up by separate settlement transactions.
+        java.math.BigDecimal cumulativePaid = r.getTotalPaidToDate() != null ? r.getTotalPaidToDate() : dto.paidAmount;
+        dto.dueAmount       = totalAmt.subtract(cumulativePaid).max(java.math.BigDecimal.ZERO);
         dto.dueDate         = r.getDueDate() != null ? r.getDueDate().format(ISO) + "Z" : null;
+        dto.bankAccountCode = r.getBankAccountCode();
+        dto.bankAccountName = r.getBankAccountName();
+        dto.minorCharges    = r.getMinorCharges();
+        dto.totalPaidToDate = r.getTotalPaidToDate();
+        dto.balanceAfter    = r.getBalanceAfter();
+        dto.linkedBillId    = r.getLinkedBillId() != null ? String.valueOf(r.getLinkedBillId()) : null;
         dto.createdAt       = r.getCreatedAt() != null ? r.getCreatedAt().format(ISO) + "Z" : null;
         dto.updatedAt       = r.getUpdatedAt() != null ? r.getUpdatedAt().format(ISO) + "Z" : null;
         return dto;
@@ -76,6 +96,7 @@ public class ReceiptResponseDTO {
     public String getTransactionType() { return transactionType; }
     public BigDecimal getAmount() { return amount; }
     public String getPaymentMethod() { return paymentMethod; }
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public String getStatus() { return status; }
     public String getPlanName() { return planName; }
     public String getValidFrom() { return validFrom; }
@@ -86,6 +107,12 @@ public class ReceiptResponseDTO {
     public java.math.BigDecimal getPaidAmount() { return paidAmount; }
     public java.math.BigDecimal getDueAmount() { return dueAmount; }
     public String getDueDate() { return dueDate; }
+    public String getBankAccountCode() { return bankAccountCode; }
+    public String getBankAccountName() { return bankAccountName; }
+    public List<MinorChargeDTO> getMinorCharges() { return minorCharges; }
+    public java.math.BigDecimal getTotalPaidToDate() { return totalPaidToDate; }
+    public java.math.BigDecimal getBalanceAfter() { return balanceAfter; }
+    public String getLinkedBillId() { return linkedBillId; }
     public String getCreatedAt() { return createdAt; }
     public String getUpdatedAt() { return updatedAt; }
 }

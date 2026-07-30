@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { plansService, Plan } from '../utils/supabase/plans-service';
+import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -31,7 +32,6 @@ import {
   ChevronUp,
   ChevronDown,
   Info,
-  Tag,
   Megaphone,
   Percent,
   Building2,
@@ -63,91 +63,6 @@ const availableFacilities = [
   { id: "FAC-004", name: "Football Ground", icon: Users, status: "Active" }
 ];
 
-// Sample promotions and campaigns data from promotions-campaign component
-const availablePromotions = [
-  {
-    id: 1,
-    name: "New Year Special",
-    type: "Percentage",
-    discount: "25%",
-    validPeriod: "1/1/2024 - 31/1/2024",
-    status: "Active",
-    category: "Seasonal"
-  },
-  {
-    id: 2,
-    name: "Student Discount", 
-    type: "Fixed Amount",
-    discount: "AED 20",
-    validPeriod: "1/9/2024 - 31/12/2024",
-    status: "Active",
-    category: "Demographic"
-  },
-  {
-    id: 3,
-    name: "Summer Body Challenge",
-    type: "Percentage", 
-    discount: "15%",
-    validPeriod: "1/6/2024 - 31/8/2024",
-    status: "Expired",
-    category: "Challenge"
-  },
-  {
-    id: 4,
-    name: "Referral Bonus",
-    type: "Fixed Amount",
-    discount: "AED 50",
-    validPeriod: "1/1/2024 - 31/12/2024",
-    status: "Active",
-    category: "Referral"
-  },
-  {
-    id: 5,
-    name: "Early Bird Special",
-    type: "Percentage",
-    discount: "10%",
-    validPeriod: "1/12/2024 - 31/12/2024",
-    status: "Active",
-    category: "Time-based"
-  }
-];
-
-const availableCampaigns = [
-  {
-    id: 1,
-    name: "January Fitness Challenge",
-    type: "Engagement",
-    duration: "30 days",
-    status: "Active",
-    category: "Challenge"
-  },
-  {
-    id: 2,
-    name: "Member Appreciation Week",
-    type: "Retention",
-    duration: "7 days",
-    status: "Active",
-    category: "Loyalty"
-  },
-  {
-    id: 3,
-    name: "Bring a Friend Month",
-    type: "Acquisition",
-    duration: "30 days",
-    status: "Active",  
-    category: "Referral"
-  },
-  {
-    id: 4,
-    name: "Holiday Wellness Program",
-    type: "Wellness",
-    duration: "60 days",
-    status: "Inactive",
-    category: "Seasonal"
-  }
-];
-
-
 export function ManagePlans() {
   const { currencyCode } = useCurrency();
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -160,6 +75,16 @@ export function ManagePlans() {
   const [filterDuration, setFilterDuration] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+
+  // Promotions & Campaigns loaded from Member Connect (real data, not mock)
+  const [availablePromotions, setAvailablePromotions] = useState<{
+    id: number;
+    name: string;
+    discount: string;
+    validPeriod: string;
+    status: string;
+  }[]>([]);
+  const [isLoadingPromotions, setIsLoadingPromotions] = useState(true);
 
   // Form state for creating/editing plans
   const [formData, setFormData] = useState({
@@ -188,7 +113,16 @@ export function ManagePlans() {
     maxFreezeOccurrences: "2",
     chargePerExtraDay: "5",
     freeDaysAllowed: "10",
-    autoUnfreeze: true
+    autoUnfreeze: true,
+    // Family Plan Settings (only used when planType === "Family")
+    familyBillingMode: "individual",
+    pricePerMember: "",
+    maxFamilyMembers: "",
+    maxAdultMembers: "",
+    maxChildMembers: "",
+    allowAdditionalMembers: true,
+    additionalMemberPrice: "",
+    autoCalculateTotal: true
   });
 
   // Training streams access state
@@ -199,6 +133,8 @@ export function ManagePlans() {
   const [isPromotionsCampaignsOpen, setIsPromotionsCampaignsOpen] = useState(false);
   // Freeze Policy Configuration state
   const [isFreezePolicyOpen, setIsFreezePolicyOpen] = useState(false);
+  // Family Plan Settings state
+  const [isFamilyPlanSettingsOpen, setIsFamilyPlanSettingsOpen] = useState(false);
 
   useEffect(() => {
     const loadPlans = async () => {
@@ -216,6 +152,43 @@ export function ManagePlans() {
     };
     loadPlans();
   }, []);
+
+  useEffect(() => {
+    const loadPromotions = async () => {
+      try {
+        setIsLoadingPromotions(true);
+        const data = await promotionsService.getPromotions();
+        setAvailablePromotions(data.map((promo: PromotionApi) => {
+          const discountLabel = promo.discountType === "percentage"
+            ? `${promo.discountValue ?? 0}%`
+            : promo.discountType === "free"
+              ? "Free"
+              : promo.discountValue != null
+                ? `${currencyCode} ${promo.discountValue}`
+                : "—";
+          const formatDate = (value?: string | null) => value ? new Date(value).toLocaleDateString() : "";
+          const validPeriod = promo.startDate && promo.endDate
+            ? `${formatDate(promo.startDate)} - ${formatDate(promo.endDate)}`
+            : "No expiry";
+          const status = promo.status
+            ? promo.status.charAt(0).toUpperCase() + promo.status.slice(1)
+            : "Draft";
+          return {
+            id: promo.id,
+            name: promo.name,
+            discount: discountLabel,
+            validPeriod,
+            status,
+          };
+        }));
+      } catch (err) {
+        console.error('Failed to load promotions:', err);
+      } finally {
+        setIsLoadingPromotions(false);
+      }
+    };
+    loadPromotions();
+  }, [currencyCode]);
 
   const resetForm = () => {
     setFormData({
@@ -244,7 +217,16 @@ export function ManagePlans() {
       maxFreezeOccurrences: "2",
       chargePerExtraDay: "5",
       freeDaysAllowed: "10",
-      autoUnfreeze: true
+      autoUnfreeze: true,
+      // Family Plan Settings (only used when planType === "Family")
+      familyBillingMode: "individual",
+      pricePerMember: "",
+      maxFamilyMembers: "",
+      maxAdultMembers: "",
+      maxChildMembers: "",
+      allowAdditionalMembers: true,
+      additionalMemberPrice: "",
+      autoCalculateTotal: true
     });
   };
 
@@ -276,6 +258,14 @@ export function ManagePlans() {
         selectedFacilities: formData.selectedFacilities,
         selectedPromotions: formData.selectedPromotions,
         selectedCampaigns: formData.selectedCampaigns,
+        familyBillingMode: formData.familyBillingMode,
+        pricePerMember: formData.pricePerMember ? parseFloat(formData.pricePerMember as string) : null,
+        maxFamilyMembers: formData.maxFamilyMembers ? parseInt(formData.maxFamilyMembers as string) : null,
+        maxAdultMembers: formData.maxAdultMembers ? parseInt(formData.maxAdultMembers as string) : null,
+        maxChildMembers: formData.maxChildMembers ? parseInt(formData.maxChildMembers as string) : null,
+        allowAdditionalMembers: formData.allowAdditionalMembers,
+        additionalMemberPrice: formData.additionalMemberPrice ? parseFloat(formData.additionalMemberPrice as string) : null,
+        autoCalculateTotal: formData.autoCalculateTotal,
       });
       setPlans([...plans, created]);
       setShowCreateDialog(false);
@@ -313,7 +303,15 @@ export function ManagePlans() {
       maxFreezeOccurrences: plan.maxFreezeOccurrences?.toString() || "2",
       chargePerExtraDay: plan.chargePerExtraDay?.toString() || "5",
       freeDaysAllowed: plan.freeDaysAllowed?.toString() || "10",
-      autoUnfreeze: plan.autoUnfreeze !== undefined ? plan.autoUnfreeze : true
+      autoUnfreeze: plan.autoUnfreeze !== undefined ? plan.autoUnfreeze : true,
+      familyBillingMode: plan.familyBillingMode || "individual",
+      pricePerMember: plan.pricePerMember?.toString() || "",
+      maxFamilyMembers: plan.maxFamilyMembers?.toString() || "",
+      maxAdultMembers: plan.maxAdultMembers?.toString() || "",
+      maxChildMembers: plan.maxChildMembers?.toString() || "",
+      allowAdditionalMembers: plan.allowAdditionalMembers !== undefined && plan.allowAdditionalMembers !== null ? plan.allowAdditionalMembers : true,
+      additionalMemberPrice: plan.additionalMemberPrice?.toString() || "",
+      autoCalculateTotal: plan.autoCalculateTotal !== undefined && plan.autoCalculateTotal !== null ? plan.autoCalculateTotal : true
     });
     setShowCreateDialog(true);
   };
@@ -347,6 +345,14 @@ export function ManagePlans() {
         selectedFacilities: formData.selectedFacilities,
         selectedPromotions: formData.selectedPromotions,
         selectedCampaigns: formData.selectedCampaigns,
+        familyBillingMode: formData.familyBillingMode,
+        pricePerMember: formData.pricePerMember ? parseFloat(formData.pricePerMember as string) : null,
+        maxFamilyMembers: formData.maxFamilyMembers ? parseInt(formData.maxFamilyMembers as string) : null,
+        maxAdultMembers: formData.maxAdultMembers ? parseInt(formData.maxAdultMembers as string) : null,
+        maxChildMembers: formData.maxChildMembers ? parseInt(formData.maxChildMembers as string) : null,
+        allowAdditionalMembers: formData.allowAdditionalMembers,
+        additionalMemberPrice: formData.additionalMemberPrice ? parseFloat(formData.additionalMemberPrice as string) : null,
+        autoCalculateTotal: formData.autoCalculateTotal,
       });
       setPlans(plans.map(p => p.id === editingPlan.id ? updated : p));
       setShowCreateDialog(false);
@@ -389,6 +395,7 @@ export function ManagePlans() {
   const getTypeColor = (type: string) => {
     switch (type) {
       case "Individual": return "bg-blue-100 text-blue-800";
+      case "Couple": return "bg-pink-100 text-pink-800";
       case "Family": return "bg-purple-100 text-purple-800";
       case "Corporate": return "bg-orange-100 text-orange-800";
       default: return "bg-gray-100 text-gray-800";
@@ -402,10 +409,6 @@ export function ManagePlans() {
 
   const getPromotionNames = (promotionIds: number[]) => {
     return promotionIds.map(id => availablePromotions.find(promo => promo.id === id)?.name).filter(Boolean);
-  };
-
-  const getCampaignNames = (campaignIds: number[]) => {
-    return campaignIds.map(id => availableCampaigns.find(campaign => campaign.id === id)?.name).filter(Boolean);
   };
 
   const getFacilityNames = (facilityIds: string[]) => {
@@ -473,30 +476,6 @@ export function ManagePlans() {
     setFormData(prev => ({
       ...prev,
       selectedPromotions: []
-    }));
-  };
-
-  // Campaigns handlers
-  const handleCampaignToggle = (campaignId: number) => {
-    setFormData(prev => ({
-      ...prev,
-      selectedCampaigns: prev.selectedCampaigns.includes(campaignId)
-        ? prev.selectedCampaigns.filter(id => id !== campaignId)
-        : [...prev.selectedCampaigns, campaignId]
-    }));
-  };
-
-  const handleSelectAllCampaigns = () => {
-    setFormData(prev => ({
-      ...prev,
-      selectedCampaigns: availableCampaigns.filter(c => c.status === "Active").map(c => c.id)
-    }));
-  };
-
-  const handleDeselectAllCampaigns = () => {
-    setFormData(prev => ({
-      ...prev,
-      selectedCampaigns: []
     }));
   };
 
@@ -650,6 +629,7 @@ export function ManagePlans() {
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="individual">Individual</SelectItem>
+                  <SelectItem value="couple">Couple</SelectItem>
                   <SelectItem value="family">Family</SelectItem>
                   <SelectItem value="corporate">Corporate</SelectItem>
                 </SelectContent>
@@ -680,7 +660,7 @@ export function ManagePlans() {
                 <TableHead>Assigned Trainers</TableHead>
                 <TableHead>Training Streams</TableHead>
                 <TableHead>Facilities</TableHead>
-                <TableHead>Promotions & Campaigns</TableHead>
+                <TableHead>Promotions</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -777,40 +757,20 @@ export function ManagePlans() {
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
-                      {(plan.selectedPromotions && plan.selectedPromotions.length > 0) || 
-                       (plan.selectedCampaigns && plan.selectedCampaigns.length > 0) ? (
-                        <>
-                          {plan.selectedPromotions && plan.selectedPromotions.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {getPromotionNames(plan.selectedPromotions).slice(0, 1).map((promoName, index) => (
-                                <Badge key={index} variant="outline" className="text-xs bg-green-50 text-green-700">
-                                  <Percent className="h-3 w-3 mr-1" />
-                                  {promoName}
-                                </Badge>
-                              ))}
-                              {plan.selectedPromotions.length > 1 && (
-                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
-                                  +{plan.selectedPromotions.length - 1} more
-                                </Badge>
-                              )}
-                            </div>
+                      {plan.selectedPromotions && plan.selectedPromotions.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {getPromotionNames(plan.selectedPromotions).slice(0, 1).map((promoName, index) => (
+                            <Badge key={index} variant="outline" className="text-xs bg-green-50 text-green-700">
+                              <Percent className="h-3 w-3 mr-1" />
+                              {promoName}
+                            </Badge>
+                          ))}
+                          {plan.selectedPromotions.length > 1 && (
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                              +{plan.selectedPromotions.length - 1} more
+                            </Badge>
                           )}
-                          {plan.selectedCampaigns && plan.selectedCampaigns.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {getCampaignNames(plan.selectedCampaigns).slice(0, 1).map((campaignName, index) => (
-                                <Badge key={index} variant="outline" className="text-xs bg-purple-50 text-purple-700">
-                                  <Megaphone className="h-3 w-3 mr-1" />
-                                  {campaignName}
-                                </Badge>
-                              ))}
-                              {plan.selectedCampaigns.length > 1 && (
-                                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
-                                  +{plan.selectedCampaigns.length - 1} more
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                        </>
+                        </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">No promotions</span>
                       )}
@@ -955,35 +915,19 @@ export function ManagePlans() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg border bg-white">
-                  <p className="text-xs text-muted-foreground">Promotions</p>
-                  {viewingPlan.selectedPromotions.length > 0 ? (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {getPromotionNames(viewingPlan.selectedPromotions).map((promo) => (
-                        <Badge key={promo} variant="outline" className="text-xs bg-green-50 text-green-700">
-                          {promo}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">No promotions</p>
-                  )}
-                </div>
-                <div className="p-3 rounded-lg border bg-white">
-                  <p className="text-xs text-muted-foreground">Campaigns</p>
-                  {viewingPlan.selectedCampaigns.length > 0 ? (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {getCampaignNames(viewingPlan.selectedCampaigns).map((campaign) => (
-                        <Badge key={campaign} variant="outline" className="text-xs bg-purple-50 text-purple-700">
-                          {campaign}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">No campaigns</p>
-                  )}
-                </div>
+              <div className="p-3 rounded-lg border bg-white">
+                <p className="text-xs text-muted-foreground">Promotions</p>
+                {viewingPlan.selectedPromotions.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {getPromotionNames(viewingPlan.selectedPromotions).map((promo) => (
+                      <Badge key={promo} variant="outline" className="text-xs bg-green-50 text-green-700">
+                        {promo}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">No promotions</p>
+                )}
               </div>
 
               <div className="p-3 rounded-lg border bg-white">
@@ -1043,6 +987,7 @@ export function ManagePlans() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Individual">Individual</SelectItem>
+                    <SelectItem value="Couple">Couple</SelectItem>
                     <SelectItem value="Family">Family</SelectItem>
                     <SelectItem value="Corporate">Corporate</SelectItem>
                   </SelectContent>
@@ -1418,16 +1363,16 @@ export function ManagePlans() {
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Promotions & Campaigns */}
-            <Collapsible 
-              open={isPromotionsCampaignsOpen} 
+            {/* Promotions */}
+            <Collapsible
+              open={isPromotionsCampaignsOpen}
               onOpenChange={setIsPromotionsCampaignsOpen}
               className="border rounded-lg p-4 space-y-4"
             >
               <CollapsibleTrigger className="flex items-center justify-between w-full">
                 <div className="flex items-center space-x-2">
                   <Megaphone className="h-5 w-5 text-orange-600" />
-                  <Label className="text-base cursor-pointer">Promotions & Campaigns</Label>
+                  <Label className="text-base cursor-pointer">Promotions</Label>
                 </div>
                 {isPromotionsCampaignsOpen ? (
                   <ChevronUp className="h-4 w-4" />
@@ -1435,10 +1380,10 @@ export function ManagePlans() {
                   <ChevronDown className="h-4 w-4" />
                 )}
               </CollapsibleTrigger>
-              
+
               <CollapsibleContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Attach promotional offers and marketing campaigns to this membership plan.
+                  Attach promotional offers from Member Connect to this membership plan.
                 </p>
 
                 {/* Promotions Section */}
@@ -1469,7 +1414,11 @@ export function ManagePlans() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
-                    {availablePromotions.map((promotion) => (
+                    {isLoadingPromotions ? (
+                      <p className="text-sm text-muted-foreground p-2">Loading promotions...</p>
+                    ) : availablePromotions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground p-2">No promotions found. Create one in Member Connect &gt; Promotions &amp; Campaigns.</p>
+                    ) : availablePromotions.map((promotion) => (
                       <div key={promotion.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
                         <Checkbox
                           id={`promotion-${promotion.id}`}
@@ -1478,7 +1427,7 @@ export function ManagePlans() {
                           disabled={promotion.status !== "Active"}
                         />
                         <div className="flex-1">
-                          <Label 
+                          <Label
                             htmlFor={`promotion-${promotion.id}`}
                             className={`text-sm cursor-pointer ${promotion.status !== "Active" ? "text-muted-foreground" : ""}`}
                           >
@@ -1488,8 +1437,8 @@ export function ManagePlans() {
                             <Badge variant="outline" className="text-xs">
                               {promotion.discount}
                             </Badge>
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={`text-xs ${promotion.status === "Active" ? "text-green-600" : "text-red-600"}`}
                             >
                               {promotion.status}
@@ -1506,88 +1455,14 @@ export function ManagePlans() {
                   </div>
                 </div>
 
-                {/* Campaigns Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center space-x-2">
-                      <Tag className="h-4 w-4 text-purple-600" />
-                      <span>Available Campaigns</span>
-                    </Label>
-                    <div className="flex space-x-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleSelectAllCampaigns}
-                      >
-                        Select Active
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleDeselectAllCampaigns}
-                      >
-                        Deselect All
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
-                    {availableCampaigns.map((campaign) => (
-                      <div key={campaign.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                        <Checkbox
-                          id={`campaign-${campaign.id}`}
-                          checked={formData.selectedCampaigns.includes(campaign.id)}
-                          onCheckedChange={() => handleCampaignToggle(campaign.id)}
-                          disabled={campaign.status !== "Active"}
-                        />
-                        <div className="flex-1">
-                          <Label 
-                            htmlFor={`campaign-${campaign.id}`}
-                            className={`text-sm cursor-pointer ${campaign.status !== "Active" ? "text-muted-foreground" : ""}`}
-                          >
-                            {campaign.name}
-                          </Label>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {campaign.type}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {campaign.duration}
-                            </Badge>
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs ${campaign.status === "Active" ? "text-green-600" : "text-red-600"}`}
-                            >
-                              {campaign.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="text-sm text-muted-foreground">
-                    {formData.selectedCampaigns.length} of {availableCampaigns.filter(c => c.status === "Active").length} active campaigns selected
-                  </div>
-                </div>
-
                 {/* Summary */}
-                {(formData.selectedPromotions.length > 0 || formData.selectedCampaigns.length > 0) && (
+                {formData.selectedPromotions.length > 0 && (
                   <div className="bg-muted/30 rounded-md p-3">
                     <Label className="text-sm font-medium">Selected Marketing Elements:</Label>
                     <div className="mt-2 space-y-1">
-                      {formData.selectedPromotions.length > 0 && (
-                        <div className="text-sm">
-                          <span className="font-medium text-green-600">Promotions:</span> {formData.selectedPromotions.length} selected
-                        </div>
-                      )}
-                      {formData.selectedCampaigns.length > 0 && (
-                        <div className="text-sm">
-                          <span className="font-medium text-purple-600">Campaigns:</span> {formData.selectedCampaigns.length} selected
-                        </div>
-                      )}
+                      <div className="text-sm">
+                        <span className="font-medium text-green-600">Promotions:</span> {formData.selectedPromotions.length} selected
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1735,6 +1610,172 @@ export function ManagePlans() {
                 </div>
               </CollapsibleContent>
             </Collapsible>
+
+            {/* Family Plan Settings — only for planType === "Family" */}
+            {formData.planType === "Family" && (
+              <Collapsible
+                open={isFamilyPlanSettingsOpen}
+                onOpenChange={setIsFamilyPlanSettingsOpen}
+                className="border rounded-lg p-4 space-y-4"
+              >
+                <CollapsibleTrigger className="flex items-center justify-between w-full">
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-5 w-5 text-[#2B7A78]" />
+                    <Label className="text-base cursor-pointer">Family Plan Settings</Label>
+                  </div>
+                  {isFamilyPlanSettingsOpen ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </CollapsibleTrigger>
+
+                <CollapsibleContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Configure how this Family plan bills its members and how many members a family can have.
+                  </p>
+
+                  {/* Billing Mode */}
+                  <div className="space-y-2">
+                    <Label htmlFor="familyBillingMode">Billing Mode</Label>
+                    <Select
+                      value={formData.familyBillingMode}
+                      onValueChange={(value) => setFormData({...formData, familyBillingMode: value})}
+                    >
+                      <SelectTrigger id="familyBillingMode">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="individual">Individual — adults bill separately, minors bill to head</SelectItem>
+                        <SelectItem value="family_head">Family Head — everyone bills together on ONE invoice</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="pricePerMember">
+                        Price Per Member
+                        <span className="text-xs text-muted-foreground ml-2">({currencyCode})</span>
+                      </Label>
+                      <Input
+                        id="pricePerMember"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="e.g., 100.00"
+                        value={formData.pricePerMember}
+                        onChange={(e) => setFormData({...formData, pricePerMember: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="maxFamilyMembers">
+                        Maximum Family Members
+                        <span className="text-xs text-muted-foreground ml-2">(blank = unlimited)</span>
+                      </Label>
+                      <Input
+                        id="maxFamilyMembers"
+                        type="number"
+                        min="0"
+                        placeholder="e.g., 5"
+                        value={formData.maxFamilyMembers}
+                        onChange={(e) => setFormData({...formData, maxFamilyMembers: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="maxAdultMembers">
+                        Maximum Adult Members
+                        <span className="text-xs text-muted-foreground ml-2">(blank = unlimited)</span>
+                      </Label>
+                      <Input
+                        id="maxAdultMembers"
+                        type="number"
+                        min="0"
+                        placeholder="e.g., 2"
+                        value={formData.maxAdultMembers}
+                        onChange={(e) => setFormData({...formData, maxAdultMembers: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="maxChildMembers">
+                        Maximum Child Members
+                        <span className="text-xs text-muted-foreground ml-2">(blank = unlimited)</span>
+                      </Label>
+                      <Input
+                        id="maxChildMembers"
+                        type="number"
+                        min="0"
+                        placeholder="e.g., 3"
+                        value={formData.maxChildMembers}
+                        onChange={(e) => setFormData({...formData, maxChildMembers: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Allow Additional Members */}
+                  <div className="flex items-center justify-between p-3 border rounded-lg bg-[#F9FAFB]">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="allowAdditionalMembers" className="text-base">Allow Additional Members</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Let a family exceed Maximum Family Members, billed at the additional member price
+                      </p>
+                    </div>
+                    <Switch
+                      id="allowAdditionalMembers"
+                      checked={formData.allowAdditionalMembers}
+                      onCheckedChange={(checked) => setFormData({...formData, allowAdditionalMembers: checked})}
+                    />
+                  </div>
+
+                  {formData.allowAdditionalMembers && (
+                    <div className="space-y-2">
+                      <Label htmlFor="additionalMemberPrice">
+                        Additional Member Price
+                        <span className="text-xs text-muted-foreground ml-2">({currencyCode}, falls back to Price Per Member if blank)</span>
+                      </Label>
+                      <Input
+                        id="additionalMemberPrice"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="e.g., 75.00"
+                        value={formData.additionalMemberPrice}
+                        onChange={(e) => setFormData({...formData, additionalMemberPrice: e.target.value})}
+                      />
+                    </div>
+                  )}
+
+                  {/* Auto Calculate Total */}
+                  <div className="flex items-center justify-between p-3 border rounded-lg bg-[#F9FAFB]">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="autoCalculateTotal" className="text-base">Auto Calculate Total Amount</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically compute the family invoice as Price Per Member × current member count
+                      </p>
+                    </div>
+                    <Switch
+                      id="autoCalculateTotal"
+                      checked={formData.autoCalculateTotal}
+                      onCheckedChange={(checked) => setFormData({...formData, autoCalculateTotal: checked})}
+                    />
+                  </div>
+
+                  {formData.familyBillingMode === "family_head" && (
+                    <div className="bg-[#DFF5F4] border border-[#2B7A78] rounded-md p-4">
+                      <div className="flex items-start gap-2">
+                        <Info className="h-5 w-5 text-[#2B7A78] flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-[#1E293B]">Family Head Billing Preview</p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Example: {formData.pricePerMember || "0"} × 5 members = {currencyCode} {((parseFloat(formData.pricePerMember as string) || 0) * 5).toFixed(2)} on ONE invoice billed only to the family head.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </div>
 
           {/* Actions */}

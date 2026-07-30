@@ -103,6 +103,182 @@ public class ReceiptService {
                 .collect(Collectors.toList());
     }
 
+    // ── Member Statement of Account ──────────────────────────────────────────
+
+    /**
+     * Builds a member's full Statement of Account: every receipt billed/paid
+     * against them, oldest-first, with a running balance. A billed-to-head member
+     * (any minor, or an adult under family_head billing mode) never carries their
+     * own receipts — their fees are folded into their head's bill (see
+     * Receipt.minorCharges) — so their statement always comes back empty with
+     * billedToHead=true and familyHeadName populated instead.
+     */
+    @Transactional(readOnly = true)
+    public com.company.project.dto.MemberStatementResponseDTO getMemberStatement(
+            Long memberDbId, LocalDateTime from, LocalDateTime to) {
+        Member member = memberRepository.findById(memberDbId)
+                .orElseThrow(() -> new RuntimeException("Member not found: " + memberDbId));
+
+        com.company.project.dto.MemberStatementResponseDTO dto = new com.company.project.dto.MemberStatementResponseDTO();
+        dto.setMemberDbId(String.valueOf(member.getId()));
+        dto.setMemberId(member.getMemberId());
+        dto.setMemberName(member.getName());
+        dto.setMemberPhone(member.getPhone());
+        dto.setIsMinor(Boolean.TRUE.equals(member.getIsMinor()));
+        dto.setBilledToHead(member.isEffectivelyBilledToHead());
+
+        if (member.isEffectivelyBilledToHead()) {
+            String headName = null;
+            if (member.getFamilyHeadId() != null) {
+                headName = memberRepository.findByMemberId(member.getFamilyHeadId())
+                        .map(Member::getName).orElse(null);
+            }
+            dto.setFamilyHeadName(headName);
+            dto.setOpeningBalance(BigDecimal.ZERO);
+            dto.setTotalBilled(BigDecimal.ZERO);
+            dto.setTotalPaid(BigDecimal.ZERO);
+            dto.setClosingBalance(BigDecimal.ZERO);
+            dto.setLines(new ArrayList<>());
+            return dto;
+        }
+
+        List<Receipt> receipts = receiptRepository.findByMemberDbIdOrderByTransactionDateAsc(memberDbId);
+        // Fallback: handles stale/null member_db_id on older receipts, same as getPendingBillsForMember.
+        if (receipts.isEmpty()) {
+            receipts = receiptRepository.findByMemberNameOrderByTransactionDateAsc(member.getName());
+            for (Receipt r : receipts) {
+                if (r.getMemberDbId() == null || !r.getMemberDbId().equals(memberDbId)) {
+                    r.setMemberDbId(memberDbId);
+                    receiptRepository.save(r);
+                }
+            }
+        }
+
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        // Bills (New/Renewal/Add-on/Daily Entry) create debt; "Payment" receipts are
+        // settlement vouchers created by settlePayment(). Each bill's paidAmount is
+        // now an immutable record of only what it received at creation time — later
+        // settlements never rewrite it, they exist purely as their own separate rows
+        // with their own real date — so no cross-attribution/subtraction is needed
+        // here: a bill's initial payment is just its own paidAmount, and every
+        // settlement is simply its own row.
+        List<Receipt> bills = receipts.stream()
+                .filter(r -> !"Payment".equalsIgnoreCase(r.getTransactionType()))
+                .collect(Collectors.toList());
+        List<Receipt> settlements = receipts.stream()
+                .filter(r -> "Payment".equalsIgnoreCase(r.getTransactionType()))
+                .collect(Collectors.toList());
+
+        List<com.company.project.dto.StatementLineDTO> allRows = new ArrayList<>();
+
+        for (Receipt b : bills) {
+            LocalDateTime txnDate = b.getTransactionDate();
+            BigDecimal billAmount = b.getAmount() != null ? b.getAmount() : BigDecimal.ZERO;
+            BigDecimal initialPayment = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
+
+            com.company.project.dto.StatementLineDTO invoiceRow = new com.company.project.dto.StatementLineDTO();
+            invoiceRow.setDate(txnDate != null ? txnDate.format(dateFmt) : null);
+            invoiceRow.setReceiptNo(b.getReceiptNo());
+            invoiceRow.setType("Invoice");
+            invoiceRow.setDescription(b.getPlanName() != null ? b.getPlanName() : b.getTransactionType());
+            invoiceRow.setDebit(billAmount);
+            invoiceRow.setCredit(BigDecimal.ZERO);
+            invoiceRow.setStatus(b.getStatus());
+            invoiceRow.setMinorCharges(b.getMinorCharges());
+            allRows.add(invoiceRow);
+
+            // Split the initial payment into one row per instrument actually used at
+            // creation time (e.g. 50 via Card + 10 via Cash), not one lumped row under
+            // a single method label. Walk the bill's own breakdown in order and consume
+            // legs up to initialPayment's total.
+            BigDecimal remaining = initialPayment;
+            List<com.company.project.dto.PaymentSplitDTO> breakdown = b.getPaymentBreakdown();
+            if (breakdown != null && !breakdown.isEmpty()) {
+                for (com.company.project.dto.PaymentSplitDTO leg : breakdown) {
+                    if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+                    BigDecimal legAmount = leg.getAmount() != null ? leg.getAmount() : BigDecimal.ZERO;
+                    BigDecimal take = legAmount.min(remaining);
+                    if (take.compareTo(BigDecimal.ZERO) <= 0) continue;
+                    allRows.add(buildPaymentRow(txnDate, dateFmt, b.getReceiptNo(), leg.getMethod(), take, b.getStatus()));
+                    remaining = remaining.subtract(take);
+                }
+            }
+            if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                allRows.add(buildPaymentRow(txnDate, dateFmt, b.getReceiptNo(), b.getPaymentMethod(), remaining, b.getStatus()));
+            }
+        }
+
+        for (Receipt s : settlements) {
+            LocalDateTime txnDate = s.getTransactionDate();
+            List<com.company.project.dto.PaymentSplitDTO> breakdown = s.getPaymentBreakdown();
+            if (breakdown != null && !breakdown.isEmpty()) {
+                for (com.company.project.dto.PaymentSplitDTO leg : breakdown) {
+                    BigDecimal legAmount = leg.getAmount() != null ? leg.getAmount() : BigDecimal.ZERO;
+                    if (legAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
+                    allRows.add(buildPaymentRow(txnDate, dateFmt, s.getReceiptNo(), leg.getMethod(), legAmount, s.getStatus()));
+                }
+            } else {
+                BigDecimal amount = s.getAmount() != null ? s.getAmount() : BigDecimal.ZERO;
+                if (amount.compareTo(BigDecimal.ZERO) > 0) {
+                    allRows.add(buildPaymentRow(txnDate, dateFmt, s.getReceiptNo(), s.getPaymentMethod(), amount, s.getStatus()));
+                }
+            }
+        }
+
+        // Stable sort by date — ties (a bill's Invoice + initial-Payment row share the
+        // bill's own date) keep insertion order, so Invoice always precedes its Payment.
+        allRows.sort(Comparator.comparing(
+                com.company.project.dto.StatementLineDTO::getDate,
+                Comparator.nullsLast(Comparator.naturalOrder())));
+
+        BigDecimal openingBalance = BigDecimal.ZERO;
+        for (com.company.project.dto.StatementLineDTO row : allRows) {
+            if (from != null && row.getDate() != null && LocalDateTime.parse(row.getDate() + "T00:00:00").isBefore(from)) {
+                openingBalance = openingBalance.add(row.getDebit()).subtract(row.getCredit());
+            }
+        }
+
+        BigDecimal running = openingBalance;
+        BigDecimal totalBilled = BigDecimal.ZERO;
+        BigDecimal totalPaid = BigDecimal.ZERO;
+        List<com.company.project.dto.StatementLineDTO> lines = new ArrayList<>();
+
+        for (com.company.project.dto.StatementLineDTO row : allRows) {
+            LocalDateTime rowDate = row.getDate() != null ? LocalDateTime.parse(row.getDate() + "T00:00:00") : null;
+            if (from != null && rowDate != null && rowDate.isBefore(from)) continue;
+            if (to != null && rowDate != null && rowDate.isAfter(to)) continue;
+
+            running = running.add(row.getDebit()).subtract(row.getCredit());
+            totalBilled = totalBilled.add(row.getDebit());
+            totalPaid = totalPaid.add(row.getCredit());
+            row.setBalance(running);
+            lines.add(row);
+        }
+
+        dto.setOpeningBalance(openingBalance);
+        dto.setTotalBilled(totalBilled);
+        dto.setTotalPaid(totalPaid);
+        dto.setClosingBalance(running);
+        dto.setLines(lines);
+        return dto;
+    }
+
+    private com.company.project.dto.StatementLineDTO buildPaymentRow(
+            LocalDateTime txnDate, DateTimeFormatter dateFmt, String receiptNo,
+            String method, BigDecimal amount, String status) {
+        com.company.project.dto.StatementLineDTO row = new com.company.project.dto.StatementLineDTO();
+        row.setDate(txnDate != null ? txnDate.format(dateFmt) : null);
+        row.setReceiptNo(receiptNo);
+        row.setType("Payment");
+        row.setDescription("Payment received" + (method != null ? " (" + method + ")" : ""));
+        row.setDebit(BigDecimal.ZERO);
+        row.setCredit(amount);
+        row.setPaymentMethod(method);
+        row.setStatus(status);
+        return row;
+    }
+
     // ── Write ───────────────────────────────────────────────────────────────
 
     public ReceiptResponseDTO createReceipt(Receipt receipt) {
@@ -128,6 +304,41 @@ public class ReceiptService {
      * Called from MemberService after creating or renewing a member.
      */
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus) {
+        return createReceiptForMember(member, transactionType, paymentStatus, null, null, null);
+    }
+
+    public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,
+                                          List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown) {
+        return createReceiptForMember(member, transactionType, paymentStatus, paymentBreakdown, null, null);
+    }
+
+    /**
+     * Records the invoice total, the amount actually received, and the true
+     * remainder as separate fields — a partial/credit payment (e.g. AED 5 received
+     * against a AED 45 invoice) must show paidAmount=5, not 0 or the full 45.
+     * paidAmount is derived from member.outstandingBalance (invoice − outstanding)
+     * rather than from the coarse paid/pending paymentStatus string, so a partial
+     * amount is captured correctly regardless of which bucket the member's overall
+     * status falls into.
+     */
+    public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,
+                                          List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+                                          String bankAccountCode, String bankAccountName) {
+        return createReceiptForMember(member, transactionType, paymentStatus, paymentBreakdown,
+                bankAccountCode, bankAccountName, null, null);
+    }
+
+    /**
+     * Same as above, but lets the caller override the invoice total and attach an
+     * itemized minorCharges breakdown — used when a family head's bill folds in
+     * one or more minor family members' fees, so the receipt's amount covers the
+     * combined household charge rather than just member.getMembershipFee().
+     */
+    public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,
+                                          List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+                                          String bankAccountCode, String bankAccountName,
+                                          BigDecimal amountOverride,
+                                          List<com.company.project.dto.MinorChargeDTO> minorCharges) {
         Receipt r = new Receipt();
         r.setTransactionDate(LocalDateTime.now());
         r.setMemberDbId(member.getId());
@@ -135,17 +346,90 @@ public class ReceiptService {
         r.setMemberName(member.getName());
         r.setMemberPhone(member.getPhone());
         r.setTransactionType(transactionType);
-        r.setAmount(member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO);
+
+        BigDecimal totalAmount = amountOverride != null ? amountOverride
+                : (member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO);
+        BigDecimal outstanding = member.getOutstandingBalance() != null ? member.getOutstandingBalance() : BigDecimal.ZERO;
+        BigDecimal paidAmount = totalAmount.subtract(outstanding).max(BigDecimal.ZERO);
+
+        r.setAmount(totalAmount);
+        r.setMinorCharges(minorCharges);
+        // The actual method the received portion moved through (Cash/Card/Bank Transfer/
+        // Cheque). "Credit" only ever appears here when nothing has been received yet.
         r.setPaymentMethod(normalizePaymentMethod(member.getPaymentMethodUsed()));
-        boolean isPaid = "paid".equalsIgnoreCase(paymentStatus);
-        r.setStatus(isPaid ? "Paid" : "Pending");
-        r.setPaidAmount(isPaid ? r.getAmount() : BigDecimal.ZERO);
-        r.setDueDate(member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate());
+        r.setPaymentBreakdown(paymentBreakdown);
+        r.setPaidAmount(paidAmount);
+        // Initial rollup state = exactly what this transaction paid; later
+        // settlements advance this field without ever rewriting paidAmount itself.
+        r.setTotalPaidToDate(paidAmount);
+        // member.outstandingBalance is already finalized by the caller (MemberService)
+        // before this method runs, so it reflects the true balance after this bill.
+        r.setBalanceAfter(member.getOutstandingBalance() != null ? member.getOutstandingBalance() : BigDecimal.ZERO);
+        if (paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            r.setStatus("Pending");
+        } else if (paidAmount.compareTo(totalAmount) >= 0) {
+            r.setStatus("Paid");
+        } else {
+            r.setStatus("Partial");
+        }
+        r.setBankAccountCode(bankAccountCode);
+        r.setBankAccountName(bankAccountName);
+        // A pending/partial balance is due on the member's payment due date, not the
+        // membership renewal date — only fall back to the renewal date once fully paid.
+        r.setDueDate(paidAmount.compareTo(totalAmount) < 0 && member.getNextPaymentDate() != null
+                ? member.getNextPaymentDate()
+                : (member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate()));
         r.setPlanName(member.getMembershipPlan());
         r.setValidFrom(member.getMembershipStartDate());
         r.setValidTill(member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate());
         r.setMembershipType(member.getMembershipType());
         r.setProcessedBy("Admin");
+
+        Receipt saved = receiptRepository.save(r);
+        saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
+        return receiptRepository.save(saved);
+    }
+
+    /**
+     * Bills a single charge (e.g. a minor family member's renewal fee) onto their
+     * guardian's account: the receipt's member fields are the guardian's — the
+     * minor never gets their own receipt/ledger entry — with minorCharges
+     * itemizing which family member the charge is actually for.
+     */
+    public Receipt createMinorChargeReceipt(Member guardian, Member minor, BigDecimal fee, boolean paid,
+                                            String transactionType,
+                                            List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+                                            String bankAccountCode, String bankAccountName) {
+        Receipt r = new Receipt();
+        r.setTransactionDate(LocalDateTime.now());
+        r.setMemberDbId(guardian.getId());
+        r.setMemberId(guardian.getMemberId());
+        r.setMemberName(guardian.getName());
+        r.setMemberPhone(guardian.getPhone());
+        r.setTransactionType(transactionType);
+
+        BigDecimal amount = fee != null ? fee : BigDecimal.ZERO;
+        BigDecimal paidAmount = paid ? amount : BigDecimal.ZERO;
+
+        r.setAmount(amount);
+        r.setPaymentMethod(normalizePaymentMethod(guardian.getPaymentMethodUsed()));
+        r.setPaymentBreakdown(paymentBreakdown);
+        r.setPaidAmount(paidAmount);
+        r.setTotalPaidToDate(paidAmount);
+        r.setBalanceAfter(guardian.getOutstandingBalance() != null ? guardian.getOutstandingBalance() : BigDecimal.ZERO);
+        r.setStatus(paid ? "Paid" : "Pending");
+        r.setBankAccountCode(bankAccountCode);
+        r.setBankAccountName(bankAccountName);
+        r.setDueDate(paid ? null : guardian.getNextPaymentDate());
+        r.setPlanName(minor.getMembershipPlan());
+        r.setValidFrom(minor.getMembershipStartDate());
+        r.setValidTill(minor.getMembershipEndDate() != null ? minor.getMembershipEndDate() : minor.getExpiryDate());
+        r.setMembershipType(guardian.getMembershipType());
+        r.setProcessedBy("Admin");
+        r.setRemarks("Charge for family member: " + minor.getName()
+                + (minor.getRelationshipToHead() != null ? " (" + minor.getRelationshipToHead() + ")" : ""));
+        r.setMinorCharges(List.of(new com.company.project.dto.MinorChargeDTO(
+                minor.getMemberId(), minor.getId(), minor.getName(), amount)));
 
         Receipt saved = receiptRepository.save(r);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
@@ -161,6 +445,8 @@ public class ReceiptService {
                 .orElseThrow(() -> new RuntimeException("Member not found: " + req.getMemberDbId()));
 
         BigDecimal totalPaid = BigDecimal.ZERO;
+        Long soleBillId = null;
+        boolean singleBill = req.getBillPayments() != null && req.getBillPayments().size() == 1;
 
         if (req.getBillPayments() != null) {
             for (SettlePaymentRequestDTO.BillPayment bp : req.getBillPayments()) {
@@ -169,14 +455,28 @@ public class ReceiptService {
                 Receipt existing = receiptRepository.findById(bp.getReceiptId())
                         .orElseThrow(() -> new RuntimeException("Receipt not found: " + bp.getReceiptId()));
 
-                BigDecimal currentPaid = existing.getPaidAmount() != null ? existing.getPaidAmount() : BigDecimal.ZERO;
-                BigDecimal newPaid = currentPaid.add(bp.getPayAmount());
-                existing.setPaidAmount(newPaid);
+                // The bill's own transaction facts — paidAmount, paymentMethod,
+                // paymentBreakdown, balanceAfter — are an immutable record of what
+                // happened when THIS receipt was created. A later settlement must
+                // NEVER rewrite them (that used to merge unrelated payment events into
+                // one row, e.g. "Paid in 2 payments: 25 Cash + 25 Bank Transfer").
+                // This settlement gets its own separate receipt below, with its own
+                // number, date, method and amount. Only the bill's live rollup state —
+                // how much has been paid toward it in total, and whether it's now
+                // fully settled — may still advance, the same way
+                // Member.outstandingBalance does.
+                BigDecimal billPaidSoFar = existing.getTotalPaidToDate() != null
+                        ? existing.getTotalPaidToDate()
+                        : (existing.getPaidAmount() != null ? existing.getPaidAmount() : BigDecimal.ZERO);
+                BigDecimal newBillPaid = billPaidSoFar.add(bp.getPayAmount());
+                existing.setTotalPaidToDate(newBillPaid);
 
                 BigDecimal fullAmount = existing.getAmount() != null ? existing.getAmount() : BigDecimal.ZERO;
-                existing.setStatus(newPaid.compareTo(fullAmount) >= 0 ? "Paid" : "Partial");
+                existing.setStatus(newBillPaid.compareTo(fullAmount) >= 0 ? "Paid" : "Partial");
+
                 receiptRepository.save(existing);
                 totalPaid = totalPaid.add(bp.getPayAmount());
+                if (singleBill) soleBillId = existing.getId();
             }
         }
 
@@ -203,6 +503,7 @@ public class ReceiptService {
         settlement.setAmount(totalPaid);
         settlement.setPaidAmount(totalPaid);
         settlement.setPaymentMethod(normalizePaymentMethod(req.getPaymentMethod()));
+        settlement.setPaymentBreakdown(req.getPaymentBreakdown());
         settlement.setStatus("Paid");
         settlement.setPlanName(member.getMembershipPlan());
         settlement.setValidFrom(member.getMembershipStartDate());
@@ -210,6 +511,10 @@ public class ReceiptService {
         settlement.setMembershipType(member.getMembershipType());
         settlement.setProcessedBy("Admin");
         settlement.setRemarks(req.getRemarks());
+        settlement.setLinkedBillId(soleBillId);
+        // member.outstandingBalance was just finalized above (post-settlement), so this
+        // is the true "remaining due after this payment" snapshot for the receipt row.
+        settlement.setBalanceAfter(member.getOutstandingBalance());
 
         Receipt saved = receiptRepository.save(settlement);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
@@ -229,7 +534,8 @@ public class ReceiptService {
                     req.getPaymentMethod(),
                     saved.getReceiptNo(),
                     saved.getReceiptNo(),
-                    req.getRemarks()
+                    req.getRemarks(),
+                    req.getPaymentBreakdown()
             );
         }
 
@@ -274,7 +580,7 @@ public class ReceiptService {
         for (Receipt r : paidReceipts) {
             if (r.getTransactionDate() != null) {
                 String key = r.getTransactionDate().format(labelFmt);
-                monthlyMap.computeIfPresent(key, (k, v) -> v.add(r.getAmount() != null ? r.getAmount() : BigDecimal.ZERO));
+                monthlyMap.computeIfPresent(key, (k, v) -> v.add(r.getPaidAmount() != null ? r.getPaidAmount() : BigDecimal.ZERO));
             }
         }
 
@@ -318,6 +624,10 @@ public class ReceiptService {
         }
         for (Member m : memberRepository.findDueSoonMembers(now, sevenDaysLater)) {
             result.add(buildDueDTO(m, "Due Soon", now, dateFmt));
+        }
+        for (Member m : memberRepository.findPendingMembersWithBalance(now, sevenDaysLater)) {
+            String statusLabel = "partial".equalsIgnoreCase(m.getPaymentStatus()) ? "Partial" : "Pending";
+            result.add(buildDueDTO(m, statusLabel, now, dateFmt));
         }
         return result;
     }

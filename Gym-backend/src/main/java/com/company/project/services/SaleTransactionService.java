@@ -85,6 +85,7 @@ public class SaleTransactionService {
         transaction.setMemberId(req.getMemberId());
         transaction.setMemberName(req.getMemberName());
         transaction.setPaymentMethod(req.getPaymentMethod());
+        transaction.setPaymentBreakdown(req.getPaymentBreakdown());
         transaction.setSubtotal(req.getSubtotal() != null ? req.getSubtotal() : BigDecimal.ZERO);
         transaction.setDiscountAmount(req.getDiscountAmount() != null ? req.getDiscountAmount() : BigDecimal.ZERO);
         transaction.setTaxAmount(req.getTaxAmount() != null ? req.getTaxAmount() : BigDecimal.ZERO);
@@ -150,7 +151,8 @@ public class SaleTransactionService {
                 transaction.getPaymentMethod(),
                 transaction.getTransactionNumber(),
                 transaction.getTransactionNumber(),
-                transaction.getNotes()
+                transaction.getNotes(),
+                transaction.getPaymentBreakdown()
         );
 
         return SaleTransactionResponseDTO.fromEntity(transaction, savedItems);

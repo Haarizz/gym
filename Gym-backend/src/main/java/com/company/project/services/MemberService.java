@@ -1,12 +1,16 @@
 package com.company.project.services;
 
 import com.company.project.automation.AutomationExecutorService;
+import com.company.project.dto.FamilyGroupResponseDTO;
 import com.company.project.dto.FamilyMemberDTO;
+import com.company.project.dto.FamilyRenewalRequestDTO;
 import com.company.project.dto.FreezeRequestDTO;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
 import com.company.project.dto.MembersPageResponseDTO;
+import com.company.project.dto.MinorRenewalRequestDTO;
 import com.company.project.dto.PaginationDTO;
+import com.company.project.dto.PaymentSplitDTO;
 import com.company.project.dto.RenewalRequestDTO;
 import com.company.project.services.NotificationService;
 import com.company.project.entities.Member;
@@ -55,6 +59,7 @@ public class MemberService {
     private final NotificationService notificationService;
     private final AutomationExecutorService automationExecutorService;
     private final ReceiptVoucherService receiptVoucherService;
+    private final FinancialEventService financialEventService;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
@@ -65,7 +70,8 @@ public class MemberService {
                          PasswordEncoder passwordEncoder,
                          NotificationService notificationService,
                          AutomationExecutorService automationExecutorService,
-                         ReceiptVoucherService receiptVoucherService) {
+                         ReceiptVoucherService receiptVoucherService,
+                         FinancialEventService financialEventService) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
         this.receiptService            = receiptService;
@@ -76,6 +82,7 @@ public class MemberService {
         this.notificationService       = notificationService;
         this.automationExecutorService = automationExecutorService;
         this.receiptVoucherService     = receiptVoucherService;
+        this.financialEventService     = financialEventService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -131,22 +138,148 @@ public class MemberService {
 
         // Determine family head flag
         boolean hasFamily = request.getFamilyMembers() != null && !request.getFamilyMembers().isEmpty();
+        // "Couple" is a constrained Family registration (exactly one connected adult,
+        // no minors) — it reuses the exact same head/adult linking + independent
+        // billing logic as Family, just capped to one dependent by the frontend.
         boolean isFamilyType = "Family".equalsIgnoreCase(member.getMembershipType())
-                || "family".equalsIgnoreCase(member.getMembershipType());
+                || "Couple".equalsIgnoreCase(member.getMembershipType());
         if (isFamilyType && hasFamily) {
             member.setIsFamilyHead(true);
         } else if (request.getIsFamilyHead() != null) {
             member.setIsFamilyHead(request.getIsFamilyHead());
         }
 
-        // Calculate expiry date from plan duration (overrides any frontend-sent value)
-        if (member.getMembershipStartDate() != null && member.getMembershipPlan() != null) {
-            planRepository.findByName(member.getMembershipPlan()).ifPresent(plan -> {
-                LocalDateTime expiry = computeExpiry(member.getMembershipStartDate(), plan);
-                member.setMembershipEndDate(expiry);
-                member.setExpiryDate(expiry);
+        // Enforce the Couple constraint server-side too — exactly one connected
+        // adult, never a minor — so it can't be bypassed by calling the API directly.
+        if ("Couple".equalsIgnoreCase(member.getMembershipType()) && hasFamily) {
+            if (request.getFamilyMembers().size() > 1) {
+                throw new RuntimeException("Couple membership allows only one connected member.");
+            }
+            if (Boolean.TRUE.equals(request.getFamilyMembers().get(0).getIsMinor())) {
+                throw new RuntimeException("Couple membership only supports an adult connected member.");
+            }
+        }
+
+        // Resolve the plan up front — needed both for expiry (below) and to decide
+        // how a Family plan bills its members (see familyHeadBillingMode).
+        MembershipPlan resolvedPlan = member.getMembershipPlan() != null
+                ? planRepository.findByName(member.getMembershipPlan()).orElse(null)
+                : null;
+
+        // "family_head" billing mode: EVERY family member (adult or minor) folds
+        // into ONE invoice on the head — nobody but the head ever carries their own
+        // outstandingBalance/receipt. "individual" (default — every existing Family/
+        // Couple plan) keeps today's behavior: adults bill independently, only
+        // minors fold into the head's bill.
+        boolean familyHeadBillingMode = "Family".equalsIgnoreCase(member.getMembershipType())
+                && hasFamily && resolvedPlan != null
+                && "family_head".equalsIgnoreCase(resolvedPlan.getFamilyBillingMode());
+
+        if (isFamilyType && hasFamily && resolvedPlan != null) {
+            List<FamilyMemberDTO> validRows = request.getFamilyMembers().stream()
+                    .filter(fm -> fm.getName() != null && !fm.getName().isBlank())
+                    .collect(Collectors.toList());
+            long adultCount = 1 + validRows.stream().filter(fm -> !Boolean.TRUE.equals(fm.getIsMinor())).count();
+            long childCount = validRows.stream().filter(fm -> Boolean.TRUE.equals(fm.getIsMinor())).count();
+            enforceFamilyMemberCaps(resolvedPlan, adultCount, childCount);
+        }
+
+        // Split family members into independently-billed adults and guardian-billed
+        // dependents. Under family_head billing mode EVERY member (adult or minor)
+        // is guardian-billed — reusing the exact same "billed to head" mechanism
+        // minors have always used, just no longer gated on isMinor.
+        List<FamilyMemberDTO> adultFamilyMembers = new ArrayList<>();
+        List<FamilyMemberDTO> minorFamilyMembers = new ArrayList<>();
+        if (isFamilyType && hasFamily) {
+            for (FamilyMemberDTO fm : request.getFamilyMembers()) {
+                if (fm.getName() == null || fm.getName().isBlank()) continue;
+                if (familyHeadBillingMode || Boolean.TRUE.equals(fm.getIsMinor())) {
+                    minorFamilyMembers.add(fm);
+                } else {
+                    adultFamilyMembers.add(fm);
+                }
+            }
+        }
+        // Dependents billed to the head. Two different models depending on the
+        // plan's billing mode:
+        //  - "individual" (existing Family/Couple behavior): each minor's own fee/
+        //    payment is captured on their own row and folded onto the head's due.
+        //  - "family_head": nobody but the head ever makes a payment — the head's
+        //    own fee IS the whole family's invoice (price-per-member × headcount,
+        //    or the plan's flat price as a fallback), and dependents carry no fee/
+        //    payment of their own at all, not even a folded "unpaid share".
+        BigDecimal minorFeeTotal = BigDecimal.ZERO;
+        BigDecimal minorPaidTotal = BigDecimal.ZERO;
+        List<PaymentSplitDTO> minorPaidLegs = new ArrayList<>();
+        // Fee attributed to each dependent — informational only under family_head
+        // mode (their share of the one combined invoice, for display/itemization);
+        // the real amount owed under "individual" mode (folded onto the head's due
+        // below).
+        Map<FamilyMemberDTO, BigDecimal> billedFeeByMember = new java.util.IdentityHashMap<>();
+
+        if (familyHeadBillingMode) {
+            int totalMembers = 1 + minorFamilyMembers.size();
+            boolean autoCalc = !Boolean.FALSE.equals(resolvedPlan.getAutoCalculateTotal())
+                    && resolvedPlan.getPricePerMember() != null;
+            BigDecimal combinedHeadFee;
+            if (autoCalc) {
+                combinedHeadFee = BigDecimal.ZERO;
+                for (int i = 0; i < totalMembers; i++) {
+                    combinedHeadFee = combinedHeadFee.add(memberPriceForIndex(resolvedPlan, i));
+                }
+                int idx = 1;
+                for (FamilyMemberDTO fm : minorFamilyMembers) {
+                    billedFeeByMember.put(fm, memberPriceForIndex(resolvedPlan, idx++));
+                }
+            } else {
+                // Auto-calculate is off (or no price-per-member configured) — fall
+                // back to the plan's own flat price as the whole family's invoice.
+                combinedHeadFee = resolvedPlan.getPrice() != null ? resolvedPlan.getPrice() : BigDecimal.ZERO;
+                for (FamilyMemberDTO fm : minorFamilyMembers) {
+                    billedFeeByMember.put(fm, BigDecimal.ZERO);
+                }
+            }
+            member.setMembershipFee(combinedHeadFee);
+        } else {
+            for (FamilyMemberDTO fm : minorFamilyMembers) {
+                BigDecimal fee = fm.getMinorFee() != null ? fm.getMinorFee() : BigDecimal.ZERO;
+                billedFeeByMember.put(fm, fee);
+                minorFeeTotal = minorFeeTotal.add(fee);
+                BigDecimal paidAmt = fm.getMinorPaidAmount() != null ? fm.getMinorPaidAmount() : BigDecimal.ZERO;
+                if (paidAmt.compareTo(fee) > 0) paidAmt = fee; // clamp — can't pay more than the fee
+                if (paidAmt.compareTo(BigDecimal.ZERO) > 0) {
+                    minorPaidTotal = minorPaidTotal.add(paidAmt);
+                    if (fm.getMinorPaymentBreakdown() != null && !fm.getMinorPaymentBreakdown().isEmpty()) {
+                        minorPaidLegs.addAll(fm.getMinorPaymentBreakdown());
+                    } else if (fm.getMinorPaymentMethod() != null) {
+                        minorPaidLegs.add(new PaymentSplitDTO(fm.getMinorPaymentMethod(), paidAmt, null));
+                    }
+                }
+            }
+        }
+        BigDecimal minorUnpaidTotal = minorFeeTotal.subtract(minorPaidTotal);
+
+        // Calculate expiry date from plan duration (overrides any frontend-sent value),
+        // except when the frontend explicitly set a due date tied to a real outstanding
+        // balance — e.g. a credit payment's due date — which is unrelated to the
+        // membership's renewal cycle and must not be clobbered by the expiry date.
+        boolean hasExplicitCreditDueDate = request.getNextPaymentDate() != null
+                && request.getOutstandingBalance() != null
+                && request.getOutstandingBalance().compareTo(BigDecimal.ZERO) > 0;
+        // Default a blank Start Date to today rather than silently skipping expiry
+        // computation — otherwise leaving that field empty on the form means the
+        // member's expiry/next-payment-date never gets set at all, matching the
+        // fallback already applied to linked family/couple members below.
+        if (member.getMembershipStartDate() == null) {
+            member.setMembershipStartDate(LocalDateTime.now());
+        }
+        if (resolvedPlan != null) {
+            LocalDateTime expiry = computeExpiry(member.getMembershipStartDate(), resolvedPlan);
+            member.setMembershipEndDate(expiry);
+            member.setExpiryDate(expiry);
+            if (!hasExplicitCreditDueDate) {
                 member.setNextPaymentDate(expiry);
-            });
+            }
         }
 
         // Set last payment date when payment is made at registration
@@ -164,6 +297,19 @@ public class MemberService {
             }
         }
 
+        // Fold minors' UNPAID fees on top of the head's own outstanding balance — a
+        // minor's fee only sits as the head's due when it wasn't marked paid above;
+        // any minor paid at registration is excluded, so it never shows as due.
+        // Not applicable under family_head mode — there the combined fee already IS
+        // the whole family's invoice, with nothing left to fold on top.
+        if (!familyHeadBillingMode && minorFeeTotal.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal ownOutstanding = member.getOutstandingBalance() != null ? member.getOutstandingBalance() : BigDecimal.ZERO;
+            member.setOutstandingBalance(ownOutstanding.add(minorUnpaidTotal));
+            if (minorUnpaidTotal.compareTo(BigDecimal.ZERO) > 0 && "paid".equalsIgnoreCase(member.getPaymentStatus())) {
+                member.setPaymentStatus("partial");
+            }
+        }
+
         // First save to get the auto-generated DB id
         Member saved = memberRepository.save(member);
 
@@ -171,30 +317,70 @@ public class MemberService {
         saved.setMemberId("MBR-" + String.format("%010d", saved.getId()));
         saved = memberRepository.save(saved);
 
-        // Auto-create a receipt for the new member
-        receiptService.createReceiptForMember(saved, "New", saved.getPaymentStatus());
+        // Auto-create a receipt for the new member — its amount covers the head's own
+        // fee plus any minors billed to them, itemized via minorCharges. paidAmount is
+        // derived from (combinedFee - outstandingBalance), which now correctly nets out
+        // to the head's own paid amount plus any minors' fees paid at registration.
+        BigDecimal ownFee = saved.getMembershipFee() != null ? saved.getMembershipFee() : BigDecimal.ZERO;
+        BigDecimal combinedFee = ownFee.add(minorFeeTotal);
+        // Under family_head mode there's no independent per-dependent payment to
+        // check — every member is "paid" together, exactly when the head's own
+        // combined invoice ended up fully covered.
+        boolean familyPaidInFull = saved.getOutstandingBalance() == null
+                || saved.getOutstandingBalance().compareTo(BigDecimal.ZERO) <= 0;
+        List<com.company.project.dto.MinorChargeDTO> minorCharges = minorFamilyMembers.isEmpty() ? null
+                : minorFamilyMembers.stream()
+                        .map(fm -> {
+                            BigDecimal fee = billedFeeByMember.get(fm);
+                            boolean paidFlag;
+                            if (familyHeadBillingMode) {
+                                paidFlag = familyPaidInFull;
+                            } else {
+                                BigDecimal paidAmt = fm.getMinorPaidAmount() != null ? fm.getMinorPaidAmount() : BigDecimal.ZERO;
+                                paidFlag = fee.compareTo(BigDecimal.ZERO) > 0 && paidAmt.compareTo(fee) >= 0;
+                            }
+                            return new com.company.project.dto.MinorChargeDTO(null, null, fm.getName(), fee, paidFlag);
+                        })
+                        .collect(Collectors.toList());
+        List<PaymentSplitDTO> combinedBreakdown = new ArrayList<>();
+        if (request.getPaymentBreakdown() != null) combinedBreakdown.addAll(request.getPaymentBreakdown());
+        combinedBreakdown.addAll(minorPaidLegs);
+        com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
+                saved, "New", saved.getPaymentStatus(), combinedBreakdown.isEmpty() ? null : combinedBreakdown,
+                request.getBankAccountCode(), request.getBankAccountName(), combinedFee, minorCharges);
 
-        // Post to General Ledger — only when payment was actually made
-        if ("paid".equalsIgnoreCase(saved.getPaymentStatus()) && saved.getMembershipFee() != null) {
+        // Post to General Ledger for whatever amount was actually received — a partial/
+        // credit payment (e.g. AED 5 received against a AED 45 invoice) must still post
+        // the AED 5 through the real payment method; it is NOT skipped just because the
+        // member's overall status is "pending" rather than "paid".
+        if (receipt.getPaidAmount() != null && receipt.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            financialEventService.onMemberPaymentReceived(receipt);
             receiptVoucherService.createVoucherFromModule(
                     "Member Registration – " + saved.getName(),
                     "Membership",
                     saved.getName(),
                     saved.getId(),
-                    saved.getMembershipFee(),
+                    receipt.getPaidAmount(),
                     saved.getPaymentMethodUsed(),
                     saved.getMemberId(),
                     null,
                     "New member: " + saved.getMembershipPlan()
+                            + (request.getBankAccountName() != null && !request.getBankAccountName().isBlank()
+                                    ? " | Bank: " + request.getBankAccountName() : ""),
+                    request.getPaymentBreakdown()
             );
         }
 
-        // Create linked family member records
-        if (isFamilyType && hasFamily) {
-            for (FamilyMemberDTO fm : request.getFamilyMembers()) {
-                if (fm.getName() == null || fm.getName().isBlank()) continue;
-                createFamilyMemberRecord(fm, saved);
-            }
+        // Create linked family member records: independently-billed adults get a
+        // fully independent membership (own plan/fee/receipt/ledger post); billed-
+        // to-head members (all minors, plus adults under family_head billing mode)
+        // were already billed into the head's receipt above and just need an
+        // identification record.
+        for (FamilyMemberDTO fm : adultFamilyMembers) {
+            registerFamilyAdult(fm, saved);
+        }
+        for (FamilyMemberDTO fm : minorFamilyMembers) {
+            createBilledToHeadRecord(fm, saved, billedFeeByMember.get(fm));
         }
 
         // Auto-create app login account if credentials were provided
@@ -287,31 +473,158 @@ public class MemberService {
     }
 
     /**
-     * Create a family member record linked to the given head member.
-     * Inherits plan, dates, and financial info from the head.
+     * Generates a unique placeholder email so the NOT NULL / UNIQUE constraint on
+     * Member.email is satisfied for a family member who wasn't given a real one.
      */
-    private void createFamilyMemberRecord(FamilyMemberDTO fm, Member head) {
+    private String syntheticFamilyEmail(String headMemberId, String name) {
+        return "family_" + headMemberId + "_"
+                + name.trim().toLowerCase().replaceAll("[^a-z0-9]", "_")
+                + "_" + System.currentTimeMillis() + "@family.local";
+    }
+
+    /**
+     * Per-member price under family_head auto-calculate billing: the plan's
+     * pricePerMember for members within maxFamilyMembers, additionalMemberPrice
+     * (falling back to pricePerMember) for every member beyond that cap. index is
+     * 0-based across the whole family, head included (head is always index 0).
+     */
+    private BigDecimal memberPriceForIndex(MembershipPlan plan, int index) {
+        BigDecimal base = plan.getPricePerMember() != null ? plan.getPricePerMember() : BigDecimal.ZERO;
+        Integer max = plan.getMaxFamilyMembers();
+        if (max == null || max <= 0 || index < max) return base;
+        BigDecimal extra = plan.getAdditionalMemberPrice();
+        return extra != null ? extra : base;
+    }
+
+    /**
+     * Server-side enforcement of a Family plan's member-count limits — mirrors the
+     * Couple constraint in createMember() so caps can't be bypassed by calling the
+     * API directly. adultCount includes the head.
+     */
+    private void enforceFamilyMemberCaps(MembershipPlan plan, long adultCount, long childCount) {
+        long totalCount = adultCount + childCount;
+        boolean allowExtra = !Boolean.FALSE.equals(plan.getAllowAdditionalMembers());
+        Integer maxAdults = plan.getMaxAdultMembers();
+        Integer maxChildren = plan.getMaxChildMembers();
+        Integer maxTotal = plan.getMaxFamilyMembers();
+        if (maxAdults != null && maxAdults > 0 && adultCount > maxAdults) {
+            throw new RuntimeException("This family plan allows a maximum of " + maxAdults + " adult member(s).");
+        }
+        if (maxChildren != null && maxChildren > 0 && childCount > maxChildren) {
+            throw new RuntimeException("This family plan allows a maximum of " + maxChildren + " child member(s).");
+        }
+        if (maxTotal != null && maxTotal > 0 && totalCount > maxTotal && !allowExtra) {
+            throw new RuntimeException("This family plan allows a maximum of " + maxTotal + " member(s).");
+        }
+    }
+
+    /**
+     * Registers an adult family member as a completely independent membership —
+     * own plan, fee, receipt, and ledger post — linked to the head only for
+     * relationship/reporting grouping via familyHeadId. Renewing/freezing this
+     * member later never touches any other family member.
+     */
+    private void registerFamilyAdult(FamilyMemberDTO fm, Member head) {
         Member dep = new Member();
         dep.setName(fm.getName());
-        // Auto-generate a unique placeholder email so the NOT NULL / UNIQUE constraint is satisfied
-        String safeEmail = "family_" + head.getMemberId() + "_"
-                + fm.getName().trim().toLowerCase().replaceAll("[^a-z0-9]", "_")
-                + "_" + System.currentTimeMillis() + "@family.local";
-        dep.setEmail(safeEmail);
+        dep.setEmail(fm.getEmail() != null && !fm.getEmail().isBlank()
+                ? fm.getEmail() : syntheticFamilyEmail(head.getMemberId(), fm.getName()));
+        dep.setPhone(fm.getPhone());
         dep.setMembershipType(head.getMembershipType());
-        dep.setMembershipStatus(head.getMembershipStatus());
-        dep.setMembershipPlan(head.getMembershipPlan());
-        dep.setMembershipStartDate(head.getMembershipStartDate());
-        dep.setMembershipEndDate(head.getMembershipEndDate());
-        dep.setExpiryDate(head.getExpiryDate());
-        dep.setJoinDate(head.getJoinDate());
-        dep.setMonthlyFee(head.getMonthlyFee());
-        dep.setMembershipFee(head.getMembershipFee());
-        dep.setPaymentStatus(head.getPaymentStatus());
+        dep.setMembershipStatus("active");
+        dep.setMembershipPlan(fm.getMembershipPlan() != null && !fm.getMembershipPlan().isBlank()
+                ? fm.getMembershipPlan() : head.getMembershipPlan());
+        dep.setMembershipStartDate(head.getMembershipStartDate() != null
+                ? head.getMembershipStartDate() : LocalDateTime.now());
+        dep.setJoinDate(dep.getMembershipStartDate());
+        dep.setMembershipFee(fm.getMembershipFee());
+        dep.setPaymentStatus(fm.getPaymentStatus() != null ? fm.getPaymentStatus() : "pending");
+        dep.setPaymentMethodUsed(fm.getPaymentMethod());
         dep.setTotalVisits(0);
         dep.setIsFamilyHead(false);
         dep.setFamilyHeadId(head.getMemberId());
         dep.setRelationshipToHead(fm.getRelationship());
+        dep.setIsMinor(false);
+        dep.setBilledToHead(false);
+
+        if (dep.getMembershipPlan() != null) {
+            planRepository.findByName(dep.getMembershipPlan()).ifPresent(plan -> {
+                LocalDateTime expiry = computeExpiry(dep.getMembershipStartDate(), plan);
+                dep.setMembershipEndDate(expiry);
+                dep.setExpiryDate(expiry);
+                dep.setNextPaymentDate(expiry);
+            });
+        }
+
+        if (fm.getOutstandingBalance() != null) {
+            dep.setOutstandingBalance(fm.getOutstandingBalance());
+        } else if (dep.getMembershipFee() != null) {
+            dep.setOutstandingBalance("paid".equalsIgnoreCase(dep.getPaymentStatus())
+                    ? BigDecimal.ZERO : dep.getMembershipFee());
+        }
+        if ("paid".equalsIgnoreCase(dep.getPaymentStatus())) {
+            dep.setLastPaymentDate(LocalDateTime.now());
+        }
+
+        Member savedDep = memberRepository.save(dep);
+        savedDep.setMemberId("MBR-" + String.format("%010d", savedDep.getId()));
+        savedDep = memberRepository.save(savedDep);
+
+        com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
+                savedDep, "New", savedDep.getPaymentStatus(), fm.getPaymentBreakdown(),
+                fm.getBankAccountCode(), fm.getBankAccountName());
+
+        if (receipt.getPaidAmount() != null && receipt.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            financialEventService.onMemberPaymentReceived(receipt);
+            receiptVoucherService.createVoucherFromModule(
+                    "Family Member Registration – " + savedDep.getName(),
+                    "Membership",
+                    savedDep.getName(),
+                    savedDep.getId(),
+                    receipt.getPaidAmount(),
+                    savedDep.getPaymentMethodUsed(),
+                    savedDep.getMemberId(),
+                    null,
+                    "New family member (" + fm.getRelationship() + ") of " + head.getName()
+                            + ": " + savedDep.getMembershipPlan(),
+                    fm.getPaymentBreakdown()
+            );
+        }
+    }
+
+    /**
+     * Creates an identification-only record for a family member whose charges are
+     * billed to the head's account instead of carrying their own: no plan pricing
+     * of their own, no outstandingBalance, no receipt/ledger post (see createMember /
+     * renewFamilyMinor). Always used for a minor; also used for an ADULT dependent
+     * under a family_head-billing-mode Family plan (see Member.billedToHead).
+     * billedFee is display-only here (informational on the dependent's own record) —
+     * the authoritative amount actually invoiced lives on the head's Receipt.
+     */
+    private void createBilledToHeadRecord(FamilyMemberDTO fm, Member head, BigDecimal billedFee) {
+        Member dep = new Member();
+        dep.setName(fm.getName());
+        dep.setEmail(fm.getEmail() != null && !fm.getEmail().isBlank()
+                ? fm.getEmail() : syntheticFamilyEmail(head.getMemberId(), fm.getName()));
+        dep.setPhone(fm.getPhone());
+        dep.setMembershipType(head.getMembershipType());
+        dep.setMembershipStatus(head.getMembershipStatus());
+        dep.setMembershipPlan(fm.getMembershipPlan() != null && !fm.getMembershipPlan().isBlank()
+                ? fm.getMembershipPlan() : head.getMembershipPlan());
+        dep.setMembershipStartDate(head.getMembershipStartDate());
+        dep.setMembershipEndDate(head.getMembershipEndDate());
+        dep.setExpiryDate(head.getExpiryDate());
+        dep.setJoinDate(head.getJoinDate());
+        dep.setMembershipFee(billedFee);
+        dep.setPaymentStatus(null);
+        dep.setOutstandingBalance(null);
+        dep.setTotalVisits(0);
+        dep.setIsFamilyHead(false);
+        dep.setFamilyHeadId(head.getMemberId());
+        dep.setRelationshipToHead(fm.getRelationship());
+        dep.setIsMinor(Boolean.TRUE.equals(fm.getIsMinor()));
+        dep.setBilledToHead(true);
+        if (fm.getDateOfBirth() != null) dep.setDateOfBirth(parseDate(fm.getDateOfBirth()));
 
         Member savedDep = memberRepository.save(dep);
         savedDep.setMemberId("MBR-" + String.format("%010d", savedDep.getId()));
@@ -326,8 +639,15 @@ public class MemberService {
     }
 
     public void deleteMember(Long id) {
-        if (!memberRepository.existsById(id)) {
-            throw new RuntimeException("Member not found with id: " + id);
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+        if (Boolean.TRUE.equals(member.getIsFamilyHead()) && member.getMemberId() != null) {
+            List<Member> dependents = memberRepository.findByFamilyHeadId(member.getMemberId());
+            if (!dependents.isEmpty()) {
+                throw new RuntimeException("Cannot delete " + member.getName()
+                        + " — reassign or remove their " + dependents.size()
+                        + " linked family member(s) first.");
+            }
         }
         memberRepository.deleteById(id);
     }
@@ -335,9 +655,12 @@ public class MemberService {
     public MemberResponseDTO renewMember(Long id, RenewalRequestDTO request) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+        if (member.isEffectivelyBilledToHead()) {
+            throw new RuntimeException("This member's charges are billed to their family head — "
+                    + "use the family member renewal endpoint instead.");
+        }
         if (request.getPlanName()        != null) member.setMembershipPlan(request.getPlanName());
         if (request.getMembershipFee()   != null) member.setMembershipFee(request.getMembershipFee());
-        if (request.getPaymentStatus()   != null) member.setPaymentStatus(request.getPaymentStatus());
         if (request.getMembershipType()  != null) member.setMembershipType(request.getMembershipType());
         if (request.getMembershipStatus() != null) member.setMembershipStatus(request.getMembershipStatus());
 
@@ -360,36 +683,291 @@ public class MemberService {
             member.setNextPaymentDate(endDate);
         }
 
-        // Record payment date on renewal only when payment was actually made
-        boolean renewalPaid = "paid".equalsIgnoreCase(member.getPaymentStatus());
-        if (renewalPaid) {
+        // How much is actually being collected now — may be a genuine partial amount
+        // (a "Credit" renewal with something received via a real method), not just a
+        // binary paid/pending flag. Falls back to the old binary paymentStatus when
+        // the caller doesn't send amountReceived, so existing callers keep working.
+        BigDecimal fee = member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO;
+        BigDecimal amountReceived = request.getAmountReceived() != null
+                ? request.getAmountReceived().max(BigDecimal.ZERO).min(fee)
+                : ("paid".equalsIgnoreCase(request.getPaymentStatus()) ? fee : BigDecimal.ZERO);
+        BigDecimal outstanding = fee.subtract(amountReceived).max(BigDecimal.ZERO);
+
+        member.setOutstandingBalance(outstanding);
+        if (outstanding.compareTo(BigDecimal.ZERO) <= 0) {
+            member.setPaymentStatus("paid");
             member.setLastPaymentDate(LocalDateTime.now());
-            member.setOutstandingBalance(BigDecimal.ZERO);
-        } else if (member.getMembershipFee() != null) {
-            member.setOutstandingBalance(member.getMembershipFee());
+        } else if (amountReceived.compareTo(BigDecimal.ZERO) > 0) {
+            member.setPaymentStatus("partial");
+            member.setLastPaymentDate(LocalDateTime.now());
+        } else {
+            member.setPaymentStatus("pending");
         }
+        // "Credit" is only ever the stored method label when nothing was actually
+        // received yet — any real money always carries its real method, consistent
+        // with the Add Member credit flow (see gymbios-credit-payment-fix).
+        member.setPaymentMethodUsed(amountReceived.compareTo(BigDecimal.ZERO) > 0
+                ? request.getPaymentMethod() : "Credit");
 
         Member saved = memberRepository.save(member);
 
-        // Auto-create a receipt for the renewal, reflecting the actual payment status
-        receiptService.createReceiptForMember(saved, "Renewal", saved.getPaymentStatus());
+        // Auto-create a receipt for the renewal, reflecting whatever was actually
+        // received now (paidAmount is derived from fee − outstandingBalance).
+        com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
+                saved, "Renewal", saved.getPaymentStatus(), request.getPaymentBreakdown(),
+                request.getBankAccountCode(), request.getBankAccountName());
 
-        // Post to General Ledger — only when payment was actually made
-        if (renewalPaid && saved.getMembershipFee() != null) {
+        // Post to General Ledger for whatever amount was actually received — a partial/
+        // credit renewal must still post the real amount through the real method; it
+        // is not skipped just because the member's overall status isn't "paid".
+        if (receipt.getPaidAmount() != null && receipt.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            financialEventService.onMemberPaymentReceived(receipt);
             receiptVoucherService.createVoucherFromModule(
                     "Membership Renewal – " + saved.getName(),
                     "Membership",
                     saved.getName(),
                     saved.getId(),
-                    saved.getMembershipFee(),
+                    receipt.getPaidAmount(),
                     saved.getPaymentMethodUsed(),
                     saved.getMemberId(),
                     null,
-                    "Renewal: " + saved.getMembershipPlan()
+                    "Renewal: " + saved.getMembershipPlan(),
+                    null
             );
         }
 
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * Renews a single family member whose charges are billed to their head (any
+     * minor, or an adult under family_head billing mode). Their own
+     * membershipEndDate/expiryDate are updated for record-keeping, but the charge
+     * is billed onto the head's account (a new receipt under the head's name,
+     * added to the head's outstandingBalance) rather than creating an independent
+     * balance for this member. The head's own membership/expiry is left untouched
+     * — for renewing the WHOLE family together in one invoice, see renewFamily().
+     */
+    public MemberResponseDTO renewFamilyMinor(Long minorId, MinorRenewalRequestDTO request) {
+        Member minor = memberRepository.findById(minorId)
+                .orElseThrow(() -> new RuntimeException("Member not found with id: " + minorId));
+        if (!minor.isEffectivelyBilledToHead()) {
+            throw new RuntimeException("This member is not billed to a family head — use the standard renew endpoint.");
+        }
+        if (minor.getFamilyHeadId() == null) {
+            throw new RuntimeException("This minor has no assigned guardian.");
+        }
+        Member guardian = memberRepository.findByMemberId(minor.getFamilyHeadId())
+                .orElseThrow(() -> new RuntimeException("Guardian not found for this minor."));
+
+        if (request.getPlanName() != null) minor.setMembershipPlan(request.getPlanName());
+        BigDecimal fee = request.getFee() != null ? request.getFee() : minor.getMembershipFee();
+        minor.setMembershipFee(fee);
+        boolean paid = "paid".equalsIgnoreCase(request.getPaymentStatus());
+
+        if (minor.getMembershipPlan() != null) {
+            planRepository.findByName(minor.getMembershipPlan()).ifPresent(plan -> {
+                LocalDateTime base = minor.getExpiryDate() != null ? minor.getExpiryDate() : LocalDateTime.now();
+                LocalDateTime newExpiry = computeExpiry(base, plan);
+                minor.setMembershipEndDate(newExpiry);
+                minor.setExpiryDate(newExpiry);
+            });
+        }
+        Member savedMinor = memberRepository.save(minor);
+
+        BigDecimal guardianOutstanding = guardian.getOutstandingBalance() != null
+                ? guardian.getOutstandingBalance() : BigDecimal.ZERO;
+        if (!paid) {
+            guardian.setOutstandingBalance(guardianOutstanding.add(fee != null ? fee : BigDecimal.ZERO));
+        } else {
+            guardian.setLastPaymentDate(LocalDateTime.now());
+        }
+        Member savedGuardian = memberRepository.save(guardian);
+
+        com.company.project.entities.Receipt receipt = receiptService.createMinorChargeReceipt(
+                savedGuardian, savedMinor, fee, paid, "Renewal", null, null, null);
+
+        if (paid) {
+            financialEventService.onMemberPaymentReceived(receipt);
+            receiptVoucherService.createVoucherFromModule(
+                    "Family Member Renewal – " + savedMinor.getName(),
+                    "Membership",
+                    savedGuardian.getName(),
+                    savedGuardian.getId(),
+                    receipt.getPaidAmount(),
+                    savedGuardian.getPaymentMethodUsed(),
+                    savedGuardian.getMemberId(),
+                    null,
+                    "Renewal for family member " + savedMinor.getName()
+                            + " (billed to " + savedGuardian.getName() + ")",
+                    null
+            );
+        }
+
+        return MemberResponseDTO.fromEntity(savedMinor);
+    }
+
+    /**
+     * Renews an entire family together in ONE invoice under family_head billing
+     * mode: counts every current family member (head + dependents), recalculates
+     * pricePerMember × headcount (same tiered pricing as createMember's auto-
+     * calculate), extends everyone's membership dates together, and posts a
+     * single receipt/ledger entry to the head. Adding or removing a family member
+     * before the next renewal is exactly what changes this recalculated total.
+     */
+    public MemberResponseDTO renewFamily(Long headId, FamilyRenewalRequestDTO request) {
+        Member head = memberRepository.findById(headId)
+                .orElseThrow(() -> new RuntimeException("Member not found with id: " + headId));
+        if (!Boolean.TRUE.equals(head.getIsFamilyHead())) {
+            throw new RuntimeException("This member is not a family head.");
+        }
+
+        String planName = request.getPlanName() != null ? request.getPlanName() : head.getMembershipPlan();
+        MembershipPlan plan = planName != null ? planRepository.findByName(planName).orElse(null) : null;
+        if (plan == null || !"family_head".equalsIgnoreCase(plan.getFamilyBillingMode())) {
+            throw new RuntimeException("This family's plan is not billed as a single family invoice — "
+                    + "renew each member individually instead.");
+        }
+        if (request.getPlanName() != null) head.setMembershipPlan(request.getPlanName());
+        if (request.getPaymentStatus() != null) head.setPaymentStatus(request.getPaymentStatus());
+        if (request.getPaymentMethod() != null) head.setPaymentMethodUsed(request.getPaymentMethod());
+
+        List<Member> dependents = memberRepository.findByFamilyHeadId(head.getMemberId());
+        int totalMembers = 1 + dependents.size();
+        BigDecimal totalFee = BigDecimal.ZERO;
+        for (int i = 0; i < totalMembers; i++) {
+            totalFee = totalFee.add(memberPriceForIndex(plan, i));
+        }
+        head.setMembershipFee(totalFee);
+
+        // Extend expiry together for the head and every dependent from the head's
+        // current expiry (or today) — same base date, same duration, so the whole
+        // family stays in sync.
+        LocalDateTime base = head.getExpiryDate() != null ? head.getExpiryDate() : LocalDateTime.now();
+        LocalDateTime newExpiry = computeExpiry(base, plan);
+        head.setMembershipEndDate(newExpiry);
+        head.setExpiryDate(newExpiry);
+        head.setNextPaymentDate(newExpiry);
+
+        boolean renewalPaid = "paid".equalsIgnoreCase(head.getPaymentStatus());
+        if (renewalPaid) {
+            head.setLastPaymentDate(LocalDateTime.now());
+            head.setOutstandingBalance(BigDecimal.ZERO);
+        } else {
+            head.setOutstandingBalance(totalFee);
+        }
+
+        for (Member dep : dependents) {
+            dep.setMembershipEndDate(newExpiry);
+            dep.setExpiryDate(newExpiry);
+        }
+        memberRepository.saveAll(dependents);
+        Member savedHead = memberRepository.save(head);
+
+        List<com.company.project.dto.MinorChargeDTO> memberCharges = new ArrayList<>();
+        for (int i = 0; i < dependents.size(); i++) {
+            Member dep = dependents.get(i);
+            memberCharges.add(new com.company.project.dto.MinorChargeDTO(
+                    dep.getMemberId(), dep.getId(), dep.getName(), memberPriceForIndex(plan, i + 1), renewalPaid));
+        }
+
+        com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
+                savedHead, "Renewal", savedHead.getPaymentStatus(), request.getPaymentBreakdown(),
+                request.getBankAccountCode(), request.getBankAccountName(), totalFee,
+                memberCharges.isEmpty() ? null : memberCharges);
+
+        if (renewalPaid) {
+            financialEventService.onMemberPaymentReceived(receipt);
+            receiptVoucherService.createVoucherFromModule(
+                    "Family Renewal – " + savedHead.getName(),
+                    "Membership",
+                    savedHead.getName(),
+                    savedHead.getId(),
+                    receipt.getPaidAmount(),
+                    savedHead.getPaymentMethodUsed(),
+                    savedHead.getMemberId(),
+                    null,
+                    "Family renewal (" + totalMembers + " member(s)): " + savedHead.getMembershipPlan(),
+                    request.getPaymentBreakdown()
+            );
+        }
+
+        return MemberResponseDTO.fromEntity(savedHead);
+    }
+
+    /**
+     * Returns the family head plus every linked family member (adults + minors)
+     * for the family that the given member belongs to — resolving through the
+     * head whether the given id IS the head or one of their dependents.
+     */
+    @Transactional(readOnly = true)
+    public FamilyGroupResponseDTO getFamilyGroup(Long id) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+        String headMemberId = Boolean.TRUE.equals(member.getIsFamilyHead())
+                ? member.getMemberId() : member.getFamilyHeadId();
+        if (headMemberId == null) {
+            throw new RuntimeException("This member does not belong to a family group.");
+        }
+        Member head = memberRepository.findByMemberId(headMemberId)
+                .orElseThrow(() -> new RuntimeException("Family head not found."));
+        List<MemberResponseDTO> members = memberRepository.findByFamilyHeadId(headMemberId).stream()
+                .map(MemberResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+        return new FamilyGroupResponseDTO(MemberResponseDTO.fromEntity(head), members);
+    }
+
+    /**
+     * Adds a new adult or minor family member to an existing family head after
+     * initial registration — dispatches to the same registration logic used at
+     * signup time (independent billing for adults, guardian-billed for minors —
+     * unless the head's plan is family_head billing mode, in which case every
+     * new member is guardian-billed regardless of isMinor). No receipt is created
+     * here — the added member is picked up by the next family renewal invoice
+     * (see renewFamily), matching how adding a minor has always worked.
+     */
+    public MemberResponseDTO addFamilyMember(Long headId, FamilyMemberDTO fm) {
+        Member head = memberRepository.findById(headId)
+                .orElseThrow(() -> new RuntimeException("Member not found with id: " + headId));
+        if (fm.getName() == null || fm.getName().isBlank()) {
+            throw new RuntimeException("Family member name is required.");
+        }
+        if (!Boolean.TRUE.equals(head.getIsFamilyHead())) {
+            head.setIsFamilyHead(true);
+            head = memberRepository.save(head);
+        }
+
+        MembershipPlan headPlan = head.getMembershipPlan() != null
+                ? planRepository.findByName(head.getMembershipPlan()).orElse(null) : null;
+        boolean familyHeadBillingMode = headPlan != null
+                && "family_head".equalsIgnoreCase(headPlan.getFamilyBillingMode());
+        List<Member> existingDependents = memberRepository.findByFamilyHeadId(head.getMemberId());
+
+        if (headPlan != null) {
+            boolean newIsMinor = Boolean.TRUE.equals(fm.getIsMinor());
+            long adultCount = 1 + existingDependents.stream().filter(m -> !Boolean.TRUE.equals(m.getIsMinor())).count()
+                    + (newIsMinor ? 0 : 1);
+            long childCount = existingDependents.stream().filter(m -> Boolean.TRUE.equals(m.getIsMinor())).count()
+                    + (newIsMinor ? 1 : 0);
+            enforceFamilyMemberCaps(headPlan, adultCount, childCount);
+        }
+
+        if (familyHeadBillingMode || Boolean.TRUE.equals(fm.getIsMinor())) {
+            // Fee here is informational only (their share of the one combined family
+            // invoice, shown on their own record) — nothing is billed at this point;
+            // the real amount is recalculated fresh at the next renewFamily() call.
+            BigDecimal informationalFee = familyHeadBillingMode
+                    ? memberPriceForIndex(headPlan, existingDependents.size() + 1)
+                    : fm.getMinorFee();
+            createBilledToHeadRecord(fm, head, informationalFee);
+        } else {
+            registerFamilyAdult(fm, head);
+        }
+        List<Member> dependents = memberRepository.findByFamilyHeadId(head.getMemberId());
+        Member added = dependents.stream()
+                .max((a, b) -> a.getId().compareTo(b.getId()))
+                .orElseThrow(() -> new RuntimeException("Failed to create family member"));
+        return MemberResponseDTO.fromEntity(added);
     }
 
     public MemberResponseDTO freezeMember(Long id, FreezeRequestDTO request) {

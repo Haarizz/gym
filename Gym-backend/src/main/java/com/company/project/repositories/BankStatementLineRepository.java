@@ -12,4 +12,9 @@ public interface BankStatementLineRepository extends JpaRepository<BankStatement
     void deleteByReconciliationId(Long reconciliationId);
 
     long countByReconciliationIdAndIsMatchedFalse(Long reconciliationId);
+
+    /** Every journal voucher already claimed by some statement line, across all reconciliations. */
+    List<BankStatementLine> findByMatchedJournalVoucherIdIsNotNull();
+
+    boolean existsByMatchedJournalVoucherIdAndIdNot(Long matchedJournalVoucherId, Long id);
 }

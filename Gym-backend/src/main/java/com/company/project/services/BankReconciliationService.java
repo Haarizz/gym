@@ -1,31 +1,70 @@
 package com.company.project.services;
 
+import com.company.project.dto.AutoMatchSuggestionDTO;
 import com.company.project.dto.BankReconciliationRequestDTO;
 import com.company.project.dto.BankReconciliationResponseDTO;
 import com.company.project.dto.BankStatementLineDTO;
+import com.company.project.dto.MatchCandidateDTO;
+import com.company.project.entities.AccountHead;
 import com.company.project.entities.BankReconciliation;
 import com.company.project.entities.BankStatementLine;
+import com.company.project.entities.JournalVoucher;
+import com.company.project.entities.JournalVoucherLine;
+import com.company.project.repositories.AccountHeadRepository;
 import com.company.project.repositories.BankReconciliationRepository;
 import com.company.project.repositories.BankStatementLineRepository;
+import com.company.project.repositories.JournalVoucherLineRepository;
+import com.company.project.repositories.JournalVoucherRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.Collections;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class BankReconciliationService {
 
+    /**
+     * The chart of accounts currently has a single bank ledger account (see
+     * FinancialEventService — every non-cash payment method posts here). Until
+     * the system supports one AccountHead per real bank, this is the only
+     * account a bank reconciliation can be checked against.
+     */
+    private static final String BANK_ACCOUNT_CODE = FinancialEventService.ACC_CASH_AT_BANK;
+
+    /** How many days on either side of a statement line's date to look for a matching posted entry. */
+    private static final int MATCH_WINDOW_DAYS = 30;
+
+    /** Amounts are stored with 2 decimal places; anything smaller is rounding noise. */
+    private static final BigDecimal AMOUNT_TOLERANCE = new BigDecimal("0.01");
+
+    private static final int MAX_CANDIDATES = 25;
+
     private final BankReconciliationRepository reconciliationRepository;
     private final BankStatementLineRepository lineRepository;
+    private final AccountHeadRepository accountHeadRepository;
+    private final JournalVoucherRepository journalVoucherRepository;
+    private final JournalVoucherLineRepository journalVoucherLineRepository;
 
     public BankReconciliationService(BankReconciliationRepository reconciliationRepository,
-                                     BankStatementLineRepository lineRepository) {
+                                     BankStatementLineRepository lineRepository,
+                                     AccountHeadRepository accountHeadRepository,
+                                     JournalVoucherRepository journalVoucherRepository,
+                                     JournalVoucherLineRepository journalVoucherLineRepository) {
         this.reconciliationRepository = reconciliationRepository;
         this.lineRepository = lineRepository;
+        this.accountHeadRepository = accountHeadRepository;
+        this.journalVoucherRepository = journalVoucherRepository;
+        this.journalVoucherLineRepository = journalVoucherLineRepository;
     }
 
     @Transactional(readOnly = true)
@@ -71,19 +110,46 @@ public class BankReconciliationService {
         }
         mapFromRequest(r, req);
         r = reconciliationRepository.save(r);
-        lineRepository.deleteByReconciliationId(id);
-        saveLines(id, req.getLines());
+        reconcileLines(id, req.getLines());
         return getById(r.getId());
     }
 
-    public BankReconciliationResponseDTO matchLine(Long reconciliationId, Long lineId, String voucherNo) {
+    /**
+     * Matches a bank statement line to a real, posted journal voucher — never to
+     * an arbitrary typed string. Validates that the voucher exists, is POSTED,
+     * actually posts to the bank account being reconciled, and isn't already
+     * claimed by a different statement line (a single ledger movement should
+     * only ever explain one bank-statement line).
+     */
+    public BankReconciliationResponseDTO matchLine(Long reconciliationId, Long lineId, Long journalVoucherId) {
         BankStatementLine line = lineRepository.findById(lineId)
                 .orElseThrow(() -> new IllegalArgumentException("Line not found: " + lineId));
         if (!reconciliationId.equals(line.getReconciliationId())) {
             throw new IllegalArgumentException("Line " + lineId + " does not belong to reconciliation " + reconciliationId);
         }
+        if (journalVoucherId == null) {
+            throw new IllegalArgumentException("journalVoucherId is required");
+        }
+
+        JournalVoucher jv = journalVoucherRepository.findById(journalVoucherId)
+                .orElseThrow(() -> new IllegalArgumentException("Journal voucher not found: " + journalVoucherId));
+        if (!"POSTED".equals(jv.getStatus()) || jv.getDeletedAt() != null) {
+            throw new IllegalStateException("Only posted journal vouchers can be matched to a bank statement line");
+        }
+        boolean hitsBankAccount = journalVoucherLineRepository.findByJournalVoucherId(journalVoucherId).stream()
+                .anyMatch(l -> BANK_ACCOUNT_CODE.equals(l.getAccountCode()));
+        if (!hitsBankAccount) {
+            throw new IllegalStateException(
+                    "Journal voucher " + jv.getVoucherNo() + " does not post to the bank account and cannot be matched");
+        }
+        if (lineRepository.existsByMatchedJournalVoucherIdAndIdNot(journalVoucherId, lineId)) {
+            throw new IllegalStateException(
+                    "Journal voucher " + jv.getVoucherNo() + " is already matched to another statement line");
+        }
+
         line.setIsMatched(true);
-        line.setMatchedVoucherNo(voucherNo);
+        line.setMatchedJournalVoucherId(journalVoucherId);
+        line.setMatchedVoucherNo(jv.getVoucherNo());
         lineRepository.save(line);
         updateStatus(reconciliationId);
         return getById(reconciliationId);
@@ -97,6 +163,7 @@ public class BankReconciliationService {
         }
         line.setIsMatched(false);
         line.setMatchedVoucherNo(null);
+        line.setMatchedJournalVoucherId(null);
         lineRepository.save(line);
         updateStatus(reconciliationId);
         return getById(reconciliationId);
@@ -121,18 +188,160 @@ public class BankReconciliationService {
         reconciliationRepository.delete(r);
     }
 
+    /**
+     * Real, unmatched, POSTED journal vouchers on the bank account that could
+     * plausibly correspond to this statement line — for the manual match picker.
+     * Ranked by amount closeness then date proximity so the most likely match
+     * appears first; never returns anything that isn't an actual posted voucher.
+     */
+    @Transactional(readOnly = true)
+    public List<MatchCandidateDTO> getMatchCandidates(Long reconciliationId, Long lineId) {
+        BankStatementLine line = lineRepository.findById(lineId)
+                .orElseThrow(() -> new IllegalArgumentException("Line not found: " + lineId));
+        if (!reconciliationId.equals(line.getReconciliationId())) {
+            throw new IllegalArgumentException("Line " + lineId + " does not belong to reconciliation " + reconciliationId);
+        }
+
+        Map<Long, JournalVoucher> postedById = loadPostedVouchers();
+        Set<Long> usedJvIds = alreadyMatchedJournalVoucherIds();
+        List<JournalVoucherLine> bankLines = journalVoucherLineRepository.findByAccountCode(BANK_ACCOUNT_CODE);
+
+        boolean wantDebit = isBankCredit(line.getType());
+        BigDecimal target = line.getAmount() != null ? line.getAmount() : BigDecimal.ZERO;
+
+        List<MatchCandidateDTO> candidates = new ArrayList<>();
+        for (JournalVoucherLine jvl : bankLines) {
+            JournalVoucher jv = postedById.get(jvl.getJournalVoucherId());
+            if (jv == null || usedJvIds.contains(jv.getId())) continue;
+            BigDecimal amount = wantDebit ? jvl.getDebit() : jvl.getCredit();
+            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) continue;
+            candidates.add(new MatchCandidateDTO(jv.getId(), jv.getVoucherNo(), jv.getDate(), jv.getNarration(), amount));
+        }
+
+        candidates.sort(Comparator
+                .comparing((MatchCandidateDTO c) -> c.getAmount().subtract(target).abs())
+                .thenComparing(c -> Math.abs(daysBetween(line.getTransactionDate(), c.getDate()))));
+
+        return candidates.size() > MAX_CANDIDATES ? candidates.subList(0, MAX_CANDIDATES) : candidates;
+    }
+
+    /**
+     * Read-only suggestions for every unmatched line in the reconciliation.
+     * Only lines with at least one *exact*-amount, direction-matching, posted
+     * voucher within {@link #MATCH_WINDOW_DAYS} of the statement date are
+     * included — nothing is applied here, the caller reviews and confirms via
+     * matchLine() for each accepted suggestion.
+     */
+    @Transactional(readOnly = true)
+    public List<AutoMatchSuggestionDTO> suggestAutoMatches(Long reconciliationId) {
+        if (!reconciliationRepository.existsById(reconciliationId)) {
+            throw new IllegalArgumentException("Reconciliation not found: " + reconciliationId);
+        }
+
+        Map<Long, JournalVoucher> postedById = loadPostedVouchers();
+        Set<Long> usedJvIds = alreadyMatchedJournalVoucherIds();
+        List<JournalVoucherLine> bankLines = journalVoucherLineRepository.findByAccountCode(BANK_ACCOUNT_CODE);
+
+        List<BankStatementLine> unmatchedLines = lineRepository
+                .findByReconciliationIdOrderByTransactionDateAsc(reconciliationId).stream()
+                .filter(l -> !Boolean.TRUE.equals(l.getIsMatched()))
+                .collect(Collectors.toList());
+
+        List<AutoMatchSuggestionDTO> suggestions = new ArrayList<>();
+        for (BankStatementLine line : unmatchedLines) {
+            boolean wantDebit = isBankCredit(line.getType());
+            BigDecimal target = line.getAmount() != null ? line.getAmount() : BigDecimal.ZERO;
+
+            List<MatchCandidateDTO> exactMatches = new ArrayList<>();
+            for (JournalVoucherLine jvl : bankLines) {
+                JournalVoucher jv = postedById.get(jvl.getJournalVoucherId());
+                if (jv == null || usedJvIds.contains(jv.getId())) continue;
+                if (jv.getDate() == null || line.getTransactionDate() == null) continue;
+                if (Math.abs(daysBetween(line.getTransactionDate(), jv.getDate())) > MATCH_WINDOW_DAYS) continue;
+
+                BigDecimal amount = wantDebit ? jvl.getDebit() : jvl.getCredit();
+                if (amount == null) continue;
+                if (amount.subtract(target).abs().compareTo(AMOUNT_TOLERANCE) > 0) continue;
+
+                exactMatches.add(new MatchCandidateDTO(jv.getId(), jv.getVoucherNo(), jv.getDate(), jv.getNarration(), amount));
+            }
+            if (exactMatches.isEmpty()) continue;
+
+            exactMatches.sort(Comparator.comparing(
+                    c -> Math.abs(daysBetween(line.getTransactionDate(), c.getDate()))));
+
+            String confidence = exactMatches.size() == 1 ? "HIGH" : "AMBIGUOUS";
+            suggestions.add(new AutoMatchSuggestionDTO(line.getId(), confidence, exactMatches));
+        }
+        return suggestions;
+    }
+
     private void mapFromRequest(BankReconciliation r, BankReconciliationRequestDTO req) {
         r.setBankAccountName(req.getBankAccountName());
         r.setStatementDate(req.getStatementDate());
         r.setOpeningBalance(req.getOpeningBalance() != null ? req.getOpeningBalance() : BigDecimal.ZERO);
         r.setClosingBalance(req.getClosingBalance() != null ? req.getClosingBalance() : BigDecimal.ZERO);
-        r.setSystemBalance(req.getSystemBalance() != null ? req.getSystemBalance() : BigDecimal.ZERO);
-        BigDecimal diff = (req.getClosingBalance() != null ? req.getClosingBalance() : BigDecimal.ZERO)
-                .subtract(req.getSystemBalance() != null ? req.getSystemBalance() : BigDecimal.ZERO);
-        r.setDifference(diff);
+
+        // The "system"/ledger balance is never taken from client input — it is
+        // always computed from the actual posted ledger as of the statement
+        // date, otherwise "reconciling" would just be comparing the bank
+        // statement to whatever number the user felt like typing.
+        BigDecimal systemBalance = computeSystemBalance(req.getStatementDate());
+        r.setSystemBalance(systemBalance);
+
+        BigDecimal closing = req.getClosingBalance() != null ? req.getClosingBalance() : BigDecimal.ZERO;
+        r.setDifference(closing.subtract(systemBalance));
         r.setNotes(req.getNotes());
     }
 
+    /** opening_balance(bank account) + net(debit-credit) of all POSTED lines on or before asOfDate. */
+    private BigDecimal computeSystemBalance(LocalDate asOfDate) {
+        AccountHead account = accountHeadRepository.findByCode(BANK_ACCOUNT_CODE).orElse(null);
+        BigDecimal opening = account != null && account.getOpeningBalance() != null
+                ? account.getOpeningBalance() : BigDecimal.ZERO;
+
+        Map<Long, JournalVoucher> postedById = loadPostedVouchers();
+        BigDecimal net = BigDecimal.ZERO;
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByAccountCode(BANK_ACCOUNT_CODE)) {
+            JournalVoucher jv = postedById.get(line.getJournalVoucherId());
+            if (jv == null || jv.getDate() == null) continue;
+            if (asOfDate != null && jv.getDate().isAfter(asOfDate)) continue;
+            BigDecimal debit = line.getDebit() != null ? line.getDebit() : BigDecimal.ZERO;
+            BigDecimal credit = line.getCredit() != null ? line.getCredit() : BigDecimal.ZERO;
+            net = net.add(debit).subtract(credit);
+        }
+        return opening.add(net);
+    }
+
+    private Map<Long, JournalVoucher> loadPostedVouchers() {
+        return journalVoucherRepository.findByStatusOrderByDateDesc("POSTED").stream()
+                .collect(Collectors.toMap(JournalVoucher::getId, jv -> jv, (a, b) -> a));
+    }
+
+    private Set<Long> alreadyMatchedJournalVoucherIds() {
+        Set<Long> ids = new HashSet<>();
+        for (BankStatementLine l : lineRepository.findByMatchedJournalVoucherIdIsNotNull()) {
+            ids.add(l.getMatchedJournalVoucherId());
+        }
+        return ids;
+    }
+
+    /** Bank-statement CREDIT (deposit, money in) increases the Cash-at-Bank asset — i.e. a DEBIT in the ledger. */
+    private static boolean isBankCredit(String statementLineType) {
+        return "CREDIT".equalsIgnoreCase(statementLineType);
+    }
+
+    private static long daysBetween(LocalDate a, LocalDate b) {
+        if (a == null || b == null) return Long.MAX_VALUE / 2;
+        return ChronoUnit.DAYS.between(a, b);
+    }
+
+    /**
+     * Used only by create(): every line is brand new, so it always starts
+     * unmatched — a bank statement line can only become "matched" by going
+     * through matchLine(), never by being submitted pre-matched in a request
+     * body.
+     */
     private void saveLines(Long reconciliationId, List<BankStatementLineDTO> lineDTOs) {
         if (lineDTOs == null) return;
         for (BankStatementLineDTO dto : lineDTOs) {
@@ -143,9 +352,48 @@ public class BankReconciliationService {
             line.setAmount(dto.getAmount());
             line.setType(dto.getType());
             line.setReference(dto.getReference());
-            line.setIsMatched(dto.getIsMatched() != null ? dto.getIsMatched() : false);
-            line.setMatchedVoucherNo(dto.getMatchedVoucherNo());
+            line.setIsMatched(false);
             lineRepository.save(line);
+        }
+    }
+
+    /**
+     * Used by update(): applies the edited line list without discarding match
+     * state. A line whose id matches an existing row is updated in place —
+     * its isMatched/matchedVoucherNo/matchedJournalVoucherId are left exactly
+     * as they were, since editing a statement date typo shouldn't silently
+     * unmatch every transaction. Lines omitted from the new list are removed;
+     * lines with no id (newly added in the edit form) are inserted, unmatched.
+     */
+    private void reconcileLines(Long reconciliationId, List<BankStatementLineDTO> lineDTOs) {
+        List<BankStatementLine> existing = lineRepository.findByReconciliationIdOrderByTransactionDateAsc(reconciliationId);
+        Map<Long, BankStatementLine> existingById = existing.stream()
+                .collect(Collectors.toMap(BankStatementLine::getId, l -> l));
+        Set<Long> keptIds = new HashSet<>();
+
+        if (lineDTOs != null) {
+            for (BankStatementLineDTO dto : lineDTOs) {
+                BankStatementLine line = dto.getId() != null ? existingById.get(dto.getId()) : null;
+                if (line == null) {
+                    line = new BankStatementLine();
+                    line.setReconciliationId(reconciliationId);
+                    line.setIsMatched(false);
+                } else {
+                    keptIds.add(line.getId());
+                }
+                line.setTransactionDate(dto.getTransactionDate());
+                line.setDescription(dto.getDescription());
+                line.setAmount(dto.getAmount());
+                line.setType(dto.getType());
+                line.setReference(dto.getReference());
+                lineRepository.save(line);
+            }
+        }
+
+        for (BankStatementLine line : existing) {
+            if (!keptIds.contains(line.getId())) {
+                lineRepository.delete(line);
+            }
         }
     }
 

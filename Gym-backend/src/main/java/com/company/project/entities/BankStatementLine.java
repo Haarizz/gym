@@ -36,6 +36,10 @@ public class BankStatementLine extends BaseEntity {
     @Column(name = "matched_voucher_no")
     private String matchedVoucherNo;
 
+    /** FK to journal_vouchers.id — the real posted voucher this line was matched against. */
+    @Column(name = "matched_journal_voucher_id")
+    private Long matchedJournalVoucherId;
+
     public BankStatementLine() {}
 
     public Long getId() { return id; }
@@ -64,4 +68,7 @@ public class BankStatementLine extends BaseEntity {
 
     public String getMatchedVoucherNo() { return matchedVoucherNo; }
     public void setMatchedVoucherNo(String matchedVoucherNo) { this.matchedVoucherNo = matchedVoucherNo; }
+
+    public Long getMatchedJournalVoucherId() { return matchedJournalVoucherId; }
+    public void setMatchedJournalVoucherId(Long matchedJournalVoucherId) { this.matchedJournalVoucherId = matchedJournalVoucherId; }
 }

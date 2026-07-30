@@ -158,6 +158,20 @@ public class Member extends BaseEntity {
     @Column(name = "relationship_to_head")
     private String relationshipToHead;
 
+    // True for a non-adult family member whose charges/renewals are billed to the
+    // family head instead of carrying their own outstandingBalance/receipts/ledger.
+    @Column(name = "is_minor")
+    private Boolean isMinor = false;
+
+    // True when this member's charges/renewals are folded into the family head's
+    // single invoice instead of carrying their own outstandingBalance/receipts/ledger.
+    // Always true for a minor (isMinor); also true for an ADULT dependent when their
+    // family plan's billing mode is "family_head" (see MembershipPlan.familyBillingMode).
+    // Kept separate from isMinor so billing routing and age/relationship reporting
+    // don't have to stay conflated.
+    @Column(name = "billed_to_head")
+    private Boolean billedToHead = false;
+
     // Face recognition device enrollment
     @Column(name = "face_id")
     private String faceId;  // null until face recognition device is enrolled
@@ -313,6 +327,19 @@ public class Member extends BaseEntity {
 
     public String getRelationshipToHead() { return relationshipToHead; }
     public void setRelationshipToHead(String relationshipToHead) { this.relationshipToHead = relationshipToHead; }
+
+    public Boolean getIsMinor() { return isMinor; }
+    public void setIsMinor(Boolean isMinor) { this.isMinor = isMinor; }
+
+    public Boolean getBilledToHead() { return billedToHead; }
+    public void setBilledToHead(Boolean billedToHead) { this.billedToHead = billedToHead; }
+
+    // Falls back to isMinor when billedToHead hasn't been backfilled (e.g. a minor
+    // created before this column existed) — every minor has always been billed to
+    // their guardian regardless of whether this flag was explicitly stamped on them.
+    public boolean isEffectivelyBilledToHead() {
+        return Boolean.TRUE.equals(billedToHead) || Boolean.TRUE.equals(isMinor);
+    }
 
     public String getFaceId() { return faceId; }
     public void setFaceId(String faceId) { this.faceId = faceId; }

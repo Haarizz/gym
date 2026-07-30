@@ -9,15 +9,21 @@ import com.company.project.entities.JournalVoucherLine;
 import com.company.project.repositories.AccountHeadRepository;
 import com.company.project.repositories.JournalVoucherLineRepository;
 import com.company.project.repositories.JournalVoucherRepository;
+import com.company.project.exceptions.BusinessRuleViolationException;
+import com.company.project.exceptions.EntityNotFoundException;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,44 +34,29 @@ public class JournalVoucherService {
     private final JournalVoucherLineRepository lineRepository;
     private final AccountHeadRepository accountHeadRepository;
     private final FinancialEventService financialEventService;
+    private final VoucherNumberService voucherNumberService;
 
     public JournalVoucherService(JournalVoucherRepository journalVoucherRepository,
                                  JournalVoucherLineRepository lineRepository,
                                  AccountHeadRepository accountHeadRepository,
-                                 FinancialEventService financialEventService) {
+                                 FinancialEventService financialEventService,
+                                 VoucherNumberService voucherNumberService) {
         this.journalVoucherRepository = journalVoucherRepository;
         this.lineRepository           = lineRepository;
         this.accountHeadRepository    = accountHeadRepository;
         this.financialEventService    = financialEventService;
+        this.voucherNumberService     = voucherNumberService;
     }
 
-    private synchronized String generateVoucherNo() {
-        int year = LocalDate.now().getYear();
-        String prefix = "JV-" + year + "-";
-        Optional<JournalVoucher> last = journalVoucherRepository
-                .findTopByVoucherNoStartingWithOrderByVoucherNoDesc(prefix);
-        int seq = last.map(jv -> {
-            try {
-                return Integer.parseInt(jv.getVoucherNo().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                return 1;
-            }
-        }).orElse(1);
-        return String.format("%s%05d", prefix, seq);
-    }
-
+    /**
+     * Filters at the query level (via Specification) instead of loading the whole
+     * table and filtering with a Java stream, so a search only pulls matching rows
+     * over the wire (see docs/gymbios-financial-roadmap.html — M1).
+     */
     public List<JournalVoucherResponseDTO> getJournalVouchers(String search, String status) {
-        List<JournalVoucher> all = journalVoucherRepository.findAllByOrderByDateDesc();
+        Specification<JournalVoucher> spec = buildSpec(search, status);
+        List<JournalVoucher> all = journalVoucherRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "date"));
         return all.stream()
-                .filter(jv -> {
-                    if (search == null || search.isBlank()) return true;
-                    String s = search.toLowerCase(Locale.ROOT);
-                    return (jv.getVoucherNo() != null && jv.getVoucherNo().toLowerCase(Locale.ROOT).contains(s))
-                            || (jv.getNarration() != null && jv.getNarration().toLowerCase(Locale.ROOT).contains(s))
-                            || (jv.getReference() != null && jv.getReference().toLowerCase(Locale.ROOT).contains(s));
-                })
-                .filter(jv -> status == null || status.isBlank() || status.equalsIgnoreCase("all")
-                        || (jv.getStatus() != null && jv.getStatus().equalsIgnoreCase(status)))
                 .map(jv -> {
                     List<JournalVoucherLine> lines = lineRepository.findByJournalVoucherId(jv.getId());
                     return JournalVoucherResponseDTO.fromEntity(jv, lines);
@@ -73,9 +64,29 @@ public class JournalVoucherService {
                 .collect(Collectors.toList());
     }
 
+    private Specification<JournalVoucher> buildSpec(String search, String status) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.isNull(root.get("deletedAt")));
+
+            if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) {
+                predicates.add(cb.equal(cb.lower(root.get("status")), status.toLowerCase(Locale.ROOT)));
+            }
+            if (search != null && !search.isBlank()) {
+                String like = "%" + search.toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("voucherNo")), like),
+                        cb.like(cb.lower(root.get("narration")), like),
+                        cb.like(cb.lower(root.get("reference")), like)
+                ));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
     public JournalVoucherResponseDTO getJournalVoucherById(Long id) {
-        JournalVoucher jv = journalVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Journal Voucher not found: " + id));
+        JournalVoucher jv = journalVoucherRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new EntityNotFoundException("Journal Voucher not found: " + id));
         List<JournalVoucherLine> lines = lineRepository.findByJournalVoucherId(id);
         return JournalVoucherResponseDTO.fromEntity(jv, lines);
     }
@@ -90,7 +101,7 @@ public class JournalVoucherService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         JournalVoucher jv = new JournalVoucher();
-        jv.setVoucherNo(generateVoucherNo());
+        jv.setVoucherNo(voucherNumberService.next("JV"));
         jv.setDate(req.getDate() != null ? req.getDate() : LocalDate.now());
         jv.setNarration(req.getNarration());
         jv.setStatus(req.getStatus() != null && !req.getStatus().isBlank() ? req.getStatus() : "DRAFT");
@@ -103,10 +114,10 @@ public class JournalVoucherService {
     }
 
     public JournalVoucherResponseDTO updateJournalVoucher(Long id, JournalVoucherRequestDTO req) {
-        JournalVoucher jv = journalVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Journal Voucher not found: " + id));
+        JournalVoucher jv = journalVoucherRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new EntityNotFoundException("Journal Voucher not found: " + id));
         if (!"DRAFT".equalsIgnoreCase(jv.getStatus())) {
-            throw new RuntimeException("Only DRAFT journal vouchers can be edited");
+            throw new BusinessRuleViolationException("Only DRAFT journal vouchers can be edited");
         }
         List<JournalVoucherLineDTO> lineDTOs = req.getLines() != null ? req.getLines() : Collections.emptyList();
         BigDecimal totalDebit = lineDTOs.stream()
@@ -134,10 +145,10 @@ public class JournalVoucherService {
      * balance sheet always reflects the latest posted state.
      */
     public JournalVoucherResponseDTO postJournalVoucher(Long id) {
-        JournalVoucher jv = journalVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Journal Voucher not found: " + id));
+        JournalVoucher jv = journalVoucherRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new EntityNotFoundException("Journal Voucher not found: " + id));
         if (!"DRAFT".equalsIgnoreCase(jv.getStatus())) {
-            throw new RuntimeException("Only DRAFT vouchers can be posted");
+            throw new BusinessRuleViolationException("Only DRAFT vouchers can be posted");
         }
 
         // Validate balance before posting
@@ -145,7 +156,7 @@ public class JournalVoucherService {
         BigDecimal dr = lines.stream().map(l -> l.getDebit()  != null ? l.getDebit()  : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal cr = lines.stream().map(l -> l.getCredit() != null ? l.getCredit() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (dr.compareTo(cr) != 0) {
-            throw new RuntimeException(
+            throw new BusinessRuleViolationException(
                     "Cannot post: journal does not balance — DR=" + dr + " CR=" + cr);
         }
 
@@ -174,13 +185,13 @@ public class JournalVoucherService {
      * entry is never deleted or modified.
      */
     public JournalVoucherResponseDTO reverseJournalVoucher(Long id, LocalDate reversalDate, String reason) {
-        JournalVoucher original = journalVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Journal Voucher not found: " + id));
+        JournalVoucher original = journalVoucherRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new EntityNotFoundException("Journal Voucher not found: " + id));
         if (!"POSTED".equalsIgnoreCase(original.getStatus())) {
-            throw new RuntimeException("Only POSTED vouchers can be reversed");
+            throw new BusinessRuleViolationException("Only POSTED vouchers can be reversed");
         }
         if (original.getReversedByVoucherId() != null) {
-            throw new RuntimeException("Voucher " + original.getVoucherNo() + " is already reversed");
+            throw new BusinessRuleViolationException("Voucher " + original.getVoucherNo() + " is already reversed");
         }
 
         List<JournalVoucherLine> originalLines = lineRepository.findByJournalVoucherId(id);
@@ -191,7 +202,7 @@ public class JournalVoucherService {
         LocalDate date = reversalDate != null ? reversalDate : LocalDate.now();
 
         JournalVoucher reversal = new JournalVoucher();
-        reversal.setVoucherNo(generateVoucherNo());
+        reversal.setVoucherNo(voucherNumberService.next("JV"));
         reversal.setDate(date);
         reversal.setNarration(reversalNarration);
         reversal.setStatus("POSTED");
@@ -235,13 +246,13 @@ public class JournalVoucherService {
     }
 
     public JournalVoucherResponseDTO cancelJournalVoucher(Long id) {
-        JournalVoucher jv = journalVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Journal Voucher not found: " + id));
+        JournalVoucher jv = journalVoucherRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new EntityNotFoundException("Journal Voucher not found: " + id));
         if ("POSTED".equalsIgnoreCase(jv.getStatus())) {
-            throw new RuntimeException("Posted vouchers cannot be cancelled — use reverseJournalVoucher() instead");
+            throw new BusinessRuleViolationException("Posted vouchers cannot be cancelled — use reverseJournalVoucher() instead");
         }
         if ("REVERSED".equalsIgnoreCase(jv.getStatus())) {
-            throw new RuntimeException("Reversed vouchers cannot be cancelled");
+            throw new BusinessRuleViolationException("Reversed vouchers cannot be cancelled");
         }
         jv.setStatus("CANCELLED");
         JournalVoucher saved = journalVoucherRepository.save(jv);
@@ -249,14 +260,21 @@ public class JournalVoucherService {
         return JournalVoucherResponseDTO.fromEntity(saved, lines);
     }
 
+    /**
+     * Soft-deletes a DRAFT or CANCELLED voucher: marks it deleted_at rather than
+     * removing the row, so the header and its lines remain in the database for
+     * audit purposes. Deleted vouchers are excluded from buildSpec()'s "IS NULL"
+     * predicate and from findByIdAndDeletedAtIsNull(), so they behave as
+     * "not found" everywhere else in this service.
+     */
     public void deleteJournalVoucher(Long id) {
-        JournalVoucher jv = journalVoucherRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Journal Voucher not found: " + id));
+        JournalVoucher jv = journalVoucherRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new EntityNotFoundException("Journal Voucher not found: " + id));
         if (!"DRAFT".equalsIgnoreCase(jv.getStatus()) && !"CANCELLED".equalsIgnoreCase(jv.getStatus())) {
-            throw new RuntimeException("Only DRAFT or CANCELLED vouchers can be deleted");
+            throw new BusinessRuleViolationException("Only DRAFT or CANCELLED vouchers can be deleted");
         }
-        lineRepository.deleteByJournalVoucherId(id);
-        journalVoucherRepository.delete(jv);
+        jv.setDeletedAt(LocalDateTime.now());
+        journalVoucherRepository.save(jv);
     }
 
     private List<JournalVoucherLine> saveLines(Long journalVoucherId, List<JournalVoucherLineDTO> lineDTOs) {

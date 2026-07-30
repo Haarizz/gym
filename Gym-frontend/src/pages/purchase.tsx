@@ -13,6 +13,20 @@ import { Textarea } from "../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
 import {
+  EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
+  CARD_TYPE_OPTIONS
+} from "../components/shared/split-payment-fields";
+import type { SplitPaymentValue, SplitPaymentDetails } from "../components/shared/split-payment-fields";
+import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
+
+// Maps this page's Payment Method select value to the SplitPaymentValue key
+// so Credit Card/Cheque/Bank Transfer's method-specific details can be
+// validated/built by reusing the same helpers Mixed Payment legs use
+// elsewhere in the app.
+const PURCHASE_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
+  cash: 'cash', credit_card: 'card', cheque: 'cheque', bank_transfer: 'bankTransfer'
+};
+import {
   ShoppingBag,
   Plus,
   Search,
@@ -177,8 +191,15 @@ export function Purchase() {
   const [payingBill, setPayingBill]                     = useState<SupplierBill | null>(null);
   const [payAmount, setPayAmount]                       = useState('');
   const [payMethod, setPayMethod]                       = useState('cash');
+  const [payMethodDetails, setPayMethodDetails]         = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
   const [payNotes, setPayNotes]                         = useState('');
   const [confirmingId, setConfirmingId]                 = useState<number | null>(null);
+  const [bankAccounts, setBankAccounts]                 = useState<AccountHead[]>([]);
+  useEffect(() => {
+    accountHeadsService.getBankAccounts()
+      .then(setBankAccounts)
+      .catch(err => console.error('Failed to load bank accounts:', err));
+  }, []);
 
   // â”€â”€ Bill form data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [billForm, setBillForm] = useState(defaultBillForm);
@@ -389,14 +410,26 @@ export function Purchase() {
       toast.error('Please enter a valid payment amount');
       return;
     }
+    const legKey = PURCHASE_METHOD_TO_LEG_KEY[payMethod];
+    if (legKey && legKey !== 'cash') {
+      const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: amount };
+      if (!isSplitPaymentDetailsValid(probe, payMethodDetails)) {
+        toast.error('Please fill in the required payment details');
+        return;
+      }
+    }
     setSaving(true);
     try {
-      await supplierBillService.recordPayment(payingBill.id, amount, payMethod, payNotes || undefined);
+      const paymentBreakdown = legKey && legKey !== 'cash'
+        ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: amount }, payMethodDetails, bankAccounts)
+        : undefined;
+      await supplierBillService.recordPayment(payingBill.id, amount, payMethod, payNotes || undefined, paymentBreakdown);
       toast.success('Payment recorded successfully');
       setShowPaymentDialog(false);
       setPayingBill(null);
       setPayAmount('');
       setPayMethod('cash');
+      setPayMethodDetails(EMPTY_SPLIT_DETAILS);
       setPayNotes('');
       await loadData();
     } catch (err: any) {
@@ -1803,7 +1836,7 @@ export function Purchase() {
       {/* â”€â”€ Record Payment Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={showPaymentDialog} onOpenChange={open => {
         setShowPaymentDialog(open);
-        if (!open) { setPayingBill(null); setPayAmount(''); setPayMethod('cash'); setPayNotes(''); }
+        if (!open) { setPayingBill(null); setPayAmount(''); setPayMethod('cash'); setPayMethodDetails(EMPTY_SPLIT_DETAILS); setPayNotes(''); }
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1831,7 +1864,7 @@ export function Purchase() {
 
             <div>
               <Label>Payment Method</Label>
-              <Select value={payMethod} onValueChange={setPayMethod}>
+              <Select value={payMethod} onValueChange={(v) => { setPayMethod(v); setPayMethodDetails(EMPTY_SPLIT_DETAILS); }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1844,6 +1877,65 @@ export function Purchase() {
                 </SelectContent>
               </Select>
             </div>
+
+            {payMethod === 'credit_card' && (
+              <div>
+                <Label>Card Type *</Label>
+                <Select value={payMethodDetails.cardType} onValueChange={(v) => setPayMethodDetails(d => ({ ...d, cardType: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
+                  <SelectContent>
+                    {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {payMethod === 'cheque' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Cheque Number *</Label>
+                  <Input
+                    value={payMethodDetails.chequeNumber}
+                    onChange={e => setPayMethodDetails(d => ({ ...d, chequeNumber: e.target.value }))}
+                    placeholder="Cheque number"
+                  />
+                </div>
+                <div>
+                  <Label>Bank Name (optional)</Label>
+                  <Input
+                    value={payMethodDetails.chequeBankName}
+                    onChange={e => setPayMethodDetails(d => ({ ...d, chequeBankName: e.target.value }))}
+                    placeholder="e.g. SBI"
+                  />
+                </div>
+              </div>
+            )}
+
+            {payMethod === 'bank_transfer' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Reference *</Label>
+                  <Input
+                    value={payMethodDetails.bankTransferReference}
+                    onChange={e => setPayMethodDetails(d => ({ ...d, bankTransferReference: e.target.value }))}
+                    placeholder="Transaction ID"
+                  />
+                </div>
+                <div>
+                  <Label>Bank Account (Ledger)</Label>
+                  <Select value={payMethodDetails.bankTransferAccountId} onValueChange={(v) => setPayMethodDetails(d => ({ ...d, bankTransferAccountId: v }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map(account => (
+                        <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
 
             <div>
               <Label>Notes</Label>

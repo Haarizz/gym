@@ -29,11 +29,18 @@ export interface SaleItem {
   discountPercent: number;
 }
 
+export interface PaymentSplitLeg {
+  method: string;
+  amount: number;
+  reference?: string;
+}
+
 export interface SaleTransactionRequest {
   posSessionId?: number;
   memberId?: number;
   memberName: string;
-  paymentMethod: 'CASH' | 'CARD' | 'ONLINE' | 'WALLET';
+  paymentMethod: 'CASH' | 'CARD' | 'ONLINE' | 'WALLET' | 'CHEQUE' | 'MIXED';
+  paymentBreakdown?: PaymentSplitLeg[];
   items: SaleItem[];
   subtotal: number;
   discountAmount: number;
@@ -64,6 +71,7 @@ export interface SaleTransaction {
   memberId?: number;
   memberName: string;
   paymentMethod: string;
+  paymentBreakdown?: PaymentSplitLeg[];
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
@@ -131,6 +139,7 @@ function mapTransaction(r: any): SaleTransaction {
     memberId: r.member_id ?? r.memberId,
     memberName: r.member_name ?? r.memberName ?? '',
     paymentMethod: r.payment_method ?? r.paymentMethod ?? '',
+    paymentBreakdown: r.payment_breakdown ?? r.paymentBreakdown,
     subtotal: Number(r.subtotal ?? 0),
     discountAmount: Number(r.discount_amount ?? r.discountAmount ?? 0),
     taxAmount: Number(r.tax_amount ?? r.taxAmount ?? 0),
@@ -168,6 +177,7 @@ function toTransactionBody(req: SaleTransactionRequest): Record<string, any> {
     member_id: req.memberId,
     member_name: req.memberName,
     payment_method: req.paymentMethod,
+    payment_breakdown: req.paymentBreakdown,
     items: req.items.map(item => ({
       product_id: item.productId,
       product_name: item.productName,

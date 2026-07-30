@@ -19,6 +19,11 @@ public class CommunityController {
         this.communityService = communityService;
     }
 
+    @GetMapping("/stats")
+    public ResponseEntity<CommunityEngagementStatsDTO> getEngagementStats() {
+        return ResponseEntity.ok(communityService.getEngagementStats());
+    }
+
     @GetMapping("/posts")
     public ResponseEntity<CommunityPostsPageResponseDTO> getFeed(
             @RequestParam(required = false) String q,

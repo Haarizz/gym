@@ -44,6 +44,7 @@ export interface CreateAddonRequest {
   start_date: string;
   expiry_date: string;
   notes?: string;
+  payment_breakdown?: Record<string, any>[];
 }
 
 class AddonsService {

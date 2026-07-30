@@ -17,10 +17,17 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -143,6 +150,73 @@ public class CommunityService {
 
         CommunityPost saved = communityPostRepository.save(post);
         return toPostResponse(saved, false);
+    }
+
+    /**
+     * Real engagement metrics for the analytics dashboard — no invented "features"
+     * like challenges/leaderboards/chat, since none of those exist as trackable
+     * entities. Grounded in the actual post type (achievement/question/tip) and
+     * the like/comment counters already maintained on each post.
+     */
+    @Transactional(readOnly = true)
+    public CommunityEngagementStatsDTO getEngagementStats() {
+        List<CommunityPost> posts = communityPostRepository.findAll().stream()
+                .filter(p -> !p.isArchived())
+                .collect(Collectors.toList());
+
+        long totalPosts = posts.size();
+        long totalLikes = posts.stream().mapToLong(CommunityPost::getLikeCount).sum();
+        long totalComments = posts.stream().mapToLong(CommunityPost::getCommentCount).sum();
+
+        Map<String, long[]> byTypeAgg = new LinkedHashMap<>();
+        for (CommunityPost p : posts) {
+            String type = p.getType() != null && !p.getType().isBlank() ? p.getType() : "other";
+            long[] agg = byTypeAgg.computeIfAbsent(type, k -> new long[3]);
+            agg[0]++;
+            agg[1] += p.getLikeCount();
+            agg[2] += p.getCommentCount();
+        }
+        List<CommunityEngagementStatsDTO.TypeBreakdown> byType = byTypeAgg.entrySet().stream()
+                .map(e -> new CommunityEngagementStatsDTO.TypeBreakdown(
+                        e.getKey(), e.getValue()[0], e.getValue()[1], e.getValue()[2]))
+                .sorted(Comparator.comparingLong(CommunityEngagementStatsDTO.TypeBreakdown::getPosts).reversed())
+                .collect(Collectors.toList());
+
+        // Weekly activity for the last 8 ISO weeks (Monday-start buckets)
+        int weekCount = 8;
+        LocalDate currentWeekStart = LocalDate.now().with(DayOfWeek.MONDAY);
+        List<LocalDate> weekStarts = new ArrayList<>();
+        for (int i = weekCount - 1; i >= 0; i--) {
+            weekStarts.add(currentWeekStart.minusWeeks(i));
+        }
+        Map<LocalDate, long[]> weeklyAgg = new LinkedHashMap<>();
+        for (LocalDate ws : weekStarts) weeklyAgg.put(ws, new long[3]);
+
+        for (CommunityPost p : posts) {
+            if (p.getCreatedAt() == null) continue;
+            LocalDate postWeekStart = p.getCreatedAt().toLocalDate().with(DayOfWeek.MONDAY);
+            long[] agg = weeklyAgg.get(postWeekStart);
+            if (agg == null) continue;
+            agg[0]++;
+            agg[1] += p.getLikeCount();
+            agg[2] += p.getCommentCount();
+        }
+
+        DateTimeFormatter labelFmt = DateTimeFormatter.ofPattern("MMM d");
+        List<CommunityEngagementStatsDTO.WeeklyPoint> weekly = weekStarts.stream()
+                .map(ws -> {
+                    long[] agg = weeklyAgg.get(ws);
+                    return new CommunityEngagementStatsDTO.WeeklyPoint(ws.format(labelFmt), agg[0], agg[1], agg[2]);
+                })
+                .collect(Collectors.toList());
+
+        CommunityEngagementStatsDTO dto = new CommunityEngagementStatsDTO();
+        dto.setTotalPosts(totalPosts);
+        dto.setTotalLikes(totalLikes);
+        dto.setTotalComments(totalComments);
+        dto.setByType(byType);
+        dto.setWeekly(weekly);
+        return dto;
     }
 
     public List<CommunityPostCommentResponseDTO> getComments(Long postId) {

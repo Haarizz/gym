@@ -14,7 +14,6 @@ import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Separator } from "../components/ui/separator";
 import {
   AlertCircle,
-  DollarSign,
   CreditCard,
   Download,
   Search,
@@ -32,13 +31,18 @@ import {
   Printer,
   TrendingUp,
   RefreshCw,
-  Snowflake
+  Snowflake,
+  ScrollText,
+  UserRoundSearch,
+  Baby
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { toast } from 'sonner';
-import { billingService, BillingStats, MemberDue } from '../utils/supabase/billing-service';
+import { billingService, BillingStats, MemberDue, MemberStatement } from '../utils/supabase/billing-service';
 import { receiptsService } from '../utils/supabase/receipts-service';
 import type { Receipt } from '../utils/supabase/receipts-service';
+import { membersService } from '../utils/supabase/members-service';
+import type { Member } from '../utils/supabase/members-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 
 interface BillingProps {
@@ -67,6 +71,17 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   const [freezeOpen, setFreezeOpen] = useState(false);
   const [freezeMember, setFreezeMember] = useState<MemberDue | null>(null);
 
+  // Member SOA (Statement of Account) tab
+  const [soaSearchTerm, setSoaSearchTerm]       = useState("");
+  const [soaSuggestions, setSoaSuggestions]     = useState<Member[]>([]);
+  const [soaSearchLoading, setSoaSearchLoading] = useState(false);
+  const [soaShowSuggestions, setSoaShowSuggestions] = useState(false);
+  const [soaSelectedMember, setSoaSelectedMember] = useState<Member | null>(null);
+  const [soaFrom, setSoaFrom]                   = useState("");
+  const [soaTo, setSoaTo]                       = useState("");
+  const [soaStatement, setSoaStatement]         = useState<MemberStatement | null>(null);
+  const [soaLoading, setSoaLoading]             = useState(false);
+
   // Real data state
   const [stats, setStats] = useState<BillingStats | null>(null);
   const [memberDues, setMemberDues] = useState<MemberDue[]>([]);
@@ -92,6 +107,52 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   };
 
   useEffect(() => { loadStats(); loadDues(); }, []);
+
+  // ── Member SOA: debounced member search ─────────────────────────────────
+  useEffect(() => {
+    if (!soaSearchTerm.trim()) { setSoaSuggestions([]); return; }
+    setSoaSearchLoading(true);
+    const timer = setTimeout(() => {
+      membersService.searchMembers(soaSearchTerm)
+        .then(setSoaSuggestions)
+        .catch(() => setSoaSuggestions([]))
+        .finally(() => setSoaSearchLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [soaSearchTerm]);
+
+  const handleSelectSoaMember = (member: Member) => {
+    setSoaSelectedMember(member);
+    setSoaSearchTerm("");
+    setSoaShowSuggestions(false);
+    setSoaSuggestions([]);
+    setSoaStatement(null);
+  };
+
+  const handleGenerateStatement = () => {
+    if (!soaSelectedMember) { toast.error('Please select a member first'); return; }
+    setSoaLoading(true);
+    billingService.getMemberStatement(Number(soaSelectedMember.id), soaFrom || undefined, soaTo || undefined)
+      .then(setSoaStatement)
+      .catch(() => toast.error('Failed to generate statement'))
+      .finally(() => setSoaLoading(false));
+  };
+
+  const handleExportStatementCsv = () => {
+    if (!soaStatement || soaStatement.lines.length === 0) { toast.info('No statement lines to export'); return; }
+    const header = 'Date,Receipt #,Type,Description,Debit,Credit,Balance,Payment Method,Status\n';
+    const rows = soaStatement.lines.map(l =>
+      `"${l.date}","${l.receipt_no}","${l.type}","${l.description.replace(/"/g, '""')}","${l.debit.toFixed(2)}","${l.credit.toFixed(2)}","${l.balance.toFixed(2)}","${l.payment_method ?? ''}","${l.status}"`
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `soa-${soaStatement.member_id}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported statement for ${soaStatement.member_name}`);
+  };
 
   useEffect(() => {
     const filters: { search?: string; transactionType?: string; status?: string } = {};
@@ -126,6 +187,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
 
   const handleDownloadReceipt = (receipt: Receipt) => {
     const totalAmt  = Number(receipt.amount);
+    const paidAmt   = Number(receipt.paid_amount ?? totalAmt);
+    const balanceDue = Number(receipt.due_amount ?? 0);
     const vatAmount = totalAmt * 5 / 105;
     const dateStr   = receipt.transaction_date
       ? new Date(receipt.transaction_date).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })
@@ -226,7 +289,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
     <div class="row bold"><span>Gross Total:</span><span>${currencyCode} ${totalAmt.toFixed(2)}</span></div>
     <div class="row"><span>VAT (5%):</span><span>${currencyCode} ${vatAmount.toFixed(2)}</span></div>
     <div class="row total-final"><span>Invoice Amount:</span><span>${currencyCode} ${totalAmt.toFixed(2)}</span></div>
-    <div class="row total-paid"><span>TOTAL PAID:</span><span>${currencyCode} ${totalAmt.toFixed(2)}</span></div>
+    <div class="row total-paid"><span>PAID THIS TRANSACTION:</span><span>${currencyCode} ${paidAmt.toFixed(2)}</span></div>
+    ${balanceDue > 0 ? `<div class="row total-paid" style="color:#c00"><span>BALANCE DUE:</span><span>${currencyCode} ${balanceDue.toFixed(2)}</span></div>` : ''}
   </div>
   <hr class="thin"/>
   <div class="payment-box">
@@ -309,10 +373,12 @@ export function Billing({ onNavigate }: BillingProps = {}) {
 
   const handleExportAllReceipts = () => {
     if (receipts.length === 0) { toast.info('No receipts to export'); return; }
-    const header = 'Receipt No,Member,Member ID,Plan,Type,Amount,Date,Payment Method,Status\n';
-    const rows = receipts.map(r =>
-      `"${r.receipt_no}","${r.member_name}","${r.member_id}","${r.plan_name ?? ''}","${r.transaction_type}","${Number(r.amount).toFixed(2)}","${r.transaction_date ? new Date(r.transaction_date).toLocaleDateString() : ''}","${r.payment_method ?? ''}","${r.status}"`
-    ).join('\n');
+    const header = 'Receipt No,Member,Member ID,Plan,Type,Amount Paid,Remaining Due,Date & Time,Payment Method,Created By,Status\n';
+    const rows = receipts.map(r => {
+      const paid = Number(r.paid_amount ?? 0);
+      const remainingDue = Number(r.balance_after ?? 0);
+      return `"${r.receipt_no}","${r.member_name}","${r.member_id}","${r.plan_name ?? ''}","${r.transaction_type}","${paid.toFixed(2)}","${remainingDue.toFixed(2)}","${r.transaction_date ? new Date(r.transaction_date).toLocaleString() : ''}","${r.payment_method ?? ''}","${r.processed_by ?? ''}","${r.status}"`;
+    }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -371,7 +437,6 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Collection</CardTitle>
-            <div className="p-2 rounded-lg bg-blue-100"><DollarSign className="h-4 w-4 text-blue-600" /></div>
           </CardHeader>
           <CardContent>
             {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : (
@@ -433,6 +498,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         <TabsList className="w-full flex">
           <TabsTrigger value="receipts" className="flex-1">Member Receipts</TabsTrigger>
           <TabsTrigger value="dues" className="flex-1">Member Due</TabsTrigger>
+          <TabsTrigger value="soa" className="flex-1">Member SOA</TabsTrigger>
           <TabsTrigger value="collection" className="flex-1">Total Collection</TabsTrigger>
         </TabsList>
 
@@ -497,16 +563,18 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               ) : receipts.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">No receipts found.</div>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50/50">
                     <TableRow className="hover:bg-transparent">
                       <TableHead>Receipt #</TableHead>
                       <TableHead>Member</TableHead>
-                      <TableHead>Plan</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead>Amount Paid</TableHead>
+                      <TableHead>Transaction Date &amp; Time</TableHead>
                       <TableHead>Payment Method</TableHead>
+                      <TableHead>Remaining Due</TableHead>
+                      <TableHead>Created By</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -514,6 +582,11 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   <TableBody>
                     {receipts.map((receipt) => (
                       <TableRow key={receipt.id} className="hover:bg-slate-50/50 transition-colors">
+                        {/* Every payment action — the bill's own initial payment, and each
+                            later settlement — is its own immutable row with its own unique
+                            receipt number. Two payments made at different times are NEVER
+                            merged into one row; only legs paid within the SAME payment
+                            event (below) are combined under one receipt. */}
                         <TableCell className="font-medium">{receipt.receipt_no}</TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-3">
@@ -524,17 +597,35 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                             </Avatar>
                             <div>
                               <div className="font-medium">{receipt.member_name}</div>
-                              <div className="text-sm text-muted-foreground">{receipt.member_id}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {receipt.member_id}{receipt.plan_name ? ` · ${receipt.plan_name}` : ''}
+                              </div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{receipt.plan_name ?? '-'}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">{receipt.transaction_type}</Badge>
                         </TableCell>
-                        <TableCell className="font-medium"><CurrencyGlyph /> {Number(receipt.amount).toLocaleString()}</TableCell>
+                        <TableCell className="font-medium">
+                          <div><CurrencyGlyph /> {Number(receipt.paid_amount ?? 0).toLocaleString()}</div>
+                          {receipt.transaction_type !== 'Payment' && Number(receipt.due_amount ?? 0) > 0 && (
+                            <div className="text-xs font-normal text-amber-600">
+                              of <CurrencyGlyph /> {Number(receipt.amount).toLocaleString()} — <CurrencyGlyph /> {Number(receipt.due_amount).toLocaleString()} due on this bill
+                            </div>
+                          )}
+                          {/* Legs paid within this SAME payment event only (e.g. 20 Cash +
+                              30 Card at one checkout) — never legs from separate payments
+                              made at different times, which each get their own row instead. */}
+                          {receipt.payment_breakdown && receipt.payment_breakdown.length > 1 && (
+                            <div className="text-xs font-normal text-muted-foreground mt-0.5">
+                              Split: {receipt.payment_breakdown
+                                .map(leg => `${Number(leg.amount).toLocaleString()} (${leg.method})`)
+                                .join(' + ')}
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell>
-                          {receipt.transaction_date ? new Date(receipt.transaction_date).toLocaleDateString() : '-'}
+                          {receipt.transaction_date ? new Date(receipt.transaction_date).toLocaleString() : '-'}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center">
@@ -542,6 +633,10 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                             {receipt.payment_method ?? '-'}
                           </div>
                         </TableCell>
+                        <TableCell className={Number(receipt.balance_after ?? 0) > 0 ? 'text-red-600 font-medium' : ''}>
+                          <CurrencyGlyph /> {Number(receipt.balance_after ?? 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell>{receipt.processed_by ?? '-'}</TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(receipt.status)}>{receipt.status}</Badge>
                         </TableCell>
@@ -580,6 +675,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -615,7 +711,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-3" />
                   <p className="text-lg font-medium mb-1">No Outstanding Dues</p>
                   <p className="text-sm text-muted-foreground">
-                    All members are up to date. Members with <strong>payment_status = 'overdue'</strong> or <strong>next_payment_date</strong> within 7 days will appear here.
+                    All members are up to date. Members who are <strong>overdue</strong>, have a <strong>pending</strong> balance, or a payment due within 7 days will appear here.
                   </p>
                 </div>
               ) : (
@@ -782,6 +878,208 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* ── Member SOA Tab ── */}
+        <TabsContent value="soa" className="space-y-6">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserRoundSearch className="h-5 w-5" style={{ color: '#2B7A78' }} />Generate Statement of Account
+              </CardTitle>
+              <CardDescription>Select a member to see every receipt billed and paid against them, in one place</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="relative">
+                  <Label className="mb-2 block">Select Member *</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="Search by name, ID or phone..."
+                      className="pl-10"
+                      value={soaSelectedMember ? soaSelectedMember.name : soaSearchTerm}
+                      onChange={(e) => {
+                        setSoaSelectedMember(null);
+                        setSoaSearchTerm(e.target.value);
+                        setSoaShowSuggestions(true);
+                      }}
+                      onFocus={() => setSoaShowSuggestions(true)}
+                    />
+                  </div>
+                  {soaShowSuggestions && soaSearchTerm && !soaSelectedMember && (
+                    <Card className="absolute z-10 w-full mt-2 max-h-80 overflow-y-auto border-slate-200/80 shadow-md">
+                      <CardContent className="p-2">
+                        {soaSearchLoading ? (
+                          <div className="flex justify-center p-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
+                        ) : soaSuggestions.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center p-4">No members found</p>
+                        ) : soaSuggestions.map(member => (
+                          <div
+                            key={member.id}
+                            onClick={() => handleSelectSoaMember(member)}
+                            className="p-3 rounded-lg hover:bg-[#DFF5F4] cursor-pointer transition-colors mb-1"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="bg-gradient-to-r from-[#2B7A78] to-[#00c5cb] text-white text-xs">
+                                  {member.name?.split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="font-medium text-sm flex items-center gap-1">
+                                  {member.name}
+                                  {member.is_minor && <Baby className="h-4 w-4 text-amber-600" />}
+                                </div>
+                                <div className="flex gap-2 text-xs text-muted-foreground">
+                                  <span>{member.member_id}</span>
+                                  <span>{member.phone}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+                <div>
+                  <Label className="mb-2 block">From Date</Label>
+                  <Input type="date" value={soaFrom} onChange={(e) => setSoaFrom(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="mb-2 block">To Date</Label>
+                  <Input type="date" value={soaTo} onChange={(e) => setSoaTo(e.target.value)} />
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <Button
+                  style={{ backgroundColor: '#2B7A78' }}
+                  className="text-white"
+                  disabled={!soaSelectedMember || soaLoading}
+                  onClick={handleGenerateStatement}
+                >
+                  {soaLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
+                  Generate Statement
+                </Button>
+                {soaStatement && !soaStatement.billed_to_head && (
+                  <Button variant="outline" onClick={handleExportStatementCsv}>
+                    <Download className="mr-2 h-4 w-4" />Export CSV
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {soaLoading && (
+            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+          )}
+
+          {!soaLoading && soaStatement && soaStatement.billed_to_head && (
+            <Card className="border-amber-200 bg-amber-50 shadow-md">
+              <CardContent className="py-12 text-center">
+                <Baby className="h-12 w-12 mx-auto text-amber-600 mb-3" />
+                <p className="text-lg font-medium mb-1">
+                  {soaStatement.member_name} {soaStatement.is_minor ? 'is a minor' : 'is billed to their family head'}
+                </p>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  This member doesn't carry an independent billing account — there are no transactions to show here.
+                  {soaStatement.family_head_name
+                    ? <> Their fees are billed to their {soaStatement.is_minor ? 'guardian' : 'family head'}, <strong>{soaStatement.family_head_name}</strong> — generate that member's statement to see them itemized there.</>
+                    : ' Their fees are billed to their family head.'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {!soaLoading && soaStatement && !soaStatement.billed_to_head && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card className="border-primary/10 shadow-md">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Opening Balance</CardTitle></CardHeader>
+                  <CardContent><div className="text-xl font-bold"><CurrencyGlyph /> {soaStatement.opening_balance.toLocaleString()}</div></CardContent>
+                </Card>
+                <Card className="border-primary/10 shadow-md">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Billed</CardTitle></CardHeader>
+                  <CardContent><div className="text-xl font-bold"><CurrencyGlyph /> {soaStatement.total_billed.toLocaleString()}</div></CardContent>
+                </Card>
+                <Card className="border-primary/10 shadow-md">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Paid</CardTitle></CardHeader>
+                  <CardContent><div className="text-xl font-bold text-green-600"><CurrencyGlyph /> {soaStatement.total_paid.toLocaleString()}</div></CardContent>
+                </Card>
+                <Card className="border-primary/10 shadow-md">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Closing Balance</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className={`text-xl font-bold ${soaStatement.closing_balance > 0 ? 'text-red-600' : ''}`}>
+                      <CurrencyGlyph /> {soaStatement.closing_balance.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle>{soaStatement.member_name} — Statement of Account</CardTitle>
+                  <CardDescription>{soaStatement.member_id}{soaStatement.member_phone ? ` · ${soaStatement.member_phone}` : ''}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {soaStatement.lines.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">No transactions found for this member{soaFrom || soaTo ? ' in the selected date range' : ''}.</div>
+                  ) : (
+                    <Table>
+                      <TableHeader className="bg-slate-50/50">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead>Date</TableHead>
+                          <TableHead>Receipt #</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-right">Debit</TableHead>
+                          <TableHead className="text-right">Credit</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {soaStatement.lines.map((line, idx) => (
+                          <TableRow key={idx} className="hover:bg-slate-50/50 transition-colors">
+                            <TableCell>{line.date ? new Date(line.date).toLocaleDateString() : '-'}</TableCell>
+                            <TableCell className="font-medium">{line.receipt_no}</TableCell>
+                            <TableCell><Badge variant="outline" className="text-xs">{line.type}</Badge></TableCell>
+                            <TableCell>
+                              <div>{line.description}</div>
+                              {line.minor_charges && line.minor_charges.length > 0 && (
+                                <div className="text-xs text-amber-700 mt-0.5 flex items-center gap-1">
+                                  <Baby className="h-3 w-3" />
+                                  Incl. {line.minor_charges.map(mc => `${mc.name}: ${Number(mc.amount).toLocaleString()}`).join(', ')}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {line.debit > 0 ? <><CurrencyGlyph /> {line.debit.toLocaleString()}</> : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-green-600">
+                              {line.credit > 0 ? <><CurrencyGlyph /> {line.credit.toLocaleString()}</> : '-'}
+                            </TableCell>
+                            <TableCell className={`text-right font-bold ${line.balance > 0 ? 'text-red-600' : ''}`}>
+                              <CurrencyGlyph /> {line.balance.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {!soaLoading && !soaStatement && (
+            <Card className="border-primary/10 shadow-md">
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <ScrollText className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                Search and select a member above, then click <strong>Generate Statement</strong> to see their full payment history.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ── Total Collection Tab ── */}
@@ -975,6 +1273,45 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   <span className="font-medium">Total Amount:</span>
                   <span className="font-bold text-lg"><CurrencyGlyph /> {Number(selectedReceipt.amount).toLocaleString()}</span>
                 </div>
+                {(() => {
+                  const paid = Number(selectedReceipt.paid_amount ?? 0);
+                  const pending = Number(selectedReceipt.due_amount ?? 0);
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Paid (this transaction):</span>
+                        <span>
+                          <CurrencyGlyph /> {paid.toLocaleString()}
+                        </span>
+                      </div>
+                      {pending > 0 && selectedReceipt.transaction_type !== 'Payment' && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-amber-600 font-medium">Still due on this bill:</span>
+                          <span className="text-amber-600 font-medium">
+                            <CurrencyGlyph /> {pending.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Remaining due (member balance):</span>
+                  <span className={Number(selectedReceipt.balance_after ?? 0) > 0 ? 'text-red-600 font-medium' : ''}>
+                    <CurrencyGlyph /> {Number(selectedReceipt.balance_after ?? 0).toLocaleString()}
+                  </span>
+                </div>
+                {selectedReceipt.payment_breakdown && selectedReceipt.payment_breakdown.length > 1 && (
+                  <div className="space-y-1 pt-1">
+                    <span className="text-sm text-muted-foreground">Payment Split (same transaction):</span>
+                    {selectedReceipt.payment_breakdown.map((leg, idx) => (
+                      <div key={idx} className="flex justify-between text-sm pl-2">
+                        <span className="text-muted-foreground">{leg.method}{leg.reference ? ` — ${leg.reference}` : ''}</span>
+                        <span><CurrencyGlyph /> {Number(leg.amount).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>

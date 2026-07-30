@@ -27,6 +27,16 @@ public class MembershipPlanRequestDTO {
     private Integer maxSessions;
     private List<String> assignableTrainers = new ArrayList<>();
 
+    // Family plan settings (only meaningful when planType == "Family")
+    private String familyBillingMode;
+    private BigDecimal pricePerMember;
+    private Integer maxFamilyMembers;
+    private Integer maxAdultMembers;
+    private Integer maxChildMembers;
+    private Boolean allowAdditionalMembers;
+    private BigDecimal additionalMemberPrice;
+    private Boolean autoCalculateTotal;
+
     // Capacity
     private String membershipCapacity;
     private Integer maxCapacity;
@@ -81,6 +91,30 @@ public class MembershipPlanRequestDTO {
 
     public List<String> getAssignableTrainers() { return assignableTrainers; }
     public void setAssignableTrainers(List<String> assignableTrainers) { this.assignableTrainers = assignableTrainers; }
+
+    public String getFamilyBillingMode() { return familyBillingMode; }
+    public void setFamilyBillingMode(String familyBillingMode) { this.familyBillingMode = familyBillingMode; }
+
+    public BigDecimal getPricePerMember() { return pricePerMember; }
+    public void setPricePerMember(BigDecimal pricePerMember) { this.pricePerMember = pricePerMember; }
+
+    public Integer getMaxFamilyMembers() { return maxFamilyMembers; }
+    public void setMaxFamilyMembers(Integer maxFamilyMembers) { this.maxFamilyMembers = maxFamilyMembers; }
+
+    public Integer getMaxAdultMembers() { return maxAdultMembers; }
+    public void setMaxAdultMembers(Integer maxAdultMembers) { this.maxAdultMembers = maxAdultMembers; }
+
+    public Integer getMaxChildMembers() { return maxChildMembers; }
+    public void setMaxChildMembers(Integer maxChildMembers) { this.maxChildMembers = maxChildMembers; }
+
+    public Boolean getAllowAdditionalMembers() { return allowAdditionalMembers; }
+    public void setAllowAdditionalMembers(Boolean allowAdditionalMembers) { this.allowAdditionalMembers = allowAdditionalMembers; }
+
+    public BigDecimal getAdditionalMemberPrice() { return additionalMemberPrice; }
+    public void setAdditionalMemberPrice(BigDecimal additionalMemberPrice) { this.additionalMemberPrice = additionalMemberPrice; }
+
+    public Boolean getAutoCalculateTotal() { return autoCalculateTotal; }
+    public void setAutoCalculateTotal(Boolean autoCalculateTotal) { this.autoCalculateTotal = autoCalculateTotal; }
 
     public String getMembershipCapacity() { return membershipCapacity; }
     public void setMembershipCapacity(String membershipCapacity) { this.membershipCapacity = membershipCapacity; }

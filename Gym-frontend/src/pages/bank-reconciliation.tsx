@@ -5,6 +5,8 @@ import {
   BankReconciliation as ApiReconciliation,
   BankReconciliationCreateRequest,
   BankStatementLine,
+  MatchCandidate,
+  AutoMatchSuggestion,
 } from "../utils/supabase/bank-reconciliation-service";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -45,6 +47,8 @@ import {
   Zap,
   SplitSquareHorizontal,
   Plus,
+  Loader2,
+  Info,
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
 
@@ -74,6 +78,7 @@ interface BankAccount {
 }
 
 interface LineForm {
+  id?: number;
   transactionDate: string;
   description: string;
   amount: string;
@@ -86,7 +91,6 @@ interface ReconciliationForm {
   statementDate: string;
   openingBalance: string;
   closingBalance: string;
-  systemBalance: string;
   notes: string;
   lines: LineForm[];
 }
@@ -110,7 +114,6 @@ const emptyForm: ReconciliationForm = {
   statementDate: new Date().toISOString().split("T")[0],
   openingBalance: "",
   closingBalance: "",
-  systemBalance: "",
   notes: "",
   lines: [],
 };
@@ -142,8 +145,21 @@ export function BankReconciliation() {
   const [customDateRange, setCustomDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [newNote, setNewNote] = useState<string>("");
-  const [matchVoucherNo, setMatchVoucherNo] = useState<string>("");
-  const [showMatchInput, setShowMatchInput] = useState(false);
+
+  // Manual match picker (real posted vouchers only — never free text)
+  const [showMatchPicker, setShowMatchPicker] = useState(false);
+  const [matchCandidates, setMatchCandidates] = useState<MatchCandidate[]>([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
+  const [matchingInProgress, setMatchingInProgress] = useState(false);
+
+  // Auto-match review
+  const [showAutoMatchDialog, setShowAutoMatchDialog] = useState(false);
+  const [autoMatchSuggestions, setAutoMatchSuggestions] = useState<AutoMatchSuggestion[]>([]);
+  const [autoMatchPicks, setAutoMatchPicks] = useState<Record<number, number>>({}); // lineId -> chosen journalVoucherId
+  const [loadingAutoMatch, setLoadingAutoMatch] = useState(false);
+  const [applyingAutoMatch, setApplyingAutoMatch] = useState(false);
 
   // Create/Edit dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -279,21 +295,40 @@ export function BankReconciliation() {
 
   const handleViewTransaction = (transaction: BankTransaction) => {
     setSelectedTransaction(transaction);
-    setShowMatchInput(false);
-    setMatchVoucherNo("");
+    setShowMatchPicker(false);
+    setMatchCandidates([]);
+    setSelectedCandidateId(null);
+    setCandidateSearch("");
     setNewNote("");
     setIsDetailsOpen(true);
   };
 
-  const handleMatchTransaction = async (transaction: BankTransaction, voucherNo: string) => {
-    if (!currentReconciliation) { toast.error("No active reconciliation"); return; }
+  const loadMatchCandidates = async (transaction: BankTransaction) => {
+    if (!currentReconciliation) return;
+    setShowMatchPicker(true);
+    setSelectedCandidateId(null);
+    setCandidateSearch("");
+    setLoadingCandidates(true);
     try {
-      const updated = await bankReconciliationService.matchLine(currentReconciliation.id, transaction.lineId, voucherNo || "MANUAL");
+      const candidates = await bankReconciliationService.getMatchCandidates(currentReconciliation.id, transaction.lineId);
+      setMatchCandidates(candidates);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to load matching ledger entries");
+    } finally {
+      setLoadingCandidates(false);
+    }
+  };
+
+  const handleMatchTransaction = async (transaction: BankTransaction, journalVoucherId: number) => {
+    if (!currentReconciliation) { toast.error("No active reconciliation"); return; }
+    setMatchingInProgress(true);
+    try {
+      const updated = await bankReconciliationService.matchLine(currentReconciliation.id, transaction.lineId, journalVoucherId);
       toast.success("Transaction matched successfully");
       setCurrentReconciliation(updated);
       setAllTransactions(mapLinesToTransactions(updated));
-      setShowMatchInput(false);
-      setMatchVoucherNo("");
+      setShowMatchPicker(false);
+      setSelectedCandidateId(null);
       // Update selected transaction in details panel
       const updatedLine = updated.lines.find(l => l.id === transaction.lineId);
       if (updatedLine && selectedTransaction?.lineId === transaction.lineId) {
@@ -307,6 +342,8 @@ export function BankReconciliation() {
       }
     } catch (e: any) {
       toast.error(e.message || "Failed to match transaction");
+    } finally {
+      setMatchingInProgress(false);
     }
   };
 
@@ -325,8 +362,61 @@ export function BankReconciliation() {
     }
   };
 
-  const handleAutoMatch = () => {
-    toast.info("Auto-match requires manual review of individual transactions");
+  const handleAutoMatch = async () => {
+    if (!currentReconciliation) { toast.error("No active reconciliation"); return; }
+    setLoadingAutoMatch(true);
+    try {
+      const suggestions = await bankReconciliationService.getAutoMatchSuggestions(currentReconciliation.id);
+      if (suggestions.length === 0) {
+        toast.info("No candidate matches found — all remaining lines need to be recorded in the ledger first, or matched manually.");
+        return;
+      }
+      // Pre-select the single candidate for every HIGH-confidence suggestion.
+      const picks: Record<number, number> = {};
+      suggestions.forEach(s => {
+        if (s.confidence === "HIGH" && s.candidates.length === 1) {
+          picks[s.lineId] = s.candidates[0].journalVoucherId;
+        }
+      });
+      setAutoMatchPicks(picks);
+      setAutoMatchSuggestions(suggestions);
+      setShowAutoMatchDialog(true);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to compute auto-match suggestions");
+    } finally {
+      setLoadingAutoMatch(false);
+    }
+  };
+
+  const handleApplyAutoMatch = async (onlyHighConfidence: boolean) => {
+    if (!currentReconciliation) return;
+    const toApply = autoMatchSuggestions.filter(s => {
+      const picked = autoMatchPicks[s.lineId];
+      if (!picked) return false;
+      return onlyHighConfidence ? s.confidence === "HIGH" : true;
+    });
+    if (toApply.length === 0) {
+      toast.error("Nothing selected to apply");
+      return;
+    }
+    setApplyingAutoMatch(true);
+    let succeeded = 0;
+    let failed = 0;
+    for (const s of toApply) {
+      try {
+        await bankReconciliationService.matchLine(currentReconciliation.id, s.lineId, autoMatchPicks[s.lineId]);
+        succeeded++;
+      } catch {
+        failed++;
+      }
+    }
+    setApplyingAutoMatch(false);
+    if (succeeded > 0) toast.success(`Matched ${succeeded} transaction${succeeded === 1 ? "" : "s"}`);
+    if (failed > 0) toast.error(`${failed} match${failed === 1 ? "" : "es"} failed — they may already be matched elsewhere`);
+    setShowAutoMatchDialog(false);
+    setAutoMatchSuggestions([]);
+    setAutoMatchPicks({});
+    await loadReconciliations();
   };
 
   const handleExport = (format: string) => {
@@ -364,9 +454,9 @@ export function BankReconciliation() {
       statementDate: rec.statementDate.split("T")[0],
       openingBalance: String(rec.openingBalance),
       closingBalance: String(rec.closingBalance),
-      systemBalance: String(rec.systemBalance),
       notes: rec.notes ?? "",
       lines: rec.lines.map(l => ({
+        id: l.id,
         transactionDate: l.transactionDate.split("T")[0],
         description: l.description,
         amount: String(l.amount),
@@ -382,16 +472,16 @@ export function BankReconciliation() {
     statementDate: f.statementDate,
     openingBalance: parseFloat(f.openingBalance) || 0,
     closingBalance: parseFloat(f.closingBalance) || 0,
-    systemBalance: parseFloat(f.systemBalance) || 0,
     notes: f.notes || undefined,
+    // Existing lines keep their id so the backend preserves their match state;
+    // lines without an id are newly added and will be inserted unmatched.
     lines: f.lines.map(l => ({
+      id: l.id,
       transactionDate: l.transactionDate,
       description: l.description,
       amount: parseFloat(l.amount) || 0,
       type: l.type,
       reference: l.reference,
-      isMatched: false,
-      matchedVoucherNo: null,
     } as Partial<BankStatementLine>)),
   });
 
@@ -491,7 +581,7 @@ export function BankReconciliation() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Opening Balance</Label>
           <Input type="number" step="0.01" value={form.openingBalance} onChange={e => setForm(f => ({ ...f, openingBalance: e.target.value }))} placeholder="0.00" className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
@@ -500,10 +590,14 @@ export function BankReconciliation() {
           <Label>Closing Balance (Bank)</Label>
           <Input type="number" step="0.01" value={form.closingBalance} onChange={e => setForm(f => ({ ...f, closingBalance: e.target.value }))} placeholder="0.00" className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
         </div>
-        <div className="space-y-2">
-          <Label>System / Ledger Balance</Label>
-          <Input type="number" step="0.01" value={form.systemBalance} onChange={e => setForm(f => ({ ...f, systemBalance: e.target.value }))} placeholder="0.00" className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20" />
-        </div>
+      </div>
+
+      <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+        <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+        <span>
+          Ledger Balance is computed automatically from posted journal entries as of the statement
+          date — it can't be typed in, so the comparison to your bank statement is always accurate.
+        </span>
       </div>
 
       <div className="space-y-2">
@@ -589,9 +683,10 @@ export function BankReconciliation() {
             <div className="flex items-center space-x-3">
               <Button
                 onClick={handleAutoMatch}
+                disabled={loadingAutoMatch || !currentReconciliation}
                 className="bg-gymbios-secondary hover:bg-gymbios-secondary/90 text-white"
               >
-                <Zap className="h-4 w-4 mr-2" />
+                {loadingAutoMatch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
                 Auto-Match
               </Button>
 
@@ -964,7 +1059,7 @@ export function BankReconciliation() {
                             {transaction.status === "Unmatched" && (
                               <Button
                                 size="sm"
-                                onClick={(e) => { e.stopPropagation(); handleMatchTransaction(transaction, "MANUAL"); }}
+                                onClick={(e) => { e.stopPropagation(); handleViewTransaction(transaction); }}
                                 className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-xs"
                               >
                                 Match
@@ -991,7 +1086,7 @@ export function BankReconciliation() {
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
                                 {transaction.status === "Unmatched" && (
-                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleMatchTransaction(transaction, "MANUAL"); }}>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewTransaction(transaction); }}>
                                     <CheckCircle className="h-4 w-4 mr-2" /> Match
                                   </DropdownMenuItem>
                                 )}
@@ -1188,22 +1283,65 @@ export function BankReconciliation() {
                   <CardContent className="p-6 space-y-4">
                     {selectedTransaction.status === "Unmatched" && (
                       <>
-                        {showMatchInput ? (
+                        {showMatchPicker ? (
                           <div className="space-y-3">
-                            <Label className="text-sm font-medium text-gray-700">Voucher / Reference No.</Label>
+                            <Label className="text-sm font-medium text-gray-700">Select the matching ledger entry</Label>
                             <Input
-                              value={matchVoucherNo}
-                              onChange={e => setMatchVoucherNo(e.target.value)}
-                              placeholder="e.g. RV-2026-00001 or MANUAL"
+                              value={candidateSearch}
+                              onChange={e => setCandidateSearch(e.target.value)}
+                              placeholder="Search by voucher no. or description..."
                             />
+                            <div className="max-h-64 overflow-y-auto border rounded-lg divide-y">
+                              {loadingCandidates ? (
+                                <div className="p-6 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" /> Loading ledger entries...
+                                </div>
+                              ) : (() => {
+                                const q = candidateSearch.trim().toLowerCase();
+                                const filtered = q
+                                  ? matchCandidates.filter(c =>
+                                      c.voucherNo.toLowerCase().includes(q) || c.narration.toLowerCase().includes(q))
+                                  : matchCandidates;
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="p-6 text-center text-sm text-muted-foreground">
+                                      No unmatched posted ledger entries found for this amount. Record the
+                                      transaction in the ledger first, then come back to match it.
+                                    </div>
+                                  );
+                                }
+                                return filtered.map(c => (
+                                  <div
+                                    key={c.journalVoucherId}
+                                    onClick={() => setSelectedCandidateId(c.journalVoucherId)}
+                                    className={cn(
+                                      "p-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between gap-3",
+                                      selectedCandidateId === c.journalVoucherId && "bg-green-50"
+                                    )}
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="font-mono text-sm font-medium text-gymbios-primary">{c.voucherNo}</p>
+                                      <p className="text-xs text-gray-600 truncate">{c.narration}</p>
+                                      <p className="text-xs text-gray-400">{formatDate(c.date)}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <span className="font-mono text-sm font-semibold"><CurrencyGlyph /> {c.amount.toFixed(2)}</span>
+                                      {selectedCandidateId === c.journalVoucherId && <CheckCircle className="h-4 w-4 text-green-600" />}
+                                    </div>
+                                  </div>
+                                ));
+                              })()}
+                            </div>
                             <div className="flex space-x-2">
                               <Button
                                 className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                                onClick={() => handleMatchTransaction(selectedTransaction, matchVoucherNo || "MANUAL")}
+                                disabled={!selectedCandidateId || matchingInProgress}
+                                onClick={() => selectedCandidateId && handleMatchTransaction(selectedTransaction, selectedCandidateId)}
                               >
-                                <CheckCircle className="h-4 w-4 mr-2" /> Confirm Match
+                                {matchingInProgress ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                                Confirm Match
                               </Button>
-                              <Button variant="outline" onClick={() => { setShowMatchInput(false); setMatchVoucherNo(""); }}>
+                              <Button variant="outline" onClick={() => { setShowMatchPicker(false); setSelectedCandidateId(null); }}>
                                 Cancel
                               </Button>
                             </div>
@@ -1211,19 +1349,12 @@ export function BankReconciliation() {
                         ) : (
                           <Button
                             className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-base font-medium"
-                            onClick={() => setShowMatchInput(true)}
+                            onClick={() => loadMatchCandidates(selectedTransaction)}
                           >
                             <CheckCircle className="h-5 w-5 mr-2" />
                             Match with Ledger
                           </Button>
                         )}
-
-                        <Button
-                          className="w-full bg-green-600/80 hover:bg-green-700 text-white"
-                          onClick={() => handleMatchTransaction(selectedTransaction, "MANUAL")}
-                        >
-                          <Zap className="h-4 w-4 mr-2" /> Quick Match (Manual)
-                        </Button>
                       </>
                     )}
 
@@ -1278,7 +1409,6 @@ export function BankReconciliation() {
                               statementDate: currentReconciliation.statementDate,
                               openingBalance: currentReconciliation.openingBalance,
                               closingBalance: currentReconciliation.closingBalance,
-                              systemBalance: currentReconciliation.systemBalance,
                               notes: newNote.trim(),
                               lines: currentReconciliation.lines.map(l => ({ ...l })),
                             });
@@ -1330,6 +1460,84 @@ export function BankReconciliation() {
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={savingForm}>Cancel</Button>
             <Button className="btn-primary" onClick={handleEdit} disabled={savingForm}>
               {savingForm ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auto-Match Review */}
+      <Dialog open={showAutoMatchDialog} onOpenChange={setShowAutoMatchDialog}>
+        <DialogContent className="w-[96vw] max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-xl font-semibold text-gray-900">Auto-Match Suggestions</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Every suggestion below is a real posted journal voucher with the same amount and direction as the
+              statement line, found within 30 days of its date. Review and confirm before applying.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            {autoMatchSuggestions.map(s => {
+              const txn = allTransactions.find(t => t.lineId === s.lineId);
+              const picked = autoMatchPicks[s.lineId];
+              return (
+                <div key={s.lineId} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="font-medium text-gray-900">{txn?.description ?? `Line #${s.lineId}`}</p>
+                      <p className="text-xs text-gray-500">
+                        {txn ? formatDate(txn.date) : ""} • {txn?.type === "Credit" ? "+" : "-"}
+                        <CurrencyGlyph /> {txn ? Math.abs(txn.bankAmount).toFixed(2) : ""}
+                      </p>
+                    </div>
+                    <Badge className={s.confidence === "HIGH" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
+                      {s.confidence === "HIGH" ? "1 match found" : `${s.candidates.length} possible matches`}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    {s.candidates.map(c => (
+                      <label
+                        key={c.journalVoucherId}
+                        className={cn(
+                          "flex items-center justify-between gap-3 p-2 rounded-md cursor-pointer border",
+                          picked === c.journalVoucherId ? "border-green-400 bg-green-50" : "border-transparent hover:bg-gray-50"
+                        )}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="radio"
+                            name={`auto-match-${s.lineId}`}
+                            checked={picked === c.journalVoucherId}
+                            onChange={() => setAutoMatchPicks(prev => ({ ...prev, [s.lineId]: c.journalVoucherId }))}
+                          />
+                          <div className="min-w-0">
+                            <p className="font-mono text-sm font-medium text-gymbios-primary">{c.voucherNo}</p>
+                            <p className="text-xs text-gray-600 truncate">{c.narration}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-500 flex-shrink-0">{formatDate(c.date)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setShowAutoMatchDialog(false)} disabled={applyingAutoMatch}>
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleApplyAutoMatch(true)}
+              disabled={applyingAutoMatch || !autoMatchSuggestions.some(s => s.confidence === "HIGH")}
+            >
+              Apply High-Confidence Only
+            </Button>
+            <Button className="btn-primary" onClick={() => handleApplyAutoMatch(false)} disabled={applyingAutoMatch}>
+              {applyingAutoMatch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Apply Selected
             </Button>
           </DialogFooter>
         </DialogContent>

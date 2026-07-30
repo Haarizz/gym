@@ -13,6 +13,12 @@ export interface BillEntry {
   status: string;
 }
 
+export interface PaymentSplitLeg {
+  method: string;
+  amount: number;
+  reference?: string;
+}
+
 export interface PaymentVoucher {
   id: string;
   voucherNo: string;
@@ -22,6 +28,7 @@ export interface PaymentVoucher {
   paymentDate: string;
   amount: number;
   paymentMethod: string;
+  paymentBreakdown?: PaymentSplitLeg[];
   status: string;
   description: string;
   bankAccount?: string;
@@ -40,6 +47,7 @@ export interface PaymentVoucherCreateRequest {
   paymentDate: string;
   amount: number;
   paymentMethod: string;
+  paymentBreakdown?: PaymentSplitLeg[];
   status?: string;
   description: string;
   bankAccount?: string;
@@ -72,6 +80,7 @@ function mapPaymentVoucher(r: any): PaymentVoucher {
     paymentDate: r.payment_date ?? r.paymentDate ?? "",
     amount: Number(r.amount ?? 0),
     paymentMethod: r.payment_method ?? r.paymentMethod ?? "",
+    paymentBreakdown: r.payment_breakdown ?? r.paymentBreakdown,
     status: r.status ?? "Pending",
     description: r.description ?? "",
     bankAccount: r.bank_account ?? r.bankAccount,
@@ -92,6 +101,7 @@ function toBody(req: PaymentVoucherCreateRequest) {
     payment_date: req.paymentDate,
     amount: req.amount,
     payment_method: req.paymentMethod,
+    payment_breakdown: req.paymentBreakdown,
     status: req.status,
     description: req.description,
     bank_account: req.bankAccount,

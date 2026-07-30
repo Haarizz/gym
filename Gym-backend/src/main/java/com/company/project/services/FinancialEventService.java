@@ -1,7 +1,12 @@
 package com.company.project.services;
 
+import com.company.project.dto.PaymentSplitDTO;
 import com.company.project.entities.*;
+import com.company.project.enums.PaymentMethod;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +60,8 @@ import java.util.Optional;
 @Transactional
 public class FinancialEventService {
 
+    private static final Logger log = LoggerFactory.getLogger(FinancialEventService.class);
+
     // ── Account code constants ────────────────────────────────────────────────
     public static final String ACC_CASH_IN_HAND       = "1000";
     public static final String ACC_CASH_AT_BANK        = "1001";
@@ -78,15 +85,18 @@ public class FinancialEventService {
     private final JournalVoucherLineRepository      lineRepo;
     private final AccountHeadRepository             accountRepo;
     private final JournalEntrySourceRepository      sourceRepo;
+    private final VoucherNumberService              voucherNumberService;
 
     public FinancialEventService(JournalVoucherRepository jvRepo,
                                  JournalVoucherLineRepository lineRepo,
                                  AccountHeadRepository accountRepo,
-                                 JournalEntrySourceRepository sourceRepo) {
+                                 JournalEntrySourceRepository sourceRepo,
+                                 VoucherNumberService voucherNumberService) {
         this.jvRepo      = jvRepo;
         this.lineRepo    = lineRepo;
         this.accountRepo = accountRepo;
         this.sourceRepo  = sourceRepo;
+        this.voucherNumberService = voucherNumberService;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -103,15 +113,16 @@ public class FinancialEventService {
 
         BigDecimal amount = safe(receipt.getPaidAmount() != null
                 ? receipt.getPaidAmount() : receipt.getAmount());
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for Receipt id={}: amount {} is not positive", receipt.getId(), amount);
+            return;
+        }
 
-        String cashCode = paymentMethodToAccount(receipt.getPaymentMethod());
-        String cashName = cashCode.equals(ACC_CASH_AT_BANK) ? "Cash at Bank" : "Cash in Hand";
-
-        List<JvLine> lines = List.of(
-                dr(cashCode, cashName, amount, "Member payment — " + receipt.getMemberName()),
-                cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", amount, "Revenue recognition")
-        );
+        List<JvLine> lines = new ArrayList<>(buildMoneyLines(
+                receipt.getPaymentMethod(), receipt.getPaymentBreakdown(),
+                receipt.getBankAccountCode(), receipt.getBankAccountName(), amount, true,
+                "Member payment — " + receipt.getMemberName()));
+        lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", amount, "Revenue recognition"));
 
         LocalDate date = receipt.getTransactionDate() != null
                 ? receipt.getTransactionDate().toLocalDate() : LocalDate.now();
@@ -136,13 +147,14 @@ public class FinancialEventService {
         BigDecimal total   = safe(sale.getTotalAmount());
         BigDecimal tax     = safe(sale.getTaxAmount());
         BigDecimal revenue = total.subtract(tax);
-        if (total.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for SaleTransaction id={}: total {} is not positive", sale.getId(), total);
+            return;
+        }
 
-        String cashCode = paymentMethodToAccount(sale.getPaymentMethod());
-        String cashName = cashCode.equals(ACC_CASH_AT_BANK) ? "Cash at Bank" : "Cash in Hand";
-
-        List<JvLine> lines = new ArrayList<>();
-        lines.add(dr(cashCode, cashName, total, "POS sale — " + sale.getTransactionNumber()));
+        List<JvLine> lines = new ArrayList<>(buildMoneyLines(
+                sale.getPaymentMethod(), sale.getPaymentBreakdown(), total, true,
+                "POS sale — " + sale.getTransactionNumber()));
         lines.add(cr(ACC_SALES_REVENUE, "POS Sales Revenue", revenue, "Sales revenue"));
         if (tax.compareTo(BigDecimal.ZERO) > 0) {
             lines.add(cr(ACC_TAX_PAYABLE, "Tax / GST Payable", tax, "GST collected"));
@@ -168,17 +180,18 @@ public class FinancialEventService {
         BigDecimal total   = safe(sale.getTotalAmount());
         BigDecimal tax     = safe(sale.getTaxAmount());
         BigDecimal revenue = total.subtract(tax);
-        if (total.compareTo(BigDecimal.ZERO) <= 0) return;
-
-        String cashCode = paymentMethodToAccount(sale.getPaymentMethod());
-        String cashName = cashCode.equals(ACC_CASH_AT_BANK) ? "Cash at Bank" : "Cash in Hand";
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for SaleTransaction refund id={}: total {} is not positive", sale.getId(), total);
+            return;
+        }
 
         List<JvLine> lines = new ArrayList<>();
         lines.add(dr(ACC_SALES_REVENUE, "POS Sales Revenue", revenue, "Refund — revenue reversal"));
         if (tax.compareTo(BigDecimal.ZERO) > 0) {
             lines.add(dr(ACC_TAX_PAYABLE, "Tax / GST Payable", tax, "Refund — GST reversal"));
         }
-        lines.add(cr(cashCode, cashName, total, "Refund paid out"));
+        lines.addAll(buildMoneyLines(
+                sale.getPaymentMethod(), sale.getPaymentBreakdown(), total, false, "Refund paid out"));
 
         LocalDate date = sale.getUpdatedAt() != null
                 ? sale.getUpdatedAt().toLocalDate() : LocalDate.now();
@@ -186,6 +199,38 @@ public class FinancialEventService {
         JournalVoucher jv = createAndPost(
                 "POS Refund: " + sale.getTransactionNumber(), date, lines, "SALES");
         registerSource("SaleTransactionRefund", sale.getId(), "SALES", jv.getId());
+    }
+
+    /**
+     * SERVICE — Member add-on purchased (Training, Nutrition, Spa, Classes, ...).
+     * DR  Cash/Bank                    (amount)
+     * CR  Service / Add-on Revenue     (amount)
+     */
+    public void onAddonPaymentReceived(MemberAddon addon) {
+        if (alreadyJournaled("MemberAddon", addon.getId())) return;
+
+        BigDecimal amount = safe(addon.getAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for MemberAddon id={}: amount {} is not positive", addon.getId(), amount);
+            return;
+        }
+
+        List<JvLine> lines = new ArrayList<>(buildMoneyLines(
+                addon.getPaymentMode(), addon.getPaymentBreakdown(), amount, true,
+                "Add-on purchase — " + addon.getMemberName()));
+        lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", amount,
+                "Revenue recognition — " + addon.getAddonName()));
+
+        LocalDate date = addon.getPurchaseDate() != null
+                ? addon.getPurchaseDate().toLocalDate() : LocalDate.now();
+
+        JournalVoucher jv = createAndPost(
+                "Add-on: " + (addon.getAddonName() != null ? addon.getAddonName() : "Add-on")
+                + " — " + addon.getMemberName()
+                + " | " + addon.getTransactionId(),
+                date, lines, "ADDONS");
+
+        registerSource("MemberAddon", addon.getId(), "ADDONS", jv.getId());
     }
 
     /**
@@ -200,7 +245,10 @@ public class FinancialEventService {
         BigDecimal amount = safe(expense.getAmount());
         BigDecimal tax    = safe(expense.getTaxAmount());
         BigDecimal total  = safe(expense.getTotalAmount());
-        if (total.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for Expense id={}: total {} is not positive", expense.getId(), total);
+            return;
+        }
 
         String expenseCode = categoryToExpenseAccount(expense.getCategory());
         String expenseName = expense.getCategory() != null ? expense.getCategory() + " Expense"
@@ -232,7 +280,10 @@ public class FinancialEventService {
         if (alreadyJournaled("SalaryPayment", payment.getId())) return;
 
         BigDecimal amount = safe(payment.getNetSalary());
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for SalaryPayment id={}: net salary {} is not positive", payment.getId(), amount);
+            return;
+        }
 
         List<JvLine> lines = List.of(
                 dr(ACC_SALARY_EXPENSE, "Salary Expense", amount,
@@ -259,7 +310,10 @@ public class FinancialEventService {
         if (alreadyJournaled("SalaryAdvance", advance.getId())) return;
 
         BigDecimal amount = safe(advance.getApprovedAmount());
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for SalaryAdvance id={}: approved amount {} is not positive", advance.getId(), amount);
+            return;
+        }
 
         List<JvLine> lines = List.of(
                 dr(ACC_SALARY_ADVANCE_REC, "Salary Advance Receivable", amount,
@@ -285,7 +339,10 @@ public class FinancialEventService {
         if (alreadyJournaled("Asset", asset.getId())) return;
 
         BigDecimal amount = safe(asset.getPurchasePrice());
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for Asset id={}: purchase price {} is not positive", asset.getId(), amount);
+            return;
+        }
 
         String assetAccCode = categoryToAssetAccount(asset.getCategory());
         String assetAccName = (asset.getCategory() != null ? asset.getCategory() : "Fixed") + " Assets";
@@ -316,7 +373,10 @@ public class FinancialEventService {
         BigDecimal subtotal = safe(bill.getSubtotal());
         BigDecimal tax      = safe(bill.getTaxAmount());
         BigDecimal total    = safe(bill.getTotalAmount());
-        if (total.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for SupplierBill id={}: total {} is not positive", bill.getId(), total);
+            return;
+        }
 
         List<JvLine> lines = new ArrayList<>();
         lines.add(dr(ACC_PURCHASE_COGS, "Purchase / COGS", subtotal,
@@ -344,16 +404,17 @@ public class FinancialEventService {
         if (alreadyJournaled("PaymentVoucher", voucher.getId())) return;
 
         BigDecimal amount = safe(voucher.getAmount());
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for PaymentVoucher id={}: amount {} is not positive", voucher.getId(), amount);
+            return;
+        }
 
-        String cashCode = paymentMethodToAccount(voucher.getPaymentMethod());
-        String cashName = cashCode.equals(ACC_CASH_AT_BANK) ? "Cash at Bank" : "Cash in Hand";
-
-        List<JvLine> lines = List.of(
-                dr(ACC_ACCOUNTS_PAYABLE, "Accounts Payable", amount,
-                        "Payment to " + voucher.getSupplierName()),
-                cr(cashCode, cashName, amount, "Payment via " + voucher.getPaymentMethod())
-        );
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_ACCOUNTS_PAYABLE, "Accounts Payable", amount,
+                "Payment to " + voucher.getSupplierName()));
+        lines.addAll(buildMoneyLines(
+                voucher.getPaymentMethod(), voucher.getPaymentBreakdown(), amount, false,
+                "Payment via " + voucher.getPaymentMethod()));
 
         LocalDate date = voucher.getPaymentDate() != null ? voucher.getPaymentDate() : LocalDate.now();
 
@@ -361,6 +422,56 @@ public class FinancialEventService {
                 "Payment: " + voucher.getVoucherNo() + " — " + voucher.getSupplierName(),
                 date, lines, "PAYMENTS");
         registerSource("PaymentVoucher", voucher.getId(), "PAYMENTS", jv.getId());
+    }
+
+    /**
+     * RECEIPT VOUCHER — accountant-entered receipt marked "completed" through the
+     * manual Ledgers/Receipt Voucher screen.
+     * DR  Cash/Bank                    (amount)
+     * CR  [account mapped from sourceCategory]   (amount)
+     *
+     * Closes the gap where a manually entered Receipt Voucher was shown on the
+     * Ledgers screen as if it were posted, but never actually generated a journal
+     * entry or updated any AccountHead balance (see
+     * docs/gymbios-financial-roadmap.html — C1). Vouchers created internally via
+     * ReceiptVoucherService.createVoucherFromModule() (POS sales, member payments,
+     * add-ons, …) are NOT routed through this method — those events already post
+     * their own journal entry via onSaleCompleted()/onMemberPaymentReceived()/etc.,
+     * so posting again here would double-count the same cash movement.
+     */
+    public void onManualReceiptVoucherPosted(ReceiptVoucher voucher) {
+        if (alreadyJournaled("ReceiptVoucher", voucher.getId())) return;
+
+        BigDecimal amount = safe(voucher.getAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for ReceiptVoucher id={}: amount {} is not positive", voucher.getId(), amount);
+            return;
+        }
+
+        String revenueCode = categoryToRevenueAccount(voucher.getSourceCategory());
+        if (revenueCode == null) {
+            throw new IllegalStateException(
+                    "Cannot post Receipt Voucher " + voucher.getVoucherNo()
+                    + " to the ledger: source category '" + voucher.getSourceCategory()
+                    + "' is not mapped to an account. Set a recognized source category "
+                    + "(e.g. Membership, POS, Service) before marking it completed.");
+        }
+        String revenueName = revenueAccountName(revenueCode);
+
+        List<JvLine> lines = new ArrayList<>(buildMoneyLines(
+                voucher.getPaymentMode(), voucher.getPaymentBreakdown(), amount, true,
+                "Receipt Voucher " + voucher.getVoucherNo()
+                        + (voucher.getMemberName() != null ? " — " + voucher.getMemberName() : "")));
+        lines.add(cr(revenueCode, revenueName, amount, "Manual receipt — " + voucher.getSourceCategory()));
+
+        LocalDate date = voucher.getDate() != null ? voucher.getDate() : LocalDate.now();
+
+        JournalVoucher jv = createAndPost(
+                "Receipt Voucher: " + voucher.getVoucherNo()
+                + (voucher.getSource() != null ? " — " + voucher.getSource() : ""),
+                date, lines, "RECEIPT_VOUCHER");
+
+        registerSource("ReceiptVoucher", voucher.getId(), "RECEIPT_VOUCHER", jv.getId());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -384,7 +495,7 @@ public class FinancialEventService {
         }
 
         JournalVoucher jv = new JournalVoucher();
-        jv.setVoucherNo(generateVoucherNo());
+        jv.setVoucherNo(voucherNumberService.next("JV"));
         jv.setDate(date);
         jv.setNarration(narration);
         jv.setStatus("POSTED");
@@ -451,21 +562,6 @@ public class FinancialEventService {
         sourceRepo.save(src);
     }
 
-    private synchronized String generateVoucherNo() {
-        int year = LocalDate.now().getYear();
-        String prefix = "JV-" + year + "-";
-        return jvRepo.findTopByVoucherNoStartingWithOrderByVoucherNoDesc(prefix)
-                .map(jv -> {
-                    try {
-                        int seq = Integer.parseInt(jv.getVoucherNo().substring(prefix.length())) + 1;
-                        return String.format("%s%05d", prefix, seq);
-                    } catch (NumberFormatException e) {
-                        return String.format("%s%05d", prefix, 1);
-                    }
-                })
-                .orElse(String.format("%s%05d", prefix, 1));
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
     //  HELPER BUILDERS
     // ─────────────────────────────────────────────────────────────────────────
@@ -487,8 +583,76 @@ public class FinancialEventService {
         if (method == null) return ACC_CASH_IN_HAND;
         return switch (method.toUpperCase()) {
             case "CASH", "CASH IN HAND" -> ACC_CASH_IN_HAND;
-            default -> ACC_CASH_AT_BANK;  // CARD, ONLINE, BANK_TRANSFER, WALLET
+            default -> ACC_CASH_AT_BANK;  // CARD, CHEQUE, ONLINE, BANK_TRANSFER, WALLET
         };
+    }
+
+    /** Human-readable name for a cash/bank account code, for journal line descriptions. */
+    private static String cashAccountName(String code) {
+        return ACC_CASH_AT_BANK.equals(code) ? "Cash at Bank" : "Cash in Hand";
+    }
+
+    /**
+     * Builds the debit (or credit) side of the "money" leg of a journal entry for a
+     * given payment method. For a single method (Cash/Card/Cheque/...) this is one
+     * line for the full amount. For a "Mixed" payment, it's one line per leg in the
+     * breakdown — e.g. DR Cash in Hand 500 + DR Cash at Bank 500 instead of a single
+     * line — so cash-drawer and bank reconciliation both tie out to the ledger.
+     *
+     * @param debit true to debit these accounts (money coming in), false to credit
+     *              them (money going out)
+     */
+    private static List<JvLine> buildMoneyLines(String paymentMethod, List<PaymentSplitDTO> breakdown,
+                                                 BigDecimal totalAmount, boolean debit, String narration) {
+        return buildMoneyLines(paymentMethod, breakdown, null, null, totalAmount, debit, narration);
+    }
+
+    /**
+     * Same as above, but lets the caller pin the "money" leg to a specific ledger
+     * account (e.g. a named bank account picked from Chart of Accounts) instead of
+     * the generic Cash in Hand / Cash at Bank bucket. Used for Bank Transfer receipts
+     * where the user selected exactly which bank account was credited.
+     */
+    private static List<JvLine> buildMoneyLines(String paymentMethod, List<PaymentSplitDTO> breakdown,
+                                                 String overrideAccountCode, String overrideAccountName,
+                                                 BigDecimal totalAmount, boolean debit, String narration) {
+        PaymentMethod pm = PaymentMethod.fromString(paymentMethod);
+        boolean hasOverride = overrideAccountCode != null && !overrideAccountCode.isBlank();
+
+        if (pm != PaymentMethod.MIXED || breakdown == null || breakdown.isEmpty()) {
+            String code = hasOverride ? overrideAccountCode : paymentMethodToAccount(paymentMethod);
+            String name = hasOverride && overrideAccountName != null && !overrideAccountName.isBlank()
+                    ? overrideAccountName : cashAccountName(code);
+            JvLine line = debit
+                    ? dr(code, name, totalAmount, narration)
+                    : cr(code, name, totalAmount, narration);
+            return List.of(line);
+        }
+
+        BigDecimal sum = breakdown.stream()
+                .map(PaymentSplitDTO::getAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (sum.subtract(totalAmount).abs().compareTo(new BigDecimal("0.01")) > 0) {
+            throw new BusinessRuleViolationException(
+                    "Mixed payment legs (" + sum + ") do not add up to the total amount (" + totalAmount + ")");
+        }
+
+        List<JvLine> lines = new ArrayList<>();
+        for (PaymentSplitDTO leg : breakdown) {
+            if (leg.getAmount() == null || leg.getAmount().compareTo(BigDecimal.ZERO) <= 0) continue;
+            boolean legHasOverride = leg.getBankAccountCode() != null && !leg.getBankAccountCode().isBlank();
+            String code = legHasOverride ? leg.getBankAccountCode() : paymentMethodToAccount(leg.getMethod());
+            String name = legHasOverride && leg.getBankAccountName() != null && !leg.getBankAccountName().isBlank()
+                    ? leg.getBankAccountName() : cashAccountName(code);
+            String legLabel = leg.getMethod() != null ? leg.getMethod() : "Payment";
+            String desc = narration + " — " + legLabel
+                    + (leg.getReference() != null && !leg.getReference().isBlank() ? " #" + leg.getReference() : "");
+            lines.add(debit
+                    ? dr(code, name, leg.getAmount(), desc)
+                    : cr(code, name, leg.getAmount(), desc));
+        }
+        return lines;
     }
 
     /** Maps expense category to the most appropriate expense account code. */
@@ -500,6 +664,29 @@ public class FinancialEventService {
             case "PURCHASE", "COGS"     -> ACC_PURCHASE_COGS;
             default                      -> ACC_MISC_EXPENSE;
         };
+    }
+
+    /**
+     * Maps a manual Receipt Voucher's source category to a revenue account code.
+     * Returns null when the category is unrecognized, so the caller can reject the
+     * post rather than guess which revenue line the money belongs to.
+     */
+    private static String categoryToRevenueAccount(String category) {
+        if (category == null) return null;
+        return switch (category.trim().toUpperCase()) {
+            case "MEMBERSHIP", "MEMBER" -> ACC_MEMBERSHIP_REVENUE;
+            case "POS", "SALE", "SALES" -> ACC_SALES_REVENUE;
+            case "ADDON", "ADD-ON", "SERVICE" -> ACC_SERVICE_REVENUE;
+            default -> null;
+        };
+    }
+
+    /** Human-readable name for a revenue account code, for journal line descriptions. */
+    private static String revenueAccountName(String code) {
+        if (ACC_MEMBERSHIP_REVENUE.equals(code)) return "Membership Revenue";
+        if (ACC_SALES_REVENUE.equals(code)) return "POS Sales Revenue";
+        if (ACC_SERVICE_REVENUE.equals(code)) return "Service / Add-on Revenue";
+        return "Revenue";
     }
 
     /** Maps asset category to a fixed-asset account code. */

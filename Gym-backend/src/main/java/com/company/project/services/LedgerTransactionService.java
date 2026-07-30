@@ -88,10 +88,14 @@ public class LedgerTransactionService {
         //    When status = Paid, a JV is also auto-generated. Show both:
         //    the PV as the business authorization and the JV as the ledger entry.
         if (type == null || type.isBlank() || "payment".equalsIgnoreCase(type)) {
-            List<PaymentVoucher> pvs = paymentVoucherRepository.findAllByOrderByPaymentDateDesc();
+            List<PaymentVoucher> pvs = (from != null && to != null)
+                    ? paymentVoucherRepository.findByPaymentDateBetweenOrderByPaymentDateDesc(from, to)
+                    : paymentVoucherRepository.findAllByOrderByPaymentDateDesc();
             for (PaymentVoucher pv : pvs) {
                 LocalDate date = pv.getPaymentDate();
                 if (date == null) continue;
+                // Only needed for the single-bound (from-only or to-only) case —
+                // the from+to case is already filtered at the query level above.
                 if (from != null && date.isBefore(from)) continue;
                 if (to   != null && date.isAfter(to))   continue;
                 LedgerTransactionDTO dto = new LedgerTransactionDTO();
@@ -115,10 +119,13 @@ public class LedgerTransactionService {
         //    - Auto-generated JVs from all business events (labelled "System")
         //    - Manually entered JVs from the accountant
         if (type == null || type.isBlank() || "journal".equalsIgnoreCase(type)) {
-            List<JournalVoucher> jvs = journalVoucherRepository.findAllByOrderByDateDesc();
+            List<JournalVoucher> jvs = (from != null && to != null)
+                    ? journalVoucherRepository.findByStatusAndDateBetweenOrderByDateDesc("POSTED", from, to)
+                    : journalVoucherRepository.findByStatusOrderByDateDesc("POSTED");
             for (JournalVoucher jv : jvs) {
-                if (!"POSTED".equalsIgnoreCase(jv.getStatus())) continue;
                 LocalDate date = jv.getDate();
+                // Only needed for the single-bound case — from+to is already
+                // filtered at the query level above; status=POSTED always is.
                 if (from != null && date != null && date.isBefore(from)) continue;
                 if (to   != null && date != null && date.isAfter(to))   continue;
                 LedgerTransactionDTO dto = new LedgerTransactionDTO();
@@ -149,7 +156,22 @@ public class LedgerTransactionService {
         }
 
         result.sort(Comparator.comparing(LedgerTransactionDTO::getDate,
-                Comparator.nullsLast(Comparator.reverseOrder())));
+                Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing((d1, d2) -> {
+                    Long id1 = extractId(d1.getId());
+                    Long id2 = extractId(d2.getId());
+                    return id2.compareTo(id1);
+                }));
         return result;
+    }
+
+    private Long extractId(String idStr) {
+        if (idStr == null) return 0L;
+        String num = idStr.replaceAll("\\D+", "");
+        try {
+            return num.isEmpty() ? 0L : Long.parseLong(num);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
     }
 }

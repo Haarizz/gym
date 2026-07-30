@@ -19,6 +19,7 @@ public class PaymentVoucherResponseDTO {
     private LocalDate paymentDate;
     private BigDecimal amount;
     private String paymentMethod;
+    private List<PaymentSplitDTO> paymentBreakdown;
     private String status;
     private String description;
     private String bankAccount;
@@ -41,6 +42,7 @@ public class PaymentVoucherResponseDTO {
         dto.setPaymentDate(pv.getPaymentDate());
         dto.setAmount(pv.getAmount());
         dto.setPaymentMethod(pv.getPaymentMethod());
+        dto.setPaymentBreakdown(pv.getPaymentBreakdown());
         dto.setStatus(pv.getStatus());
         dto.setDescription(pv.getDescription());
         dto.setBankAccount(pv.getBankAccount());
@@ -76,6 +78,9 @@ public class PaymentVoucherResponseDTO {
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
+    public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

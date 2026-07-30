@@ -7,6 +7,20 @@ import { productsService, Product } from '../utils/supabase/products-service';
 import { membersService } from '../utils/supabase/members-service';
 import { useFavorites } from '../hooks/useFavorites';
 import { POSProductCard } from '../components/shared/POSProductCard';
+import {
+  SplitPaymentFields, isSplitPaymentValid, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
+  EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
+} from '../components/shared/split-payment-fields';
+import type { SplitPaymentValue, SplitPaymentDetails } from '../components/shared/split-payment-fields';
+import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
+
+// Maps the Payment Method select value to the SplitPaymentValue key so a
+// single (non-Mixed) method's details can be validated/built by reusing the
+// same helpers Mixed Payment legs use. "digital" (Digital Wallet) is this
+// page's Online Payment equivalent.
+const POS_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
+  cash: 'cash', card: 'card', cheque: 'cheque', digital: 'online'
+};
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -58,7 +72,9 @@ import {
   Coffee,
   Lock,
   Unlock,
-  Heart
+  Heart,
+  FileCheck,
+  Split
 } from 'lucide-react';
 
 interface CashMovement {
@@ -180,6 +196,17 @@ export function PointOfSale() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash');
   const [selectedCustomer, setSelectedCustomer] = useState('c1');
   const [receivedAmount, setReceivedAmount] = useState('');
+  const [splitPayment, setSplitPayment] = useState<SplitPaymentValue>(EMPTY_SPLIT_PAYMENT);
+  const [splitDetails, setSplitDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
+  // Card Type / Cheque Number / Digital Wallet details for the top-level
+  // (non-Mixed) Payment Method.
+  const [methodDetails, setMethodDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
+  const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+  useEffect(() => {
+    accountHeadsService.getBankAccounts()
+      .then(setBankAccounts)
+      .catch(err => console.error('Failed to load bank accounts:', err));
+  }, []);
   const [heldInvoices, setHeldInvoices] = useState<Invoice[]>([]);
 
   // Cash drop/out states
@@ -459,19 +486,47 @@ export function PointOfSale() {
 
   const processPayment = async () => {
     if (currentInvoice.items.length === 0) return;
+    if (selectedPaymentMethod === 'mixed') {
+      if (!isSplitPaymentValid(splitPayment, currentInvoice.total)) {
+        toast.error('Split payment amounts must add up to the total amount');
+        return;
+      }
+      if (!isSplitPaymentDetailsValid(splitPayment, splitDetails)) {
+        toast.error('Please fill in the required details for each payment method used in the split');
+        return;
+      }
+    } else {
+      const legKey = POS_METHOD_TO_LEG_KEY[selectedPaymentMethod];
+      if (legKey && legKey !== 'cash') {
+        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: currentInvoice.total };
+        if (!isSplitPaymentDetailsValid(probe, methodDetails)) {
+          toast.error('Please fill in the required payment details');
+          return;
+        }
+      }
+    }
     setProcessingPayment(true);
     try {
-      const paymentMethodMap: Record<string, 'CASH' | 'CARD' | 'ONLINE' | 'WALLET'> = {
+      const paymentMethodMap: Record<string, 'CASH' | 'CARD' | 'ONLINE' | 'WALLET' | 'CHEQUE' | 'MIXED'> = {
         cash: 'CASH',
         card: 'CARD',
         digital: 'WALLET',
         online: 'ONLINE',
+        cheque: 'CHEQUE',
+        mixed: 'MIXED',
       };
+      const legKey = POS_METHOD_TO_LEG_KEY[selectedPaymentMethod];
+      const paymentBreakdown = selectedPaymentMethod === 'mixed'
+        ? buildSplitPaymentBreakdown(splitPayment, splitDetails, bankAccounts)
+        : (legKey && legKey !== 'cash'
+            ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: currentInvoice.total }, methodDetails, bankAccounts)
+            : undefined);
       const req: SaleTransactionRequest = {
         posSessionId: currentSession?.apiId,
         memberId: selectedMember?.id,
         memberName: selectedMember?.name || 'Walk-in Customer',
         paymentMethod: paymentMethodMap[selectedPaymentMethod] || 'CASH',
+        paymentBreakdown,
         items: currentInvoice.items.map(item => ({
           productId: item.productId ?? 0,
           productName: item.name,
@@ -491,6 +546,9 @@ export function PointOfSale() {
       clearInvoice();
       setShowPaymentDialog(false);
       setReceivedAmount('');
+      setSplitPayment(EMPTY_SPLIT_PAYMENT);
+      setSplitDetails(EMPTY_SPLIT_DETAILS);
+      setMethodDetails(EMPTY_SPLIT_DETAILS);
       setSelectedMember(null);
       setWalkInSelected(false);
       setMemberSearch('');
@@ -2210,7 +2268,10 @@ export function PointOfSale() {
           <div className="space-y-4">
             <div>
               <Label className="text-[#1E293B]">Payment Method</Label>
-              <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+              <Select
+                value={selectedPaymentMethod}
+                onValueChange={(v) => { setSelectedPaymentMethod(v); setMethodDetails(EMPTY_SPLIT_DETAILS); }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -2233,9 +2294,108 @@ export function PointOfSale() {
                       Digital Wallet
                     </div>
                   </SelectItem>
+                  <SelectItem value="cheque">
+                    <div className="flex items-center">
+                      <FileCheck className="h-4 w-4 mr-2" />
+                      Cheque
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="mixed">
+                    <div className="flex items-center">
+                      <Split className="h-4 w-4 mr-2" />
+                      Mixed
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {selectedPaymentMethod === 'card' && (
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-[#1E293B]">Card Type *</Label>
+                  <Select value={methodDetails.cardType} onValueChange={(v) => setMethodDetails(d => ({ ...d, cardType: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
+                    <SelectContent>
+                      {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-[#1E293B]">Reference (optional)</Label>
+                  <Input
+                    value={methodDetails.cardReference}
+                    onChange={(e) => setMethodDetails(d => ({ ...d, cardReference: e.target.value }))}
+                    placeholder="Transaction number"
+                  />
+                </div>
+              </div>
+            )}
+
+            {selectedPaymentMethod === 'cheque' && (
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-[#1E293B]">Cheque Number *</Label>
+                  <Input
+                    value={methodDetails.chequeNumber}
+                    onChange={(e) => setMethodDetails(d => ({ ...d, chequeNumber: e.target.value }))}
+                    placeholder="Cheque number"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[#1E293B]">Bank Name (optional)</Label>
+                  <Input
+                    value={methodDetails.chequeBankName}
+                    onChange={(e) => setMethodDetails(d => ({ ...d, chequeBankName: e.target.value }))}
+                    placeholder="e.g. SBI"
+                  />
+                </div>
+              </div>
+            )}
+
+            {selectedPaymentMethod === 'digital' && (
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-[#1E293B]">Payment Type *</Label>
+                  <Select value={methodDetails.onlinePaymentType} onValueChange={(v) => setMethodDetails(d => ({ ...d, onlinePaymentType: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select payment type" /></SelectTrigger>
+                    <SelectContent>
+                      {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-[#1E293B]">Transaction / Reference ID *</Label>
+                  <Input
+                    value={methodDetails.onlineReference}
+                    onChange={(e) => setMethodDetails(d => ({ ...d, onlineReference: e.target.value }))}
+                    placeholder="Transaction ID"
+                  />
+                </div>
+                {methodDetails.onlinePaymentType === 'Other' && (
+                  <div>
+                    <Label className="text-[#1E293B]">Payment Provider Name *</Label>
+                    <Input
+                      value={methodDetails.onlineProviderName}
+                      onChange={(e) => setMethodDetails(d => ({ ...d, onlineProviderName: e.target.value }))}
+                      placeholder="Provider name"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedPaymentMethod === 'mixed' && (
+              <SplitPaymentFields
+                total={currentInvoice.total}
+                value={splitPayment}
+                onChange={setSplitPayment}
+                details={splitDetails}
+                onDetailsChange={setSplitDetails}
+                bankAccounts={bankAccounts}
+                currencyCode={currencyCode}
+              />
+            )}
 
             {selectedPaymentMethod === 'cash' && (
               <div>
@@ -2266,7 +2426,15 @@ export function PointOfSale() {
             </Button>
             <Button
               onClick={processPayment}
-              disabled={processingPayment}
+              disabled={
+                processingPayment
+                || (selectedPaymentMethod === 'mixed' && (!isSplitPaymentValid(splitPayment, currentInvoice.total) || !isSplitPaymentDetailsValid(splitPayment, splitDetails)))
+                || (() => {
+                    const legKey = POS_METHOD_TO_LEG_KEY[selectedPaymentMethod];
+                    if (!legKey || legKey === 'cash') return false;
+                    return !isSplitPaymentDetailsValid({ ...EMPTY_SPLIT_PAYMENT, [legKey]: currentInvoice.total }, methodDetails);
+                  })()
+              }
               className="bg-[#2B7A78] hover:bg-[#236862] text-white"
             >
               <CheckCircle className="h-4 w-4 mr-2" />

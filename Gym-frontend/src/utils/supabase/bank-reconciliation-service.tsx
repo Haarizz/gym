@@ -12,6 +12,7 @@ export interface BankStatementLine {
   reference: string;
   isMatched: boolean;
   matchedVoucherNo: string | null;
+  matchedJournalVoucherId: number | null;
 }
 
 export interface BankReconciliation {
@@ -35,9 +36,24 @@ export interface BankReconciliationCreateRequest {
   statementDate: string;
   openingBalance: number;
   closingBalance: number;
-  systemBalance: number;
   notes?: string;
+  /** Existing lines being kept must include their `id` so match state survives the edit. */
   lines?: Partial<BankStatementLine>[];
+}
+
+/** A real, posted journal voucher that could explain a bank statement line. */
+export interface MatchCandidate {
+  journalVoucherId: number;
+  voucherNo: string;
+  date: string;
+  narration: string;
+  amount: number;
+}
+
+export interface AutoMatchSuggestion {
+  lineId: number;
+  confidence: "HIGH" | "AMBIGUOUS";
+  candidates: MatchCandidate[];
 }
 
 function mapLine(r: any): BankStatementLine {
@@ -51,6 +67,7 @@ function mapLine(r: any): BankStatementLine {
     reference: r.reference ?? "",
     isMatched: r.is_matched ?? false,
     matchedVoucherNo: r.matched_voucher_no ?? null,
+    matchedJournalVoucherId: r.matched_journal_voucher_id ?? null,
   };
 }
 
@@ -72,15 +89,32 @@ function mapReconciliation(r: any): BankReconciliation {
   };
 }
 
+function mapCandidate(r: any): MatchCandidate {
+  return {
+    journalVoucherId: r.journal_voucher_id,
+    voucherNo: r.voucher_no ?? "",
+    date: r.date,
+    narration: r.narration ?? "",
+    amount: r.amount ?? 0,
+  };
+}
+
+function mapSuggestion(r: any): AutoMatchSuggestion {
+  return {
+    lineId: r.line_id,
+    confidence: r.confidence ?? "AMBIGUOUS",
+    candidates: (r.candidates ?? []).map(mapCandidate),
+  };
+}
+
 function toLineBody(line: Partial<BankStatementLine>): any {
   return {
+    id: line.id ?? null,
     transaction_date: line.transactionDate,
     description: line.description ?? null,
     amount: line.amount ?? 0,
     type: line.type ?? "DEBIT",
     reference: line.reference ?? null,
-    is_matched: line.isMatched ?? false,
-    matched_voucher_no: line.matchedVoucherNo ?? null,
   };
 }
 
@@ -115,7 +149,6 @@ class BankReconciliationService {
         statement_date: req.statementDate,
         opening_balance: req.openingBalance,
         closing_balance: req.closingBalance,
-        system_balance: req.systemBalance,
         notes: req.notes ?? null,
         lines: (req.lines ?? []).map(toLineBody),
       }),
@@ -135,7 +168,6 @@ class BankReconciliationService {
           statement_date: req.statementDate,
           opening_balance: req.openingBalance,
           closing_balance: req.closingBalance,
-          system_balance: req.systemBalance,
           notes: req.notes ?? null,
           lines: (req.lines ?? []).map(toLineBody),
         }),
@@ -148,17 +180,20 @@ class BankReconciliationService {
   async matchLine(
     reconciliationId: number,
     lineId: number,
-    voucherNo: string
+    journalVoucherId: number
   ): Promise<BankReconciliation> {
     const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/bank-reconciliations/${reconciliationId}/lines/${lineId}/match`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voucher_no: voucherNo }),
+        body: JSON.stringify({ journal_voucher_id: journalVoucherId }),
       }
     );
-    if (!res.ok) throw new Error("Failed to match line");
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      throw new Error(err || "Failed to match line");
+    }
     return mapReconciliation(await res.json());
   }
 
@@ -172,6 +207,26 @@ class BankReconciliationService {
     );
     if (!res.ok) throw new Error("Failed to unmatch line");
     return mapReconciliation(await res.json());
+  }
+
+  /** Real, unmatched, posted vouchers on the bank account that could match this line — for the manual match picker. */
+  async getMatchCandidates(reconciliationId: number, lineId: number): Promise<MatchCandidate[]> {
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/bank-reconciliations/${reconciliationId}/lines/${lineId}/candidates`,
+      { method: "GET" }
+    );
+    if (!res.ok) throw new Error("Failed to fetch match candidates");
+    return (await res.json()).map(mapCandidate);
+  }
+
+  /** Read-only suggestions — nothing is applied until matchLine() is called for an accepted suggestion. */
+  async getAutoMatchSuggestions(reconciliationId: number): Promise<AutoMatchSuggestion[]> {
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/bank-reconciliations/${reconciliationId}/auto-match`,
+      { method: "GET" }
+    );
+    if (!res.ok) throw new Error("Failed to compute auto-match suggestions");
+    return (await res.json()).map(mapSuggestion);
   }
 
   async complete(reconciliationId: number): Promise<BankReconciliation> {

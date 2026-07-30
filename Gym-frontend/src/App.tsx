@@ -104,6 +104,9 @@ import { Facilities } from "./pages/facilities";
 import { Login } from "./pages/login";
 import { EmergencyProfile } from "./pages/emergency-profile";
 import { Recruitment } from "./pages/recruitment";
+import { PayrollReports } from "./pages/payroll-reports";
+import { PayrollAnalytics } from "./pages/payroll-analytics";
+
 import ErrorBoundary from "./components/shared/error-boundary";
 import {
   LayoutDashboard,
@@ -940,22 +943,8 @@ export default function App() {
       <Route path="/salary-payments" element={<SalaryPayments onNavigate={handleNavClick} />} />
       <Route path="/salary-advances" element={<SalaryAdvances onNavigate={handleNavClick} />} />
       <Route path="/recruitment" element={<Recruitment />} />
-      <Route path="/payroll-reports" element={
-        <div className="p-6">
-          <h1>Payroll Reports</h1>
-          <p className="text-muted-foreground">
-            Generate comprehensive payroll reports including salary summaries, tax reports, and employee earnings.
-          </p>
-        </div>
-      } />
-      <Route path="/payroll-analytics" element={
-        <div className="p-6">
-          <h1>Payroll Analytics</h1>
-          <p className="text-muted-foreground">
-            Advanced analytics for payroll costs, employee performance metrics, and workforce insights.
-          </p>
-        </div>
-      } />
+      <Route path="/payroll-reports" element={<PayrollReports />} />
+      <Route path="/payroll-analytics" element={<PayrollAnalytics />} />
       <Route path="/payroll-settings" element={
         <div className="p-6">
           <h1>Payroll Settings</h1>

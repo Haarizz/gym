@@ -4,6 +4,7 @@ import com.company.project.entities.MemberAddon;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * Response DTO for MemberAddon.
@@ -26,6 +27,7 @@ public class MemberAddonResponseDTO {
     private String purchaseDate;
     private String status;
     private String notes;
+    private List<PaymentSplitDTO> paymentBreakdown;
     private String createdAt;
     private String updatedAt;
 
@@ -48,6 +50,7 @@ public class MemberAddonResponseDTO {
         dto.purchaseDate    = a.getPurchaseDate() != null ? a.getPurchaseDate().format(ISO) + "Z" : null;
         dto.status          = a.getStatus();
         dto.notes           = a.getNotes();
+        dto.paymentBreakdown = a.getPaymentBreakdown();
         dto.createdAt       = a.getCreatedAt() != null ? a.getCreatedAt().format(ISO) + "Z" : null;
         dto.updatedAt       = a.getUpdatedAt() != null ? a.getUpdatedAt().format(ISO) + "Z" : null;
         return dto;
@@ -70,6 +73,7 @@ public class MemberAddonResponseDTO {
     public String getPurchaseDate() { return purchaseDate; }
     public String getStatus() { return status; }
     public String getNotes() { return notes; }
+    public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public String getCreatedAt() { return createdAt; }
     public String getUpdatedAt() { return updatedAt; }
 }

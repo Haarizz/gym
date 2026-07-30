@@ -16,6 +16,10 @@ import {
   Filter,
   Clock,
   FileText,
+  Settings,
+  Pencil,
+  Trash2,
+  X,
 } from "lucide-react";
 import { FaCircleCheck, FaStar } from "react-icons/fa6";
 import {
@@ -70,6 +74,21 @@ import {
 } from "../utils/referral-rewards";
 import { membersService, Member as ApiMember } from "../utils/supabase/members-service";
 import { addonsService, MemberAddon } from "../utils/supabase/addons-service";
+import { addonPlansService, AddonPlan as ApiAddonPlan } from "../utils/supabase/addon-plans-service";
+import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
+import {
+  EMPTY_SPLIT_DETAILS, EMPTY_SPLIT_PAYMENT, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
+  CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
+} from "../components/shared/split-payment-fields";
+import type { SplitPaymentValue, SplitPaymentDetails } from "../components/shared/split-payment-fields";
+
+// Maps this page's Payment Method select value to the SplitPaymentValue key
+// so Card/UPI/Bank Transfer's method-specific details can be validated/built
+// by reusing the same helpers Mixed Payment legs use elsewhere in the app.
+// "UPI" is this page's Online Payment equivalent.
+const ADDON_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
+  Cash: 'cash', Card: 'card', UPI: 'online', 'Bank Transfer': 'bankTransfer'
+};
 
 interface MemberAddonsProps {
   onNavigate?: (section: string) => void;
@@ -100,14 +119,9 @@ function toLocalMember(m: ApiMember): Member {
   };
 }
 
-interface Addon {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  validity: number;
-  category: "Training" | "Nutrition" | "Spa" | "Classes" | "Other";
-}
+// Same shape as the AddonPlan the backend catalog returns — kept as a local
+// alias since this file only ever deals with it in this shape.
+type Addon = ApiAddonPlan;
 
 const getCategoryIcon = (category: string) => {
   const baseClass = "text-white block shrink-0";
@@ -132,72 +146,13 @@ const getCategoryColor = (category: string) => {
 
 // Use the MemberAddon type from the API service directly
 
-const availableAddons: Addon[] = [
-  {
-    id: "PT-15",
-    name: "Personal Training – 15 Sessions",
-    description: "One-on-one sessions with certified trainer",
-    price: 450,
-    validity: 30,
-    category: "Training",
-  },
-  {
-    id: "NP-30",
-    name: "Nutrition Plan – 30 Days",
-    description: "Customized meal plan and nutrition guidance",
-    price: 200,
-    validity: 30,
-    category: "Nutrition",
-  },
-  {
-    id: "PT-30",
-    name: "Personal Training – 30 Sessions",
-    description: "Extended personal training package",
-    price: 850,
-    validity: 60,
-    category: "Training",
-  },
-  {
-    id: "GC-20",
-    name: "Group Classes – 20 Sessions",
-    description: "Access to premium group fitness classes",
-    price: 300,
-    validity: 30,
-    category: "Classes",
-  },
-  {
-    id: "SPA-10",
-    name: "Spa & Recovery – 10 Sessions",
-    description: "Massage therapy and recovery sessions",
-    price: 500,
-    validity: 45,
-    category: "Spa",
-  },
-  {
-    id: "PT-8",
-    name: "Personal Training – 8 Sessions",
-    description: "Starter personal training package",
-    price: 280,
-    validity: 20,
-    category: "Training",
-  },
-  {
-    id: "YOGA-20",
-    name: "Yoga Classes – 20 Sessions",
-    description: "Mind and body wellness through yoga",
-    price: 320,
-    validity: 30,
-    category: "Classes",
-  },
-  {
-    id: "SWIM-10",
-    name: "Swimming Lessons – 10 Sessions",
-    description: "Professional swimming coaching",
-    price: 400,
-    validity: 30,
-    category: "Classes",
-  },
-];
+const EMPTY_PLAN_FORM = {
+  name: "",
+  description: "",
+  price: 0,
+  validity: 30,
+  category: "Training" as Addon["category"],
+};
 
 
 export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
@@ -205,7 +160,10 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [searchSuggestions, setSearchSuggestions] = useState<ApiMember[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [addonSearchQuery, setAddonSearchQuery] = useState("");
   const [selectedAddon, setSelectedAddon] = useState<Addon | null>(null);
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
@@ -213,12 +171,122 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
+  const [methodDetails, setMethodDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
+  const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+  useEffect(() => {
+    accountHeadsService.getBankAccounts()
+      .then(setBankAccounts)
+      .catch(err => console.error('Failed to load bank accounts:', err));
+  }, []);
   const [notes, setNotes] = useState("");
   const [customValidity, setCustomValidity] = useState<number>(30);
   const [customAmount, setCustomAmount] = useState<number>(0);
   const [transactionSearchQuery, setTransactionSearchQuery] = useState("");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<string>("all");
   const [lastCreatedAddon, setLastCreatedAddon] = useState<MemberAddon | null>(null);
+
+  // Add-on plan catalog — admin-editable, replacing what used to be a
+  // hardcoded array. addonPlans holds every plan (incl. inactive ones, shown
+  // in the Manage dialog); the purchase picker only ever offers active ones.
+  const [addonPlans, setAddonPlans] = useState<Addon[]>([]);
+  const [addonPlansLoading, setAddonPlansLoading] = useState(true);
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Addon | null>(null);
+  const [isAddingPlan, setIsAddingPlan] = useState(false);
+  const [planForm, setPlanForm] = useState(EMPTY_PLAN_FORM);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+
+  const loadAddonPlans = () => {
+    setAddonPlansLoading(true);
+    addonPlansService.getAll()
+      .then(setAddonPlans)
+      .catch(() => toast.error("Failed to load add-on plans"))
+      .finally(() => setAddonPlansLoading(false));
+  };
+
+  useEffect(() => { loadAddonPlans(); }, []);
+
+  const handleOpenManageModal = () => {
+    setEditingPlan(null);
+    setIsAddingPlan(false);
+    setPlanForm(EMPTY_PLAN_FORM);
+    setIsManageModalOpen(true);
+  };
+
+  const handleStartAddPlan = () => {
+    setEditingPlan(null);
+    setPlanForm(EMPTY_PLAN_FORM);
+    setIsAddingPlan(true);
+  };
+
+  const handleStartEditPlan = (plan: Addon) => {
+    setEditingPlan(plan);
+    setPlanForm({
+      name: plan.name,
+      description: plan.description,
+      price: plan.price,
+      validity: plan.validity,
+      category: plan.category,
+    });
+    setIsAddingPlan(true);
+  };
+
+  const handleCancelPlanForm = () => {
+    setIsAddingPlan(false);
+    setEditingPlan(null);
+    setPlanForm(EMPTY_PLAN_FORM);
+  };
+
+  const handleSavePlan = async () => {
+    if (!planForm.name.trim()) {
+      toast.error("Plan name is required");
+      return;
+    }
+    if (planForm.price <= 0) {
+      toast.error("Price must be greater than 0");
+      return;
+    }
+    if (planForm.validity <= 0) {
+      toast.error("Validity must be greater than 0 days");
+      return;
+    }
+    setIsSavingPlan(true);
+    try {
+      if (editingPlan) {
+        await addonPlansService.update(editingPlan.id, planForm);
+        toast.success("Add-on plan updated");
+      } else {
+        await addonPlansService.create(planForm);
+        toast.success("Add-on plan created");
+      }
+      handleCancelPlanForm();
+      loadAddonPlans();
+    } catch {
+      toast.error(editingPlan ? "Failed to update plan" : "Failed to create plan");
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  const handleDeletePlan = async (plan: Addon) => {
+    if (!window.confirm(`Delete "${plan.name}"? This cannot be undone.`)) return;
+    try {
+      await addonPlansService.delete(plan.id);
+      toast.success("Add-on plan deleted");
+      loadAddonPlans();
+    } catch {
+      toast.error("Failed to delete plan");
+    }
+  };
+
+  const handleTogglePlanActive = async (plan: Addon) => {
+    try {
+      await addonPlansService.toggleActive(plan.id);
+      loadAddonPlans();
+    } catch {
+      toast.error("Failed to update plan status");
+    }
+  };
 
   // Reward Redemption States
   const [availableReward, setAvailableReward] = useState<ReferralReward | null>(null);
@@ -258,6 +326,8 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       if (results.length > 0) {
         const found = toLocalMember(results[0]);
         setSelectedMember(found);
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
         toast.success(`Member ${found.name} found!`);
       } else {
         toast.error("Member not found. Please check ID or name.");
@@ -267,10 +337,42 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     }
   };
 
+  // Live search-as-you-type — mirrors the suggestions pattern in members.tsx (Renewals tab)
+  const handleSearchInputChange = (value: string) => {
+    setSearchQuery(value);
+    if (value.trim().length > 1) {
+      membersService.searchMembers(value)
+        .then(results => {
+          setSearchSuggestions(results.slice(0, 6));
+          setShowSuggestions(results.length > 0);
+        })
+        .catch(() => setSearchSuggestions([]));
+    } else {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectMemberFromSuggestions = (member: ApiMember) => {
+    setSelectedMember(toLocalMember(member));
+    setSearchQuery(member.name);
+    setSearchSuggestions([]);
+    setShowSuggestions(false);
+  };
+
   const filteredAddons = useMemo(() => {
-    if (filterCategory === "all") return availableAddons;
-    return availableAddons.filter((addon) => addon.category === filterCategory);
-  }, [filterCategory]);
+    let active = addonPlans.filter((addon) => addon.isActive);
+    if (filterCategory !== "all") {
+      active = active.filter((addon) => addon.category === filterCategory);
+    }
+    if (addonSearchQuery.trim()) {
+      const q = addonSearchQuery.trim().toLowerCase();
+      active = active.filter((addon) =>
+        addon.name.toLowerCase().includes(q) || addon.description.toLowerCase().includes(q)
+      );
+    }
+    return active;
+  }, [addonPlans, filterCategory, addonSearchQuery]);
 
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions];
@@ -328,11 +430,23 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const handleConfirmPurchase = async () => {
     if (!selectedMember || !selectedAddon || !customAmount) return;
 
+    const legKey = ADDON_METHOD_TO_LEG_KEY[paymentMethod];
+    if (legKey && legKey !== 'cash') {
+      const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: customAmount };
+      if (!isSplitPaymentDetailsValid(probe, methodDetails)) {
+        toast.error(`Please fill in the required ${paymentMethod} details`);
+        return;
+      }
+    }
+
     const newExpiry = calculateNewExpiry();
     const startDate = new Date();
 
     try {
       setIsSubmitting(true);
+      const paymentBreakdown = legKey && legKey !== 'cash'
+        ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: customAmount }, methodDetails, bankAccounts)
+        : undefined;
       const created = await addonsService.createAddon({
         member_db_id: Number(selectedMember.id),
         member_id: selectedMember.membershipId,
@@ -345,6 +459,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
         start_date: startDate.toISOString(),
         expiry_date: (newExpiry || startDate).toISOString(),
         notes: notes || undefined,
+        payment_breakdown: paymentBreakdown,
       });
       setTransactions(prev => [created, ...prev]);
       setLastCreatedAddon(created);
@@ -352,6 +467,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       setIsSuccessDialogOpen(true);
       setNotes("");
       setPaymentMethod("Cash");
+      setMethodDetails(EMPTY_SPLIT_DETAILS);
     } catch {
       toast.error("Failed to save add-on purchase. Please try again.");
     } finally {
@@ -398,6 +514,10 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" onClick={handleOpenManageModal}>
+                <Settings className="mr-2 h-4 w-4" />
+                Manage Add-on Plans
+              </Button>
               <Button onClick={handleOpenPurchaseModal}>
                 <Plus className="mr-2 h-4 w-4" />
                 Purchase An Add-On
@@ -611,16 +731,34 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                     <p className="text-[11px] text-muted-foreground">Find by Member ID, name or phone</p>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 relative">
                   <div className="relative flex-1">
                     <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4 shrink-0" />
                     <Input
                       placeholder="Search by Member ID, Name, or Phone"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => handleSearchInputChange(e.target.value)}
+                      onFocus={() => { if (searchSuggestions.length > 0) setShowSuggestions(true); }}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                       onKeyDown={(e) => e.key === "Enter" && handleMemberSearch()}
                       className="pl-10"
                     />
+                    {showSuggestions && searchSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-2 rounded-xl border-2 border-border bg-white shadow-xl overflow-hidden">
+                        {searchSuggestions.map((member) => (
+                          <div
+                            key={member.id}
+                            onMouseDown={() => selectMemberFromSuggestions(member)}
+                            className="px-4 py-2.5 hover:bg-slate-50/50 cursor-pointer transition-colors border-b border-border last:border-b-0"
+                          >
+                            <p className="text-sm font-medium">{member.name}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {member.member_id || member.id} • {member.phone}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <Button onClick={handleMemberSearch} className="shrink-0">
                     Search
@@ -676,7 +814,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             <div className="rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="h-0.5 w-full bg-gradient-to-r from-purple-500 to-violet-400" />
               <div className="px-6 py-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold shrink-0">2</div>
                     <div>
@@ -684,21 +822,37 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                       <p className="text-[11px] text-muted-foreground">Choose a service to purchase for the member</p>
                     </div>
                   </div>
-                  <Select value={filterCategory} onValueChange={setFilterCategory}>
-                    <SelectTrigger className="w-[160px] h-8 text-xs">
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      <SelectItem value="Training">Personal Training</SelectItem>
-                      <SelectItem value="Nutrition">Nutrition</SelectItem>
-                      <SelectItem value="Classes">Group Classes</SelectItem>
-                      <SelectItem value="Spa">Spa & Recovery</SelectItem>
-                      <SelectItem value="Other">Other Services</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
+                      <Input
+                        placeholder="Search add-ons..."
+                        value={addonSearchQuery}
+                        onChange={(e) => setAddonSearchQuery(e.target.value)}
+                        className="pl-8 h-8 text-xs w-[180px]"
+                      />
+                    </div>
+                    <Select value={filterCategory} onValueChange={setFilterCategory}>
+                      <SelectTrigger className="w-[160px] h-8 text-xs">
+                        <SelectValue placeholder="All Categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        <SelectItem value="Training">Personal Training</SelectItem>
+                        <SelectItem value="Nutrition">Nutrition</SelectItem>
+                        <SelectItem value="Classes">Group Classes</SelectItem>
+                        <SelectItem value="Spa">Spa & Recovery</SelectItem>
+                        <SelectItem value="Other">Other Services</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
+                {filteredAddons.length === 0 && (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    No add-ons match "{addonSearchQuery}".
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredAddons.map((addon) => (
                     <div
@@ -814,7 +968,10 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
               {/* Payment Method */}
               <div className="space-y-1.5">
                 <Label htmlFor="payment" className="text-xs font-medium">Payment Method</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <Select
+                  value={paymentMethod}
+                  onValueChange={(v) => { setPaymentMethod(v); setMethodDetails(EMPTY_SPLIT_DETAILS); }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -834,6 +991,66 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                   </SelectContent>
                 </Select>
               </div>
+
+              {paymentMethod === 'Card' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Card Type <span className="text-red-500">*</span></Label>
+                  <Select value={methodDetails.cardType || undefined} onValueChange={(v) => setMethodDetails(d => ({ ...d, cardType: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
+                    <SelectContent>
+                      {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {paymentMethod === 'UPI' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Payment Type <span className="text-red-500">*</span></Label>
+                    <Select value={methodDetails.onlinePaymentType || undefined} onValueChange={(v) => setMethodDetails(d => ({ ...d, onlinePaymentType: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectContent>
+                        {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Reference ID <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={methodDetails.onlineReference}
+                      onChange={(e) => setMethodDetails(d => ({ ...d, onlineReference: e.target.value }))}
+                      placeholder="Transaction ID"
+                    />
+                  </div>
+                  {methodDetails.onlinePaymentType === 'Other' && (
+                    <div className="col-span-2 space-y-1.5">
+                      <Label className="text-xs font-medium">Payment Provider Name <span className="text-red-500">*</span></Label>
+                      <Input
+                        value={methodDetails.onlineProviderName}
+                        onChange={(e) => setMethodDetails(d => ({ ...d, onlineProviderName: e.target.value }))}
+                        placeholder="Provider name"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {paymentMethod === 'Bank Transfer' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Bank Account (Ledger)</Label>
+                  <Select value={methodDetails.bankTransferAccountId || undefined} onValueChange={(v) => setMethodDetails(d => ({ ...d, bankTransferAccountId: v }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map(account => (
+                        <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Notes */}
               <div className="space-y-1.5">
@@ -932,6 +1149,176 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             <Button onClick={handleSuccessClose} className="flex-1 h-9 text-xs">
               Done
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Add-on Plans Modal */}
+      <Dialog open={isManageModalOpen} onOpenChange={(open) => { setIsManageModalOpen(open); if (!open) handleCancelPlanForm(); }}>
+        <DialogContent className="w-[96vw] max-w-[900px] sm:max-w-[900px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
+          <div className="pl-6 pr-14 pt-6 pb-5 border-b bg-white/95 backdrop-blur-sm shrink-0">
+            <div className="flex items-center justify-between gap-6">
+              <div className="flex items-center gap-3.5">
+                <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary shadow-sm shrink-0">
+                  <Settings size={21} className="text-white block shrink-0" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight leading-tight">Manage Add-on Plans</h2>
+                  <p className="text-xs text-muted-foreground mt-1">Create, edit, or remove services offered in the catalog</p>
+                </div>
+              </div>
+              {!isAddingPlan && (
+                <Button size="sm" className="shrink-0" onClick={handleStartAddPlan}>
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  New Plan
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto min-h-0 px-6 py-6 space-y-5">
+            {isAddingPlan && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">{editingPlan ? "Edit Plan" : "New Plan"}</p>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCancelPlanForm}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label className="text-xs">Plan Name</Label>
+                    <Input
+                      value={planForm.name}
+                      onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
+                      placeholder="e.g. Personal Training – 15 Sessions"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label className="text-xs">Description</Label>
+                    <Textarea
+                      value={planForm.description}
+                      onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}
+                      placeholder="Short description shown to staff when purchasing"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Category</Label>
+                    <Select
+                      value={planForm.category}
+                      onValueChange={(v) => setPlanForm({ ...planForm, category: v as Addon["category"] })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Training">Training</SelectItem>
+                        <SelectItem value="Nutrition">Nutrition</SelectItem>
+                        <SelectItem value="Classes">Classes</SelectItem>
+                        <SelectItem value="Spa">Spa</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Validity (days)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={planForm.validity}
+                      onChange={(e) => setPlanForm({ ...planForm, validity: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Price ({currencyCode})</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={planForm.price}
+                      onChange={(e) => setPlanForm({ ...planForm, price: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="outline" size="sm" onClick={handleCancelPlanForm}>Cancel</Button>
+                  <Button size="sm" onClick={handleSavePlan} disabled={isSavingPlan}>
+                    {isSavingPlan ? "Saving…" : editingPlan ? "Save Changes" : "Create Plan"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {addonPlansLoading ? (
+              <div className="text-center py-14 text-sm text-muted-foreground">Loading plans…</div>
+            ) : addonPlans.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-14 rounded-xl border border-dashed">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3">
+                  <Package className="h-6 w-6 text-primary" />
+                </div>
+                <p className="text-sm font-medium">No add-on plans yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Click "New Plan" above to create your first one.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Validity</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {addonPlans.map((plan) => (
+                      <TableRow key={plan.id}>
+                        <TableCell>
+                          <p className="text-sm font-medium">{plan.name}</p>
+                          <p className="text-xs text-muted-foreground">{plan.description}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-[10px]">{plan.category}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{plan.validity} days</TableCell>
+                        <TableCell className="text-sm font-semibold"><CurrencyGlyph /> {plan.price}</TableCell>
+                        <TableCell>
+                          <button onClick={() => handleTogglePlanActive(plan)}>
+                            <Badge className={plan.isActive ? "bg-green-100 text-green-800 cursor-pointer" : "bg-gray-100 text-gray-600 cursor-pointer"}>
+                              {plan.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="outline" size="sm"
+                              className="h-8 w-8 p-0 border-primary/20 hover:bg-blue-50"
+                              title="Edit Plan"
+                              onClick={() => handleStartEditPlan(plan)}
+                            >
+                              <Pencil className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button
+                              variant="outline" size="sm"
+                              className="h-8 w-8 p-0 border-primary/20 hover:bg-red-50"
+                              title="Delete Plan"
+                              onClick={() => handleDeletePlan(plan)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <div className="px-6 py-4 border-t bg-slate-50/60 flex justify-end shrink-0">
+            <Button variant="outline" onClick={() => setIsManageModalOpen(false)}>Close</Button>
           </div>
         </DialogContent>
       </Dialog>

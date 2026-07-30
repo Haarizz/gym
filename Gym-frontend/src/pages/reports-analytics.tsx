@@ -5,8 +5,10 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Input } from "../components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { Users, Calendar, DollarSign, Download, Filter, RefreshCw, BarChart3, FileText, TrendingUp, Activity } from 'lucide-react';
+import { Users, Calendar, DollarSign, Download, RefreshCw, BarChart3, FileText, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { toast } from "sonner";
 import { membersService, Member as MemberApi } from "../utils/supabase/members-service";
 import { receiptsService, Receipt } from "../utils/supabase/receipts-service";
@@ -21,6 +23,65 @@ type MembershipTrendPoint = { month: string; monthKey: string; newMembers: numbe
 type RevenueBucket = { name: string; value: number; amount: number; color: string };
 type PeakHourPoint = { hour: string; usage: number };
 type DemographicPoint = { ageGroup: string; count: number; percentage: number };
+type RangeKey = '7d' | '30d' | '90d' | 'ytd' | 'all' | 'custom';
+
+const RANGE_LABELS: Record<RangeKey, string> = {
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  '90d': 'Last 90 days',
+  ytd: 'Year to date',
+  all: 'All time',
+  custom: 'Custom range',
+};
+
+function getRangeBounds(rangeKey: RangeKey, customFrom: string, customTo: string) {
+  const now = new Date();
+  let end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  let start: Date;
+
+  switch (rangeKey) {
+    case '7d':
+      start = new Date(end);
+      start.setDate(start.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+      break;
+    case '30d':
+      start = new Date(end);
+      start.setDate(start.getDate() - 29);
+      start.setHours(0, 0, 0, 0);
+      break;
+    case '90d':
+      start = new Date(end);
+      start.setDate(start.getDate() - 89);
+      start.setHours(0, 0, 0, 0);
+      break;
+    case 'ytd':
+      start = new Date(now.getFullYear(), 0, 1);
+      break;
+    case 'custom': {
+      start = customFrom ? new Date(`${customFrom}T00:00:00`) : new Date(end.getFullYear(), end.getMonth() - 1, end.getDate());
+      end = customTo ? new Date(`${customTo}T23:59:59.999`) : end;
+      break;
+    }
+    case 'all':
+    default:
+      start = new Date(2000, 0, 1);
+      break;
+  }
+
+  const durationMs = Math.max(1, end.getTime() - start.getTime());
+  const prevEnd = new Date(start.getTime() - 1);
+  const prevStart = new Date(prevEnd.getTime() - durationMs);
+  const hasComparison = rangeKey !== 'all';
+
+  return { start, end, prevStart, prevEnd, hasComparison };
+}
+
+function pctChange(current: number, previous: number): number | null {
+  if (previous > 0) return ((current - previous) / previous) * 100;
+  if (current > 0) return 100;
+  return null;
+}
 
 export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
   const { currencyCode } = useCurrency();
@@ -34,6 +95,14 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
   const [attendanceStats, setAttendanceStats] = useState<AttendanceStats | null>(null);
   const [classAttendance, setClassAttendance] = useState<DashboardClassAttendance[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+  const [rangeKey, setRangeKey] = useState<RangeKey>('30d');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  const [reportType, setReportType] = useState<'revenue' | 'membership' | 'attendance' | 'summary'>('summary');
+  const [reportFormat, setReportFormat] = useState<'csv' | 'excel' | 'pdf'>('csv');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -51,6 +120,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
 
       const raw = (classAttResp as any)?.data ?? classAttResp;
       setClassAttendance(Array.isArray(raw) ? raw : []);
+      setLastRefreshed(new Date());
     } catch (e: any) {
       toast.error(e?.message || "Failed to load reports data");
     } finally {
@@ -61,6 +131,57 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const { start: rangeStart, end: rangeEnd, prevStart, prevEnd, hasComparison } = useMemo(
+    () => getRangeBounds(rangeKey, customFrom, customTo),
+    [rangeKey, customFrom, customTo]
+  );
+
+  const isCancelledStatus = (s: string | undefined) =>
+    s === "inactive" || s === "expired" || s === "suspended" || s === "frozen";
+
+  const parseMemberJoinDate = (m: MemberApi) => {
+    const raw = m.join_date || m.created_at;
+    const dt = raw ? new Date(raw) : null;
+    return dt && !Number.isNaN(dt.getTime()) ? dt : null;
+  };
+
+  const parseMemberUpdatedDate = (m: MemberApi) => {
+    const dt = m.updated_at ? new Date(m.updated_at) : null;
+    return dt && !Number.isNaN(dt.getTime()) ? dt : null;
+  };
+
+  const parseReceiptDate = (r: Receipt) => {
+    const dt = r.transaction_date ? new Date(r.transaction_date) : null;
+    return dt && !Number.isNaN(dt.getTime()) ? dt : null;
+  };
+
+  // Receipts / new-signups / cancellations scoped to the selected range and its equivalent prior range
+  const receiptsInRange = useMemo(() => receipts.filter((r) => {
+    const dt = parseReceiptDate(r);
+    return dt ? dt >= rangeStart && dt <= rangeEnd : false;
+  }), [receipts, rangeStart, rangeEnd]);
+
+  const receiptsInPrevRange = useMemo(() => receipts.filter((r) => {
+    const dt = parseReceiptDate(r);
+    return dt ? dt >= prevStart && dt <= prevEnd : false;
+  }), [receipts, prevStart, prevEnd]);
+
+  const newMembersInRange = useMemo(() => members.filter((m) => {
+    const dt = parseMemberJoinDate(m);
+    return dt ? dt >= rangeStart && dt <= rangeEnd : false;
+  }), [members, rangeStart, rangeEnd]);
+
+  const newMembersInPrevRange = useMemo(() => members.filter((m) => {
+    const dt = parseMemberJoinDate(m);
+    return dt ? dt >= prevStart && dt <= prevEnd : false;
+  }), [members, prevStart, prevEnd]);
+
+  const cancelledMembersInRange = useMemo(() => members.filter((m) => {
+    if (!isCancelledStatus(m.membership_status)) return false;
+    const dt = parseMemberUpdatedDate(m);
+    return dt ? dt >= rangeStart && dt <= rangeEnd : false;
+  }), [members, rangeStart, rangeEnd]);
 
   const membershipTrends: MembershipTrendPoint[] = useMemo(() => {
     const now = new Date();
@@ -74,34 +195,20 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       months.push({ label, key, start, end });
     }
 
-    const parseMemberDate = (m: MemberApi) => {
-      const raw = m.join_date || m.created_at;
-      const dt = raw ? new Date(raw) : null;
-      return dt && !Number.isNaN(dt.getTime()) ? dt : null;
-    };
-
-    const parseUpdatedDate = (m: MemberApi) => {
-      const dt = m.updated_at ? new Date(m.updated_at) : null;
-      return dt && !Number.isNaN(dt.getTime()) ? dt : null;
-    };
-
-    const isCancelledStatus = (s: string | undefined) =>
-      s === "inactive" || s === "expired" || s === "suspended" || s === "frozen";
-
     return months.map(({ label, key, start, end }) => {
       const newMembers = members.filter((m) => {
-        const dt = parseMemberDate(m);
+        const dt = parseMemberJoinDate(m);
         return dt ? dt >= start && dt <= end : false;
       }).length;
 
       const cancelledMembers = members.filter((m) => {
         if (!isCancelledStatus(m.membership_status)) return false;
-        const dt = parseUpdatedDate(m);
+        const dt = parseMemberUpdatedDate(m);
         return dt ? dt >= start && dt <= end : false;
       }).length;
 
       const totalMembers = members.filter((m) => {
-        const dt = parseMemberDate(m);
+        const dt = parseMemberJoinDate(m);
         return dt ? dt <= end : false;
       }).length;
 
@@ -109,9 +216,9 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     });
   }, [members]);
 
-  const revenueBreakdown: RevenueBucket[] = useMemo(() => {
+  const buildRevenueBreakdown = useCallback((rows: Receipt[]): RevenueBucket[] => {
     const buckets: Record<string, number> = {};
-    const total = receipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const total = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
 
     const normalizeCategory = (r: Receipt) => {
       const t = (r.transaction_type || "").toLowerCase();
@@ -124,7 +231,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       return "Other Services";
     };
 
-    receipts.forEach((r) => {
+    rows.forEach((r) => {
       const cat = normalizeCategory(r);
       buckets[cat] = (buckets[cat] || 0) + (Number(r.amount) || 0);
     });
@@ -145,14 +252,15 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         color: colors[name] ?? "#64748b",
       }))
       .sort((a, b) => b.amount - a.amount);
-  }, [receipts]);
+  }, []);
+
+  const revenueBreakdown = useMemo(() => buildRevenueBreakdown(receiptsInRange), [receiptsInRange, buildRevenueBreakdown]);
 
   const revenueTrend = useMemo(() => {
     const sums: Record<string, number> = {};
     receipts.forEach((r) => {
-      const raw = r.transaction_date;
-      const dt = raw ? new Date(raw) : null;
-      if (!dt || Number.isNaN(dt.getTime())) return;
+      const dt = parseReceiptDate(r);
+      if (!dt) return;
       const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
       sums[key] = (sums[key] || 0) + (Number(r.amount) || 0);
     });
@@ -161,6 +269,36 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       revenue: Math.round(sums[m.monthKey] || 0),
     }));
   }, [receipts, membershipTrends]);
+
+  const topPlans = useMemo(() => {
+    const buckets: Record<string, { plan: string; revenue: number; count: number }> = {};
+    receiptsInRange.forEach((r) => {
+      const plan = r.plan_name || r.transaction_type || "Unspecified";
+      if (!buckets[plan]) buckets[plan] = { plan, revenue: 0, count: 0 };
+      buckets[plan].revenue += Number(r.amount) || 0;
+      buckets[plan].count += 1;
+    });
+    return Object.values(buckets).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
+  }, [receiptsInRange]);
+
+  const membershipEvents = useMemo(() => {
+    const joined = newMembersInRange.map((m) => ({
+      name: m.name,
+      type: 'Joined' as const,
+      date: parseMemberJoinDate(m),
+      detail: m.membership_type || m.membership_plan || '—',
+    }));
+    const cancelled = cancelledMembersInRange.map((m) => ({
+      name: m.name,
+      type: 'Cancelled' as const,
+      date: parseMemberUpdatedDate(m),
+      detail: m.membership_status,
+    }));
+    return [...joined, ...cancelled]
+      .filter((e) => e.date)
+      .sort((a, b) => (b.date as Date).getTime() - (a.date as Date).getTime())
+      .slice(0, 12);
+  }, [newMembersInRange, cancelledMembersInRange]);
 
   const peakHours: PeakHourPoint[] = useMemo(() => {
     const peak = attendanceStats?.peakHours ?? {};
@@ -203,20 +341,29 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     const totalMembers = members.length;
     const activeMembers = members.filter((m) => m.membership_status === "active").length;
     const retention = totalMembers > 0 ? (activeMembers / totalMembers) * 100 : 0;
-    const totalRevenue = receipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-    const arpm = activeMembers > 0 ? totalRevenue / activeMembers : 0;
+
+    const periodRevenue = receiptsInRange.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const prevPeriodRevenue = receiptsInPrevRange.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const arpm = activeMembers > 0 ? periodRevenue / activeMembers : 0;
+    const prevArpm = activeMembers > 0 ? prevPeriodRevenue / activeMembers : 0;
+    const arpmChange = hasComparison ? pctChange(arpm, prevArpm) : null;
+
+    const newMembersChange = hasComparison ? pctChange(newMembersInRange.length, newMembersInPrevRange.length) : null;
+
     const classUtil = classAttendance.length > 0
       ? classAttendance.reduce((s, x) => s + (x.percentage || 0), 0) / classAttendance.length
       : 0;
+
     const todayAttendance = attendanceStats?.totalToday ?? 0;
+    const weeklyDailyAvg = (attendanceStats?.totalThisWeek ?? 0) / 7;
+    const todayVsAvg = weeklyDailyAvg > 0 ? pctChange(todayAttendance, weeklyDailyAvg) : null;
 
     return [
       {
         title: "Member Retention",
         value: `${retention.toFixed(1)}%`,
-        change: "",
-        trend: "up",
-        description: `${activeMembers.toLocaleString()} active members`,
+        change: null as number | null,
+        description: `${activeMembers.toLocaleString()} active of ${totalMembers.toLocaleString()} members`,
         icon: Users,
         iconShell: "bg-emerald-50",
         iconColor: "text-emerald-600",
@@ -225,19 +372,27 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       {
         title: "Avg Revenue / Member",
         value: `${currencyCode} ${Math.round(arpm).toLocaleString()}`,
-        change: "",
-        trend: "up",
-        description: "From receipts data",
+        change: arpmChange,
+        description: `vs previous period`,
         icon: DollarSign,
         iconShell: "bg-blue-50",
         iconColor: "text-blue-600",
         valueColor: "text-blue-700",
       },
       {
+        title: "New Members",
+        value: newMembersInRange.length.toLocaleString(),
+        change: newMembersChange,
+        description: `vs previous period`,
+        icon: TrendingUp,
+        iconShell: "bg-indigo-50",
+        iconColor: "text-indigo-600",
+        valueColor: "text-indigo-700",
+      },
+      {
         title: "Class Utilization",
         value: `${classUtil.toFixed(0)}%`,
-        change: "",
-        trend: "up",
+        change: null as number | null,
         description: "Avg across classes",
         icon: Activity,
         iconShell: "bg-amber-50",
@@ -247,16 +402,15 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       {
         title: "Today's Attendance",
         value: todayAttendance.toLocaleString(),
-        change: "",
-        trend: "up",
-        description: "Check-ins today",
-        icon: TrendingUp,
+        change: todayVsAvg,
+        description: `vs 7-day daily avg`,
+        icon: BarChart3,
         iconShell: "bg-slate-50",
         iconColor: "text-slate-600",
         valueColor: "text-slate-700",
       },
     ];
-  }, [members, receipts, classAttendance, attendanceStats]);
+  }, [members, receiptsInRange, receiptsInPrevRange, newMembersInRange, newMembersInPrevRange, classAttendance, attendanceStats, currencyCode, hasComparison]);
 
   const membershipMetrics = useMemo(() => {
     const total = members.length;
@@ -289,6 +443,124 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     };
   }, [members, attendanceStats]);
 
+  const rangeLabel = useMemo(() => {
+    if (rangeKey === 'custom') {
+      return `${customFrom || rangeStart.toISOString().split('T')[0]}_to_${customTo || rangeEnd.toISOString().split('T')[0]}`;
+    }
+    return RANGE_LABELS[rangeKey].toLowerCase().replaceAll(' ', '_');
+  }, [rangeKey, customFrom, customTo, rangeStart, rangeEnd]);
+
+  // Export helpers
+  const downloadBlob = (filename: string, blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const toCsvCell = (value: unknown) => {
+    const s = value == null ? "" : String(value);
+    return `"${s.replaceAll('"', '""')}"`;
+  };
+
+  const buildCsv = (header: string[], rows: (string | number)[][]) =>
+    [header.map(toCsvCell).join(","), ...rows.map((row) => row.map(toCsvCell).join(","))].join("\n");
+
+  const buildRevenueCsv = () => buildCsv(
+    ["Category", `Amount (${currencyCode})`, "Share %"],
+    revenueBreakdown.map((b) => [b.name, Math.round(b.amount), b.value]),
+  );
+
+  const buildMembershipCsv = () => buildCsv(
+    ["Event", "Member", "Date", "Detail"],
+    membershipEvents.map((e) => [e.type, e.name, (e.date as Date).toISOString().split('T')[0], e.detail || '']),
+  );
+
+  const buildAttendanceCsv = () => buildCsv(
+    ["Class", "Utilization %"],
+    classAttendance.map((c: any) => [c.class ?? c.name ?? 'Unknown', c.percentage ?? 0]),
+  );
+
+  const buildSummaryCsv = () => buildCsv(
+    ["Metric", "Value"],
+    [
+      ["Range", RANGE_LABELS[rangeKey]],
+      ...kpiData.map((k) => [k.title, k.value]),
+      ["Top Plan", topPlans[0]?.plan ?? "—"],
+      ["Total Receipts In Range", receiptsInRange.length],
+      ["New Members In Range", newMembersInRange.length],
+      ["Cancelled Members In Range", cancelledMembersInRange.length],
+    ],
+  );
+
+  const csvBuilders: Record<typeof reportType, () => string> = {
+    revenue: buildRevenueCsv,
+    membership: buildMembershipCsv,
+    attendance: buildAttendanceCsv,
+    summary: buildSummaryCsv,
+  };
+
+  const runExport = useCallback((type: typeof reportType, format: typeof reportFormat) => {
+    const csv = csvBuilders[type]();
+    const filenameBase = `reports_${type}_${rangeLabel}`;
+
+    if (format === 'csv') {
+      downloadBlob(`${filenameBase}.csv`, new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      toast.success("CSV downloaded");
+      return;
+    }
+
+    if (format === 'excel') {
+      const lines = csv.split("\n").map((l) => l.split(",").map((c) => c.replace(/^"|"$/g, '').replaceAll('""', '"')));
+      const html = `<html><head><meta charset="utf-8" /></head><body><table border="1" cellspacing="0" cellpadding="4">${lines
+        .map((cells, i) => `<tr>${cells.map((c) => `<${i === 0 ? 'th' : 'td'}>${c}</${i === 0 ? 'th' : 'td'}>`).join('')}</tr>`)
+        .join('')}</table></body></html>`;
+      downloadBlob(`${filenameBase}.xls`, new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" }));
+      toast.success("Excel downloaded");
+      return;
+    }
+
+    // pdf: print-friendly popup
+    const w = window.open("", "_blank");
+    if (!w) {
+      toast.error("Popup blocked. Please allow popups to export PDF.");
+      return;
+    }
+    const lines = csv.split("\n").map((l) => l.split(",").map((c) => c.replace(/^"|"$/g, '').replaceAll('""', '"')));
+    w.document.write(`
+      <html><head><meta charset="utf-8" /><title>Report</title>
+      <style>body{font-family:ui-sans-serif,system-ui;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left}th{background:#f9fafb}</style>
+      </head><body>
+      <h1 style="margin:0 0 6px;font-size:18px;">${type.charAt(0).toUpperCase() + type.slice(1)} Report</h1>
+      <div style="color:#6b7280;font-size:12px;margin-bottom:16px;">Range: ${RANGE_LABELS[rangeKey]}</div>
+      <table>${lines.map((cells, i) => `<tr>${cells.map((c) => `<${i === 0 ? 'th' : 'td'}>${c}</${i === 0 ? 'th' : 'td'}>`).join('')}</tr>`).join('')}</table>
+      <script>window.onload = () => window.print();</script>
+      </body></html>
+    `);
+    w.document.close();
+    toast.success("Print dialog opened (Save as PDF)");
+  }, [csvBuilders, rangeKey, rangeLabel]);
+
+  const handleExportReport = useCallback(() => {
+    runExport('summary', 'csv');
+  }, [runExport]);
+
+  const getTrendIcon = (change: number | null) => {
+    if (change === null) return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
+    return change >= 0
+      ? <ArrowUpRight className="h-3.5 w-3.5 text-green-600" />
+      : <ArrowDownRight className="h-3.5 w-3.5 text-red-600" />;
+  };
+
+  const getTrendColor = (change: number | null) => {
+    if (change === null) return "text-muted-foreground";
+    return change >= 0 ? "text-green-600" : "text-red-600";
+  };
+
   if (loading && members.length === 0 && receipts.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -303,9 +575,31 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         <div>
           <h1 className="text-3xl font-bold">Reports & Analytics</h1>
           <p className="text-gray-600 mt-1">Comprehensive business intelligence and performance metrics.</p>
+          {lastRefreshed && (
+            <p className="text-xs text-muted-foreground mt-1">Last refreshed {lastRefreshed.toLocaleTimeString()}</p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button 
+          <Select value={rangeKey} onValueChange={(v) => setRangeKey(v as RangeKey)}>
+            <SelectTrigger className="w-[160px] bg-white">
+              <SelectValue placeholder="Date Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="ytd">Year to date</SelectItem>
+              <SelectItem value="all">All time</SelectItem>
+              <SelectItem value="custom">Custom range</SelectItem>
+            </SelectContent>
+          </Select>
+          {rangeKey === 'custom' && (
+            <>
+              <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="w-[150px] bg-white" />
+              <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="w-[150px] bg-white" />
+            </>
+          )}
+          <Button
             size="sm"
             className="btn-primary shadow-sm hover:shadow-md transition-all"
             onClick={() => onNavigate?.('custom-reports')}
@@ -321,13 +615,9 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
             disabled={loading}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh Data
+            Refresh
           </Button>
-          <Button size="sm" variant="outline" className="shadow-sm hover:shadow-md transition-all">
-            <Filter className="mr-2 h-4 w-4" />
-            Custom Filter
-          </Button>
-          <Button size="sm" className="shadow-sm hover:shadow-md transition-all">
+          <Button size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={handleExportReport}>
             <Download className="mr-2 h-4 w-4" />
             Export Report
           </Button>
@@ -335,7 +625,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {kpiData.map((kpi, index) => (
           <Card key={index} className={statCardShell}>
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
@@ -346,11 +636,14 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${kpi.valueColor}`}>{kpi.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <span className={kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'}>
-                  {kpi.change}
-                </span>{' '}
-                {kpi.description}
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                {kpi.change !== undefined && kpi.change !== null && (
+                  <>
+                    {getTrendIcon(kpi.change)}
+                    <span className={getTrendColor(kpi.change)}>{Math.abs(kpi.change).toFixed(1)}%</span>
+                  </>
+                )}
+                <span>{kpi.description}</span>
               </p>
             </CardContent>
           </Card>
@@ -389,28 +682,34 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
             <Card className={panelCardShell}>
               <CardHeader>
                 <CardTitle>Revenue Distribution</CardTitle>
-                <CardDescription>Revenue breakdown by service type</CardDescription>
+                <CardDescription>Revenue breakdown by service type ({RANGE_LABELS[rangeKey]})</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={revenueBreakdown}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {revenueBreakdown.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                {revenueBreakdown.length === 0 ? (
+                  <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                    No receipts in this range.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={revenueBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {revenueBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -518,6 +817,45 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
               </div>
             </CardContent>
           </Card>
+
+          <Card className={panelCardShell}>
+            <CardHeader>
+              <CardTitle>Recent Signups & Cancellations</CardTitle>
+              <CardDescription>Member events within {RANGE_LABELS[rangeKey].toLowerCase()}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {membershipEvents.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-8 text-center">
+                  No member events in this range.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow>
+                      <TableHead>Member</TableHead>
+                      <TableHead>Event</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Detail</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {membershipEvents.map((e, i) => (
+                      <TableRow key={i} className="transition-colors hover:bg-slate-50/50">
+                        <TableCell className="font-medium">{e.name}</TableCell>
+                        <TableCell>
+                          <Badge className={e.type === 'Joined' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                            {e.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{(e.date as Date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-muted-foreground">{e.detail}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="revenue" className={tabContentShell}>
@@ -545,12 +883,12 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
             <Card className={panelCardShell}>
               <CardHeader>
                 <CardTitle>Revenue Summary</CardTitle>
-                <CardDescription>This month's performance</CardDescription>
+                <CardDescription>{RANGE_LABELS[rangeKey]}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {revenueBreakdown.length === 0 ? (
                   <div className="text-sm text-muted-foreground py-8 text-center">
-                    No receipts found yet.
+                    No receipts found in this range.
                   </div>
                 ) : (
                   revenueBreakdown.map((item, index) => (
@@ -566,6 +904,41 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
               </CardContent>
             </Card>
           </div>
+
+          <Card className={panelCardShell}>
+            <CardHeader>
+              <CardTitle>Top Performing Plans</CardTitle>
+              <CardDescription>Highest revenue plans/transaction types within {RANGE_LABELS[rangeKey].toLowerCase()}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {topPlans.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-8 text-center">
+                  No transactions in this range.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow>
+                      <TableHead>Plan / Transaction Type</TableHead>
+                      <TableHead>Transactions</TableHead>
+                      <TableHead>Revenue</TableHead>
+                      <TableHead>Avg / Transaction</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topPlans.map((p, i) => (
+                      <TableRow key={i} className="transition-colors hover:bg-slate-50/50">
+                        <TableCell className="font-medium">{p.plan}</TableCell>
+                        <TableCell>{p.count}</TableCell>
+                        <TableCell className="text-green-600 font-medium"><CurrencyGlyph /> {Math.round(p.revenue).toLocaleString()}</TableCell>
+                        <TableCell className="text-muted-foreground"><CurrencyGlyph /> {Math.round(p.revenue / p.count).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="operations" className={tabContentShell}>
@@ -626,13 +999,13 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
                 </div>
                 <div>
                   <div className="flex justify-between mb-2">
-                    <span className="text-sm">Receipts Loaded</span>
-                    <span className="text-sm font-medium">{receipts.length.toLocaleString()}</span>
+                    <span className="text-sm">Receipts In Range</span>
+                    <span className="text-sm font-medium">{receiptsInRange.length.toLocaleString()}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-purple-600 h-2 rounded-full"
-                      style={{ width: `${Math.min(100, (receipts.length / 5000) * 100)}%` }}
+                      style={{ width: `${receipts.length > 0 ? Math.min(100, (receiptsInRange.length / receipts.length) * 100) : 0}%` }}
                     ></div>
                   </div>
                 </div>
@@ -644,69 +1017,68 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         <TabsContent value="custom" className={tabContentShell}>
           <Card className={panelCardShell}>
             <CardHeader>
-              <CardTitle>Custom Report Builder</CardTitle>
-              <CardDescription>Create custom reports and analytics</CardDescription>
+              <CardTitle>Quick Report Export</CardTitle>
+              <CardDescription>Export a filtered report for {RANGE_LABELS[rangeKey].toLowerCase()} in the format you need</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Date Range</label>
-                  <Select defaultValue="month">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="week">Last 7 days</SelectItem>
-                      <SelectItem value="month">Last 30 days</SelectItem>
-                      <SelectItem value="quarter">Last 3 months</SelectItem>
-                      <SelectItem value="year">Last 12 months</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Report Type</label>
-                  <Select defaultValue="revenue">
+                  <Select value={reportType} onValueChange={(v) => setReportType(v as typeof reportType)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="summary">Full Summary</SelectItem>
                       <SelectItem value="revenue">Revenue Analysis</SelectItem>
                       <SelectItem value="membership">Membership Report</SelectItem>
                       <SelectItem value="attendance">Class Attendance</SelectItem>
-                      <SelectItem value="equipment">Equipment Usage</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Format</label>
-                  <Select defaultValue="pdf">
+                  <Select value={reportFormat} onValueChange={(v) => setReportFormat(v as typeof reportFormat)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pdf">PDF Report</SelectItem>
-                      <SelectItem value="excel">Excel Spreadsheet</SelectItem>
                       <SelectItem value="csv">CSV Data</SelectItem>
+                      <SelectItem value="excel">Excel Spreadsheet</SelectItem>
+                      <SelectItem value="pdf">PDF Report</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              
-              <div className="flex space-x-4">
-                <Button className="shadow-sm hover:shadow-md transition-all" onClick={() => onNavigate?.("custom-reports")}>
-                  <BarChart3 className="mr-2 h-4 w-4" />
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button className="shadow-sm hover:shadow-md transition-all" onClick={() => runExport(reportType, reportFormat)}>
+                  <Download className="mr-2 h-4 w-4" />
                   Generate Report
                 </Button>
-                <Button variant="outline" className="shadow-sm hover:shadow-md transition-all">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Schedule Report
+                <Button variant="outline" className="shadow-sm hover:shadow-md transition-all" onClick={() => onNavigate?.('custom-reports')}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Open Full Custom Report Builder
                 </Button>
               </div>
 
-              <div className="mt-8 text-center py-8 text-muted-foreground bg-gray-50 rounded-xl">
-                <BarChart3 className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium mb-2">Advanced Report Builder</h3>
-                <p>Create custom reports with drag-and-drop functionality and advanced filtering options. This feature is under development.</p>
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-gray-50 rounded-xl">
+                  <div className="text-2xl font-bold text-primary">{receiptsInRange.length}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Receipts in range</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-xl">
+                  <div className="text-2xl font-bold text-primary">{newMembersInRange.length}</div>
+                  <div className="text-xs text-muted-foreground mt-1">New members</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-xl">
+                  <div className="text-2xl font-bold text-primary">{cancelledMembersInRange.length}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Cancellations</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-xl">
+                  <div className="text-2xl font-bold text-primary">{classAttendance.length}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Classes tracked</div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -715,4 +1087,3 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     </div>
   );
 }
-

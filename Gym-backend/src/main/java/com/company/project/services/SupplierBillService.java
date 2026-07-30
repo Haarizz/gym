@@ -242,6 +242,8 @@ public class SupplierBillService {
         BigDecimal currentPaid = bill.getAmountPaid() != null ? bill.getAmountPaid() : BigDecimal.ZERO;
         BigDecimal newAmountPaid = currentPaid.add(req.getAmount() != null ? req.getAmount() : BigDecimal.ZERO);
         bill.setAmountPaid(newAmountPaid);
+        if (req.getPaymentMethod() != null) bill.setPaymentMethod(req.getPaymentMethod());
+        if (req.getPaymentBreakdown() != null) bill.setPaymentBreakdown(req.getPaymentBreakdown());
 
         BigDecimal total = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
         if (newAmountPaid.compareTo(total) >= 0) {
