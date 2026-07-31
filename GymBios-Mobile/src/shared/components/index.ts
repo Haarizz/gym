@@ -12,3 +12,6 @@ export { SearchBar } from './SearchBar';
 export { EmptyState } from './EmptyState';
 export { FormSection } from './FormSection';
 export * from './ReportComponents';
+export { AppBottomSheet } from './AppBottomSheet';
+export { ModuleSheet } from './ModuleSheet';
+

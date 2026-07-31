@@ -1,50 +1,100 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
 import { Radius, Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
 import { Typography } from '@/shared/components/Typography';
-import type { Staff } from '../../domain/Staff';
-import { useStaffWizard } from '../hooks/useStaffWizard';
-import { ProgressIndicator } from '../components/wizard/ProgressIndicator';
-import { WizardHeader } from '../components/wizard/WizardHeader';
-import { WizardNavigation } from '../components/wizard/WizardNavigation';
-import { PersonalStep } from './steps/PersonalStep';
-import { EmploymentStep } from './steps/EmploymentStep';
-import { CompensationStep } from './steps/CompensationStep';
-import { ScheduleStep } from './steps/ScheduleStep';
-import { AppAccessStep } from './steps/AppAccessStep';
+import type { MembershipPlan } from '../../domain/MembershipPlan';
+import {
+  useMembershipPlanWizard,
+  mapPlanToWizardData,
+} from '../hooks/useMembershipPlanWizard';
+import { StepIndicator } from './StepIndicator';
+import { WizardNavigation } from './WizardNavigation';
+import { BasicInformationStep } from './steps/BasicInformationStep';
+import { DurationPricingStep } from './steps/DurationPricingStep';
+import { SessionsCapacityStep } from './steps/SessionsCapacityStep';
+import { FamilyOptionsStep } from './steps/FamilyOptionsStep';
+import { FreezePolicyStep } from './steps/FreezePolicyStep';
+import { AssignmentsStep } from './steps/AssignmentsStep';
+import { useState } from 'react';
 
-interface StaffWizardScreenProps {
+interface MembershipPlanFormProps {
   mode: 'create' | 'edit';
-  initialData?: Staff;
-  staffId?: string;
+  initialData?: MembershipPlan;
+  planId?: number;
   onSuccess: () => void;
+  onCancel: () => void;
 }
 
-const STEP_LABELS = [
-  'Personal',
-  'Employment',
-  'Compensation',
-  'Schedule',
-  'Access',
-];
-
-export function StaffWizardScreen({
+export function MembershipPlanForm({
   mode,
   initialData,
-  staffId,
+  planId,
   onSuccess,
-}: StaffWizardScreenProps) {
+  onCancel,
+}: MembershipPlanFormProps) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   const handleError = useCallback((_error: Error) => {
-    Alert.alert('Error', 'An error occurred. Please try again.');
+    Alert.alert('Error', 'Something went wrong. Please try again.');
   }, []);
+
+  const {
+    step,
+    totalSteps,
+    steps,
+    data,
+    canGoNext,
+    loading,
+    updateField,
+    next,
+    previous,
+    submit,
+  } = useMembershipPlanWizard({
+    mode,
+    initialData,
+    planId,
+    onSuccess,
+    onError: handleError,
+  });
+
+  const stepLabels = steps.map((s) => s.title);
+  const isFamily = data.planType === 'FAMILY';
+
+  // Determine which step index maps to which component.
+  // Steps order: basic(1), duration(2), sessions(3), [family(4)?], freeze(4|5), assign(5|6)
+  const renderStep = useCallback(() => {
+    const noErrors = {};
+    const stepId = steps[step - 1]?.id;
+
+    switch (stepId) {
+      case 'basic':
+        return <BasicInformationStep values={data} errors={noErrors} onChange={updateField} />;
+      case 'duration':
+        return <DurationPricingStep values={data} errors={noErrors} onChange={updateField} />;
+      case 'sessions':
+        return <SessionsCapacityStep values={data} errors={noErrors} onChange={updateField} />;
+      case 'family':
+        return <FamilyOptionsStep values={data} errors={noErrors} onChange={updateField} />;
+      case 'freeze':
+        return <FreezePolicyStep values={data} errors={noErrors} onChange={updateField} />;
+      case 'assignments':
+        return <AssignmentsStep values={data} errors={noErrors} onChange={updateField} />;
+      default:
+        return null;
+    }
+  }, [step, steps, data, updateField]);
 
   const handleCancel = useCallback(() => {
     setShowDiscardDialog(true);
@@ -56,72 +106,10 @@ export function StaffWizardScreen({
 
   const handleDiscard = useCallback(() => {
     setShowDiscardDialog(false);
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/staff');
-    }
-  }, [router]);
+    onCancel();
+  }, [onCancel]);
 
-  const wizard = useStaffWizard({
-    mode,
-    initialData,
-    staffId,
-    onSuccess,
-    onError: handleError,
-  });
-
-  const {
-    step,
-    totalSteps,
-    data,
-    updateField,
-    canGoNext,
-    canGoPrevious,
-    loading,
-    next,
-    previous,
-    submit,
-    addCertification,
-    removeCertification,
-    onChangeCert,
-  } = wizard;
-
-  const currentStepTitle = useMemo(() => {
-    const titles: Record<number, string> = {
-      1: 'Personal Information',
-      2: 'Employment Details',
-      3: 'Compensation',
-      4: 'Schedule & Certifications',
-      5: 'App Access & Review',
-    };
-    return titles[step] ?? '';
-  }, [step]);
-
-  const renderStep = useCallback(() => {
-    switch (step) {
-      case 1:
-        return <PersonalStep data={data} updateField={updateField} />;
-      case 2:
-        return <EmploymentStep data={data} updateField={updateField} />;
-      case 3:
-        return <CompensationStep data={data} updateField={updateField} />;
-      case 4:
-        return (
-          <ScheduleStep
-            data={data}
-            updateField={updateField}
-            addCertification={addCertification}
-            removeCertification={removeCertification}
-            onChangeCert={onChangeCert}
-          />
-        );
-      case 5:
-        return <AppAccessStep data={data} updateField={updateField} />;
-      default:
-        return null;
-    }
-  }, [step, data, updateField, addCertification, removeCertification, onChangeCert]);
+  const currentStepTitle = steps[step - 1]?.title ?? '';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -129,19 +117,26 @@ export function StaffWizardScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <WizardHeader
-          title={mode === 'create' ? 'New Staff' : 'Edit Staff'}
-          subtitle={currentStepTitle}
-        />
+        {/* Header */}
+        <View style={styles.wizardHeader}>
+          <Typography variant="subtitle" color="text">
+            {mode === 'create' ? 'New Plan' : 'Edit Plan'}
+          </Typography>
+          <Typography variant="caption" color="textSecondary">
+            {currentStepTitle}
+          </Typography>
+        </View>
 
+        {/* Progress */}
         <View style={styles.indicatorContainer}>
-          <ProgressIndicator
+          <StepIndicator
             current={step}
             total={totalSteps}
-            labels={STEP_LABELS}
+            labels={stepLabels}
           />
         </View>
 
+        {/* Step content */}
         <ScrollView
           style={styles.flex}
           contentContainerStyle={styles.scrollContent}
@@ -152,6 +147,7 @@ export function StaffWizardScreen({
           <View style={styles.bottomSpacer} />
         </ScrollView>
 
+        {/* Sticky footer */}
         <View
           style={[
             styles.stickyFooter,
@@ -172,6 +168,7 @@ export function StaffWizardScreen({
         </View>
       </KeyboardAvoidingView>
 
+      {/* Discard confirmation dialog */}
       <Modal
         visible={showDiscardDialog}
         transparent
@@ -183,13 +180,10 @@ export function StaffWizardScreen({
             <Typography variant="subtitle" color="text">
               Discard changes?
             </Typography>
-
             <View style={styles.modalSpacer} />
-
             <Typography variant="body" color="textSecondary">
               All entered information will be lost.
             </Typography>
-
             <View style={styles.modalActions}>
               <View style={styles.modalButtonWrapper}>
                 <Button
@@ -200,9 +194,7 @@ export function StaffWizardScreen({
                   style={styles.modalButton}
                 />
               </View>
-
               <View style={styles.modalButtonSpacer} />
-
               <View style={styles.modalButtonWrapper}>
                 <Button
                   label="Discard"
@@ -227,6 +219,11 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  wizardHeader: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.two,
   },
   indicatorContainer: {
     paddingBottom: Spacing.one,
