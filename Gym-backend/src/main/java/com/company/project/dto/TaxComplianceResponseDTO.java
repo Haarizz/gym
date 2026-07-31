@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.TaxCompliance;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,7 +20,9 @@ public class TaxComplianceResponseDTO {
     private String filingReference;
     private String documentUrl;
     private boolean isOverdue;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public TaxComplianceResponseDTO() {}

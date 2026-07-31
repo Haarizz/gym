@@ -2,6 +2,8 @@ package com.company.project.dto;
 
 import com.company.project.entities.PaymentVoucher;
 import com.company.project.entities.PaymentVoucherBill;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,7 +29,9 @@ public class PaymentVoucherResponseDTO {
     private LocalDate chequeDate;
     private String notes;
     private List<PaymentVoucherBillDTO> bills;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public PaymentVoucherResponseDTO() {}

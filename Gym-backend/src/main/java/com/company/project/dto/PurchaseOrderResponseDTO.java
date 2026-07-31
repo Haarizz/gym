@@ -3,6 +3,8 @@ package com.company.project.dto;
 import com.company.project.entities.PurchaseOrder;
 import com.company.project.entities.PurchaseOrderItem;
 import com.company.project.entities.Supplier;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,6 +19,7 @@ public class PurchaseOrderResponseDTO {
     private String supplierName;
     private LocalDateTime orderDate;
     private LocalDateTime expectedDeliveryDate;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime actualDeliveryDate;
     private String status;
     private String priority;
@@ -30,7 +33,9 @@ public class PurchaseOrderResponseDTO {
     private String notes;
     private String createdBy;
     private String approvedBy;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
     private List<PurchaseOrderItemDTO> items;
 

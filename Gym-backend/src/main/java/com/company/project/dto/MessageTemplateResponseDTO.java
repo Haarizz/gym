@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +17,7 @@ public class MessageTemplateResponseDTO {
     private List<String> variables = new ArrayList<>();
     private Integer usageCount;
     private String createdBy;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdDate;
     private Boolean active;
 

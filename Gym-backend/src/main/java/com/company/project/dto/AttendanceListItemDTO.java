@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 
 public class AttendanceListItemDTO {
@@ -17,7 +20,9 @@ public class AttendanceListItemDTO {
     private String walkInEmail;
     private String walkInPaymentStatus;
     // Common
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime checkInTime;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime checkOutTime;
     private Integer totalMinutes;
     private String formattedDuration;   // "1h 30m"

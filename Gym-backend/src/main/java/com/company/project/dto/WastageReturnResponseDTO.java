@@ -2,6 +2,8 @@ package com.company.project.dto;
 
 import com.company.project.entities.WastageReturn;
 import com.company.project.entities.WastageReturnItem;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,9 +27,12 @@ public class WastageReturnResponseDTO {
     private Integer totalItems;
     private BigDecimal totalValue;
     private String notes;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime approvalDate;
     private String rejectionReason;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
     private String createdBy;
     private List<WastageReturnItemDTO> items;

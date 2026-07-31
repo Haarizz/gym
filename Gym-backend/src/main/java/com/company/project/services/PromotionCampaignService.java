@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.math.BigDecimal;
 
 @Service
 @Transactional
@@ -181,4 +182,57 @@ public class PromotionCampaignService {
             promotion.setUsageCount(0);
         }
     }
+
+    /**
+     * Validate a promotion by its voucher code.
+     * Checks: exists, status is active, not expired, usage limit not exceeded.
+     */
+    @Transactional(readOnly = true)
+    public PromotionCampaignResponseDTO validateByCode(String code) {
+        PromotionCampaign promotion = promotionRepository.findByCodeIgnoreCase(code)
+                .orElseThrow(() -> new RuntimeException("Invalid promotion code"));
+
+        if (!"active".equalsIgnoreCase(promotion.getStatus())) {
+            throw new RuntimeException("Promotion is not active");
+        }
+
+        if (promotion.getEndDate() != null && promotion.getEndDate().isBefore(LocalDate.now())) {
+            throw new RuntimeException("Promotion has expired");
+        }
+
+        if (promotion.getStartDate() != null && promotion.getStartDate().isAfter(LocalDate.now())) {
+            throw new RuntimeException("Promotion has not started yet");
+        }
+
+        if (promotion.getUsageLimit() != null && promotion.getUsageCount() != null
+                && promotion.getUsageCount() >= promotion.getUsageLimit()) {
+            throw new RuntimeException("Promotion usage limit has been reached");
+        }
+
+        return PromotionCampaignResponseDTO.fromEntity(promotion);
+    }
+
+    /**
+     * Increment the usage count when a promotion is successfully redeemed.
+     */
+    public PromotionCampaignResponseDTO redeemPromotion(Long id, BigDecimal revenue, BigDecimal savings) {
+        PromotionCampaign promotion = promotionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Promotion not found: " + id));
+
+        int currentCount = promotion.getUsageCount() != null ? promotion.getUsageCount() : 0;
+        promotion.setUsageCount(currentCount + 1);
+
+        if (revenue != null) {
+            BigDecimal currentRev = promotion.getTotalRevenue() != null ? promotion.getTotalRevenue() : BigDecimal.ZERO;
+            promotion.setTotalRevenue(currentRev.add(revenue));
+        }
+
+        if (savings != null) {
+            BigDecimal currentSav = promotion.getTotalSavings() != null ? promotion.getTotalSavings() : BigDecimal.ZERO;
+            promotion.setTotalSavings(currentSav.add(savings));
+        }
+
+        return PromotionCampaignResponseDTO.fromEntity(promotionRepository.save(promotion));
+    }
 }
+

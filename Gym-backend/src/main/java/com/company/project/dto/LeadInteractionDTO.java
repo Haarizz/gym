@@ -1,11 +1,15 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 
 public class LeadInteractionDTO {
 
     private Long id;
     private String type;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime date;
     private String staffMember;
     private String notes;

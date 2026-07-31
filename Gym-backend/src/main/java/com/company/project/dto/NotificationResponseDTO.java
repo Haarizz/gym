@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 
 public class NotificationResponseDTO {
@@ -14,6 +17,7 @@ public class NotificationResponseDTO {
     private String actionUrl;
     private int count;
     private boolean isRead;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
 
     public NotificationResponseDTO() {}

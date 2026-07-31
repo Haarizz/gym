@@ -8,8 +8,10 @@ import com.company.project.dto.FollowUpStatsDTO;
 import com.company.project.dto.PaginationDTO;
 import com.company.project.entities.CommunicationRecord;
 import com.company.project.entities.FollowUp;
+import com.company.project.entities.Lead;
 import com.company.project.repositories.CommunicationRecordRepository;
 import com.company.project.repositories.FollowUpRepository;
+import com.company.project.repositories.LeadRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,13 +36,16 @@ public class FollowUpService {
     private final FollowUpRepository followUpRepository;
     private final CommunicationRecordRepository communicationRecordRepository;
     private final NotificationService notificationService;
+    private final LeadRepository leadRepository;
 
     public FollowUpService(FollowUpRepository followUpRepository,
                            CommunicationRecordRepository communicationRecordRepository,
-                           NotificationService notificationService) {
+                           NotificationService notificationService,
+                           LeadRepository leadRepository) {
         this.followUpRepository = followUpRepository;
         this.communicationRecordRepository = communicationRecordRepository;
         this.notificationService = notificationService;
+        this.leadRepository = leadRepository;
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -60,7 +65,7 @@ public class FollowUpService {
         notificationService.notifyRoles(
                 List.of("ADMIN", "MANAGER"),
                 "New Follow-Up Scheduled",
-                "Follow-up for " + (saved.getMemberName() != null ? saved.getMemberName() : "a contact") +
+                "Follow-up for " + (saved.getLead() != null ? saved.getLead().getFirstName() : "a contact") +
                 " is due on " + (saved.getDueDate() != null ? saved.getDueDate().toLocalDate().toString() : "N/A") + ".",
                 "INFO", "MEDIUM", "FOLLOW_UPS",
                 saved.getId(), "/follow-ups",
@@ -95,6 +100,12 @@ public class FollowUpService {
         fu.setCompletedDate(LocalDateTime.now());
         if (outcome != null) fu.setOutcome(outcome);
         if (notes != null) fu.setNotes(notes);
+
+        if (fu.getLead() != null) {
+            fu.getLead().setLastContactDate(LocalDateTime.now());
+            leadRepository.save(fu.getLead());
+        }
+
         return toDTO(followUpRepository.save(fu));
     }
 
@@ -134,9 +145,11 @@ public class FollowUpService {
             }
             if (search != null && !search.isBlank()) {
                 String like = "%" + search.toLowerCase() + "%";
+                jakarta.persistence.criteria.Join<FollowUp, Lead> leadJoin = root.join("lead", jakarta.persistence.criteria.JoinType.LEFT);
                 predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("memberName")), like),
-                        cb.like(cb.lower(root.get("memberEmail")), like),
+                        cb.like(cb.lower(leadJoin.get("firstName")), like),
+                        cb.like(cb.lower(leadJoin.get("lastName")), like),
+                        cb.like(cb.lower(leadJoin.get("email")), like),
                         cb.like(cb.lower(root.get("subject")), like),
                         cb.like(cb.lower(root.get("followUpId")), like)
                 ));
@@ -214,10 +227,11 @@ public class FollowUpService {
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private void mapRequestToEntity(FollowUpRequestDTO req, FollowUp fu) {
-        if (req.getMemberId() != null) fu.setMemberId(req.getMemberId());
-        if (req.getMemberName() != null) fu.setMemberName(req.getMemberName());
-        if (req.getMemberEmail() != null) fu.setMemberEmail(req.getMemberEmail());
-        if (req.getMemberPhone() != null) fu.setMemberPhone(req.getMemberPhone());
+        if (req.getLeadId() != null) {
+            Lead lead = leadRepository.findById(req.getLeadId())
+                    .orElseThrow(() -> new RuntimeException("Lead not found: " + req.getLeadId()));
+            fu.setLead(lead);
+        }
         if (req.getType() != null) fu.setType(req.getType());
         if (req.getStatus() != null) fu.setStatus(req.getStatus());
         if (req.getPriority() != null) fu.setPriority(req.getPriority());
@@ -239,10 +253,12 @@ public class FollowUpService {
         FollowUpResponseDTO dto = new FollowUpResponseDTO();
         dto.setId(fu.getId());
         dto.setFollowUpId(fu.getFollowUpId());
-        dto.setMemberId(fu.getMemberId());
-        dto.setMemberName(fu.getMemberName());
-        dto.setMemberEmail(fu.getMemberEmail());
-        dto.setMemberPhone(fu.getMemberPhone());
+        if (fu.getLead() != null) {
+            dto.setLeadId(fu.getLead().getId());
+            dto.setLeadName(fu.getLead().getFirstName() + " " + (fu.getLead().getLastName() != null ? fu.getLead().getLastName() : ""));
+            dto.setLeadEmail(fu.getLead().getEmail());
+            dto.setLeadPhone(fu.getLead().getPhone());
+        }
         dto.setType(fu.getType());
         dto.setStatus(fu.getStatus());
         dto.setPriority(fu.getPriority());

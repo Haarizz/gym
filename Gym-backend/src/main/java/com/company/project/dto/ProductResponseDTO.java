@@ -5,6 +5,8 @@ import com.company.project.entities.ProductCategory;
 import com.company.project.entities.ProductStock;
 import com.company.project.entities.ProductUnit;
 import com.company.project.entities.Warehouse;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -39,7 +41,9 @@ public class ProductResponseDTO {
     private BigDecimal inventoryValue;
     private List<ProductStockDTO> stockByWarehouse;
     private String stockStatus;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
     private List<ProductUnitDTO> units;
 

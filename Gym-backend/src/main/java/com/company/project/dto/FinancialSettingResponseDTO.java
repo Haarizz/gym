@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.FinancialSetting;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.time.LocalDateTime;
 
 public class FinancialSettingResponseDTO {
@@ -11,7 +13,9 @@ public class FinancialSettingResponseDTO {
     private String category;
     private String description;
     private Boolean isActive;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public FinancialSettingResponseDTO() {}

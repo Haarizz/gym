@@ -172,10 +172,17 @@ public class ReceiptService {
 
         List<com.company.project.dto.StatementLineDTO> allRows = new ArrayList<>();
 
+        // Keyed by bill id so a later settlement (which only remembers
+        // linkedBillId, not the minor charges themselves) can still be
+        // attributed back to whichever minor's charge it paid down.
+        Map<Long, Receipt> billsById = bills.stream()
+                .collect(Collectors.toMap(Receipt::getId, r -> r, (a, bb) -> a));
+
         for (Receipt b : bills) {
             LocalDateTime txnDate = b.getTransactionDate();
             BigDecimal billAmount = b.getAmount() != null ? b.getAmount() : BigDecimal.ZERO;
             BigDecimal initialPayment = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
+            List<com.company.project.dto.MinorChargeDTO> billMinorCharges = b.getMinorCharges();
 
             com.company.project.dto.StatementLineDTO invoiceRow = new com.company.project.dto.StatementLineDTO();
             invoiceRow.setDate(txnDate != null ? txnDate.format(dateFmt) : null);
@@ -185,7 +192,7 @@ public class ReceiptService {
             invoiceRow.setDebit(billAmount);
             invoiceRow.setCredit(BigDecimal.ZERO);
             invoiceRow.setStatus(b.getStatus());
-            invoiceRow.setMinorCharges(b.getMinorCharges());
+            invoiceRow.setMinorCharges(billMinorCharges);
             allRows.add(invoiceRow);
 
             // Split the initial payment into one row per instrument actually used at
@@ -200,28 +207,48 @@ public class ReceiptService {
                     BigDecimal legAmount = leg.getAmount() != null ? leg.getAmount() : BigDecimal.ZERO;
                     BigDecimal take = legAmount.min(remaining);
                     if (take.compareTo(BigDecimal.ZERO) <= 0) continue;
-                    allRows.add(buildPaymentRow(txnDate, dateFmt, b.getReceiptNo(), leg.getMethod(), take, b.getStatus()));
+                    com.company.project.dto.StatementLineDTO payRow =
+                            buildPaymentRow(txnDate, dateFmt, b.getReceiptNo(), leg.getMethod(), take, b.getStatus());
+                    payRow.setMinorCharges(scaleMinorCharges(billMinorCharges, take));
+                    allRows.add(payRow);
                     remaining = remaining.subtract(take);
                 }
             }
             if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-                allRows.add(buildPaymentRow(txnDate, dateFmt, b.getReceiptNo(), b.getPaymentMethod(), remaining, b.getStatus()));
+                com.company.project.dto.StatementLineDTO payRow =
+                        buildPaymentRow(txnDate, dateFmt, b.getReceiptNo(), b.getPaymentMethod(), remaining, b.getStatus());
+                payRow.setMinorCharges(scaleMinorCharges(billMinorCharges, remaining));
+                allRows.add(payRow);
             }
         }
 
         for (Receipt s : settlements) {
             LocalDateTime txnDate = s.getTransactionDate();
+            // A settlement only remembers which single bill it paid down
+            // (linkedBillId) — recover that bill's minorCharges so a later
+            // "clear dues" payment can still be traced back to the minor it
+            // was actually for, e.g. "Due of Son paid by Dad".
+            Receipt linkedBill = s.getLinkedBillId() != null ? billsById.get(s.getLinkedBillId()) : null;
+            List<com.company.project.dto.MinorChargeDTO> linkedMinorCharges =
+                    linkedBill != null ? linkedBill.getMinorCharges() : null;
+
             List<com.company.project.dto.PaymentSplitDTO> breakdown = s.getPaymentBreakdown();
             if (breakdown != null && !breakdown.isEmpty()) {
                 for (com.company.project.dto.PaymentSplitDTO leg : breakdown) {
                     BigDecimal legAmount = leg.getAmount() != null ? leg.getAmount() : BigDecimal.ZERO;
                     if (legAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
-                    allRows.add(buildPaymentRow(txnDate, dateFmt, s.getReceiptNo(), leg.getMethod(), legAmount, s.getStatus()));
+                    com.company.project.dto.StatementLineDTO payRow =
+                            buildPaymentRow(txnDate, dateFmt, s.getReceiptNo(), leg.getMethod(), legAmount, s.getStatus());
+                    payRow.setMinorCharges(scaleMinorCharges(linkedMinorCharges, legAmount));
+                    allRows.add(payRow);
                 }
             } else {
                 BigDecimal amount = s.getAmount() != null ? s.getAmount() : BigDecimal.ZERO;
                 if (amount.compareTo(BigDecimal.ZERO) > 0) {
-                    allRows.add(buildPaymentRow(txnDate, dateFmt, s.getReceiptNo(), s.getPaymentMethod(), amount, s.getStatus()));
+                    com.company.project.dto.StatementLineDTO payRow =
+                            buildPaymentRow(txnDate, dateFmt, s.getReceiptNo(), s.getPaymentMethod(), amount, s.getStatus());
+                    payRow.setMinorCharges(scaleMinorCharges(linkedMinorCharges, amount));
+                    allRows.add(payRow);
                 }
             }
         }
@@ -277,6 +304,30 @@ public class ReceiptService {
         row.setPaymentMethod(method);
         row.setStatus(status);
         return row;
+    }
+
+    /**
+     * Re-labels a bill's minorCharges for a single Payment row that only
+     * covers part of that bill (e.g. a bill folding in one minor's AED 25
+     * add-on gets paid in two legs of AED 10 and AED 15) — the row should
+     * show the amount actually credited in THAT row, not the minor's whole
+     * original charge amount. Only rewritten when there's exactly one minor
+     * charge on the bill (the common case for both single add-ons and single
+     * renewals); a bill folding in multiple minors' charges at once falls
+     * back to showing their original amounts as-is (same best-effort
+     * attribution limit as the settlement/bill date-window matching above).
+     */
+    private List<com.company.project.dto.MinorChargeDTO> scaleMinorCharges(
+            List<com.company.project.dto.MinorChargeDTO> original, BigDecimal rowAmount) {
+        if (original == null || original.isEmpty() || rowAmount == null || rowAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        if (original.size() == 1) {
+            com.company.project.dto.MinorChargeDTO src = original.get(0);
+            return List.of(new com.company.project.dto.MinorChargeDTO(
+                    src.getMemberId(), src.getMemberDbId(), src.getName(), rowAmount, true));
+        }
+        return original;
     }
 
     // ── Write ───────────────────────────────────────────────────────────────
@@ -400,6 +451,21 @@ public class ReceiptService {
                                             String transactionType,
                                             List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
                                             String bankAccountCode, String bankAccountName) {
+        return createMinorChargeReceipt(guardian, minor, fee, paid ? fee : BigDecimal.ZERO,
+                transactionType, null, paymentBreakdown, bankAccountCode, bankAccountName);
+    }
+
+    /**
+     * Same as above, but takes a genuine partial paidAmount (e.g. AED 10 received
+     * now against a AED 25 add-on) instead of a binary paid/unpaid flag, and an
+     * optional description overriding the default plan-name label (used e.g. for
+     * an add-on bought for a minor: "Add-on: Personal Training" rather than the
+     * minor's membership plan name).
+     */
+    public Receipt createMinorChargeReceipt(Member guardian, Member minor, BigDecimal fee, BigDecimal paidAmount,
+                                            String transactionType, String description,
+                                            List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+                                            String bankAccountCode, String bankAccountName) {
         Receipt r = new Receipt();
         r.setTransactionDate(LocalDateTime.now());
         r.setMemberDbId(guardian.getId());
@@ -409,19 +475,20 @@ public class ReceiptService {
         r.setTransactionType(transactionType);
 
         BigDecimal amount = fee != null ? fee : BigDecimal.ZERO;
-        BigDecimal paidAmount = paid ? amount : BigDecimal.ZERO;
+        BigDecimal paid = paidAmount != null ? paidAmount.max(BigDecimal.ZERO).min(amount) : BigDecimal.ZERO;
+        boolean fullyPaid = paid.compareTo(amount) >= 0;
 
         r.setAmount(amount);
         r.setPaymentMethod(normalizePaymentMethod(guardian.getPaymentMethodUsed()));
         r.setPaymentBreakdown(paymentBreakdown);
-        r.setPaidAmount(paidAmount);
-        r.setTotalPaidToDate(paidAmount);
+        r.setPaidAmount(paid);
+        r.setTotalPaidToDate(paid);
         r.setBalanceAfter(guardian.getOutstandingBalance() != null ? guardian.getOutstandingBalance() : BigDecimal.ZERO);
-        r.setStatus(paid ? "Paid" : "Pending");
+        r.setStatus(paid.compareTo(BigDecimal.ZERO) <= 0 ? "Pending" : (fullyPaid ? "Paid" : "Partial"));
         r.setBankAccountCode(bankAccountCode);
         r.setBankAccountName(bankAccountName);
-        r.setDueDate(paid ? null : guardian.getNextPaymentDate());
-        r.setPlanName(minor.getMembershipPlan());
+        r.setDueDate(fullyPaid ? null : guardian.getNextPaymentDate());
+        r.setPlanName(description != null ? description : minor.getMembershipPlan());
         r.setValidFrom(minor.getMembershipStartDate());
         r.setValidTill(minor.getMembershipEndDate() != null ? minor.getMembershipEndDate() : minor.getExpiryDate());
         r.setMembershipType(guardian.getMembershipType());
@@ -429,7 +496,7 @@ public class ReceiptService {
         r.setRemarks("Charge for family member: " + minor.getName()
                 + (minor.getRelationshipToHead() != null ? " (" + minor.getRelationshipToHead() + ")" : ""));
         r.setMinorCharges(List.of(new com.company.project.dto.MinorChargeDTO(
-                minor.getMemberId(), minor.getId(), minor.getName(), amount)));
+                minor.getMemberId(), minor.getId(), minor.getName(), amount, fullyPaid)));
 
         Receipt saved = receiptRepository.save(r);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));

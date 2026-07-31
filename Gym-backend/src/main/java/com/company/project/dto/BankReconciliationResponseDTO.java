@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.BankReconciliation;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -19,7 +21,9 @@ public class BankReconciliationResponseDTO {
     private String notes;
     private long unmatchedCount;
     private List<BankStatementLineDTO> lines;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public BankReconciliationResponseDTO() {}

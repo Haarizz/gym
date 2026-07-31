@@ -104,6 +104,7 @@ interface Lead {
   preferredContactMethod: 'email' | 'phone' | 'whatsapp' | 'sms';
   leadScore: number; // 1-100 calculated score
   interactions: LeadInteraction[];
+  followUps: LeadFollowUp[];
   avatar?: string;
 }
 
@@ -115,6 +116,19 @@ interface LeadInteraction {
   notes: string;
   outcome?: 'positive' | 'neutral' | 'negative';
   duration?: number; // in minutes for calls/meetings
+}
+
+interface LeadFollowUp {
+  id: string;
+  type: string;
+  dueDate: Date;
+  scheduledTime?: string;
+  assignedStaff: string;
+  estimatedDuration?: number;
+  subject: string;
+  notes?: string;
+  status: string;
+  priority: string;
 }
 
 interface Staff {
@@ -200,6 +214,18 @@ export function Leads() {
       notes: i.notes,
       outcome: i.outcome as LeadInteraction['outcome'],
       duration: i.duration,
+    })),
+    followUps: (l.followUps || []).map(f => ({
+      id: String(f.id),
+      type: f.type,
+      dueDate: new Date(f.dueDate),
+      scheduledTime: f.scheduledTime,
+      assignedStaff: f.assignedStaff,
+      estimatedDuration: f.estimatedDuration,
+      subject: f.subject,
+      notes: f.notes,
+      status: f.status,
+      priority: f.priority,
     })),
   }));
 
@@ -1065,6 +1091,67 @@ export function Leads() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Follow-ups List */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex justify-between items-center">
+                      Scheduled Follow-ups
+                      <Badge variant="outline" className="ml-2">
+                        {selectedLead.followUps?.length || 0}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {selectedLead.followUps && selectedLead.followUps.length > 0 ? (
+                        selectedLead.followUps.map((fu) => (
+                          <div key={fu.id} className="flex items-start space-x-3 p-3 rounded-lg border">
+                            <div className="flex-shrink-0">
+                              {fu.type === 'call' && <Phone className="h-4 w-4 text-blue-600" />}
+                              {fu.type === 'email' && <Mail className="h-4 w-4 text-green-600" />}
+                              {fu.type === 'meeting' && <Users className="h-4 w-4 text-purple-600" />}
+                              {fu.type === 'whatsapp' && <MessageSquare className="h-4 w-4 text-green-600" />}
+                              {(!['call', 'email', 'meeting', 'whatsapp'].includes(fu.type)) && <CalendarIcon className="h-4 w-4 text-gray-600" />}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium">{fu.subject}</h4>
+                                <span className="text-sm text-muted-foreground">
+                                  {format(fu.dueDate, 'MMM dd, yyyy')} {fu.scheduledTime || ''}
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">{fu.notes || 'No notes provided'}</p>
+                              <div className="flex items-center space-x-2 mt-2">
+                                <span className="text-xs text-muted-foreground">Assigned: {fu.assignedStaff}</span>
+                                <Badge variant="outline" className={
+                                  fu.status === 'completed' ? 'text-green-700 border-green-200' :
+                                  fu.status === 'pending' ? 'text-yellow-700 border-yellow-200' :
+                                  fu.status === 'overdue' ? 'text-red-700 border-red-200' :
+                                  'text-gray-700 border-gray-200'
+                                }>
+                                  {fu.status}
+                                </Badge>
+                                <Badge variant="outline" className={
+                                  fu.priority === 'high' ? 'text-red-700 border-red-200' :
+                                  fu.priority === 'medium' ? 'text-yellow-700 border-yellow-200' :
+                                  'text-blue-700 border-blue-200'
+                                }>
+                                  {fu.priority}
+                                </Badge>
+                                {fu.estimatedDuration && (
+                                  <span className="text-xs text-muted-foreground">{fu.estimatedDuration} min</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground text-center py-4 text-sm">No follow-ups scheduled for this lead.</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </>
           )}
@@ -1134,7 +1221,10 @@ export function Leads() {
                 setNewLead({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '' });
                 setShowAddLead(false);
                 await loadLeads();
-              } catch { toast.error('Failed to add lead'); }
+              } catch (error) {
+                console.error("Add Lead Error:", error);
+                toast.error('Failed to add lead');
+              }
             }}>
               Add Lead
             </Button>

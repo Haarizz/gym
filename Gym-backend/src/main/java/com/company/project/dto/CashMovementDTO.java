@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.CashMovement;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -12,6 +14,7 @@ public class CashMovementDTO {
     private String type;
     private BigDecimal amount;
     private String reason;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
 
     public CashMovementDTO() {}

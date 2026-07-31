@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.PosSession;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,11 +16,15 @@ public class PosSessionResponseDTO {
     private String openingDenominations;
     private String closingDenominations;
     private String status;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime openedAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime closedAt;
     private String staffName;
     private String notes;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
     private BigDecimal totalSales;
     private int transactionCount;

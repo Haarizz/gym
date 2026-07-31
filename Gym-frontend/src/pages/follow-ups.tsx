@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { followUpService, type FollowUpResponse } from '../utils/supabase/follow-up-service';
+import { leadService } from '../utils/supabase/lead-service';
+import { staffService } from '../utils/supabase/staff-service';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -94,7 +97,8 @@ import {
   CalendarDays,
   CalendarCheck,
   CalendarX,
-  CalendarClock
+  CalendarClock,
+  ChevronsUpDown
 } from 'lucide-react';
 import { toast } from "sonner";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, isYesterday, addWeeks, subDays } from "date-fns";
@@ -103,10 +107,11 @@ import { Automations } from "./automations";
 
 interface FollowUp {
   id: string;
-  memberName: string;
-  memberEmail: string;
-  memberPhone: string;
-  memberAvatar?: string;
+  leadId: number;
+  leadName: string;
+  leadEmail?: string;
+  leadPhone?: string;
+  leadAvatar?: string;
   type: 'call' | 'email' | 'sms' | 'whatsapp' | 'in-app' | 'meeting' | 'visit';
   status: 'pending' | 'completed' | 'overdue' | 'cancelled' | 'rescheduled';
   priority: 'high' | 'medium' | 'low';
@@ -169,7 +174,7 @@ export function FollowUps() {
 
   // API state
   const [apiFollowUps, setApiFollowUps] = useState<FollowUpResponse[]>([]);
-  const [newFU, setNewFU] = useState({ memberName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '' });
+  const [newFU, setNewFU] = useState({ leadId: '', leadName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '' });
   const [completeOutcome, setCompleteOutcome] = useState('successful');
   const [completeNotes, setCompleteNotes] = useState('');
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
@@ -177,7 +182,19 @@ export function FollowUps() {
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [editingFollowUp, setEditingFollowUp] = useState<FollowUp | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [editFU, setEditFU] = useState({ memberName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '', status: 'pending' });
+  const [editFU, setEditFU] = useState({ leadName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '', status: 'pending' });
+
+  // Leads and Staff dynamic data
+  const [leadsList, setLeadsList] = useState<{id: string, name: string}[]>([]);
+  const [staffList, setStaffList] = useState<{id: string, name: string}[]>([]);
+  
+  // Combobox popover states for New Follow-up
+  const [openLeadCombobox, setOpenLeadCombobox] = useState(false);
+  const [openStaffCombobox, setOpenStaffCombobox] = useState(false);
+
+  // Combobox popover states for Edit Follow-up
+  const [openEditLeadCombobox, setOpenEditLeadCombobox] = useState(false);
+  const [openEditStaffCombobox, setOpenEditStaffCombobox] = useState(false);
 
   const loadFollowUps = useCallback(async () => {
     try {
@@ -188,20 +205,23 @@ export function FollowUps() {
 
   useEffect(() => { loadFollowUps(); }, [loadFollowUps]);
 
-  // Sample data - in real app this would come from your backend
-  const staffMembers = [
-    { id: '1', name: 'Sarah Johnson' },
-    { id: '2', name: 'Ahmed Hassan' },
-    { id: '3', name: 'Maria Rodriguez' },
-    { id: '4', name: 'David Wilson' },
-  ];
+  useEffect(() => {
+    leadService.getLeads({ size: 1000 }).then(res => {
+      setLeadsList(res.leads.map(l => ({ id: String(l.id), name: `${l.firstName} ${l.lastName}`.trim() })));
+    }).catch(console.error);
+    
+    staffService.getStaff({}, 1, 100).then(res => {
+      setStaffList(res.items.map(s => ({ id: String(s.id), name: s.name })));
+    }).catch(console.error);
+  }, []);
 
 
   const displayFollowUps: FollowUp[] = apiFollowUps.map(f => ({
     id: String(f.id),
-    memberName: f.memberName,
-    memberEmail: f.memberEmail || '',
-    memberPhone: f.memberPhone || '',
+    leadId: f.leadId,
+    leadName: f.leadName,
+    leadEmail: f.leadEmail || '',
+    leadPhone: f.leadPhone || '',
     type: (f.type === 'in_app' ? 'in-app' : f.type) as FollowUp['type'],
     status: f.status as FollowUp['status'],
     priority: f.priority as FollowUp['priority'],
@@ -266,9 +286,9 @@ export function FollowUps() {
   const filteredFollowUps = useMemo(() => {
     let filtered = displayFollowUps.filter(followUp => {
       const matchesSearch = searchTerm === '' || 
-        followUp.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        followUp.memberEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        followUp.memberPhone.includes(searchTerm) ||
+        followUp.leadName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (followUp.leadEmail && followUp.leadEmail.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (followUp.leadPhone && followUp.leadPhone.includes(searchTerm)) ||
         followUp.subject.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || followUp.status === statusFilter;
@@ -391,16 +411,16 @@ export function FollowUps() {
   const handleQuickAction = useCallback((followUp: FollowUp, action: string) => {
     switch (action) {
       case 'call':
-        window.open(`tel:${followUp.memberPhone}`);
-        toast.success(`Calling ${followUp.memberName}`);
+        if (followUp.leadPhone) window.open(`tel:${followUp.leadPhone}`);
+        toast.success(`Calling ${followUp.leadName}`);
         break;
       case 'email':
-        window.open(`mailto:${followUp.memberEmail}?subject=${encodeURIComponent(followUp.subject)}`);
-        toast.success(`Email opened for ${followUp.memberName}`);
+        if (followUp.leadEmail) window.open(`mailto:${followUp.leadEmail}?subject=${encodeURIComponent(followUp.subject)}`);
+        toast.success(`Email opened for ${followUp.leadName}`);
         break;
       case 'whatsapp':
-        window.open(`https://wa.me/${followUp.memberPhone.replace(/\s+/g, '').replace('+', '')}`);
-        toast.success(`WhatsApp opened for ${followUp.memberName}`);
+        if (followUp.leadPhone) window.open(`https://wa.me/${followUp.leadPhone.replace(/\s+/g, '').replace('+', '')}`);
+        toast.success(`WhatsApp opened for ${followUp.leadName}`);
         break;
       case 'complete':
         handleCompleteFollowUp(followUp);
@@ -411,7 +431,7 @@ export function FollowUps() {
         setShowRescheduleDialog(true);
         break;
       case 'delete':
-        if (window.confirm(`Delete follow-up for ${followUp.memberName}?`)) {
+        if (window.confirm(`Delete follow-up for ${followUp.leadName}?`)) {
           followUpService.delete(Number(followUp.id)).then(() => { toast.success('Follow-up deleted'); loadFollowUps(); }).catch(() => toast.error('Failed to delete'));
         }
         break;
@@ -456,7 +476,7 @@ export function FollowUps() {
   const handleOpenEdit = useCallback((followUp: FollowUp) => {
     setEditingFollowUp(followUp);
     setEditFU({
-      memberName: followUp.memberName,
+      leadName: followUp.leadName,
       type: followUp.type === 'in-app' ? 'in_app' : followUp.type,
       subject: followUp.subject,
       priority: followUp.priority,
@@ -669,7 +689,7 @@ export function FollowUps() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Staff</SelectItem>
-                  {staffMembers.map(staff => (
+                  {staffList.map(staff => (
                     <SelectItem key={staff.id} value={staff.name}>{staff.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -804,13 +824,13 @@ export function FollowUps() {
                     <TableCell onClick={() => handleFollowUpClick(followUp)}>
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={followUp.memberAvatar} />
+                          <AvatarImage src={followUp.leadAvatar} />
                           <AvatarFallback>
-                            {followUp.memberName.split(' ').map(n => n[0]).join('')}
+                            {followUp.leadName.split(' ').map(n => n[0]).join('')}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium">{followUp.memberName}</p>
+                          <p className="font-medium">{followUp.leadName}</p>
                           <div className="flex items-center space-x-1">
                             {followUp.tags.slice(0, 2).map(tag => (
                               <Badge key={tag} variant="outline" className="text-xs">
@@ -823,8 +843,8 @@ export function FollowUps() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="text-sm">{followUp.memberEmail}</p>
-                        <p className="text-sm text-muted-foreground">{followUp.memberPhone}</p>
+                        <p className="text-sm">{followUp.leadEmail}</p>
+                        <p className="text-sm text-muted-foreground">{followUp.leadPhone}</p>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -933,13 +953,13 @@ export function FollowUps() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={followUp.memberAvatar} />
+                            <AvatarImage src={followUp.leadAvatar} />
                             <AvatarFallback className="text-xs">
-                              {followUp.memberName.split(' ').map(n => n[0]).join('')}
+                              {followUp.leadName.split(' ').map(n => n[0]).join('')}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{followUp.memberName}</p>
+                            <p className="text-sm font-medium truncate">{followUp.leadName}</p>
                             <p className="text-xs text-muted-foreground truncate">{followUp.subject}</p>
                           </div>
                         </div>
@@ -1020,13 +1040,13 @@ export function FollowUps() {
               <SheetHeader>
                 <SheetTitle className="flex items-center space-x-3">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage src={selectedFollowUp.memberAvatar} />
+                    <AvatarImage src={selectedFollowUp.leadAvatar} />
                     <AvatarFallback>
-                      {selectedFollowUp.memberName.split(' ').map(n => n[0]).join('')}
+                      {selectedFollowUp.leadName.split(' ').map(n => n[0]).join('')}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="text-xl font-bold">{selectedFollowUp.memberName}</h3>
+                    <h3 className="text-xl font-bold">{selectedFollowUp.leadName}</h3>
                     <div className="flex items-center space-x-2">
                       <Badge className={getStatusColor(selectedFollowUp.status)}>
                         {getStatusIcon(selectedFollowUp.status)}
@@ -1118,11 +1138,11 @@ export function FollowUps() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label className="text-sm text-muted-foreground">Email</Label>
-                        <p className="font-medium">{selectedFollowUp.memberEmail}</p>
+                        <p className="font-medium">{selectedFollowUp.leadEmail}</p>
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Phone</Label>
-                        <p className="font-medium">{selectedFollowUp.memberPhone}</p>
+                        <p className="font-medium">{selectedFollowUp.leadPhone}</p>
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Membership Status</Label>
@@ -1241,9 +1261,46 @@ export function FollowUps() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="memberName">Member Name</Label>
-              <Input id="memberName" placeholder="Select or enter member name" value={newFU.memberName} onChange={e => setNewFU(p => ({ ...p, memberName: e.target.value }))} />
+            <div className="flex flex-col space-y-2 mt-1">
+              <Label htmlFor="leadName">Lead Name</Label>
+              <Popover open={openLeadCombobox} onOpenChange={setOpenLeadCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openLeadCombobox}
+                    className="w-full justify-between"
+                  >
+                    {newFU.leadId
+                      ? leadsList.find((lead) => lead.id === newFU.leadId)?.name || newFU.leadName
+                      : "Select lead..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search lead..." />
+                    <CommandEmpty>No lead found.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {leadsList.map((lead) => (
+                          <CommandItem
+                            key={lead.id}
+                            value={lead.name}
+                            onSelect={() => {
+                              setNewFU(p => ({ ...p, leadId: lead.id, leadName: lead.name }));
+                              setOpenLeadCombobox(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", newFU.leadId === lead.id ? "opacity-100" : "opacity-0")} />
+                            {lead.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label htmlFor="followUpType">Follow-up Type</Label>
@@ -1287,18 +1344,46 @@ export function FollowUps() {
               <Label htmlFor="scheduledTime">Scheduled Time</Label>
               <Input id="scheduledTime" type="time" value={newFU.scheduledTime} onChange={e => setNewFU(p => ({ ...p, scheduledTime: e.target.value }))} />
             </div>
-            <div>
+            <div className="flex flex-col space-y-2 mt-1">
               <Label htmlFor="assignedStaff">Assigned Staff</Label>
-              <Select value={newFU.assignedStaff} onValueChange={v => setNewFU(p => ({ ...p, assignedStaff: v }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select staff member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {staffMembers.map(staff => (
-                    <SelectItem key={staff.id} value={staff.name}>{staff.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={openStaffCombobox} onOpenChange={setOpenStaffCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openStaffCombobox}
+                    className="w-full justify-between"
+                  >
+                    {newFU.assignedStaff
+                      ? staffList.find((staff) => staff.name === newFU.assignedStaff)?.name || newFU.assignedStaff
+                      : "Select staff member..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search staff..." />
+                    <CommandEmpty>No staff found.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {staffList.map((staff) => (
+                          <CommandItem
+                            key={staff.id}
+                            value={staff.name}
+                            onSelect={() => {
+                              setNewFU(p => ({ ...p, assignedStaff: staff.name }));
+                              setOpenStaffCombobox(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", newFU.assignedStaff === staff.name ? "opacity-100" : "opacity-0")} />
+                            {staff.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label htmlFor="duration">Estimated Duration (minutes)</Label>
@@ -1314,28 +1399,29 @@ export function FollowUps() {
               Cancel
             </Button>
             <Button onClick={async () => {
-              if (!newFU.memberName || !newFU.subject || !newFU.dueDate) {
-                toast.error('Member name, subject, and due date are required');
+              if (!newFU.leadName || !newFU.subject || !newFU.dueDate) {
+                toast.error('Lead name, subject, and due date are required');
                 return;
               }
               try {
                 await followUpService.create({
-                  memberName: newFU.memberName,
+                  leadId: Number(newFU.leadId) || 1, // Defaulting to 1 if not set in simple UI
                   type: newFU.type,
                   subject: newFU.subject,
                   priority: newFU.priority,
-                  dueDate: newFU.dueDate,
+                  dueDate: newFU.dueDate.includes('T') ? newFU.dueDate : `${newFU.dueDate}T00:00:00`,
                   scheduledTime: newFU.scheduledTime || undefined,
                   assignedStaff: newFU.assignedStaff || undefined,
                   estimatedDuration: newFU.estimatedDuration ? Number(newFU.estimatedDuration) : undefined,
                   notes: newFU.notes || undefined,
                 });
                 toast.success('Follow-up scheduled successfully');
-                setNewFU({ memberName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '' });
+                setNewFU({ leadId: '', leadName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '' });
                 setShowAddFollowUp(false);
                 loadFollowUps();
-              } catch {
-                toast.error('Failed to schedule follow-up');
+              } catch (err: any) {
+                console.error("Schedule follow-up error:", err);
+                toast.error(err.message || 'Failed to schedule follow-up');
               }
             }}>
               Schedule Follow-up
@@ -1356,8 +1442,8 @@ export function FollowUps() {
           {completingFollowUp && (
             <div className="space-y-4">
               <div>
-                <Label>Member</Label>
-                <p className="font-medium">{completingFollowUp.memberName}</p>
+                <Label>Lead</Label>
+                <p className="font-medium">{completingFollowUp.leadName}</p>
               </div>
               <div>
                 <Label>Subject</Label>
@@ -1445,9 +1531,44 @@ export function FollowUps() {
             <DialogDescription>Update follow-up details</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Member Name</Label>
-              <Input value={editFU.memberName} onChange={e => setEditFU(p => ({ ...p, memberName: e.target.value }))} />
+            <div className="flex flex-col space-y-2 mt-1">
+              <Label>Lead Name</Label>
+              <Popover open={openEditLeadCombobox} onOpenChange={setOpenEditLeadCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openEditLeadCombobox}
+                    className="w-full justify-between"
+                  >
+                    {editFU.leadName || "Select lead..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search lead..." />
+                    <CommandEmpty>No lead found.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {leadsList.map((lead) => (
+                          <CommandItem
+                            key={lead.id}
+                            value={lead.name}
+                            onSelect={() => {
+                              setEditFU(p => ({ ...p, leadName: lead.name }));
+                              setOpenEditLeadCombobox(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", editFU.leadName === lead.name ? "opacity-100" : "opacity-0")} />
+                            {lead.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label>Type</Label>
@@ -1500,14 +1621,44 @@ export function FollowUps() {
               <Label>Scheduled Time</Label>
               <Input type="time" value={editFU.scheduledTime} onChange={e => setEditFU(p => ({ ...p, scheduledTime: e.target.value }))} />
             </div>
-            <div>
+            <div className="flex flex-col space-y-2 mt-1">
               <Label>Assigned Staff</Label>
-              <Select value={editFU.assignedStaff} onValueChange={v => setEditFU(p => ({ ...p, assignedStaff: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
-                <SelectContent>
-                  {staffMembers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Popover open={openEditStaffCombobox} onOpenChange={setOpenEditStaffCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openEditStaffCombobox}
+                    className="w-full justify-between"
+                  >
+                    {editFU.assignedStaff || "Select staff..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search staff..." />
+                    <CommandEmpty>No staff found.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {staffList.map((staff) => (
+                          <CommandItem
+                            key={staff.id}
+                            value={staff.name}
+                            onSelect={() => {
+                              setEditFU(p => ({ ...p, assignedStaff: staff.name }));
+                              setOpenEditStaffCombobox(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", editFU.assignedStaff === staff.name ? "opacity-100" : "opacity-0")} />
+                            {staff.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label>Estimated Duration (min)</Label>
@@ -1524,11 +1675,11 @@ export function FollowUps() {
               if (!editingFollowUp) return;
               try {
                 await followUpService.update(Number(editingFollowUp.id), {
-                  memberName: editFU.memberName,
+                  leadId: editingFollowUp.leadId,
                   type: editFU.type,
                   subject: editFU.subject,
                   priority: editFU.priority,
-                  dueDate: editFU.dueDate,
+                  dueDate: editFU.dueDate.includes('T') ? editFU.dueDate : `${editFU.dueDate}T00:00:00`,
                   scheduledTime: editFU.scheduledTime || undefined,
                   assignedStaff: editFU.assignedStaff || undefined,
                   estimatedDuration: editFU.estimatedDuration ? Number(editFU.estimatedDuration) : undefined,

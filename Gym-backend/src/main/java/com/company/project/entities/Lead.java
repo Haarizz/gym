@@ -81,6 +81,9 @@ public class Lead extends BaseEntity {
     @OneToMany(mappedBy = "lead", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<LeadInteraction> interactions = new ArrayList<>();
 
+    @OneToMany(mappedBy = "lead", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<FollowUp> followUps = new ArrayList<>();
+
     public Lead() {}
 
     // Getters & Setters
@@ -144,4 +147,7 @@ public class Lead extends BaseEntity {
 
     public List<LeadInteraction> getInteractions() { return interactions; }
     public void setInteractions(List<LeadInteraction> interactions) { this.interactions = interactions; }
+
+    public List<FollowUp> getFollowUps() { return followUps; }
+    public void setFollowUps(List<FollowUp> followUps) { this.followUps = followUps; }
 }

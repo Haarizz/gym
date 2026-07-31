@@ -722,7 +722,18 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                                 <td className="py-3 px-2 text-sm text-muted-foreground">
                                   {bill.transaction_date ? new Date(bill.transaction_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                                 </td>
-                                <td className="py-3 px-2 text-sm">{bill.transaction_type}</td>
+                                <td className="py-3 px-2 text-sm">
+                                  {bill.transaction_type}
+                                  {bill.minor_charges && bill.minor_charges.length > 0 && (
+                                    <div className="mt-1 space-y-0.5">
+                                      {bill.minor_charges.map((mc, i) => (
+                                        <div key={i} className="text-xs text-amber-700 italic">
+                                          Due of {mc.name} (<CurrencyGlyph /> {Number(mc.amount).toFixed(2)}) — billed to {selectedMember?.name}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
                                 <td className="py-3 px-2 text-right text-sm"><CurrencyGlyph /> {Number(bill.amount).toFixed(2)}</td>
                                 <td className="py-3 px-2 text-right text-sm text-green-600">
                                   <CurrencyGlyph /> {Number(bill.paid_amount ?? 0).toFixed(2)}
@@ -1208,6 +1219,11 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                       <div>
                         <span className="font-medium">{bill.receipt_no}</span>
                         <span className="text-muted-foreground ml-2">- {bill.transaction_type}</span>
+                        {bill.minor_charges && bill.minor_charges.length > 0 && (
+                          <div className="text-xs text-amber-700 italic">
+                            Due of {bill.minor_charges.map(mc => mc.name).join(', ')} — paid by {selectedMember?.name}
+                          </div>
+                        )}
                       </div>
                       <span className="font-medium"><CurrencyGlyph /> {parseFloat(amount).toFixed(2)}</span>
                     </div>

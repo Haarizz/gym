@@ -4,8 +4,11 @@ import com.company.project.dto.MemberAddonPageResponseDTO;
 import com.company.project.dto.MemberAddonRequestDTO;
 import com.company.project.dto.MemberAddonResponseDTO;
 import com.company.project.dto.PaginationDTO;
+import com.company.project.entities.Member;
 import com.company.project.entities.MemberAddon;
+import com.company.project.entities.Receipt;
 import com.company.project.repositories.MemberAddonRepository;
+import com.company.project.repositories.MemberRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,6 +18,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -30,13 +34,19 @@ public class MemberAddonService {
     private final MemberAddonRepository memberAddonRepository;
     private final ReceiptVoucherService receiptVoucherService;
     private final FinancialEventService financialEventService;
+    private final MemberRepository memberRepository;
+    private final ReceiptService receiptService;
 
     public MemberAddonService(MemberAddonRepository memberAddonRepository,
                                ReceiptVoucherService receiptVoucherService,
-                               FinancialEventService financialEventService) {
+                               FinancialEventService financialEventService,
+                               MemberRepository memberRepository,
+                               ReceiptService receiptService) {
         this.memberAddonRepository = memberAddonRepository;
         this.receiptVoucherService = receiptVoucherService;
         this.financialEventService = financialEventService;
+        this.memberRepository = memberRepository;
+        this.receiptService = receiptService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -83,6 +93,23 @@ public class MemberAddonService {
             addon.setStatus("Active");
         }
 
+        // A minor (or any billed_to_head dependent) never carries their own
+        // dues — an add-on bought for them must be folded into their family
+        // head's account instead, the same way membership fees already work
+        // for them (see ReceiptService.createMinorChargeReceipt).
+        Member targetMember = addon.getMemberDbId() != null
+                ? memberRepository.findById(addon.getMemberDbId()).orElse(null)
+                : null;
+        boolean billToGuardian = targetMember != null && targetMember.isEffectivelyBilledToHead();
+        Member guardian = null;
+        if (billToGuardian) {
+            if (targetMember.getFamilyHeadId() == null) {
+                throw new RuntimeException("This member has no assigned family head to bill this add-on to.");
+            }
+            guardian = memberRepository.findByMemberId(targetMember.getFamilyHeadId())
+                    .orElseThrow(() -> new RuntimeException("Family head not found for this member."));
+        }
+
         // First save to get the auto-generated DB id
         MemberAddon saved = memberAddonRepository.save(addon);
 
@@ -90,20 +117,70 @@ public class MemberAddonService {
         saved.setTransactionId("TXN-" + String.format("%010d", saved.getId()));
         saved = memberAddonRepository.save(saved);
 
-        // Post to General Ledger
-        financialEventService.onAddonPaymentReceived(saved);
-        receiptVoucherService.createVoucherFromModule(
-                "Add-on Purchase – " + (saved.getAddonName() != null ? saved.getAddonName() : "Add-on"),
-                "Add-on",
-                saved.getMemberName(),
-                saved.getMemberDbId(),
-                saved.getAmount(),
-                saved.getPaymentMode(),
-                saved.getTransactionId(),
-                saved.getTransactionId(),
-                saved.getNotes(),
-                saved.getPaymentBreakdown()
-        );
+        if (billToGuardian) {
+            BigDecimal fee = saved.getAmount() != null ? saved.getAmount() : BigDecimal.ZERO;
+            BigDecimal paidNow = request.getPaidAmount() != null
+                    ? request.getPaidAmount().max(BigDecimal.ZERO).min(fee) : BigDecimal.ZERO;
+            BigDecimal due = fee.subtract(paidNow).max(BigDecimal.ZERO);
+
+            BigDecimal guardianOutstanding = guardian.getOutstandingBalance() != null
+                    ? guardian.getOutstandingBalance() : BigDecimal.ZERO;
+            if (due.compareTo(BigDecimal.ZERO) > 0) {
+                guardian.setOutstandingBalance(guardianOutstanding.add(due));
+                // Only escalate — never downgrade an already-worse "overdue" status.
+                if (!"overdue".equalsIgnoreCase(guardian.getPaymentStatus())) {
+                    guardian.setPaymentStatus(paidNow.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
+                }
+            }
+            if (paidNow.compareTo(BigDecimal.ZERO) > 0) {
+                guardian.setLastPaymentDate(LocalDateTime.now());
+                guardian.setPaymentMethodUsed(saved.getPaymentMode());
+            }
+            Member savedGuardian = memberRepository.save(guardian);
+
+            // Bills the guardian's account, itemizing which family member the
+            // add-on was actually for — the minor itself never gets a receipt
+            // or an outstandingBalance of their own.
+            Receipt receipt = receiptService.createMinorChargeReceipt(
+                    savedGuardian, targetMember, fee, paidNow, "Add-on",
+                    "Add-on: " + (saved.getAddonName() != null ? saved.getAddonName() : "Add-on"),
+                    saved.getPaymentBreakdown(), null, null);
+
+            // Cash-basis: only post/voucher whatever was actually collected now,
+            // never the full add-on fee if part of it is left as a due.
+            if (paidNow.compareTo(BigDecimal.ZERO) > 0) {
+                financialEventService.onMemberPaymentReceived(receipt);
+                receiptVoucherService.createVoucherFromModule(
+                        "Add-on Purchase – " + (saved.getAddonName() != null ? saved.getAddonName() : "Add-on")
+                                + " (for " + saved.getMemberName() + ", billed to " + savedGuardian.getName() + ")",
+                        "Add-on",
+                        savedGuardian.getName(),
+                        savedGuardian.getId(),
+                        paidNow,
+                        saved.getPaymentMode(),
+                        saved.getTransactionId(),
+                        saved.getTransactionId(),
+                        saved.getNotes(),
+                        saved.getPaymentBreakdown()
+                );
+            }
+        } else {
+            // Existing behavior for a member who carries their own balance: an
+            // add-on purchase is always recorded as fully paid immediately.
+            financialEventService.onAddonPaymentReceived(saved);
+            receiptVoucherService.createVoucherFromModule(
+                    "Add-on Purchase – " + (saved.getAddonName() != null ? saved.getAddonName() : "Add-on"),
+                    "Add-on",
+                    saved.getMemberName(),
+                    saved.getMemberDbId(),
+                    saved.getAmount(),
+                    saved.getPaymentMode(),
+                    saved.getTransactionId(),
+                    saved.getTransactionId(),
+                    saved.getNotes(),
+                    saved.getPaymentBreakdown()
+            );
+        }
 
         return MemberAddonResponseDTO.fromEntity(saved);
     }

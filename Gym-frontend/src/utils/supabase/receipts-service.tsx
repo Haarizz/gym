@@ -19,6 +19,17 @@ export interface ReceiptPaymentLeg {
   provider_name?: string;
 }
 
+// One family member's charge folded into this bill instead of billed to
+// them directly (see the family-billing "billed to head" model) — carried
+// on a bill so the pending-dues screen can show whose due it actually is.
+export interface ReceiptMinorCharge {
+  member_id?: string;
+  member_db_id?: number;
+  name: string;
+  amount: number;
+  paid?: boolean;
+}
+
 export interface Receipt {
   id: string;
   receipt_no: string;
@@ -42,6 +53,7 @@ export interface Receipt {
   bank_account_code?: string;
   bank_account_name?: string;
   payment_breakdown?: ReceiptPaymentLeg[];
+  minor_charges?: ReceiptMinorCharge[];
   membership_type?: string;
   // Cumulative amount paid toward this specific bill across its whole lifecycle
   // (this row's own paid_amount plus any later settlements applied against it).

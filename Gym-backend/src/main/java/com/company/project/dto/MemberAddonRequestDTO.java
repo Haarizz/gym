@@ -24,6 +24,12 @@ public class MemberAddonRequestDTO {
     // Method-specific detail (card type, cheque number, online payment type, ...)
     // for the payment mode above — single entry, no Mixed support on this module.
     private List<PaymentSplitDTO> paymentBreakdown;
+    // Only meaningful when the target member is billed to a family head (any
+    // minor, or a billed_to_head adult): how much is actually being collected
+    // now, out of `amount` — the remainder becomes a due on the guardian's
+    // account instead of the member's own. Ignored for a member who carries
+    // their own balance (that path is always treated as fully paid).
+    private BigDecimal paidAmount;
 
     public MemberAddonRequestDTO() {}
 
@@ -64,4 +70,7 @@ public class MemberAddonRequestDTO {
 
     public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
+
+    public BigDecimal getPaidAmount() { return paidAmount; }
+    public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
 }

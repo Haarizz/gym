@@ -6,8 +6,10 @@ import com.company.project.dto.LeadRequestDTO;
 import com.company.project.dto.LeadResponseDTO;
 import com.company.project.dto.LeadStatsDTO;
 import com.company.project.dto.PaginationDTO;
+import com.company.project.dto.FollowUpResponseDTO;
 import com.company.project.entities.Lead;
 import com.company.project.entities.LeadInteraction;
+import com.company.project.entities.FollowUp;
 import com.company.project.repositories.LeadInteractionRepository;
 import com.company.project.repositories.LeadRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -227,6 +229,9 @@ public class LeadService {
         dto.setPreferredContactMethod(lead.getPreferredContactMethod());
         dto.setLeadScore(lead.getLeadScore());
         dto.setInteractions(lead.getInteractions().stream().map(this::toInteractionDTO).collect(Collectors.toList()));
+        if (lead.getFollowUps() != null) {
+            dto.setFollowUps(lead.getFollowUps().stream().map(this::toFollowUpDTO).collect(Collectors.toList()));
+        }
         dto.setCreatedAt(lead.getCreatedAt());
         dto.setUpdatedAt(lead.getUpdatedAt());
         return dto;
@@ -241,6 +246,23 @@ public class LeadService {
         dto.setNotes(i.getNotes());
         dto.setOutcome(i.getOutcome());
         dto.setDuration(i.getDuration());
+        return dto;
+    }
+
+    private FollowUpResponseDTO toFollowUpDTO(FollowUp fu) {
+        FollowUpResponseDTO dto = new FollowUpResponseDTO();
+        dto.setId(fu.getId());
+        dto.setFollowUpId(fu.getFollowUpId());
+        dto.setType(fu.getType());
+        dto.setStatus(fu.getStatus());
+        dto.setPriority(fu.getPriority());
+        dto.setAssignedStaff(fu.getAssignedStaff());
+        dto.setDueDate(fu.getDueDate());
+        dto.setScheduledTime(fu.getScheduledTime());
+        dto.setCompletedDate(fu.getCompletedDate());
+        dto.setSubject(fu.getSubject());
+        dto.setOutcome(fu.getOutcome());
+        dto.setCreatedAt(fu.getCreatedAt());
         return dto;
     }
 }

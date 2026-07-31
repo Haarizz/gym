@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -16,6 +19,7 @@ public class CommunityPostResponseDTO {
     private Long authorUserId;
     private String authorUsername;
     private List<String> authorRoles;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
     private boolean archived;
 

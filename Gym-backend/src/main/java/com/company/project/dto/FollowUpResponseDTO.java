@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -7,16 +10,17 @@ public class FollowUpResponseDTO {
 
     private Long id;
     private String followUpId;
-    private String memberId;
-    private String memberName;
-    private String memberEmail;
-    private String memberPhone;
+    private Long leadId;
+    private String leadName;
+    private String leadEmail;
+    private String leadPhone;
     private String type;
     private String status;
     private String priority;
     private String assignedStaff;
     private LocalDateTime dueDate;
     private String scheduledTime;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime completedDate;
     private String subject;
     private String notes;
@@ -27,7 +31,9 @@ public class FollowUpResponseDTO {
     private Integer estimatedDuration;
     private String outcome;
     private List<CommunicationRecordDTO> communicationHistory;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     // Getters & Setters
@@ -38,17 +44,17 @@ public class FollowUpResponseDTO {
     public String getFollowUpId() { return followUpId; }
     public void setFollowUpId(String followUpId) { this.followUpId = followUpId; }
 
-    public String getMemberId() { return memberId; }
-    public void setMemberId(String memberId) { this.memberId = memberId; }
+    public Long getLeadId() { return leadId; }
+    public void setLeadId(Long leadId) { this.leadId = leadId; }
 
-    public String getMemberName() { return memberName; }
-    public void setMemberName(String memberName) { this.memberName = memberName; }
+    public String getLeadName() { return leadName; }
+    public void setLeadName(String leadName) { this.leadName = leadName; }
 
-    public String getMemberEmail() { return memberEmail; }
-    public void setMemberEmail(String memberEmail) { this.memberEmail = memberEmail; }
+    public String getLeadEmail() { return leadEmail; }
+    public void setLeadEmail(String leadEmail) { this.leadEmail = leadEmail; }
 
-    public String getMemberPhone() { return memberPhone; }
-    public void setMemberPhone(String memberPhone) { this.memberPhone = memberPhone; }
+    public String getLeadPhone() { return leadPhone; }
+    public void setLeadPhone(String leadPhone) { this.leadPhone = leadPhone; }
 
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }

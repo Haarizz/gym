@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.Expense;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,7 +23,9 @@ public class ExpenseResponseDTO {
     private String notes;
     private String status;
     private String receiptUrl;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public ExpenseResponseDTO() {}

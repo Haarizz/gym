@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.Supplier;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,7 +23,9 @@ public class SupplierResponseDTO {
     private Boolean isActive;
     private Double rating;
     private String notes;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public SupplierResponseDTO() {}

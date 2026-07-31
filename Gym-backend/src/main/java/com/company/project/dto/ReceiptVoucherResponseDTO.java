@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.ReceiptVoucher;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,7 +28,9 @@ public class ReceiptVoucherResponseDTO {
     private String transactionId;
     private String approvedBy;
     private String voucherType;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
     private Long journalVoucherId;
 

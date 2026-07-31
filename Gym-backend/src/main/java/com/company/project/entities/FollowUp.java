@@ -18,18 +18,9 @@ public class FollowUp extends BaseEntity {
     @Column(name = "follow_up_id", unique = true)
     private String followUpId;
 
-    // Optionally link to a member (memberId e.g. MBR-0000000001) or lead
-    @Column(name = "member_id")
-    private String memberId;
-
-    @Column(name = "member_name")
-    private String memberName;
-
-    @Column(name = "member_email")
-    private String memberEmail;
-
-    @Column(name = "member_phone")
-    private String memberPhone;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lead_id", nullable = false)
+    private Lead lead;
 
     // call / email / sms / whatsapp / in_app / meeting / visit
     @Column(name = "type")
@@ -96,17 +87,8 @@ public class FollowUp extends BaseEntity {
     public String getFollowUpId() { return followUpId; }
     public void setFollowUpId(String followUpId) { this.followUpId = followUpId; }
 
-    public String getMemberId() { return memberId; }
-    public void setMemberId(String memberId) { this.memberId = memberId; }
-
-    public String getMemberName() { return memberName; }
-    public void setMemberName(String memberName) { this.memberName = memberName; }
-
-    public String getMemberEmail() { return memberEmail; }
-    public void setMemberEmail(String memberEmail) { this.memberEmail = memberEmail; }
-
-    public String getMemberPhone() { return memberPhone; }
-    public void setMemberPhone(String memberPhone) { this.memberPhone = memberPhone; }
+    public Lead getLead() { return lead; }
+    public void setLead(Lead lead) { this.lead = lead; }
 
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }

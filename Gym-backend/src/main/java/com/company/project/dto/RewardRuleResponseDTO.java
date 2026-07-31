@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -14,6 +17,7 @@ public class RewardRuleResponseDTO {
     private String conditionTrigger;
     private Boolean isActive;
     private Integer expiryDays;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
 
     // Getters & Setters
