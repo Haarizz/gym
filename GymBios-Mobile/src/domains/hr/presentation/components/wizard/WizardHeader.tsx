@@ -24,8 +24,8 @@ export function WizardHeader({ title, subtitle }: WizardHeaderProps) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.three,
-    gap: Spacing.one,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.one,
+    gap: Spacing.half,
   },
 });

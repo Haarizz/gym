@@ -6,7 +6,6 @@ import { Spacing } from '@/core/theme';
 import type { Staff } from '../../domain/Staff';
 import { useStaffWizard } from '../hooks/useStaffWizard';
 import { ProgressIndicator } from '../components/wizard/ProgressIndicator';
-import { StaffAvatarPicker } from '../components/wizard/StaffAvatarPicker';
 import { WizardHeader } from '../components/wizard/WizardHeader';
 import { WizardNavigation } from '../components/wizard/WizardNavigation';
 import { PersonalStep } from './steps/PersonalStep';
@@ -113,17 +112,13 @@ export function StaffWizardScreen({
           subtitle={currentStepTitle}
         />
 
-        <ProgressIndicator
-          current={step}
-          total={totalSteps}
-          labels={STEP_LABELS}
-        />
-
-        <StaffAvatarPicker
-          photoUrl={data.photoUrl}
-          name={data.name}
-          onChangePhotoUrl={(url) => updateField('photoUrl', url)}
-        />
+        <View style={styles.indicatorContainer}>
+          <ProgressIndicator
+            current={step}
+            total={totalSteps}
+            labels={STEP_LABELS}
+          />
+        </View>
 
         <ScrollView
           style={styles.flex}
@@ -135,16 +130,23 @@ export function StaffWizardScreen({
           <View style={styles.bottomSpacer} />
         </ScrollView>
 
-        <WizardNavigation
-          isFirst={step === 1}
-          isLast={step === totalSteps}
-          loading={loading}
-          canProceed={canGoNext}
-          onNext={next}
-          onPrevious={previous}
-          onSubmit={submit}
-          mode={mode}
-        />
+        <View
+          style={[
+            styles.stickyFooter,
+            { paddingBottom: Math.max(insets.bottom, Spacing.two) },
+          ]}
+        >
+          <WizardNavigation
+            isFirst={step === 1}
+            isLast={step === totalSteps}
+            loading={loading}
+            canProceed={canGoNext}
+            onNext={next}
+            onPrevious={previous}
+            onSubmit={submit}
+            mode={mode}
+          />
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -158,10 +160,19 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  indicatorContainer: {
+    paddingBottom: Spacing.one,
+  },
   scrollContent: {
     flexGrow: 1,
+    paddingTop: Spacing.one,
   },
   bottomSpacer: {
-    height: Spacing.four,
+    height: Spacing.three,
+  },
+  stickyFooter: {
+    backgroundColor: '#f9fafe',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
   },
 });

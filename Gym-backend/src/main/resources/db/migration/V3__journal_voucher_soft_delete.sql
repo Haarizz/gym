@@ -6,4 +6,4 @@
 -- voucher as removed without erasing it, so its history remains queryable for
 -- audit purposes. NULL means "not deleted" (the default, and the only state
 -- POSTED/REVERSED vouchers can ever be in, since those were never deletable).
-ALTER TABLE journal_vouchers ADD COLUMN deleted_at TIMESTAMP;
+ALTER TABLE journal_vouchers ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;

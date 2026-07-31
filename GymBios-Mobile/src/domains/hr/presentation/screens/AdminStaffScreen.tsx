@@ -82,9 +82,14 @@ export function AdminStaffScreen({
             </Typography>
           </View>
         </View>
+        <Button
+          label="+ Add Staff"
+          onPress={onNavigateToCreate}
+          size="lg"
+        />
       </View>
     ),
-    [search, totalStaff, activeStaff, inactiveStaff, theme],
+    [search, totalStaff, activeStaff, inactiveStaff, theme, onNavigateToCreate],
   );
 
   const renderEmpty = useCallback(
@@ -119,15 +124,6 @@ export function AdminStaffScreen({
           onRefresh={refresh}
           showsVerticalScrollIndicator={false}
         />
-
-        <View style={styles.fabContainer}>
-          <Button
-            label="+ Add Staff"
-            onPress={onNavigateToCreate}
-            size="lg"
-            style={styles.fab}
-          />
-        </View>
       </View>
     </ScreenLayout>
   );
@@ -156,19 +152,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: 100,
-  },
-  fabContainer: {
-    position: 'absolute',
-    bottom: Spacing.four,
-    left: Spacing.four,
-    right: Spacing.four,
-  },
-  fab: {
-    shadowColor: BrandColors.teal,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingBottom: Spacing.four,
   },
 });
