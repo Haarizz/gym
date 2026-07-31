@@ -26,7 +26,7 @@ export function WizardNavigation({
   onSubmit,
   mode,
 }: WizardNavigationProps) {
-  const submitLabel = mode === 'edit' ? 'Save Changes' : 'Create Staff';
+  const submitLabel = mode === 'edit' ? 'Save Changes' : 'Create Plan';
 
   return (
     <View style={styles.container}>

@@ -1,0 +1,1 @@
+export { ApiMemberAccessRepository } from './ApiMemberAccessRepository';
