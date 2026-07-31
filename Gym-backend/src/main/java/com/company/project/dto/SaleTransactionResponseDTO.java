@@ -2,6 +2,8 @@ package com.company.project.dto;
 
 import com.company.project.entities.SaleTransaction;
 import com.company.project.entities.SaleTransactionItem;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -25,7 +27,9 @@ public class SaleTransactionResponseDTO {
     private BigDecimal changeAmount;
     private String status;
     private String notes;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
     private List<SaleTransactionItemDTO> items;
 

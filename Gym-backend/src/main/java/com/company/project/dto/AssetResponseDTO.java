@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.Asset;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -34,7 +36,9 @@ public class AssetResponseDTO {
     private String disposalReason;
     private List<AssetMaintenanceDTO> maintenanceHistory;
     private List<AssetTransferDTO> transferHistory;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public AssetResponseDTO() {}

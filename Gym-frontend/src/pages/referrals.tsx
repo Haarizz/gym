@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { referralService, type ReferralResponse, type RewardRuleResponse } from '../utils/supabase/referral-service';
+import { membersService, type Member } from '../utils/supabase/members-service';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -13,6 +14,8 @@ import { Separator } from "../components/ui/separator";
 import { Progress } from "../components/ui/progress";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { 
@@ -48,7 +51,9 @@ import {
   Calendar,
   Info,
   AlertCircle,
-  Bell
+  Bell,
+  Check,
+  ChevronsUpDown
 } from 'lucide-react';
 import { toast } from "sonner";
 
@@ -124,14 +129,21 @@ export function Referrals() {
   const [apiReferrals, setApiReferrals] = useState<ReferralResponse[]>([]);
   const [apiStats, setApiStats] = useState({ totalReferrals: 0, successfulReferrals: 0, conversionRate: 0, totalRewards: 0, activeRules: 0 });
   const [apiRules, setApiRules] = useState<RewardRuleResponse[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+
+  // Dropdown states
+  const [addReferralOpen, setAddReferralOpen] = useState(false);
+  const [addRefereeOpen, setAddRefereeOpen] = useState(false);
+  const [editReferralOpen, setEditReferralOpen] = useState(false);
+  const [editRefereeOpen, setEditRefereeOpen] = useState(false);
 
   // New referral form state
-  const [newReferral, setNewReferral] = useState({ referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '' });
+  const [newReferral, setNewReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '' });
   // New rule form state
   const [newRule, setNewRule] = useState({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
   const [editingReferral, setEditingReferral] = useState<ReferralResponse | null>(null);
   const [showEditReferral, setShowEditReferral] = useState(false);
-  const [editReferral, setEditReferral] = useState({ referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: '', status: 'pending', notes: '' });
+  const [editReferral, setEditReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: '', status: 'pending', notes: '' });
   const [editingRule, setEditingRule] = useState<RewardRuleResponse | null>(null);
   const [showEditRule, setShowEditRule] = useState(false);
   const [editRule, setEditRule] = useState({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
@@ -145,13 +157,21 @@ export function Referrals() {
       const [statsData, referralsData, rulesData] = await Promise.all([
         referralService.getStats(),
         referralService.getReferrals({ size: 100, status: filterStatus !== 'all' ? filterStatus : undefined, search: searchTerm || undefined }),
-        referralService.getRules(),
+        referralService.getRules()
       ]);
       setApiStats({ totalReferrals: statsData.totalReferrals, successfulReferrals: statsData.successfulReferrals, conversionRate: statsData.conversionRate, totalRewards: Number(statsData.totalRewards), activeRules: statsData.activeRules });
       setApiReferrals(referralsData.referrals);
       setApiRules(rulesData);
-    } catch {
-      // keep existing display on error
+    } catch (e) {
+      console.error("Error loading referrals data:", e);
+    }
+
+    try {
+      const membersData = await membersService.getMembers({}, { limit: 1000 });
+      setMembers(membersData?.members || []);
+    } catch (e) {
+      console.error("Error loading members:", e);
+      setMembers([]);
     }
   }, [filterStatus, searchTerm]);
 
@@ -726,7 +746,7 @@ export function Referrals() {
                           <Button size="sm" variant="outline" onClick={() => { setViewingReferral(activity); setShowViewReferral(true); }}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => { setEditingReferral(activity); setEditReferral({ referrerName: activity.referrerName || '', refereeName: activity.refereeName || '', refereeEmail: activity.refereeEmail || '', refereePhone: activity.refereePhone || '', date: activity.date || activity.createdAt, status: activity.status, notes: '' }); setShowEditReferral(true); }}>
+                          <Button size="sm" variant="outline" onClick={() => { setEditingReferral(activity); setEditReferral({ referrerMemberId: activity.referrerMemberId || '', referrerName: activity.referrerName || '', refereeName: activity.refereeName || '', refereeEmail: activity.refereeEmail || '', refereePhone: activity.refereePhone || '', date: activity.date || activity.createdAt, status: activity.status, notes: '' }); setShowEditReferral(true); }}>
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={async () => { if (!window.confirm('Delete this referral?')) return; try { await referralService.delete(Number(activity.id)); toast.success('Referral deleted'); loadData(); } catch { toast.error('Failed to delete'); } }}>
@@ -1095,13 +1115,96 @@ export function Referrals() {
             <DialogTitle className="text-[#2B7A78]">Edit Referral</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div>
-              <Label>Referrer Name</Label>
-              <Input className="mt-1" value={editReferral.referrerName} onChange={e => setEditReferral(p => ({ ...p, referrerName: e.target.value }))} />
+            <div className="flex flex-col">
+              <Label className="mb-1">Referrer Name</Label>
+              <Popover open={editReferralOpen} onOpenChange={setEditReferralOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={editReferralOpen}
+                    className="w-full justify-between"
+                  >
+                    {editReferral.referrerName || "Select a member..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] sm:w-[400px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search member..." />
+                    <CommandList>
+                      <CommandEmpty>No member found.</CommandEmpty>
+                      <CommandGroup>
+                        {members.map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            value={member.name.toLowerCase()}
+                            onSelect={() => {
+                              setEditReferral(p => ({ ...p, referrerName: member.name, referrerMemberId: member.id }));
+                              setEditReferralOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                editReferral.referrerMemberId === member.id ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {member.name} ({member.email || member.phone})
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
-            <div>
-              <Label>Referee Name</Label>
-              <Input className="mt-1" value={editReferral.refereeName} onChange={e => setEditReferral(p => ({ ...p, refereeName: e.target.value }))} />
+            <div className="flex flex-col">
+              <Label className="mb-1">Referee Name</Label>
+              <Popover open={editRefereeOpen} onOpenChange={setEditRefereeOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={editRefereeOpen}
+                    className="w-full justify-between"
+                  >
+                    {editReferral.refereeName || "Select a member..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] sm:w-[400px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search member..." />
+                    <CommandList>
+                      <CommandEmpty>No member found.</CommandEmpty>
+                      <CommandGroup>
+                        {members.map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            value={`${member.name} ${member.email || ''} ${member.phone || ''}`}
+                            onSelect={() => {
+                              setEditReferral(p => ({ 
+                                ...p, 
+                                refereeName: member.name,
+                                refereeEmail: member.email || '',
+                                refereePhone: member.phone || ''
+                              }));
+                              setEditRefereeOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                editReferral.refereeName === member.name ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {member.name} ({member.email || member.phone})
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label>Referee Email</Label>
@@ -1132,7 +1235,7 @@ export function Referrals() {
             <Button className="bg-[#2B7A78] hover:bg-[#236763] text-white" onClick={async () => {
               if (!editingReferral) return;
               try {
-                await referralService.update(Number(editingReferral.id), { referrerName: editReferral.referrerName, refereeName: editReferral.refereeName, refereeEmail: editReferral.refereeEmail || undefined, refereePhone: editReferral.refereePhone || undefined, date: editReferral.date, status: editReferral.status, notes: editReferral.notes || undefined });
+                await referralService.update(Number(editingReferral.id), { referrerMemberId: editReferral.referrerMemberId || undefined, referrerName: editReferral.referrerName, refereeName: editReferral.refereeName, refereeEmail: editReferral.refereeEmail || undefined, refereePhone: editReferral.refereePhone || undefined, date: editReferral.date, status: editReferral.status, notes: editReferral.notes || undefined });
                 toast.success('Referral updated');
                 setShowEditReferral(false);
                 loadData();
@@ -1313,13 +1416,96 @@ export function Referrals() {
           </DialogHeader>
 
           <div className="space-y-4 mt-2">
-            <div>
-              <Label>Referrer Name (Existing Member)</Label>
-              <Input placeholder="e.g., Sarah Johnson" className="mt-1" value={newReferral.referrerName} onChange={e => setNewReferral(p => ({ ...p, referrerName: e.target.value }))} />
+            <div className="flex flex-col">
+              <Label className="mb-1">Referrer Name (Existing Member)</Label>
+              <Popover open={addReferralOpen} onOpenChange={setAddReferralOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={addReferralOpen}
+                    className="w-full justify-between"
+                  >
+                    {newReferral.referrerName || "Select a member..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] sm:w-[400px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search member..." />
+                    <CommandList>
+                      <CommandEmpty>No member found.</CommandEmpty>
+                      <CommandGroup>
+                        {members.map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            value={`${member.name} ${member.email || ''} ${member.phone || ''}`}
+                            onSelect={() => {
+                              setNewReferral(p => ({ ...p, referrerName: member.name, referrerMemberId: member.id }));
+                              setAddReferralOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                newReferral.referrerMemberId === member.id ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {member.name} ({member.email || member.phone})
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
-            <div>
-              <Label>Referred Person Name</Label>
-              <Input placeholder="New person's full name" className="mt-1" value={newReferral.refereeName} onChange={e => setNewReferral(p => ({ ...p, refereeName: e.target.value }))} />
+            <div className="flex flex-col">
+              <Label className="mb-1">Referred Person Name</Label>
+              <Popover open={addRefereeOpen} onOpenChange={setAddRefereeOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={addRefereeOpen}
+                    className="w-full justify-between"
+                  >
+                    {newReferral.refereeName || "Select a member..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] sm:w-[400px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search member..." />
+                    <CommandList>
+                      <CommandEmpty>No member found.</CommandEmpty>
+                      <CommandGroup>
+                        {members.map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            value={`${member.name} ${member.email || ''} ${member.phone || ''}`}
+                            onSelect={() => {
+                              setNewReferral(p => ({ 
+                                ...p, 
+                                refereeName: member.name,
+                                refereeEmail: member.email || '',
+                                refereePhone: member.phone || ''
+                              }));
+                              setAddRefereeOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                newReferral.refereeName === member.name ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {member.name} ({member.email || member.phone})
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label>Referred Person Email</Label>
@@ -1357,10 +1543,14 @@ export function Referrals() {
             <Button
               className="bg-[#2B7A78] hover:bg-[#236763] text-white"
               onClick={async () => {
+                if (!newReferral.referrerName || !newReferral.refereeName) {
+                  toast.error("Referrer Name and Referee Name are required.");
+                  return;
+                }
                 try {
-                  await referralService.create({ referrerName: newReferral.referrerName, refereeName: newReferral.refereeName, refereeEmail: newReferral.refereeEmail || undefined, refereePhone: newReferral.refereePhone || undefined, date: newReferral.date, status: newReferral.status, notes: newReferral.notes || undefined });
+                  await referralService.create({ referrerMemberId: newReferral.referrerMemberId || undefined, referrerName: newReferral.referrerName, refereeName: newReferral.refereeName, refereeEmail: newReferral.refereeEmail || undefined, refereePhone: newReferral.refereePhone || undefined, date: newReferral.date, status: newReferral.status, notes: newReferral.notes || undefined });
                   toast.success('Referral Added!', { description: 'The new referral has been registered.' });
-                  setNewReferral({ referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '' });
+                  setNewReferral({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '' });
                   setShowAddReferral(false);
                   await loadData();
                 } catch { toast.error('Failed to create referral'); }

@@ -5,10 +5,7 @@ import java.util.List;
 
 public class FollowUpRequestDTO {
 
-    private String memberId;
-    private String memberName;
-    private String memberEmail;
-    private String memberPhone;
+    private Long leadId;
     private String type;
     private String status;
     private String priority;
@@ -27,17 +24,8 @@ public class FollowUpRequestDTO {
 
     // Getters & Setters
 
-    public String getMemberId() { return memberId; }
-    public void setMemberId(String memberId) { this.memberId = memberId; }
-
-    public String getMemberName() { return memberName; }
-    public void setMemberName(String memberName) { this.memberName = memberName; }
-
-    public String getMemberEmail() { return memberEmail; }
-    public void setMemberEmail(String memberEmail) { this.memberEmail = memberEmail; }
-
-    public String getMemberPhone() { return memberPhone; }
-    public void setMemberPhone(String memberPhone) { this.memberPhone = memberPhone; }
+    public Long getLeadId() { return leadId; }
+    public void setLeadId(Long leadId) { this.leadId = leadId; }
 
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }

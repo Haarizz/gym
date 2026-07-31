@@ -104,6 +104,10 @@ interface Member {
   status: "Active" | "Expired" | "Frozen";
   email: string;
   phone: string;
+  // Family billing: true for any minor (or a billed_to_head adult) — their
+  // charges are folded into their family head's account instead of their own.
+  billedToHead: boolean;
+  familyHeadName?: string;
 }
 
 function toLocalMember(m: ApiMember): Member {
@@ -116,6 +120,8 @@ function toLocalMember(m: ApiMember): Member {
     status: m.membership_status === "active" ? "Active" : m.membership_status === "frozen" ? "Frozen" : "Expired",
     email: m.email,
     phone: m.phone,
+    billedToHead: Boolean((m as any).is_minor || (m as any).billed_to_head),
+    familyHeadName: (m as any).family_head_name || (m as any).family_head_id || undefined,
   };
 }
 
@@ -181,6 +187,12 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [notes, setNotes] = useState("");
   const [customValidity, setCustomValidity] = useState<number>(30);
   const [customAmount, setCustomAmount] = useState<number>(0);
+  // Only used when the selected member is billed to a family head — how much
+  // is being collected right now; any remainder becomes a due on the head's
+  // account instead of the member's own. Defaults to the full amount (fully
+  // paid), matching this page's existing "always paid" behavior for members
+  // who carry their own balance.
+  const [minorPaidNow, setMinorPaidNow] = useState<string>("");
   const [transactionSearchQuery, setTransactionSearchQuery] = useState("");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<string>("all");
   const [lastCreatedAddon, setLastCreatedAddon] = useState<MemberAddon | null>(null);
@@ -413,6 +425,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     setSelectedAddon(addon);
     setCustomValidity(addon.validity);
     setCustomAmount(addon.price);
+    setMinorPaidNow(String(addon.price));
     setIsPurchaseDialogOpen(true);
   };
 
@@ -430,9 +443,18 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const handleConfirmPurchase = async () => {
     if (!selectedMember || !selectedAddon || !customAmount) return;
 
+    const billedToHead = selectedMember.billedToHead;
+    // A billed-to-head member's fee may be left partially or fully unpaid
+    // now — the remainder becomes a due on their family head's account
+    // instead of theirs. Any other member's add-on is always fully paid,
+    // same as before.
+    const paidNowAmount = billedToHead
+      ? Math.max(0, Math.min(customAmount, parseFloat(minorPaidNow || "0") || 0))
+      : customAmount;
+
     const legKey = ADDON_METHOD_TO_LEG_KEY[paymentMethod];
-    if (legKey && legKey !== 'cash') {
-      const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: customAmount };
+    if (paidNowAmount > 0 && legKey && legKey !== 'cash') {
+      const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: paidNowAmount };
       if (!isSplitPaymentDetailsValid(probe, methodDetails)) {
         toast.error(`Please fill in the required ${paymentMethod} details`);
         return;
@@ -444,9 +466,12 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
 
     try {
       setIsSubmitting(true);
-      const paymentBreakdown = legKey && legKey !== 'cash'
-        ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: customAmount }, methodDetails, bankAccounts)
+      const paymentBreakdown = paidNowAmount > 0 && legKey && legKey !== 'cash'
+        ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: paidNowAmount }, methodDetails, bankAccounts)
         : undefined;
+      // "Credit" mirrors this app's convention elsewhere (Add Member, renewals):
+      // only ever the stored method label when nothing has been received yet.
+      const paymentModeToSend = billedToHead && paidNowAmount <= 0 ? "Credit" : paymentMethod;
       const created = await addonsService.createAddon({
         member_db_id: Number(selectedMember.id),
         member_id: selectedMember.membershipId,
@@ -455,11 +480,12 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
         addon_description: selectedAddon.description,
         category: selectedAddon.category,
         amount: customAmount,
-        payment_mode: paymentMethod,
+        payment_mode: paymentModeToSend,
         start_date: startDate.toISOString(),
         expiry_date: (newExpiry || startDate).toISOString(),
         notes: notes || undefined,
         payment_breakdown: paymentBreakdown,
+        paid_amount: billedToHead ? paidNowAmount : undefined,
       });
       setTransactions(prev => [created, ...prev]);
       setLastCreatedAddon(created);
@@ -468,6 +494,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       setNotes("");
       setPaymentMethod("Cash");
       setMethodDetails(EMPTY_SPLIT_DETAILS);
+      setMinorPaidNow("");
     } catch {
       toast.error("Failed to save add-on purchase. Please try again.");
     } finally {
@@ -965,6 +992,38 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                 </div>
               </div>
 
+              {/* Family billing notice + partial payment, only for a member billed to a family head */}
+              {selectedMember?.billedToHead && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
+                  <div className="h-0.5 w-full bg-gradient-to-r from-amber-400 to-amber-600" />
+                  <div className="px-4 py-3 space-y-2">
+                    <p className="text-[11px] text-amber-900">
+                      <strong>{selectedMember.name}</strong> is billed to their family head — this charge
+                      will be added to <strong>{selectedMember.familyHeadName || "their family head"}</strong>'s
+                      account, not shown as a due on {selectedMember.name}.
+                    </p>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="minorPaidNow" className="text-xs font-medium">
+                        Amount Received Now ({currencyCode}) <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <Input
+                        id="minorPaidNow"
+                        type="number"
+                        min={0}
+                        max={customAmount}
+                        value={minorPaidNow}
+                        onChange={(e) => setMinorPaidNow(e.target.value)}
+                        placeholder="0.00"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Leave less than the full amount to bill the remainder as a due to{" "}
+                        {selectedMember.familyHeadName || "the family head"}.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Payment Method */}
               <div className="space-y-1.5">
                 <Label htmlFor="payment" className="text-xs font-medium">Payment Method</Label>
@@ -1115,7 +1174,9 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             {[
               { label: "Add-on", value: selectedAddon?.name },
               { label: "Amount", value: `${currencyCode} ${customAmount}` },
-              { label: "Payment", value: paymentMethod },
+              ...(selectedMember?.billedToHead
+                ? [{ label: "Billed To", value: selectedMember.familyHeadName || "Family Head" }]
+                : [{ label: "Payment", value: paymentMethod }]),
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>

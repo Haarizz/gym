@@ -4,6 +4,7 @@ import com.company.project.dto.ReferralPageResponseDTO;
 import com.company.project.dto.ReferralRequestDTO;
 import com.company.project.dto.ReferralResponseDTO;
 import com.company.project.dto.ReferralStatsDTO;
+import com.company.project.dto.ReferralValidationResponseDTO;
 import com.company.project.dto.RewardRuleRequestDTO;
 import com.company.project.dto.RewardRuleResponseDTO;
 import com.company.project.services.ReferralService;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/referrals")
@@ -37,6 +39,17 @@ public class ReferralController {
     @GetMapping("/stats")
     public ResponseEntity<ReferralStatsDTO> getStats() {
         return ResponseEntity.ok(referralService.getStats());
+    }
+
+    /** GET /api/referrals/validate-code?code=XYZ */
+    @GetMapping("/validate-code")
+    public ResponseEntity<?> validateCode(@RequestParam String code) {
+        try {
+            ReferralValidationResponseDTO result = referralService.validateByCode(code);
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     /** GET /api/referrals/{id} */
@@ -111,3 +124,4 @@ public class ReferralController {
         return ResponseEntity.noContent().build();
     }
 }
+

@@ -2,6 +2,8 @@ package com.company.project.dto;
 
 import com.company.project.entities.SupplierBill;
 import com.company.project.entities.SupplierBillItem;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -32,7 +34,9 @@ public class SupplierBillResponseDTO {
     private String receivedBy;
     private String paymentMethod;
     private List<PaymentSplitDTO> paymentBreakdown;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
     private List<SupplierBillItemDTO> items;
 

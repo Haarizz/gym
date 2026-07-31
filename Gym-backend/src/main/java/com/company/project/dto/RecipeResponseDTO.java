@@ -2,6 +2,8 @@ package com.company.project.dto;
 
 import com.company.project.entities.Recipe;
 import com.company.project.entities.RecipeIngredient;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,7 +26,9 @@ public class RecipeResponseDTO {
     private String notes;
     private List<RecipeIngredientDTO> items;
     private BigDecimal estimatedCost;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
     private String createdBy;
 

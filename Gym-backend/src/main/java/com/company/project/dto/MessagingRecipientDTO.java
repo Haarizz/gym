@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +15,9 @@ public class MessagingRecipientDTO {
     private String type;
     private String membershipStatus;
     private String membershipPlan;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime membershipExpiry;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime joinDate;
     private Boolean isVip = false;
     private String location;

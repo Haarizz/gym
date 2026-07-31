@@ -18,10 +18,10 @@ export interface CommunicationRecord {
 export interface FollowUpResponse {
   id: number;
   followUpId: string;
-  memberId?: string;
-  memberName: string;
-  memberEmail?: string;
-  memberPhone?: string;
+  leadId: number;
+  leadName: string;
+  leadEmail?: string;
+  leadPhone?: string;
   type: 'call' | 'email' | 'sms' | 'whatsapp' | 'in_app' | 'meeting' | 'visit';
   status: 'pending' | 'completed' | 'overdue' | 'cancelled' | 'rescheduled';
   priority: 'high' | 'medium' | 'low';
@@ -43,10 +43,7 @@ export interface FollowUpResponse {
 }
 
 export interface FollowUpRequest {
-  memberId?: string;
-  memberName: string;
-  memberEmail?: string;
-  memberPhone?: string;
+  leadId: number;
   type: string;
   status?: string;
   priority?: string;
@@ -87,10 +84,39 @@ export interface FollowUpPage {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function getHeaders(): Promise<HeadersInit> {
-  const token = authService.getToken();
+  const token = authService.getAccessToken();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+function mapToFollowUpResponse(f: any): FollowUpResponse {
+  return {
+    id: f.id,
+    followUpId: f.follow_up_id || f.followUpId,
+    leadId: f.lead_id || f.leadId,
+    leadName: f.lead_name || f.leadName,
+    leadEmail: f.lead_email || f.leadEmail,
+    leadPhone: f.lead_phone || f.leadPhone,
+    type: f.type,
+    status: f.status,
+    priority: f.priority,
+    assignedStaff: f.assigned_staff || f.assignedStaff,
+    dueDate: f.due_date || f.dueDate,
+    scheduledTime: f.scheduled_time || f.scheduledTime,
+    completedDate: f.completed_date || f.completedDate,
+    subject: f.subject,
+    notes: f.notes,
+    tags: f.tags,
+    membershipStatus: f.membership_status || f.membershipStatus,
+    membershipPlan: f.membership_plan || f.membershipPlan,
+    followUpReason: f.follow_up_reason || f.followUpReason,
+    estimatedDuration: f.estimated_duration || f.estimatedDuration,
+    outcome: f.outcome,
+    communicationHistory: f.communication_history || f.communicationHistory || [],
+    createdAt: f.created_at || f.createdAt,
+    updatedAt: f.updated_at || f.updatedAt,
   };
 }
 
@@ -118,8 +144,9 @@ export const followUpService = {
     const res = await fetch(`${BASE_URL}/follow-ups?${p}`, { headers: await getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch follow-ups');
     const raw = await res.json();
+    const followUpsRaw = raw.follow_ups ?? raw.followUps ?? [];
     return {
-      followUps: raw.follow_ups ?? raw.followUps ?? [],
+      followUps: followUpsRaw.map(mapToFollowUpResponse),
       pagination: raw.pagination ?? {},
     };
   },
@@ -133,27 +160,66 @@ export const followUpService = {
   async getById(id: number): Promise<FollowUpResponse> {
     const res = await fetch(`${BASE_URL}/follow-ups/${id}`, { headers: await getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch follow-up');
-    return res.json();
+    return mapToFollowUpResponse(await res.json());
   },
 
   async create(request: FollowUpRequest): Promise<FollowUpResponse> {
+    const payload = {
+      lead_id: request.leadId,
+      type: request.type,
+      status: request.status,
+      priority: request.priority,
+      assigned_staff: request.assignedStaff,
+      due_date: request.dueDate,
+      scheduled_time: request.scheduledTime,
+      completed_date: request.completedDate,
+      subject: request.subject,
+      notes: request.notes,
+      tags: request.tags,
+      membership_status: request.membershipStatus,
+      membership_plan: request.membershipPlan,
+      follow_up_reason: request.followUpReason,
+      estimated_duration: request.estimatedDuration,
+      outcome: request.outcome
+    };
     const res = await fetch(`${BASE_URL}/follow-ups`, {
       method: 'POST',
       headers: await getHeaders(),
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error('Failed to create follow-up');
-    return res.json();
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Failed to create follow-up: ${err}`);
+    }
+    return mapToFollowUpResponse(await res.json());
   },
 
   async update(id: number, request: FollowUpRequest): Promise<FollowUpResponse> {
+    const payload = {
+      lead_id: request.leadId,
+      type: request.type,
+      status: request.status,
+      priority: request.priority,
+      assigned_staff: request.assignedStaff,
+      due_date: request.dueDate,
+      scheduled_time: request.scheduledTime,
+      completed_date: request.completedDate,
+      subject: request.subject,
+      notes: request.notes,
+      tags: request.tags,
+      membership_status: request.membershipStatus,
+      membership_plan: request.membershipPlan,
+      follow_up_reason: request.followUpReason,
+      estimated_duration: request.estimatedDuration,
+      outcome: request.outcome
+    };
     const res = await fetch(`${BASE_URL}/follow-ups/${id}`, {
       method: 'PUT',
       headers: await getHeaders(),
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to update follow-up');
-    return res.json();
+    return mapToFollowUpResponse(await res.json());
   },
 
   async delete(id: number): Promise<void> {
@@ -171,7 +237,7 @@ export const followUpService = {
       body: JSON.stringify({ outcome, notes }),
     });
     if (!res.ok) throw new Error('Failed to complete follow-up');
-    return res.json();
+    return mapToFollowUpResponse(await res.json());
   },
 
   async cancel(id: number): Promise<FollowUpResponse> {
@@ -180,7 +246,7 @@ export const followUpService = {
       headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to cancel follow-up');
-    return res.json();
+    return mapToFollowUpResponse(await res.json());
   },
 
   async reschedule(id: number, dueDate: string): Promise<FollowUpResponse> {
@@ -190,7 +256,7 @@ export const followUpService = {
       body: JSON.stringify({ dueDate }),
     });
     if (!res.ok) throw new Error('Failed to reschedule follow-up');
-    return res.json();
+    return mapToFollowUpResponse(await res.json());
   },
 
   async markOverdue(): Promise<void> {

@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,6 +20,7 @@ public class LeadResponseDTO {
     private String priority;
     private String assignedStaff;
     private LocalDateTime nextFollowUp;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime lastContactDate;
     private Integer interestLevel;
     private String notes;
@@ -26,7 +30,10 @@ public class LeadResponseDTO {
     private String preferredContactMethod;
     private Integer leadScore;
     private List<LeadInteractionDTO> interactions;
+    private List<FollowUpResponseDTO> followUps;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     // Getters & Setters
@@ -90,6 +97,9 @@ public class LeadResponseDTO {
 
     public List<LeadInteractionDTO> getInteractions() { return interactions; }
     public void setInteractions(List<LeadInteractionDTO> interactions) { this.interactions = interactions; }
+
+    public List<FollowUpResponseDTO> getFollowUps() { return followUps; }
+    public void setFollowUps(List<FollowUpResponseDTO> followUps) { this.followUps = followUps; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

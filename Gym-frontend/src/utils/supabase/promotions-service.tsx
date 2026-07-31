@@ -105,6 +105,33 @@ class PromotionsService {
     return response.json();
   }
 
+  /**
+   * Fetch active discount promotions for use in the member creation discount dropdown.
+   * Filters to only type="discount" promotions that are within their valid date range
+   * and haven't exceeded their usage limit.
+   */
+  async getActiveDiscountPromotions(): Promise<PromotionApi[]> {
+    const all = await this.getPromotions("active");
+    const now = new Date();
+    return all.filter(p => {
+      if (p.type !== "discount") return false;
+      // Check date range
+      if (p.endDate) {
+        const end = new Date(p.endDate);
+        end.setHours(23, 59, 59, 999);
+        if (end < now) return false;
+      }
+      if (p.startDate) {
+        const start = new Date(p.startDate);
+        start.setHours(0, 0, 0, 0);
+        if (start > now) return false;
+      }
+      // Check usage limit
+      if (p.usageLimit != null && p.usageCount != null && p.usageCount >= p.usageLimit) return false;
+      return true;
+    });
+  }
+
   async getPromotionById(id: number): Promise<PromotionApi> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/promotions/${id}`
@@ -156,6 +183,40 @@ class PromotionsService {
     if (!response.ok) throw new Error(`Failed to run bulk action: ${response.status}`);
     return response.json();
   }
+
+  /**
+   * Validate a promotion code. Returns the promotion if valid,
+   * or throws with a user-friendly error message.
+   */
+  async validateCode(code: string): Promise<PromotionApi> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/promotions/validate-code?code=${encodeURIComponent(code)}`
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.message || `Invalid promotion code`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Record a promotion redemption (increments usage count).
+   * Call this after a member is successfully created with a promotion discount.
+   */
+  async redeemPromotion(id: number, revenue?: number, savings?: number): Promise<PromotionApi> {
+    const params = new URLSearchParams();
+    if (revenue !== undefined) params.append('revenue', revenue.toString());
+    if (savings !== undefined) params.append('savings', savings.toString());
+    
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/promotions/${id}/redeem${queryString}`,
+      { method: "POST" }
+    );
+    if (!response.ok) throw new Error(`Failed to redeem promotion: ${response.status}`);
+    return response.json();
+  }
 }
 
 export const promotionsService = new PromotionsService();
+

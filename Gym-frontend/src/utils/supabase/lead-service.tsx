@@ -1,4 +1,5 @@
 import { authService } from './auth-service';
+import { FollowUpResponse } from './follow-up-service';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
@@ -35,6 +36,7 @@ export interface LeadResponse {
   preferredContactMethod?: 'email' | 'phone' | 'whatsapp' | 'sms';
   leadScore?: number;
   interactions: LeadInteraction[];
+  followUps?: FollowUpResponse[];
   createdAt: string;
   updatedAt?: string;
 }
@@ -82,10 +84,40 @@ export interface LeadPage {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function getHeaders(): Promise<HeadersInit> {
-  const token = authService.getToken();
+  const token = authService.getAccessToken();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+function mapToLeadResponse(l: any): LeadResponse {
+  if (!l) return l;
+  return {
+    ...l,
+    id: l.id,
+    leadId: l.lead_id || l.leadId,
+    firstName: l.first_name || l.firstName || '',
+    lastName: l.last_name || l.lastName || '',
+    email: l.email,
+    phone: l.phone,
+    status: l.status,
+    source: l.source,
+    priority: l.priority,
+    assignedStaff: l.assigned_staff || l.assignedStaff,
+    nextFollowUp: l.next_follow_up || l.nextFollowUp,
+    lastContactDate: l.last_contact_date || l.lastContactDate,
+    interestLevel: l.interest_level || l.interestLevel,
+    notes: l.notes,
+    tags: l.tags || [],
+    membershipInterest: l.membership_interest || l.membershipInterest,
+    budget: l.budget,
+    preferredContactMethod: l.preferred_contact_method || l.preferredContactMethod,
+    leadScore: l.lead_score || l.leadScore,
+    interactions: l.interactions || [],
+    followUps: l.follow_ups || l.followUps || [],
+    createdAt: l.created_at || l.createdAt,
+    updatedAt: l.updated_at || l.updatedAt,
   };
 }
 
@@ -112,7 +144,7 @@ export const leadService = {
     if (!res.ok) throw new Error('Failed to fetch leads');
     const raw = await res.json();
     return {
-      leads: raw.leads ?? [],
+      leads: (raw.leads ?? []).map(mapToLeadResponse),
       pagination: raw.pagination ?? {},
     };
   },
@@ -126,27 +158,67 @@ export const leadService = {
   async getById(id: number): Promise<LeadResponse> {
     const res = await fetch(`${BASE_URL}/leads/${id}`, { headers: await getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch lead');
-    return res.json();
+    return mapToLeadResponse(await res.json());
   },
 
   async create(request: LeadRequest): Promise<LeadResponse> {
+    const payload = {
+      first_name: request.firstName,
+      last_name: request.lastName,
+      email: request.email,
+      phone: request.phone,
+      status: request.status,
+      source: request.source,
+      priority: request.priority,
+      assigned_staff: request.assignedStaff,
+      next_follow_up: request.nextFollowUp,
+      last_contact_date: request.lastContactDate,
+      interest_level: request.interestLevel,
+      notes: request.notes,
+      tags: request.tags,
+      membership_interest: request.membershipInterest,
+      budget: request.budget,
+      preferred_contact_method: request.preferredContactMethod,
+      lead_score: request.leadScore,
+    };
+
     const res = await fetch(`${BASE_URL}/leads`, {
       method: 'POST',
       headers: await getHeaders(),
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to create lead');
-    return res.json();
+    return mapToLeadResponse(await res.json());
   },
 
   async update(id: number, request: LeadRequest): Promise<LeadResponse> {
+    const payload = {
+      first_name: request.firstName,
+      last_name: request.lastName,
+      email: request.email,
+      phone: request.phone,
+      status: request.status,
+      source: request.source,
+      priority: request.priority,
+      assigned_staff: request.assignedStaff,
+      next_follow_up: request.nextFollowUp,
+      last_contact_date: request.lastContactDate,
+      interest_level: request.interestLevel,
+      notes: request.notes,
+      tags: request.tags,
+      membership_interest: request.membershipInterest,
+      budget: request.budget,
+      preferred_contact_method: request.preferredContactMethod,
+      lead_score: request.leadScore,
+    };
+
     const res = await fetch(`${BASE_URL}/leads/${id}`, {
       method: 'PUT',
       headers: await getHeaders(),
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to update lead');
-    return res.json();
+    return mapToLeadResponse(await res.json());
   },
 
   async delete(id: number): Promise<void> {
@@ -164,7 +236,7 @@ export const leadService = {
       body: JSON.stringify({ status }),
     });
     if (!res.ok) throw new Error('Failed to update lead status');
-    return res.json();
+    return mapToLeadResponse(await res.json());
   },
 
   async addInteraction(leadId: number, interaction: LeadInteraction): Promise<LeadInteraction> {

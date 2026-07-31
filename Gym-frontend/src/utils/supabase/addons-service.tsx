@@ -45,6 +45,10 @@ export interface CreateAddonRequest {
   expiry_date: string;
   notes?: string;
   payment_breakdown?: Record<string, any>[];
+  // Only meaningful when the member is billed to a family head (any minor,
+  // or a billed_to_head adult): how much is being collected now, out of
+  // `amount` — the remainder becomes a due on the family head's account.
+  paid_amount?: number;
 }
 
 class AddonsService {

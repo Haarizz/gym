@@ -85,10 +85,15 @@ export interface ReferralPage {
   };
 }
 
+export interface ReferralValidationResponse {
+  referral: ReferralResponse;
+  applicableRewardRules: RewardRuleResponse[];
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function getHeaders(): Promise<HeadersInit> {
-  const token = authService.getToken();
+  const token = authService.getAccessToken();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -114,7 +119,23 @@ export const referralService = {
     if (!res.ok) throw new Error('Failed to fetch referrals');
     const raw = await res.json();
     return {
-      referrals: raw.referrals ?? [],
+      referrals: (raw.referrals ?? []).map((r: any) => ({
+        ...r,
+        referrerMemberId: r.referrer_member_id,
+        referrerName: r.referrer_name,
+        refereeName: r.referee_name,
+        refereeEmail: r.referee_email,
+        refereePhone: r.referee_phone,
+        referralCode: r.referral_code,
+        referralLink: r.referral_link,
+        rewardAmount: r.reward_amount,
+        signupDate: r.signup_date,
+        paymentDate: r.payment_date,
+        ruleId: r.rule_id,
+        ruleName: r.rule_name,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at
+      })),
       pagination: raw.pagination ?? {},
     };
   },
@@ -122,23 +143,80 @@ export const referralService = {
   async getStats(): Promise<ReferralStats> {
     const res = await fetch(`${BASE_URL}/referrals/stats`, { headers: await getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch referral stats');
-    return res.json();
+    const raw = await res.json();
+    return {
+      totalReferrals: raw.total_referrals,
+      successfulReferrals: raw.successful_referrals,
+      pendingReferrals: raw.pending_referrals,
+      expiredReferrals: raw.expired_referrals,
+      conversionRate: raw.conversion_rate,
+      totalRewards: raw.total_rewards,
+      activeRules: raw.active_rules
+    };
   },
 
   async getById(id: number): Promise<ReferralResponse> {
     const res = await fetch(`${BASE_URL}/referrals/${id}`, { headers: await getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch referral');
-    return res.json();
+    const r = await res.json();
+    return {
+      ...r,
+      referrerMemberId: r.referrer_member_id,
+      referrerName: r.referrer_name,
+      refereeName: r.referee_name,
+      refereeEmail: r.referee_email,
+      refereePhone: r.referee_phone,
+      referralCode: r.referral_code,
+      referralLink: r.referral_link,
+      rewardAmount: r.reward_amount,
+      signupDate: r.signup_date,
+      paymentDate: r.payment_date,
+      ruleId: r.rule_id,
+      ruleName: r.rule_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    };
   },
 
   async create(request: ReferralRequest): Promise<ReferralResponse> {
+    const payload = {
+      referrer_member_id: request.referrerMemberId,
+      referrer_name: request.referrerName,
+      referee_name: request.refereeName,
+      referee_email: request.refereeEmail,
+      referee_phone: request.refereePhone,
+      status: request.status,
+      reward_amount: request.rewardAmount,
+      date: request.date,
+      signup_date: request.signupDate,
+      payment_date: request.paymentDate,
+      notes: request.notes,
+      rule_id: request.ruleId
+    };
     const res = await fetch(`${BASE_URL}/referrals`, {
       method: 'POST',
       headers: await getHeaders(),
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to create referral');
-    return res.json();
+    const r = await res.json();
+    return {
+      ...r,
+      referrerMemberId: r.referrer_member_id,
+      referrerName: r.referrer_name,
+      refereeName: r.referee_name,
+      refereeEmail: r.referee_email,
+      refereePhone: r.referee_phone,
+      referralCode: r.referral_code,
+      referralLink: r.referral_link,
+      rewardAmount: r.reward_amount,
+      signupDate: r.signup_date,
+      paymentDate: r.payment_date,
+      ruleId: r.rule_id,
+      ruleName: r.rule_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    };
   },
 
   async update(id: number, request: ReferralRequest): Promise<ReferralResponse> {
@@ -148,7 +226,24 @@ export const referralService = {
       body: JSON.stringify(request),
     });
     if (!res.ok) throw new Error('Failed to update referral');
-    return res.json();
+    const r = await res.json();
+    return {
+      ...r,
+      referrerMemberId: r.referrer_member_id,
+      referrerName: r.referrer_name,
+      refereeName: r.referee_name,
+      refereeEmail: r.referee_email,
+      refereePhone: r.referee_phone,
+      referralCode: r.referral_code,
+      referralLink: r.referral_link,
+      rewardAmount: r.reward_amount,
+      signupDate: r.signup_date,
+      paymentDate: r.payment_date,
+      ruleId: r.rule_id,
+      ruleName: r.rule_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    };
   },
 
   async delete(id: number): Promise<void> {
@@ -165,7 +260,24 @@ export const referralService = {
       headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to mark referral as successful');
-    return res.json();
+    const r = await res.json();
+    return {
+      ...r,
+      referrerMemberId: r.referrer_member_id,
+      referrerName: r.referrer_name,
+      refereeName: r.referee_name,
+      refereeEmail: r.referee_email,
+      refereePhone: r.referee_phone,
+      referralCode: r.referral_code,
+      referralLink: r.referral_link,
+      rewardAmount: r.reward_amount,
+      signupDate: r.signup_date,
+      paymentDate: r.payment_date,
+      ruleId: r.rule_id,
+      ruleName: r.rule_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    };
   },
 
   async markExpired(id: number): Promise<ReferralResponse> {
@@ -174,31 +286,116 @@ export const referralService = {
       headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to mark referral as expired');
-    return res.json();
+    const r = await res.json();
+    return {
+      ...r,
+      referrerMemberId: r.referrer_member_id,
+      referrerName: r.referrer_name,
+      refereeName: r.referee_name,
+      refereeEmail: r.referee_email,
+      refereePhone: r.referee_phone,
+      referralCode: r.referral_code,
+      referralLink: r.referral_link,
+      rewardAmount: r.reward_amount,
+      signupDate: r.signup_date,
+      paymentDate: r.payment_date,
+      ruleId: r.rule_id,
+      ruleName: r.rule_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    };
+  },
+
+  /**
+   * Validate a referral code for use during member creation.
+   * Returns the referral details plus applicable reward rules for the referee (new member).
+   */
+  async validateCode(code: string): Promise<ReferralValidationResponse> {
+    const res = await fetch(`${BASE_URL}/referrals/validate-code?code=${encodeURIComponent(code)}`, {
+      headers: await getHeaders(),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || 'Invalid referral code');
+    }
+    const r = await res.json();
+    return {
+      referral: {
+        ...r.referral,
+        referrerMemberId: r.referral.referrer_member_id,
+        referrerName: r.referral.referrer_name,
+        refereeName: r.referral.referee_name,
+        refereeEmail: r.referral.referee_email,
+        refereePhone: r.referral.referee_phone,
+        referralCode: r.referral.referral_code,
+        referralLink: r.referral.referral_link,
+        rewardAmount: r.referral.reward_amount,
+        signupDate: r.referral.signup_date,
+        paymentDate: r.referral.payment_date,
+        ruleId: r.referral.rule_id,
+        ruleName: r.referral.rule_name,
+        createdAt: r.referral.created_at,
+        updatedAt: r.referral.updated_at
+      },
+      applicableRewardRules: (r.applicable_reward_rules || []).map((rule: any) => ({
+        ...rule,
+        conditionTrigger: rule.condition_trigger,
+        isActive: rule.is_active,
+        expiryDays: rule.expiry_days,
+        createdAt: rule.created_at
+      }))
+    };
   },
 
   // Reward Rules
   async getRules(): Promise<RewardRuleResponse[]> {
     const res = await fetch(`${BASE_URL}/referrals/rules`, { headers: await getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch reward rules');
-    return res.json();
+    const raw = await res.json();
+    return raw.map((r: any) => ({
+      ...r,
+      conditionTrigger: r.condition_trigger,
+      isActive: r.is_active,
+      expiryDays: r.expiry_days,
+      createdAt: r.created_at
+    }));
   },
 
   async createRule(request: RewardRuleRequest): Promise<RewardRuleResponse> {
+    const payload = {
+      name: request.name,
+      type: request.type,
+      value: request.value,
+      unit: request.unit,
+      eligibility: request.eligibility,
+      condition_trigger: request.conditionTrigger,
+      is_active: request.isActive,
+      expiry_days: request.expiryDays
+    };
     const res = await fetch(`${BASE_URL}/referrals/rules`, {
       method: 'POST',
       headers: await getHeaders(),
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to create reward rule');
     return res.json();
   },
 
   async updateRule(id: number, request: RewardRuleRequest): Promise<RewardRuleResponse> {
+    const payload = {
+      name: request.name,
+      type: request.type,
+      value: request.value,
+      unit: request.unit,
+      eligibility: request.eligibility,
+      condition_trigger: request.conditionTrigger,
+      is_active: request.isActive,
+      expiry_days: request.expiryDays
+    };
     const res = await fetch(`${BASE_URL}/referrals/rules/${id}`, {
       method: 'PUT',
       headers: await getHeaders(),
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to update reward rule');
     return res.json();
@@ -221,3 +418,4 @@ export const referralService = {
     if (!res.ok) throw new Error('Failed to delete reward rule');
   },
 };
+

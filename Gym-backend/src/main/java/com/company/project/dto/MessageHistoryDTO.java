@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +15,7 @@ public class MessageHistoryDTO {
     private String status;
     private Integer recipientCount;
     private List<String> recipients = new ArrayList<>();
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime sentDate;
     private LocalDateTime scheduledDate;
     private Double deliveryRate;

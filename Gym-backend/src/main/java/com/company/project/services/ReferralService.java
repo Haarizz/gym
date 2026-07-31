@@ -5,6 +5,7 @@ import com.company.project.dto.ReferralPageResponseDTO;
 import com.company.project.dto.ReferralRequestDTO;
 import com.company.project.dto.ReferralResponseDTO;
 import com.company.project.dto.ReferralStatsDTO;
+import com.company.project.dto.ReferralValidationResponseDTO;
 import com.company.project.dto.RewardRuleRequestDTO;
 import com.company.project.dto.RewardRuleResponseDTO;
 import com.company.project.entities.Referral;
@@ -268,4 +269,34 @@ public class ReferralService {
         dto.setCreatedAt(rule.getCreatedAt());
         return dto;
     }
+
+    // ── Referral Code Validation ──────────────────────────────────────────────
+
+    /**
+     * Validate a referral code for use during member creation.
+     * Checks that the referral exists and is in 'pending' status.
+     * Returns the referral details plus active reward rules applicable to the referee (new member).
+     */
+    @Transactional(readOnly = true)
+    public ReferralValidationResponseDTO validateByCode(String code) {
+        Referral ref = referralRepository.findByReferralCode(code)
+                .orElseThrow(() -> new RuntimeException("Invalid referral code"));
+
+        if (!"pending".equalsIgnoreCase(ref.getStatus())) {
+            throw new RuntimeException("Referral code has already been used or expired");
+        }
+
+        ReferralResponseDTO referralDto = toDTO(ref);
+
+        // Find active reward rules that apply to the referee (new member) or both
+        List<RewardRuleResponseDTO> applicableRules = ruleRepository.findByIsActiveTrue()
+                .stream()
+                .filter(rule -> "referee".equalsIgnoreCase(rule.getEligibility())
+                        || "both".equalsIgnoreCase(rule.getEligibility()))
+                .map(this::toRuleDTO)
+                .collect(Collectors.toList());
+
+        return new ReferralValidationResponseDTO(referralDto, applicableRules);
+    }
 }
+

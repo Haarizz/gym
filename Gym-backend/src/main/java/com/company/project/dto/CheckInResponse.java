@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 
 public class CheckInResponse {
@@ -10,6 +13,7 @@ public class CheckInResponse {
     private String memberName;
     private String memberId;          // business ID: MBR-XXXXXXXXXX
     private String membershipStatus;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime checkInTime;
     private String checkInMethod;
     private String resolvedBy;

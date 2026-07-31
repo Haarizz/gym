@@ -498,44 +498,7 @@ const menuItems = [
       },
     ],
   },
-  {
-    title: "Assets",
-    icon: Building2,
-    id: "assets",
-    path: "/assets",
-    subItems: [
-      {
-        title: "Manage Assets",
-        icon: Package,
-        id: "manage-assets",
-        path: "/manage-assets",
-      },
-      {
-        title: "Transactions",
-        icon: RefreshCcw,
-        id: "asset-transactions",
-        path: "/asset-transactions",
-      },
-      {
-        title: "Reports",
-        icon: BarChart3,
-        id: "asset-reports",
-        path: "/asset-reports",
-      },
-      {
-        title: "Analytics",
-        icon: PieChart,
-        id: "asset-analytics",
-        path: "/asset-analytics",
-      },
-      {
-        title: "Settings",
-        icon: Settings,
-        id: "asset-settings",
-        path: "/asset-settings",
-      },
-    ],
-  },
+
   {
     title: "GymOS",
     icon: Cog,

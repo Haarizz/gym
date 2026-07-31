@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.CostCenter;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -18,7 +20,9 @@ public class CostCenterResponseDTO {
     private Double utilization;
     private Boolean isActive;
     private int linkedAccounts;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public CostCenterResponseDTO() {}

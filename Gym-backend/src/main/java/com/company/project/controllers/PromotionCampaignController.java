@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/promotions")
@@ -75,4 +76,23 @@ public class PromotionCampaignController {
         }
         return ResponseEntity.ok(Map.of("message", "Bulk action completed", "count", String.valueOf(ids.size())));
     }
+
+    @GetMapping("/validate-code")
+    public ResponseEntity<?> validateCode(@RequestParam String code) {
+        try {
+            PromotionCampaignResponseDTO dto = promotionService.validateByCode(code);
+            return ResponseEntity.ok(dto);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/redeem")
+    public ResponseEntity<PromotionCampaignResponseDTO> redeemPromotion(
+            @PathVariable Long id,
+            @RequestParam(required = false) BigDecimal revenue,
+            @RequestParam(required = false) BigDecimal savings) {
+        return ResponseEntity.ok(promotionService.redeemPromotion(id, revenue, savings));
+    }
 }
+

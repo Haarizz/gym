@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 
 public class StaffAttendanceDTO {
@@ -11,7 +14,9 @@ public class StaffAttendanceDTO {
     private String staffRole;
     private String staffDepartment;
     private String photoUrl;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime clockInTime;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime clockOutTime;
     private Integer totalMinutes;
     private String formattedDuration;

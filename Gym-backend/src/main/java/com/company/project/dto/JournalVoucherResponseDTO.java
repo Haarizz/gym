@@ -2,6 +2,8 @@ package com.company.project.dto;
 
 import com.company.project.entities.JournalVoucher;
 import com.company.project.entities.JournalVoucherLine;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,7 +25,9 @@ public class JournalVoucherResponseDTO {
     private Long reversesVoucherId;
     private Long reversedByVoucherId;
     private List<JournalVoucherLineDTO> lines;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public JournalVoucherResponseDTO() {}

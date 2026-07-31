@@ -1049,7 +1049,11 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                               {line.minor_charges && line.minor_charges.length > 0 && (
                                 <div className="text-xs text-amber-700 mt-0.5 flex items-center gap-1">
                                   <Baby className="h-3 w-3" />
-                                  Incl. {line.minor_charges.map(mc => `${mc.name}: ${Number(mc.amount).toLocaleString()}`).join(', ')}
+                                  {line.type === 'Payment'
+                                    ? line.minor_charges.map(mc =>
+                                        `Due of ${mc.name} (${Number(mc.amount).toLocaleString()}) paid by ${soaStatement?.member_name || 'family head'}`
+                                      ).join(', ')
+                                    : `Incl. ${line.minor_charges.map(mc => `${mc.name}: ${Number(mc.amount).toLocaleString()}`).join(', ')}`}
                                 </div>
                               )}
                             </TableCell>

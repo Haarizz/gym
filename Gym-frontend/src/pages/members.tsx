@@ -703,7 +703,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       total -= parseFloat(discountAmount);
     }
     
-    return Math.max(0, total);
+    return Math.round(Math.max(0, total) * 100) / 100;
   };
   
   const handleProcessRenewalUpgrade = async () => {

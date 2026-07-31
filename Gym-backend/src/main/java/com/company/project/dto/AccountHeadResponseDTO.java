@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import com.company.project.entities.AccountHead;
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,7 +22,9 @@ public class AccountHeadResponseDTO {
     private BigDecimal currentBalance;
     private Boolean isActive;
     private String description;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
 
     public AccountHeadResponseDTO() {}
