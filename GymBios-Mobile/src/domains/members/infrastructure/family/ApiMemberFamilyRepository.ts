@@ -9,9 +9,8 @@ import type { Member } from '../../domain/Member';
 import { apiClient } from '@/core/network/apiClient';
 
 interface FamilyMemberResponse {
-  id: number;
-  first_name: string;
-  last_name: string;
+  id: string;
+  name: string;
   email: string;
   phone: string;
   date_of_birth?: string | null;
@@ -26,7 +25,7 @@ interface FamilyMemberResponse {
 }
 
 interface FamilyGroupResponse {
-  head_id: number;
+  head_id: string;
   head_name: string;
   head_email: string;
   head_phone: string;
@@ -36,10 +35,10 @@ interface FamilyGroupResponse {
 }
 
 interface MemberResponse {
-  id: number;
+  id: string;
+  member_id: string;
 
-  first_name: string;
-  last_name: string;
+  name: string;
   email: string;
   phone: string;
   date_of_birth?: string | null;
@@ -83,7 +82,7 @@ export class ApiMemberFamilyRepository implements MemberFamilyRepository {
     const data = response.data;
 
     return {
-      headId: data.head_id,
+      headId: Number(data.head_id),
       headName: data.head_name,
       headEmail: data.head_email,
       headPhone: data.head_phone,
@@ -109,9 +108,8 @@ export class ApiMemberFamilyRepository implements MemberFamilyRepository {
     response: FamilyMemberResponse,
   ): FamilyMember {
     return {
-      id: response.id,
-      firstName: response.first_name,
-      lastName: response.last_name,
+      id: Number(response.id),
+      name: response.name,
       email: response.email,
       phone: response.phone,
       dateOfBirth: response.date_of_birth ?? undefined,
@@ -128,10 +126,10 @@ export class ApiMemberFamilyRepository implements MemberFamilyRepository {
 
   private toMemberDomain(response: MemberResponse): Member {
     return {
-      id: response.id,
+      id: Number(response.id),
+      memberId: response.member_id,
 
-      firstName: response.first_name,
-      lastName: response.last_name,
+      name: response.name,
       email: response.email,
       phone: response.phone,
       dateOfBirth: response.date_of_birth ?? undefined,
@@ -171,8 +169,7 @@ export class ApiMemberFamilyRepository implements MemberFamilyRepository {
     request: AddFamilyMemberRequest,
   ): Record<string, unknown> {
     return {
-      first_name: request.firstName,
-      last_name: request.lastName,
+      name: request.name,
       email: request.email,
       phone: request.phone,
       date_of_birth: request.dateOfBirth,

@@ -9,10 +9,10 @@ import type { Member, MemberPage } from '../../domain/Member';
 import { apiClient } from '@/core/network/apiClient';
 
 interface MemberResponse {
-  id: number;
+  id: string;
+  member_id: string;
 
-  first_name: string;
-  last_name: string;
+  name: string;
   email: string;
   phone: string;
   date_of_birth?: string | null;
@@ -71,7 +71,7 @@ export class ApiMemberDirectoryRepository
     if (filters?.limit) params.limit = filters.limit;
 
     const response = await apiClient.get<MembersPageResponse>(
-      '/api/members',
+      '/members',
       { params },
     );
 
@@ -86,7 +86,7 @@ export class ApiMemberDirectoryRepository
 
   async getMember(id: number): Promise<Member> {
     const response = await apiClient.get<MemberResponse>(
-      `/api/members/${id}`,
+      `/members/${id}`,
     );
 
     return this.toDomain(response.data);
@@ -94,7 +94,7 @@ export class ApiMemberDirectoryRepository
 
   async getCurrentMember(): Promise<Member> {
     const response = await apiClient.get<MemberResponse>(
-      '/api/members/me',
+      '/members/me',
     );
 
     return this.toDomain(response.data);
@@ -102,7 +102,7 @@ export class ApiMemberDirectoryRepository
 
   async getMemberByUser(userId: number): Promise<Member> {
     const response = await apiClient.get<MemberResponse>(
-      `/api/members/by-user/${userId}`,
+      `/members/by-user/${userId}`,
     );
 
     return this.toDomain(response.data);
@@ -110,7 +110,7 @@ export class ApiMemberDirectoryRepository
 
   async createMember(request: CreateMemberRequest): Promise<Member> {
     const response = await apiClient.post<MemberResponse>(
-      '/api/members',
+      '/members',
       this.toRequest(request),
     );
 
@@ -122,7 +122,7 @@ export class ApiMemberDirectoryRepository
     request: UpdateMemberRequest,
   ): Promise<Member> {
     const response = await apiClient.put<MemberResponse>(
-      `/api/members/${id}`,
+      `/members/${id}`,
       this.toRequest(request),
     );
 
@@ -130,15 +130,15 @@ export class ApiMemberDirectoryRepository
   }
 
   async deleteMember(id: number): Promise<void> {
-    await apiClient.delete(`/api/members/${id}`);
+    await apiClient.delete(`/members/${id}`);
   }
 
   private toDomain(response: MemberResponse): Member {
     return {
-      id: response.id,
+      id: Number(response.id),
+      memberId: response.member_id,
 
-      firstName: response.first_name,
-      lastName: response.last_name,
+      name: response.name,
       email: response.email,
       phone: response.phone,
       dateOfBirth: response.date_of_birth ?? undefined,
@@ -178,8 +178,7 @@ export class ApiMemberDirectoryRepository
     request: CreateMemberRequest | UpdateMemberRequest,
   ): Record<string, unknown> {
     return {
-      first_name: request.firstName,
-      last_name: request.lastName,
+      name: request.name,
       email: request.email,
       phone: request.phone,
       date_of_birth: request.dateOfBirth,
@@ -192,6 +191,30 @@ export class ApiMemberDirectoryRepository
       start_date: request.startDate,
       ...('endDate' in request ? { end_date: request.endDate } : {}),
       payment_status: request.paymentStatus,
+      ...('paymentMethodUsed' in request && request.paymentMethodUsed
+        ? {
+            payment_method_used: request.paymentMethodUsed,
+            payment_breakdown: request.paymentBreakdown
+              ? request.paymentBreakdown.map((split) => ({
+                  method: split.method,
+                  amount: split.amount,
+                  reference: split.reference,
+                  card_type: split.cardType,
+                  cheque_number: split.chequeNumber,
+                  cheque_date: split.chequeDate,
+                  bank_name: split.bankName,
+                  bank_account_code: split.bankAccountCode,
+                  bank_account_name: split.bankAccountName,
+                  online_payment_type: split.onlinePaymentType,
+                  provider_name: split.providerName,
+                }))
+              : undefined,
+            discount_applied: request.discountApplied,
+            outstanding_balance: request.outstandingBalance,
+            bank_account_code: request.bankAccountCode,
+            bank_account_name: request.bankAccountName,
+          }
+        : {}),
     };
   }
 }

@@ -14,4 +14,15 @@ export { FormSection } from './FormSection';
 export * from './ReportComponents';
 export { AppBottomSheet } from './AppBottomSheet';
 export { ModuleSheet } from './ModuleSheet';
+export { AvatarPicker, type AvatarPickerProps } from './AvatarPicker';
+export { Dropdown, type DropdownProps, type DropdownOption } from './Dropdown';
+export {
+  WizardHeader,
+  ProgressIndicator,
+  WizardNavigation,
+  type WizardHeaderProps,
+  type ProgressIndicatorProps,
+  type WizardNavigationProps,
+} from './Wizard';
+
 

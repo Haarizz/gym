@@ -24,21 +24,27 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
   ABSENT: { bg: '#fee2e2', text: '#dc2626', border: '#fecaca' },
 };
 
-function getStatusStyle(status: string) {
-  return STATUS_STYLES[status.toUpperCase()] ?? {
-    bg: '#f3f4f6',
-    text: '#374151',
-    border: '#e5e7eb',
-  };
+function getStatusStyle(status?: string) {
+  const normalized = status?.toUpperCase() ?? 'UNKNOWN';
+
+  return (
+    STATUS_STYLES[normalized] ?? {
+      bg: '#f3f4f6',
+      text: '#374151',
+      border: '#e5e7eb',
+    }
+  );
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
   const style = getStatusStyle(status);
 
+  const normalized = status?.toUpperCase() ?? 'UNKNOWN';
+
   return (
     <View style={[styles.badge, { backgroundColor: style.bg, borderColor: style.border }]}>
       <Typography variant="caption" style={[styles.text, { color: style.text }]}>
-        {status.toUpperCase()}
+        {normalized}
       </Typography>
     </View>
   );

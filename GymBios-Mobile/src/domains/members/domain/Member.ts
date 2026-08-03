@@ -1,9 +1,9 @@
 export interface Member {
   id: number;
+  memberId: string;
 
   // Personal Information
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
   phone: string;
   dateOfBirth?: string;
