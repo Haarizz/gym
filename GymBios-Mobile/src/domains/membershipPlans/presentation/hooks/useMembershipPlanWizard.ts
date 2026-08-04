@@ -2,11 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import type { MembershipPlan } from '../../domain/MembershipPlan';
 import type { MembershipPlanRequest } from '../../application/MembershipPlanRepository';
-import { MembershipPlanService } from '../../application/MembershipPlanService';
-import { ApiMembershipPlanRepository } from '../../infrastructure/ApiMembershipPlanRepository';
-
-const repository = new ApiMembershipPlanRepository();
-const planService = new MembershipPlanService(repository);
+import { useCreatePlan, useUpdatePlan } from './useMembershipPlans';
 
 export interface PlanWizardData {
   // Step 1: Basic Info
@@ -243,7 +239,9 @@ export function useMembershipPlanWizard({
   const [data, setData] = useState<PlanWizardData>(() =>
     mapPlanToWizardData(initialData),
   );
-  const [submitting, setSubmitting] = useState(false);
+  const createPlanMutation = useCreatePlan();
+  const updatePlanMutation = useUpdatePlan();
+  const submitting = createPlanMutation.isPending || updatePlanMutation.isPending;
 
   const steps = useMemo(() => buildSteps(data.planType), [data.planType]);
   const totalSteps = steps.length;
@@ -271,20 +269,17 @@ export function useMembershipPlanWizard({
 
   const submit = useCallback(async () => {
     try {
-      setSubmitting(true);
       const request = buildRequest(data);
       if (mode === 'create') {
-        await planService.createPlan(request);
+        await createPlanMutation.mutateAsync(request);
       } else if (mode === 'edit' && planId !== undefined) {
-        await planService.updatePlan(planId, request);
+        await updatePlanMutation.mutateAsync({ id: planId, request });
       }
       onSuccess?.();
     } catch (err) {
       onError?.(err as Error);
-    } finally {
-      setSubmitting(false);
     }
-  }, [mode, data, planId, onSuccess, onError]);
+  }, [mode, data, planId, createPlanMutation, updatePlanMutation, onSuccess, onError]);
 
   return {
     step,

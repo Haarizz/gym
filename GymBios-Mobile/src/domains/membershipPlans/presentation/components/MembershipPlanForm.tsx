@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -26,7 +26,6 @@ import { SessionsCapacityStep } from './steps/SessionsCapacityStep';
 import { FamilyOptionsStep } from './steps/FamilyOptionsStep';
 import { FreezePolicyStep } from './steps/FreezePolicyStep';
 import { AssignmentsStep } from './steps/AssignmentsStep';
-import { useState } from 'react';
 
 interface MembershipPlanFormProps {
   mode: 'create' | 'edit';
@@ -70,7 +69,6 @@ export function MembershipPlanForm({
   });
 
   const stepLabels = steps.map((s) => s.title);
-  const isFamily = data.planType === 'FAMILY';
 
   // Determine which step index maps to which component.
   // Steps order: basic(1), duration(2), sessions(3), [family(4)?], freeze(4|5), assign(5|6)

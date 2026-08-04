@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { Staff } from '../../domain/Staff';
 import type {
@@ -13,130 +14,83 @@ import { ApiStaffRepository } from '../../infrastructure/ApiStaffRepository';
 const repository = new ApiStaffRepository();
 const staffService = new StaffService(repository);
 
-export function useStaff(initialFilters?: StaffFilters) {
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+export const staffKeys = {
+  all: ['staff'] as const,
+  lists: () => [...staffKeys.all, 'list'] as const,
+  list: (filters: StaffFilters | undefined) =>
+    [...staffKeys.lists(), filters] as const,
+  details: () => [...staffKeys.all, 'detail'] as const,
+  detail: (id: string) => [...staffKeys.details(), id] as const,
+};
 
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+export function useStaff(initialFilters?: StaffFilters) {
+  const queryClient = useQueryClient();
+  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
 
   const filters = useMemo(() => initialFilters, [initialFilters]);
 
-  const refresh = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const staffQuery = useQuery({
+    queryKey: staffKeys.list(filters),
+    queryFn: () => staffService.getStaff(filters),
+  });
 
-      const page = await staffService.getStaff(filters);
-      setStaff(page.content);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
+  const staff = staffQuery.data?.content ?? [];
+  const loading = staffQuery.isFetching;
+  const error = staffQuery.error as Error | null;
 
-  const loadStaff = useCallback(async (id: string) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const refresh = useCallback(() => {
+    return staffQuery.refetch();
+  }, [staffQuery]);
 
-      const result = await staffService.getStaffById(id);
+  const loadStaff = useCallback(
+    async (id: string) => {
+      const result = await queryClient.fetchQuery({
+        queryKey: staffKeys.detail(id),
+        queryFn: () => staffService.getStaffById(id),
+      });
       setSelectedStaff(result);
-
       return result;
-    } catch (err) {
-      setError(err as Error);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [queryClient],
+  );
+
+  const createStaffMutation = useCreateStaff();
+  const updateStaffMutation = useUpdateStaff();
+  const deleteStaffMutation = useDeleteStaff();
 
   const createStaff = useCallback(
     async (request: CreateStaffRequest) => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        const created = await staffService.createStaff(request);
-
-        setStaff(previous => [created, ...previous]);
-
-        return created;
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      return createStaffMutation.mutateAsync(request);
     },
-    [],
+    [createStaffMutation],
   );
 
   const updateStaff = useCallback(
     async (id: string, request: UpdateStaffRequest) => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        const updated = await staffService.updateStaff(id, request);
-
-        setStaff(previous =>
-          previous.map(item => (item.id === id ? updated : item)),
-        );
-
-        if (selectedStaff?.id === id) {
-          setSelectedStaff(updated);
-        }
-
-        return updated;
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      const updated = await updateStaffMutation.mutateAsync({ id, request });
+      setSelectedStaff((prev) => (prev?.id === id ? updated : prev));
+      return updated;
     },
-    [selectedStaff],
+    [updateStaffMutation],
   );
 
   const deleteStaff = useCallback(
     async (id: string) => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        await staffService.deleteStaff(id);
-
-        setStaff(previous =>
-          previous.filter(item => item.id !== id),
-        );
-
-        if (selectedStaff?.id === id) {
-          setSelectedStaff(null);
-        }
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      await deleteStaffMutation.mutateAsync(id);
+      setSelectedStaff((prev) => (prev?.id === id ? null : prev));
     },
-    [selectedStaff],
+    [deleteStaffMutation],
   );
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
 
   return {
     staff,
     selectedStaff,
 
     loading,
-    submitting,
+    submitting:
+      createStaffMutation.isPending ||
+      updateStaffMutation.isPending ||
+      deleteStaffMutation.isPending,
     error,
 
     refresh,
@@ -145,4 +99,48 @@ export function useStaff(initialFilters?: StaffFilters) {
     updateStaff,
     deleteStaff,
   };
+}
+
+export function useCreateStaff() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: CreateStaffRequest) =>
+      staffService.createStaff(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+export function useUpdateStaff() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      request,
+    }: {
+      id: string;
+      request: UpdateStaffRequest;
+    }) => staffService.updateStaff(id, request),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.all });
+      queryClient.invalidateQueries({ queryKey: staffKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+export function useDeleteStaff() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => staffService.deleteStaff(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
 }

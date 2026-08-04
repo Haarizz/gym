@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import type { Staff, StaffCertification, WeeklySchedule } from '../../domain/Staff';
 import type { CreateStaffRequest, UpdateStaffRequest } from '../../application/StaffRepository';
-import { useStaff } from './useStaff';
+import { useCreateStaff, useUpdateStaff } from './useStaff';
 
 export interface StaffWizardData {
   name: string;
@@ -153,7 +153,9 @@ export function useStaffWizard({
   const [data, setData] = useState<StaffWizardData>(() =>
     mapStaffToWizardData(initialData),
   );
-  const { createStaff, updateStaff, submitting } = useStaff();
+  const createStaffMutation = useCreateStaff();
+  const updateStaffMutation = useUpdateStaff();
+  const submitting = createStaffMutation.isPending || updateStaffMutation.isPending;
 
   const currentStep = STEPS[step - 1];
   const totalSteps = STEPS.length;
@@ -223,15 +225,18 @@ export function useStaffWizard({
   const submit = useCallback(async () => {
     try {
       if (mode === 'create') {
-        await createStaff(buildCreateRequest(data));
+        await createStaffMutation.mutateAsync(buildCreateRequest(data));
       } else if (mode === 'edit' && staffId) {
-        await updateStaff(staffId, buildUpdateRequest(data));
+        await updateStaffMutation.mutateAsync({
+          id: staffId,
+          request: buildUpdateRequest(data),
+        });
       }
       onSuccess?.();
     } catch (err) {
       onError?.(err as Error);
     }
-  }, [mode, data, staffId, createStaff, updateStaff, onSuccess, onError]);
+  }, [mode, data, staffId, createStaffMutation, updateStaffMutation, onSuccess, onError]);
 
   return {
     step,

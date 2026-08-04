@@ -30,4 +30,17 @@ export const moduleSections: ModuleSection[] = [
       },
     ],
   },
+  {
+    id: 'finance',
+    title: 'Finance',
+    items: [
+      {
+        id: 'billing',
+        title: 'Billing',
+        subtitle: 'Receipts & Payments',
+        icon: 'credit-card',
+        route: '/billing',
+      },
+    ],
+  },
 ];

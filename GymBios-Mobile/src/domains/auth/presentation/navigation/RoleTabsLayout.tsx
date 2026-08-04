@@ -63,12 +63,30 @@ export function RoleTabsLayout({
   ] as const;
 
   // Module routes that should be accessible via navigation but hidden from the bottom tab bar.
-  const MODULE_ROUTES = ['membership-plans', 'members'] as const;
+  const MODULE_ROUTES = ['membership-plans', 'members', 'billing'] as const;
 
   const isFullScreen = FULL_SCREEN_ROUTES.some(
     ([feature, action]) =>
       segments[1] === feature &&
       segments[2] === action,
+  );
+
+  const HIDE_ROLE_HEADER_ROUTES = [
+    ['billing', 'receipts'],
+    ['billing', 'dues'],
+    ['billing', 'statements'],
+    ['billing', 'members'],
+    ['billing', 'reports'],
+    ['billing', 'create-receipt'],
+
+    ['members', '[id]'],
+    ['staff', '[id]'],
+  ] as const;
+
+  const showRoleHeader = !HIDE_ROLE_HEADER_ROUTES.some(
+    ([feature, page]) =>
+      segments[1] === feature &&
+      segments[2] === page,
   );
 
   const resolvedColors = (headerColors && headerColors.length > 0
@@ -82,7 +100,7 @@ export function RoleTabsLayout({
       edges={['top']}
       style={[styles.safeArea, { backgroundColor: resolvedColors[0] }]}>
       <View style={styles.container}>
-        {!isFullScreen && (
+        {!isFullScreen && showRoleHeader && (
           <LinearGradient
             colors={resolvedColors}
             style={styles.header}>
