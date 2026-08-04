@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -10,90 +10,33 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Slider } from "../components/ui/slider";
-import { Users, MessageSquare, Calendar, Trophy, Plus, Heart, MessageCircle, Share2, Filter, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Users, MessageSquare, Calendar, Trophy, Plus, Heart, MessageCircle, Share2, Filter, Image as ImageIcon, Loader2, Star, Flame } from 'lucide-react';
+import { communityService, TrendingTopic, LeaderboardEntry, CommunityEngagementStats } from "../utils/supabase/community-service";
+import { membersService } from "../utils/supabase/members-service";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
-const communityPosts = [
-  {
-    id: 1,
-    author: "Sarah Johnson",
-    avatar: "/avatars/sarah.jpg",
-    timestamp: "2 hours ago",
-    content: "Just hit a new PR on deadlifts! 185lbs 💪 Thanks to everyone for the motivation and support!",
-    likes: 24,
-    comments: 8,
-    type: "achievement"
-  },
-  {
-    id: 2,
-    author: "Mike Chen",
-    avatar: "/avatars/mike.jpg",
-    timestamp: "4 hours ago",
-    content: "Looking for a workout buddy for early morning sessions (6 AM). Anyone interested in joining me for strength training?",
-    likes: 12,
-    comments: 15,
-    type: "question"
-  },
-  {
-    id: 3,
-    author: "Emily Rodriguez",
-    avatar: "/avatars/emily.jpg",
-    timestamp: "1 day ago",
-    content: "Nutrition tip: Try adding Greek yogurt with berries for a post-workout snack. High protein and delicious! 🥣",
-    likes: 31,
-    comments: 6,
-    type: "tip"
-  }
-];
-
-const upcomingEvents = [
-  {
-    id: 1,
-    title: "HIIT Challenge Week",
-    date: "Oct 1-7, 2024",
-    participants: 45,
-    description: "7-day high-intensity interval training challenge"
-  },
-  {
-    id: 2,
-    title: "Nutrition Workshop",
-    date: "Oct 12, 2024",
-    participants: 23,
-    description: "Learn about meal prep and healthy eating habits"
-  },
-  {
-    id: 3,
-    title: "Yoga Retreat Weekend",
-    date: "Oct 19-20, 2024",
-    participants: 18,
-    description: "Relaxing weekend yoga retreat at the local park"
-  }
-];
-
-const achievements = [
-  {
-    id: 1,
-    member: "Sarah Johnson",
-    achievement: "Deadlift PR - 185lbs",
-    date: "Today",
-    badge: "strength"
-  },
-  {
-    id: 2,
-    member: "David Thompson",
-    achievement: "30-Day Streak",
-    date: "Yesterday",
-    badge: "consistency"
-  },
-  {
-    id: 3,
-    member: "Lisa Wong",
-    achievement: "First 5K Run",
-    date: "2 days ago",
-    badge: "cardio"
-  }
-];
+// Post type from API
+interface FeedPost {
+  id: number;
+  topic: string;
+  content: string;
+  type: string;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+  authorUserId: number;
+  authorUsername: string;
+  authorRoles: string[];
+  createdAt: string;
+  archived: boolean;
+  image?: {
+    dataUrl: string;
+    aspectRatio: string;
+    cropPosition: number;
+    cropZoom: number;
+  } | null;
+}
 
 type CropRatio = "1:1" | "4:5" | "9:16";
 
@@ -474,20 +417,89 @@ export function CreatePostModal({ onPostCreated, trigger }: { onPostCreated?: ()
 }
 
 export function Community() {
+  // Real data state
+  const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(true);
+  const [activeMemberCount, setActiveMemberCount] = useState(0);
+  const [trendingTopics, setTrendingTopics] = useState<TrendingTopic[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [engagementStats, setEngagementStats] = useState<CommunityEngagementStats | null>(null);
+
+  // Fetch feed posts
+  const loadFeed = useCallback(async () => {
+    setIsLoadingFeed(true);
+    try {
+      const token = sessionStorage.getItem("token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE}/community/posts?limit=50`, { headers });
+      if (!res.ok) throw new Error("Failed to fetch feed");
+      const data = await res.json();
+      setFeedPosts((data.posts ?? []).map((p: any) => ({
+        id: p.id,
+        topic: p.topic ?? "",
+        content: p.content ?? "",
+        type: p.type ?? "update",
+        likeCount: p.likeCount ?? 0,
+        commentCount: p.commentCount ?? 0,
+        likedByMe: p.likedByMe ?? false,
+        authorUserId: p.authorUserId ?? 0,
+        authorUsername: p.authorUsername ?? "Unknown",
+        authorRoles: p.authorRoles ?? [],
+        createdAt: p.createdAt ?? "",
+        archived: p.archived ?? false,
+        image: p.image ?? null,
+      })));
+    } catch {
+      setFeedPosts([]);
+    } finally {
+      setIsLoadingFeed(false);
+    }
+  }, []);
+
+  // Fetch sidebar / stats data
+  const loadSidebarData = useCallback(async () => {
+    try {
+      const [membersResp, topics, board, engagement] = await Promise.all([
+        membersService.getMembers({ status: "active" }, { page: 1, limit: 1 }).catch(() => ({ members: [], pagination: { total: 0 } } as any)),
+        communityService.getTrendingTopics().catch(() => []),
+        communityService.getLeaderboard().catch(() => []),
+        communityService.getEngagementStats().catch(() => null),
+      ]);
+      setActiveMemberCount(membersResp?.pagination?.total ?? membersResp?.members?.length ?? 0);
+      setTrendingTopics(topics);
+      setLeaderboard(board);
+      setEngagementStats(engagement);
+    } catch {
+      // silent
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFeed();
+    loadSidebarData();
+  }, [loadFeed, loadSidebarData]);
+
+  const achievementPosts = useMemo(
+    () => feedPosts.filter((p) => p.type === "achievement"),
+    [feedPosts],
+  );
+
+  const postsToday = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    return feedPosts.filter((p) => p.createdAt?.startsWith(todayStr)).length;
+  }, [feedPosts]);
+
+  const distinctTypes = useMemo(
+    () => new Set(feedPosts.map((p) => p.type)).size,
+    [feedPosts],
+  );
+
   const getPostTypeColor = (type: string) => {
     switch (type) {
       case "achievement": return "bg-green-100 text-green-800";
       case "question": return "bg-blue-100 text-blue-800";
       case "tip": return "bg-purple-100 text-purple-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getBadgeColor = (badge: string) => {
-    switch (badge) {
-      case "strength": return "bg-red-100 text-red-800";
-      case "consistency": return "bg-blue-100 text-blue-800";
-      case "cardio": return "bg-green-100 text-green-800";
       default: return "bg-gray-100 text-gray-800";
     }
   };
@@ -524,40 +536,55 @@ export function Community() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {communityPosts.map((post) => (
-                    <div key={post.id} className="border-b pb-6 last:border-b-0">
-                      <div className="flex items-start space-x-3">
-                        <Avatar>
-                          <AvatarImage src={post.avatar} />
-                          <AvatarFallback>{post.author.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 space-y-3">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">{post.author}</span>
-                            <span className="text-sm text-muted-foreground">{post.timestamp}</span>
-                            <Badge className={getPostTypeColor(post.type)}>
-                              {post.type}
-                            </Badge>
-                          </div>
-                          <p className="text-sm">{post.content}</p>
-                          <div className="flex items-center space-x-4">
-                            <Button variant="ghost" size="sm" className="text-muted-foreground">
-                              <Heart className="mr-1 h-4 w-4" />
-                              {post.likes}
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-muted-foreground">
-                              <MessageCircle className="mr-1 h-4 w-4" />
-                              {post.comments}
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-muted-foreground">
-                              <Share2 className="mr-1 h-4 w-4" />
-                              Share
-                            </Button>
+                  {isLoadingFeed ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">Loading posts...</span>
+                    </div>
+                  ) : feedPosts.length === 0 ? (
+                    <div className="text-center py-8">
+                      <MessageSquare className="mx-auto h-10 w-10 text-slate-400" />
+                      <p className="mt-4 text-sm font-medium text-slate-600">No community posts yet</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Be the first to share something with the community!</p>
+                    </div>
+                  ) : (
+                    feedPosts.map((post) => (
+                      <div key={post.id} className="border-b pb-6 last:border-b-0">
+                        <div className="flex items-start space-x-3">
+                          <Avatar>
+                            <AvatarFallback>{post.authorUsername.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 space-y-3">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">{post.authorUsername}</span>
+                              <span className="text-sm text-muted-foreground">
+                                {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : ""}
+                              </span>
+                              <Badge className={getPostTypeColor(post.type)}>
+                                {post.type}
+                              </Badge>
+                            </div>
+                            {post.topic && <p className="text-sm font-medium">{post.topic}</p>}
+                            <p className="text-sm">{post.content}</p>
+                            <div className="flex items-center space-x-4">
+                              <Button variant="ghost" size="sm" className="text-muted-foreground">
+                                <Heart className={`mr-1 h-4 w-4 ${post.likedByMe ? "text-red-500 fill-red-500" : ""}`} />
+                                {post.likeCount}
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-muted-foreground">
+                                <MessageCircle className="mr-1 h-4 w-4" />
+                                {post.commentCount}
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-muted-foreground">
+                                <Share2 className="mr-1 h-4 w-4" />
+                                Share
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -570,19 +597,19 @@ export function Community() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Active Members</span>
-                    <span className="font-medium">410</span>
+                    <span className="font-medium">{activeMemberCount}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Posts Today</span>
-                    <span className="font-medium">23</span>
+                    <span className="font-medium">{postsToday}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Challenges Active</span>
-                    <span className="font-medium">3</span>
+                    <span className="text-sm">Post Types</span>
+                    <span className="font-medium">{distinctTypes}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Upcoming Events</span>
-                    <span className="font-medium">5</span>
+                    <span className="text-sm">Total Posts</span>
+                    <span className="font-medium">{feedPosts.length}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -592,18 +619,16 @@ export function Community() {
                   <CardTitle>Trending Topics</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">#MondayMotivation</span>
-                    <Badge variant="secondary">12 posts</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">#DeadliftPR</span>
-                    <Badge variant="secondary">8 posts</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">#NutritionTips</span>
-                    <Badge variant="secondary">6 posts</Badge>
-                  </div>
+                  {trendingTopics.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No trending topics yet.</p>
+                  ) : (
+                    trendingTopics.slice(0, 5).map((t) => (
+                      <div key={t.topic} className="flex items-center justify-between">
+                        <span className="text-sm">{t.topic}</span>
+                        <Badge variant="secondary">{t.postCount} {t.postCount === 1 ? "post" : "posts"}</Badge>
+                      </div>
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -613,24 +638,14 @@ export function Community() {
         <TabsContent value="events" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Upcoming Events</CardTitle>
-              <CardDescription>Join community events and challenges</CardDescription>
+              <CardTitle>Community Events</CardTitle>
+              <CardDescription>Events will appear here once the events feature is set up.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4">
-                {upcomingEvents.map((event) => (
-                  <div key={event.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold">{event.title}</h3>
-                      <Badge variant="outline">{event.participants} joined</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">{event.description}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{event.date}</span>
-                      <Button size="sm">Join Event</Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
+                <Calendar className="mx-auto h-10 w-10 text-slate-400" />
+                <p className="mt-4 text-sm font-medium text-slate-600">No community events yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">When events are created, they will appear here for members to browse and join.</p>
               </div>
             </CardContent>
           </Card>
@@ -640,124 +655,115 @@ export function Community() {
           <Card>
             <CardHeader>
               <CardTitle>Recent Achievements</CardTitle>
-              <CardDescription>Celebrate member accomplishments</CardDescription>
+              <CardDescription>Achievement posts shared by community members</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {achievements.map((achievement) => (
-                  <div key={achievement.id} className="flex items-center space-x-3">
-                    <div className="flex-shrink-0">
-                      <Trophy className="h-8 w-8 text-yellow-500" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium">{achievement.member}</span>
-                        <Badge className={getBadgeColor(achievement.badge)}>
-                          {achievement.badge}
-                        </Badge>
+              {achievementPosts.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
+                  <Trophy className="mx-auto h-10 w-10 text-slate-400" />
+                  <p className="mt-4 text-sm font-medium text-slate-600">No achievement posts yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Achievements will appear here when members share posts of type "achievement".</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {achievementPosts.slice(0, 8).map((post) => (
+                    <div key={post.id} className="flex items-center space-x-3">
+                      <div className="flex-shrink-0">
+                        <Trophy className="h-8 w-8 text-yellow-500" />
                       </div>
-                      <p className="text-sm text-muted-foreground">{achievement.achievement}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">{post.authorUsername}</span>
+                          <Badge className="bg-green-100 text-green-800">achievement</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{post.topic || post.content}</p>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Heart className="h-3 w-3" /> {post.likeCount}
+                      </div>
                     </div>
-                    <span className="text-sm text-muted-foreground">{achievement.date}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="leaderboard" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {leaderboard.length === 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle>Workout Streak</CardTitle>
-                <CardDescription>Consecutive days</CardDescription>
+                <CardTitle>Community Leaderboard</CardTitle>
+                <CardDescription>Top contributors ranked by engagement</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-lg">1.</span>
-                    <span>David Thompson</span>
-                  </div>
-                  <Badge>30 days</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-lg">2.</span>
-                    <span>Sarah Johnson</span>
-                  </div>
-                  <Badge>28 days</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-lg">3.</span>
-                    <span>Mike Chen</span>
-                  </div>
-                  <Badge>25 days</Badge>
+              <CardContent>
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
+                  <Trophy className="mx-auto h-10 w-10 text-slate-400" />
+                  <p className="mt-4 text-sm font-medium text-slate-600">No leaderboard data yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">The leaderboard will populate once members start posting and engaging.</p>
                 </div>
               </CardContent>
             </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Top Posters */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Posters</CardTitle>
+                  <CardDescription>Most active contributors</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {leaderboard.slice(0, 5).map((entry, idx) => (
+                    <div key={entry.userId} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-lg">{idx + 1}.</span>
+                        <span>{entry.username}</span>
+                      </div>
+                      <Badge>{entry.totalPosts} {entry.totalPosts === 1 ? "post" : "posts"}</Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Visits</CardTitle>
-                <CardDescription>This month</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-lg">1.</span>
-                    <span>Lisa Wong</span>
-                  </div>
-                  <Badge>22 visits</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-lg">2.</span>
-                    <span>Emily Rodriguez</span>
-                  </div>
-                  <Badge>20 visits</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-lg">3.</span>
-                    <span>Sarah Johnson</span>
-                  </div>
-                  <Badge>19 visits</Badge>
-                </div>
-              </CardContent>
-            </Card>
+              {/* Most Liked */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Most Liked</CardTitle>
+                  <CardDescription>Total likes received</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[...leaderboard].sort((a, b) => b.totalLikes - a.totalLikes).slice(0, 5).map((entry, idx) => (
+                    <div key={entry.userId} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-lg">{idx + 1}.</span>
+                        <span>{entry.username}</span>
+                      </div>
+                      <Badge>{entry.totalLikes} {entry.totalLikes === 1 ? "like" : "likes"}</Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Community Points</CardTitle>
-                <CardDescription>Engagement score</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-lg">1.</span>
-                    <span>Mike Chen</span>
-                  </div>
-                  <Badge>1,250 pts</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-lg">2.</span>
-                    <span>Sarah Johnson</span>
-                  </div>
-                  <Badge>1,180 pts</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-lg">3.</span>
-                    <span>David Thompson</span>
-                  </div>
-                  <Badge>1,095 pts</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              {/* Engagement Score */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Engagement Score</CardTitle>
+                  <CardDescription>Likes + comments earned</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {leaderboard.slice(0, 5).map((entry, idx) => (
+                    <div key={entry.userId} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-lg">{idx + 1}.</span>
+                        <span>{entry.username}</span>
+                      </div>
+                      <Badge>{entry.engagementScore.toLocaleString()} pts</Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

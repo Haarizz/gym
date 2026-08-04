@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { followUpService, type FollowUpResponse } from '../utils/supabase/follow-up-service';
 import { leadService } from '../utils/supabase/lead-service';
 import { staffService } from '../utils/supabase/staff-service';
@@ -126,8 +127,6 @@ interface FollowUp {
   tags: string[];
   membershipStatus: 'active' | 'pending' | 'expired' | 'frozen' | 'cancelled';
   membershipPlan?: string;
-  lastVisit?: Date;
-  nextBillingDate?: Date;
   communicationHistory: CommunicationRecord[];
   outcome?: 'successful' | 'no-response' | 'callback-requested' | 'not-interested' | 'converted' | 'rescheduled';
   followUpReason: string;
@@ -156,7 +155,6 @@ export function FollowUps() {
   const [selectedFollowUp, setSelectedFollowUp] = useState<FollowUp | null>(null);
   const [showAddFollowUp, setShowAddFollowUp] = useState(false);
   const [showFollowUpDetail, setShowFollowUpDetail] = useState(false);
-  const [showBulkActions, setShowBulkActions] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -178,11 +176,13 @@ export function FollowUps() {
   const [completeOutcome, setCompleteOutcome] = useState('successful');
   const [completeNotes, setCompleteNotes] = useState('');
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
+  const [showBulkReassign, setShowBulkReassign] = useState(false);
+  const [bulkReassignStaff, setBulkReassignStaff] = useState('');
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [editingFollowUp, setEditingFollowUp] = useState<FollowUp | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [editFU, setEditFU] = useState({ leadName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '', status: 'pending' });
+  const [editFU, setEditFU] = useState({ leadId: 0, leadName: '', type: 'call', subject: '', priority: 'medium', dueDate: '', scheduledTime: '', assignedStaff: '', estimatedDuration: '', notes: '', status: 'pending' });
 
   // Leads and Staff dynamic data
   const [leadsList, setLeadsList] = useState<{id: string, name: string}[]>([]);
@@ -214,6 +214,18 @@ export function FollowUps() {
       setStaffList(res.items.map(s => ({ id: String(s.id), name: s.name })));
     }).catch(console.error);
   }, []);
+
+  // Arriving from Leads' "Schedule follow-up" quick action — open the Add
+  // dialog pre-filled with that lead instead of requiring it to be re-picked.
+  const location = useLocation();
+  useEffect(() => {
+    const state = location.state as { prefillLeadId?: number; prefillLeadName?: string } | null;
+    if (state?.prefillLeadId) {
+      setNewFU(p => ({ ...p, leadId: String(state.prefillLeadId), leadName: state.prefillLeadName || '' }));
+      setShowAddFollowUp(true);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
 
   const displayFollowUps: FollowUp[] = apiFollowUps.map(f => ({
@@ -456,12 +468,15 @@ export function FollowUps() {
         loadFollowUps();
       } catch { toast.error('Failed to complete some follow-ups'); }
     } else if (action === 'reschedule') {
-      toast.info('Use the reschedule button on individual follow-ups');
+      setReschedulingId(null);
+      setRescheduleDate('');
+      setShowRescheduleDialog(true);
+      return;
     } else if (action === 'assign') {
-      toast.info('Use the edit button to reassign individual follow-ups');
+      setShowBulkReassign(true);
+      return;
     }
     setSelectedFollowUps([]);
-    setShowBulkActions(false);
   }, [selectedFollowUps, loadFollowUps]);
 
   const handleDeleteFollowUp = useCallback(async (id: string) => {
@@ -476,6 +491,7 @@ export function FollowUps() {
   const handleOpenEdit = useCallback((followUp: FollowUp) => {
     setEditingFollowUp(followUp);
     setEditFU({
+      leadId: followUp.leadId,
       leadName: followUp.leadName,
       type: followUp.type === 'in-app' ? 'in_app' : followUp.type,
       subject: followUp.subject,
@@ -490,6 +506,20 @@ export function FollowUps() {
     setShowEditDialog(true);
   }, []);
 
+  const handleExportCSV = useCallback(() => {
+    const csv = ['Lead,Subject,Type,Status,Priority,Assigned Staff,Due Date', ...filteredFollowUps.map(f =>
+      `${f.leadName},${f.subject},${f.type},${f.status},${f.priority},${f.assignedStaff || ''},${f.dueDate.toISOString()}`
+    )].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'follow-ups.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Follow-ups exported');
+  }, [filteredFollowUps]);
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -499,13 +529,9 @@ export function FollowUps() {
           <p className="text-muted-foreground">Comprehensive member management and operations.</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => setShowBulkActions(true)}>
+          <Button variant="outline" onClick={handleExportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Export
-          </Button>
-          <Button variant="outline" onClick={() => setShowAutomation(true)}>
-            <Settings className="mr-2 h-4 w-4" />
-            Automation
           </Button>
           <Button onClick={() => setShowAddFollowUp(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -1154,18 +1180,6 @@ export function FollowUps() {
                         <Label className="text-sm text-muted-foreground">Plan</Label>
                         <p className="font-medium">{selectedFollowUp.membershipPlan || 'Not specified'}</p>
                       </div>
-                      <div>
-                        <Label className="text-sm text-muted-foreground">Last Visit</Label>
-                        <p className="font-medium">
-                          {selectedFollowUp.lastVisit ? format(selectedFollowUp.lastVisit, 'MMM dd, yyyy') : 'No visits'}
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="text-sm text-muted-foreground">Next Billing</Label>
-                        <p className="font-medium">
-                          {selectedFollowUp.nextBillingDate ? format(selectedFollowUp.nextBillingDate, 'MMM dd, yyyy') : 'N/A'}
-                        </p>
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1399,13 +1413,13 @@ export function FollowUps() {
               Cancel
             </Button>
             <Button onClick={async () => {
-              if (!newFU.leadName || !newFU.subject || !newFU.dueDate) {
-                toast.error('Lead name, subject, and due date are required');
+              if (!newFU.leadId || !newFU.leadName || !newFU.subject || !newFU.dueDate) {
+                toast.error('Please select a lead from the list, and fill in subject and due date');
                 return;
               }
               try {
                 await followUpService.create({
-                  leadId: Number(newFU.leadId) || 1, // Defaulting to 1 if not set in simple UI
+                  leadId: Number(newFU.leadId),
                   type: newFU.type,
                   subject: newFU.subject,
                   priority: newFU.priority,
@@ -1499,8 +1513,10 @@ export function FollowUps() {
       <Dialog open={showRescheduleDialog} onOpenChange={setShowRescheduleDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Reschedule Follow-up</DialogTitle>
-            <DialogDescription>Select a new due date for this follow-up</DialogDescription>
+            <DialogTitle>Reschedule Follow-up{!reschedulingId && selectedFollowUps.length > 0 ? 's' : ''}</DialogTitle>
+            <DialogDescription>
+              {reschedulingId ? 'Select a new due date for this follow-up' : `Select a new due date for ${selectedFollowUps.length} selected follow-up(s)`}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -1511,14 +1527,61 @@ export function FollowUps() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRescheduleDialog(false)}>Cancel</Button>
             <Button onClick={async () => {
-              if (!reschedulingId || !rescheduleDate) { toast.error('Please select a date'); return; }
+              if (!rescheduleDate) { toast.error('Please select a date'); return; }
+              const ids = reschedulingId ? [reschedulingId] : selectedFollowUps;
+              if (ids.length === 0) { toast.error('Please select a date'); return; }
               try {
-                await followUpService.reschedule(Number(reschedulingId), rescheduleDate);
-                toast.success('Follow-up rescheduled');
+                await Promise.all(ids.map(id => followUpService.reschedule(Number(id), rescheduleDate)));
+                toast.success(`Rescheduled ${ids.length} follow-up(s)`);
                 setShowRescheduleDialog(false);
+                setReschedulingId(null);
+                setSelectedFollowUps([]);
                 loadFollowUps();
               } catch { toast.error('Failed to reschedule'); }
             }}>Reschedule</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Reassign Staff Dialog */}
+      <Dialog open={showBulkReassign} onOpenChange={setShowBulkReassign}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reassign Staff</DialogTitle>
+            <DialogDescription>Reassign {selectedFollowUps.length} selected follow-up(s) to a staff member</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Staff Member</Label>
+            <Select value={bulkReassignStaff} onValueChange={setBulkReassignStaff}>
+              <SelectTrigger className="mt-1"><SelectValue placeholder="Select staff" /></SelectTrigger>
+              <SelectContent>
+                {staffList.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkReassign(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              if (!bulkReassignStaff) { toast.error('Please select a staff member'); return; }
+              try {
+                await Promise.all(selectedFollowUps.map(id => {
+                  const fu = displayFollowUps.find(f => f.id === id);
+                  if (!fu) return Promise.resolve();
+                  return followUpService.update(Number(id), {
+                    leadId: fu.leadId,
+                    type: fu.type,
+                    dueDate: fu.dueDate.toISOString(),
+                    subject: fu.subject,
+                    assignedStaff: bulkReassignStaff,
+                  });
+                }));
+                toast.success(`Reassigned ${selectedFollowUps.length} follow-up(s) to ${bulkReassignStaff}`);
+                setShowBulkReassign(false);
+                setBulkReassignStaff('');
+                setSelectedFollowUps([]);
+                loadFollowUps();
+              } catch { toast.error('Failed to reassign staff'); }
+            }}>Reassign</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1556,7 +1619,7 @@ export function FollowUps() {
                             key={lead.id}
                             value={lead.name}
                             onSelect={() => {
-                              setEditFU(p => ({ ...p, leadName: lead.name }));
+                              setEditFU(p => ({ ...p, leadId: lead.id, leadName: lead.name }));
                               setOpenEditLeadCombobox(false);
                             }}
                           >
@@ -1675,7 +1738,7 @@ export function FollowUps() {
               if (!editingFollowUp) return;
               try {
                 await followUpService.update(Number(editingFollowUp.id), {
-                  leadId: editingFollowUp.leadId,
+                  leadId: editFU.leadId || editingFollowUp.leadId,
                   type: editFU.type,
                   subject: editFU.subject,
                   priority: editFU.priority,

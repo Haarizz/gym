@@ -1139,7 +1139,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         || applicableRewardRules[0];
       
       if (!discountRule) {
-        toast.error('Referral code is valid but no active reward rules apply to new members');
+        toast.success(`Referral from ${referral.referrerName} applied! (No discount for new members)`);
+        setAppliedReferralId(referral.id);
+        setReferralCodeApplied(true);
+        setPromoCodeApplied(false);
+        setPromoCodeInput('');
+        setSelectedDiscount('no-discount');
         setIsValidatingReferralCode(false);
         return;
       }
@@ -1785,10 +1790,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         ...memberPayload,
       } as Partial<Parameters<typeof membersService.updateMember>[1]> & Record<string, any>;
 
+      let createdMember: any = null;
       if (isEditMode && internalId) {
         await membersService.updateMember(internalId, updatePayload);
       } else {
-        await membersService.createMember({ ...memberPayload, total_visits: 0 } as any);
+        createdMember = await membersService.createMember({ ...memberPayload, total_visits: 0 } as any);
       }
 
       // Record promotion redemption (increment usage count and track revenue)
@@ -1800,10 +1806,17 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         }
       }
 
-      // Record referral as successful
-      if (appliedReferralId && discountAmount > 0) {
+      // Record referral as successful and let the reward engine generate rewards
+      // for both referrer and referee. Not gated on discountAmount > 0 — the
+      // referrer's reward doesn't depend on the referee having received a
+      // client-side discount, only on a valid referral code being used to sign up.
+      if (appliedReferralId) {
         try {
-          await referralService.markSuccessful(appliedReferralId);
+          await referralService.markSuccessful(appliedReferralId, {
+            purchaseAmount: getFinalPrice(),
+            membershipPlanId: selectedPlan?.id ? Number(selectedPlan.id) : undefined,
+            refereeMemberId: createdMember?.member_id || undefined,
+          });
         } catch (e) {
           console.error('Failed to mark referral as successful:', e);
         }

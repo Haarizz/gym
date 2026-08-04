@@ -11,4 +11,7 @@ public interface LeadRepository extends JpaRepository<Lead, Long>, JpaSpecificat
     Optional<Lead> findByLeadId(String leadId);
 
     long countByStatus(String status);
+
+    @org.springframework.data.jpa.repository.Query("SELECT l.status, COUNT(l) FROM Lead l GROUP BY l.status")
+    java.util.List<Object[]> countLeadsByStatus();
 }

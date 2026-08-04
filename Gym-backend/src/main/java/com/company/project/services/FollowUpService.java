@@ -6,6 +6,7 @@ import com.company.project.dto.FollowUpRequestDTO;
 import com.company.project.dto.FollowUpResponseDTO;
 import com.company.project.dto.FollowUpStatsDTO;
 import com.company.project.dto.PaginationDTO;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.entities.CommunicationRecord;
 import com.company.project.entities.FollowUp;
 import com.company.project.entities.Lead;
@@ -77,25 +78,25 @@ public class FollowUpService {
 
     public FollowUpResponseDTO updateFollowUp(Long id, FollowUpRequestDTO req) {
         FollowUp fu = followUpRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Follow-up not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + id));
         mapRequestToEntity(req, fu);
         return toDTO(followUpRepository.save(fu));
     }
 
     public FollowUpResponseDTO getById(Long id) {
         return toDTO(followUpRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Follow-up not found: " + id)));
+                .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + id)));
     }
 
     public void deleteFollowUp(Long id) {
         FollowUp fu = followUpRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Follow-up not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + id));
         followUpRepository.delete(fu);
     }
 
     public FollowUpResponseDTO complete(Long id, String outcome, String notes) {
         FollowUp fu = followUpRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Follow-up not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + id));
         fu.setStatus("completed");
         fu.setCompletedDate(LocalDateTime.now());
         if (outcome != null) fu.setOutcome(outcome);
@@ -111,14 +112,14 @@ public class FollowUpService {
 
     public FollowUpResponseDTO cancel(Long id) {
         FollowUp fu = followUpRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Follow-up not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + id));
         fu.setStatus("cancelled");
         return toDTO(followUpRepository.save(fu));
     }
 
     public FollowUpResponseDTO reschedule(Long id, LocalDateTime newDueDate) {
         FollowUp fu = followUpRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Follow-up not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + id));
         fu.setStatus("rescheduled");
         fu.setDueDate(newDueDate);
         return toDTO(followUpRepository.save(fu));
@@ -196,7 +197,7 @@ public class FollowUpService {
 
     public CommunicationRecordDTO addRecord(Long followUpId, CommunicationRecordDTO dto) {
         FollowUp fu = followUpRepository.findById(followUpId)
-                .orElseThrow(() -> new RuntimeException("Follow-up not found: " + followUpId));
+                .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + followUpId));
 
         CommunicationRecord record = new CommunicationRecord();
         record.setFollowUp(fu);
@@ -229,7 +230,7 @@ public class FollowUpService {
     private void mapRequestToEntity(FollowUpRequestDTO req, FollowUp fu) {
         if (req.getLeadId() != null) {
             Lead lead = leadRepository.findById(req.getLeadId())
-                    .orElseThrow(() -> new RuntimeException("Lead not found: " + req.getLeadId()));
+                    .orElseThrow(() -> new EntityNotFoundException("Lead not found: " + req.getLeadId()));
             fu.setLead(lead);
         }
         if (req.getType() != null) fu.setType(req.getType());

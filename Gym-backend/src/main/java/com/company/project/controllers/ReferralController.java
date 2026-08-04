@@ -1,8 +1,10 @@
 package com.company.project.controllers;
 
+import com.company.project.dto.MarkSuccessfulRequestDTO;
 import com.company.project.dto.ReferralPageResponseDTO;
 import com.company.project.dto.ReferralRequestDTO;
 import com.company.project.dto.ReferralResponseDTO;
+import com.company.project.dto.ReferralSettingsDTO;
 import com.company.project.dto.ReferralStatsDTO;
 import com.company.project.dto.ReferralValidationResponseDTO;
 import com.company.project.dto.RewardRuleRequestDTO;
@@ -58,6 +60,13 @@ public class ReferralController {
         return ResponseEntity.ok(referralService.getById(id));
     }
 
+    /** GET /api/referrals/fix-rewards (TEMPORARY FIX) */
+    @GetMapping("/fix-rewards")
+    public ResponseEntity<String> fixRewards() {
+        String diag = referralService.fixRetroactiveRewards();
+        return ResponseEntity.ok(diag);
+    }
+
     /** POST /api/referrals */
     @PostMapping
     public ResponseEntity<ReferralResponseDTO> create(@RequestBody ReferralRequestDTO request) {
@@ -80,14 +89,28 @@ public class ReferralController {
 
     /** POST /api/referrals/{id}/mark-successful */
     @PostMapping("/{id}/mark-successful")
-    public ResponseEntity<ReferralResponseDTO> markSuccessful(@PathVariable Long id) {
-        return ResponseEntity.ok(referralService.markSuccessful(id));
+    public ResponseEntity<ReferralResponseDTO> markSuccessful(@PathVariable Long id,
+            @RequestBody(required = false) MarkSuccessfulRequestDTO body) {
+        return ResponseEntity.ok(referralService.markSuccessful(id, body));
     }
 
     /** POST /api/referrals/{id}/mark-expired */
     @PostMapping("/{id}/mark-expired")
     public ResponseEntity<ReferralResponseDTO> markExpired(@PathVariable Long id) {
         return ResponseEntity.ok(referralService.markExpired(id));
+    }
+
+    /** GET /api/referrals/unredeemed-reward?memberId=MBR-0000000001 */
+    @GetMapping("/unredeemed-reward")
+    public ResponseEntity<ReferralResponseDTO> getUnredeemedReward(@RequestParam String memberId) {
+        ReferralResponseDTO reward = referralService.getUnredeemedReward(memberId);
+        return reward != null ? ResponseEntity.ok(reward) : ResponseEntity.noContent().build();
+    }
+
+    /** POST /api/referrals/{id}/redeem-reward */
+    @PostMapping("/{id}/redeem-reward")
+    public ResponseEntity<ReferralResponseDTO> redeemReward(@PathVariable Long id) {
+        return ResponseEntity.ok(referralService.redeemReward(id));
     }
 
     // ── Reward Rules ──────────────────────────────────────────────────────────
@@ -122,6 +145,20 @@ public class ReferralController {
     public ResponseEntity<Void> deleteRule(@PathVariable Long id) {
         referralService.deleteRule(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Settings ──────────────────────────────────────────────────────────────
+
+    /** GET /api/referrals/settings */
+    @GetMapping("/settings")
+    public ResponseEntity<ReferralSettingsDTO> getSettings() {
+        return ResponseEntity.ok(referralService.getSettings());
+    }
+
+    /** PUT /api/referrals/settings */
+    @PutMapping("/settings")
+    public ResponseEntity<ReferralSettingsDTO> updateSettings(@RequestBody ReferralSettingsDTO request) {
+        return ResponseEntity.ok(referralService.updateSettings(request));
     }
 }
 

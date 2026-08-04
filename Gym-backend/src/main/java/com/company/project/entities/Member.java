@@ -186,6 +186,12 @@ public class Member extends BaseEntity {
     @Column(name = "app_access_enabled")
     private Boolean appAccessEnabled;
 
+    // Reward wallet running balance — credited by RewardRedemptionService when a
+    // WALLET_CREDIT reward is redeemed, spent down at checkout. Tracked in detail
+    // by WalletTransaction; this column is the cached current total.
+    @Column(name = "wallet_balance", precision = 12, scale = 2)
+    private BigDecimal walletBalance = BigDecimal.ZERO;
+
     public Member() {}
 
     // ── Getters & Setters ───────────────────────────────────────────────────
@@ -352,4 +358,7 @@ public class Member extends BaseEntity {
 
     public Boolean getAppAccessEnabled() { return appAccessEnabled; }
     public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
+
+    public BigDecimal getWalletBalance() { return walletBalance; }
+    public void setWalletBalance(BigDecimal walletBalance) { this.walletBalance = walletBalance; }
 }

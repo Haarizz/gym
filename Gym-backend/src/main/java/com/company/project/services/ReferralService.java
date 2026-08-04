@@ -1,17 +1,25 @@
 package com.company.project.services;
 
+import com.company.project.dto.MarkSuccessfulRequestDTO;
 import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.ReferralPageResponseDTO;
 import com.company.project.dto.ReferralRequestDTO;
 import com.company.project.dto.ReferralResponseDTO;
+import com.company.project.dto.ReferralSettingsDTO;
 import com.company.project.dto.ReferralStatsDTO;
 import com.company.project.dto.ReferralValidationResponseDTO;
 import com.company.project.dto.RewardRuleRequestDTO;
 import com.company.project.dto.RewardRuleResponseDTO;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.entities.Referral;
 import com.company.project.entities.ReferralRewardRule;
+import com.company.project.entities.ReferralSettings;
 import com.company.project.repositories.ReferralRepository;
 import com.company.project.repositories.ReferralRewardRuleRepository;
+import com.company.project.repositories.ReferralSettingsRepository;
+import com.company.project.repositories.ReferralRewardRepository;
+import com.company.project.repositories.RewardAuditLogRepository;
+import com.company.project.entities.ReferralReward;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -29,17 +37,59 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.jdbc.core.JdbcTemplate;
+
 @Service
 @Transactional
 public class ReferralService {
 
     private final ReferralRepository referralRepository;
     private final ReferralRewardRuleRepository ruleRepository;
+    private final ReferralSettingsRepository settingsRepository;
+    private final RewardEngineService rewardEngineService;
+    private final ReferralRewardRepository rewardRepository;
+    private final RewardAuditLogRepository auditLogRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     public ReferralService(ReferralRepository referralRepository,
-                           ReferralRewardRuleRepository ruleRepository) {
+                           ReferralRewardRuleRepository ruleRepository,
+                           ReferralSettingsRepository settingsRepository,
+                           RewardEngineService rewardEngineService,
+                           ReferralRewardRepository rewardRepository,
+                           RewardAuditLogRepository auditLogRepository,
+                           JdbcTemplate jdbcTemplate) {
         this.referralRepository = referralRepository;
         this.ruleRepository = ruleRepository;
+        this.settingsRepository = settingsRepository;
+        this.rewardEngineService = rewardEngineService;
+        this.rewardRepository = rewardRepository;
+        this.auditLogRepository = auditLogRepository;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    // ── Settings ───────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public ReferralSettingsDTO getSettings() {
+        return ReferralSettingsDTO.fromEntity(loadOrCreateSettings());
+    }
+
+    public ReferralSettingsDTO updateSettings(ReferralSettingsDTO req) {
+        ReferralSettings s = loadOrCreateSettings();
+        if (req.getProgramEnabled() != null) s.setProgramEnabled(req.getProgramEnabled());
+        if (req.getAutoGenerateCodes() != null) s.setAutoGenerateCodes(req.getAutoGenerateCodes());
+        if (req.getEmailNotifications() != null) s.setEmailNotifications(req.getEmailNotifications());
+        if (req.getAutoProcessRewards() != null) s.setAutoProcessRewards(req.getAutoProcessRewards());
+        if (req.getCodePrefix() != null) s.setCodePrefix(req.getCodePrefix());
+        if (req.getLinkDomain() != null) s.setLinkDomain(req.getLinkDomain());
+        if (req.getMaxRewardsPerMember() != null) s.setMaxRewardsPerMember(req.getMaxRewardsPerMember());
+        if (req.getExpiryDays() != null) s.setExpiryDays(req.getExpiryDays());
+        if (req.getMinPurchaseAmount() != null) s.setMinPurchaseAmount(req.getMinPurchaseAmount());
+        return ReferralSettingsDTO.fromEntity(settingsRepository.save(s));
+    }
+
+    private ReferralSettings loadOrCreateSettings() {
+        return settingsRepository.findById(1L).orElseGet(() -> settingsRepository.save(new ReferralSettings()));
     }
 
     // ── Referrals ─────────────────────────────────────────────────────────────
@@ -55,7 +105,7 @@ public class ReferralService {
                 + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         ref.setReferralCode(baseCode);
 
-        // Apply rule if provided
+        // Apply rule if provided, otherwise auto-assign an active one
         if (req.getRuleId() != null) {
             ruleRepository.findById(req.getRuleId()).ifPresent(rule -> {
                 ref.setRuleId(rule.getId());
@@ -64,6 +114,15 @@ public class ReferralService {
                     ref.setRewardAmount(rule.getValue());
                 }
             });
+        } else {
+            ruleRepository.findByIsActiveTrue().stream()
+                .filter(r -> "referrer".equalsIgnoreCase(r.getEligibility()) || "both".equalsIgnoreCase(r.getEligibility()))
+                .findFirst()
+                .ifPresent(rule -> {
+                    ref.setRuleId(rule.getId());
+                    ref.setRuleName(rule.getName());
+                    ref.setRewardAmount(rule.getValue());
+                });
         }
 
         Referral saved = referralRepository.save(ref);
@@ -78,7 +137,7 @@ public class ReferralService {
 
     public ReferralResponseDTO updateReferral(Long id, ReferralRequestDTO req) {
         Referral ref = referralRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Referral not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id));
         mapRequestToEntity(req, ref);
 
         if (req.getRuleId() != null) {
@@ -93,26 +152,82 @@ public class ReferralService {
 
     public ReferralResponseDTO getById(Long id) {
         return toDTO(referralRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Referral not found: " + id)));
+                .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id)));
     }
 
     public void deleteReferral(Long id) {
         Referral ref = referralRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Referral not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id));
+        
+        // Delete associated rewards first to prevent foreign key constraint violations
+        List<ReferralReward> rewards = rewardRepository.findByReferralId(id);
+        for (ReferralReward r : rewards) {
+            auditLogRepository.deleteAll(auditLogRepository.findByRewardIdOrderByCreatedAtDesc(r.getId()));
+        }
+        rewardRepository.deleteAll(rewards);
+        
         referralRepository.delete(ref);
     }
 
     public ReferralResponseDTO markSuccessful(Long id) {
+        return markSuccessful(id, null);
+    }
+
+    public ReferralResponseDTO markSuccessful(Long id, MarkSuccessfulRequestDTO req) {
         Referral ref = referralRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Referral not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id));
+
+        if (ref.getRewardAmount() == null || ref.getRewardAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            ruleRepository.findByIsActiveTrue().stream()
+                .filter(r -> "referrer".equalsIgnoreCase(r.getEligibility()) || "both".equalsIgnoreCase(r.getEligibility()))
+                .findFirst()
+                .ifPresent(rule -> {
+                    ref.setRuleId(rule.getId());
+                    ref.setRuleName(rule.getName());
+                    ref.setRewardAmount(rule.getValue());
+                });
+        }
+
+        if (!"pending".equals(ref.getStatus())) {
+            // It's already successful or expired, so this is a reused code!
+            // Create a new referral for this new signup so the referrer gets another reward
+            Referral clone = new Referral();
+            clone.setReferrerMemberId(ref.getReferrerMemberId());
+            clone.setReferrerName(ref.getReferrerName());
+            clone.setRefereeName("Referred Member (Reused Code)");
+            clone.setReferralCode(ref.getReferralCode() + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase());
+            clone.setStatus("successful");
+            clone.setSignupDate(LocalDate.now());
+            clone.setRewardAmount(ref.getRewardAmount());
+            clone.setRuleId(ref.getRuleId());
+            clone.setRuleName(ref.getRuleName());
+            clone.setDate(LocalDate.now());
+            applyMarkSuccessfulRequest(clone, req);
+            clone = referralRepository.save(clone);
+            clone.setReferralId("REF-" + String.format("%010d", clone.getId()));
+            clone = referralRepository.save(clone);
+            rewardEngineService.generateRewardsForReferral(clone);
+            return toDTO(clone);
+        }
+
         ref.setStatus("successful");
         ref.setSignupDate(LocalDate.now());
-        return toDTO(referralRepository.save(ref));
+        applyMarkSuccessfulRequest(ref, req);
+        Referral saved = referralRepository.save(ref);
+        rewardEngineService.generateRewardsForReferral(saved);
+        return toDTO(saved);
+    }
+
+    private void applyMarkSuccessfulRequest(Referral ref, MarkSuccessfulRequestDTO req) {
+        if (req == null) return;
+        if (req.getPurchaseAmount() != null) ref.setPurchaseAmount(req.getPurchaseAmount());
+        if (req.getMembershipPlanId() != null) ref.setMembershipPlanId(req.getMembershipPlanId());
+        if (req.getRefereeMemberId() != null) ref.setRefereeMemberId(req.getRefereeMemberId());
     }
 
     public ReferralResponseDTO markExpired(Long id) {
         Referral ref = referralRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Referral not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id));
         ref.setStatus("expired");
         return toDTO(referralRepository.save(ref));
     }
@@ -173,6 +288,73 @@ public class ReferralService {
         return stats;
     }
 
+    @Transactional
+    public String fixRetroactiveRewards() {
+        try {
+            StringBuilder debug = new StringBuilder();
+            debug.append("== DIAGNOSTIC FIX ==\n");
+        List<Referral> all = referralRepository.findAll();
+        for (Referral ref : all) {
+            if (ref.getRewardAmount() == null || ref.getRewardAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                ruleRepository.findByIsActiveTrue().stream()
+                    .filter(r -> "referrer".equalsIgnoreCase(r.getEligibility()) || "both".equalsIgnoreCase(r.getEligibility()))
+                    .findFirst()
+                    .ifPresent(rule -> {
+                        ref.setRuleId(rule.getId());
+                        ref.setRuleName(rule.getName());
+                        ref.setRewardAmount(rule.getValue());
+                        referralRepository.save(ref);
+                    });
+            }
+            if ("successful".equalsIgnoreCase(ref.getStatus())) {
+                List<ReferralReward> existing = rewardRepository.findByReferralId(ref.getId());
+                debug.append("Ref ").append(ref.getId()).append(" (Amt: ").append(ref.getRewardAmount()).append(") has ").append(existing.size()).append(" rewards.\n");
+                
+                debug.append("-> Checking for missing reward generations...\n");
+                rewardEngineService.generateRewardsForReferral(ref);
+                
+                if (ref.getRewardAmount() != null) {
+                    for (ReferralReward r : existing) {
+                        debug.append("  -> Reward ").append(r.getId()).append(": Value=").append(r.getRewardValue()).append(", Status=").append(r.getStatus()).append("\n");
+                        if (r.getRewardValue() != null && r.getRewardValue().compareTo(ref.getRewardAmount()) != 0) {
+                            debug.append("    -> UPDATING value to ").append(ref.getRewardAmount()).append("\n");
+                            r.setRewardValue(ref.getRewardAmount());
+                            rewardRepository.save(r);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Ensure JPA changes are written to the database before native SQL runs
+        rewardRepository.flush();
+        
+        // Fully recalculate wallet balances based on updated rewards
+        jdbcTemplate.execute(
+            "UPDATE members m SET wallet_balance = (" +
+            "  COALESCE((SELECT SUM(reward_value) FROM referral_rewards WHERE member_id = m.member_id AND status = 'REDEEMED' AND reward_type = 'WALLET_CREDIT'), 0) - " +
+            "  COALESCE((SELECT SUM(amount) FROM wallet_transactions WHERE member_id = m.member_id AND type = 'DEBIT'), 0) + " +
+            "  COALESCE((SELECT SUM(amount) FROM wallet_transactions WHERE member_id = m.member_id AND type = 'CREDIT' AND source_type != 'REFERRAL_REWARD'), 0)" +
+            ")"
+        );
+        
+            // Dump member wallet balances
+            jdbcTemplate.query("SELECT member_id, wallet_balance FROM members", (rs, rowNum) -> {
+                debug.append("Member ").append(rs.getString("member_id")).append(" Wallet: ").append(rs.getBigDecimal("wallet_balance")).append("\n");
+                return null;
+            });
+
+            return debug.toString();
+        } catch (Exception e) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("ERROR: ").append(e.getMessage()).append("\n");
+            for (StackTraceElement el : e.getStackTrace()) {
+                sb.append("  ").append(el.toString()).append("\n");
+            }
+            return sb.toString();
+        }
+    }
+
     // ── Reward Rules ───────────────────────────────────────────────────────────
 
     public RewardRuleResponseDTO createRule(RewardRuleRequestDTO req) {
@@ -183,7 +365,7 @@ public class ReferralService {
 
     public RewardRuleResponseDTO updateRule(Long id, RewardRuleRequestDTO req) {
         ReferralRewardRule rule = ruleRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Rule not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Rule not found: " + id));
         mapRuleRequest(req, rule);
         return toRuleDTO(ruleRepository.save(rule));
     }
@@ -194,7 +376,7 @@ public class ReferralService {
 
     public RewardRuleResponseDTO toggleRule(Long id) {
         ReferralRewardRule rule = ruleRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Rule not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Rule not found: " + id));
         rule.setIsActive(!Boolean.TRUE.equals(rule.getIsActive()));
         return toRuleDTO(ruleRepository.save(rule));
     }
@@ -250,6 +432,7 @@ public class ReferralService {
         dto.setNotes(ref.getNotes());
         dto.setRuleId(ref.getRuleId());
         dto.setRuleName(ref.getRuleName());
+        dto.setRewardRedeemed(ref.getRewardRedeemed());
         dto.setCreatedAt(ref.getCreatedAt());
         dto.setUpdatedAt(ref.getUpdatedAt());
         return dto;
@@ -270,6 +453,56 @@ public class ReferralService {
         return dto;
     }
 
+    // ── Reward redemption (member-addons checkout) ────────────────────────────
+
+    /**
+     * The referrer's oldest unredeemed reward from a successful referral, if any
+     * — offered as a discount at checkout (e.g. an add-on purchase).
+     */
+    @Transactional(readOnly = true)
+    public ReferralResponseDTO getUnredeemedReward(String referrerMemberId) {
+        return referralRepository
+                .findByReferrerMemberIdAndStatusAndRewardRedeemedFalseOrderByDateAsc(referrerMemberId, "successful")
+                .stream()
+                .filter(r -> r.getRewardAmount() != null && r.getRewardAmount().signum() > 0)
+                .findFirst()
+                .map(this::toDTO)
+                .orElse(null);
+    }
+
+    public ReferralResponseDTO redeemReward(Long id) {
+        Referral ref = referralRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id));
+        if (Boolean.TRUE.equals(ref.getRewardRedeemed())) {
+            throw new IllegalStateException("This referral's reward has already been redeemed");
+        }
+        ref.setRewardRedeemed(true);
+        return toDTO(referralRepository.save(ref));
+    }
+
+    // ── Expiry enforcement ────────────────────────────────────────────────────
+    // Called by NotificationScheduler. A pending referral whose reward rule
+    // carries an expiryDays window (days since the referral was logged) and
+    // that window has elapsed without the referee signing up is auto-expired,
+    // since ReferralRewardRule.expiryDays was otherwise stored/displayed but
+    // never actually enforced.
+    public void expirePendingReferralsPastDeadline() {
+        LocalDate today = LocalDate.now();
+        List<Referral> pending = referralRepository.findByStatus("pending");
+        List<Referral> toExpire = new ArrayList<>();
+        for (Referral ref : pending) {
+            if (ref.getRuleId() == null || ref.getDate() == null) continue;
+            ruleRepository.findById(ref.getRuleId()).ifPresent(rule -> {
+                if (rule.getExpiryDays() != null
+                        && ref.getDate().plusDays(rule.getExpiryDays()).isBefore(today)) {
+                    toExpire.add(ref);
+                }
+            });
+        }
+        toExpire.forEach(ref -> ref.setStatus("expired"));
+        referralRepository.saveAll(toExpire);
+    }
+
     // ── Referral Code Validation ──────────────────────────────────────────────
 
     /**
@@ -280,11 +513,10 @@ public class ReferralService {
     @Transactional(readOnly = true)
     public ReferralValidationResponseDTO validateByCode(String code) {
         Referral ref = referralRepository.findByReferralCode(code)
-                .orElseThrow(() -> new RuntimeException("Invalid referral code"));
+                .orElseThrow(() -> new EntityNotFoundException("Invalid referral code"));
 
-        if (!"pending".equalsIgnoreCase(ref.getStatus())) {
-            throw new RuntimeException("Referral code has already been used or expired");
-        }
+        // Allow reused codes by not strictly checking for "pending" status here.
+        // If it's already successful, markSuccessful() will clone the referral to reward the referrer again.
 
         ReferralResponseDTO referralDto = toDTO(ref);
 

@@ -1,13 +1,25 @@
 package com.company.project.services;
 
+import com.company.project.dto.ApplyAccessDaysRequestDTO;
+import com.company.project.dto.ApplyAccessDaysResponseDTO;
+import com.company.project.dto.EligibleMemberDTO;
 import com.company.project.dto.PromotionCampaignRequestDTO;
 import com.company.project.dto.PromotionCampaignResponseDTO;
+import com.company.project.entities.Member;
+import com.company.project.entities.MembershipPlan;
+import com.company.project.entities.PromotionAccessDaysAudit;
 import com.company.project.entities.PromotionCampaign;
+import com.company.project.exceptions.EntityNotFoundException;
+import com.company.project.repositories.MemberRepository;
+import com.company.project.repositories.MembershipPlanRepository;
+import com.company.project.repositories.PromotionAccessDaysAuditRepository;
 import com.company.project.repositories.PromotionCampaignRepository;
+import com.company.project.repositories.ReceiptRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -18,9 +30,21 @@ import java.math.BigDecimal;
 public class PromotionCampaignService {
 
     private final PromotionCampaignRepository promotionRepository;
+    private final MemberRepository memberRepository;
+    private final MembershipPlanRepository membershipPlanRepository;
+    private final ReceiptRepository receiptRepository;
+    private final PromotionAccessDaysAuditRepository accessDaysAuditRepository;
 
-    public PromotionCampaignService(PromotionCampaignRepository promotionRepository) {
+    public PromotionCampaignService(PromotionCampaignRepository promotionRepository,
+                                     MemberRepository memberRepository,
+                                     MembershipPlanRepository membershipPlanRepository,
+                                     ReceiptRepository receiptRepository,
+                                     PromotionAccessDaysAuditRepository accessDaysAuditRepository) {
         this.promotionRepository = promotionRepository;
+        this.memberRepository = memberRepository;
+        this.membershipPlanRepository = membershipPlanRepository;
+        this.receiptRepository = receiptRepository;
+        this.accessDaysAuditRepository = accessDaysAuditRepository;
     }
 
     public List<PromotionCampaignResponseDTO> getPromotions(String status) {
@@ -32,7 +56,7 @@ public class PromotionCampaignService {
 
     public PromotionCampaignResponseDTO getPromotionById(Long id) {
         PromotionCampaign promotion = promotionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Promotion not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Promotion not found: " + id));
         return PromotionCampaignResponseDTO.fromEntity(promotion);
     }
 
@@ -44,21 +68,21 @@ public class PromotionCampaignService {
 
     public PromotionCampaignResponseDTO updatePromotion(Long id, PromotionCampaignRequestDTO req) {
         PromotionCampaign promotion = promotionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Promotion not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Promotion not found: " + id));
         applyRequest(promotion, req, false);
         return PromotionCampaignResponseDTO.fromEntity(promotionRepository.save(promotion));
     }
 
     public void deletePromotion(Long id) {
         if (!promotionRepository.existsById(id)) {
-            throw new RuntimeException("Promotion not found: " + id);
+            throw new EntityNotFoundException("Promotion not found: " + id);
         }
         promotionRepository.deleteById(id);
     }
 
     public PromotionCampaignResponseDTO duplicatePromotion(Long id) {
         PromotionCampaign original = promotionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Promotion not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Promotion not found: " + id));
 
         PromotionCampaign copy = new PromotionCampaign();
         copy.setName(original.getName() + " (Copy)");
@@ -133,6 +157,31 @@ public class PromotionCampaignService {
                 .collect(Collectors.toList());
     }
 
+    // ── Status auto-transition ────────────────────────────────────────────────
+    // Called by NotificationScheduler. Status is otherwise purely user/API-set,
+    // so a "scheduled" promotion never flips to "active" when its start date
+    // arrives, and nothing ever flips to "expired" when the end date passes.
+    public void autoTransitionStatuses() {
+        LocalDate today = LocalDate.now();
+
+        List<PromotionCampaign> candidates = new ArrayList<>();
+        candidates.addAll(promotionRepository.findByStatusOrderByCreatedAtDesc("scheduled"));
+        candidates.addAll(promotionRepository.findByStatusOrderByCreatedAtDesc("active"));
+        candidates.addAll(promotionRepository.findByStatusOrderByCreatedAtDesc("paused"));
+
+        List<PromotionCampaign> changed = new ArrayList<>();
+        for (PromotionCampaign p : candidates) {
+            if (p.getEndDate() != null && p.getEndDate().isBefore(today)) {
+                p.setStatus("expired");
+                changed.add(p);
+            } else if ("scheduled".equals(p.getStatus()) && p.getStartDate() != null && !p.getStartDate().isAfter(today)) {
+                p.setStatus("active");
+                changed.add(p);
+            }
+        }
+        if (!changed.isEmpty()) promotionRepository.saveAll(changed);
+    }
+
     // Helpers
     private void applyRequest(PromotionCampaign promotion, PromotionCampaignRequestDTO req, boolean isCreate) {
         if (req.getName() != null) promotion.setName(req.getName());
@@ -190,23 +239,23 @@ public class PromotionCampaignService {
     @Transactional(readOnly = true)
     public PromotionCampaignResponseDTO validateByCode(String code) {
         PromotionCampaign promotion = promotionRepository.findByCodeIgnoreCase(code)
-                .orElseThrow(() -> new RuntimeException("Invalid promotion code"));
+                .orElseThrow(() -> new EntityNotFoundException("Invalid promotion code"));
 
         if (!"active".equalsIgnoreCase(promotion.getStatus())) {
-            throw new RuntimeException("Promotion is not active");
+            throw new IllegalStateException("Promotion is not active");
         }
 
         if (promotion.getEndDate() != null && promotion.getEndDate().isBefore(LocalDate.now())) {
-            throw new RuntimeException("Promotion has expired");
+            throw new IllegalStateException("Promotion has expired");
         }
 
         if (promotion.getStartDate() != null && promotion.getStartDate().isAfter(LocalDate.now())) {
-            throw new RuntimeException("Promotion has not started yet");
+            throw new IllegalStateException("Promotion has not started yet");
         }
 
         if (promotion.getUsageLimit() != null && promotion.getUsageCount() != null
                 && promotion.getUsageCount() >= promotion.getUsageLimit()) {
-            throw new RuntimeException("Promotion usage limit has been reached");
+            throw new IllegalStateException("Promotion usage limit has been reached");
         }
 
         return PromotionCampaignResponseDTO.fromEntity(promotion);
@@ -217,7 +266,7 @@ public class PromotionCampaignService {
      */
     public PromotionCampaignResponseDTO redeemPromotion(Long id, BigDecimal revenue, BigDecimal savings) {
         PromotionCampaign promotion = promotionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Promotion not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Promotion not found: " + id));
 
         int currentCount = promotion.getUsageCount() != null ? promotion.getUsageCount() : 0;
         promotion.setUsageCount(currentCount + 1);
@@ -233,6 +282,139 @@ public class PromotionCampaignService {
         }
 
         return PromotionCampaignResponseDTO.fromEntity(promotionRepository.save(promotion));
+    }
+
+    // ── Promotional Access Days ───────────────────────────────────────────────
+
+    /**
+     * Real member data shaped for the frontend's policyRuleEngine.ts Member type,
+     * so the eligibility preview evaluates actual members instead of hardcoded
+     * sample data.
+     */
+    @Transactional(readOnly = true)
+    public List<EligibleMemberDTO> getEligibilityMembers() {
+        List<Member> members = memberRepository.findAll();
+        List<EligibleMemberDTO> result = new ArrayList<>();
+
+        for (Member m : members) {
+            EligibleMemberDTO dto = new EligibleMemberDTO();
+            dto.setId(String.valueOf(m.getId()));
+            dto.setName(m.getName());
+            dto.setEmail(m.getEmail());
+            String joined = m.getJoinDate() != null ? m.getJoinDate().toLocalDate().toString() : null;
+            dto.setJoinedAt(joined);
+            dto.setPurchaseDate(joined);
+
+            // "individual / family / corporate" (what the eligibility rule engine's
+            // membership_type condition expects) lives on the plan's planType, not on
+            // Member.membershipType (which is the Basic/Standard/Premium/VIP tier).
+            if (m.getMembershipPlan() != null) {
+                membershipPlanRepository.findByName(m.getMembershipPlan()).ifPresent(plan -> {
+                    int months = planDurationInMonths(plan);
+                    dto.setCurrentPlan(new EligibleMemberDTO.CurrentPlan(m.getMembershipPlan(), months));
+                    if (plan.getPlanType() != null) {
+                        dto.setMembershipType(plan.getPlanType().toLowerCase());
+                    }
+                });
+            }
+
+            long renewals = m.getId() != null
+                    ? receiptRepository.countByMemberDbIdAndTransactionType(m.getId(), "Renewal")
+                    : 0;
+            dto.setRenewalCount((int) renewals);
+
+            result.add(dto);
+        }
+        return result;
+    }
+
+    private int planDurationInMonths(MembershipPlan plan) {
+        int val;
+        try {
+            val = Integer.parseInt(plan.getDurationValue());
+        } catch (Exception e) {
+            return 0;
+        }
+        String type = plan.getDurationType();
+        if (type == null) return val;
+        switch (type.toLowerCase()) {
+            case "monthly":
+            case "months":
+                return val;
+            case "annual":
+            case "annually":
+            case "yearly":
+            case "years":
+                return val * 12;
+            case "quarterly":
+                return val * 3;
+            case "weekly":
+            case "weeks":
+                return 0;
+            default:
+                return val;
+        }
+    }
+
+    /**
+     * Actually grants the matched members their promotional access days by
+     * extending their membership expiry, instead of the frontend's previous
+     * simulate-and-toast behavior. Idempotent per (promotion, member) via
+     * PromotionAccessDaysAudit's unique constraint — re-applying the same
+     * promotion never double-grants a member who was already applied.
+     */
+    public ApplyAccessDaysResponseDTO applyAccessDays(ApplyAccessDaysRequestDTO req) {
+        if (req.getPromotionId() == null) {
+            throw new IllegalArgumentException("promotionId is required");
+        }
+        PromotionCampaign promotion = promotionRepository.findById(req.getPromotionId())
+                .orElseThrow(() -> new EntityNotFoundException("Promotion not found: " + req.getPromotionId()));
+
+        List<ApplyAccessDaysRequestDTO.Match> matches = req.getMatches() != null ? req.getMatches() : List.of();
+        LocalDateTime now = LocalDateTime.now();
+
+        int appliedCount = 0;
+        int totalDays = 0;
+        List<String> skipped = new ArrayList<>();
+
+        for (ApplyAccessDaysRequestDTO.Match match : matches) {
+            Long memberId;
+            try {
+                memberId = match.getMemberId() != null ? Long.valueOf(match.getMemberId()) : null;
+            } catch (NumberFormatException e) {
+                memberId = null;
+            }
+
+            if (memberId == null || match.getRewardDays() == null || match.getRewardDays() <= 0
+                    || accessDaysAuditRepository.existsByPromotionIdAndMemberId(promotion.getId(), memberId)) {
+                skipped.add(match.getMemberId());
+                continue;
+            }
+
+            Member member = memberRepository.findById(memberId).orElse(null);
+            if (member == null) {
+                skipped.add(match.getMemberId());
+                continue;
+            }
+
+            LocalDateTime base = member.getExpiryDate() != null ? member.getExpiryDate() : now;
+            LocalDateTime newExpiry = base.plusDays(match.getRewardDays());
+            member.setExpiryDate(newExpiry);
+            member.setMembershipEndDate(newExpiry);
+            memberRepository.save(member);
+
+            PromotionAccessDaysAudit audit = new PromotionAccessDaysAudit();
+            audit.setPromotionId(promotion.getId());
+            audit.setMemberId(memberId);
+            audit.setRuleId(match.getRuleId());
+            audit.setAppliedDays(match.getRewardDays());
+            accessDaysAuditRepository.save(audit);
+
+            appliedCount++;
+            totalDays += match.getRewardDays();
+        }
+
+        return new ApplyAccessDaysResponseDTO(true, appliedCount, skipped.size(), totalDays, now, skipped);
     }
 }
 

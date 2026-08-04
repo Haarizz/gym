@@ -94,6 +94,32 @@ export interface PromotionRequest {
   policyConfigJson?: string;
 }
 
+export interface EligibleMemberApi {
+  id: string;
+  name: string;
+  email?: string | null;
+  membershipType?: string | null;
+  joinedAt?: string | null;
+  currentPlan?: { name: string; durationMonths: number } | null;
+  renewalCount?: number | null;
+  purchaseDate?: string | null;
+}
+
+export interface AccessDaysMatch {
+  ruleId: string;
+  memberId: string;
+  rewardDays: number;
+}
+
+export interface ApplyAccessDaysResult {
+  success: boolean;
+  appliedCount: number;
+  skippedCount: number;
+  totalDaysApplied: number;
+  appliedAt: string;
+  skippedMemberIds: string[];
+}
+
 class PromotionsService {
   async getPromotions(status?: string): Promise<PromotionApi[]> {
     const params = new URLSearchParams();
@@ -214,6 +240,32 @@ class PromotionsService {
       { method: "POST" }
     );
     if (!response.ok) throw new Error(`Failed to redeem promotion: ${response.status}`);
+    return response.json();
+  }
+
+  /**
+   * Real member data shaped for the policyRuleEngine, used to preview and
+   * apply Promotional Access Days rules against actual members.
+   */
+  async getEligibilityMembers(): Promise<EligibleMemberApi[]> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/promotions/eligibility-members`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch eligibility members: ${response.status}`);
+    return response.json();
+  }
+
+  /**
+   * Durably grants the matched members their promotional access days
+   * (extends membership expiry) and records an audit trail. Idempotent per
+   * (promotion, member) on the backend.
+   */
+  async applyAccessDays(promotionId: number, matches: AccessDaysMatch[]): Promise<ApplyAccessDaysResult> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/promotions/apply-access-days`,
+      { method: "POST", body: JSON.stringify({ promotionId, matches }) }
+    );
+    if (!response.ok) throw new Error(`Failed to apply access days: ${response.status}`);
     return response.json();
   }
 }

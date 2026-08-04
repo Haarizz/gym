@@ -66,12 +66,8 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
-import {
-  getNextRewardForMember,
-  getTotalUnredeemedAmount,
-  applyRewardToTransaction,
-  type ReferralReward
-} from "../utils/referral-rewards";
+import { referralService, ReferralResponse } from "../utils/supabase/referral-service";
+import { walletService } from "../utils/supabase/reward-service";
 import { membersService, Member as ApiMember } from "../utils/supabase/members-service";
 import { addonsService, MemberAddon } from "../utils/supabase/addons-service";
 import { addonPlansService, AddonPlan as ApiAddonPlan } from "../utils/supabase/addon-plans-service";
@@ -300,11 +296,16 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     }
   };
 
-  // Reward Redemption States
-  const [availableReward, setAvailableReward] = useState<ReferralReward | null>(null);
-  const [showRewardModal, setShowRewardModal] = useState(false);
+  // Reward Redemption — the referrer's unredeemed reward from a successful
+  // referral (real backend: ReferralRewardRule/Referral), offered as a
+  // discount on this add-on purchase.
+  const [availableReward, setAvailableReward] = useState<ReferralResponse | null>(null);
   const [rewardApplied, setRewardApplied] = useState(false);
-  const [finalAmountAfterReward, setFinalAmountAfterReward] = useState<number>(0);
+
+  // Wallet — reward wallet credit balance the member can apply toward this
+  // purchase (see reward-service.tsx / WalletController).
+  const [memberWalletBalance, setMemberWalletBalance] = useState(0);
+  const [walletAmountApplied, setWalletAmountApplied] = useState(0);
 
   // Load transactions from API on mount
   useEffect(() => {
@@ -426,7 +427,28 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     setCustomValidity(addon.validity);
     setCustomAmount(addon.price);
     setMinorPaidNow(String(addon.price));
+    setRewardApplied(false);
+    setAvailableReward(null);
+    setWalletAmountApplied(0);
+    setMemberWalletBalance(0);
+    referralService.getUnredeemedReward(selectedMember.membershipId)
+      .then(setAvailableReward)
+      .catch(() => {}); // no reward to offer — not a purchase-blocking failure
+    walletService.getWallet(selectedMember.membershipId)
+      .then(w => setMemberWalletBalance(w.balance))
+      .catch(() => {}); // no wallet / not fetchable — not a purchase-blocking failure
     setIsPurchaseDialogOpen(true);
+  };
+
+  const handleApplyReward = () => {
+    setRewardApplied(true);
+  };
+
+  const handleApplyWallet = () => {
+    if (!memberWalletBalance) return;
+    const remainingBeforeWallet = Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0));
+    const amount = Math.min(memberWalletBalance, remainingBeforeWallet);
+    setWalletAmountApplied(amount);
   };
 
   const calculateNewExpiry = () => {
@@ -441,7 +463,9 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   };
 
   const handleConfirmPurchase = async () => {
-    if (!selectedMember || !selectedAddon || !customAmount) return;
+    if (!selectedMember || !selectedAddon || customAmount === undefined || customAmount < 0) return;
+
+    const amountToPay = Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) - walletAmountApplied);
 
     const billedToHead = selectedMember.billedToHead;
     // A billed-to-head member's fee may be left partially or fully unpaid
@@ -449,8 +473,8 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     // instead of theirs. Any other member's add-on is always fully paid,
     // same as before.
     const paidNowAmount = billedToHead
-      ? Math.max(0, Math.min(customAmount, parseFloat(minorPaidNow || "0") || 0))
-      : customAmount;
+      ? Math.max(0, Math.min(amountToPay, parseFloat(minorPaidNow || "0") || 0))
+      : amountToPay;
 
     const legKey = ADDON_METHOD_TO_LEG_KEY[paymentMethod];
     if (paidNowAmount > 0 && legKey && legKey !== 'cash') {
@@ -469,9 +493,14 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       const paymentBreakdown = paidNowAmount > 0 && legKey && legKey !== 'cash'
         ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: paidNowAmount }, methodDetails, bankAccounts)
         : undefined;
-      // "Credit" mirrors this app's convention elsewhere (Add Member, renewals):
-      // only ever the stored method label when nothing has been received yet.
-      const paymentModeToSend = billedToHead && paidNowAmount <= 0 ? "Credit" : paymentMethod;
+        
+      let paymentModeToSend = paymentMethod;
+      if (amountToPay === 0) {
+        if (walletAmountApplied > 0) paymentModeToSend = "Wallet";
+        else if (rewardApplied) paymentModeToSend = "Reward";
+      } else if (billedToHead && paidNowAmount <= 0) {
+        paymentModeToSend = "Credit";
+      }
       const created = await addonsService.createAddon({
         member_db_id: Number(selectedMember.id),
         member_id: selectedMember.membershipId,
@@ -487,10 +516,23 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
         payment_breakdown: paymentBreakdown,
         paid_amount: billedToHead ? paidNowAmount : undefined,
       });
+      if (rewardApplied && availableReward) {
+        // Best-effort: the add-on purchase already succeeded, so a failure here
+        // (e.g. someone else redeemed it a moment earlier) shouldn't undo it.
+        referralService.redeemReward(availableReward.id).catch(() => {});
+      }
+      if (walletAmountApplied > 0) {
+        walletService.debit(
+          selectedMember.membershipId, walletAmountApplied, 'BILLING_USE', Number(created.id),
+          `Applied to add-on purchase ${created.transaction_id}`
+        ).catch(() => {});
+      }
       setTransactions(prev => [created, ...prev]);
       setLastCreatedAddon(created);
       setIsPurchaseDialogOpen(false);
       setIsSuccessDialogOpen(true);
+      setAvailableReward(null);
+      setRewardApplied(false);
       setNotes("");
       setPaymentMethod("Cash");
       setMethodDetails(EMPTY_SPLIT_DETAILS);
@@ -987,10 +1029,62 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                     id="amount"
                     type="number"
                     value={customAmount}
-                    onChange={(e) => setCustomAmount(Number(e.target.value))}
+                    onChange={(e) => {
+                      setCustomAmount(Number(e.target.value));
+                      setWalletAmountApplied(0); // reset on manual change
+                      setRewardApplied(false);
+                    }}
                   />
                 </div>
               </div>
+
+              {/* Referral reward available for this member */}
+              {availableReward && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-900">
+                      Referral reward available: {currencyCode} {availableReward.rewardAmount}
+                    </p>
+                    <p className="text-[11px] text-emerald-800">
+                      {rewardApplied ? "Applied to this purchase." : `From referring ${availableReward.refereeName}.`}
+                    </p>
+                  </div>
+                  {!rewardApplied && customAmount > 0 && (
+                    <Button size="sm" variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-100" onClick={handleApplyReward}>
+                      Apply
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Wallet balance available for this member */}
+              {memberWalletBalance > 0 && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-blue-900">
+                      Wallet balance available: {currencyCode} {memberWalletBalance}
+                    </p>
+                    <p className="text-[11px] text-blue-800">
+                      {walletAmountApplied > 0 ? `${currencyCode} ${walletAmountApplied} applied to this purchase.` : "Use it toward this purchase."}
+                    </p>
+                  </div>
+                  {walletAmountApplied === 0 && customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) > 0 && (
+                    <Button size="sm" variant="outline" className="border-blue-300 text-blue-800 hover:bg-blue-100" onClick={handleApplyWallet}>
+                      Use Wallet
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Outstanding Amount to Pay */}
+              {customAmount > 0 && (rewardApplied || walletAmountApplied > 0) && (
+                <div className="flex items-center justify-between px-4 py-2 bg-muted/20 border rounded-xl">
+                  <span className="text-sm font-medium">Balance to Pay</span>
+                  <span className="text-sm font-bold text-primary">
+                    {currencyCode} {Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) - walletAmountApplied).toFixed(2)}
+                  </span>
+                </div>
+              )}
 
               {/* Family billing notice + partial payment, only for a member billed to a family head */}
               {selectedMember?.billedToHead && (

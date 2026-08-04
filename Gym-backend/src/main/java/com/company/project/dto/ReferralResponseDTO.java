@@ -26,6 +26,7 @@ public class ReferralResponseDTO {
     private String notes;
     private Long ruleId;
     private String ruleName;
+    private Boolean rewardRedeemed;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
@@ -83,6 +84,9 @@ public class ReferralResponseDTO {
 
     public String getRuleName() { return ruleName; }
     public void setRuleName(String ruleName) { this.ruleName = ruleName; }
+
+    public Boolean getRewardRedeemed() { return rewardRedeemed; }
+    public void setRewardRedeemed(Boolean rewardRedeemed) { this.rewardRedeemed = rewardRedeemed; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

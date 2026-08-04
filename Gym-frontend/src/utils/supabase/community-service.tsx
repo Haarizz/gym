@@ -24,6 +24,20 @@ export interface CommunityEngagementStats {
   weekly: CommunityWeeklyPoint[];
 }
 
+export interface TrendingTopic {
+  topic: string;
+  postCount: number;
+}
+
+export interface LeaderboardEntry {
+  userId: number;
+  username: string;
+  totalPosts: number;
+  totalLikes: number;
+  totalComments: number;
+  engagementScore: number;
+}
+
 class CommunityService {
   async getEngagementStats(): Promise<CommunityEngagementStats> {
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/community/stats`, {
@@ -49,6 +63,35 @@ class CommunityService {
       })),
     };
   }
+
+  async getTrendingTopics(): Promise<TrendingTopic[]> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/community/stats/trending-topics`, {
+      method: "GET",
+    });
+    if (!res.ok) throw new Error("Failed to fetch trending topics");
+    const data = await res.json();
+    return (data ?? []).map((t: any) => ({
+      topic: t.topic ?? "",
+      postCount: t.postCount ?? 0,
+    }));
+  }
+
+  async getLeaderboard(): Promise<LeaderboardEntry[]> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/community/stats/leaderboard`, {
+      method: "GET",
+    });
+    if (!res.ok) throw new Error("Failed to fetch leaderboard");
+    const data = await res.json();
+    return (data ?? []).map((e: any) => ({
+      userId: e.userId ?? 0,
+      username: e.username ?? "Unknown",
+      totalPosts: e.totalPosts ?? 0,
+      totalLikes: e.totalLikes ?? 0,
+      totalComments: e.totalComments ?? 0,
+      engagementScore: e.engagementScore ?? 0,
+    }));
+  }
 }
 
 export const communityService = new CommunityService();
+

@@ -219,6 +219,69 @@ public class CommunityService {
         return dto;
     }
 
+    /**
+     * Trending topics — aggregates non-archived posts from the last 30 days,
+     * groups by topic, counts posts per topic, returns top 10.
+     */
+    @Transactional(readOnly = true)
+    public List<TrendingTopicDTO> getTrendingTopics() {
+        LocalDate cutoff = LocalDate.now().minusDays(30);
+        List<CommunityPost> recentPosts = communityPostRepository.findAll().stream()
+                .filter(p -> !p.isArchived())
+                .filter(p -> p.getCreatedAt() != null && !p.getCreatedAt().toLocalDate().isBefore(cutoff))
+                .collect(Collectors.toList());
+
+        Map<String, Integer> topicCounts = new LinkedHashMap<>();
+        for (CommunityPost p : recentPosts) {
+            String topic = p.getTopic();
+            if (topic == null || topic.isBlank()) continue;
+            topicCounts.merge(topic.trim(), 1, Integer::sum);
+        }
+
+        return topicCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(10)
+                .map(e -> new TrendingTopicDTO(e.getKey(), e.getValue()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Leaderboard — aggregates all non-archived posts by author, sums likes +
+     * comments as an engagement score, returns top 10 users.
+     */
+    @Transactional(readOnly = true)
+    public List<LeaderboardEntryDTO> getLeaderboard() {
+        List<CommunityPost> posts = communityPostRepository.findAll().stream()
+                .filter(p -> !p.isArchived())
+                .collect(Collectors.toList());
+
+        // userId → [postCount, totalLikes, totalComments]
+        Map<Long, long[]> agg = new LinkedHashMap<>();
+        Map<Long, String> userNames = new LinkedHashMap<>();
+
+        for (CommunityPost p : posts) {
+            User author = p.getAuthorUser();
+            if (author == null || author.getId() == null) continue;
+            Long uid = author.getId();
+            userNames.putIfAbsent(uid, author.getUsername());
+            long[] counts = agg.computeIfAbsent(uid, k -> new long[3]);
+            counts[0]++;
+            counts[1] += p.getLikeCount();
+            counts[2] += p.getCommentCount();
+        }
+
+        return agg.entrySet().stream()
+                .map(e -> new LeaderboardEntryDTO(
+                        e.getKey(),
+                        userNames.getOrDefault(e.getKey(), "Unknown"),
+                        (int) e.getValue()[0],
+                        e.getValue()[1],
+                        e.getValue()[2]))
+                .sorted(Comparator.comparingLong(LeaderboardEntryDTO::getEngagementScore).reversed())
+                .limit(10)
+                .collect(Collectors.toList());
+    }
+
     public List<CommunityPostCommentResponseDTO> getComments(Long postId) {
         List<CommunityPostComment> comments = communityPostCommentRepository.findByPostIdOrderByCreatedAtAsc(postId);
         return comments.stream().map(this::toCommentResponse).collect(Collectors.toList());

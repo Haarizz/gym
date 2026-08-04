@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MemberApprovalModal } from "../components/shared/member-approval-modal";
 import { MemberAddons } from "./member-addons";
 import { MemberReceipts } from "./member-receipts";
+import { rewardService, walletService, type ReferralReward, type Wallet as RewardWallet } from "../utils/supabase/reward-service";
 import { 
   Plus, 
   Search, 
@@ -141,6 +142,26 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [profileMember, setProfileMember] = useState<Member | null>(null);
+  const [profileRewards, setProfileRewards] = useState<ReferralReward[]>([]);
+  const [profileWallet, setProfileWallet] = useState<RewardWallet | null>(null);
+  const [profileRewardsLoading, setProfileRewardsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isProfileDialogOpen || !profileMember) {
+      setProfileRewards([]);
+      setProfileWallet(null);
+      return;
+    }
+    const memberBusinessId = String(profileMember.member_id || profileMember.id);
+    setProfileRewardsLoading(true);
+    Promise.all([
+      rewardService.getByMember(memberBusinessId).catch(() => []),
+      walletService.getWallet(memberBusinessId).catch(() => null),
+    ]).then(([rewards, wallet]) => {
+      setProfileRewards(rewards);
+      setProfileWallet(wallet);
+    }).finally(() => setProfileRewardsLoading(false));
+  }, [isProfileDialogOpen, profileMember]);
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
   const [photoViewer, setPhotoViewer] = useState<{ src: string; name: string } | null>(null);
   
@@ -1526,6 +1547,52 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           </div>
                         </div>
                       )}
+                      {/* Rewards & Wallet */}
+                      <div className="border-t pt-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Rewards & Wallet</p>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm text-muted-foreground">Wallet Balance</span>
+                          <span className="text-sm font-semibold text-primary">
+                            <CurrencyGlyph /> {(profileWallet?.balance ?? 0).toLocaleString()}
+                          </span>
+                        </div>
+                        {profileRewardsLoading ? (
+                          <p className="text-sm text-muted-foreground">Loading rewards…</p>
+                        ) : profileRewards.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No rewards yet.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {(['AVAILABLE', 'CLAIMED', 'REDEEMED', 'EXPIRED'] as const).map((group) => {
+                              const items = profileRewards.filter(r => r.status === group);
+                              if (items.length === 0) return null;
+                              return (
+                                <div key={group}>
+                                  <p className="text-[11px] font-medium text-muted-foreground mb-1">
+                                    {group === 'AVAILABLE' ? 'Available' : group === 'CLAIMED' ? 'Claimed' : group === 'REDEEMED' ? 'Redeemed' : 'Expired'} ({items.length})
+                                  </p>
+                                  <div className="space-y-1">
+                                    {items.map((r) => (
+                                      <div key={r.id} className="flex items-center justify-between text-sm">
+                                        <span>{r.rewardName}</span>
+                                        <Badge
+                                          className={
+                                            r.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' :
+                                            r.status === 'CLAIMED' ? 'bg-blue-100 text-blue-800' :
+                                            r.status === 'REDEEMED' ? 'bg-gray-100 text-gray-700' :
+                                            'bg-red-100 text-red-700'
+                                          }
+                                        >
+                                          {r.status}
+                                        </Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </DialogContent>

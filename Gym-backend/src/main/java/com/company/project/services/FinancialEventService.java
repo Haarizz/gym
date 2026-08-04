@@ -44,6 +44,7 @@ import java.util.Optional;
  *   2100  Tax / GST Payable
  *   2200  GST Input Credit
  *   2300  Deferred Revenue
+ *   2400  Reward Wallet Liability
  *
  *   REVENUE
  *   4000  Membership Revenue
@@ -54,6 +55,7 @@ import java.util.Optional;
  *   5000  Salary Expense
  *   5100  Maintenance Expense
  *   5200  Purchase / COGS
+ *   5300  Referral & Loyalty Rewards Expense
  *   5700  Miscellaneous Expense
  */
 @Service
@@ -79,7 +81,9 @@ public class FinancialEventService {
     public static final String ACC_SALARY_EXPENSE      = "5000";
     public static final String ACC_MAINTENANCE_EXPENSE = "5100";
     public static final String ACC_PURCHASE_COGS       = "5200";
+    public static final String ACC_REWARD_EXPENSE      = "5300";
     public static final String ACC_MISC_EXPENSE        = "5700";
+    public static final String ACC_REWARD_LIABILITY    = "2400";
 
     private final JournalVoucherRepository          jvRepo;
     private final JournalVoucherLineRepository      lineRepo;
@@ -474,6 +478,61 @@ public class FinancialEventService {
         registerSource("ReceiptVoucher", voucher.getId(), "RECEIPT_VOUCHER", jv.getId());
     }
 
+    /**
+     * REWARDS — a WALLET_CREDIT or CASH referral/loyalty reward is issued
+     * (approved/generated and ready to use, or immediately auto-applied).
+     * DR  Referral & Loyalty Rewards Expense   (rewardValue)
+     * CR  Reward Wallet Liability              (rewardValue)
+     *
+     * Coupon/membership/PT/class/gift/points rewards are not posted here — they
+     * either have no direct cash cost (points) or their cost is realized through
+     * the receipt they're eventually applied to (discount) rather than as a
+     * standalone liability.
+     */
+    public void onReferralRewardIssued(ReferralReward reward) {
+        if (alreadyJournaled("ReferralReward", reward.getId())) return;
+
+        BigDecimal amount = safe(reward.getRewardValue());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = List.of(
+                dr(ACC_REWARD_EXPENSE, "Referral & Loyalty Rewards Expense", amount,
+                        "Reward issued — " + reward.getRewardCode() + " (" + reward.getMemberId() + ")"),
+                cr(ACC_REWARD_LIABILITY, "Reward Wallet Liability", amount,
+                        "Reward payable — " + reward.getRewardCode())
+        );
+
+        JournalVoucher jv = createAndPost(
+                "Reward Issued: " + reward.getRewardCode() + " — " + reward.getMemberId(),
+                LocalDate.now(), lines, "REWARDS");
+        registerSource("ReferralReward", reward.getId(), "REWARDS", jv.getId());
+    }
+
+    /**
+     * REWARDS — a CASH reward is actually paid out to the member (settles the
+     * liability booked by onReferralRewardIssued()).
+     * DR  Reward Wallet Liability              (rewardValue)
+     * CR  Cash in Hand                         (rewardValue)
+     */
+    public void onReferralRewardPaidOut(ReferralReward reward) {
+        if (alreadyJournaled("ReferralRewardPayout", reward.getId())) return;
+
+        BigDecimal amount = safe(reward.getRewardValue());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = List.of(
+                dr(ACC_REWARD_LIABILITY, "Reward Wallet Liability", amount,
+                        "Cash payout — " + reward.getRewardCode()),
+                cr(ACC_CASH_IN_HAND, "Cash in Hand", amount,
+                        "Cash payout — " + reward.getRewardCode() + " (" + reward.getMemberId() + ")")
+        );
+
+        JournalVoucher jv = createAndPost(
+                "Reward Cash Payout: " + reward.getRewardCode() + " — " + reward.getMemberId(),
+                LocalDate.now(), lines, "REWARDS");
+        registerSource("ReferralRewardPayout", reward.getId(), "REWARDS", jv.getId());
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  INTERNAL MACHINERY
     // ─────────────────────────────────────────────────────────────────────────
@@ -583,13 +642,19 @@ public class FinancialEventService {
         if (method == null) return ACC_CASH_IN_HAND;
         return switch (method.toUpperCase()) {
             case "CASH", "CASH IN HAND" -> ACC_CASH_IN_HAND;
-            default -> ACC_CASH_AT_BANK;  // CARD, CHEQUE, ONLINE, BANK_TRANSFER, WALLET
+            // A "Wallet" leg is the member spending previously-issued reward credit,
+            // not real cash coming in — it draws down the liability booked by
+            // onReferralRewardIssued() rather than falsely inflating cash/bank.
+            case "WALLET" -> ACC_REWARD_LIABILITY;
+            default -> ACC_CASH_AT_BANK;  // CARD, CHEQUE, ONLINE, BANK_TRANSFER
         };
     }
 
     /** Human-readable name for a cash/bank account code, for journal line descriptions. */
     private static String cashAccountName(String code) {
-        return ACC_CASH_AT_BANK.equals(code) ? "Cash at Bank" : "Cash in Hand";
+        if (ACC_CASH_AT_BANK.equals(code)) return "Cash at Bank";
+        if (ACC_REWARD_LIABILITY.equals(code)) return "Reward Wallet Liability";
+        return "Cash in Hand";
     }
 
     /**

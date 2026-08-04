@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -21,6 +21,8 @@ import {
 } from "../components/ui/dropdown-menu";
 import { cn } from "../components/ui/utils";
 import api from "../api/axiosConfig";
+import { communityService, TrendingTopic, LeaderboardEntry, CommunityEngagementStats } from "../utils/supabase/community-service";
+import { membersService } from "../utils/supabase/members-service";
 import {
   Calendar,
   ChevronRight,
@@ -213,23 +215,7 @@ const safeFormatTime = (isoString?: string) => {
   return formatDistanceToNow(date, { addSuffix: true });
 };
 
-const upcomingEvents: CommunityEvent[] = [
-  { id: 1, title: "HIIT Challenge Week", date: "Oct 1-7, 2024", participants: 45, description: "A seven-day high-intensity challenge with daily scoreboards and recovery guidance.", location: "Studio A", host: "Coach Riya" },
-  { id: 2, title: "Nutrition Workshop", date: "Oct 12, 2024", participants: 23, description: "Meal prep systems, portion guidance, and practical grocery planning for busy members.", location: "Community Lounge", host: "Coach Daniel" },
-  { id: 3, title: "Yoga Retreat Weekend", date: "Oct 19-20, 2024", participants: 18, description: "A slower weekend flow focused on mobility, breathwork, and stress recovery.", location: "Lakeside Park", host: "Coach Maya" },
-];
-
-const achievements: MemberAchievement[] = [
-  { id: 1, member: "Sarah Johnson", achievement: "Deadlift PR - 185 lbs", date: "Today", badge: "strength", summary: "Improved by 10 lbs over the previous best." },
-  { id: 2, member: "David Thompson", achievement: "30-Day Streak", date: "Yesterday", badge: "consistency", summary: "Logged a full month of uninterrupted workouts." },
-  { id: 3, member: "Lisa Wong", achievement: "First 5K Run", date: "2 days ago", badge: "cardio", summary: "Completed her first 5K after six weeks of training." },
-];
-
-const leaderboardCards = [
-  { title: "Workout Streak", description: "Consecutive training days", rows: [{ rank: "1", name: "David Thompson", value: "30 days" }, { rank: "2", name: "Sarah Johnson", value: "28 days" }, { rank: "3", name: "Mike Chen", value: "25 days" }] },
-  { title: "Monthly Visits", description: "Most visits this month", rows: [{ rank: "1", name: "Lisa Wong", value: "22 visits" }, { rank: "2", name: "Emily Rodriguez", value: "20 visits" }, { rank: "3", name: "Sarah Johnson", value: "19 visits" }] },
-  { title: "Community Points", description: "Engagement score leaders", rows: [{ rank: "1", name: "Mike Chen", value: "1,250 pts" }, { rank: "2", name: "Sarah Johnson", value: "1,180 pts" }, { rank: "3", name: "David Thompson", value: "1,095 pts" }] },
-];
+// Events, achievements, and leaderboard are now fetched from the backend — no hardcoded arrays.
 
 const getAspectRatioValue = (aspectRatio: CropRatioOption) => {
   switch (aspectRatio) {
@@ -285,6 +271,12 @@ export function Community() {
   const [isDeletingPostId, setIsDeletingPostId] = useState<number | null>(null);
   const [isDeletingCommentId, setIsDeletingCommentId] = useState<number | null>(null);
 
+  // Real data state
+  const [activeMemberCount, setActiveMemberCount] = useState(0);
+  const [trendingTopics, setTrendingTopics] = useState<TrendingTopic[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [engagementStats, setEngagementStats] = useState<CommunityEngagementStats | null>(null);
+
   const currentUserId = useMemo(() => Number(sessionStorage.getItem("userId") ?? NaN), []);
   const currentRoles = useMemo(() => {
     try {
@@ -305,6 +297,28 @@ export function Community() {
     isAdmin || (Number.isFinite(currentUserId) && Number(comment.authorUserId) === Number(currentUserId));
 
   const filteredPosts = feedPosts;
+
+  // Fetch real sidebar / stats data
+  const loadRealData = useCallback(async () => {
+    try {
+      const [membersResp, topics, board, engagement] = await Promise.all([
+        membersService.getMembers({ status: "active" }, { page: 1, limit: 1 }).catch(() => ({ members: [], pagination: { total: 0 } } as any)),
+        communityService.getTrendingTopics().catch(() => []),
+        communityService.getLeaderboard().catch(() => []),
+        communityService.getEngagementStats().catch(() => null),
+      ]);
+      setActiveMemberCount(membersResp?.pagination?.total ?? membersResp?.members?.length ?? 0);
+      setTrendingTopics(topics);
+      setLeaderboard(board);
+      setEngagementStats(engagement);
+    } catch {
+      // silent — best-effort
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRealData();
+  }, [loadRealData]);
 
   const deletePost = async (post: CommunityPost) => {
     if (isDeletingPostId != null) return;
@@ -432,12 +446,38 @@ export function Community() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, feedFilter, feedView]);
 
-  const stats = useMemo(() => ({
-    activeMembers: 410,
-    postsToday: feedPosts.length,
-    openChallenges: 3,
-    eventRsvps: upcomingEvents.reduce((sum, event) => sum + event.participants, 0),
-  }), [feedPosts.length]);
+  // Compute engagement week-over-week change from real data
+  const engagementDelta = useMemo(() => {
+    if (!engagementStats || engagementStats.weekly.length < 2) return null;
+    const weeks = engagementStats.weekly;
+    const current = weeks[weeks.length - 1];
+    const previous = weeks[weeks.length - 2];
+    const curTotal = current.likes + current.comments;
+    const prevTotal = previous.likes + previous.comments;
+    if (prevTotal === 0) return curTotal > 0 ? 100 : 0;
+    return Math.round(((curTotal - prevTotal) / prevTotal) * 100);
+  }, [engagementStats]);
+
+  const topTopic = useMemo(() => {
+    if (trendingTopics.length > 0) return trendingTopics[0].topic;
+    return null;
+  }, [trendingTopics]);
+
+  // Achievement-type posts from the feed
+  const achievementPosts = useMemo(
+    () => feedPosts.filter((p) => p.type === "achievement"),
+    [feedPosts],
+  );
+
+  const stats = useMemo(() => {
+    const distinctTypes = new Set(feedPosts.map((p) => p.type));
+    return {
+      activeMembers: activeMemberCount,
+      postsToday: feedPosts.length,
+      postTypes: distinctTypes.size,
+      totalEngagement: engagementStats ? engagementStats.totalLikes + engagementStats.totalComments : 0,
+    };
+  }, [feedPosts, activeMemberCount, engagementStats]);
 
   const resetPostDraft = () => {
     setPostDraft(createEmptyPostDraft());
@@ -748,27 +788,27 @@ export function Community() {
 
         <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Open Challenges</CardTitle>
+            <CardTitle className="text-sm font-medium text-primary">Post Types</CardTitle>
             <div className="rounded-lg bg-orange-50 p-2">
               <Target className="h-4 w-4 text-orange-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-700">{stats.openChallenges}</div>
-            <p className="text-xs text-muted-foreground">Current accountability and challenge tracks</p>
+            <div className="text-2xl font-bold text-orange-700">{stats.postTypes}</div>
+            <p className="text-xs text-muted-foreground">Distinct content categories in the feed</p>
           </CardContent>
         </Card>
 
         <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Event RSVPs</CardTitle>
+            <CardTitle className="text-sm font-medium text-primary">Total Engagement</CardTitle>
             <div className="rounded-lg bg-purple-50 p-2">
-              <Calendar className="h-4 w-4 text-purple-600" />
+              <Heart className="h-4 w-4 text-purple-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-700">{stats.eventRsvps}</div>
-            <p className="text-xs text-muted-foreground">Sign-ups across upcoming workshops and challenges</p>
+            <div className="text-2xl font-bold text-purple-700">{stats.totalEngagement.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Total likes and comments across all posts</p>
           </CardContent>
         </Card>
       </div>
@@ -993,16 +1033,28 @@ export function Community() {
                       <TrendingUp className="h-4 w-4 text-emerald-600" />
                       Engagement this week
                     </div>
-                    <p className="mt-2 text-2xl font-bold">+18%</p>
-                    <p className="text-xs text-muted-foreground">More comments and post shares than last week.</p>
+                    <p className="mt-2 text-2xl font-bold">
+                      {engagementDelta !== null ? `${engagementDelta >= 0 ? "+" : ""}${engagementDelta}%` : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {engagementDelta !== null
+                        ? engagementDelta >= 0
+                          ? "More interactions than last week."
+                          : "Fewer interactions than last week."
+                        : "Not enough data yet to compare weeks."}
+                    </p>
                   </div>
                   <div className="rounded-xl bg-slate-50 p-4">
                     <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                       <Star className="h-4 w-4 text-amber-500" />
                       Most discussed topic
                     </div>
-                    <p className="mt-2 text-lg font-semibold">Workout accountability</p>
-                    <p className="text-xs text-muted-foreground">Members are actively looking for training partners and weekly check-ins.</p>
+                    <p className="mt-2 text-lg font-semibold">{topTopic ?? "No posts yet"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {topTopic
+                        ? `"${topTopic}" is the most-posted topic in the last 30 days.`
+                        : "Topics will appear once members start posting."}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -1012,41 +1064,16 @@ export function Community() {
                   <CardTitle>Trending Topics</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {[
-                    { topic: "Workout accountability", count: "12 posts" },
-                    { topic: "Deadlift progress", count: "8 posts" },
-                    { topic: "Nutrition swaps", count: "6 posts" },
-                    { topic: "Morning partner search", count: "5 posts" },
-                  ].map((item) => (
-                    <div key={item.topic} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                      <span className="text-sm font-medium">{item.topic}</span>
-                      <Badge variant="secondary">{item.count}</Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className={cardShell}>
-                <CardHeader>
-                  <CardTitle>Suggested Circles</CardTitle>
-                  <CardDescription>Small groups members can join based on interests.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {[
-                    { name: "Strength Club", members: "84 members" },
-                    { name: "Morning Crew", members: "57 members" },
-                    { name: "Meal Prep Circle", members: "39 members" },
-                  ].map((group) => (
-                    <div key={group.name} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-3">
-                      <div>
-                        <p className="font-medium">{group.name}</p>
-                        <p className="text-xs text-muted-foreground">{group.members}</p>
+                  {trendingTopics.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No trending topics yet. Start posting to see what's popular.</p>
+                  ) : (
+                    trendingTopics.map((item) => (
+                      <div key={item.topic} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                        <span className="text-sm font-medium">{item.topic}</span>
+                        <Badge variant="secondary">{item.postCount} {item.postCount === 1 ? "post" : "posts"}</Badge>
                       </div>
-                      <Button variant="ghost" size="sm" className="text-primary hover:text-primary">
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1054,79 +1081,19 @@ export function Community() {
         </TabsContent>
 
         <TabsContent value="events" className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.65fr_1fr]">
-            <div className="grid gap-4">
-              {upcomingEvents.map((event) => (
-                <Card key={event.id} className={cardShell}>
-                  <CardContent className="p-0">
-                    <div className="grid gap-0 md:grid-cols-[180px_1fr]">
-                      <div className="flex flex-col justify-between border-r border-slate-200 bg-slate-50 p-5 text-slate-900">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Community Event</p>
-                          <p className="mt-3 text-2xl font-bold">{event.date}</p>
-                        </div>
-                        <Badge variant="outline" className="w-fit bg-white text-slate-700">
-                          {event.participants} joined
-                        </Badge>
-                      </div>
-                      <div className="p-5 space-y-4">
-                        <div>
-                          <h3 className="text-xl font-semibold">{event.title}</h3>
-                          <p className="mt-2 text-sm text-muted-foreground">{event.description}</p>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-lg bg-slate-50 p-3 text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <MapPin className="h-4 w-4" />
-                              Location
-                            </div>
-                            <p className="mt-1 font-medium text-slate-800">{event.location}</p>
-                          </div>
-                          <div className="rounded-lg bg-slate-50 p-3 text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Users className="h-4 w-4" />
-                              Host
-                            </div>
-                            <p className="mt-1 font-medium text-slate-800">{event.host}</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Button size="sm" onClick={() => toast.success(`Joined ${event.title}.`, { description: "The event card is interactive with mock data." })}>
-                            Join Event
-                          </Button>
-                          <Button variant="outline" size="sm" className={softButton}>
-                            Save Spot
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <Card className={cardShell}>
-              <CardHeader>
-                <CardTitle>Event Snapshot</CardTitle>
-                <CardDescription>Quick view of community programming activity.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-sm text-muted-foreground">Upcoming events</p>
-                  <p className="mt-2 text-2xl font-bold">{upcomingEvents.length}</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-sm text-muted-foreground">Total RSVPs</p>
-                  <p className="mt-2 text-2xl font-bold">{stats.eventRsvps}</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-sm text-muted-foreground">Highest demand</p>
-                  <p className="mt-2 text-lg font-semibold">HIIT Challenge Week</p>
-                  <p className="text-xs text-muted-foreground">Currently leading sign-ups and member mentions.</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card className={cardShell}>
+            <CardHeader>
+              <CardTitle>Community Events</CardTitle>
+              <CardDescription>Events will appear here once the events feature is set up in your gym management system.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
+                <Calendar className="mx-auto h-10 w-10 text-slate-400" />
+                <p className="mt-4 text-sm font-medium text-slate-600">No community events yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">When events are created, they will appear here for members to browse and join.</p>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="achievements" className="space-y-6">
@@ -1134,25 +1101,36 @@ export function Community() {
             <Card className={cardShell}>
               <CardHeader>
                 <CardTitle>Recent Achievements</CardTitle>
-                <CardDescription>Celebrate member milestones and visible progress stories.</CardDescription>
+                <CardDescription>Achievement posts shared by members in the community feed.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {achievements.map((achievement) => (
-                  <div key={achievement.id} className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
-                      <Trophy className="h-6 w-6 text-yellow-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{achievement.member}</span>
-                        <Badge className={getBadgeColor(achievement.badge)}>{achievement.badge}</Badge>
-                      </div>
-                      <p className="mt-1 text-sm font-medium text-slate-800">{achievement.achievement}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{achievement.summary}</p>
-                    </div>
-                    <span className="text-sm text-muted-foreground">{achievement.date}</span>
+                {achievementPosts.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
+                    <Trophy className="mx-auto h-10 w-10 text-slate-400" />
+                    <p className="mt-4 text-sm font-medium text-slate-600">No achievement posts yet</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Achievements will appear here when members share posts of type "achievement".</p>
                   </div>
-                ))}
+                ) : (
+                  achievementPosts.slice(0, 8).map((post) => (
+                    <div key={post.id} className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
+                        <Trophy className="h-6 w-6 text-yellow-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{post.authorUsername}</span>
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">achievement</Badge>
+                          {post.topic && <Badge variant="outline">{post.topic}</Badge>}
+                        </div>
+                        <p className="mt-1 text-sm text-slate-700">{post.content}</p>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1"><Heart className="h-3 w-3" /> {post.likes}</span>
+                        <span>{safeFormatTime(post.createdAt)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
 
@@ -1160,39 +1138,45 @@ export function Community() {
               <Card className={cardShell}>
                 <CardHeader>
                   <CardTitle>Achievement Pulse</CardTitle>
-                  <CardDescription>What members are unlocking most often this week.</CardDescription>
+                  <CardDescription>Real achievement activity from community posts.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="rounded-lg bg-slate-50 p-4">
                     <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                       <Medal className="h-4 w-4 text-red-500" />
-                      Strength milestones
+                      Achievement posts
                     </div>
-                    <p className="mt-2 text-2xl font-bold">14</p>
-                    <p className="text-xs text-muted-foreground">Most common member achievement category right now.</p>
+                    <p className="mt-2 text-2xl font-bold">{achievementPosts.length}</p>
+                    <p className="text-xs text-muted-foreground">Total achievement posts shared by members.</p>
                   </div>
                   <div className="rounded-lg bg-slate-50 p-4">
                     <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                       <Flame className="h-4 w-4 text-orange-500" />
-                      Streaks completed
+                      Achievement engagement
                     </div>
-                    <p className="mt-2 text-2xl font-bold">9</p>
-                    <p className="text-xs text-muted-foreground">Members hitting consistency goals across the last seven days.</p>
+                    <p className="mt-2 text-2xl font-bold">
+                      {achievementPosts.reduce((sum, p) => sum + p.likes + p.comments, 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Total likes and comments on achievement posts.</p>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className={cardShell}>
                 <CardHeader>
-                  <CardTitle>Recognition Themes</CardTitle>
+                  <CardTitle>Post Type Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {["Personal records", "Consistency streaks", "Cardio milestones", "Nutrition habits"].map((theme) => (
-                    <div key={theme} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                      <span className="text-sm font-medium">{theme}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  ))}
+                  {engagementStats && engagementStats.byType.length > 0 ? (
+                    engagementStats.byType.map((t) => (
+                      <div key={t.type} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                        <span className="text-sm font-medium capitalize">{t.type}</span>
+                        <Badge variant="secondary">{t.posts} {t.posts === 1 ? "post" : "posts"}</Badge>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No posts yet.</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1200,32 +1184,95 @@ export function Community() {
         </TabsContent>
 
         <TabsContent value="leaderboard" className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {leaderboardCards.map((board, index) => (
-              <Card key={board.title} className={cardShell}>
+          {leaderboard.length === 0 ? (
+            <Card className={cardShell}>
+              <CardHeader>
+                <CardTitle>Community Leaderboard</CardTitle>
+                <CardDescription>Top contributors ranked by engagement.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
+                  <Trophy className="mx-auto h-10 w-10 text-slate-400" />
+                  <p className="mt-4 text-sm font-medium text-slate-600">No leaderboard data yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">The leaderboard will populate once members start posting and engaging.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {/* Top Posters */}
+              <Card className={cardShell}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    {index === 0 ? <Flame className="h-5 w-5 text-orange-500" /> : index === 1 ? <TrendingUp className="h-5 w-5 text-blue-600" /> : <Star className="h-5 w-5 text-purple-600" />}
-                    <span>{board.title}</span>
+                    <Flame className="h-5 w-5 text-orange-500" />
+                    <span>Top Posters</span>
                   </CardTitle>
-                  <CardDescription>{board.description}</CardDescription>
+                  <CardDescription>Most active community contributors</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {board.rows.map((row) => (
-                    <div key={`${board.title}-${row.rank}`} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  {leaderboard.slice(0, 5).map((entry, idx) => (
+                    <div key={entry.userId} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${row.rank === "1" ? "bg-amber-100 text-amber-800" : row.rank === "2" ? "bg-slate-200 text-slate-700" : "bg-orange-100 text-orange-800"}`}>
-                          {row.rank}
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${idx === 0 ? "bg-amber-100 text-amber-800" : idx === 1 ? "bg-slate-200 text-slate-700" : "bg-orange-100 text-orange-800"}`}>
+                          {idx + 1}
                         </div>
-                        <span className="font-medium">{row.name}</span>
+                        <span className="font-medium">{entry.username}</span>
                       </div>
-                      <Badge variant="outline">{row.value}</Badge>
+                      <Badge variant="outline">{entry.totalPosts} {entry.totalPosts === 1 ? "post" : "posts"}</Badge>
                     </div>
                   ))}
                 </CardContent>
               </Card>
-            ))}
-          </div>
+
+              {/* Most Liked */}
+              <Card className={cardShell}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Heart className="h-5 w-5 text-red-500" />
+                    <span>Most Liked</span>
+                  </CardTitle>
+                  <CardDescription>Members whose posts get the most love</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {[...leaderboard].sort((a, b) => b.totalLikes - a.totalLikes).slice(0, 5).map((entry, idx) => (
+                    <div key={entry.userId} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${idx === 0 ? "bg-amber-100 text-amber-800" : idx === 1 ? "bg-slate-200 text-slate-700" : "bg-orange-100 text-orange-800"}`}>
+                          {idx + 1}
+                        </div>
+                        <span className="font-medium">{entry.username}</span>
+                      </div>
+                      <Badge variant="outline">{entry.totalLikes} {entry.totalLikes === 1 ? "like" : "likes"}</Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Engagement Score */}
+              <Card className={cardShell}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-purple-600" />
+                    <span>Engagement Score</span>
+                  </CardTitle>
+                  <CardDescription>Combined likes + comments earned</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {leaderboard.slice(0, 5).map((entry, idx) => (
+                    <div key={entry.userId} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${idx === 0 ? "bg-amber-100 text-amber-800" : idx === 1 ? "bg-slate-200 text-slate-700" : "bg-orange-100 text-orange-800"}`}>
+                          {idx + 1}
+                        </div>
+                        <span className="font-medium">{entry.username}</span>
+                      </div>
+                      <Badge variant="outline">{entry.engagementScore.toLocaleString()} pts</Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

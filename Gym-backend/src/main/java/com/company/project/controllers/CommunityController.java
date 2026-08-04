@@ -24,6 +24,16 @@ public class CommunityController {
         return ResponseEntity.ok(communityService.getEngagementStats());
     }
 
+    @GetMapping("/stats/trending-topics")
+    public ResponseEntity<java.util.List<TrendingTopicDTO>> getTrendingTopics() {
+        return ResponseEntity.ok(communityService.getTrendingTopics());
+    }
+
+    @GetMapping("/stats/leaderboard")
+    public ResponseEntity<java.util.List<LeaderboardEntryDTO>> getLeaderboard() {
+        return ResponseEntity.ok(communityService.getLeaderboard());
+    }
+
     @GetMapping("/posts")
     public ResponseEntity<CommunityPostsPageResponseDTO> getFeed(
             @RequestParam(required = false) String q,

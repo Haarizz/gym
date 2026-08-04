@@ -218,159 +218,23 @@ export function PromotionsCampaign() {
   });
   const [policyRules, setPolicyRules] = useState<Rule[]>([]);
 
-  // Sample members data for preview (in production, this would come from your backend)
-  const sampleMembers: Member[] = useMemo(() => [
-    {
-      id: "m1",
-      name: "Ahmed Hassan",
-      email: "ahmed.hassan@example.com",
-      membershipType: "individual",
-      joinedAt: "2023-06-15",
-      currentPlan: {
-        name: "Premium Annual",
-        durationMonths: 12,
-        startDate: "2024-01-01",
-        endDate: "2024-12-31"
-      },
-      renewalCount: 2,
-      purchaseDate: "2024-01-01"
-    },
-    {
-      id: "m2",
-      name: "Fatima Al-Mansoori",
-      email: "fatima.mansoori@example.com",
-      membershipType: "family",
-      joinedAt: "2024-01-10",
-      currentPlan: {
-        name: "Family Monthly",
-        durationMonths: 3,
-        startDate: "2024-01-10",
-        endDate: "2024-04-10"
-      },
-      renewalCount: 0,
-      purchaseDate: "2024-01-10"
-    },
-    {
-      id: "m3",
-      name: "Mohammed Al-Zaabi",
-      email: "mohammed.zaabi@example.com",
-      membershipType: "corporate",
-      joinedAt: "2023-03-20",
-      currentPlan: {
-        name: "Corporate Annual",
-        durationMonths: 12,
-        startDate: "2023-03-20",
-        endDate: "2024-03-20"
-      },
-      renewalCount: 1,
-      purchaseDate: "2023-03-20"
-    },
-    {
-      id: "m4",
-      name: "Sara Ahmed",
-      email: "sara.ahmed@example.com",
-      membershipType: "individual",
-      joinedAt: "2024-02-01",
-      currentPlan: {
-        name: "Standard Monthly",
-        durationMonths: 6,
-        startDate: "2024-02-01",
-        endDate: "2024-08-01"
-      },
-      renewalCount: 0,
-      purchaseDate: "2024-02-01"
-    },
-    {
-      id: "m5",
-      name: "Khalid Ibrahim",
-      email: "khalid.ibrahim@example.com",
-      membershipType: "individual",
-      joinedAt: "2023-09-15",
-      currentPlan: {
-        name: "Premium Monthly",
-        durationMonths: 3,
-        startDate: "2024-01-15",
-        endDate: "2024-04-15"
-      },
-      renewalCount: 3,
-      purchaseDate: "2024-01-15"
-    },
-    {
-      id: "m6",
-      name: "Layla Hassan",
-      email: "layla.hassan@example.com",
-      membershipType: "family",
-      joinedAt: "2023-11-20",
-      currentPlan: {
-        name: "Family Annual",
-        durationMonths: 12,
-        startDate: "2023-11-20",
-        endDate: "2024-11-20"
-      },
-      renewalCount: 1,
-      purchaseDate: "2023-11-20"
-    },
-    {
-      id: "m7",
-      name: "Omar Abdullah",
-      email: "omar.abdullah@example.com",
-      membershipType: "individual",
-      joinedAt: "2024-01-25",
-      currentPlan: {
-        name: "Standard Monthly",
-        durationMonths: 1,
-        startDate: "2024-01-25",
-        endDate: "2024-02-25"
-      },
-      renewalCount: 0,
-      purchaseDate: "2024-01-25"
-    },
-    {
-      id: "m8",
-      name: "Noura Al-Kaabi",
-      email: "noura.kaabi@example.com",
-      membershipType: "corporate",
-      joinedAt: "2023-05-10",
-      currentPlan: {
-        name: "Corporate Annual",
-        durationMonths: 12,
-        startDate: "2023-05-10",
-        endDate: "2024-05-10"
-      },
-      renewalCount: 2,
-      purchaseDate: "2023-05-10"
-    },
-    {
-      id: "m9",
-      name: "Rashid Al-Shamsi",
-      email: "rashid.shamsi@example.com",
-      membershipType: "individual",
-      joinedAt: "2023-12-01",
-      currentPlan: {
-        name: "Premium Monthly",
-        durationMonths: 6,
-        startDate: "2023-12-01",
-        endDate: "2024-06-01"
-      },
-      renewalCount: 1,
-      purchaseDate: "2023-12-01"
-    },
-    {
-      id: "m10",
-      name: "Maryam Ali",
-      email: "maryam.ali@example.com",
-      membershipType: "family",
-      joinedAt: "2024-01-05",
-      currentPlan: {
-        name: "Family Monthly",
-        durationMonths: 3,
-        startDate: "2024-01-05",
-        endDate: "2024-04-05"
-      },
-      renewalCount: 0,
-      purchaseDate: "2024-01-05"
-    }
-  ], []);
+  // Real members for the Promotional Access Days eligibility preview, loaded from
+  // the backend (previously a hardcoded 10-entry sample array).
+  const [eligibilityMembers, setEligibilityMembers] = useState<Member[]>([]);
+  useEffect(() => {
+    promotionsService.getEligibilityMembers()
+      .then(data => setEligibilityMembers(data.map(m => ({
+        id: m.id,
+        name: m.name,
+        email: m.email || undefined,
+        membershipType: (m.membershipType as Member["membershipType"]) || undefined,
+        joinedAt: m.joinedAt || undefined,
+        currentPlan: m.currentPlan || null,
+        renewalCount: m.renewalCount ?? 0,
+        purchaseDate: m.purchaseDate || undefined,
+      }))))
+      .catch(() => toast.error("Failed to load members for eligibility preview"));
+  }, []);
 
   const normalizePromotion = (api: PromotionApi): Promotion => ({
     id: api.id,
@@ -660,8 +524,22 @@ export function PromotionsCampaign() {
     const totalSavings = promotions.reduce((sum, p) => sum + p.totalSavings, 0);
     const avgConversionRate = promotions.length > 0 ? 
       promotions.reduce((sum, p) => sum + p.conversionRate, 0) / promotions.length : 0;
-    const topPromotion = promotions.reduce((top, p) => 
+    const topPromotion = promotions.reduce((top, p) =>
       p.totalRevenue > (top?.totalRevenue || 0) ? p : top, promotions[0]);
+
+    // totalRevenue/usageCount are lifetime cumulative counters with no
+    // timestamped redemption history to compute a real revenue-growth trend
+    // from, so "Growth" instead tracks new promotions created this month vs
+    // last month — the one month-over-month signal actually derivable from
+    // the data we have (createdDate).
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const thisMonthCount = promotions.filter(p => p.createdDate >= startOfMonth).length;
+    const lastMonthCount = promotions.filter(p => p.createdDate >= startOfLastMonth && p.createdDate < startOfMonth).length;
+    const newPromotionsGrowth = lastMonthCount > 0
+      ? Math.round(((thisMonthCount - lastMonthCount) / lastMonthCount) * 100)
+      : (thisMonthCount > 0 ? 100 : 0);
 
     return {
       period: 'month',
@@ -673,7 +551,7 @@ export function PromotionsCampaign() {
       totalSavings,
       conversionRate: avgConversionRate,
       topPerformingPromotion: topPromotion?.name || 'None',
-      revenueGrowth: 0,
+      revenueGrowth: newPromotionsGrowth,
       redemptionGrowth: 0
     };
   }, [promotions]);
@@ -854,7 +732,6 @@ export function PromotionsCampaign() {
       else if (action === 'delete') toast.success(`Deleted ${selectedPromotions.length} promotions`);
       else toast.info(`Action: ${action} for ${selectedPromotions.length} promotions`);
       setSelectedPromotions([]);
-      setShowBulkActions(false);
       await fetchPromotions();
     } catch (e) {
       toast.error("Bulk action failed. Please try again.");
@@ -972,7 +849,8 @@ export function PromotionsCampaign() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Growth</p>
-                <p className="text-2xl font-bold text-indigo-600">+{analytics.revenueGrowth}%</p>
+                <p className="text-2xl font-bold text-indigo-600">{analytics.revenueGrowth >= 0 ? '+' : ''}{analytics.revenueGrowth}%</p>
+                <p className="text-[11px] text-muted-foreground">new promotions vs last month</p>
               </div>
               <ArrowUp className="h-6 w-6 text-indigo-600" />
             </div>
@@ -1889,15 +1767,25 @@ export function PromotionsCampaign() {
 
                   {/* Eligibility Preview */}
                   <div>
+                    {!editingPromotionId && (
+                      <Alert className="mb-4 border-amber-200 bg-amber-50">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800">
+                          Save this promotion first — Apply Promotion needs a saved promotion to record which members already received their days.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     <EligibilityPreview
-                      members={sampleMembers}
+                      members={eligibilityMembers}
                       rules={policyRules}
                       onApply={async (matches) => {
-                        // In production, this would call your backend API
-                        console.log("Applying promotion to members:", matches);
-                        toast.success("Promotion applied successfully!", {
-                          description: `${matches.length} members will receive promotional access days`,
-                        });
+                        if (!editingPromotionId) {
+                          throw new Error("Save this promotion before applying it to members");
+                        }
+                        const result = await promotionsService.applyAccessDays(editingPromotionId, matches);
+                        if (result.skippedCount > 0) {
+                          toast.info(`${result.skippedCount} member(s) already had this promotion applied and were skipped`);
+                        }
                       }}
                     />
                   </div>

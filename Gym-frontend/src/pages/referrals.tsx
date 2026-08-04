@@ -1,7 +1,11 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
-import { referralService, type ReferralResponse, type RewardRuleResponse } from '../utils/supabase/referral-service';
+import { referralService, type ReferralResponse, type RewardRuleResponse, type ReferralSettings } from '../utils/supabase/referral-service';
+import { rewardService } from '../utils/supabase/reward-service';
 import { membersService, type Member } from '../utils/supabase/members-service';
+import { MyRewards } from './my-rewards';
+import { RewardQueue } from './reward-queue';
+import { RewardRules } from './reward-rules';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -18,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popove
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import QRCode from "react-qr-code";
 import { 
   Share2, 
   Copy, 
@@ -118,9 +123,7 @@ export function Referrals() {
   const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedMember, setSelectedMember] = useState<string>('');
-  const [showAddRule, setShowAddRule] = useState(false);
   const [showAddReferral, setShowAddReferral] = useState(false);
-  const [showBulkActions, setShowBulkActions] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [dateRange, setDateRange] = useState('7d');
@@ -128,8 +131,63 @@ export function Referrals() {
   // API state
   const [apiReferrals, setApiReferrals] = useState<ReferralResponse[]>([]);
   const [apiStats, setApiStats] = useState({ totalReferrals: 0, successfulReferrals: 0, conversionRate: 0, totalRewards: 0, activeRules: 0 });
+  const [apiRewardStats, setApiRewardStats] = useState({ redeemed: 0, walletCreditsIssued: 0 });
   const [apiRules, setApiRules] = useState<RewardRuleResponse[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+
+  // Analytics tab — derived entirely from real referral data (no fabricated numbers).
+  const analytics = useMemo(() => {
+    // Use actual backend system stats for true totals, instead of just the paginated front-end array.
+    const total = apiStats.totalReferrals;
+    const successful = apiStats.successfulReferrals;
+    const paid = apiReferrals.filter(r => !!r.paymentDate).length;
+    const redeemed = apiRewardStats.redeemed;
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const thisMonthCount = apiReferrals.filter(r => new Date(r.date) >= startOfMonth).length;
+    const lastMonthCount = apiReferrals.filter(r => new Date(r.date) >= startOfLastMonth && new Date(r.date) < startOfMonth).length;
+    const monthGrowthPct = lastMonthCount > 0 ? Math.round(((thisMonthCount - lastMonthCount) / lastMonthCount) * 100) : (thisMonthCount > 0 ? 100 : 0);
+
+    const rewardsPaid = apiRewardStats.walletCreditsIssued || 0;
+    const avgValue = successful > 0 ? Math.round((apiStats.totalRewards / successful) * 100) / 100 : 0;
+    const redemptionRate = successful > 0 ? Math.round((redeemed / successful) * 1000) / 10 : 0;
+
+    const ruleCounts: Record<string, number> = {};
+    apiReferrals.forEach(r => { if (r.ruleName) ruleCounts[r.ruleName] = (ruleCounts[r.ruleName] || 0) + 1; });
+    const topRule = Object.entries(ruleCounts).sort((a, b) => b[1] - a[1])[0];
+
+    return {
+      total, successful, paid, redeemed,
+      thisMonthCount, monthGrowthPct, rewardsPaid, avgValue, redemptionRate,
+      topRuleName: topRule?.[0], topRuleCount: topRule?.[1] || 0,
+    };
+  }, [apiReferrals, apiStats, apiRewardStats]);
+
+  // Settings tab state
+  const DEFAULT_SETTINGS: ReferralSettings = {
+    programEnabled: true, autoGenerateCodes: true, emailNotifications: true, autoProcessRewards: false,
+    codePrefix: 'GYM', linkDomain: 'gymbios.app/ref', maxRewardsPerMember: 1000, expiryDays: 90, minPurchaseAmount: 100,
+  };
+  const [settings, setSettings] = useState<ReferralSettings>(DEFAULT_SETTINGS);
+  const [savingSettings, setSavingSettings] = useState(false);
+  useEffect(() => {
+    if (activeTab !== 'settings') return;
+    referralService.getSettings().then(setSettings).catch(() => toast.error('Failed to load settings'));
+  }, [activeTab]);
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const saved = await referralService.updateSettings(settings);
+      setSettings(saved);
+      toast.success('Settings saved');
+    } catch {
+      toast.error('Failed to save settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   // Dropdown states
   const [addReferralOpen, setAddReferralOpen] = useState(false);
@@ -138,15 +196,10 @@ export function Referrals() {
   const [editRefereeOpen, setEditRefereeOpen] = useState(false);
 
   // New referral form state
-  const [newReferral, setNewReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '' });
-  // New rule form state
-  const [newRule, setNewRule] = useState({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
+  const [newReferral, setNewReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '', ruleId: 'auto' });
   const [editingReferral, setEditingReferral] = useState<ReferralResponse | null>(null);
   const [showEditReferral, setShowEditReferral] = useState(false);
   const [editReferral, setEditReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: '', status: 'pending', notes: '' });
-  const [editingRule, setEditingRule] = useState<RewardRuleResponse | null>(null);
-  const [showEditRule, setShowEditRule] = useState(false);
-  const [editRule, setEditRule] = useState({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
   const [viewingReferral, setViewingReferral] = useState<ReferralResponse | null>(null);
   const [showViewReferral, setShowViewReferral] = useState(false);
 
@@ -154,12 +207,14 @@ export function Referrals() {
 
   const loadData = useCallback(async () => {
     try {
-      const [statsData, referralsData, rulesData] = await Promise.all([
+      const [statsData, referralsData, rulesData, rewardStatsData] = await Promise.all([
         referralService.getStats(),
-        referralService.getReferrals({ size: 100, status: filterStatus !== 'all' ? filterStatus : undefined, search: searchTerm || undefined }),
-        referralService.getRules()
+        referralService.getReferrals({ size: 1000, status: filterStatus !== 'all' ? filterStatus : undefined, search: searchTerm || undefined }),
+        referralService.getRules(),
+        rewardService.getStats()
       ]);
       setApiStats({ totalReferrals: statsData.totalReferrals, successfulReferrals: statsData.successfulReferrals, conversionRate: statsData.conversionRate, totalRewards: Number(statsData.totalRewards), activeRules: statsData.activeRules });
+      setApiRewardStats({ redeemed: rewardStatsData.redeemed || 0, walletCreditsIssued: Number(rewardStatsData.walletCreditsIssued || 0) });
       setApiReferrals(referralsData.referrals);
       setApiRules(rulesData);
     } catch (e) {
@@ -189,8 +244,6 @@ export function Referrals() {
 
 
 
-  const rewardRulesState: RewardRule[] = apiRules.map(r => ({ id: String(r.id), name: r.name, type: r.type as any, value: r.value, unit: r.unit, eligibility: r.eligibility as any, condition: r.conditionTrigger as any, isActive: r.isActive, expiryDays: r.expiryDays }));
-
   const topReferrers = Object.values(apiReferrals.reduce<Record<string, { id: string; memberName: string; memberEmail: string; referralCode: string; referralLink: string; totalReferrals: number; successfulReferrals: number; pendingReferrals: number; totalRewardsEarned: number; rewardBalance: number; joinDate: string; lastActivity: string; tier: 'Bronze'|'Silver'|'Gold'|'Platinum' }>>((acc, r) => {
       const key = r.referrerName || 'Unknown';
       if (!acc[key]) acc[key] = { id: key, memberName: r.referrerName || '', memberEmail: '', referralCode: r.referralCode, referralLink: r.referralLink, totalReferrals: 0, successfulReferrals: 0, pendingReferrals: 0, totalRewardsEarned: 0, rewardBalance: 0, joinDate: r.createdAt, lastActivity: r.createdAt, tier: 'Bronze' };
@@ -201,15 +254,6 @@ export function Referrals() {
       acc[key].tier = s >= 11 ? 'Platinum' : s >= 6 ? 'Gold' : s >= 3 ? 'Silver' : 'Bronze';
       return acc;
     }, {})).sort((a, b) => b.successfulReferrals - a.successfulReferrals).slice(0, 5);
-
-  const handleToggleRewardRule = useCallback(async (ruleId: string, nextValue: boolean) => {
-    try {
-      await referralService.toggleRule(Number(ruleId));
-      await loadData();
-    } catch {
-      toast.error('Failed to toggle rule');
-    }
-  }, [loadData]);
 
   const handleCopyCode = useCallback((code: string) => {
     navigator.clipboard.writeText(code);
@@ -246,12 +290,24 @@ export function Referrals() {
     });
   }, []);
 
+  const [qrDialogLink, setQrDialogLink] = useState<string | null>(null);
   const handleGenerateQR = useCallback((link: string) => {
-    // In a real app, you'd generate a QR code
-    toast.info('QR Code Generator', {
-      description: 'QR code generation feature coming soon!',
-    });
+    setQrDialogLink(link.startsWith('http') ? link : `https://${link}`);
   }, []);
+
+  const handleExportCSV = useCallback(() => {
+    const csv = ['Referrer,Referee,Email,Status,Reward,Date', ...apiReferrals.map(r =>
+      `${r.referrerName},${r.refereeName},${r.refereeEmail || ''},${r.status},${r.rewardAmount || 0},${r.date || r.createdAt}`
+    )].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'referrals.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Report downloaded');
+  }, [apiReferrals]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -293,23 +349,16 @@ export function Referrals() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => setShowBulkActions(true)}>
+          <Button variant="outline" onClick={handleExportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Export Data
           </Button>
-          <Button 
+          <Button
             onClick={() => setShowAddReferral(true)}
             className="bg-[#2B7A78] hover:bg-[#236763] text-white"
           >
             <Plus className="mr-2 h-4 w-4" />
             Add a Referral
-          </Button>
-          <Button 
-            onClick={() => setShowAddRule(true)}
-            className="bg-[#E63946] hover:bg-[#c92e3a] text-white"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Reward Rule
           </Button>
         </div>
       </div>
@@ -397,14 +446,26 @@ export function Referrals() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="w-full flex">
+        <TabsList className="w-full flex flex-wrap h-auto">
           <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
           <TabsTrigger value="members" className="flex-1">Members</TabsTrigger>
           <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
-          <TabsTrigger value="rewards" className="flex-1">Rewards</TabsTrigger>
+          <TabsTrigger value="my-rewards" className="flex-1">My Rewards</TabsTrigger>
+          <TabsTrigger value="reward-queue" className="flex-1">Reward Queue</TabsTrigger>
+          <TabsTrigger value="rewards" className="flex-1">Reward Rules</TabsTrigger>
           <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
           <TabsTrigger value="settings" className="flex-1">Settings</TabsTrigger>
         </TabsList>
+
+        {/* My Rewards Tab — staff-operated member reward lookup */}
+        <TabsContent value="my-rewards" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <MyRewards />
+        </TabsContent>
+
+        {/* Reward Queue Tab — admin approval/redemption queue */}
+        <TabsContent value="reward-queue" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <RewardQueue />
+        </TabsContent>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
@@ -481,7 +542,7 @@ export function Referrals() {
                           {activity.status}
                         </Badge>
                         <p className="text-sm text-muted-foreground mt-1">
-                          <CurrencyGlyph /> {activity.rewardAmount}
+                          <CurrencyGlyph /> {activity.rewardAmount || 0}
                         </p>
                       </div>
                     </div>
@@ -508,11 +569,20 @@ export function Referrals() {
                   <Send className="h-6 w-6 text-blue-600" />
                   <span>Add Referral</span>
                 </Button>
-                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={async () => { toast.loading('Processing...'); try { await loadData(); toast.success('Data refreshed'); } catch { toast.error('Refresh failed'); } }}>
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={async () => { 
+                  toast.loading('Processing...', { id: 'refresh' }); 
+                  try { 
+                    await referralService.fixRewards();
+                    await loadData(); 
+                    toast.success('Data refreshed & rewards fixed', { id: 'refresh' }); 
+                  } catch { 
+                    toast.error('Refresh failed', { id: 'refresh' }); 
+                  } 
+                }}>
                   <Gift className="h-6 w-6 text-green-600" />
                   <span>Refresh Data</span>
                 </Button>
-                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={() => { const csv = ['Referrer,Referee,Email,Status,Reward,Date', ...apiReferrals.map(r => `${r.referrerName},${r.refereeName},${r.refereeEmail || ''},${r.status},${r.rewardAmount || 0},${r.date || r.createdAt}`)].join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'referrals.csv'; a.click(); URL.revokeObjectURL(url); toast.success('Report downloaded'); }}>
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={handleExportCSV}>
                   <BarChart3 className="h-6 w-6 text-purple-600" />
                   <span>Export CSV</span>
                 </Button>
@@ -769,81 +839,7 @@ export function Referrals() {
 
         {/* Rewards Tab */}
         <TabsContent value="rewards" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold">Reward Rules</h2>
-              <p className="text-muted-foreground">Configure and manage referral reward programs</p>
-            </div>
-            <Button onClick={() => setShowAddRule(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Rule
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {rewardRulesState.map((rule) => (
-              <Card
-                key={rule.id}
-                className={`${rule.isActive ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} shadow-md hover:shadow-lg transition-shadow`}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{rule.name}</CardTitle>
-                    <Switch
-                      checked={rule.isActive}
-                      onCheckedChange={(checked) => handleToggleRewardRule(rule.id, checked === true)}
-                    />
-                  </div>
-                  <CardDescription className="text-xs">
-                    {rule.type === 'discount' && 'Percentage discount'}
-                    {rule.type === 'credit' && 'Account credit'}
-                    {rule.type === 'points' && 'Loyalty points'}
-                    {rule.type === 'free_session' && 'Free training session'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Reward Value</Label>
-                      <p className="text-lg font-bold text-green-600">
-                        {rule.value} {rule.unit}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Eligibility</Label>
-                      <Badge variant="outline" className="capitalize">
-                        {rule.eligibility}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Condition</Label>
-                      <Badge variant="outline" className="capitalize">
-                        {rule.condition}
-                      </Badge>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Expires in</Label>
-                      <p className="text-xs font-medium">
-                        {rule.expiryDays} days
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button variant="outline" size="sm" onClick={() => { const apiRule = apiRules.find(r => String(r.id) === rule.id); if (apiRule) { setEditingRule(apiRule); setEditRule({ name: apiRule.name, type: apiRule.type, value: String(apiRule.value), unit: apiRule.unit, eligibility: apiRule.eligibility, conditionTrigger: apiRule.conditionTrigger, expiryDays: String(apiRule.expiryDays || 90) }); setShowEditRule(true); } }}>
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={async () => { if (!window.confirm(`Delete rule "${rule.name}"?`)) return; try { await referralService.deleteRule(Number(rule.id)); toast.success('Rule deleted'); loadData(); } catch { toast.error('Failed to delete rule'); } }}>
-                    <X className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+          <RewardRules />
         </TabsContent>
 
         {/* Analytics Tab */}
@@ -858,28 +854,28 @@ export function Referrals() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span>Referral Links Shared</span>
-                    <span className="font-bold">245</span>
+                    <span>Referrals Created</span>
+                    <span className="font-bold">{analytics.total}</span>
                   </div>
                   <Progress value={100} className="h-2" />
-                  
+
                   <div className="flex items-center justify-between">
-                    <span>Clicks Received</span>
-                    <span className="font-bold">198</span>
+                    <span>Signed Up (Successful)</span>
+                    <span className="font-bold">{analytics.successful}</span>
                   </div>
-                  <Progress value={80.8} className="h-2" />
-                  
+                  <Progress value={analytics.total > 0 ? (analytics.successful / analytics.total) * 100 : 0} className="h-2" />
+
                   <div className="flex items-center justify-between">
-                    <span>Signups Completed</span>
-                    <span className="font-bold">156</span>
+                    <span>Payment Recorded</span>
+                    <span className="font-bold">{analytics.paid}</span>
                   </div>
-                  <Progress value={63.7} className="h-2" />
-                  
+                  <Progress value={analytics.total > 0 ? (analytics.paid / analytics.total) * 100 : 0} className="h-2" />
+
                   <div className="flex items-center justify-between">
-                    <span>Payments Made</span>
-                    <span className="font-bold">123</span>
+                    <span>Reward Redeemed</span>
+                    <span className="font-bold">{analytics.redeemed}</span>
                   </div>
-                  <Progress value={50.2} className="h-2" />
+                  <Progress value={analytics.total > 0 ? (analytics.redeemed / analytics.total) * 100 : 0} className="h-2" />
                 </div>
               </CardContent>
             </Card>
@@ -895,25 +891,27 @@ export function Referrals() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
                       <p className="text-sm text-muted-foreground">This Month</p>
-                      <p className="text-2xl font-bold text-blue-600">45</p>
-                      <p className="text-xs text-green-600">+12% from last month</p>
+                      <p className="text-2xl font-bold text-blue-600">{analytics.thisMonthCount}</p>
+                      <p className={`text-xs ${analytics.monthGrowthPct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {analytics.monthGrowthPct >= 0 ? '+' : ''}{analytics.monthGrowthPct}% from last month
+                      </p>
                     </div>
                     <div className="text-center p-4 bg-purple-50 rounded-lg">
                       <p className="text-sm text-muted-foreground">Rewards Paid</p>
-                      <p className="text-2xl font-bold text-purple-600"><CurrencyGlyph /> 2,250</p>
-                      <p className="text-xs text-green-600">+8% from last month</p>
+                      <p className="text-2xl font-bold text-purple-600"><CurrencyGlyph /> {analytics.rewardsPaid.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">{analytics.redeemed} redeemed</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <p className="text-sm text-muted-foreground">Avg. Value</p>
-                      <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> 50</p>
-                      <p className="text-xs text-gray-600">per referral</p>
+                      <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {analytics.avgValue}</p>
+                      <p className="text-xs text-gray-600">per successful referral</p>
                     </div>
                     <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">ROI</p>
-                      <p className="text-2xl font-bold text-orange-600">340%</p>
-                      <p className="text-xs text-green-600">+25% improvement</p>
+                      <p className="text-sm text-muted-foreground">Redemption Rate</p>
+                      <p className="text-2xl font-bold text-orange-600">{analytics.redemptionRate}%</p>
+                      <p className="text-xs text-gray-600">of successful referrals</p>
                     </div>
                   </div>
                 </div>
@@ -932,19 +930,25 @@ export function Referrals() {
                 <Alert>
                   <TrendingUp className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Peak Activity:</strong> Most referrals happen on weekends. Consider weekend-specific promotions.
+                    <strong>Conversion Rate:</strong> {apiStats.conversionRate}% of referrals become successful signups
+                    ({analytics.successful} of {analytics.total}).
                   </AlertDescription>
                 </Alert>
                 <Alert>
                   <Users className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Top Performers:</strong> Gold tier members have 3x higher referral rates.
+                    {analytics.topRuleName ? (
+                      <><strong>Most-Used Rule:</strong> "{analytics.topRuleName}" has been applied to {analytics.topRuleCount} referral{analytics.topRuleCount === 1 ? '' : 's'}.</>
+                    ) : (
+                      <><strong>Most-Used Rule:</strong> No reward rules have been applied to any referral yet.</>
+                    )}
                   </AlertDescription>
                 </Alert>
                 <Alert>
                   <Gift className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Reward Optimization:</strong> <CurrencyGlyph /> 50 credit shows highest conversion rate.
+                    <strong>Reward Redemption:</strong> {analytics.redemptionRate}% of successful referrals have redeemed their reward
+                    ({analytics.redeemed} of {analytics.successful}).
                   </AlertDescription>
                 </Alert>
               </div>
@@ -969,7 +973,7 @@ export function Referrals() {
                       <Label>Enable Referral Program</Label>
                       <p className="text-sm text-muted-foreground">Turn the entire referral system on/off</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch checked={settings.programEnabled} onCheckedChange={(v) => setSettings(p => ({ ...p, programEnabled: v }))} />
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -977,7 +981,7 @@ export function Referrals() {
                       <Label>Auto-generate Codes</Label>
                       <p className="text-sm text-muted-foreground">Automatically create codes for new members</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch checked={settings.autoGenerateCodes} onCheckedChange={(v) => setSettings(p => ({ ...p, autoGenerateCodes: v }))} />
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -985,17 +989,17 @@ export function Referrals() {
                       <Label>Email Notifications</Label>
                       <p className="text-sm text-muted-foreground">Send email updates for referral activities</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch checked={settings.emailNotifications} onCheckedChange={(v) => setSettings(p => ({ ...p, emailNotifications: v }))} />
                   </div>
 
                   <div>
                     <Label htmlFor="codePrefix">Referral Code Prefix</Label>
-                    <Input id="codePrefix" defaultValue="GYM123" className="mt-1" />
+                    <Input id="codePrefix" value={settings.codePrefix} onChange={(e) => setSettings(p => ({ ...p, codePrefix: e.target.value }))} className="mt-1" />
                   </div>
 
                   <div>
                     <Label htmlFor="linkDomain">Referral Link Domain</Label>
-                    <Input id="linkDomain" defaultValue="gymbios.app/ref" className="mt-1" />
+                    <Input id="linkDomain" value={settings.linkDomain} onChange={(e) => setSettings(p => ({ ...p, linkDomain: e.target.value }))} className="mt-1" />
                   </div>
                 </div>
 
@@ -1004,19 +1008,19 @@ export function Referrals() {
 
                   <div>
                     <Label htmlFor="maxRewards">Maximum Rewards per Member</Label>
-                    <Input id="maxRewards" type="number" defaultValue="1000" className="mt-1" />
+                    <Input id="maxRewards" type="number" value={settings.maxRewardsPerMember ?? ''} onChange={(e) => setSettings(p => ({ ...p, maxRewardsPerMember: e.target.value ? Number(e.target.value) : null }))} className="mt-1" />
                     <p className="text-sm text-muted-foreground mt-1">Monthly limit in <CurrencyGlyph /></p>
                   </div>
 
                   <div>
                     <Label htmlFor="expiryDays">Default Reward Expiry</Label>
-                    <Input id="expiryDays" type="number" defaultValue="90" className="mt-1" />
+                    <Input id="expiryDays" type="number" value={settings.expiryDays} onChange={(e) => setSettings(p => ({ ...p, expiryDays: Number(e.target.value) }))} className="mt-1" />
                     <p className="text-sm text-muted-foreground mt-1">Days until rewards expire</p>
                   </div>
 
                   <div>
                     <Label htmlFor="minAmount">Minimum Transaction Amount</Label>
-                    <Input id="minAmount" type="number" defaultValue="100" className="mt-1" />
+                    <Input id="minAmount" type="number" value={settings.minPurchaseAmount ?? ''} onChange={(e) => setSettings(p => ({ ...p, minPurchaseAmount: e.target.value ? Number(e.target.value) : null }))} className="mt-1" />
                     <p className="text-sm text-muted-foreground mt-1">Minimum <CurrencyGlyph /> amount to trigger rewards</p>
                   </div>
 
@@ -1025,7 +1029,7 @@ export function Referrals() {
                       <Label>Auto-process Rewards</Label>
                       <p className="text-sm text-muted-foreground">Automatically credit rewards when conditions are met</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch checked={settings.autoProcessRewards} onCheckedChange={(v) => setSettings(p => ({ ...p, autoProcessRewards: v }))} />
                   </div>
                 </div>
               </div>
@@ -1067,9 +1071,9 @@ export function Referrals() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="ml-auto">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Save Settings
+              <Button className="ml-auto" onClick={handleSaveSettings} disabled={savingSettings}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${savingSettings ? 'animate-spin' : ''}`} />
+                {savingSettings ? 'Saving...' : 'Save Settings'}
               </Button>
             </CardFooter>
           </Card>
@@ -1140,7 +1144,7 @@ export function Referrals() {
                             key={member.id}
                             value={member.name.toLowerCase()}
                             onSelect={() => {
-                              setEditReferral(p => ({ ...p, referrerName: member.name, referrerMemberId: member.id }));
+                              setEditReferral(p => ({ ...p, referrerName: member.name, referrerMemberId: member.member_id || member.id }));
                               setEditReferralOpen(false);
                             }}
                           >
@@ -1245,166 +1249,6 @@ export function Referrals() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Rule Dialog */}
-      <Dialog open={showEditRule} onOpenChange={setShowEditRule}>
-        <DialogContent className="max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-[#2B7A78]">Edit Reward Rule</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label>Rule Name</Label>
-              <Input className="mt-1" value={editRule.name} onChange={e => setEditRule(p => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Reward Type</Label>
-              <Select value={editRule.type} onValueChange={v => setEditRule(p => ({ ...p, type: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="credit">Cash Credit</SelectItem>
-                  <SelectItem value="discount">Membership Discount</SelectItem>
-                  <SelectItem value="points">Loyalty Points</SelectItem>
-                  <SelectItem value="free_session">Free Session</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Value</Label>
-              <Input type="number" className="mt-1" value={editRule.value} onChange={e => setEditRule(p => ({ ...p, value: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Unit</Label>
-              <Input className="mt-1" value={editRule.unit} onChange={e => setEditRule(p => ({ ...p, unit: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Eligibility</Label>
-              <Select value={editRule.eligibility} onValueChange={v => setEditRule(p => ({ ...p, eligibility: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="referrer">Referrer Only</SelectItem>
-                  <SelectItem value="referee">Referee Only</SelectItem>
-                  <SelectItem value="both">Both Parties</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Condition</Label>
-              <Select value={editRule.conditionTrigger} onValueChange={v => setEditRule(p => ({ ...p, conditionTrigger: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="signup">On Signup</SelectItem>
-                  <SelectItem value="payment">On Payment</SelectItem>
-                  <SelectItem value="both">Both</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Expiry Days</Label>
-              <Input type="number" className="mt-1" value={editRule.expiryDays} onChange={e => setEditRule(p => ({ ...p, expiryDays: e.target.value }))} />
-            </div>
-          </div>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowEditRule(false)}>Cancel</Button>
-            <Button className="bg-[#E63946] hover:bg-[#c92e3a] text-white" onClick={async () => {
-              if (!editingRule) return;
-              try {
-                await referralService.updateRule(Number(editingRule.id), { name: editRule.name, type: editRule.type, value: Number(editRule.value), unit: editRule.unit, eligibility: editRule.eligibility, conditionTrigger: editRule.conditionTrigger, expiryDays: Number(editRule.expiryDays), isActive: editingRule.isActive });
-                toast.success('Rule updated');
-                setShowEditRule(false);
-                loadData();
-              } catch { toast.error('Failed to update rule'); }
-            }}>Save Changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ---------------- Add Reward Rule Modal ---------------- */}
-      <Dialog open={showAddRule} onOpenChange={setShowAddRule}>
-        <DialogContent className="max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-[#2B7A78]">
-              Add Reward Rule
-            </DialogTitle>
-            <DialogDescription>
-              Define a new reward policy for referrals or achievements.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label>Rule Name</Label>
-              <Input placeholder="e.g., 10% discount on next month" className="mt-1" value={newRule.name} onChange={e => setNewRule(p => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Reward Type</Label>
-              <Select value={newRule.type} onValueChange={v => setNewRule(p => ({ ...p, type: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="credit">Cash Credit</SelectItem>
-                  <SelectItem value="discount">Membership Discount</SelectItem>
-                  <SelectItem value="points">Loyalty Points</SelectItem>
-                  <SelectItem value="free_session">Free Session</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Reward Value</Label>
-              <Input placeholder="e.g., 25" type="number" className="mt-1" value={newRule.value} onChange={e => setNewRule(p => ({ ...p, value: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Unit</Label>
-              <Input placeholder={`${currencyCode} / % / session`} className="mt-1" value={newRule.unit} onChange={e => setNewRule(p => ({ ...p, unit: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Eligibility</Label>
-              <Select value={newRule.eligibility} onValueChange={v => setNewRule(p => ({ ...p, eligibility: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="referrer">Referrer Only</SelectItem>
-                  <SelectItem value="referee">Referee Only</SelectItem>
-                  <SelectItem value="both">Both Parties</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Condition</Label>
-              <Select value={newRule.conditionTrigger} onValueChange={v => setNewRule(p => ({ ...p, conditionTrigger: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="signup">On Signup</SelectItem>
-                  <SelectItem value="payment">On Payment</SelectItem>
-                  <SelectItem value="both">Both Signup & Payment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Expiry Days</Label>
-              <Input placeholder="e.g., 90" type="number" className="mt-1" value={newRule.expiryDays} onChange={e => setNewRule(p => ({ ...p, expiryDays: e.target.value }))} />
-            </div>
-          </div>
-
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowAddRule(false)} className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#2B7A78]/10">
-              Cancel
-            </Button>
-            <Button
-              className="bg-[#E63946] hover:bg-[#c92e3a] text-white"
-              onClick={async () => {
-                try {
-                  await referralService.createRule({ name: newRule.name, type: newRule.type, value: Number(newRule.value), unit: newRule.unit, eligibility: newRule.eligibility, conditionTrigger: newRule.conditionTrigger, expiryDays: Number(newRule.expiryDays), isActive: true });
-                  toast.success('Reward Rule Created!', { description: 'The new reward rule has been added.' });
-                  setNewRule({ name: '', type: 'credit', value: '', unit: currencyCode as string, eligibility: 'referrer', conditionTrigger: 'payment', expiryDays: '90' });
-                  setShowAddRule(false);
-                  await loadData();
-                } catch { toast.error('Failed to create rule'); }
-              }}
-            >
-              Save Rule
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* ---------------- Add Referral Modal ---------------- */}
       <Dialog open={showAddReferral} onOpenChange={setShowAddReferral}>
         <DialogContent className="max-w-md rounded-2xl">
@@ -1441,7 +1285,7 @@ export function Referrals() {
                             key={member.id}
                             value={`${member.name} ${member.email || ''} ${member.phone || ''}`}
                             onSelect={() => {
-                              setNewReferral(p => ({ ...p, referrerName: member.name, referrerMemberId: member.id }));
+                              setNewReferral(p => ({ ...p, referrerName: member.name, referrerMemberId: member.member_id || member.id }));
                               setAddReferralOpen(false);
                             }}
                           >
@@ -1531,6 +1375,20 @@ export function Referrals() {
               </Select>
             </div>
             <div>
+              <Label>Reward Rule (Optional)</Label>
+              <Select value={newReferral.ruleId} onValueChange={v => setNewReferral(p => ({ ...p, ruleId: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Auto-assign active rule" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto-assign active rule</SelectItem>
+                  {apiRules.filter(r => r.isActive).map(rule => (
+                    <SelectItem key={rule.id} value={String(rule.id)}>
+                      {rule.name} (<CurrencyGlyph />{rule.value})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Notes (Optional)</Label>
               <Input placeholder="Additional notes about this referral" className="mt-1" value={newReferral.notes} onChange={e => setNewReferral(p => ({ ...p, notes: e.target.value }))} />
             </div>
@@ -1548,9 +1406,9 @@ export function Referrals() {
                   return;
                 }
                 try {
-                  await referralService.create({ referrerMemberId: newReferral.referrerMemberId || undefined, referrerName: newReferral.referrerName, refereeName: newReferral.refereeName, refereeEmail: newReferral.refereeEmail || undefined, refereePhone: newReferral.refereePhone || undefined, date: newReferral.date, status: newReferral.status, notes: newReferral.notes || undefined });
+                  await referralService.create({ referrerMemberId: newReferral.referrerMemberId || undefined, referrerName: newReferral.referrerName, refereeName: newReferral.refereeName, refereeEmail: newReferral.refereeEmail || undefined, refereePhone: newReferral.refereePhone || undefined, date: newReferral.date, status: newReferral.status, notes: newReferral.notes || undefined, ruleId: newReferral.ruleId !== 'auto' ? Number(newReferral.ruleId) : undefined });
                   toast.success('Referral Added!', { description: 'The new referral has been registered.' });
-                  setNewReferral({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '' });
+                  setNewReferral({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '', ruleId: 'auto' });
                   setShowAddReferral(false);
                   await loadData();
                 } catch { toast.error('Failed to create referral'); }
@@ -1559,6 +1417,32 @@ export function Referrals() {
               Save Referral
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR Code Dialog */}
+      <Dialog open={!!qrDialogLink} onOpenChange={(open) => !open && setQrDialogLink(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Referral QR Code</DialogTitle>
+            <DialogDescription>Scan to open the referral link</DialogDescription>
+          </DialogHeader>
+          {qrDialogLink && (
+            <div className="space-y-4">
+              <div className="flex justify-center p-6 bg-white rounded-lg border">
+                <QRCode value={qrDialogLink} size={200} />
+              </div>
+              <p className="text-xs text-center text-muted-foreground break-all">{qrDialogLink}</p>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { navigator.clipboard.writeText(qrDialogLink); toast.success('Link copied to clipboard'); }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy Link
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
