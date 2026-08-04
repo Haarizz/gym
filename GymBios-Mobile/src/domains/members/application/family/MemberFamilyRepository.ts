@@ -2,8 +2,7 @@ import type { FamilyGroup } from '../../domain/FamilyGroup';
 import type { Member } from '../../domain/Member';
 
 export interface AddFamilyMemberRequest {
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
   phone: string;
   dateOfBirth?: string;

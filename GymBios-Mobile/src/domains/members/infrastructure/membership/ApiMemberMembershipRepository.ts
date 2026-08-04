@@ -9,10 +9,10 @@ import type { Member } from '../../domain/Member';
 import { apiClient } from '@/core/network/apiClient';
 
 interface MemberResponse {
-  id: number;
+  id: string;
+  member_id: string;
 
-  first_name: string;
-  last_name: string;
+  name: string;
   email: string;
   phone: string;
   date_of_birth?: string | null;
@@ -88,10 +88,10 @@ export class ApiMemberMembershipRepository
 
   private toDomain(response: MemberResponse): Member {
     return {
-      id: response.id,
+      id: Number(response.id),
+      memberId: response.member_id,
 
-      firstName: response.first_name,
-      lastName: response.last_name,
+      name: response.name,
       email: response.email,
       phone: response.phone,
       dateOfBirth: response.date_of_birth ?? undefined,

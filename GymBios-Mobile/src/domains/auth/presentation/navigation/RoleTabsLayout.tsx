@@ -58,10 +58,12 @@ export function RoleTabsLayout({
     ['staff', 'edit'],
     ['membership-plans', 'create'],
     ['membership-plans', 'edit'],
+    ['members', 'create'],
+    ['members', 'edit'],
   ] as const;
 
   // Module routes that should be accessible via navigation but hidden from the bottom tab bar.
-  const MODULE_ROUTES = ['membership-plans'] as const;
+  const MODULE_ROUTES = ['membership-plans', 'members'] as const;
 
   const isFullScreen = FULL_SCREEN_ROUTES.some(
     ([feature, action]) =>

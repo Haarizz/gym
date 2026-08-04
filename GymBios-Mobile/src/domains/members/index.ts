@@ -54,3 +54,31 @@ export { ApiMemberAccessRepository } from './infrastructure/access/ApiMemberAcce
 // Hooks
 export { useMembers } from './hooks/useMembers';
 export { useMemberActions } from './hooks/useMemberActions';
+
+// Presentation
+export { MembersListScreen } from './presentation/screens/MembersListScreen';
+export { MemberDetailsScreen } from './presentation/screens/MemberDetailsScreen';
+export { MemberFormScreen } from './presentation/screens/MemberFormScreen';
+export { MemberCreateEditScreen } from './presentation/screens/MemberCreateEditScreen';
+
+export { MemberAvatar } from './presentation/components/MemberAvatar';
+export { PaymentStatusBadge } from './presentation/components/PaymentStatusBadge';
+export { MemberCard } from './presentation/components/MemberCard';
+export { SectionHeader } from './presentation/components/SectionHeader';
+export { LoadingSkeleton } from './presentation/components/LoadingSkeleton';
+export { showConfirmationDialog } from './presentation/components/ConfirmationDialog';
+export { showDeleteMemberDialog } from './presentation/components/DeleteMemberDialog';
+
+export { MemberHeader } from './presentation/components/sections/MemberHeader';
+export { MembershipSection } from './presentation/components/sections/MembershipSection';
+export { PaymentSection } from './presentation/components/sections/PaymentSection';
+export { MedicalSection } from './presentation/components/sections/MedicalSection';
+export { EmergencyContactSection } from './presentation/components/sections/EmergencyContactSection';
+export { FamilySection } from './presentation/components/sections/FamilySection';
+export { AppAccessSection } from './presentation/components/sections/AppAccessSection';
+export { QuickActionsSection } from './presentation/components/sections/QuickActionsSection';
+
+export { RenewMembershipBottomSheet } from './presentation/components/bottomSheets/RenewMembershipBottomSheet';
+export { FreezeMembershipBottomSheet } from './presentation/components/bottomSheets/FreezeMembershipBottomSheet';
+export { FamilyMemberBottomSheet } from './presentation/components/bottomSheets/FamilyMemberBottomSheet';
+export { CredentialsBottomSheet } from './presentation/components/bottomSheets/CredentialsBottomSheet';

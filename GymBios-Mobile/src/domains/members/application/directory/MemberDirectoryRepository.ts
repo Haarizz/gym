@@ -1,3 +1,4 @@
+import type { PaymentSplit } from '@/shared/payment';
 import type { Member, MemberPage } from '../../domain/Member';
 
 export interface MemberFilters {
@@ -10,8 +11,7 @@ export interface MemberFilters {
 }
 
 export interface CreateMemberRequest {
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
   phone: string;
   dateOfBirth?: string;
@@ -24,11 +24,17 @@ export interface CreateMemberRequest {
   status: string;
   startDate: string;
   paymentStatus: string;
+
+  paymentMethodUsed?: string;
+  paymentBreakdown?: PaymentSplit[];
+  discountApplied?: number;
+  outstandingBalance?: number;
+  bankAccountCode?: string;
+  bankAccountName?: string;
 }
 
 export interface UpdateMemberRequest {
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
   phone: string;
   dateOfBirth?: string;
