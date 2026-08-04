@@ -17,6 +17,10 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     boolean existsByEmail(String email);
 
+    Optional<Member> findByEmail(String email);
+
+    Optional<Member> findByPhone(String phone);
+
     Optional<Member> findByMemberId(String memberId);
 
     Optional<Member> findByUserId(Long userId);
@@ -83,4 +87,14 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
            "  WHERE a.checkInTime >= :cutoff" +
            ")")
     List<Member> findMembersAbsentSince(@Param("cutoff") LocalDateTime cutoff);
+
+    // ── Dashboard Metrics ──────────────────────────────────────────────────────
+
+    @Query("SELECT COUNT(m) FROM Member m WHERE m.membershipStatus = :status AND m.joinDate >= :startDate")
+    long countByMembershipStatusAndJoinDateAfter(@Param("status") String status, @Param("startDate") LocalDateTime startDate);
+
+    @Query("SELECT m.membershipType, COUNT(m), SUM(m.membershipFee) FROM Member m WHERE m.membershipStatus = 'active' GROUP BY m.membershipType")
+    List<Object[]> countActiveMembersByType();
+
+    List<Member> findTop5ByOrderByJoinDateDesc();
 }

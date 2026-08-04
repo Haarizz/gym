@@ -834,41 +834,45 @@ export function CommunityAnalytics() {
             <CardDescription>Sales achievement by team members</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {data.staffPerformance.map((staff, index) => (
-                <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 rounded-full bg-primary/10">
-                      <Users className="h-4 w-4 text-primary" />
+            {data.staffPerformance.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">No staff sales data available for this month.</p>
+            ) : (
+              <div className="space-y-4">
+                {data.staffPerformance.map((staff, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Users className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{staff.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          <CurrencyGlyph /> {staff.sales.toLocaleString()} / <CurrencyGlyph /> {staff.target.toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{staff.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        <CurrencyGlyph /> {staff.sales.toLocaleString()} / <CurrencyGlyph /> {staff.target.toLocaleString()}
-                      </p>
+                    
+                    <div className="flex items-center space-x-3">
+                      <div className="text-right">
+                        <p className="text-sm font-medium">
+                          {staff.achievement.toFixed(1)}%
+                        </p>
+                        <Progress 
+                          value={Math.min(staff.achievement, 100)} 
+                          className="w-20 h-2"
+                          style={{
+                            '--progress-background': getProgressColor(staff.achievement)
+                          } as React.CSSProperties}
+                        />
+                      </div>
+                      <Badge variant={staff.achievement >= 100 ? "default" : "secondary"}>
+                        {staff.achievement >= 100 ? "Target Met" : "In Progress"}
+                      </Badge>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right">
-                      <p className="text-sm font-medium">
-                        {staff.achievement.toFixed(1)}%
-                      </p>
-                      <Progress 
-                        value={Math.min(staff.achievement, 100)} 
-                        className="w-20 h-2"
-                        style={{
-                          '--progress-background': getProgressColor(staff.achievement)
-                        } as React.CSSProperties}
-                      />
-                    </div>
-                    <Badge variant={staff.achievement >= 100 ? "default" : "secondary"}>
-                      {staff.achievement >= 100 ? "Target Met" : "In Progress"}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -880,28 +884,31 @@ export function CommunityAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {data.retentionFunnel.map((stage, index) => {
-                const percentage = index === 0 ? 100 : (stage.value / (data.retentionFunnel[0]?.value || 1)) * 100;
-                return (
-                  <div key={index} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-foreground">{stage.name}</span>
-                      <span className="text-sm font-bold text-foreground">{stage.value}</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-6 relative">
-                      <div 
-                        className="h-6 rounded-full flex items-center justify-center text-white text-xs font-medium transition-all duration-500"
-                        style={{ 
-                          width: `${percentage}%`,
-                          backgroundColor: stage.color
-                        }}
-                      >
-                        {percentage.toFixed(0)}%
+              {(() => {
+                const maxVal = Math.max(...data.retentionFunnel.map((s) => s.value), 1);
+                return data.retentionFunnel.map((stage, index) => {
+                  const percentage = (stage.value / maxVal) * 100;
+                  return (
+                    <div key={index} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-foreground">{stage.name}</span>
+                        <span className="text-sm font-bold text-foreground">{stage.value}</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-6 relative">
+                        <div 
+                          className="h-6 rounded-full flex items-center justify-center text-white text-xs font-medium transition-all duration-500"
+                          style={{ 
+                            width: `${percentage}%`,
+                            backgroundColor: stage.color
+                          }}
+                        >
+                          {percentage > 0 ? `${percentage.toFixed(0)}%` : ""}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </CardContent>
         </Card>

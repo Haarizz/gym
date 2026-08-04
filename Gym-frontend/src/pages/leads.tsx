@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { leadService, type LeadResponse } from '../utils/supabase/lead-service';
+import { staffService } from '../utils/supabase/staff-service';
+import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -149,7 +151,6 @@ export function Leads() {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [dateRange, setDateRange] = useState('all');
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
-  const [showBulkActions, setShowBulkActions] = useState(false);
   const [sortField, setSortField] = useState<keyof Lead>('createdDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -167,6 +168,9 @@ export function Leads() {
   const [showUpdateStatus, setShowUpdateStatus] = useState(false);
   const [statusLeadId, setStatusLeadId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState('new');
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [bulkAssignStaff, setBulkAssignStaff] = useState('');
+  const navigate = useNavigate();
 
   const loadLeads = useCallback(async () => {
     try {
@@ -177,14 +181,25 @@ export function Leads() {
 
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
-  // Sample data - in real app this would come from your backend
-  const staffMembers = [
-    { id: '1', name: 'Sarah Johnson' },
-    { id: '2', name: 'Ahmed Hassan' },
-    { id: '3', name: 'Maria Rodriguez' },
-    { id: '4', name: 'David Wilson' },
-  ];
+  const [staffMembers, setStaffMembers] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    staffService.getStaff({}, 1, 100)
+      .then(res => setStaffMembers(res.items.map(s => ({ id: String(s.id), name: s.name }))))
+      .catch(console.error);
+  }, []);
 
+
+  const parseSafeDate = (d: any, fallback: Date = new Date()) => {
+    if (!d) return fallback;
+    const parsed = new Date(d);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+  };
+
+  const parseOptionalDate = (d: any) => {
+    if (!d) return undefined;
+    const parsed = new Date(d);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  };
 
   const displayLeads: Lead[] = apiLeads.map(l => ({
     id: String(l.id),
@@ -196,9 +211,9 @@ export function Leads() {
     source: (l.source as Lead['source']) || 'other',
     priority: (l.priority as Lead['priority']) || 'medium',
     assignedStaff: l.assignedStaff,
-    nextFollowUp: l.nextFollowUp ? new Date(l.nextFollowUp) : undefined,
-    createdDate: new Date(l.createdAt),
-    lastContactDate: l.lastContactDate ? new Date(l.lastContactDate) : undefined,
+    nextFollowUp: parseOptionalDate(l.nextFollowUp),
+    createdDate: parseSafeDate(l.createdAt),
+    lastContactDate: parseOptionalDate(l.lastContactDate),
     interestLevel: l.interestLevel || 5,
     notes: l.notes || '',
     tags: l.tags || [],
@@ -209,7 +224,7 @@ export function Leads() {
     interactions: (l.interactions || []).map(i => ({
       id: String(i.id),
       type: i.type as LeadInteraction['type'],
-      date: new Date(i.date),
+      date: parseSafeDate(i.date),
       staffMember: i.staffMember,
       notes: i.notes,
       outcome: i.outcome as LeadInteraction['outcome'],
@@ -218,7 +233,7 @@ export function Leads() {
     followUps: (l.followUps || []).map(f => ({
       id: String(f.id),
       type: f.type,
-      dueDate: new Date(f.dueDate),
+      dueDate: parseSafeDate(f.dueDate),
       scheduledTime: f.scheduledTime,
       assignedStaff: f.assignedStaff,
       estimatedDuration: f.estimatedDuration,
@@ -373,10 +388,10 @@ export function Leads() {
       setShowUpdateStatus(true);
       return;
     } else if (action === 'assign') {
-      toast.info('Use the edit button to assign individual leads');
+      setShowBulkAssign(true);
+      return;
     }
     setSelectedLeads([]);
-    setShowBulkActions(false);
   }, [selectedLeads, loadLeads]);
 
   const handleDeleteLead = useCallback(async (id: string) => {
@@ -423,10 +438,24 @@ export function Leads() {
         toast.success(`WhatsApp opened for ${lead.firstName} ${lead.lastName}`);
         break;
       case 'schedule':
-        toast.info('Follow-up scheduling feature coming soon!');
+        navigate('/follow-ups', { state: { prefillLeadId: Number(lead.id), prefillLeadName: `${lead.firstName} ${lead.lastName}`.trim() } });
         break;
     }
-  }, []);
+  }, [navigate]);
+
+  const handleExportCSV = useCallback(() => {
+    const csv = ['First Name,Last Name,Email,Phone,Status,Source,Priority,Assigned Staff,Created', ...filteredLeads.map(l =>
+      `${l.firstName},${l.lastName},${l.email},${l.phone},${l.status},${l.source},${l.priority},${l.assignedStaff || ''},${l.createdDate.toISOString()}`
+    )].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'leads.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Leads exported');
+  }, [filteredLeads]);
 
   return (
     <div className="p-6 space-y-6">
@@ -437,7 +466,7 @@ export function Leads() {
           <p className="text-muted-foreground">Comprehensive member management and operations.</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => setShowBulkActions(true)}>
+          <Button variant="outline" onClick={handleExportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
@@ -1339,7 +1368,7 @@ export function Leads() {
                   priority: editLead.priority,
                   notes: editLead.notes || undefined,
                   assignedStaff: editLead.assignedStaff || undefined,
-                  nextFollowUp: editLead.nextFollowUp || undefined,
+                  nextFollowUp: editLead.nextFollowUp ? (editLead.nextFollowUp.includes('T') ? editLead.nextFollowUp : `${editLead.nextFollowUp}T00:00:00`) : undefined,
                   membershipInterest: editLead.membershipInterest || undefined,
                   interestLevel: editLead.interestLevel ? Number(editLead.interestLevel) : undefined,
                   leadScore: editLead.leadScore ? Number(editLead.leadScore) : undefined,
@@ -1458,6 +1487,45 @@ export function Leads() {
                 loadLeads();
               } catch { toast.error('Failed to update status'); }
             }}>Update Status</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Assign Staff Dialog */}
+      <Dialog open={showBulkAssign} onOpenChange={setShowBulkAssign}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Assign Staff</DialogTitle>
+            <DialogDescription>Assign {selectedLeads.length} selected lead(s) to a staff member</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Staff Member</Label>
+            <Select value={bulkAssignStaff} onValueChange={setBulkAssignStaff}>
+              <SelectTrigger className="mt-1"><SelectValue placeholder="Select staff" /></SelectTrigger>
+              <SelectContent>
+                {staffMembers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkAssign(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              if (!bulkAssignStaff) {
+                toast.error('Please select a staff member');
+                return;
+              }
+              try {
+                await Promise.all(selectedLeads.map(id => {
+                  const lead = displayLeads.find(l => l.id === id);
+                  return leadService.update(Number(id), { firstName: lead?.firstName || '', assignedStaff: bulkAssignStaff });
+                }));
+                toast.success(`Assigned ${selectedLeads.length} lead(s) to ${bulkAssignStaff}`);
+                setShowBulkAssign(false);
+                setBulkAssignStaff('');
+                setSelectedLeads([]);
+                loadLeads();
+              } catch { toast.error('Failed to assign staff'); }
+            }}>Assign</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

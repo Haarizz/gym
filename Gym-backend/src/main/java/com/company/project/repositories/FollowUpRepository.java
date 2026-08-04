@@ -15,4 +15,6 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long>, JpaSp
     long countByStatus(String status);
 
     List<FollowUp> findByStatusAndDueDateBefore(String status, LocalDateTime dateTime);
+
+    List<FollowUp> findTop5ByStatusOrderByDueDateAsc(String status);
 }

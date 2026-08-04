@@ -22,6 +22,7 @@ export interface ReferralResponse {
   notes?: string;
   ruleId?: number;
   ruleName?: string;
+  rewardRedeemed?: boolean;
   createdAt: string;
   updatedAt?: string;
 }
@@ -90,6 +91,18 @@ export interface ReferralValidationResponse {
   applicableRewardRules: RewardRuleResponse[];
 }
 
+export interface ReferralSettings {
+  programEnabled: boolean;
+  autoGenerateCodes: boolean;
+  emailNotifications: boolean;
+  autoProcessRewards: boolean;
+  codePrefix: string;
+  linkDomain: string;
+  maxRewardsPerMember?: number | null;
+  expiryDays: number;
+  minPurchaseAmount?: number | null;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function getHeaders(): Promise<HeadersInit> {
@@ -136,8 +149,20 @@ export const referralService = {
         createdAt: r.created_at,
         updatedAt: r.updated_at
       })),
-      pagination: raw.pagination ?? {},
+      pagination: (() => {
+        const pg = raw.pagination ?? {};
+        return {
+          currentPage: pg.page ?? 1,
+          totalPages: pg.total_pages ?? pg.totalPages ?? 1,
+          totalItems: pg.total ?? pg.totalItems ?? 0,
+          itemsPerPage: pg.limit ?? pg.itemsPerPage ?? 20,
+        };
+      })(),
     };
+  },
+
+  async fixRewards(): Promise<void> {
+    await fetch(`${BASE_URL}/referrals/fix-rewards`, { headers: await getHeaders() });
   },
 
   async getStats(): Promise<ReferralStats> {
@@ -220,10 +245,24 @@ export const referralService = {
   },
 
   async update(id: number, request: ReferralRequest): Promise<ReferralResponse> {
+    const payload = {
+      referrer_member_id: request.referrerMemberId,
+      referrer_name: request.referrerName,
+      referee_name: request.refereeName,
+      referee_email: request.refereeEmail,
+      referee_phone: request.refereePhone,
+      status: request.status,
+      reward_amount: request.rewardAmount,
+      date: request.date,
+      signup_date: request.signupDate,
+      payment_date: request.paymentDate,
+      notes: request.notes,
+      rule_id: request.ruleId
+    };
     const res = await fetch(`${BASE_URL}/referrals/${id}`, {
       method: 'PUT',
       headers: await getHeaders(),
-      body: JSON.stringify(request),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to update referral');
     const r = await res.json();
@@ -254,10 +293,19 @@ export const referralService = {
     if (!res.ok) throw new Error('Failed to delete referral');
   },
 
-  async markSuccessful(id: number): Promise<ReferralResponse> {
+  async markSuccessful(id: number, opts?: {
+    purchaseAmount?: number;
+    membershipPlanId?: number;
+    refereeMemberId?: string;
+  }): Promise<ReferralResponse> {
     const res = await fetch(`${BASE_URL}/referrals/${id}/mark-successful`, {
       method: 'POST',
       headers: await getHeaders(),
+      body: opts ? JSON.stringify({
+        purchase_amount: opts.purchaseAmount,
+        membership_plan_id: opts.membershipPlanId,
+        referee_member_id: opts.refereeMemberId,
+      }) : undefined,
     });
     if (!res.ok) throw new Error('Failed to mark referral as successful');
     const r = await res.json();
@@ -301,6 +349,65 @@ export const referralService = {
       paymentDate: r.payment_date,
       ruleId: r.rule_id,
       ruleName: r.rule_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    };
+  },
+
+  /**
+   * The referrer's oldest unredeemed reward from a successful referral, if any —
+   * offered as a discount at checkout (e.g. an add-on purchase). Returns null
+   * when there's nothing to redeem.
+   */
+  async getUnredeemedReward(memberId: string): Promise<ReferralResponse | null> {
+    const res = await fetch(`${BASE_URL}/referrals/unredeemed-reward?memberId=${encodeURIComponent(memberId)}`, {
+      headers: await getHeaders(),
+    });
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error('Failed to fetch unredeemed reward');
+    const r = await res.json();
+    return {
+      ...r,
+      referrerMemberId: r.referrer_member_id,
+      referrerName: r.referrer_name,
+      refereeName: r.referee_name,
+      refereeEmail: r.referee_email,
+      refereePhone: r.referee_phone,
+      referralCode: r.referral_code,
+      referralLink: r.referral_link,
+      rewardAmount: r.reward_amount,
+      signupDate: r.signup_date,
+      paymentDate: r.payment_date,
+      ruleId: r.rule_id,
+      ruleName: r.rule_name,
+      rewardRedeemed: r.reward_redeemed,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    };
+  },
+
+  async redeemReward(id: number): Promise<ReferralResponse> {
+    const res = await fetch(`${BASE_URL}/referrals/${id}/redeem-reward`, {
+      method: 'POST',
+      headers: await getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to redeem reward');
+    const r = await res.json();
+    return {
+      ...r,
+      referrerMemberId: r.referrer_member_id,
+      referrerName: r.referrer_name,
+      refereeName: r.referee_name,
+      refereeEmail: r.referee_email,
+      refereePhone: r.referee_phone,
+      referralCode: r.referral_code,
+      referralLink: r.referral_link,
+      rewardAmount: r.reward_amount,
+      signupDate: r.signup_date,
+      paymentDate: r.payment_date,
+      ruleId: r.rule_id,
+      ruleName: r.rule_name,
+      rewardRedeemed: r.reward_redeemed,
       createdAt: r.created_at,
       updatedAt: r.updated_at
     };
@@ -416,6 +523,57 @@ export const referralService = {
       headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to delete reward rule');
+  },
+
+  // ── Settings ─────────────────────────────────────────────────────────────
+
+  async getSettings(): Promise<ReferralSettings> {
+    const res = await fetch(`${BASE_URL}/referrals/settings`, { headers: await getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch referral settings');
+    const s = await res.json();
+    return {
+      programEnabled: s.program_enabled,
+      autoGenerateCodes: s.auto_generate_codes,
+      emailNotifications: s.email_notifications,
+      autoProcessRewards: s.auto_process_rewards,
+      codePrefix: s.code_prefix,
+      linkDomain: s.link_domain,
+      maxRewardsPerMember: s.max_rewards_per_member,
+      expiryDays: s.expiry_days,
+      minPurchaseAmount: s.min_purchase_amount,
+    };
+  },
+
+  async updateSettings(settings: Partial<ReferralSettings>): Promise<ReferralSettings> {
+    const payload = {
+      program_enabled: settings.programEnabled,
+      auto_generate_codes: settings.autoGenerateCodes,
+      email_notifications: settings.emailNotifications,
+      auto_process_rewards: settings.autoProcessRewards,
+      code_prefix: settings.codePrefix,
+      link_domain: settings.linkDomain,
+      max_rewards_per_member: settings.maxRewardsPerMember,
+      expiry_days: settings.expiryDays,
+      min_purchase_amount: settings.minPurchaseAmount,
+    };
+    const res = await fetch(`${BASE_URL}/referrals/settings`, {
+      method: 'PUT',
+      headers: await getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to update referral settings');
+    const s = await res.json();
+    return {
+      programEnabled: s.program_enabled,
+      autoGenerateCodes: s.auto_generate_codes,
+      emailNotifications: s.email_notifications,
+      autoProcessRewards: s.auto_process_rewards,
+      codePrefix: s.code_prefix,
+      linkDomain: s.link_domain,
+      maxRewardsPerMember: s.max_rewards_per_member,
+      expiryDays: s.expiry_days,
+      minPurchaseAmount: s.min_purchase_amount,
+    };
   },
 };
 

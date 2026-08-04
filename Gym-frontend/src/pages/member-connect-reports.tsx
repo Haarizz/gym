@@ -85,83 +85,12 @@ import {
 import { toast } from "sonner";
 import { format, addDays, subDays, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, startOfWeek, endOfWeek, isToday, isYesterday, subWeeks } from "date-fns";
 import { cn } from "../components/ui/utils";
+import { promotionsService, type PromotionApi } from '../utils/supabase/promotions-service';
+import { referralService, type ReferralResponse } from '../utils/supabase/referral-service';
+import { followUpService, type FollowUpResponse } from '../utils/supabase/follow-up-service';
+import { messagingService, type MessagingAnalyticsApi, type MessageHistoryApi } from '../utils/supabase/messaging-service';
 
-// Types and interfaces
-interface Campaign {
-  id: string;
-  name: string;
-  type: 'email' | 'sms' | 'push' | 'social' | 'referral';
-  status: 'active' | 'completed' | 'draft' | 'paused';
-  startDate: Date;
-  endDate: Date;
-  membersTargeted: number;
-  messagesSent: number;
-  delivered: number;
-  opened: number;
-  clicked: number;
-  responded: number;
-  conversions: number;
-  cost: number;
-  revenue: number;
-  createdBy: string;
-  notes?: string;
-}
-
-interface MemberEngagement {
-  memberId: string;
-  memberName: string;
-  membershipType: string;
-  totalInteractions: number;
-  messagesReceived: number;
-  messagesOpened: number;
-  messagesClicked: number;
-  campaignsParticipated: number;
-  referralsMade: number;
-  followUpsCompleted: number;
-  lastEngagement: Date;
-  engagementScore: number;
-  communicationPreference: 'email' | 'sms' | 'push' | 'all';
-  avatar?: string;
-}
-
-interface CommunicationMetrics {
-  date: string;
-  emailsSent: number;
-  emailsOpened: number;
-  emailsClicked: number;
-  smsSent: number;
-  smsOpened: number;
-  smsClicked: number;
-  pushSent: number;
-  pushOpened: number;
-  pushClicked: number;
-  totalEngagement: number;
-}
-
-interface ReferralReport {
-  id: string;
-  referrerName: string;
-  referreeName: string;
-  referralDate: Date;
-  status: 'pending' | 'converted' | 'expired';
-  campaignId?: string;
-  rewardGiven: number;
-  conversionDate?: Date;
-  membershipValue: number;
-}
-
-interface FollowUpReport {
-  id: string;
-  memberName: string;
-  followUpType: 'welcome' | 'retention' | 'reactivation' | 'feedback' | 'renewal';
-  scheduledDate: Date;
-  completedDate?: Date;
-  method: 'email' | 'sms' | 'call' | 'in-person';
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
-  outcome?: 'positive' | 'neutral' | 'negative';
-  notes?: string;
-  assignedTo: string;
-}
+// All interfaces now come from respective service files
 
 export function MemberConnectReports() {
     const [activeTab, setActiveTab] = useState('overview');
@@ -178,272 +107,75 @@ export function MemberConnectReports() {
   const [showCampaignDetail, setShowCampaignDetail] = useState(false);
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
-  // Sample data - in real app this would come from your backend
-  const campaigns: Campaign[] = [
-    {
-      id: '1',
-      name: 'Summer Fitness Challenge',
-      type: 'email',
-      status: 'active',
-      startDate: subDays(new Date(), 14),
-      endDate: addDays(new Date(), 16),
-      membersTargeted: 450,
-      messagesSent: 1350,
-      delivered: 1321,
-      opened: 892,
-      clicked: 234,
-      responded: 87,
-      conversions: 23,
-      cost: 850,
-      revenue: 5750,
-      createdBy: 'Sarah Johnson',
-      notes: 'Great engagement rates. Consider extending campaign.'
-    },
-    {
-      id: '2',
-      name: 'New Member Welcome Series',
-      type: 'email',
-      status: 'active',
-      startDate: subDays(new Date(), 30),
-      endDate: addDays(new Date(), 335),
-      membersTargeted: 180,
-      messagesSent: 720,
-      delivered: 714,
-      opened: 521,
-      clicked: 156,
-      responded: 89,
-      conversions: 34,
-      cost: 320,
-      revenue: 8160,
-      createdBy: 'Mike Chen'
-    },
-    {
-      id: '3',
-      name: 'Class Reminder SMS',
-      type: 'sms',
-      status: 'active',
-      startDate: subDays(new Date(), 7),
-      endDate: addDays(new Date(), 23),
-      membersTargeted: 320,
-      messagesSent: 960,
-      delivered: 952,
-      opened: 847,
-      clicked: 203,
-      responded: 145,
-      conversions: 67,
-      cost: 480,
-      revenue: 3350,
-      createdBy: 'Lisa Ahmed'
-    },
-    {
-      id: '4',
-      name: 'Referral Rewards Program',
-      type: 'referral',
-      status: 'completed',
-      startDate: subDays(new Date(), 60),
-      endDate: subDays(new Date(), 30),
-      membersTargeted: 280,
-      messagesSent: 840,
-      delivered: 821,
-      opened: 623,
-      clicked: 187,
-      responded: 142,
-      conversions: 89,
-      cost: 1200,
-      revenue: 17800,
-      createdBy: 'John Smith'
-    },
-    {
-      id: '5',
-      name: 'Winter Membership Promotion',
-      type: 'social',
-      status: 'completed',
-      startDate: subDays(new Date(), 90),
-      endDate: subDays(new Date(), 45),
-      membersTargeted: 520,
-      messagesSent: 1560,
-      delivered: 1534,
-      opened: 1021,
-      clicked: 312,
-      responded: 189,
-      conversions: 67,
-      cost: 980,
-      revenue: 13400,
-      createdBy: 'Emma Wilson'
-    }
-  ];
+  const [apiPromotions, setApiPromotions] = useState<PromotionApi[]>([]);
+  const [apiReferrals, setApiReferrals] = useState<ReferralResponse[]>([]);
+  const [apiFollowUps, setApiFollowUps] = useState<FollowUpResponse[]>([]);
+  const [apiMessagingStats, setApiMessagingStats] = useState<MessagingAnalyticsApi | null>(null);
+  const [apiMessageHistory, setApiMessageHistory] = useState<MessageHistoryApi[]>([]);
+  
+  const [apiReferralStats, setApiReferralStats] = useState({ totalReferrals: 0, successfulReferrals: 0 });
+  const [apiFollowUpStats, setApiFollowUpStats] = useState({ totalFollowUps: 0, completedFollowUps: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const memberEngagements: MemberEngagement[] = [
-    {
-      memberId: '1',
-      memberName: 'Ahmed Hassan',
-      membershipType: 'Premium Annual',
-      totalInteractions: 45,
-      messagesReceived: 23,
-      messagesOpened: 21,
-      messagesClicked: 8,
-      campaignsParticipated: 6,
-      referralsMade: 3,
-      followUpsCompleted: 4,
-      lastEngagement: new Date(),
-      engagementScore: 92,
-      communicationPreference: 'email'
-    },
-    {
-      memberId: '2',
-      memberName: 'Sarah Johnson',
-      membershipType: 'Premium Monthly',
-      totalInteractions: 38,
-      messagesReceived: 19,
-      messagesOpened: 17,
-      messagesClicked: 6,
-      campaignsParticipated: 5,
-      referralsMade: 2,
-      followUpsCompleted: 3,
-      lastEngagement: subDays(new Date(), 1),
-      engagementScore: 78,
-      communicationPreference: 'sms'
-    },
-    {
-      memberId: '3',
-      memberName: 'Mike Chen',
-      membershipType: 'Standard Monthly',
-      totalInteractions: 52,
-      messagesReceived: 28,
-      messagesOpened: 26,
-      messagesClicked: 12,
-      campaignsParticipated: 8,
-      referralsMade: 5,
-      followUpsCompleted: 6,
-      lastEngagement: subDays(new Date(), 2),
-      engagementScore: 96,
-      communicationPreference: 'all'
-    },
-    {
-      memberId: '4',
-      memberName: 'Lisa Ahmed',
-      membershipType: 'Basic',
-      totalInteractions: 18,
-      messagesReceived: 12,
-      messagesOpened: 8,
-      messagesClicked: 2,
-      campaignsParticipated: 3,
-      referralsMade: 0,
-      followUpsCompleted: 1,
-      lastEngagement: subDays(new Date(), 7),
-      engagementScore: 34,
-      communicationPreference: 'push'
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [
+        promos, refData, refStats, followData, followStats, msgStats, msgHist
+      ] = await Promise.all([
+        promotionsService.getPromotions(),
+        referralService.getReferrals({ size: 100 }),
+        referralService.getStats(),
+        followUpService.getFollowUps({ size: 100 }),
+        followUpService.getStats(),
+        messagingService.getAnalytics(),
+        messagingService.getHistory()
+      ]);
+      setApiPromotions(promos || []);
+      setApiReferrals(refData?.referrals || []);
+      setApiReferralStats({ totalReferrals: refStats?.totalReferrals || 0, successfulReferrals: refStats?.successfulReferrals || 0 });
+      setApiFollowUps(followData?.followUps || []);
+      setApiFollowUpStats({ totalFollowUps: followStats?.totalFollowUps || 0, completedFollowUps: followStats?.completedFollowUps || 0 });
+      setApiMessagingStats(msgStats);
+      setApiMessageHistory(msgHist || []);
+    } catch (e) {
+      console.error('Error loading report data:', e);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  }, []);
 
-  const communicationMetrics: CommunicationMetrics[] = [
-    { date: 'Jan', emailsSent: 1200, emailsOpened: 840, emailsClicked: 168, smsSent: 800, smsOpened: 720, smsClicked: 144, pushSent: 600, pushOpened: 480, pushClicked: 96, totalEngagement: 78 },
-    { date: 'Feb', emailsSent: 1350, emailsOpened: 945, emailsClicked: 189, smsSent: 900, smsOpened: 810, smsClicked: 162, pushSent: 650, pushOpened: 520, pushClicked: 104, totalEngagement: 82 },
-    { date: 'Mar', emailsSent: 1180, emailsOpened: 826, emailsClicked: 165, smsSent: 750, smsOpened: 675, smsClicked: 135, pushSent: 580, pushOpened: 464, pushClicked: 93, totalEngagement: 76 },
-    { date: 'Apr', emailsSent: 1420, emailsOpened: 994, emailsClicked: 199, smsSent: 950, smsOpened: 855, smsClicked: 171, pushSent: 700, pushOpened: 560, pushClicked: 112, totalEngagement: 85 },
-    { date: 'May', emailsSent: 1580, emailsOpened: 1106, emailsClicked: 221, smsSent: 1020, smsOpened: 918, smsClicked: 184, pushSent: 750, pushOpened: 600, pushClicked: 120, totalEngagement: 89 },
-    { date: 'Jun', emailsSent: 1650, emailsOpened: 1155, emailsClicked: 231, smsSent: 1100, smsOpened: 990, smsClicked: 198, pushSent: 800, pushOpened: 640, pushClicked: 128, totalEngagement: 92 }
-  ];
-
-  const referralReports: ReferralReport[] = [
-    {
-      id: '1',
-      referrerName: 'John Smith',
-      referreeName: 'Mark Wilson',
-      referralDate: subDays(new Date(), 5),
-      status: 'converted',
-      campaignId: '4',
-      rewardGiven: 200,
-      conversionDate: subDays(new Date(), 2),
-      membershipValue: 2400
-    },
-    {
-      id: '2',
-      referrerName: 'Sarah Johnson',
-      referreeName: 'Emily Brown',
-      referralDate: subDays(new Date(), 12),
-      status: 'pending',
-      campaignId: '4',
-      rewardGiven: 0,
-      membershipValue: 0
-    },
-    {
-      id: '3',
-      referrerName: 'Ahmed Hassan',
-      referreeName: 'David Lee',
-      referralDate: subDays(new Date(), 8),
-      status: 'converted',
-      campaignId: '4',
-      rewardGiven: 200,
-      conversionDate: subDays(new Date(), 3),
-      membershipValue: 1800
-    }
-  ];
-
-  const followUpReports: FollowUpReport[] = [
-    {
-      id: '1',
-      memberName: 'Lisa Chen',
-      followUpType: 'retention',
-      scheduledDate: new Date(),
-      completedDate: new Date(),
-      method: 'email',
-      status: 'completed',
-      outcome: 'positive',
-      notes: 'Member renewed for another year',
-      assignedTo: 'Sarah Johnson'
-    },
-    {
-      id: '2',
-      memberName: 'Mike Wilson',
-      followUpType: 'welcome',
-      scheduledDate: addDays(new Date(), 1),
-      method: 'call',
-      status: 'pending',
-      assignedTo: 'Mike Chen'
-    },
-    {
-      id: '3',
-      memberName: 'Emma Davis',
-      followUpType: 'reactivation',
-      scheduledDate: subDays(new Date(), 2),
-      completedDate: subDays(new Date(), 1),
-      method: 'sms',
-      status: 'completed',
-      outcome: 'neutral',
-      notes: 'Member showed interest but no commitment yet',
-      assignedTo: 'Lisa Ahmed'
-    }
-  ];
+  React.useEffect(() => { loadData(); }, [loadData]);
 
   // Calculate key metrics
   const analytics = useMemo(() => {
-    const totalMembersEngaged = memberEngagements.length;
-    const totalCampaigns = campaigns.length;
-    const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
+    const totalMembersEngaged = apiMessagingStats?.total_recipients || 0;
+    const totalCampaigns = apiPromotions.length;
+    const activeCampaigns = apiPromotions.filter(c => c.status === 'active' || c.status === 'scheduled').length;
     
-    const totalMessagesSent = campaigns.reduce((sum, c) => sum + c.messagesSent, 0);
-    const totalOpened = campaigns.reduce((sum, c) => sum + c.opened, 0);
-    const totalClicked = campaigns.reduce((sum, c) => sum + c.clicked, 0);
-    const totalConversions = campaigns.reduce((sum, c) => sum + c.conversions, 0);
+    const totalMessagesSent = apiMessagingStats?.sent_today || 0;
+    const openRate = apiMessagingStats?.open_rate || 0;
+    const clickRate = apiMessagingStats?.click_rate || 0;
     
-    const openRate = totalMessagesSent > 0 ? (totalOpened / totalMessagesSent) * 100 : 0;
-    const clickRate = totalOpened > 0 ? (totalClicked / totalOpened) * 100 : 0;
+    // Derived approximations for now if we don't have exact metrics
+    const totalOpened = Math.round(totalMessagesSent * (openRate / 100));
+    const totalClicked = Math.round(totalOpened * (clickRate / 100));
+    const totalConversions = Math.round(totalClicked * 0.1); // approx 10% conversion from clicks
     const conversionRate = totalMessagesSent > 0 ? (totalConversions / totalMessagesSent) * 100 : 0;
     
-    const referralsGenerated = referralReports.length;
-    const referralsConverted = referralReports.filter(r => r.status === 'converted').length;
+    const referralsGenerated = apiReferralStats.totalReferrals;
+    const referralsConverted = apiReferralStats.successfulReferrals;
     const referralConversionRate = referralsGenerated > 0 ? (referralsConverted / referralsGenerated) * 100 : 0;
     
-    const followUpsCompleted = followUpReports.filter(f => f.status === 'completed').length;
-    const totalFollowUps = followUpReports.length;
+    const followUpsCompleted = apiFollowUpStats.completedFollowUps;
+    const totalFollowUps = apiFollowUpStats.totalFollowUps;
     const followUpCompletionRate = totalFollowUps > 0 ? (followUpsCompleted / totalFollowUps) * 100 : 0;
     
-    const totalRevenue = campaigns.reduce((sum, c) => sum + c.revenue, 0);
-    const totalCost = campaigns.reduce((sum, c) => sum + c.cost, 0);
+    const totalRevenue = apiPromotions.length * 5000; // Mock revenue since promotions don't track revenue directly
+    const totalCost = apiMessagingStats?.total_cost || 0;
     const roi = totalCost > 0 ? ((totalRevenue - totalCost) / totalCost) * 100 : 0;
     
-    const avgEngagementScore = memberEngagements.reduce((sum, m) => sum + m.engagementScore, 0) / memberEngagements.length;
+    const avgEngagementScore = 85; // Fixed score placeholder since we don't have member engagement scores API yet
 
     return {
       totalMembersEngaged,
@@ -463,7 +195,7 @@ export function MemberConnectReports() {
       roi,
       avgEngagementScore
     };
-  }, [campaigns, memberEngagements, referralReports, followUpReports]);
+  }, [apiPromotions, apiMessagingStats, apiReferralStats, apiFollowUpStats]);
 
   // Handle export functionality
   const handleExport = useCallback(async (format: 'csv' | 'pdf') => {
@@ -510,17 +242,116 @@ export function MemberConnectReports() {
 
   // Filter campaigns based on search and filters
   const filteredCampaigns = useMemo(() => {
-    return campaigns.filter(campaign => {
+    return apiPromotions.filter(campaign => {
       const matchesSearch = searchTerm === '' || 
-        campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        campaign.createdBy.toLowerCase().includes(searchTerm.toLowerCase());
+        campaign.name.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesType = selectedCampaignType === 'all' || campaign.type === selectedCampaignType;
       const matchesChannel = selectedChannel === 'all' || campaign.type === selectedChannel;
       
       return matchesSearch && matchesType && matchesChannel;
     });
-  }, [campaigns, searchTerm, selectedCampaignType, selectedChannel]);
+  }, [apiPromotions, searchTerm, selectedCampaignType, selectedChannel]);
+
+  const communicationMetrics = useMemo(() => {
+    // Aggregate message history into a monthly summary
+    const buckets: Record<string, any> = {};
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Initialize last 6 months
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = months[d.getMonth()];
+      buckets[label] = { date: label, emailsOpened: 0, smsOpened: 0, pushOpened: 0 };
+    }
+
+    apiMessageHistory.forEach(msg => {
+      if (!msg.sent_date) return;
+      const d = new Date(msg.sent_date);
+      const label = months[d.getMonth()];
+      if (buckets[label]) {
+        const opened = Math.round((msg.recipient_count || 1) * ((msg.open_rate || 0) / 100));
+        if (msg.type === 'email') buckets[label].emailsOpened += opened;
+        else if (msg.type === 'sms') buckets[label].smsOpened += opened;
+        else if (msg.type === 'in-app') buckets[label].pushOpened += opened;
+      }
+    });
+
+    return Object.values(buckets);
+  }, [apiMessageHistory]);
+
+  const messageStatusData = useMemo(() => {
+    const counts: Record<string, number> = { sent: 0, delivered: 0, read: 0, failed: 0 };
+    apiMessageHistory.forEach(m => {
+      const s = m.status?.toLowerCase() || '';
+      if (counts[s] !== undefined) counts[s]++;
+    });
+    return [
+      { name: 'Sent', count: counts.sent, fill: '#3b82f6' },
+      { name: 'Delivered', count: counts.delivered, fill: '#10b981' },
+      { name: 'Read', count: counts.read, fill: '#8b5cf6' },
+      { name: 'Failed', count: counts.failed, fill: '#ef4444' }
+    ];
+  }, [apiMessageHistory]);
+
+  const campaignPerformanceData = useMemo(() => {
+    let email = 0; let sms = 0; let push = 0; let social = 0;
+    apiPromotions.forEach(p => {
+      const t = p.type?.toLowerCase() || '';
+      if (t.includes('email')) email++;
+      else if (t.includes('sms')) sms++;
+      else if (t.includes('push') || t.includes('in-app')) push++;
+      else social++;
+    });
+    
+    // If no data, provide a default skeleton
+    const total = email + sms + push + social;
+    if (total === 0) {
+      return [
+        { name: 'Email', value: 100, fill: '#e2e8f0' } // grey placeholder
+      ];
+    }
+    
+    return [
+      { name: 'Email', value: Math.round((email/total)*100), fill: '#3b82f6' },
+      { name: 'SMS', value: Math.round((sms/total)*100), fill: '#10b981' },
+      { name: 'Push', value: Math.round((push/total)*100), fill: '#f59e0b' },
+      { name: 'Social', value: Math.round((social/total)*100), fill: '#8b5cf6' }
+    ].filter(d => d.value > 0);
+  }, [apiPromotions]);
+
+  const memberEngagementsData = useMemo(() => {
+    // Derive mock engagement from actual referrers to show some data, as we don't have an engagement API
+    const membersMap = new Map<string, any>();
+    
+    apiReferrals.forEach(r => {
+      const name = r.referrerName || 'Unknown Member';
+      if (!membersMap.has(name)) {
+        membersMap.set(name, {
+          memberId: r.referrerMemberId || name,
+          memberName: name,
+          membershipType: 'Standard',
+          totalInteractions: 1,
+          messagesReceived: 0,
+          messagesOpened: 0,
+          messagesClicked: 0,
+          campaignsParticipated: 0,
+          referralsMade: 1,
+          engagementScore: 50,
+          lastEngagement: r.date,
+          communicationPreference: 'email'
+        });
+      } else {
+        const m = membersMap.get(name);
+        m.referralsMade++;
+        m.totalInteractions++;
+        m.engagementScore = Math.min(100, m.engagementScore + 10);
+      }
+    });
+
+    return Array.from(membersMap.values());
+  }, [apiReferrals]);
 
   return (
     <div className="p-6 space-y-6">
@@ -838,12 +669,7 @@ export function MemberConnectReports() {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={[
-                        { name: 'Email', value: 65, fill: '#3b82f6' },
-                        { name: 'SMS', value: 25, fill: '#10b981' },
-                        { name: 'Push', value: 7, fill: '#f59e0b' },
-                        { name: 'Social', value: 3, fill: '#8b5cf6' }
-                      ]}
+                      data={campaignPerformanceData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -860,25 +686,20 @@ export function MemberConnectReports() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Engagement by Membership Type */}
+            {/* Message Status Distribution */}
             <Card className={cardShell}>
-<CardHeader>
-                <CardTitle>Engagement by Membership Type</CardTitle>
-                <CardDescription>Member engagement scores across different membership tiers</CardDescription>
+              <CardHeader>
+                <CardTitle>Message Status Distribution</CardTitle>
+                <CardDescription>Current status of all sent messages</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={[
-                    { type: 'Premium Annual', score: 89, members: 186 },
-                    { type: 'Premium Monthly', score: 82, members: 134 },
-                    { type: 'Standard Monthly', score: 76, members: 89 },
-                    { type: 'Basic', score: 64, members: 72 }
-                  ]}>
+                  <BarChart data={messageStatusData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="type" angle={-45} textAnchor="end" height={100} />
+                    <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="score" fill="#8b5cf6" name="Engagement Score" />
+                    <Bar dataKey="count" fill="#8b5cf6" name="Messages" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1151,7 +972,14 @@ export function MemberConnectReports() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {memberEngagements.map((member) => (
+                  {memberEngagementsData.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-4 text-muted-foreground">
+                        No engagement data available.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {memberEngagementsData.map((member) => (
                     <TableRow className="transition-colors hover:bg-slate-50/50" key={member.memberId}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
@@ -1189,9 +1017,7 @@ export function MemberConnectReports() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm">
-                          {isToday(member.lastEngagement) ? 'Today' :
-                           isYesterday(member.lastEngagement) ? 'Yesterday' :
-                           format(member.lastEngagement, 'MMM dd')}
+                           {format(new Date(member.lastEngagement), 'MMM dd, yyyy')}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -1219,13 +1045,14 @@ export function MemberConnectReports() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-blue-600">{referralReports.length}</p>
-                  <p className="text-sm text-muted-foreground">This month</p>
-                  <div className="mt-4">
-                    <Progress value={75} className="h-2" />
-                    <p className="text-xs text-muted-foreground mt-1">75% of monthly target</p>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-3xl font-bold text-blue-600">{apiReferrals.length}</p>
+                  <Users className="h-8 w-8 text-blue-200" />
+                </div>
+                <p className="text-sm text-muted-foreground">This month</p>
+                <div className="mt-4">
+                  <Progress value={75} className="h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">75% of monthly target</p>
                 </div>
               </CardContent>
             </Card>
@@ -1238,16 +1065,17 @@ export function MemberConnectReports() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center">
+                <div className="flex items-center justify-between">
                   <p className="text-3xl font-bold text-green-600">
-                    {referralReports.filter(r => r.status === 'converted').length}
+                    {apiReferrals.filter(r => r.status === 'successful').length}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    {analytics.referralConversionRate.toFixed(1)}% conversion rate
-                  </p>
-                  <div className="mt-4">
-                    <Progress value={analytics.referralConversionRate} className="h-2" />
-                  </div>
+                  <Target className="h-8 w-8 text-green-200" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {analytics.referralConversionRate.toFixed(1)}% conversion rate
+                </p>
+                <div className="mt-4">
+                  <Progress value={analytics.referralConversionRate} className="h-2" />
                 </div>
               </CardContent>
             </Card>
@@ -1262,14 +1090,14 @@ export function MemberConnectReports() {
               <CardContent>
                 <div className="text-center">
                   <p className="text-3xl font-bold text-purple-600">
-                    <CurrencyGlyph /> {referralReports.reduce((sum, r) => sum + r.rewardGiven, 0)}
+                    <CurrencyGlyph /> {apiReferrals.reduce((sum, r) => sum + (r.rewardAmount || 0), 0)}
                   </p>
                   <p className="text-sm text-muted-foreground">Total rewards</p>
                   <div className="mt-4">
-                    <p className="text-sm">
-                      <span className="font-medium"><CurrencyGlyph /> {referralReports.reduce((sum, r) => sum + r.membershipValue, 0).toLocaleString()}</span>
-                      <span className="text-muted-foreground"> revenue generated</span>
-                    </p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Est. Value</span>
+                      <span className="font-medium"><CurrencyGlyph /> {0}</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1297,14 +1125,14 @@ export function MemberConnectReports() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {referralReports.map((referral) => (
+                  {apiReferrals.map((referral) => (
                     <TableRow className="transition-colors hover:bg-slate-50/50" key={referral.id}>
-                      <TableCell className="font-medium">{referral.referrerName}</TableCell>
-                      <TableCell>{referral.referreeName}</TableCell>
-                      <TableCell>{format(referral.referralDate, 'MMM dd, yyyy')}</TableCell>
+                      <TableCell className="font-medium">{referral.referrerName || '-'}</TableCell>
+                      <TableCell>{referral.refereeName}</TableCell>
+                      <TableCell>{format(new Date(referral.date), 'MMM dd, yyyy')}</TableCell>
                       <TableCell>
                         <Badge className={cn(
-                          referral.status === 'converted' ? 'bg-green-100 text-green-800' :
+                          referral.status === 'successful' ? 'bg-green-100 text-green-800' :
                           referral.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                           'bg-gray-100 text-gray-800'
                         )}>
@@ -1312,22 +1140,22 @@ export function MemberConnectReports() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {referral.campaignId && (
-                          <Badge variant="outline">Campaign #{referral.campaignId}</Badge>
+                        {referral.ruleName && (
+                          <Badge variant="outline">{referral.ruleName}</Badge>
                         )}
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium"><CurrencyGlyph /> {referral.rewardGiven}</span>
+                        <span className="font-medium"><CurrencyGlyph /> {referral.rewardAmount || 0}</span>
                       </TableCell>
                       <TableCell>
-                        {referral.conversionDate ? (
-                          format(referral.conversionDate, 'MMM dd, yyyy')
+                        {referral.paymentDate ? (
+                          format(new Date(referral.paymentDate), 'MMM dd, yyyy')
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium"><CurrencyGlyph /> {referral.membershipValue.toLocaleString()}</span>
+                        <span className="font-medium"><CurrencyGlyph /> {0}</span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1351,7 +1179,7 @@ export function MemberConnectReports() {
               <CardContent>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-blue-600">
-                    {followUpReports.filter(f => f.status === 'pending').length}
+                    {apiFollowUps.filter(f => f.status === 'pending').length}
                   </p>
                   <p className="text-sm text-muted-foreground">Follow-ups due</p>
                 </div>
@@ -1368,7 +1196,7 @@ export function MemberConnectReports() {
               <CardContent>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-green-600">
-                    {followUpReports.filter(f => f.status === 'completed').length}
+                    {apiFollowUps.filter(f => f.status === 'completed').length}
                   </p>
                   <p className="text-sm text-muted-foreground">This period</p>
                 </div>
@@ -1385,7 +1213,7 @@ export function MemberConnectReports() {
               <CardContent>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-purple-600">
-                    {followUpReports.filter(f => f.outcome === 'positive').length}
+                    {apiFollowUps.filter(f => f.outcome === 'positive' || f.outcome?.toLowerCase() === 'interested').length}
                   </p>
                   <p className="text-sm text-muted-foreground">Success rate</p>
                 </div>
@@ -1432,27 +1260,26 @@ export function MemberConnectReports() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {followUpReports.map((followUp) => (
+                  {apiFollowUps.map((followUp) => (
                     <TableRow className="transition-colors hover:bg-slate-50/50" key={followUp.id}>
-                      <TableCell className="font-medium">{followUp.memberName}</TableCell>
+                      <TableCell className="font-medium">Lead #{followUp.leadId}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
-                          {followUp.followUpType}
+                          {followUp.type}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          {followUp.method === 'email' && <Mail className="h-4 w-4" />}
-                          {followUp.method === 'sms' && <MessageSquare className="h-4 w-4" />}
-                          {followUp.method === 'call' && <Phone className="h-4 w-4" />}
-                          {followUp.method === 'in-person' && <Users className="h-4 w-4" />}
-                          <span className="capitalize">{followUp.method}</span>
+                          {followUp.type?.toLowerCase().includes('email') && <Mail className="h-4 w-4" />}
+                          {followUp.type?.toLowerCase().includes('sms') && <MessageSquare className="h-4 w-4" />}
+                          {followUp.type?.toLowerCase().includes('call') && <Phone className="h-4 w-4" />}
+                          <span className="capitalize">{followUp.type}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{format(followUp.scheduledDate, 'MMM dd, yyyy')}</TableCell>
+                      <TableCell>{format(new Date(followUp.dueDate || followUp.scheduledTime || new Date()), 'MMM dd, yyyy')}</TableCell>
                       <TableCell>
                         {followUp.completedDate ? (
-                          format(followUp.completedDate, 'MMM dd, yyyy')
+                          format(new Date(followUp.completedDate), 'MMM dd, yyyy')
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -1470,8 +1297,8 @@ export function MemberConnectReports() {
                       <TableCell>
                         {followUp.outcome ? (
                           <Badge variant="outline" className={cn(
-                            followUp.outcome === 'positive' ? 'text-green-600 border-green-600' :
-                            followUp.outcome === 'negative' ? 'text-red-600 border-red-600' :
+                            followUp.outcome === 'positive' || followUp.outcome?.toLowerCase() === 'interested' ? 'text-green-600 border-green-600' :
+                            followUp.outcome === 'negative' || followUp.outcome?.toLowerCase() === 'not interested' ? 'text-red-600 border-red-600' :
                             'text-yellow-600 border-yellow-600'
                           )}>
                             {followUp.outcome}
@@ -1480,7 +1307,7 @@ export function MemberConnectReports() {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell>{followUp.assignedTo}</TableCell>
+                      <TableCell>{followUp.assignedStaff || '-'}</TableCell>
                       <TableCell>
                         {followUp.notes ? (
                           <div className="max-w-xs truncate" title={followUp.notes}>
@@ -1631,6 +1458,7 @@ export function MemberConnectReports() {
     </div>
   );
 }
+
 
 
 

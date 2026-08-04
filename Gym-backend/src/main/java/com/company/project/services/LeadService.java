@@ -7,6 +7,7 @@ import com.company.project.dto.LeadResponseDTO;
 import com.company.project.dto.LeadStatsDTO;
 import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.FollowUpResponseDTO;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.entities.Lead;
 import com.company.project.entities.LeadInteraction;
 import com.company.project.entities.FollowUp;
@@ -71,25 +72,25 @@ public class LeadService {
 
     public LeadResponseDTO updateLead(Long id, LeadRequestDTO req) {
         Lead lead = leadRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Lead not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Lead not found: " + id));
         mapRequestToEntity(req, lead);
         return toDTO(leadRepository.save(lead));
     }
 
     public LeadResponseDTO getById(Long id) {
         return toDTO(leadRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Lead not found: " + id)));
+                .orElseThrow(() -> new EntityNotFoundException("Lead not found: " + id)));
     }
 
     public void deleteLead(Long id) {
         Lead lead = leadRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Lead not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Lead not found: " + id));
         leadRepository.delete(lead);
     }
 
     public LeadResponseDTO updateStatus(Long id, String status) {
         Lead lead = leadRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Lead not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Lead not found: " + id));
         lead.setStatus(status);
         if ("converted".equals(status) || "contacted".equals(status)) {
             lead.setLastContactDate(LocalDateTime.now());
@@ -164,7 +165,7 @@ public class LeadService {
 
     public LeadInteractionDTO addInteraction(Long leadId, LeadInteractionDTO dto) {
         Lead lead = leadRepository.findById(leadId)
-                .orElseThrow(() -> new RuntimeException("Lead not found: " + leadId));
+                .orElseThrow(() -> new EntityNotFoundException("Lead not found: " + leadId));
         LeadInteraction interaction = new LeadInteraction();
         interaction.setLead(lead);
         interaction.setType(dto.getType());

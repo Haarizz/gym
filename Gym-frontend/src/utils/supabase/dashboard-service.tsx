@@ -5,60 +5,31 @@ import { demoService } from './demo-service';
 const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-0a04502f`;
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
-// Helper function to make API calls with demo fallback
+// Helper function to make API calls with backend only
 async function apiCall(endpoint: string, options: RequestInit = {}) {
-  const url = `${BASE_URL}${endpoint}`;
   const isBackendAuth = authService.isBackendAuth();
+  const backendUrl = `${backendBaseUrl}${endpoint}`;
   
   if (isBackendAuth) {
-    const backendUrl = `${backendBaseUrl}${endpoint}`;
-    console.log(`Backend auth detected for dashboard endpoint: ${endpoint}`);
     try {
       const response = await authService.makeAuthenticatedRequest(backendUrl, options);
       if (response.ok) {
         const data = await response.json();
         return data;
       }
-      console.log(`Backend responded ${response.status} for ${endpoint}, using demo fallback`);
+      throw new Error(`Backend responded ${response.status} for ${endpoint}`);
     } catch (backendError) {
-      console.log('Backend failed for dashboard endpoint, using local fallback', backendError);
+      console.error('Backend failed for dashboard endpoint', backendError);
+      throw backendError;
     }
-    return getDemoDataForEndpoint(endpoint);
   }
 
-  // If in demo mode, try to use fallback data for certain endpoints
-  if (authService.isDemoMode()) {
-    console.log(`Demo mode detected for dashboard endpoint: ${endpoint}`);
-    
-    try {
-      // Try backend first
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authService.getAccessToken() || publicAnonKey}`,
-          ...options.headers,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data;
-      }
-    } catch (backendError) {
-      console.log('Backend failed in demo mode, using local fallback');
-    }
-
-    // Fallback to demo data for specific endpoints
-    return getDemoDataForEndpoint(endpoint);
-  }
-  
+  // Fallback to fetch directly (for testing without auth if needed)
   try {
-    const response = await fetch(url, {
+    const response = await fetch(backendUrl, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authService.getAccessToken() || publicAnonKey}`,
         ...options.headers,
       },
     });
@@ -73,117 +44,6 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
     console.error(`API call failed for ${endpoint}:`, error);
     throw error;
   }
-}
-
-// Demo data fallback for dashboard endpoints
-function getDemoDataForEndpoint(endpoint: string) {
-  console.log('Getting demo data for endpoint:', endpoint);
-  
-  if (endpoint.includes('/dashboard/kpis')) {
-    return {
-      success: true,
-      data: {
-        revenue: 2850,
-        revenueChange: 8.5,
-        activeMembers: 4,
-        membersChange: 3.2,
-        todayAttendance: 2,
-        attendanceChange: 12.5,
-        availableStaff: 2
-      }
-    };
-  }
-  
-  if (endpoint.includes('/dashboard/revenue')) {
-    return {
-      success: true,
-      data: [
-        { time: '9 AM', revenue: 450, target: 400 },
-        { time: '12 PM', revenue: 1200, target: 1000 },
-        { time: '3 PM', revenue: 1850, target: 1600 },
-        { time: '6 PM', revenue: 2400, target: 2200 },
-        { time: '9 PM', revenue: 2850, target: 2800 }
-      ]
-    };
-  }
-  
-  if (endpoint.includes('/dashboard/membership-distribution')) {
-    return {
-      success: true,
-      data: [
-        { name: 'Basic', value: 1, color: '#10b981', amount: 300 },
-        { name: 'Premium', value: 2, color: '#3b82f6', amount: 1500 },
-        { name: 'VIP', value: 1, color: '#8b5cf6', amount: 1200 }
-      ]
-    };
-  }
-  
-  if (endpoint.includes('/dashboard/class-attendance')) {
-    return {
-      success: true,
-      data: [
-        { class: 'Yoga', capacity: 20, attended: 18, percentage: 90 },
-        { class: 'HIIT', capacity: 15, attended: 14, percentage: 93 },
-        { class: 'Pilates', capacity: 12, attended: 10, percentage: 83 }
-      ]
-    };
-  }
-  
-  if (endpoint.includes('/dashboard/recent-members')) {
-    // Transform demo members to match dashboard interface
-    const demoMembers = demoService.getDemoMembers().slice(0, 3).map(member => ({
-      id: member.id,
-      name: member.name,
-      email: member.email,
-      phone: member.phone,
-      membershipType: member.membership_type, // Transform membership_type to membershipType
-      joinDate: member.join_date, // Keep as string - will be safely parsed by formatJoinDate
-      status: member.membership_status as 'active' | 'expired' | 'suspended'
-    }));
-    
-    return {
-      success: true,
-      data: demoMembers
-    };
-  }
-  
-  if (endpoint.includes('/dashboard/notifications')) {
-    return {
-      success: true,
-      data: []
-    };
-  }
-  
-  if (endpoint.includes('/dashboard/staff')) {
-    return {
-      success: true,
-      data: demoService.getDemoStaff()
-    };
-  }
-  
-  if (endpoint.includes('/dashboard/search-members')) {
-    // Transform demo members for search results
-    const searchMembers = demoService.getDemoMembers().slice(0, 5).map(member => ({
-      id: member.id,
-      name: member.name,
-      email: member.email,
-      phone: member.phone,
-      membershipType: member.membership_type, // Transform membership_type to membershipType
-      joinDate: member.join_date, // Keep as string - will be safely parsed
-      status: member.membership_status as 'active' | 'expired' | 'suspended'
-    }));
-    
-    return {
-      success: true,
-      data: searchMembers
-    };
-  }
-  
-  // Default fallback
-  return {
-    success: true,
-    data: []
-  };
 }
 
 // Dashboard API functions
@@ -220,12 +80,22 @@ export const dashboardService = {
 
   // Get staff members
   async getStaffMembers() {
-    return apiCall('/dashboard/staff');
+    return apiCall('/dashboard/staff-status');
   },
 
   // Search members
   async searchMembers(query: string) {
     return apiCall(`/dashboard/search-members?q=${encodeURIComponent(query)}`);
+  },
+
+  // Get sales pipeline
+  async getSalesPipeline() {
+    return apiCall('/dashboard/sales-pipeline');
+  },
+
+  // Get pending tasks
+  async getPendingTasks() {
+    return apiCall('/dashboard/pending-tasks');
   },
 
   // Update KPI data
@@ -238,7 +108,12 @@ export const dashboardService = {
 
   // Health check
   async healthCheck() {
-    return apiCall('/health');
+    try {
+      await apiCall('/dashboard/kpis');
+      return { success: true, status: 'ok' };
+    } catch (e) {
+      return { success: false, status: 'error' };
+    }
   }
 };
 
@@ -303,6 +178,21 @@ export interface StaffMember {
   status: 'available' | 'busy' | 'offline';
   clockedIn: boolean;
   avatar?: string;
+}
+
+export interface SalesPipelineData {
+  status: string;
+  count: number;
+  color: string;
+}
+
+export interface PendingTaskData {
+  id: string;
+  leadName: string;
+  type: string;
+  dueDate: string;
+  priority: string;
+  subject: string;
 }
 
 export interface ApiResponse<T> {

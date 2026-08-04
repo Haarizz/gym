@@ -36,6 +36,11 @@ public class NotificationScheduler {
     private final AssetRepository assetRepository;
     private final TaxComplianceRepository taxComplianceRepository;
     private final AutomationExecutorService automationExecutorService;
+    private final FollowUpService followUpService;
+    private final PromotionCampaignService promotionCampaignService;
+    private final ReferralService referralService;
+    private final ReferralCampaignService referralCampaignService;
+    private final RewardRedemptionService rewardRedemptionService;
 
     public NotificationScheduler(NotificationService notificationService,
                                   NotificationRepository notificationRepository,
@@ -43,7 +48,12 @@ public class NotificationScheduler {
                                   FollowUpRepository followUpRepository,
                                   AssetRepository assetRepository,
                                   TaxComplianceRepository taxComplianceRepository,
-                                  AutomationExecutorService automationExecutorService) {
+                                  AutomationExecutorService automationExecutorService,
+                                  FollowUpService followUpService,
+                                  PromotionCampaignService promotionCampaignService,
+                                  ReferralService referralService,
+                                  ReferralCampaignService referralCampaignService,
+                                  RewardRedemptionService rewardRedemptionService) {
         this.notificationService = notificationService;
         this.notificationRepository = notificationRepository;
         this.memberRepository = memberRepository;
@@ -51,18 +61,32 @@ public class NotificationScheduler {
         this.assetRepository = assetRepository;
         this.taxComplianceRepository = taxComplianceRepository;
         this.automationExecutorService = automationExecutorService;
+        this.followUpService = followUpService;
+        this.promotionCampaignService = promotionCampaignService;
+        this.referralService = referralService;
+        this.referralCampaignService = referralCampaignService;
+        this.rewardRedemptionService = rewardRedemptionService;
     }
 
     /** Daily checks at 08:00. */
     @Scheduled(cron = "0 0 8 * * *")
     @Transactional
     public void runDailyChecks() {
+        // Apply real status transitions first so the notification counts below
+        // reflect up-to-date state rather than stale statuses nothing else flips.
+        followUpService.markOverdueFollowUps();
+        promotionCampaignService.autoTransitionStatuses();
+        referralService.expirePendingReferralsPastDeadline();
+        referralCampaignService.autoTransitionStatuses();
+        rewardRedemptionService.expireStaleRewards();
+
         checkMembershipsExpiringSoon();
         checkMembershipsExpired();
         checkFollowUpsDueToday();
         checkFollowUpsOverdue();
         checkAssetMaintenanceDue();
         checkTaxComplianceDue();
+        rewardRedemptionService.notifyRewardsExpiringSoon();
         automationExecutorService.runScheduledWorkflows();
     }
 

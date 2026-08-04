@@ -1,5 +1,8 @@
 package com.company.project.controllers;
 
+import com.company.project.dto.ApplyAccessDaysRequestDTO;
+import com.company.project.dto.ApplyAccessDaysResponseDTO;
+import com.company.project.dto.EligibleMemberDTO;
 import com.company.project.dto.PromotionCampaignRequestDTO;
 import com.company.project.dto.PromotionCampaignResponseDTO;
 import com.company.project.services.PromotionCampaignService;
@@ -93,6 +96,17 @@ public class PromotionCampaignController {
             @RequestParam(required = false) BigDecimal revenue,
             @RequestParam(required = false) BigDecimal savings) {
         return ResponseEntity.ok(promotionService.redeemPromotion(id, revenue, savings));
+    }
+
+    @GetMapping("/eligibility-members")
+    public ResponseEntity<List<EligibleMemberDTO>> getEligibilityMembers() {
+        return ResponseEntity.ok(promotionService.getEligibilityMembers());
+    }
+
+    @PostMapping("/apply-access-days")
+    public ResponseEntity<ApplyAccessDaysResponseDTO> applyAccessDays(
+            @RequestBody ApplyAccessDaysRequestDTO request) {
+        return ResponseEntity.ok(promotionService.applyAccessDays(request));
     }
 }
 

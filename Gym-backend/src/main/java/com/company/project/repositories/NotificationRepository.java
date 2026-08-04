@@ -84,6 +84,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     /** Idempotency: find existing notification by company + eventKey. */
     Optional<Notification> findByCompanyIdAndEventKey(Long companyId, String eventKey);
 
+    List<Notification> findTop5ByOrderByCreatedAtDesc();
+
     /** Cleanup: soft-delete notifications older than a cutoff date. */
     @Modifying
     @Query("UPDATE Notification n SET n.isDeleted = true WHERE n.createdAt < :cutoff AND n.isDeleted = false")

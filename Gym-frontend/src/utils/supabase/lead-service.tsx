@@ -143,9 +143,15 @@ export const leadService = {
     const res = await fetch(`${BASE_URL}/leads?${p}`, { headers: await getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch leads');
     const raw = await res.json();
+    const pg = raw.pagination ?? {};
     return {
       leads: (raw.leads ?? []).map(mapToLeadResponse),
-      pagination: raw.pagination ?? {},
+      pagination: {
+        currentPage: pg.page ?? 1,
+        totalPages: pg.total_pages ?? pg.totalPages ?? 1,
+        totalItems: pg.total ?? pg.totalItems ?? 0,
+        itemsPerPage: pg.limit ?? pg.itemsPerPage ?? (params?.size ?? 20),
+      },
     };
   },
 

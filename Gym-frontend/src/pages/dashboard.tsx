@@ -161,6 +161,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [recentMembers, setRecentMembers] = useState<Member[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [salesPipeline, setSalesPipeline] = useState<SalesPipelineData[]>([]);
+  const [pendingTasks, setPendingTasks] = useState<PendingTaskData[]>([]);
   const [searchResults, setSearchResults] = useState<Member[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
@@ -182,7 +184,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         classAttendanceResponse,
         recentMembersResponse,
         notificationsResponse,
-        staffResponse
+        staffResponse,
+        salesPipelineResponse,
+        pendingTasksResponse
       ] = await Promise.all([
         dashboardService.getKPIs(dateFilter),
         dashboardService.getRevenueData(dateFilter),
@@ -190,11 +194,22 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         dashboardService.getClassAttendance(),
         dashboardService.getRecentMembers(),
         dashboardService.getNotifications(),
-        dashboardService.getStaffMembers()
+        dashboardService.getStaffMembers(),
+        dashboardService.getSalesPipeline(),
+        dashboardService.getPendingTasks()
       ]);
 
       if (kpiResponse.success) {
-        setKpiData(kpiResponse.data);
+        const data = kpiResponse.data;
+        setKpiData({
+          revenue: data.revenue,
+          revenueChange: data.revenueChange ?? data.revenue_change ?? 0,
+          activeMembers: data.activeMembers ?? data.active_members ?? 0,
+          membersChange: data.membersChange ?? data.members_change ?? 0,
+          todayAttendance: data.todayAttendance ?? data.today_attendance ?? 0,
+          attendanceChange: data.attendanceChange ?? data.attendance_change ?? 0,
+          availableStaff: data.availableStaff ?? data.available_staff ?? 0
+        } as any);
       } else {
         console.error('KPI data error:', kpiResponse.error);
       }
@@ -233,6 +248,18 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         setStaffMembers(staffResponse.data);
       } else {
         console.error('Staff data error:', staffResponse.error);
+      }
+
+      if (salesPipelineResponse.success) {
+        setSalesPipeline(salesPipelineResponse.data);
+      } else {
+        console.error('Sales pipeline data error:', salesPipelineResponse.error);
+      }
+
+      if (pendingTasksResponse.success) {
+        setPendingTasks(pendingTasksResponse.data);
+      } else {
+        console.error('Pending tasks data error:', pendingTasksResponse.error);
       }
 
       // Show success message only if some data was loaded successfully
@@ -722,7 +749,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
 
       {/* KPI Summary Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className={dashboardCardShell}>
+        <Card className={cn(dashboardCardShell, "bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/30")}>
           <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">
@@ -764,7 +791,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className={dashboardCardShell}>
+        <Card className={cn(dashboardCardShell, "bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-100 dark:border-blue-900/30")}>
           <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">
@@ -802,7 +829,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className={dashboardCardShell}>
+        <Card className={cn(dashboardCardShell, "bg-gradient-to-br from-purple-50 to-fuchsia-50 dark:from-purple-950/20 dark:to-fuchsia-950/20 border border-purple-100 dark:border-purple-900/30")}>
           <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">
@@ -844,7 +871,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className={dashboardCardShell}>
+        <Card className={cn(dashboardCardShell, "bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 border border-orange-100 dark:border-orange-900/30")}>
           <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">
@@ -981,6 +1008,88 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Advanced Section - Sales & Operations Hub */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sales Pipeline */}
+        <Card className={dashboardCardShell}>
+          <CardHeader>
+            <CardTitle>Sales Pipeline</CardTitle>
+            <CardDescription>Live conversion tracking from leads to members</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="w-full h-[250px]" />
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={salesPipeline || []} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="status" type="category" width={100} tickFormatter={(tick) => tick.charAt(0).toUpperCase() + tick.slice(1)} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    {(salesPipeline || []).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Follow-ups */}
+        <Card className={dashboardCardShell}>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Pending Follow-ups</span>
+              <Badge variant="destructive">Action Required</Badge>
+            </CardTitle>
+            <CardDescription>High-priority tasks due today</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2">
+                {(pendingTasks || []).map((task) => (
+                  <div key={task.id} className="p-3 rounded-lg border border-red-100 bg-red-50/50 dark:bg-red-950/10 dark:border-red-900/30">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold text-sm">{task.leadName}</span>
+                      <Badge variant="outline" className="text-[10px] uppercase border-red-200 text-red-600 bg-red-100">
+                        {task.type}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">{task.subject}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-red-600 flex items-center">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Due: {task.dueDate}
+                      </span>
+                      <Button size="sm" variant="outline" className="h-7 text-xs bg-white hover:bg-red-50 hover:text-red-700">
+                        Resolve
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {(pendingTasks || []).length === 0 && (
+                  <div className="text-center p-6 text-muted-foreground bg-green-50/50 rounded-lg border border-green-100">
+                    <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                    <p className="text-sm">All caught up!</p>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

@@ -63,6 +63,28 @@ public class Referral extends BaseEntity {
     @Column(name = "rule_name")
     private String ruleName;
 
+    // Whether the referrer has already redeemed this referral's reward against a
+    // transaction (e.g. an add-on purchase). Kept separate from `status` since a
+    // referral can be "successful" for a while before its reward gets spent.
+    @Column(name = "reward_redeemed")
+    private Boolean rewardRedeemed = false;
+
+    // Amount the referee actually paid at signup — captured when markSuccessful()
+    // is called so reward rules can validate a minPurchaseAmount condition.
+    @Column(name = "purchase_amount", precision = 10, scale = 2)
+    private BigDecimal purchaseAmount;
+
+    // Which membership plan the referee purchased — lets reward rules target a
+    // specific plan via ReferralRewardRule.targetMembershipPlanId.
+    @Column(name = "membership_plan_id")
+    private Long membershipPlanId;
+
+    // The referee's business member id (e.g. MBR-0000000002), captured at
+    // markSuccessful() time once the referee has actually become a member —
+    // needed so the reward engine can attach a referee-side ReferralReward.
+    @Column(name = "referee_member_id")
+    private String refereeMemberId;
+
     public Referral() {}
 
     // Getters & Setters
@@ -114,4 +136,16 @@ public class Referral extends BaseEntity {
 
     public String getRuleName() { return ruleName; }
     public void setRuleName(String ruleName) { this.ruleName = ruleName; }
+
+    public Boolean getRewardRedeemed() { return rewardRedeemed; }
+    public void setRewardRedeemed(Boolean rewardRedeemed) { this.rewardRedeemed = rewardRedeemed; }
+
+    public BigDecimal getPurchaseAmount() { return purchaseAmount; }
+    public void setPurchaseAmount(BigDecimal purchaseAmount) { this.purchaseAmount = purchaseAmount; }
+
+    public Long getMembershipPlanId() { return membershipPlanId; }
+    public void setMembershipPlanId(Long membershipPlanId) { this.membershipPlanId = membershipPlanId; }
+
+    public String getRefereeMemberId() { return refereeMemberId; }
+    public void setRefereeMemberId(String refereeMemberId) { this.refereeMemberId = refereeMemberId; }
 }

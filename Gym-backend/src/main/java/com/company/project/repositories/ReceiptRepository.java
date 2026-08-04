@@ -53,6 +53,10 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
     // Full transaction history for a member's Statement of Account (primary: by DB id)
     List<Receipt> findByMemberDbIdOrderByTransactionDateAsc(Long memberDbId);
 
+    // How many times a member has renewed — used to evaluate "renewal count" promotional
+    // eligibility rules, since Member itself carries no renewal counter of its own.
+    long countByMemberDbIdAndTransactionType(Long memberDbId, String transactionType);
+
     // Fallback: find full history by member name (handles receipts with stale/null memberDbId)
     List<Receipt> findByMemberNameOrderByTransactionDateAsc(String memberName);
 }

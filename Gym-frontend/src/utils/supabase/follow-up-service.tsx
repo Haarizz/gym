@@ -145,9 +145,15 @@ export const followUpService = {
     if (!res.ok) throw new Error('Failed to fetch follow-ups');
     const raw = await res.json();
     const followUpsRaw = raw.follow_ups ?? raw.followUps ?? [];
+    const pg = raw.pagination ?? {};
     return {
       followUps: followUpsRaw.map(mapToFollowUpResponse),
-      pagination: raw.pagination ?? {},
+      pagination: {
+        currentPage: pg.page ?? 1,
+        totalPages: pg.total_pages ?? pg.totalPages ?? 1,
+        totalItems: pg.total ?? pg.totalItems ?? 0,
+        itemsPerPage: pg.limit ?? pg.itemsPerPage ?? (params?.size ?? 20),
+      },
     };
   },
 
