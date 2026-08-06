@@ -10,6 +10,11 @@ import java.util.List;
  */
 public class StatementLineDTO {
 
+    // The underlying Receipt's id — lets the frontend fetch/print/download the
+    // actual receipt (GET /api/receipts/{id}) instead of just displaying receiptNo
+    // as inert text. Multiple lines (e.g. a bill's split payment legs) can share
+    // the same id when they were split off of one Receipt — that's expected.
+    private Long id;
     private String date;
     private String receiptNo;
     private String type;
@@ -23,6 +28,9 @@ public class StatementLineDTO {
     // members' fees — lets the guardian's statement show exactly what portion
     // of the charge was actually for a dependent, not just their own membership.
     private List<MinorChargeDTO> minorCharges;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     public String getDate() { return date; }
     public void setDate(String date) { this.date = date; }

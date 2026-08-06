@@ -196,7 +196,7 @@ export function Referrals() {
   const [editRefereeOpen, setEditRefereeOpen] = useState(false);
 
   // New referral form state
-  const [newReferral, setNewReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '', ruleId: 'auto' });
+  const [newReferral, setNewReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '', ruleId: 'auto', referralCode: '' });
   const [editingReferral, setEditingReferral] = useState<ReferralResponse | null>(null);
   const [showEditReferral, setShowEditReferral] = useState(false);
   const [editReferral, setEditReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: '', status: 'pending', notes: '' });
@@ -816,7 +816,7 @@ export function Referrals() {
                           <Button size="sm" variant="outline" onClick={() => { setViewingReferral(activity); setShowViewReferral(true); }}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => { setEditingReferral(activity); setEditReferral({ referrerMemberId: activity.referrerMemberId || '', referrerName: activity.referrerName || '', refereeName: activity.refereeName || '', refereeEmail: activity.refereeEmail || '', refereePhone: activity.refereePhone || '', date: activity.date || activity.createdAt, status: activity.status, notes: '' }); setShowEditReferral(true); }}>
+                          <Button size="sm" variant="outline" onClick={() => { setEditingReferral(activity); setEditReferral({ referrerMemberId: activity.referrerMemberId || '', referrerName: activity.referrerName || '', refereeName: activity.refereeName || '', refereeEmail: activity.refereeEmail || '', refereePhone: activity.refereePhone || '', date: activity.date || activity.createdAt, status: activity.status, notes: activity.notes || '' }); setShowEditReferral(true); }}>
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={async () => { if (!window.confirm('Delete this referral?')) return; try { await referralService.delete(Number(activity.id)); toast.success('Referral deleted'); loadData(); } catch { toast.error('Failed to delete'); } }}>
@@ -1097,6 +1097,9 @@ export function Referrals() {
                 <div><Label className="text-xs text-muted-foreground">Reward</Label><p className="font-medium"><CurrencyGlyph /> {viewingReferral.rewardAmount || 0}</p></div>
                 <div><Label className="text-xs text-muted-foreground">Referral Code</Label><p className="text-sm font-mono">{viewingReferral.referralCode}</p></div>
                 <div><Label className="text-xs text-muted-foreground">Date</Label><p className="text-sm">{viewingReferral.date || viewingReferral.createdAt}</p></div>
+                {viewingReferral.notes && (
+                  <div className="col-span-2"><Label className="text-xs text-muted-foreground">Notes</Label><p className="text-sm">{viewingReferral.notes}</p></div>
+                )}
               </div>
               {viewingReferral.status === 'pending' && (
                 <div className="flex gap-2 pt-2">
@@ -1392,6 +1395,13 @@ export function Referrals() {
               <Label>Notes (Optional)</Label>
               <Input placeholder="Additional notes about this referral" className="mt-1" value={newReferral.notes} onChange={e => setNewReferral(p => ({ ...p, notes: e.target.value }))} />
             </div>
+            {settings.autoGenerateCodes === false && (
+              <div>
+                <Label>Referral Code</Label>
+                <Input placeholder="e.g. JOHN-SPECIAL" className="mt-1" value={newReferral.referralCode} onChange={e => setNewReferral(p => ({ ...p, referralCode: e.target.value }))} />
+                <p className="text-xs text-muted-foreground mt-1">Auto-generate is off in Settings — enter a code manually, or leave blank to fall back to the auto format.</p>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="mt-4">
@@ -1406,9 +1416,9 @@ export function Referrals() {
                   return;
                 }
                 try {
-                  await referralService.create({ referrerMemberId: newReferral.referrerMemberId || undefined, referrerName: newReferral.referrerName, refereeName: newReferral.refereeName, refereeEmail: newReferral.refereeEmail || undefined, refereePhone: newReferral.refereePhone || undefined, date: newReferral.date, status: newReferral.status, notes: newReferral.notes || undefined, ruleId: newReferral.ruleId !== 'auto' ? Number(newReferral.ruleId) : undefined });
+                  await referralService.create({ referrerMemberId: newReferral.referrerMemberId || undefined, referrerName: newReferral.referrerName, refereeName: newReferral.refereeName, refereeEmail: newReferral.refereeEmail || undefined, refereePhone: newReferral.refereePhone || undefined, date: newReferral.date, status: newReferral.status, notes: newReferral.notes || undefined, ruleId: newReferral.ruleId !== 'auto' ? Number(newReferral.ruleId) : undefined, referralCode: newReferral.referralCode || undefined });
                   toast.success('Referral Added!', { description: 'The new referral has been registered.' });
-                  setNewReferral({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '', ruleId: 'auto' });
+                  setNewReferral({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '', ruleId: 'auto', referralCode: '' });
                   setShowAddReferral(false);
                   await loadData();
                 } catch { toast.error('Failed to create referral'); }

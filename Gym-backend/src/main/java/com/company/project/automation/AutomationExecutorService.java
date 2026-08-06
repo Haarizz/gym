@@ -220,18 +220,27 @@ public class AutomationExecutorService {
 
         return switch (workflow.getFrequency()) {
             case "daily" -> true;
-            case "weekly" -> {
-                Integer dow = workflow.getDayOfWeek();
-                yield dow == null || today.getDayOfWeek().getValue() == dow;
-            }
-            case "monthly" -> {
-                Integer dom = workflow.getDayOfMonth();
-                yield dom == null || today.getDayOfMonth() == dom;
-            }
+            case "weekly" -> today.getDayOfWeek().getValue() == effectiveDayOfWeek(workflow);
+            case "monthly" -> today.getDayOfMonth() == effectiveDayOfMonth(workflow);
             // "once" workflows run once then get paused after first success
             case "once" -> workflow.getLastRunAt() == null;
             default -> false;
         };
+    }
+
+    /** Day-of-week (1=MON..7=SUN) this workflow should fire on, defaulting to its creation day
+     *  when the client never set one (e.g. the wizard didn't collect it). */
+    private int effectiveDayOfWeek(AutomationWorkflow workflow) {
+        if (workflow.getDayOfWeek() != null) return workflow.getDayOfWeek();
+        LocalDateTime created = workflow.getCreatedAt();
+        return (created != null ? created.toLocalDate() : LocalDate.now()).getDayOfWeek().getValue();
+    }
+
+    /** Day-of-month this workflow should fire on, defaulting to its creation day of month. */
+    private int effectiveDayOfMonth(AutomationWorkflow workflow) {
+        if (workflow.getDayOfMonth() != null) return workflow.getDayOfMonth();
+        LocalDateTime created = workflow.getCreatedAt();
+        return (created != null ? created.toLocalDate() : LocalDate.now()).getDayOfMonth();
     }
 
     /** Idempotency guard — did this workflow already run successfully today? */
@@ -250,12 +259,11 @@ public class AutomationExecutorService {
         return switch (workflow.getFrequency()) {
             case "daily" -> today.plusDays(1).atTime(execTime);
             case "weekly" -> {
-                int dow = workflow.getDayOfWeek() != null ? workflow.getDayOfWeek() : today.getDayOfWeek().getValue();
-                DayOfWeek target = DayOfWeek.of(dow);
+                DayOfWeek target = DayOfWeek.of(effectiveDayOfWeek(workflow));
                 yield today.with(TemporalAdjusters.next(target)).atTime(execTime);
             }
             case "monthly" -> {
-                int dom = workflow.getDayOfMonth() != null ? workflow.getDayOfMonth() : today.getDayOfMonth();
+                int dom = effectiveDayOfMonth(workflow);
                 LocalDate nextMonth = today.plusMonths(1).withDayOfMonth(Math.min(dom,
                         today.plusMonths(1).lengthOfMonth()));
                 yield nextMonth.atTime(execTime);

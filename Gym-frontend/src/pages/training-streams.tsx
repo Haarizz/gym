@@ -1015,7 +1015,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
       {/* ── MONITOR DIALOG (Live Control) ── */}
       {monitorStream && (
         <Dialog open={!!monitorStream} onOpenChange={() => setMonitorStream(null)}>
-          <DialogContent className="sm:max-w-[580px]">
+          <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Monitor className="h-5 w-5 text-primary" />

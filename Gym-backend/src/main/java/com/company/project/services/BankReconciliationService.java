@@ -49,6 +49,15 @@ public class BankReconciliationService {
 
     private static final int MAX_CANDIDATES = 25;
 
+    /**
+     * Statuses whose ledger effect must count toward a bank account's balance.
+     * A REVERSED voucher's original lines are NOT retroactively voided — the
+     * offsetting entry is a separate, newly POSTED reversal voucher — so both
+     * must be included or a reversed transaction ends up counted with its sign
+     * flipped instead of netting to zero. See {@link #loadLedgerEffectiveVouchers()}.
+     */
+    private static final List<String> LEDGER_EFFECTIVE_STATUSES = List.of("POSTED", "REVERSED");
+
     private final BankReconciliationRepository reconciliationRepository;
     private final BankStatementLineRepository lineRepository;
     private final AccountHeadRepository accountHeadRepository;
@@ -78,7 +87,9 @@ public class BankReconciliationService {
                     .findByReconciliationIdOrderByTransactionDateAsc(r.getId())
                     .stream().map(BankStatementLineDTO::fromEntity).collect(Collectors.toList());
             long unmatched = lineRepository.countByReconciliationIdAndIsMatchedFalse(r.getId());
-            return BankReconciliationResponseDTO.fromEntity(r, lines, unmatched);
+            BankReconciliationResponseDTO dto = BankReconciliationResponseDTO.fromEntity(r, lines, unmatched);
+            applyLiveBalance(r, dto);
+            return dto;
         }).collect(Collectors.toList());
     }
 
@@ -90,7 +101,26 @@ public class BankReconciliationService {
                 .findByReconciliationIdOrderByTransactionDateAsc(id)
                 .stream().map(BankStatementLineDTO::fromEntity).collect(Collectors.toList());
         long unmatched = lineRepository.countByReconciliationIdAndIsMatchedFalse(id);
-        return BankReconciliationResponseDTO.fromEntity(r, lines, unmatched);
+        BankReconciliationResponseDTO dto = BankReconciliationResponseDTO.fromEntity(r, lines, unmatched);
+        applyLiveBalance(r, dto);
+        return dto;
+    }
+
+    /**
+     * The ledger balance stored on the entity is only ever computed at create()/update() time.
+     * If new journal vouchers post to the bank account afterward (the normal, expected case —
+     * reconciliations are usually created before every transaction for the period is entered),
+     * that stored snapshot goes stale and the "difference" shown to the user stops meaning
+     * anything. For any reconciliation still open, recompute it fresh on every read instead of
+     * trusting the snapshot. COMPLETED reconciliations are a closed, audited record and must stay
+     * exactly as they were at completion — never recomputed after the fact.
+     */
+    private void applyLiveBalance(BankReconciliation r, BankReconciliationResponseDTO dto) {
+        if ("COMPLETED".equals(r.getStatus())) return;
+        BigDecimal systemBalance = computeSystemBalance(r.getStatementDate());
+        BigDecimal closing = r.getClosingBalance() != null ? r.getClosingBalance() : BigDecimal.ZERO;
+        dto.setSystemBalance(systemBalance);
+        dto.setDifference(closing.subtract(systemBalance));
     }
 
     public BankReconciliationResponseDTO create(BankReconciliationRequestDTO req) {
@@ -176,6 +206,24 @@ public class BankReconciliationService {
         }
         BankReconciliation r = reconciliationRepository.findById(reconciliationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reconciliation not found: " + reconciliationId));
+
+        // Every bank line being matched only proves the ledger has an entry for everything the
+        // bank statement shows — it says nothing about the reverse (a ledger posting to the bank
+        // account with no corresponding statement line, e.g. a dated/backdated entry or plain
+        // mistake). Recompute one final time and refuse to lock in a reconciliation that doesn't
+        // actually tie out; the whole point of reconciling is bank balance == ledger balance.
+        BigDecimal systemBalance = computeSystemBalance(r.getStatementDate());
+        BigDecimal closing = r.getClosingBalance() != null ? r.getClosingBalance() : BigDecimal.ZERO;
+        BigDecimal difference = closing.subtract(systemBalance);
+        if (difference.abs().compareTo(AMOUNT_TOLERANCE) > 0) {
+            throw new IllegalStateException(
+                    "Cannot complete: bank and ledger balances differ by " + difference.abs()
+                            + " even though all lines are matched — a posted ledger entry with no "
+                            + "matching bank statement line is the usual cause");
+        }
+
+        r.setSystemBalance(systemBalance);
+        r.setDifference(difference);
         r.setStatus("COMPLETED");
         reconciliationRepository.save(r);
         return getById(reconciliationId);
@@ -294,16 +342,16 @@ public class BankReconciliationService {
         r.setNotes(req.getNotes());
     }
 
-    /** opening_balance(bank account) + net(debit-credit) of all POSTED lines on or before asOfDate. */
+    /** opening_balance(bank account) + net(debit-credit) of all ledger-effective lines on or before asOfDate. */
     private BigDecimal computeSystemBalance(LocalDate asOfDate) {
         AccountHead account = accountHeadRepository.findByCode(BANK_ACCOUNT_CODE).orElse(null);
         BigDecimal opening = account != null && account.getOpeningBalance() != null
                 ? account.getOpeningBalance() : BigDecimal.ZERO;
 
-        Map<Long, JournalVoucher> postedById = loadPostedVouchers();
+        Map<Long, JournalVoucher> effectiveById = loadLedgerEffectiveVouchers();
         BigDecimal net = BigDecimal.ZERO;
         for (JournalVoucherLine line : journalVoucherLineRepository.findByAccountCode(BANK_ACCOUNT_CODE)) {
-            JournalVoucher jv = postedById.get(line.getJournalVoucherId());
+            JournalVoucher jv = effectiveById.get(line.getJournalVoucherId());
             if (jv == null || jv.getDate() == null) continue;
             if (asOfDate != null && jv.getDate().isAfter(asOfDate)) continue;
             BigDecimal debit = line.getDebit() != null ? line.getDebit() : BigDecimal.ZERO;
@@ -315,6 +363,12 @@ public class BankReconciliationService {
 
     private Map<Long, JournalVoucher> loadPostedVouchers() {
         return journalVoucherRepository.findByStatusOrderByDateDesc("POSTED").stream()
+                .collect(Collectors.toMap(JournalVoucher::getId, jv -> jv, (a, b) -> a));
+    }
+
+    /** POSTED + REVERSED vouchers — the full set whose lines have a real, permanent ledger effect. */
+    private Map<Long, JournalVoucher> loadLedgerEffectiveVouchers() {
+        return journalVoucherRepository.findByStatusInOrderByDateDesc(LEDGER_EFFECTIVE_STATUSES).stream()
                 .collect(Collectors.toMap(JournalVoucher::getId, jv -> jv, (a, b) -> a));
     }
 

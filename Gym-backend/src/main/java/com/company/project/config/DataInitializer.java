@@ -15,6 +15,7 @@ import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
 import com.company.project.repositories.WarehouseRepository;
 import com.company.project.services.AddonPlanService;
+import com.company.project.services.FiscalYearService;
 import com.company.project.services.ProductService;
 import com.company.project.services.SupplierBillService;
 import com.company.project.services.SupplierService;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 
@@ -46,6 +48,7 @@ public class DataInitializer implements CommandLineRunner {
     private final SupplierBillService supplierBillService;
     private final AccountHeadRepository accountHeadRepository;
     private final AddonPlanService addonPlanService;
+    private final FiscalYearService fiscalYearService;
 
     public DataInitializer(
             RoleRepository roleRepository,
@@ -61,7 +64,8 @@ public class DataInitializer implements CommandLineRunner {
             ProductService productService,
             SupplierBillService supplierBillService,
             AccountHeadRepository accountHeadRepository,
-            AddonPlanService addonPlanService
+            AddonPlanService addonPlanService,
+            FiscalYearService fiscalYearService
     ) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
@@ -77,6 +81,7 @@ public class DataInitializer implements CommandLineRunner {
         this.supplierBillService = supplierBillService;
         this.accountHeadRepository = accountHeadRepository;
         this.addonPlanService = addonPlanService;
+        this.fiscalYearService = fiscalYearService;
     }
 
     @Override
@@ -125,6 +130,12 @@ public class DataInitializer implements CommandLineRunner {
         // the Chart of Accounts screen until their first posting.
         seedDefaultAccountHeads();
 
+        // Seed the current calendar year as an OPEN FiscalYear with 12 OPEN monthly
+        // FiscalPeriods, so period-lock enforcement (FiscalPeriodService.assertPeriodOpen)
+        // has something to check against out of the box. Idempotent — skips if the
+        // year already exists.
+        fiscalYearService.ensureCalendarYearSeeded(LocalDate.now().getYear());
+
         // Seed the Add-on Plan catalog ("Purchase An Add-On" screen) — previously
         // a hardcoded array in member-addons.tsx, now an editable Chart-of-Accounts-
         // style catalog the admin can create/edit/delete from the UI.
@@ -168,7 +179,8 @@ public class DataInitializer implements CommandLineRunner {
             new DefaultAccount("5000", "Salary Expense", "EXPENSE"),
             new DefaultAccount("5100", "Maintenance Expense", "EXPENSE"),
             new DefaultAccount("5200", "Purchase / COGS", "EXPENSE"),
-            new DefaultAccount("5700", "Miscellaneous Expense", "EXPENSE")
+            new DefaultAccount("5700", "Miscellaneous Expense", "EXPENSE"),
+            new DefaultAccount("5800", "Depreciation Expense", "EXPENSE")
         );
 
         for (DefaultAccount d : defaults) {

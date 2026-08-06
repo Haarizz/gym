@@ -15,6 +15,8 @@ public interface JournalVoucherRepository extends JpaRepository<JournalVoucher, 
 
     List<JournalVoucher> findByStatusOrderByDateDesc(String status);
 
+    List<JournalVoucher> findByStatusInOrderByDateDesc(List<String> statuses);
+
     /** Date-range filtering pushed to SQL — used by LedgerTransactionService. */
     List<JournalVoucher> findByStatusAndDateBetweenOrderByDateDesc(String status, LocalDate from, LocalDate to);
 

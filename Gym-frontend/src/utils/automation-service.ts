@@ -180,6 +180,8 @@ export const automationService = {
       delayUnit: "minutes" | "hours" | "days";
     };
     frequency: string;
+    dayOfWeek?: number;
+    dayOfMonth?: number;
   }): CreateWorkflowPayload {
     const delayMinutes =
       form.action.delay *
@@ -199,6 +201,8 @@ export const automationService = {
       action_subject: form.action.subject,
       delay_minutes: delayMinutes,
       frequency: form.frequency,
+      ...(form.frequency === "weekly" ? { day_of_week: form.dayOfWeek } : {}),
+      ...(form.frequency === "monthly" ? { day_of_month: form.dayOfMonth } : {}),
       priority: "MEDIUM",
       cooldown_hours: 24,
     };

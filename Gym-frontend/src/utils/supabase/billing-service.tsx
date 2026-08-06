@@ -1,5 +1,6 @@
 import { authService } from './auth-service';
 import { Receipt } from './receipts-service';
+import { parseApiError } from './api-error';
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -26,6 +27,7 @@ export interface MemberDue {
   days_overdue: number;
   last_payment: string | null;
   status: 'Overdue' | 'Due Soon' | 'Pending';
+  due_type?: 'Membership Due' | 'Renewal Due';
 }
 
 export interface PaymentSplitLeg {
@@ -64,6 +66,11 @@ export interface StatementMinorCharge {
 }
 
 export interface StatementLine {
+  // The underlying Receipt's id — lets a caller fetch/print/download the real
+  // receipt via receiptsService.getReceiptById(id) instead of just displaying
+  // receipt_no as inert text. Multiple lines can share the same id when they
+  // were split off of one Receipt (e.g. a bill's split payment legs).
+  id?: number;
   date: string;
   receipt_no: string;
   type: string;
@@ -97,7 +104,7 @@ class BillingService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/billing/stats`
     );
-    if (!response.ok) throw new Error(`Failed to fetch billing stats: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch billing stats: ${response.status}`));
     return response.json();
   }
 
@@ -105,7 +112,7 @@ class BillingService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/billing/dues`
     );
-    if (!response.ok) throw new Error(`Failed to fetch member dues: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch member dues: ${response.status}`));
     return response.json();
   }
 
@@ -113,7 +120,7 @@ class BillingService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/billing/member/${memberDbId}/pending-bills`
     );
-    if (!response.ok) throw new Error(`Failed to fetch pending bills: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch pending bills: ${response.status}`));
     return response.json();
   }
 
@@ -125,7 +132,7 @@ class BillingService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/billing/member/${memberDbId}/statement${qs ? `?${qs}` : ''}`
     );
-    if (!response.ok) throw new Error(`Failed to fetch member statement: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch member statement: ${response.status}`));
     return response.json();
   }
 
@@ -146,7 +153,7 @@ class BillingService {
       `${backendBaseUrl}/billing/settle`,
       { method: 'POST', body: JSON.stringify(body) }
     );
-    if (!response.ok) throw new Error(`Failed to settle payment: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to settle payment: ${response.status}`));
     return response.json();
   }
 }

@@ -1,4 +1,5 @@
 import { authService } from './auth-service';
+import { parseApiError } from './api-error';
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -93,7 +94,7 @@ class ReceiptsService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/receipts?${params.toString()}`
     );
-    if (!response.ok) throw new Error(`Failed to fetch receipts: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch receipts: ${response.status}`));
     return response.json();
   }
 
@@ -101,7 +102,7 @@ class ReceiptsService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/receipts/${id}`
     );
-    if (!response.ok) throw new Error(`Failed to fetch receipt: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch receipt: ${response.status}`));
     return response.json();
   }
 }

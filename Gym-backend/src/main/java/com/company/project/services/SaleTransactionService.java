@@ -5,10 +5,14 @@ import com.company.project.dto.SaleTransactionPageResponseDTO;
 import com.company.project.dto.SaleTransactionRequestDTO;
 import com.company.project.dto.SaleTransactionResponseDTO;
 import com.company.project.entities.FinancialSetting;
+import com.company.project.entities.Product;
 import com.company.project.entities.ProductStock;
 import com.company.project.entities.SaleTransaction;
 import com.company.project.entities.SaleTransactionItem;
+import com.company.project.exceptions.BusinessRuleViolationException;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.FinancialSettingRepository;
+import com.company.project.repositories.ProductRepository;
 import com.company.project.repositories.ProductStockRepository;
 import com.company.project.repositories.SaleTransactionItemRepository;
 import com.company.project.repositories.SaleTransactionRepository;
@@ -36,6 +40,7 @@ public class SaleTransactionService {
     private final SaleTransactionRepository saleTransactionRepository;
     private final SaleTransactionItemRepository saleTransactionItemRepository;
     private final ProductStockRepository productStockRepository;
+    private final ProductRepository productRepository;
     private final FinancialEventService financialEventService;
     private final ReceiptVoucherService receiptVoucherService;
     private final FinancialSettingRepository financialSettingRepository;
@@ -43,12 +48,14 @@ public class SaleTransactionService {
     public SaleTransactionService(SaleTransactionRepository saleTransactionRepository,
                                   SaleTransactionItemRepository saleTransactionItemRepository,
                                   ProductStockRepository productStockRepository,
+                                  ProductRepository productRepository,
                                   FinancialEventService financialEventService,
                                   ReceiptVoucherService receiptVoucherService,
                                   FinancialSettingRepository financialSettingRepository) {
         this.saleTransactionRepository     = saleTransactionRepository;
         this.saleTransactionItemRepository = saleTransactionItemRepository;
         this.productStockRepository        = productStockRepository;
+        this.productRepository             = productRepository;
         this.financialEventService         = financialEventService;
         this.receiptVoucherService         = receiptVoucherService;
         this.financialSettingRepository    = financialSettingRepository;
@@ -66,18 +73,61 @@ public class SaleTransactionService {
 
     public SaleTransactionResponseDTO createTransaction(SaleTransactionRequestDTO req) {
         boolean stockCheckEnabled = isStockCheckEnabled();
+        BigDecimal calcSubtotal = BigDecimal.ZERO;
+        BigDecimal calcDiscountAmount = BigDecimal.ZERO;
+        BigDecimal calcTaxAmount = BigDecimal.ZERO;
+        BigDecimal calcCogs = BigDecimal.ZERO;
+        java.util.Map<Long, BigDecimal> productTaxRates = new java.util.HashMap<>();
 
-        // Validate stock for each item — skipped entirely when Stock Check is off
-        if (stockCheckEnabled && req.getItems() != null) {
+        // Pass 1: Validate stock and compute verified totals (Gap 5 - Security)
+        if (req.getItems() != null) {
             for (SaleTransactionRequestDTO.SaleItemRequest itemReq : req.getItems()) {
-                List<ProductStock> stocks = productStockRepository.findByProductId(itemReq.getProductId());
-                int totalStock = stocks.stream().mapToInt(s -> s.getCurrentStock() == null ? 0 : s.getCurrentStock()).sum();
-                if (totalStock < itemReq.getQuantity()) {
-                    throw new RuntimeException("Insufficient stock for product id: " + itemReq.getProductId()
-                            + ". Available: " + totalStock + ", Requested: " + itemReq.getQuantity());
+                Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new EntityNotFoundException("Product not found with id: " + itemReq.getProductId()));
+
+                if (stockCheckEnabled) {
+                    if (itemReq.getWarehouseId() != null) {
+                        ProductStock stock = productStockRepository.findByProductIdAndWarehouseId(product.getId(), itemReq.getWarehouseId())
+                            .orElseThrow(() -> new EntityNotFoundException("Stock not found in warehouse for product " + product.getName()));
+                        if ((stock.getCurrentStock() == null ? 0 : stock.getCurrentStock()) < itemReq.getQuantity()) {
+                            throw new BusinessRuleViolationException("Insufficient stock in warehouse for product " + product.getName());
+                        }
+                    } else {
+                        List<ProductStock> stocks = productStockRepository.findByProductId(product.getId());
+                        int totalStock = stocks.stream().mapToInt(s -> s.getCurrentStock() == null ? 0 : s.getCurrentStock()).sum();
+                        if (totalStock < itemReq.getQuantity()) {
+                            throw new BusinessRuleViolationException("Insufficient stock for product: " + product.getName()
+                                    + ". Available: " + totalStock + ", Requested: " + itemReq.getQuantity());
+                        }
+                    }
                 }
+
+                // Override frontend price with DB price
+                BigDecimal unitPrice = product.getSellingPrice() != null ? product.getSellingPrice() : BigDecimal.ZERO;
+                itemReq.setUnitPrice(unitPrice);
+
+                BigDecimal discPct = itemReq.getDiscountPercent() != null ? itemReq.getDiscountPercent() : BigDecimal.ZERO;
+                BigDecimal lineBeforeDisc = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+                BigDecimal discAmt = lineBeforeDisc.multiply(discPct).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+
+                calcSubtotal = calcSubtotal.add(lineBeforeDisc);
+                calcDiscountAmount = calcDiscountAmount.add(discAmt);
+
+                // Tax is always computed server-side from the product's own configured rate —
+                // never trusted from the client — so per-product rates aren't dead configuration
+                // and a modified request can't set tax to an arbitrary figure.
+                BigDecimal taxRate = product.getTaxRate() != null ? product.getTaxRate() : BigDecimal.ZERO;
+                productTaxRates.put(product.getId(), taxRate);
+                BigDecimal itemTax = lineBeforeDisc.subtract(discAmt).multiply(taxRate)
+                        .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                calcTaxAmount = calcTaxAmount.add(itemTax);
+
+                BigDecimal costPrice = product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO;
+                calcCogs = calcCogs.add(costPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity())));
             }
         }
+
+        BigDecimal calcTotalAmount = calcSubtotal.subtract(calcDiscountAmount).add(calcTaxAmount);
 
         // Build and save transaction
         SaleTransaction transaction = new SaleTransaction();
@@ -86,13 +136,14 @@ public class SaleTransactionService {
         transaction.setMemberName(req.getMemberName());
         transaction.setPaymentMethod(req.getPaymentMethod());
         transaction.setPaymentBreakdown(req.getPaymentBreakdown());
-        transaction.setSubtotal(req.getSubtotal() != null ? req.getSubtotal() : BigDecimal.ZERO);
-        transaction.setDiscountAmount(req.getDiscountAmount() != null ? req.getDiscountAmount() : BigDecimal.ZERO);
-        transaction.setTaxAmount(req.getTaxAmount() != null ? req.getTaxAmount() : BigDecimal.ZERO);
-        transaction.setTotalAmount(req.getTotalAmount() != null ? req.getTotalAmount() : BigDecimal.ZERO);
+        transaction.setSubtotal(calcSubtotal);
+        transaction.setDiscountAmount(calcDiscountAmount);
+        transaction.setTaxAmount(calcTaxAmount);
+        transaction.setTotalAmount(calcTotalAmount);
+        transaction.setTotalCogs(calcCogs);
         transaction.setReceivedAmount(req.getReceivedAmount());
-        if (req.getReceivedAmount() != null && req.getTotalAmount() != null) {
-            transaction.setChangeAmount(req.getReceivedAmount().subtract(req.getTotalAmount()));
+        if (req.getReceivedAmount() != null) {
+            transaction.setChangeAmount(req.getReceivedAmount().subtract(calcTotalAmount));
         }
         transaction.setStatus("COMPLETED");
         transaction.setNotes(req.getNotes());
@@ -114,6 +165,7 @@ public class SaleTransactionService {
                 item.setProductSku(itemReq.getProductSku());
                 item.setQuantity(itemReq.getQuantity());
                 item.setUnitPrice(itemReq.getUnitPrice());
+                item.setWarehouseId(itemReq.getWarehouseId()); // Gap 4
 
                 BigDecimal discPct = itemReq.getDiscountPercent() != null ? itemReq.getDiscountPercent() : BigDecimal.ZERO;
                 item.setDiscountPercent(discPct);
@@ -124,15 +176,22 @@ public class SaleTransactionService {
                 BigDecimal discAmt = lineBeforeDiscount.multiply(discPct)
                         .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
                 item.setDiscountAmount(discAmt);
-                item.setTaxAmount(BigDecimal.ZERO);
+
+                BigDecimal itemTaxRate = productTaxRates.getOrDefault(itemReq.getProductId(), BigDecimal.ZERO);
+                BigDecimal itemTax = lineBeforeDiscount.subtract(discAmt).multiply(itemTaxRate)
+                        .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                item.setTaxAmount(itemTax);
                 item.setTotalAmount(lineBeforeDiscount.subtract(discAmt));
 
-                saleTransactionItemRepository.save(item);
-
-                // Deduct stock — use warehouse with most stock first (skipped when Stock Check is off)
+                // If warehouse is missing, find default during deduction and save it to the item
                 if (stockCheckEnabled) {
-                    deductStock(itemReq.getProductId(), itemReq.getQuantity());
+                    Long usedWarehouseId = deductStock(itemReq.getProductId(), itemReq.getWarehouseId(), itemReq.getQuantity());
+                    if (item.getWarehouseId() == null) {
+                        item.setWarehouseId(usedWarehouseId);
+                    }
                 }
+
+                saleTransactionItemRepository.save(item);
             }
         }
 
@@ -160,13 +219,13 @@ public class SaleTransactionService {
 
     public SaleTransactionResponseDTO refundTransaction(Long id) {
         SaleTransaction transaction = saleTransactionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Transaction not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Transaction not found with id: " + id));
 
         if ("REFUNDED".equals(transaction.getStatus())) {
-            throw new RuntimeException("Transaction is already refunded");
+            throw new BusinessRuleViolationException("Transaction is already refunded");
         }
         if ("VOIDED".equals(transaction.getStatus())) {
-            throw new RuntimeException("Cannot refund a voided transaction");
+            throw new BusinessRuleViolationException("Cannot refund a voided transaction");
         }
 
         transaction.setStatus("REFUNDED");
@@ -178,7 +237,7 @@ public class SaleTransactionService {
         List<SaleTransactionItem> items = saleTransactionItemRepository.findByTransactionId(id);
         if (isStockCheckEnabled()) {
             for (SaleTransactionItem item : items) {
-                restoreStock(item.getProductId(), item.getQuantity());
+                restoreStock(item.getProductId(), item.getWarehouseId(), item.getQuantity());
             }
         }
 
@@ -193,7 +252,7 @@ public class SaleTransactionService {
     @Transactional(readOnly = true)
     public SaleTransactionResponseDTO getTransactionById(Long id) {
         SaleTransaction transaction = saleTransactionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Transaction not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Transaction not found with id: " + id));
         List<SaleTransactionItem> items = saleTransactionItemRepository.findByTransactionId(id);
         return SaleTransactionResponseDTO.fromEntity(transaction, items);
     }
@@ -216,29 +275,51 @@ public class SaleTransactionService {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private void deductStock(Long productId, int quantity) {
-        List<ProductStock> stocks = productStockRepository.findByProductId(productId);
-        // Sort by highest stock first
-        stocks.sort(Comparator.comparingInt(s -> -(s.getCurrentStock() == null ? 0 : s.getCurrentStock())));
-
-        int remaining = quantity;
-        for (ProductStock stock : stocks) {
-            if (remaining <= 0) break;
+    private Long deductStock(Long productId, Long warehouseId, int quantity) {
+        if (warehouseId != null) {
+            ProductStock stock = productStockRepository.findByProductIdAndWarehouseId(productId, warehouseId)
+                    .orElseThrow(() -> new EntityNotFoundException("Stock not found in warehouse"));
             int available = stock.getCurrentStock() == null ? 0 : stock.getCurrentStock();
-            int deduct = Math.min(available, remaining);
-            stock.setCurrentStock(available - deduct);
+            if (available < quantity) {
+                throw new BusinessRuleViolationException("Insufficient stock in warehouse");
+            }
+            stock.setCurrentStock(available - quantity);
             productStockRepository.save(stock);
-            remaining -= deduct;
+            return warehouseId;
+        } else {
+            List<ProductStock> stocks = productStockRepository.findByProductId(productId);
+            // Sort by highest stock first
+            stocks.sort(Comparator.comparingInt(s -> -(s.getCurrentStock() == null ? 0 : s.getCurrentStock())));
+
+            int remaining = quantity;
+            Long defaultWarehouseId = null;
+            for (ProductStock stock : stocks) {
+                if (remaining <= 0) break;
+                if (defaultWarehouseId == null) defaultWarehouseId = stock.getWarehouseId();
+                int available = stock.getCurrentStock() == null ? 0 : stock.getCurrentStock();
+                int deduct = Math.min(available, remaining);
+                stock.setCurrentStock(available - deduct);
+                productStockRepository.save(stock);
+                remaining -= deduct;
+            }
+            return defaultWarehouseId;
         }
     }
 
-    private void restoreStock(Long productId, int quantity) {
-        List<ProductStock> stocks = productStockRepository.findByProductId(productId);
-        if (!stocks.isEmpty()) {
-            // Restore to the first warehouse
-            ProductStock stock = stocks.get(0);
-            stock.setCurrentStock((stock.getCurrentStock() == null ? 0 : stock.getCurrentStock()) + quantity);
-            productStockRepository.save(stock);
+    private void restoreStock(Long productId, Long warehouseId, int quantity) {
+        if (warehouseId != null) {
+            productStockRepository.findByProductIdAndWarehouseId(productId, warehouseId).ifPresent(stock -> {
+                stock.setCurrentStock((stock.getCurrentStock() == null ? 0 : stock.getCurrentStock()) + quantity);
+                productStockRepository.save(stock);
+            });
+        } else {
+            List<ProductStock> stocks = productStockRepository.findByProductId(productId);
+            if (!stocks.isEmpty()) {
+                // Restore to the first warehouse
+                ProductStock stock = stocks.get(0);
+                stock.setCurrentStock((stock.getCurrentStock() == null ? 0 : stock.getCurrentStock()) + quantity);
+                productStockRepository.save(stock);
+            }
         }
     }
 

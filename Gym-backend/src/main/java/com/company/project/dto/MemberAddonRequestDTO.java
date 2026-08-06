@@ -30,6 +30,11 @@ public class MemberAddonRequestDTO {
     // account instead of the member's own. Ignored for a member who carries
     // their own balance (that path is always treated as fully paid).
     private BigDecimal paidAmount;
+    // How much of `amount` is being covered by the member's reward wallet
+    // balance, if any. Debited from the wallet in the same transaction as the
+    // add-on itself, so the wallet balance and the ledger's Reward Wallet
+    // Liability account can never drift apart (see WalletService.debit).
+    private BigDecimal walletAmountApplied;
 
     public MemberAddonRequestDTO() {}
 
@@ -73,4 +78,7 @@ public class MemberAddonRequestDTO {
 
     public BigDecimal getPaidAmount() { return paidAmount; }
     public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+
+    public BigDecimal getWalletAmountApplied() { return walletAmountApplied; }
+    public void setWalletAmountApplied(BigDecimal walletAmountApplied) { this.walletAmountApplied = walletAmountApplied; }
 }

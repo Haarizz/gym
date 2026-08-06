@@ -12,6 +12,8 @@ import com.company.project.dto.MinorRenewalRequestDTO;
 import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.PaymentSplitDTO;
 import com.company.project.dto.RenewalRequestDTO;
+import com.company.project.exceptions.BusinessRuleViolationException;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.services.NotificationService;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
@@ -113,14 +115,14 @@ public class MemberService {
     @Transactional(readOnly = true)
     public MemberResponseDTO getMemberByUserId(Long userId) {
         Member member = memberRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Member not found for userId: " + userId));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found for userId: " + userId));
         return MemberResponseDTO.fromEntity(member);
     }
 
     @Transactional(readOnly = true)
     public MemberResponseDTO getMemberById(Long id) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
         MemberResponseDTO dto = MemberResponseDTO.fromEntity(member);
         if (member.getFamilyHeadId() != null) {
             memberRepository.findByMemberId(member.getFamilyHeadId())
@@ -153,10 +155,10 @@ public class MemberService {
         // adult, never a minor — so it can't be bypassed by calling the API directly.
         if ("Couple".equalsIgnoreCase(member.getMembershipType()) && hasFamily) {
             if (request.getFamilyMembers().size() > 1) {
-                throw new RuntimeException("Couple membership allows only one connected member.");
+                throw new IllegalArgumentException("Couple membership allows only one connected member.");
             }
             if (Boolean.TRUE.equals(request.getFamilyMembers().get(0).getIsMinor())) {
-                throw new RuntimeException("Couple membership only supports an adult connected member.");
+                throw new IllegalArgumentException("Couple membership only supports an adult connected member.");
             }
         }
 
@@ -166,12 +168,12 @@ public class MemberService {
                 ? planRepository.findByName(member.getMembershipPlan()).orElse(null)
                 : null;
 
-        // "family_head" billing mode: EVERY family member (adult or minor) folds
-        // into ONE invoice on the head — nobody but the head ever carries their own
-        // outstandingBalance/receipt. "individual" (default — every existing Family/
-        // Couple plan) keeps today's behavior: adults bill independently, only
-        // minors fold into the head's bill.
-        boolean familyHeadBillingMode = "Family".equalsIgnoreCase(member.getMembershipType())
+        // "family_head" billing mode: EVERY family/couple member (adult or minor)
+        // folds into ONE invoice on the head — nobody but the head ever carries
+        // their own outstandingBalance/receipt. "individual" (default — every
+        // existing Family/Couple plan) keeps today's behavior: adults bill
+        // independently, only minors fold into the head's bill.
+        boolean familyHeadBillingMode = isFamilyType
                 && hasFamily && resolvedPlan != null
                 && "family_head".equalsIgnoreCase(resolvedPlan.getFamilyBillingMode());
 
@@ -387,7 +389,7 @@ public class MemberService {
         if (request.getAppUsername() != null && !request.getAppUsername().isBlank()
                 && request.getAppPassword() != null && !request.getAppPassword().isBlank()) {
             if (userRepository.existsByUsername(request.getAppUsername())) {
-                throw new RuntimeException("Username already taken: " + request.getAppUsername());
+                throw new BusinessRuleViolationException("Username already taken: " + request.getAppUsername());
             }
             User user = new User();
             user.setUsername(request.getAppUsername());
@@ -398,7 +400,7 @@ public class MemberService {
             user = userRepository.save(user);
 
             Role memberRole = roleRepository.findByRoleName("MEMBER")
-                    .orElseThrow(() -> new RuntimeException("MEMBER role not found"));
+                    .orElseThrow(() -> new EntityNotFoundException("MEMBER role not found"));
             userRoleRepository.save(new UserRole(null, user, memberRole));
 
             saved.setUserId(user.getId());
@@ -424,18 +426,18 @@ public class MemberService {
 
     public MemberResponseDTO setMemberCredentials(Long id, String appUsername, String appPassword) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Member not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + id));
 
         if (member.getUserId() != null) {
             // Already has an account — just update the password
             User user = userRepository.findById(member.getUserId())
-                    .orElseThrow(() -> new RuntimeException("Linked user account not found"));
+                    .orElseThrow(() -> new EntityNotFoundException("Linked user account not found"));
             user.setPasswordHash(passwordEncoder.encode(appPassword));
             userRepository.save(user);
         } else {
             // No account yet — create one
             if (userRepository.existsByUsername(appUsername)) {
-                throw new RuntimeException("Username already taken: " + appUsername);
+                throw new BusinessRuleViolationException("Username already taken: " + appUsername);
             }
             User user = new User();
             user.setUsername(appUsername);
@@ -446,7 +448,7 @@ public class MemberService {
             user = userRepository.save(user);
 
             Role memberRole = roleRepository.findByRoleName("MEMBER")
-                    .orElseThrow(() -> new RuntimeException("MEMBER role not found"));
+                    .orElseThrow(() -> new EntityNotFoundException("MEMBER role not found"));
             userRoleRepository.save(new UserRole(null, user, memberRole));
 
             member.setUserId(user.getId());
@@ -460,12 +462,12 @@ public class MemberService {
 
     public MemberResponseDTO toggleMemberAccess(Long id, boolean enabled) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Member not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + id));
         if (member.getUserId() == null) {
-            throw new RuntimeException("This member has no linked app account");
+            throw new EntityNotFoundException("This member has no linked app account");
         }
         User user = userRepository.findById(member.getUserId())
-                .orElseThrow(() -> new RuntimeException("Linked user account not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Linked user account not found"));
         user.setEnabled(enabled);
         userRepository.save(user);
         member.setAppAccessEnabled(enabled);
@@ -508,13 +510,13 @@ public class MemberService {
         Integer maxChildren = plan.getMaxChildMembers();
         Integer maxTotal = plan.getMaxFamilyMembers();
         if (maxAdults != null && maxAdults > 0 && adultCount > maxAdults) {
-            throw new RuntimeException("This family plan allows a maximum of " + maxAdults + " adult member(s).");
+            throw new IllegalArgumentException("This family plan allows a maximum of " + maxAdults + " adult member(s).");
         }
         if (maxChildren != null && maxChildren > 0 && childCount > maxChildren) {
-            throw new RuntimeException("This family plan allows a maximum of " + maxChildren + " child member(s).");
+            throw new IllegalArgumentException("This family plan allows a maximum of " + maxChildren + " child member(s).");
         }
         if (maxTotal != null && maxTotal > 0 && totalCount > maxTotal && !allowExtra) {
-            throw new RuntimeException("This family plan allows a maximum of " + maxTotal + " member(s).");
+            throw new IllegalArgumentException("This family plan allows a maximum of " + maxTotal + " member(s).");
         }
     }
 
@@ -633,18 +635,18 @@ public class MemberService {
 
     public MemberResponseDTO updateMember(Long id, MemberRequestDTO request) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
         applyRequest(request, member);
         return MemberResponseDTO.fromEntity(memberRepository.save(member));
     }
 
     public void deleteMember(Long id) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
         if (Boolean.TRUE.equals(member.getIsFamilyHead()) && member.getMemberId() != null) {
             List<Member> dependents = memberRepository.findByFamilyHeadId(member.getMemberId());
             if (!dependents.isEmpty()) {
-                throw new RuntimeException("Cannot delete " + member.getName()
+                throw new BusinessRuleViolationException("Cannot delete " + member.getName()
                         + " — reassign or remove their " + dependents.size()
                         + " linked family member(s) first.");
             }
@@ -654,9 +656,9 @@ public class MemberService {
 
     public MemberResponseDTO renewMember(Long id, RenewalRequestDTO request) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
         if (member.isEffectivelyBilledToHead()) {
-            throw new RuntimeException("This member's charges are billed to their family head — "
+            throw new BusinessRuleViolationException("This member's charges are billed to their family head — "
                     + "use the family member renewal endpoint instead.");
         }
         if (request.getPlanName()        != null) member.setMembershipPlan(request.getPlanName());
@@ -750,20 +752,27 @@ public class MemberService {
      */
     public MemberResponseDTO renewFamilyMinor(Long minorId, MinorRenewalRequestDTO request) {
         Member minor = memberRepository.findById(minorId)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + minorId));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + minorId));
         if (!minor.isEffectivelyBilledToHead()) {
-            throw new RuntimeException("This member is not billed to a family head — use the standard renew endpoint.");
+            throw new BusinessRuleViolationException("This member is not billed to a family head — use the standard renew endpoint.");
         }
         if (minor.getFamilyHeadId() == null) {
-            throw new RuntimeException("This minor has no assigned guardian.");
+            throw new BusinessRuleViolationException("This minor has no assigned guardian.");
         }
         Member guardian = memberRepository.findByMemberId(minor.getFamilyHeadId())
-                .orElseThrow(() -> new RuntimeException("Guardian not found for this minor."));
+                .orElseThrow(() -> new EntityNotFoundException("Guardian not found for this minor."));
 
         if (request.getPlanName() != null) minor.setMembershipPlan(request.getPlanName());
         BigDecimal fee = request.getFee() != null ? request.getFee() : minor.getMembershipFee();
         minor.setMembershipFee(fee);
-        boolean paid = "paid".equalsIgnoreCase(request.getPaymentStatus());
+        BigDecimal feeAmount = fee != null ? fee : BigDecimal.ZERO;
+        // A genuine partial paidAmount takes precedence; fall back to the older
+        // binary paymentStatus (paid = full fee, anything else = nothing collected)
+        // for backward compatibility with callers that don't send paidAmount.
+        BigDecimal paidAmount = request.getPaidAmount() != null
+                ? request.getPaidAmount().max(BigDecimal.ZERO).min(feeAmount)
+                : ("paid".equalsIgnoreCase(request.getPaymentStatus()) ? feeAmount : BigDecimal.ZERO);
+        boolean fullyPaid = paidAmount.compareTo(feeAmount) >= 0 && feeAmount.compareTo(BigDecimal.ZERO) > 0;
 
         if (minor.getMembershipPlan() != null) {
             planRepository.findByName(minor.getMembershipPlan()).ifPresent(plan -> {
@@ -777,17 +786,21 @@ public class MemberService {
 
         BigDecimal guardianOutstanding = guardian.getOutstandingBalance() != null
                 ? guardian.getOutstandingBalance() : BigDecimal.ZERO;
-        if (!paid) {
-            guardian.setOutstandingBalance(guardianOutstanding.add(fee != null ? fee : BigDecimal.ZERO));
-        } else {
+        BigDecimal unpaid = feeAmount.subtract(paidAmount);
+        if (unpaid.compareTo(BigDecimal.ZERO) > 0) {
+            guardian.setOutstandingBalance(guardianOutstanding.add(unpaid));
+        }
+        if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
             guardian.setLastPaymentDate(LocalDateTime.now());
+            if (request.getPaymentMethod() != null) guardian.setPaymentMethodUsed(request.getPaymentMethod());
         }
         Member savedGuardian = memberRepository.save(guardian);
 
         com.company.project.entities.Receipt receipt = receiptService.createMinorChargeReceipt(
-                savedGuardian, savedMinor, fee, paid, "Renewal", null, null, null);
+                savedGuardian, savedMinor, feeAmount, paidAmount, "Renewal", null,
+                request.getPaymentBreakdown(), request.getBankAccountCode(), request.getBankAccountName());
 
-        if (paid) {
+        if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
             financialEventService.onMemberPaymentReceived(receipt);
             receiptVoucherService.createVoucherFromModule(
                     "Family Member Renewal – " + savedMinor.getName(),
@@ -795,11 +808,12 @@ public class MemberService {
                     savedGuardian.getName(),
                     savedGuardian.getId(),
                     receipt.getPaidAmount(),
-                    savedGuardian.getPaymentMethodUsed(),
+                    request.getPaymentMethod() != null ? request.getPaymentMethod() : savedGuardian.getPaymentMethodUsed(),
                     savedGuardian.getMemberId(),
                     null,
                     "Renewal for family member " + savedMinor.getName()
-                            + " (billed to " + savedGuardian.getName() + ")",
+                            + " (billed to " + savedGuardian.getName() + ")"
+                            + (fullyPaid ? "" : " — partial payment"),
                     null
             );
         }
@@ -817,15 +831,15 @@ public class MemberService {
      */
     public MemberResponseDTO renewFamily(Long headId, FamilyRenewalRequestDTO request) {
         Member head = memberRepository.findById(headId)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + headId));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
         if (!Boolean.TRUE.equals(head.getIsFamilyHead())) {
-            throw new RuntimeException("This member is not a family head.");
+            throw new BusinessRuleViolationException("This member is not a family head.");
         }
 
         String planName = request.getPlanName() != null ? request.getPlanName() : head.getMembershipPlan();
         MembershipPlan plan = planName != null ? planRepository.findByName(planName).orElse(null) : null;
         if (plan == null || !"family_head".equalsIgnoreCase(plan.getFamilyBillingMode())) {
-            throw new RuntimeException("This family's plan is not billed as a single family invoice — "
+            throw new BusinessRuleViolationException("This family's plan is not billed as a single family invoice — "
                     + "renew each member individually instead.");
         }
         if (request.getPlanName() != null) head.setMembershipPlan(request.getPlanName());
@@ -903,14 +917,14 @@ public class MemberService {
     @Transactional(readOnly = true)
     public FamilyGroupResponseDTO getFamilyGroup(Long id) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
         String headMemberId = Boolean.TRUE.equals(member.getIsFamilyHead())
                 ? member.getMemberId() : member.getFamilyHeadId();
         if (headMemberId == null) {
-            throw new RuntimeException("This member does not belong to a family group.");
+            throw new BusinessRuleViolationException("This member does not belong to a family group.");
         }
         Member head = memberRepository.findByMemberId(headMemberId)
-                .orElseThrow(() -> new RuntimeException("Family head not found."));
+                .orElseThrow(() -> new EntityNotFoundException("Family head not found."));
         List<MemberResponseDTO> members = memberRepository.findByFamilyHeadId(headMemberId).stream()
                 .map(MemberResponseDTO::fromEntity)
                 .collect(Collectors.toList());
@@ -928,9 +942,9 @@ public class MemberService {
      */
     public MemberResponseDTO addFamilyMember(Long headId, FamilyMemberDTO fm) {
         Member head = memberRepository.findById(headId)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + headId));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
         if (fm.getName() == null || fm.getName().isBlank()) {
-            throw new RuntimeException("Family member name is required.");
+            throw new IllegalArgumentException("Family member name is required.");
         }
         if (!Boolean.TRUE.equals(head.getIsFamilyHead())) {
             head.setIsFamilyHead(true);
@@ -942,6 +956,20 @@ public class MemberService {
         boolean familyHeadBillingMode = headPlan != null
                 && "family_head".equalsIgnoreCase(headPlan.getFamilyBillingMode());
         List<Member> existingDependents = memberRepository.findByFamilyHeadId(head.getMemberId());
+
+        // Same Couple constraint enforced in createMember() (exactly one connected
+        // adult, never a minor) — Couple plans never configure maxAdultMembers/
+        // maxFamilyMembers (that UI is Family-only), so enforceFamilyMemberCaps
+        // below is a no-op for Couple and this is the only thing stopping a second
+        // member being added to a couple via this endpoint.
+        if ("Couple".equalsIgnoreCase(head.getMembershipType())) {
+            if (!existingDependents.isEmpty()) {
+                throw new IllegalArgumentException("Couple membership allows only one connected member.");
+            }
+            if (Boolean.TRUE.equals(fm.getIsMinor())) {
+                throw new IllegalArgumentException("Couple membership only supports an adult connected member.");
+            }
+        }
 
         if (headPlan != null) {
             boolean newIsMinor = Boolean.TRUE.equals(fm.getIsMinor());
@@ -966,19 +994,20 @@ public class MemberService {
         List<Member> dependents = memberRepository.findByFamilyHeadId(head.getMemberId());
         Member added = dependents.stream()
                 .max((a, b) -> a.getId().compareTo(b.getId()))
-                .orElseThrow(() -> new RuntimeException("Failed to create family member"));
+                .orElseThrow(() -> new EntityNotFoundException("Failed to create family member"));
         return MemberResponseDTO.fromEntity(added);
     }
 
     public MemberResponseDTO freezeMember(Long id, FreezeRequestDTO request) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
         LocalDateTime freezeUntil = parseDateTime(request.getFreezeUntil());
         member.setMembershipStatus("frozen");
         member.setFreezeStartDate(LocalDateTime.now());
         member.setFreezeEndDate(freezeUntil);
         if (request.getReason() != null) member.setFreezeReason(request.getReason());
         Member saved = memberRepository.save(member);
+        cascadeFreezeStateToBilledToHeadDependents(saved, "frozen", freezeUntil, request.getReason());
 
         notificationService.notifyRoles(
                 List.of("ADMIN", "MANAGER"),
@@ -1004,12 +1033,13 @@ public class MemberService {
 
     public MemberResponseDTO unfreezeMember(Long id) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
         member.setMembershipStatus("active");
         member.setFreezeStartDate(null);
         member.setFreezeEndDate(null);
         member.setFreezeReason(null);
         Member saved = memberRepository.save(member);
+        cascadeFreezeStateToBilledToHeadDependents(saved, "active", null, null);
 
         notificationService.notifyRoles(
                 List.of("ADMIN", "MANAGER"),
@@ -1030,6 +1060,37 @@ public class MemberService {
             );
         }
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * Freezing/unfreezing a family/couple HEAD used to only ever touch that one
+     * Member row — a billed-to-head dependent (minor, or an adult under
+     * family_head billing) has no independent membershipStatus of their own to
+     * freeze, so they silently kept "active" and could keep checking in after
+     * the paying head was frozen. This mirrors renewFamily(), which already
+     * propagates the new expiry to dependents the same way.
+     *
+     * Independently-billed adult dependents (individual-mode Family/Couple) are
+     * deliberately NOT touched — they manage their own membership/freeze status.
+     */
+    private void cascadeFreezeStateToBilledToHeadDependents(Member head, String status,
+                                                             LocalDateTime freezeUntil, String reason) {
+        if (!Boolean.TRUE.equals(head.getIsFamilyHead()) || head.getMemberId() == null) return;
+        List<Member> dependents = memberRepository.findByFamilyHeadId(head.getMemberId());
+        for (Member dep : dependents) {
+            if (!dep.isEffectivelyBilledToHead()) continue;
+            dep.setMembershipStatus(status);
+            if ("frozen".equals(status)) {
+                dep.setFreezeStartDate(LocalDateTime.now());
+                dep.setFreezeEndDate(freezeUntil);
+                if (reason != null) dep.setFreezeReason(reason);
+            } else {
+                dep.setFreezeStartDate(null);
+                dep.setFreezeEndDate(null);
+                dep.setFreezeReason(null);
+            }
+            memberRepository.save(dep);
+        }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

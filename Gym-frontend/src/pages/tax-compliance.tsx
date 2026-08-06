@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { taxComplianceService, TaxComplianceItem, TaxComplianceCreateRequest } from '../utils/supabase/tax-compliance-service';
+import { financialReportsService, TaxSummaryData } from '../utils/supabase/financial-reports-service';
+import { getVatRate, DEFAULT_VAT_RATE } from '../utils/tax';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -129,6 +131,39 @@ export function TaxCompliance() {
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [editingConfig, setEditingConfig] = useState<typeof initialTaxTypeConfigs[0] | null>(null);
   const [configForm, setConfigForm] = useState(defaultConfigForm);
+
+  // Reports tab — real figures derived from the posted ledger (see
+  // FinancialReportService.getTaxSummary). Corporate Tax is annual so it's
+  // computed year-to-date; VAT is filed quarterly in the UAE so it's computed
+  // for the current quarter-to-date. Both come from the same endpoint, just
+  // called with different date ranges.
+  const [annualTaxSummary, setAnnualTaxSummary] = useState<TaxSummaryData | null>(null);
+  const [quarterlyTaxSummary, setQuarterlyTaxSummary] = useState<TaxSummaryData | null>(null);
+  const [taxSummaryLoading, setTaxSummaryLoading] = useState(false);
+  const [vatRatePercent, setVatRatePercent] = useState(DEFAULT_VAT_RATE);
+
+  const loadTaxSummary = useCallback(async () => {
+    setTaxSummaryLoading(true);
+    try {
+      const today = new Date();
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      const quarterStart = new Date(today.getFullYear(), quarterStartMonth, 1);
+      const toIso = (d: Date) => d.toISOString().slice(0, 10);
+
+      const [annual, quarterly, rate] = await Promise.all([
+        financialReportsService.getTaxSummary(toIso(yearStart), toIso(today)),
+        financialReportsService.getTaxSummary(toIso(quarterStart), toIso(today)),
+        getVatRate(),
+      ]);
+      setAnnualTaxSummary(annual);
+      setQuarterlyTaxSummary(quarterly);
+      setVatRatePercent(rate);
+    } catch { /* silently degrade — Reports cards fall back to a loading/empty state */ }
+    finally { setTaxSummaryLoading(false); }
+  }, []);
+
+  useEffect(() => { loadTaxSummary(); }, [loadTaxSummary]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -563,7 +598,7 @@ export function TaxCompliance() {
           </Card>
         </TabsContent>
 
-        {/* ── Reports Tab (static) ── */}
+        {/* ── Reports Tab — derived from the posted ledger, see FinancialReportService.getTaxSummary ── */}
         <TabsContent value="reports" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
@@ -572,15 +607,20 @@ export function TaxCompliance() {
                   <Building2 className="h-5 w-5" style={{ color: '#2B7A78' }} />
                   Corporate Tax Summary
                 </CardTitle>
-                <CardDescription>Income, deductions, taxable profit</CardDescription>
+                <CardDescription>
+                  Year to date ({annualTaxSummary?.periodFrom ?? '—'} to {annualTaxSummary?.periodTo ?? '—'})
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Revenue</span><span className="font-medium"><CurrencyGlyph /> 1,850,000</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Deductions</span><span className="font-medium"><CurrencyGlyph /> 1,344,440</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxable Profit</span><span className="font-medium"><CurrencyGlyph /> 505,560</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Tax Payable (9%)</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 45,500</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Revenue</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Deductions</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.deductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxable Profit</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.taxableProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Tax Payable ({annualTaxSummary ? (annualTaxSummary.corporateTaxRate * 100).toFixed(0) : 9}%)</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.corporateTaxPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                 </div>
+                <p className="text-xs text-gray-400">
+                  UAE Corporate Tax: 0% on the first <CurrencyGlyph /> {annualTaxSummary?.corporateTaxZeroRateThreshold.toLocaleString() ?? '375,000'} of taxable profit, 9% above it.
+                </p>
                 <div className="flex gap-2">
                   <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
                   <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileText className="mr-2 h-4 w-4" />PDF</Button>
@@ -594,14 +634,19 @@ export function TaxCompliance() {
                   <Receipt className="h-5 w-5" style={{ color: '#2B7A78' }} />
                   VAT Return Report
                 </CardTitle>
-                <CardDescription>Output VAT, Input VAT, Net VAT</CardDescription>
+                <CardDescription>
+                  Current quarter to date ({quarterlyTaxSummary?.periodFrom ?? '—'} to {quarterlyTaxSummary?.periodTo ?? '—'})
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Output VAT (5%)</span><span className="font-medium"><CurrencyGlyph /> 92,500</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Input VAT (5%)</span><span className="font-medium"><CurrencyGlyph /> 80,200</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Net VAT Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 12,300</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Output VAT ({vatRatePercent}%)</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.outputVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Input VAT ({vatRatePercent}%)</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.inputVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Net VAT Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.netVatPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                 </div>
+                <p className="text-xs text-gray-400">
+                  Output VAT is collected on membership, add-on, POS and invoice sales; Input VAT is reclaimed on expenses and supplier bills.
+                </p>
                 <div className="flex gap-2">
                   <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
                   <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileCode className="mr-2 h-4 w-4" />XML</Button>
@@ -619,13 +664,16 @@ export function TaxCompliance() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Excisable Goods Value</span><span className="font-medium"><CurrencyGlyph /> 17,800</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax Rate</span><span className="font-medium">50%</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Excise Tax Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 8,900</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Excisable Goods Value</span><span className="font-medium"><CurrencyGlyph /> 0.00</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax Rate</span><span className="font-medium">—</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Excise Tax Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 0.00</span></div>
                 </div>
+                <p className="text-xs text-gray-400">
+                  No products are flagged as excisable yet (e.g. energy drinks, tobacco) — this app doesn't track excise category or rate per product, so this will read zero until that's built.
+                </p>
                 <div className="flex gap-2">
-                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
-                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileText className="mr-2 h-4 w-4" />PDF</Button>
+                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm" disabled><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
+                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm" disabled><FileText className="mr-2 h-4 w-4" />PDF</Button>
                 </div>
               </CardContent>
             </Card>

@@ -181,6 +181,13 @@ export function Leads() {
 
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
+  // Total/converted/conversion-rate KPIs come from the real backend aggregate (leadService.getStats())
+  // rather than the capped 200-row fetch above, so they stay accurate past 200 leads.
+  const [leadStats, setLeadStats] = useState<{ totalLeads: number; convertedLeads: number; conversionRate: number } | null>(null);
+  useEffect(() => {
+    leadService.getStats().then(setLeadStats).catch(() => setLeadStats(null));
+  }, [apiLeads]);
+
   const [staffMembers, setStaffMembers] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => {
     staffService.getStaff({}, 1, 100)
@@ -246,15 +253,19 @@ export function Leads() {
 
   // Calculate KPIs
   const kpis = useMemo(() => {
-    const totalLeads = displayLeads.length;
-    const convertedLeads = displayLeads.filter(lead => lead.status === 'converted').length;
+    // pendingFollowUps/hotLeads/avgLeadScore have no backend aggregate endpoint, so they're
+    // still computed from the fetched page (capped at 200) — only totalLeads/convertedLeads/
+    // conversionRate are available as true DB-wide aggregates via leadService.getStats().
     const pendingFollowUps = displayLeads.filter(lead =>
       lead.nextFollowUp && lead.nextFollowUp <= new Date() &&
       !['converted', 'lost'].includes(lead.status)
     ).length;
     const hotLeads = displayLeads.filter(lead => lead.priority === 'high' && !['converted', 'lost'].includes(lead.status)).length;
-    const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
     const avgLeadScore = displayLeads.length > 0 ? displayLeads.reduce((sum, lead) => sum + lead.leadScore, 0) / displayLeads.length : 0;
+
+    const totalLeads = leadStats?.totalLeads ?? displayLeads.length;
+    const convertedLeads = leadStats?.convertedLeads ?? displayLeads.filter(lead => lead.status === 'converted').length;
+    const conversionRate = leadStats?.conversionRate ?? (totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0);
 
     return {
       totalLeads,
@@ -264,7 +275,7 @@ export function Leads() {
       conversionRate,
       avgLeadScore
     };
-  }, [displayLeads]);
+  }, [displayLeads, leadStats]);
 
   // Filter and sort leads
   const filteredLeads = useMemo(() => {
@@ -1484,6 +1495,26 @@ export function Leads() {
                 setShowUpdateStatus(false);
                 setStatusLeadId(null);
                 setSelectedLeads([]);
+                // Marking a lead "converted" only flips its status — it doesn't create a Member.
+                // For a single lead, hand off straight into Add Member pre-filled with their info
+                // so staff aren't left to re-type everything from scratch.
+                if (newStatus === 'converted' && ids.length === 1) {
+                  const convertedLead = displayLeads.find(l => l.id === ids[0]);
+                  if (convertedLead) {
+                    navigate('/add-member', {
+                      state: {
+                        prefillLead: {
+                          leadId: convertedLead.id,
+                          firstName: convertedLead.firstName,
+                          lastName: convertedLead.lastName,
+                          email: convertedLead.email,
+                          phone: convertedLead.phone,
+                        },
+                      },
+                    });
+                    return;
+                  }
+                }
                 loadLeads();
               } catch { toast.error('Failed to update status'); }
             }}>Update Status</Button>

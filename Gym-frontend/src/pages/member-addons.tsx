@@ -515,17 +515,15 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
         notes: notes || undefined,
         payment_breakdown: paymentBreakdown,
         paid_amount: billedToHead ? paidNowAmount : undefined,
+        // Debited server-side in the same transaction as the add-on itself,
+        // so the wallet balance and its ledger liability account can't drift
+        // apart the way a separate follow-up debit call could.
+        wallet_amount_applied: walletAmountApplied > 0 ? walletAmountApplied : undefined,
       });
       if (rewardApplied && availableReward) {
         // Best-effort: the add-on purchase already succeeded, so a failure here
         // (e.g. someone else redeemed it a moment earlier) shouldn't undo it.
         referralService.redeemReward(availableReward.id).catch(() => {});
-      }
-      if (walletAmountApplied > 0) {
-        walletService.debit(
-          selectedMember.membershipId, walletAmountApplied, 'BILLING_USE', Number(created.id),
-          `Applied to add-on purchase ${created.transaction_id}`
-        ).catch(() => {});
       }
       setTransactions(prev => [created, ...prev]);
       setLastCreatedAddon(created);
@@ -537,8 +535,8 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       setPaymentMethod("Cash");
       setMethodDetails(EMPTY_SPLIT_DETAILS);
       setMinorPaidNow("");
-    } catch {
-      toast.error("Failed to save add-on purchase. Please try again.");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save add-on purchase. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

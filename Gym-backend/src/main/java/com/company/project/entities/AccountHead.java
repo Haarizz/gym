@@ -41,6 +41,9 @@ public class AccountHead extends BaseEntity {
     @Column(name = "current_balance", precision = 12, scale = 2)
     private BigDecimal currentBalance;
 
+    @Column(name = "currency_code", length = 3)
+    private String currencyCode; // e.g. USD, AED. Defaults to base currency if null.
+
     @Column(name = "is_active")
     private Boolean isActive;
 
@@ -81,6 +84,9 @@ public class AccountHead extends BaseEntity {
 
     public BigDecimal getCurrentBalance() { return currentBalance; }
     public void setCurrentBalance(BigDecimal currentBalance) { this.currentBalance = currentBalance; }
+
+    public String getCurrencyCode() { return currencyCode; }
+    public void setCurrencyCode(String currencyCode) { this.currencyCode = currencyCode; }
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }

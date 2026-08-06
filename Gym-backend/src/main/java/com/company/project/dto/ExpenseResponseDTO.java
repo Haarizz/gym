@@ -23,6 +23,7 @@ public class ExpenseResponseDTO {
     private String notes;
     private String status;
     private String receiptUrl;
+    private String paymentStatus;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
@@ -45,6 +46,7 @@ public class ExpenseResponseDTO {
         dto.setNotes(e.getNotes());
         dto.setStatus(e.getStatus());
         dto.setReceiptUrl(e.getReceiptUrl());
+        dto.setPaymentStatus(e.getPaymentStatus());
         dto.setCreatedAt(e.getCreatedAt());
         dto.setUpdatedAt(e.getUpdatedAt());
         return dto;
@@ -88,6 +90,9 @@ public class ExpenseResponseDTO {
 
     public String getReceiptUrl() { return receiptUrl; }
     public void setReceiptUrl(String receiptUrl) { this.receiptUrl = receiptUrl; }
+
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

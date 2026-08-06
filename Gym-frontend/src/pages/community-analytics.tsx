@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Badge } from "../components/ui/badge";
 import { Progress } from "../components/ui/progress";
@@ -20,7 +19,6 @@ import {
   Users,
   DollarSign,
   Target,
-  Calendar,
   Filter,
   Download,
   RefreshCw,
@@ -132,8 +130,6 @@ const COLORS = {
 
 export function CommunityAnalytics() {
   const { currencyCode } = useCurrency();
-  const [dateFilter, setDateFilter] = useState("today");
-  const [staffFilter, setStaffFilter] = useState("all");
   const [activeCollectionTab, setActiveCollectionTab] = useState("today");
   const [data, setData] = useState(emptyData);
   const [members, setMembers] = useState<MemberApi[]>([]);
@@ -173,10 +169,23 @@ export function CommunityAnalytics() {
       setMembers(memberList);
       setReceipts(receiptList);
 
+      // A billed-to-head dependent (minor, or an adult under family_head
+      // billing) never generates their own receipt — the whole household is
+      // billed to the head. Counting them as full "members" inflates New
+      // Signups/Churn and dilutes Avg Revenue/Member, so financial/household
+      // metrics below use only the billing units (heads + independent members).
+      const householdMembers = memberList.filter((m: any) => !(m.is_minor || m.billed_to_head));
+
       const institution = (targets as any[]).find((t) => t.scope === "institution");
       const assigned = institution?.revenue_target ?? 0;
       const achieved = institution?.revenue_achieved ?? 0;
       const progress = institution?.percentage ?? (assigned > 0 ? (achieved / assigned) * 100 : 0);
+
+      // Immutable receipts split a partially-paid-then-settled bill into
+      // separate rows (the bill row keeps its full r.amount even after later
+      // settlements) — summing r.amount double-counts the settled portion.
+      // r.paid_amount is the actual cash each row received and never overlaps.
+      const revenueOf = (r: Receipt): number => Number(r.paid_amount) || 0;
 
       const categorizeReceipt = (r: Receipt): "membership" | "addons" | "pos" => {
         const t = (r.transaction_type || "").toLowerCase();
@@ -191,7 +200,7 @@ export function CommunityAnalytics() {
         receiptList.forEach((r) => {
           const dateStr = (r.transaction_date || "").split("T")[0];
           if (!dateStr || !datePredicate(dateStr)) return;
-          const amount = Number(r.amount) || 0;
+          const amount = revenueOf(r);
           const cat = categorizeReceipt(r);
           out[cat] += amount;
           out.total += amount;
@@ -212,7 +221,7 @@ export function CommunityAnalytics() {
         const label = d.toLocaleString(undefined, { weekday: "short" });
         const revenue = receiptList
           .filter((r) => (r.transaction_date || "").split("T")[0] === ds)
-          .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+          .reduce((s, r) => s + revenueOf(r), 0);
         const newMembers = memberList.filter((m) => {
           const raw = m.join_date || m.created_at;
           const ms = raw ? String(raw).split("T")[0] : "";
@@ -238,7 +247,7 @@ export function CommunityAnalytics() {
         const dateStr = (r.transaction_date || "").split("T")[0];
         if (!dateStr.startsWith(monthKey)) return;
         const staffName = r.processed_by || "Unknown";
-        staffSales.set(staffName, (staffSales.get(staffName) || 0) + (Number(r.amount) || 0));
+        staffSales.set(staffName, (staffSales.get(staffName) || 0) + revenueOf(r));
       });
 
       const staffPerformance = Array.from(staffSales.entries())
@@ -250,7 +259,7 @@ export function CommunityAnalytics() {
         .sort((a, b) => b.sales - a.sales)
         .slice(0, 8);
 
-      const newSignupsThisMonth = memberList.filter((m) => {
+      const newSignupsThisMonth = householdMembers.filter((m: any) => {
         const raw = m.join_date || m.created_at;
         const ds = raw ? String(raw).split("T")[0] : "";
         return ds.startsWith(monthKey);
@@ -267,7 +276,7 @@ export function CommunityAnalytics() {
         { name: "Renewals", value: renewalsThisMonth, color: COLORS.success },
       ];
 
-      const churnCandidates = memberList.filter((m) =>
+      const churnCandidates = householdMembers.filter((m: any) =>
         m.payment_status === "overdue" ||
         m.membership_status === "expired" ||
         m.membership_status === "suspended"
@@ -355,20 +364,20 @@ export function CommunityAnalytics() {
         }))
         .sort((a, b) => b.amount - a.amount);
 
-      const revenuePerMember = memberList.length > 0 ? totalRevenue / memberList.length : 0;
+      const revenuePerMember = householdMembers.length > 0 ? totalRevenue / householdMembers.length : 0;
 
       // Lifetime value: average total amount ever paid, across members with at least one receipt
       const revenueByMember = new Map<string, number>();
       receiptList.forEach((r: any) => {
         const key = r.member_db_id ? String(r.member_db_id) : (r.member_id || r.member_name || "");
         if (!key) return;
-        revenueByMember.set(key, (revenueByMember.get(key) || 0) + (Number(r.amount) || 0));
+        revenueByMember.set(key, (revenueByMember.get(key) || 0) + revenueOf(r));
       });
       const lifetimeValue = revenueByMember.size > 0
         ? Array.from(revenueByMember.values()).reduce((s, v) => s + v, 0) / revenueByMember.size
         : 0;
 
-      const churnRate = memberList.length > 0 ? (churnCandidates.length / memberList.length) * 100 : 0;
+      const churnRate = householdMembers.length > 0 ? (churnCandidates.length / householdMembers.length) * 100 : 0;
 
       // ── Community engagement — real post/like/comment data, no invented features ──
       const communityFeatures = communityStats
@@ -551,6 +560,32 @@ export function CommunityAnalytics() {
     ];
   }, [activeCollectionTab, data]);
 
+  const handleExport = () => {
+    const collections = data.collections[activeCollectionTab as keyof typeof data.collections];
+    const rows: string[] = ['Section,Metric,Value'];
+    rows.push(`KPI,Target Progress,${data.targets.progress.toFixed(1)}%`);
+    rows.push(`KPI,Total Collections (${activeCollectionTab}),${collections.total}`);
+    rows.push(`KPI,Active Members,${members.filter((m) => m.membership_status === "active").length}`);
+    rows.push(`Collections,Membership,${collections.membership}`);
+    rows.push(`Collections,Add-ons,${collections.addons}`);
+    rows.push(`Collections,POS Sales,${collections.pos}`);
+    rows.push(`Profitability,Total Revenue,${data.profitability.totalRevenue}`);
+    rows.push(`Profitability,Total Expenses,${data.profitability.totalExpenses}`);
+    rows.push(`Profitability,Net Profit,${data.profitability.netProfit}`);
+    rows.push(`Profitability,Revenue Per Member,${data.profitability.revenuePerMember.toFixed(2)}`);
+    rows.push(`Profitability,Churn Rate,${data.profitability.churnRate.toFixed(1)}%`);
+    data.staffPerformance.forEach((s) => rows.push(`Staff Performance,${s.name},${s.sales}`));
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Analytics exported');
+  };
+
   const getRiskColor = (risk: string) => {
     switch (risk.toLowerCase()) {
       case "high": return "destructive";
@@ -591,33 +626,9 @@ export function CommunityAnalytics() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="w-[140px] shadow-sm">
-              <Calendar className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Date Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="yesterday">Yesterday</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={staffFilter} onValueChange={setStaffFilter}>
-            <SelectTrigger className="w-[140px] shadow-sm">
-              <Users className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Staff Filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Staff</SelectItem>
-              <SelectItem value="trainers">Trainers</SelectItem>
-              <SelectItem value="reception">Reception</SelectItem>
-              <SelectItem value="management">Management</SelectItem>
-            </SelectContent>
-          </Select>
-
+          {/* The Total Collections KPI/breakdown below is already driven by a
+              real, working period control — the Today/Yesterday/This Month
+              tabs (activeCollectionTab) further down the page. */}
           <Button
             variant="outline"
             size="sm"
@@ -629,7 +640,7 @@ export function CommunityAnalytics() {
             Refresh
           </Button>
 
-          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>

@@ -12,7 +12,14 @@ import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { AddMember } from "./add-member";
 import { MemberDraftModal } from "../components/shared/member-draft-modal";
-import { 
+import { toast } from "sonner";
+import QRCode from "react-qr-code";
+import { plansService, Plan } from "../utils/supabase/plans-service";
+import { trainingService, TrainingSessionApi } from "../utils/supabase/training-service";
+import { trainingStreamsService, TrainingStreamApi } from "../utils/supabase/training-streams-service";
+import { facilitiesService } from "../utils/supabase/facilities-service";
+import { leadService } from "../utils/supabase/lead-service";
+import {
   Search,
   Maximize2,
   Minimize2,
@@ -26,7 +33,6 @@ import {
   Mail,
   QrCode,
   Heart,
-  Dumbbell,
   Activity,
   Target,
   Zap,
@@ -34,7 +40,6 @@ import {
   UserPlus,
   Gift,
   Trophy,
-  Timer,
   Smartphone,
   Download,
   RefreshCw,
@@ -44,7 +49,12 @@ import {
   FileText,
   Printer,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Loader2,
+  AlertCircle,
+  Video,
+  Radio,
+  ExternalLink
 } from 'lucide-react';
 
 // Sample data - in real app, this would come from the GymOS configuration
@@ -54,227 +64,26 @@ const catalogConfig = {
   classes: false // This would be controlled by GymOS configuration
 };
 
-// Sample membership plans data
-const membershipPlans = [
-  {
-    id: 1,
-    name: "Basic Fitness",
-    duration: "1 Month",
-    price: "199 AED",
-    originalPrice: "249 AED",
-    discount: "20% OFF",
-    popular: false,
-    features: [
-      "Gym Access (6 AM - 10 PM)",
-      "Cardio & Weight Training Area",
-      "Locker Room Access",
-      "Basic Equipment Usage",
-      "Monthly Fitness Assessment"
-    ],
-    color: "blue",
-    memberCount: "2,450+ Members"
-  },
-  {
-    id: 2,
-    name: "Premium Lifestyle",
-    duration: "3 Months",
-    price: "499 AED",
-    originalPrice: "699 AED",
-    discount: "Best Value",
-    popular: true,
-    features: [
-      "24/7 Gym Access",
-      "All Group Classes",
-      "Sauna & Steam Room",
-      "Guest Pass (2/month)",
-      "Nutrition Consultation",
-      "Personal Training Session (1/month)"
-    ],
-    color: "purple",
-    memberCount: "1,850+ Members"
-  },
-  {
-    id: 3,
-    name: "Elite Performance",
-    duration: "6 Months",
-    price: "899 AED",
-    originalPrice: "1,199 AED",
-    discount: "25% OFF",
-    popular: false,
-    features: [
-      "Everything in Premium",
-      "VIP Locker Room",
-      "Priority Class Booking",
-      "Unlimited Guest Passes",
-      "Weekly Personal Training",
-      "Meal Plan & Supplements"
-    ],
-    color: "gold",
-    memberCount: "750+ Members"
-  },
-  {
-    id: 4,
-    name: "Annual Champion",
-    duration: "12 Months",
-    price: "1,599 AED",
-    originalPrice: "2,399 AED",
-    discount: "33% OFF",
-    popular: false,
-    features: [
-      "Everything in Elite",
-      "Dedicated Trainer Assignment",
-      "Customized Workout Plans",
-      "Body Composition Analysis",
-      "Recovery & Wellness Services",
-      "Competition Prep Support"
-    ],
-    color: "emerald",
-    memberCount: "450+ Members"
-  }
-];
+// Membership plans are loaded live from plansService (see fetchPlans below) —
+// the hardcoded array that used to live here (with fabricated prices and fake
+// "2,450+ Members" social-proof counts) has been removed.
 
-// Sample training streams data
-const trainingStreams = [
-  {
-    id: 1,
-    name: "Personal Training",
-    description: "One-on-one customized fitness coaching",
-    price: "150 AED/session",
-    packagePrice: "1,200 AED/10 sessions",
-    specialization: "Weight Loss & Strength",
-    trainers: [
-      { name: "Ahmed Al-Rashid", image: "/trainers/ahmed.jpg", experience: "8 years", speciality: "Strength Training" },
-      { name: "Sarah Johnson", image: "/trainers/sarah.jpg", experience: "6 years", speciality: "Weight Loss" },
-      { name: "Mohammed Hassan", image: "/trainers/mohammed.jpg", experience: "10 years", speciality: "Athletic Performance" }
-    ],
-    features: [
-      "Customized workout plans",
-      "Nutrition guidance",
-      "Progress tracking",
-      "Flexible scheduling"
-    ],
-    duration: "60 minutes",
-    availability: "Mon-Sat 6AM-10PM"
-  },
-  {
-    id: 2,
-    name: "CrossFit Training",
-    description: "High-intensity functional fitness program",
-    price: "80 AED/session",
-    packagePrice: "600 AED/10 sessions",
-    specialization: "Functional Fitness",
-    trainers: [
-      { name: "Alex Thompson", image: "/trainers/alex.jpg", experience: "7 years", speciality: "CrossFit Level 2" },
-      { name: "Fatima Al-Zahra", image: "/trainers/fatima.jpg", experience: "5 years", speciality: "Olympic Lifting" }
-    ],
-    features: [
-      "WOD (Workout of the Day)",
-      "Olympic lifting technique",
-      "Metabolic conditioning",
-      "Group motivation"
-    ],
-    duration: "45 minutes",
-    availability: "Daily 6AM-9PM"
-  },
-  {
-    id: 3,
-    name: "Yoga & Mindfulness",
-    description: "Traditional and modern yoga practices",
-    price: "60 AED/session",
-    packagePrice: "450 AED/10 sessions",
-    specialization: "Mind-Body Wellness",
-    trainers: [
-      { name: "Priya Sharma", image: "/trainers/priya.jpg", experience: "12 years", speciality: "Hatha Yoga" },
-      { name: "David Chen", image: "/trainers/david.jpg", experience: "8 years", speciality: "Vinyasa Flow" }
-    ],
-    features: [
-      "Multiple yoga styles",
-      "Meditation guidance",
-      "Flexibility improvement",
-      "Stress relief"
-    ],
-    duration: "60 minutes",
-    availability: "Daily 7AM-8PM"
-  },
-  {
-    id: 4,
-    name: "HIIT Bootcamp",
-    description: "High-Intensity Interval Training sessions",
-    price: "50 AED/session",
-    packagePrice: "400 AED/10 sessions",
-    specialization: "Cardio & Fat Loss",
-    trainers: [
-      { name: "Marcus Rodriguez", image: "/trainers/marcus.jpg", experience: "6 years", speciality: "HIIT Specialist" },
-      { name: "Layla Al-Mansouri", image: "/trainers/layla.jpg", experience: "4 years", speciality: "Circuit Training" }
-    ],
-    features: [
-      "Fat burning workouts",
-      "No equipment needed",
-      "All fitness levels",
-      "Quick results"
-    ],
-    duration: "30 minutes",
-    availability: "Mon-Fri 6AM-8PM"
-  }
-];
+// Training Streams are loaded live from trainingStreamsService (see fetchStreams
+// below) — this is a different concept than the old mock cards (named programs
+// like "Personal Training"/"CrossFit" with a trainer roster and per-session
+// pricing, which has no real backend). What's actually real here is live/
+// recorded video streaming sessions — title, instructor, category, difficulty,
+// participants, views/likes, and a Live/Scheduled/Ended status.
 
-// Sample classes data
-const classes = [
-  {
-    id: 1,
-    name: "Morning Yoga",
-    trainer: "Priya Sharma",
-    time: "7:00 AM - 8:00 AM",
-    days: ["Mon", "Wed", "Fri"],
-    capacity: 20,
-    enrolled: 15,
-    difficulty: "Beginner",
-    room: "Studio A"
-  },
-  {
-    id: 2,
-    name: "HIIT Blast",
-    trainer: "Marcus Rodriguez",
-    time: "6:30 PM - 7:00 PM",
-    days: ["Tue", "Thu", "Sat"],
-    capacity: 15,
-    enrolled: 12,
-    difficulty: "Intermediate",
-    room: "Functional Area"
-  },
-  {
-    id: 3,
-    name: "CrossFit WOD",
-    trainer: "Alex Thompson",
-    time: "8:00 AM - 8:45 AM",
-    days: ["Mon", "Wed", "Fri"],
-    capacity: 12,
-    enrolled: 10,
-    difficulty: "Advanced",
-    room: "CrossFit Box"
-  },
-  {
-    id: 4,
-    name: "Zumba Dance",
-    trainer: "Isabella Garcia",
-    time: "7:00 PM - 8:00 PM",
-    days: ["Mon", "Wed"],
-    capacity: 25,
-    enrolled: 18,
-    difficulty: "All Levels",
-    room: "Dance Studio"
-  }
-];
+// Scheduled classes are loaded live from trainingService.getSessions({ type: 'class' })
+// (see fetchSessions below) — the hardcoded array that used to live here has been removed.
 
 export function PlansServicesCatalog() {
     const [isFullscreen, setIsFullscreen] = useState(false);
-  const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
   const [showInquiryForm, setShowInquiryForm] = useState(false);
   const [showOnboardForm, setShowOnboardForm] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('monthly');
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [showPlanDetails, setShowPlanDetails] = useState(false);
   const [showChoosePlan, setShowChoosePlan] = useState(false);
   const [inquiryData, setInquiryData] = useState({
@@ -284,11 +93,92 @@ export function PlansServicesCatalog() {
     interest: "",
     message: ""
   });
+  const [submittingInquiry, setSubmittingInquiry] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [pendingMembers, setPendingMembers] = useState<any[]>([]);
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+
+  // Real membership plans (plansService -> GET /api/plans)
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [plansError, setPlansError] = useState<string | null>(null);
+
+  // Real facility catalog, used to resolve plan.selectedFacilities (ids) to names
+  const [facilityMap, setFacilityMap] = useState<Record<string, string>>({});
+
+  // Real scheduled classes (trainingService -> GET /api/sessions?type=class)
+  const [sessions, setSessions] = useState<TrainingSessionApi[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+
+  // Real training streams (trainingStreamsService -> GET /api/training-streams)
+  const [streams, setStreams] = useState<TrainingStreamApi[]>([]);
+  const [streamsLoading, setStreamsLoading] = useState(true);
+  const [streamsError, setStreamsError] = useState<string | null>(null);
+
+  const fetchPlans = async () => {
+    setPlansLoading(true);
+    setPlansError(null);
+    try {
+      const data = await plansService.getPlans('Active');
+      setPlans(data);
+    } catch (error) {
+      console.error('Failed to load membership plans:', error);
+      setPlansError('Unable to load membership plans right now.');
+    } finally {
+      setPlansLoading(false);
+    }
+  };
+
+  const fetchSessions = async () => {
+    setSessionsLoading(true);
+    setSessionsError(null);
+    try {
+      const data = await trainingService.getSessions({ type: 'class' });
+      setSessions(data);
+    } catch (error) {
+      console.error('Failed to load class schedule:', error);
+      setSessionsError('Unable to load the class schedule right now.');
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const fetchFacilities = async () => {
+    try {
+      const list = await facilitiesService.getFacilities({ status: 'Active' });
+      const map: Record<string, string> = {};
+      list.forEach((f) => { map[f.id] = f.name; });
+      setFacilityMap(map);
+    } catch (error) {
+      // Non-critical: plan cards fall back to showing raw facility ids.
+      console.error('Failed to load facilities:', error);
+    }
+  };
+
+  const fetchStreams = async () => {
+    setStreamsLoading(true);
+    setStreamsError(null);
+    try {
+      const data = await trainingStreamsService.getStreams();
+      // Cancelled streams have nothing worth showing a member/kiosk visitor.
+      setStreams(data.filter(s => s.status !== 'Cancelled'));
+    } catch (error) {
+      console.error('Failed to load training streams:', error);
+      setStreamsError('Unable to load training streams right now.');
+    } finally {
+      setStreamsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPlans();
+    fetchSessions();
+    fetchFacilities();
+    fetchStreams();
+  }, []);
 
   // Auto-refresh functionality for kiosk mode
   useEffect(() => {
@@ -296,8 +186,9 @@ export function PlansServicesCatalog() {
     if (autoRefresh && isFullscreen) {
       interval = setInterval(() => {
         setLastRefresh(new Date());
-        // In real app, this would refresh data from API
-        console.log('Auto-refreshing catalog data...');
+        fetchPlans();
+        fetchSessions();
+        fetchStreams();
       }, 10 * 60 * 1000); // 10 minutes
     }
     return () => {
@@ -332,72 +223,53 @@ export function PlansServicesCatalog() {
     }
   };
 
-  const handleInquirySubmit = () => {
-    // In real app, this would submit to API
-    console.log('Inquiry submitted:', inquiryData);
-    setShowInquiryForm(false);
-    setInquiryData({ name: "", phone: "", email: "", interest: "", message: "" });
-    // Show success toast
-  };
-
-  const generateQRCode = () => {
-    // In real app, this would generate actual QR code for entire catalog
-    const qrData = `${window.location.origin}/catalog-pdf`;
-    console.log('QR Code data:', qrData);
-    setShowQRCode(true);
-  };
-
-  const exportToPDF = () => {
-    // In real app, this would generate a PDF
-    console.log('Exporting catalog to PDF...');
-    // Simulate PDF generation
-    const pdfContent = generatePDFContent();
-    // Download or open PDF
-    window.print(); // For demo, use browser print
-  };
-
-  const generatePDFContent = () => {
-    return {
-      membershipPlans,
-      trainingStreams,
-      classes,
-      gymInfo: {
-        name: "GymBios Fitness Center",
-        address: "Dubai, UAE",
-        phone: "+971 50 123 4567",
-        email: "info@gymbios.com"
-      }
-    };
-  };
-
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
-  const getMonthName = (date: Date) => {
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  };
-
-  const getClassesForDate = (date: number) => {
-    // Mock data - in real app would filter classes by date
-    return classes.filter((_, index) => (date + index) % 7 < 2);
-  };
-
-  const getPlanColor = (color: string) => {
-    switch (color) {
-      case 'blue': return 'from-blue-500 to-blue-600';
-      case 'purple': return 'from-purple-500 to-purple-600';
-      case 'gold': return 'from-yellow-500 to-yellow-600';
-      case 'emerald': return 'from-emerald-500 to-emerald-600';
-      default: return 'from-gray-500 to-gray-600';
+  const handleInquirySubmit = async () => {
+    if (!inquiryData.name || !inquiryData.phone) return;
+    setSubmittingInquiry(true);
+    try {
+      const [firstName, ...rest] = inquiryData.name.trim().split(/\s+/);
+      await leadService.create({
+        firstName: firstName || inquiryData.name,
+        lastName: rest.join(' ') || undefined,
+        email: inquiryData.email || undefined,
+        phone: inquiryData.phone,
+        source: 'walk_in',
+        status: 'new',
+        membershipInterest: inquiryData.interest || undefined,
+        notes: inquiryData.message || undefined,
+      });
+      toast.success("Thanks! We've received your interest and will be in touch soon.");
+      setShowInquiryForm(false);
+      setInquiryData({ name: "", phone: "", email: "", interest: "", message: "" });
+    } catch (error) {
+      console.error('Failed to submit inquiry:', error);
+      toast.error("Couldn't submit your inquiry right now. Please try again or speak to our front desk.");
+    } finally {
+      setSubmittingInquiry(false);
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
+  // A scheduled stream has no "book a seat" backend of its own, so route interest
+  // through the same real leadService-backed inquiry flow used elsewhere on this page.
+  const handleStreamInterest = (stream: TrainingStreamApi) => {
+    setInquiryData({
+      ...inquiryData,
+      interest: stream.category || 'general',
+      message: `I'm interested in "${stream.title}"${stream.scheduled_time ? ` (scheduled ${new Date(stream.scheduled_time).toLocaleString()})` : ''}.`,
+    });
+    setShowInquiryForm(true);
+  };
+
+  const getStreamStatusColor = (status: string) => {
+    switch (status) {
+      case 'Live': return 'bg-red-100 text-red-800';
+      case 'Scheduled': return 'bg-blue-100 text-blue-800';
+      case 'Ended': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStreamDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Beginner': return 'bg-green-100 text-green-800';
       case 'Intermediate': return 'bg-yellow-100 text-yellow-800';
@@ -406,12 +278,66 @@ export function PlansServicesCatalog() {
     }
   };
 
-  const nextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  const generateQRCode = () => {
+    setShowQRCode(true);
   };
 
-  const prevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  const exportToPDF = () => {
+    toast.success('Opening print dialog — choose "Save as PDF" to export the catalog.');
+    window.print();
+  };
+
+  // Deterministic color assignment for plan cards (purely visual — plans
+  // don't carry a "color" field from the backend).
+  const planColorCycle = ['blue', 'purple', 'gold', 'emerald'];
+  const getPlanColor = (index: number) => {
+    switch (planColorCycle[index % planColorCycle.length]) {
+      case 'blue': return 'from-blue-500 to-blue-600';
+      case 'purple': return 'from-purple-500 to-purple-600';
+      case 'gold': return 'from-yellow-500 to-yellow-600';
+      case 'emerald': return 'from-emerald-500 to-emerald-600';
+      default: return 'from-gray-500 to-gray-600';
+    }
+  };
+
+  // Builds a human-readable feature/benefit list from the real Plan fields
+  // returned by plansService — no fabricated benefits.
+  const getPlanFeatures = (plan: Plan): string[] => {
+    const features: string[] = [];
+    if (plan.description) features.push(plan.description);
+    features.push(plan.maxSessions ? `${plan.maxSessions} sessions included` : 'Unlimited sessions');
+    if (plan.attendanceLimit && plan.attendanceLimit !== 'Unlimited' && plan.attendanceValue) {
+      features.push(`${plan.attendanceValue} visits per ${plan.attendancePeriod || 'period'}`);
+    } else {
+      features.push('Unlimited gym access');
+    }
+    if (plan.selectedFacilities && plan.selectedFacilities.length > 0) {
+      const names = plan.selectedFacilities.map((id) => facilityMap[id] || id);
+      features.push(`Facility access: ${names.join(', ')}`);
+    }
+    if (plan.maxFreezeDays) {
+      features.push(`Up to ${plan.maxFreezeDays} freeze day${plan.maxFreezeDays === 1 ? '' : 's'}`);
+    }
+    return features;
+  };
+
+  const getSessionStatusColor = (status?: string | null) => {
+    switch ((status || '').toLowerCase()) {
+      case 'scheduled': return 'bg-blue-100 text-blue-800';
+      case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'completed': return 'bg-gray-100 text-gray-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleClassInterest = (session: TrainingSessionApi) => {
+    setInquiryData({
+      ...inquiryData,
+      interest: 'group-classes',
+      message: `I'd like to reserve a spot in "${session.name}" (${session.date}, ${session.startTime}-${session.endTime}).`
+    });
+    setShowInquiryForm(true);
   };
 
   return (
@@ -563,8 +489,15 @@ export function PlansServicesCatalog() {
                 <Button variant="outline" onClick={() => setShowInquiryForm(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleInquirySubmit} disabled={!inquiryData.name || !inquiryData.phone}>
-                  Submit Inquiry
+                <Button onClick={handleInquirySubmit} disabled={!inquiryData.name || !inquiryData.phone || submittingInquiry}>
+                  {submittingInquiry ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Inquiry'
+                  )}
                 </Button>
               </div>
             </DialogContent>
@@ -603,7 +536,7 @@ export function PlansServicesCatalog() {
           )}
           {catalogConfig.trainingStreams && (
             <TabsTrigger value="training" className="flex-1 flex items-center justify-center space-x-2">
-              <Dumbbell className="h-4 w-4" />
+              <Video className="h-4 w-4" />
               <span>Training Streams</span>
             </TabsTrigger>
           )}
@@ -623,71 +556,93 @@ export function PlansServicesCatalog() {
               </p>
             </div>
 
-            <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
-              {membershipPlans.map((plan) => (
-                <Card key={plan.id} className={`${cardShell} relative overflow-hidden transition-all duration-300 ${plan.popular ? 'ring-2 ring-purple-500 scale-105' : ''} ${isFullscreen ? 'h-auto' : ''}`}>
-                  {plan.popular && (
-                    <div className="absolute top-0 right-0 bg-gradient-to-l from-purple-500 to-pink-500 text-white px-3 py-1 text-sm font-medium">
-                      Most Popular
-                    </div>
-                  )}
-                  
-                  <div className={`bg-gradient-to-r ${getPlanColor(plan.color)} text-white p-6`}>
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className={`${isFullscreen ? 'text-xl' : 'text-lg'} font-bold`}>{plan.name}</h3>
-                        <p className={`${isFullscreen ? 'text-base' : 'text-sm'} opacity-90`}>{plan.duration}</p>
+            {plansLoading && (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                <Loader2 className="h-8 w-8 animate-spin mb-3" />
+                <p>Loading membership plans...</p>
+              </div>
+            )}
+
+            {!plansLoading && plansError && (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <AlertCircle className="h-8 w-8 text-red-500 mb-3" />
+                <p className="text-gray-700 mb-4">{plansError}</p>
+                <Button variant="outline" onClick={fetchPlans}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+              </div>
+            )}
+
+            {!plansLoading && !plansError && plans.length === 0 && (
+              <div className="text-center py-16 text-gray-500">
+                No active membership plans are configured yet.
+              </div>
+            )}
+
+            {!plansLoading && !plansError && plans.length > 0 && (
+              <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
+                {plans.map((plan, index) => (
+                  <Card key={plan.id} className={`${cardShell} relative overflow-hidden transition-all duration-300 ${isFullscreen ? 'h-auto' : ''}`}>
+                    <div className={`bg-gradient-to-r ${getPlanColor(index)} text-white p-6`}>
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className={`${isFullscreen ? 'text-xl' : 'text-lg'} font-bold`}>{plan.name}</h3>
+                          <p className={`${isFullscreen ? 'text-base' : 'text-sm'} opacity-90`}>{plan.duration}</p>
+                        </div>
+                        {plan.discount > 0 && (
+                          <Badge variant="secondary" className="bg-white/20 text-white">
+                            {plan.discount}% OFF
+                          </Badge>
+                        )}
                       </div>
-                      <Badge variant="secondary" className="bg-white/20 text-white">
-                        {plan.discount}
-                      </Badge>
+
+                      <div className="text-center">
+                        <div className={`${isFullscreen ? 'text-4xl' : 'text-3xl'} font-bold mb-1`}>
+                          <CurrencyGlyph /> {plan.price.toLocaleString()}
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="text-center">
-                      <div className={`${isFullscreen ? 'text-4xl' : 'text-3xl'} font-bold mb-1`}>{plan.price}</div>
-                      <div className={`${isFullscreen ? 'text-base' : 'text-sm'} opacity-75 line-through`}>{plan.originalPrice}</div>
-                      <div className={`${isFullscreen ? 'text-sm' : 'text-xs'} opacity-90 mt-2`}>{plan.memberCount}</div>
-                    </div>
-                  </div>
-                  
-                  <CardContent className="p-6">
-                    <ul className="space-y-3 mb-6">
-                      {plan.features.map((feature, index) => (
-                        <li key={index} className={`flex items-start space-x-2 ${isFullscreen ? 'text-base' : 'text-sm'}`}>
-                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    
-                    <div className="space-y-3">
-                      <Button 
-                        className="w-full bg-[#2B7A78] hover:bg-[#236360] text-white"
-                        onClick={() => {
-                          setSelectedPlan(plan);
-                          setShowChoosePlan(true);
-                        }}
-                      >
-                        <Gift className="h-4 w-4 mr-2" />
-                        Choose Plan
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full border-primary text-primary hover:bg-primary/10"
-                        onClick={() => {
-                          setSelectedPlan(plan);
-                          setShowPlanDetails(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+
+                    <CardContent className="p-6">
+                      <ul className="space-y-3 mb-6">
+                        {getPlanFeatures(plan).map((feature, idx) => (
+                          <li key={idx} className={`flex items-start space-x-2 ${isFullscreen ? 'text-base' : 'text-sm'}`}>
+                            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <div className="space-y-3">
+                        <Button
+                          className="w-full bg-[#2B7A78] hover:bg-[#236360] text-white"
+                          onClick={() => {
+                            setSelectedPlan(plan);
+                            setShowChoosePlan(true);
+                          }}
+                        >
+                          <Gift className="h-4 w-4 mr-2" />
+                          Choose Plan
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-primary text-primary hover:bg-primary/10"
+                          onClick={() => {
+                            setSelectedPlan(plan);
+                            setShowPlanDetails(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         )}
 
@@ -695,104 +650,134 @@ export function PlansServicesCatalog() {
         {catalogConfig.trainingStreams && (
           <TabsContent value="training" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
             <div className="text-center mb-8">
-              <h2 className={`${isFullscreen ? 'text-3xl' : 'text-2xl'} font-bold mb-4`}>Specialized Training Programs</h2>
+              <h2 className={`${isFullscreen ? 'text-3xl' : 'text-2xl'} font-bold mb-4`}>Training Streams</h2>
               <p className={`text-gray-600 max-w-2xl mx-auto ${isFullscreen ? 'text-lg' : ''}`}>
-                Work with our certified trainers in specialized programs designed to help you achieve your specific fitness goals
+                Join a live session or catch up on a past recording, led by our trainers
               </p>
             </div>
 
-            <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
-              {trainingStreams.map((stream) => (
-                <Card key={stream.id} className={`${cardShell} overflow-hidden transition-all duration-300`}>
-                  <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className={`${isFullscreen ? 'text-xl' : 'text-lg'}`}>{stream.name}</CardTitle>
-                        <CardDescription className={`${isFullscreen ? 'text-base' : ''} mt-1`}>{stream.description}</CardDescription>
-                      </div>
-                      <Badge variant="outline" className="bg-white">
-                        {stream.specialization}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="p-6 space-y-6">
-                    {/* Pricing */}
-                    <div className="bg-blue-50 rounded-lg p-4">
-                      <div className="grid grid-cols-2 gap-4">
+            {streamsLoading && (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                <Loader2 className="h-8 w-8 animate-spin mb-3" />
+                <p>Loading training streams...</p>
+              </div>
+            )}
+
+            {!streamsLoading && streamsError && (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <AlertCircle className="h-8 w-8 text-red-500 mb-3" />
+                <p className="text-gray-700 mb-4">{streamsError}</p>
+                <Button variant="outline" onClick={fetchStreams}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+              </div>
+            )}
+
+            {!streamsLoading && !streamsError && streams.length === 0 && (
+              <div className="text-center py-16 text-gray-500">
+                No training streams are scheduled right now.
+              </div>
+            )}
+
+            {!streamsLoading && !streamsError && streams.length > 0 && (
+              <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
+                {streams.map((stream) => (
+                  <Card key={stream.id} className={`${cardShell} overflow-hidden transition-all duration-300`}>
+                    <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
+                      <div className="flex justify-between items-start">
                         <div>
-                          <p className={`${isFullscreen ? 'text-sm' : 'text-xs'} text-gray-600 mb-1`}>Per Session</p>
-                          <p className={`${isFullscreen ? 'text-xl' : 'text-lg'} font-bold text-blue-600`}>{stream.price}</p>
-                        </div>
-                        <div>
-                          <p className={`${isFullscreen ? 'text-sm' : 'text-xs'} text-gray-600 mb-1`}>Package Deal</p>
-                          <p className={`${isFullscreen ? 'text-xl' : 'text-lg'} font-bold text-green-600`}>{stream.packagePrice}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Features */}
-                    <div>
-                      <h4 className={`${isFullscreen ? 'text-base' : 'text-sm'} font-semibold mb-3`}>What's Included:</h4>
-                      <ul className="grid grid-cols-2 gap-2">
-                        {stream.features.map((feature, index) => (
-                          <li key={index} className={`flex items-start space-x-2 ${isFullscreen ? 'text-sm' : 'text-xs'}`}>
-                            <CheckCircle className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
-                            <span>{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* Session Info */}
-                    <div className="flex items-center justify-between text-sm text-gray-600 border-t pt-4">
-                      <div className="flex items-center space-x-1">
-                        <Timer className="h-4 w-4" />
-                        <span>{stream.duration}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{stream.availability}</span>
-                      </div>
-                    </div>
-
-                    {/* Trainers */}
-                    <div>
-                      <h4 className={`${isFullscreen ? 'text-base' : 'text-sm'} font-semibold mb-3`}>Our Expert Trainers:</h4>
-                      <div className="space-y-2">
-                        {stream.trainers.map((trainer, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-slate-50/60 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <Avatar className="h-10 w-10">
-                                <AvatarImage src={trainer.image} alt={trainer.name} />
-                                <AvatarFallback>{trainer.name.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className={`${isFullscreen ? 'text-sm' : 'text-xs'} font-medium`}>{trainer.name}</p>
-                                <p className="text-xs text-gray-500">{trainer.speciality}</p>
-                              </div>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              {trainer.experience}
-                            </Badge>
+                          <div className="flex items-center gap-2">
+                            <CardTitle className={`${isFullscreen ? 'text-xl' : 'text-lg'}`}>{stream.title}</CardTitle>
+                            {stream.status === 'Live' && <Radio className="h-4 w-4 text-red-600 animate-pulse" />}
                           </div>
-                        ))}
+                          <CardDescription className={`${isFullscreen ? 'text-base' : ''} mt-1 flex items-center space-x-2`}>
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">
+                                {stream.instructor_name ? stream.instructor_name.charAt(0) : '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span>{stream.instructor_name || 'Trainer TBA'}</span>
+                          </CardDescription>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge className={getStreamStatusColor(stream.status)}>{stream.status}</Badge>
+                          {stream.difficulty && (
+                            <Badge className={getStreamDifficultyColor(stream.difficulty)} variant="outline">{stream.difficulty}</Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    </CardHeader>
 
-                    {/* Action Buttons */}
-                    <div className="flex space-x-2 pt-2">
-                      <Button className="flex-1 bg-[#2B7A78] hover:bg-[#236360] text-white">
-                        Book Session
-                      </Button>
-                      <Button variant="outline" className="flex-1">
-                        Learn More
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    <CardContent className="p-6 space-y-4">
+                      {stream.description && (
+                        <p className={`${isFullscreen ? 'text-sm' : 'text-xs'} text-gray-600`}>{stream.description}</p>
+                      )}
+
+                      <div className="flex items-center justify-between text-sm text-gray-600 border-t pt-4">
+                        <Badge variant="outline">{stream.category}</Badge>
+                        <div className="flex items-center space-x-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{stream.duration} min</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Users className="h-4 w-4" />
+                          <span>{stream.participants}{stream.max_participants ? `/${stream.max_participants}` : ''}</span>
+                        </div>
+                      </div>
+
+                      {stream.status === 'Scheduled' && stream.scheduled_time && (
+                        <div className="flex items-center space-x-1 text-sm text-gray-600">
+                          <Calendar className="h-4 w-4" />
+                          <span>{new Date(stream.scheduled_time).toLocaleString()}</span>
+                        </div>
+                      )}
+
+                      {(stream.status === 'Live' || stream.status === 'Ended') && (
+                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                          <div className="flex items-center space-x-1">
+                            <Eye className="h-4 w-4" />
+                            <span>{stream.views} views</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Heart className="h-4 w-4" />
+                            <span>{stream.likes} likes</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="pt-2">
+                        {stream.status === 'Live' && stream.stream_url ? (
+                          <Button
+                            className="w-full bg-red-600 hover:bg-red-700 text-white"
+                            onClick={() => window.open(stream.stream_url!, '_blank', 'noopener,noreferrer')}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Join Live Session
+                          </Button>
+                        ) : stream.status === 'Ended' && stream.stream_url ? (
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => window.open(stream.stream_url!, '_blank', 'noopener,noreferrer')}
+                          >
+                            <Video className="h-4 w-4 mr-2" />
+                            Watch Recording
+                          </Button>
+                        ) : stream.status === 'Scheduled' ? (
+                          <Button
+                            className="w-full bg-[#2B7A78] hover:bg-[#236360] text-white"
+                            onClick={() => handleStreamInterest(stream)}
+                          >
+                            I'm Interested
+                          </Button>
+                        ) : null}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         )}
 
@@ -805,72 +790,106 @@ export function PlansServicesCatalog() {
             </p>
           </div>
 
-          <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
-            {classes.map((classItem) => (
-              <Card key={classItem.id} className={`${cardShell} overflow-hidden transition-all duration-300`}>
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className={`${isFullscreen ? 'text-xl' : 'text-lg'}`}>{classItem.name}</CardTitle>
-                      <CardDescription className="mt-1">
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Users className="h-4 w-4" />
-                          <span>with {classItem.trainer}</span>
+          {sessionsLoading && (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+              <Loader2 className="h-8 w-8 animate-spin mb-3" />
+              <p>Loading class schedule...</p>
+            </div>
+          )}
+
+          {!sessionsLoading && sessionsError && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <AlertCircle className="h-8 w-8 text-red-500 mb-3" />
+              <p className="text-gray-700 mb-4">{sessionsError}</p>
+              <Button variant="outline" onClick={fetchSessions}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {!sessionsLoading && !sessionsError && sessions.length === 0 && (
+            <div className="text-center py-16 text-gray-500">
+              No group classes are scheduled right now.
+            </div>
+          )}
+
+          {!sessionsLoading && !sessionsError && sessions.length > 0 && (
+            <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
+              {sessions.map((classItem) => {
+                const isFull = classItem.capacity != null && classItem.booked != null && classItem.booked >= classItem.capacity;
+                return (
+                  <Card key={classItem.id} className={`${cardShell} overflow-hidden transition-all duration-300`}>
+                    <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className={`${isFullscreen ? 'text-xl' : 'text-lg'}`}>{classItem.name}</CardTitle>
+                          <CardDescription className="mt-1">
+                            <div className="flex items-center space-x-2 mt-2">
+                              <Users className="h-4 w-4" />
+                              <span>with {classItem.trainerName || 'Trainer TBA'}</span>
+                            </div>
+                          </CardDescription>
                         </div>
-                      </CardDescription>
-                    </div>
-                    <Badge className={getDifficultyColor(classItem.difficulty)}>
-                      {classItem.difficulty}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center space-x-2 text-sm">
-                      <Clock className="h-4 w-4 text-gray-500" />
-                      <span>{classItem.time}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm">
-                      <MapPin className="h-4 w-4 text-gray-500" />
-                      <span>{classItem.room}</span>
-                    </div>
-                  </div>
+                        {classItem.status && (
+                          <Badge className={getSessionStatusColor(classItem.status)}>
+                            {classItem.status}
+                          </Badge>
+                        )}
+                      </div>
+                    </CardHeader>
 
-                  <div>
-                    <p className="text-sm text-gray-600 mb-2">Class Days:</p>
-                    <div className="flex space-x-2">
-                      {classItem.days.map((day, index) => (
-                        <Badge key={index} variant="outline" className="bg-blue-50">
-                          {day}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+                    <CardContent className="p-6 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-center space-x-2 text-sm">
+                          <Calendar className="h-4 w-4 text-gray-500" />
+                          <span>{classItem.date}</span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-sm">
+                          <Clock className="h-4 w-4 text-gray-500" />
+                          <span>{classItem.startTime} - {classItem.endTime}</span>
+                        </div>
+                      </div>
 
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-gray-600">Enrollment:</span>
-                      <span className="font-medium">{classItem.enrolled}/{classItem.capacity} spots</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-[#2B7A78] h-2 rounded-full transition-all" 
-                        style={{ width: `${(classItem.enrolled / classItem.capacity) * 100}%` }}
-                      />
-                    </div>
-                  </div>
+                      <div className="flex items-center space-x-2 text-sm">
+                        <MapPin className="h-4 w-4 text-gray-500" />
+                        <span>{classItem.location || 'Location TBA'}</span>
+                      </div>
 
-                  <Button 
-                    className="w-full bg-[#2B7A78] hover:bg-[#236360] text-white"
-                    disabled={classItem.enrolled >= classItem.capacity}
-                  >
-                    {classItem.enrolled >= classItem.capacity ? 'Class Full' : 'Reserve Spot'}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                      {classItem.price != null && (
+                        <div className="text-sm text-gray-600">
+                          Price: <span className="font-medium text-gray-900"><CurrencyGlyph /> {classItem.price}</span>
+                        </div>
+                      )}
+
+                      {classItem.capacity != null && (
+                        <div>
+                          <div className="flex items-center justify-between text-sm mb-2">
+                            <span className="text-gray-600">Enrollment:</span>
+                            <span className="font-medium">{classItem.booked ?? 0}/{classItem.capacity} spots</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-[#2B7A78] h-2 rounded-full transition-all"
+                              style={{ width: `${Math.min(100, ((classItem.booked ?? 0) / classItem.capacity) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <Button
+                        className="w-full bg-[#2B7A78] hover:bg-[#236360] text-white"
+                        disabled={isFull}
+                        onClick={() => handleClassInterest(classItem)}
+                      >
+                        {isFull ? 'Class Full' : 'Reserve Spot'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -915,39 +934,32 @@ export function PlansServicesCatalog() {
               <DialogHeader>
                 <DialogTitle className="flex items-center justify-between">
                   <span className="text-2xl">{selectedPlan.name}</span>
-                  <Badge className={`bg-gradient-to-r ${getPlanColor(selectedPlan.color)} text-white`}>
-                    {selectedPlan.discount}
-                  </Badge>
+                  {selectedPlan.discount > 0 && (
+                    <Badge className={`bg-gradient-to-r ${getPlanColor(Math.max(0, plans.findIndex(p => p.id === selectedPlan.id)))} text-white`}>
+                      {selectedPlan.discount}% OFF
+                    </Badge>
+                  )}
                 </DialogTitle>
                 <DialogDescription>
                   Complete details about this membership plan
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="space-y-6 py-4">
                 {/* Pricing Section */}
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Plan Price</p>
-                      <div className="flex items-baseline space-x-2">
-                        <span className="text-3xl font-bold text-[#2B7A78]">{selectedPlan.price}</span>
-                        <span className="text-lg text-gray-500 line-through">{selectedPlan.originalPrice}</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">Duration: {selectedPlan.duration}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600 mb-1">Members</p>
-                      <p className="text-lg font-semibold text-[#2B7A78]">{selectedPlan.memberCount}</p>
-                    </div>
+                  <p className="text-sm text-gray-600 mb-1">Plan Price</p>
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-3xl font-bold text-[#2B7A78]"><CurrencyGlyph /> {selectedPlan.price.toLocaleString()}</span>
                   </div>
+                  <p className="text-sm text-gray-600 mt-1">Duration: {selectedPlan.duration}</p>
                 </div>
 
                 {/* Features Section */}
                 <div>
                   <h4 className="font-semibold text-lg mb-4">Plan Features & Benefits</h4>
                   <ul className="space-y-3">
-                    {selectedPlan.features.map((feature: string, index: number) => (
+                    {getPlanFeatures(selectedPlan).map((feature: string, index: number) => (
                       <li key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
                         <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                         <span className="text-sm">{feature}</span>
@@ -1019,15 +1031,11 @@ export function PlansServicesCatalog() {
 
               <div className="space-y-6 py-6">
                 {/* Selected Plan Summary */}
-                <div className={`bg-gradient-to-r ${getPlanColor(selectedPlan.color)} text-white p-6 rounded-lg`}>
+                <div className={`bg-gradient-to-r ${getPlanColor(Math.max(0, plans.findIndex(p => p.id === selectedPlan.id)))} text-white p-6 rounded-lg`}>
                   <h3 className="text-xl font-bold mb-2">{selectedPlan.name}</h3>
                   <div className="flex items-baseline space-x-2 mb-3">
-                    <span className="text-3xl font-bold">{selectedPlan.price}</span>
+                    <span className="text-3xl font-bold"><CurrencyGlyph /> {selectedPlan.price.toLocaleString()}</span>
                     <span className="text-sm opacity-75">for {selectedPlan.duration}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm opacity-90">
-                    <Users className="h-4 w-4" />
-                    <span>{selectedPlan.memberCount}</span>
                   </div>
                 </div>
 
@@ -1044,12 +1052,14 @@ export function PlansServicesCatalog() {
                           <p className="text-sm text-gray-600 mb-4">
                             Add this plan to your current membership or upgrade your existing plan
                           </p>
-                          <Button 
+                          <Button
                             className="bg-[#2B7A78] hover:bg-[#236360] text-white"
                             onClick={() => {
-                              console.log('Adding plan to existing member:', selectedPlan.name);
                               setShowChoosePlan(false);
-                              alert(`Feature Coming Soon: Add ${selectedPlan.name} to existing membership`);
+                              // Honest gap: there is no member self-service portal in this app —
+                              // every plan/addon change goes through staff via the Members section.
+                              // Kiosk visitors can't add a plan to their own account from here yet.
+                              toast.info(`To add ${selectedPlan.name} to an existing membership, please see our front desk team.`);
                             }}
                           >
                             <Users className="h-4 w-4 mr-2" />
@@ -1137,6 +1147,24 @@ export function PlansServicesCatalog() {
         </DialogContent>
       </Dialog>
 
+      {/* QR Code Dialog */}
+      <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-center">Scan to View This Catalog</DialogTitle>
+            <DialogDescription className="text-center">
+              Scan with your phone to open this page on your own device.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center py-4 space-y-4">
+            <div className="bg-white p-4 rounded-lg border">
+              <QRCode value={window.location.href} size={192} bgColor="#FFFFFF" fgColor="#1f2937" level="M" />
+            </div>
+            <p className="text-xs text-gray-500 break-all text-center">{window.location.href}</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Member Draft Modal */}
       <MemberDraftModal
         open={showDraftModal}
@@ -1144,9 +1172,9 @@ export function PlansServicesCatalog() {
         selectedPlan={selectedPlan ? {
           id: selectedPlan.id.toString(),
           name: selectedPlan.name,
-          price: parseFloat(selectedPlan.price.replace(/[^\d.-]/g, '')),
+          price: selectedPlan.price,
           duration: selectedPlan.duration,
-          benefits: selectedPlan.features
+          benefits: getPlanFeatures(selectedPlan)
         } : null}
         onSubmitDraft={(draftData) => {
           setPendingMembers(prev => [...prev, draftData]);

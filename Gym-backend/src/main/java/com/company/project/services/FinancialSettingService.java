@@ -17,13 +17,13 @@ import java.util.stream.Collectors;
 public class FinancialSettingService {
 
     /**
-     * The only categories the UI actually offers (see the CATEGORIES constant in
-     * financial-settings.tsx and the comment on FinancialSetting.category).
-     * Settings are a generic key/value store with no per-key schema, so this is
-     * deliberately the only shape validated — see
-     * docs/gymbios-financial-roadmap.html — L1.
+     * The categories the UI offers: GENERAL/ACCOUNTING/TAX/BANK are the CATEGORIES
+     * constant in financial-settings.tsx; COMPANY is the Settings page's Company
+     * Details card (company_name/address/email/phone/logo keys). Settings are a
+     * generic key/value store with no per-key schema, so this is deliberately the
+     * only shape validated — see docs/gymbios-financial-roadmap.html — L1.
      */
-    private static final Set<String> VALID_CATEGORIES = Set.of("GENERAL", "ACCOUNTING", "TAX", "BANK");
+    private static final Set<String> VALID_CATEGORIES = Set.of("GENERAL", "ACCOUNTING", "TAX", "BANK", "COMPANY");
 
     private final FinancialSettingRepository financialSettingRepository;
 

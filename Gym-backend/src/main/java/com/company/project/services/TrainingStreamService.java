@@ -114,6 +114,39 @@ public class TrainingStreamService {
         return toResponse(stream);
     }
 
+    /**
+     * Joins a live stream, enforcing maxParticipants — previously nothing in the
+     * codebase ever incremented `participants` (it was only ever reset to 0), so
+     * the capacity shown in the UI ("X/Y") was purely decorative.
+     */
+    @Transactional
+    public TrainingStreamResponseDTO joinStream(Long id) {
+        TrainingStream stream = streamRepository.findById(id)
+                .orElseThrow(() -> new com.company.project.exceptions.EntityNotFoundException("Stream not found"));
+        if (!"Live".equals(stream.getStatus())) {
+            throw new com.company.project.exceptions.BusinessRuleViolationException("This stream is not live.");
+        }
+        int current = stream.getParticipants() == null ? 0 : stream.getParticipants();
+        if (stream.getMaxParticipants() != null && stream.getMaxParticipants() > 0
+                && current >= stream.getMaxParticipants()) {
+            throw new com.company.project.exceptions.BusinessRuleViolationException(
+                    "This stream is full (" + stream.getMaxParticipants() + " participants).");
+        }
+        stream.setParticipants(current + 1);
+        streamRepository.save(stream);
+        return toResponse(stream);
+    }
+
+    @Transactional
+    public TrainingStreamResponseDTO leaveStream(Long id) {
+        TrainingStream stream = streamRepository.findById(id)
+                .orElseThrow(() -> new com.company.project.exceptions.EntityNotFoundException("Stream not found"));
+        int current = stream.getParticipants() == null ? 0 : stream.getParticipants();
+        stream.setParticipants(Math.max(0, current - 1));
+        streamRepository.save(stream);
+        return toResponse(stream);
+    }
+
     public TrainingStreamAnalyticsDTO getAnalytics() {
         TrainingStreamAnalyticsDTO analytics = new TrainingStreamAnalyticsDTO();
         analytics.setLiveCount(streamRepository.countLive());

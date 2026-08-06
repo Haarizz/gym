@@ -36,17 +36,20 @@ public class MemberAddonService {
     private final FinancialEventService financialEventService;
     private final MemberRepository memberRepository;
     private final ReceiptService receiptService;
+    private final WalletService walletService;
 
     public MemberAddonService(MemberAddonRepository memberAddonRepository,
                                ReceiptVoucherService receiptVoucherService,
                                FinancialEventService financialEventService,
                                MemberRepository memberRepository,
-                               ReceiptService receiptService) {
+                               ReceiptService receiptService,
+                               WalletService walletService) {
         this.memberAddonRepository = memberAddonRepository;
         this.receiptVoucherService = receiptVoucherService;
         this.financialEventService = financialEventService;
         this.memberRepository = memberRepository;
         this.receiptService = receiptService;
+        this.walletService = walletService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -116,6 +119,17 @@ public class MemberAddonService {
         // Generate the business transaction ID: TXN-XXXXXXXXXX (zero-padded sequential)
         saved.setTransactionId("TXN-" + String.format("%010d", saved.getId()));
         saved = memberAddonRepository.save(saved);
+
+        // Debit the wallet in the same transaction as the add-on and its ledger
+        // posting below — if the balance has since changed (e.g. redeemed
+        // elsewhere a moment earlier) this throws and the whole purchase rolls
+        // back, instead of leaving the ledger's Reward Wallet Liability account
+        // consumed while the member's actual balance was never touched.
+        BigDecimal walletAmount = request.getWalletAmountApplied();
+        if (walletAmount != null && walletAmount.compareTo(BigDecimal.ZERO) > 0 && saved.getMemberId() != null) {
+            walletService.debit(saved.getMemberId(), walletAmount, "BILLING_USE", saved.getId(),
+                    "Applied to add-on purchase " + saved.getTransactionId());
+        }
 
         if (billToGuardian) {
             BigDecimal fee = saved.getAmount() != null ? saved.getAmount() : BigDecimal.ZERO;

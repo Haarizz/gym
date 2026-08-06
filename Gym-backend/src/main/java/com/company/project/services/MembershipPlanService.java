@@ -3,6 +3,7 @@ package com.company.project.services;
 import com.company.project.dto.MembershipPlanRequestDTO;
 import com.company.project.dto.MembershipPlanResponseDTO;
 import com.company.project.entities.MembershipPlan;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.MembershipPlanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +30,7 @@ public class MembershipPlanService {
 
     public MembershipPlanResponseDTO getPlanById(Long id) {
         MembershipPlan plan = planRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Plan not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Plan not found: " + id));
         return MembershipPlanResponseDTO.fromEntity(plan);
     }
 
@@ -41,21 +42,21 @@ public class MembershipPlanService {
 
     public MembershipPlanResponseDTO updatePlan(Long id, MembershipPlanRequestDTO req) {
         MembershipPlan plan = planRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Plan not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Plan not found: " + id));
         applyRequest(plan, req);
         return MembershipPlanResponseDTO.fromEntity(planRepository.save(plan));
     }
 
     public void deletePlan(Long id) {
         if (!planRepository.existsById(id)) {
-            throw new RuntimeException("Plan not found: " + id);
+            throw new EntityNotFoundException("Plan not found: " + id);
         }
         planRepository.deleteById(id);
     }
 
     public MembershipPlanResponseDTO duplicatePlan(Long id) {
         MembershipPlan original = planRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Plan not found: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Plan not found: " + id));
 
         MembershipPlan copy = new MembershipPlan();
         copy.setName(original.getName() + " (Copy)");

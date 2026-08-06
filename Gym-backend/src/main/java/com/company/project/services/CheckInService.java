@@ -26,6 +26,13 @@ public class CheckInService {
     private final AttendanceRepository attendanceRepository;
     private final QrCodeService qrCodeService;
 
+    // Per-member lock so two near-simultaneous check-ins for the same member
+    // (e.g. gate scanner + reception scanning the same QR within milliseconds)
+    // can't both pass the "already active" check before either insert commits.
+    // Effective for a single application instance, which is this app's actual
+    // deployment model (no clustering).
+    private final java.util.concurrent.ConcurrentHashMap<Long, Object> checkInLocks = new java.util.concurrent.ConcurrentHashMap<>();
+
     public CheckInService(MemberRepository memberRepository,
                           BookingRepository bookingRepository,
                           AttendanceRepository attendanceRepository,
@@ -46,25 +53,28 @@ public class CheckInService {
 
         validateMembership(member);
 
-        // Prevent duplicate active check-ins for the same member on the same day
-        LocalDateTime startOfDayNow = LocalDate.now().atStartOfDay();
-        LocalDateTime endOfDayNow   = LocalDate.now().atTime(LocalTime.MAX);
-        if (attendanceRepository.existsActiveSessionForMember(member.getId(), startOfDayNow, endOfDayNow)) {
-            throw new RuntimeException(member.getName() + " is already checked in. Please check out first.");
-        }
-
-        // Record attendance
         Attendance attendance = new Attendance();
-        attendance.setMember(member);
-        attendance.setBooking(booking);
-        attendance.setCheckInTime(LocalDateTime.now());
-        attendance.setCheckInMethod(req.getMethod());
-        attendance.setDeviceId(req.getDeviceId() != null ? req.getDeviceId() : "WEB");
-        attendance.setResolvedBy(resolved.resolvedBy);
-        attendance.setNotes(req.getNotes());
-        attendance.setStatus("active");
-        attendance.setType("member");
-        attendanceRepository.save(attendance);
+        Object lock = checkInLocks.computeIfAbsent(member.getId(), k -> new Object());
+        synchronized (lock) {
+            // Prevent duplicate active check-ins for the same member on the same day
+            LocalDateTime startOfDayNow = LocalDate.now().atStartOfDay();
+            LocalDateTime endOfDayNow   = LocalDate.now().atTime(LocalTime.MAX);
+            if (attendanceRepository.existsActiveSessionForMember(member.getId(), startOfDayNow, endOfDayNow)) {
+                throw new RuntimeException(member.getName() + " is already checked in. Please check out first.");
+            }
+
+            // Record attendance
+            attendance.setMember(member);
+            attendance.setBooking(booking);
+            attendance.setCheckInTime(LocalDateTime.now());
+            attendance.setCheckInMethod(req.getMethod());
+            attendance.setDeviceId(req.getDeviceId() != null ? req.getDeviceId() : "WEB");
+            attendance.setResolvedBy(resolved.resolvedBy);
+            attendance.setNotes(req.getNotes());
+            attendance.setStatus("active");
+            attendance.setType("member");
+            attendanceRepository.saveAndFlush(attendance);
+        }
 
         // Increment total visit counter on the member
         member.setTotalVisits(member.getTotalVisits() == null ? 1 : member.getTotalVisits() + 1);
@@ -231,6 +241,17 @@ public class CheckInService {
         if (!"active".equals(status)) {
             throw new RuntimeException(
                     "Check-in denied — membership is " + status +
+                    " for member: " + member.getName());
+        }
+        // Nothing ever flips membershipStatus to "expired" on its own (no scheduled
+        // job), so a lapsed member whose status was never manually updated could
+        // otherwise keep checking in indefinitely. This applies to billed-to-head
+        // dependents too — createBilledToHeadRecord/renewFamily keep their own
+        // expiryDate/membershipEndDate in sync with the head's plan cycle.
+        LocalDateTime expiry = member.getExpiryDate() != null ? member.getExpiryDate() : member.getMembershipEndDate();
+        if (expiry != null && expiry.isBefore(LocalDateTime.now())) {
+            throw new RuntimeException(
+                    "Check-in denied — membership expired on " + expiry.toLocalDate() +
                     " for member: " + member.getName());
         }
     }

@@ -33,6 +33,9 @@ public class Expense extends BaseEntity {
     @Column(name = "tax_rate", precision = 5, scale = 2)
     private BigDecimal taxRate;
 
+    @Column(name = "tax_code")
+    private String taxCode;
+
     @Column(name = "tax_amount", precision = 12, scale = 2)
     private BigDecimal taxAmount;
 
@@ -45,8 +48,21 @@ public class Expense extends BaseEntity {
     @Column(name = "status")
     private String status;
 
+    @Column(name = "approval_status")
+    private String approvalStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+
+    @Column(name = "approved_by")
+    private String approvedBy;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @Column(name = "receipt_url")
     private String receiptUrl;
+
+    // PAID (default — cash paid immediately) | UNPAID | CREDIT (posted to Accounts Payable)
+    @Column(name = "payment_status")
+    private String paymentStatus = "PAID";
 
     public Expense() {}
 
@@ -74,6 +90,9 @@ public class Expense extends BaseEntity {
     public BigDecimal getTaxRate() { return taxRate; }
     public void setTaxRate(BigDecimal taxRate) { this.taxRate = taxRate; }
 
+    public String getTaxCode() { return taxCode; }
+    public void setTaxCode(String taxCode) { this.taxCode = taxCode; }
+
     public BigDecimal getTaxAmount() { return taxAmount; }
     public void setTaxAmount(BigDecimal taxAmount) { this.taxAmount = taxAmount; }
 
@@ -86,6 +105,18 @@ public class Expense extends BaseEntity {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
+    public String getApprovalStatus() { return approvalStatus; }
+    public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+
     public String getReceiptUrl() { return receiptUrl; }
     public void setReceiptUrl(String receiptUrl) { this.receiptUrl = receiptUrl; }
+
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
 }

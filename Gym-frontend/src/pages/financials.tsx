@@ -70,8 +70,8 @@ export function Financials() {
         totalExpenses: dashboard.totalExpenses,
         grossProfit: dashboard.netIncome,
         netBalance: dashboard.netIncome,
-        pendingReconciliations: dashboard.pendingTaxObligations,
-        outstandingPayments: 0,
+        pendingReconciliations: dashboard.pendingReconciliations,
+        outstandingPayments: dashboard.outstandingPayments,
       });
 
       setMonthlyTrends(

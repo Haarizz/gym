@@ -49,6 +49,9 @@ export interface CreateAddonRequest {
   // or a billed_to_head adult): how much is being collected now, out of
   // `amount` — the remainder becomes a due on the family head's account.
   paid_amount?: number;
+  // How much of `amount` is covered by the member's reward wallet balance, if
+  // any — debited server-side in the same transaction as the add-on itself.
+  wallet_amount_applied?: number;
 }
 
 class AddonsService {
@@ -74,7 +77,10 @@ class AddonsService {
       `${backendBaseUrl}/member-addons`,
       { method: 'POST', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to create addon: ${response.status}`);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Failed to create addon: ${response.status}`);
+    }
     return response.json();
   }
 

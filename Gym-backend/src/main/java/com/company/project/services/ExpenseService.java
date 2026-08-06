@@ -4,6 +4,8 @@ import com.company.project.dto.ExpenseRequestDTO;
 import com.company.project.dto.ExpenseResponseDTO;
 import com.company.project.dto.ExpenseStatsDTO;
 import com.company.project.entities.Expense;
+import com.company.project.exceptions.BusinessRuleViolationException;
+import com.company.project.repositories.CostCenterRepository;
 import com.company.project.repositories.ExpenseRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,13 +23,16 @@ public class ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final NotificationService notificationService;
     private final FinancialEventService financialEventService;
+    private final CostCenterRepository costCenterRepository;
 
     public ExpenseService(ExpenseRepository expenseRepository,
                           NotificationService notificationService,
-                          FinancialEventService financialEventService) {
+                          FinancialEventService financialEventService,
+                          CostCenterRepository costCenterRepository) {
         this.expenseRepository    = expenseRepository;
         this.notificationService  = notificationService;
         this.financialEventService = financialEventService;
+        this.costCenterRepository = costCenterRepository;
     }
 
     public List<ExpenseResponseDTO> getExpenses(String search, String status, String category,
@@ -124,6 +129,8 @@ public class ExpenseService {
     }
 
     private void applyRequest(Expense expense, ExpenseRequestDTO req) {
+        validateCostCenter(req.getCostCenter());
+
         expense.setDate(req.getDate() != null ? req.getDate() : LocalDate.now());
         expense.setVendorName(req.getVendorName());
         expense.setCategory(req.getCategory());
@@ -142,5 +149,16 @@ public class ExpenseService {
         expense.setTotalAmount(totalAmount);
         expense.setNotes(req.getNotes());
         expense.setReceiptUrl(req.getReceiptUrl());
+        if (req.getPaymentStatus() != null && !req.getPaymentStatus().isBlank()) {
+            expense.setPaymentStatus(req.getPaymentStatus());
+        }
+    }
+
+    /** Blank/null is allowed (no forced dimension tagging) — only rejects unknown codes. */
+    private void validateCostCenter(String costCenterCode) {
+        if (costCenterCode == null || costCenterCode.isBlank()) return;
+        if (costCenterRepository.findByCode(costCenterCode).isEmpty()) {
+            throw new BusinessRuleViolationException("Unknown cost center code: " + costCenterCode);
+        }
     }
 }

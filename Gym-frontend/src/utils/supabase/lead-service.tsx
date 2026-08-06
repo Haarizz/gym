@@ -158,7 +158,16 @@ export const leadService = {
   async getStats(): Promise<LeadStats> {
     const res = await fetch(`${BASE_URL}/leads/stats`, { headers: await getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch lead stats');
-    return res.json();
+    const raw = await res.json();
+    return {
+      totalLeads: raw.total_leads ?? 0,
+      newLeads: raw.new_leads ?? 0,
+      contactedLeads: raw.contacted_leads ?? 0,
+      followUpLeads: raw.follow_up_leads ?? 0,
+      convertedLeads: raw.converted_leads ?? 0,
+      lostLeads: raw.lost_leads ?? 0,
+      conversionRate: raw.conversion_rate ?? 0,
+    };
   },
 
   async getById(id: number): Promise<LeadResponse> {
