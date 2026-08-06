@@ -17,6 +17,7 @@ public class ReferralRequestDTO {
     private LocalDate paymentDate;
     private String notes;
     private Long ruleId;
+    private String referralCode;
 
     // Getters & Setters
 
@@ -55,4 +56,7 @@ public class ReferralRequestDTO {
 
     public Long getRuleId() { return ruleId; }
     public void setRuleId(Long ruleId) { this.ruleId = ruleId; }
+
+    public String getReferralCode() { return referralCode; }
+    public void setReferralCode(String referralCode) { this.referralCode = referralCode; }
 }

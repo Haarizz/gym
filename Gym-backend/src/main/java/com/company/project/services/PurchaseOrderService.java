@@ -6,10 +6,12 @@ import com.company.project.dto.PurchaseOrderPageResponseDTO;
 import com.company.project.dto.PurchaseOrderRequestDTO;
 import com.company.project.dto.PurchaseOrderResponseDTO;
 import com.company.project.dto.ReceiveItemsRequestDTO;
+import com.company.project.entities.Product;
 import com.company.project.entities.ProductStock;
 import com.company.project.entities.PurchaseOrder;
 import com.company.project.entities.PurchaseOrderItem;
 import com.company.project.entities.Supplier;
+import com.company.project.repositories.ProductRepository;
 import com.company.project.repositories.ProductStockRepository;
 import com.company.project.repositories.PurchaseOrderItemRepository;
 import com.company.project.repositories.PurchaseOrderRepository;
@@ -41,17 +43,20 @@ public class PurchaseOrderService {
     private final PurchaseOrderItemRepository purchaseOrderItemRepository;
     private final SupplierRepository supplierRepository;
     private final ProductStockRepository productStockRepository;
+    private final ProductRepository productRepository;
     private final NotificationService notificationService;
 
     public PurchaseOrderService(PurchaseOrderRepository purchaseOrderRepository,
                                 PurchaseOrderItemRepository purchaseOrderItemRepository,
                                 SupplierRepository supplierRepository,
                                 ProductStockRepository productStockRepository,
+                                ProductRepository productRepository,
                                 NotificationService notificationService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.purchaseOrderItemRepository = purchaseOrderItemRepository;
         this.supplierRepository = supplierRepository;
         this.productStockRepository = productStockRepository;
+        this.productRepository = productRepository;
         this.notificationService = notificationService;
     }
 
@@ -77,11 +82,12 @@ public class PurchaseOrderService {
         // Compute totals from items
         List<PurchaseOrderRequestDTO.POItemRequest> itemReqs = req.getItems() != null ? req.getItems() : new ArrayList<>();
         BigDecimal subtotal = computeSubtotal(itemReqs);
+        BigDecimal discountAmount = computeDiscount(itemReqs);
         BigDecimal taxAmount = computeTax(itemReqs);
-        BigDecimal total = subtotal.add(taxAmount).add(po.getShippingCost());
+        BigDecimal total = subtotal.subtract(discountAmount).add(taxAmount).add(po.getShippingCost());
         po.setSubtotal(subtotal);
+        po.setDiscountAmount(discountAmount);
         po.setTaxAmount(taxAmount);
-        po.setDiscountAmount(BigDecimal.ZERO);
         po.setTotalAmount(total);
 
         // Save to get id
@@ -128,9 +134,11 @@ public class PurchaseOrderService {
 
         List<PurchaseOrderRequestDTO.POItemRequest> itemReqs = req.getItems() != null ? req.getItems() : new ArrayList<>();
         BigDecimal subtotal = computeSubtotal(itemReqs);
+        BigDecimal discountAmount = computeDiscount(itemReqs);
         BigDecimal taxAmount = computeTax(itemReqs);
-        BigDecimal total = subtotal.add(taxAmount).add(po.getShippingCost());
+        BigDecimal total = subtotal.subtract(discountAmount).add(taxAmount).add(po.getShippingCost());
         po.setSubtotal(subtotal);
+        po.setDiscountAmount(discountAmount);
         po.setTaxAmount(taxAmount);
         po.setTotalAmount(total);
 
@@ -187,6 +195,14 @@ public class PurchaseOrderService {
 
             // Increase stock
             if (poItem.getProductId() != null && receivedItem.getWarehouseId() != null) {
+                int oldTotalStock = 0;
+                // We need total old stock across all warehouses for true average cost, but typically moving average uses total stock.
+                // Let's get total current stock
+                List<ProductStock> allStocks = productStockRepository.findByProductId(poItem.getProductId());
+                if (allStocks != null) {
+                    oldTotalStock = allStocks.stream().mapToInt(s -> s.getCurrentStock() == null ? 0 : s.getCurrentStock()).sum();
+                }
+
                 Optional<ProductStock> stockOpt = productStockRepository
                         .findByProductIdAndWarehouseId(poItem.getProductId(), receivedItem.getWarehouseId());
                 if (stockOpt.isPresent()) {
@@ -202,6 +218,25 @@ public class PurchaseOrderService {
                     newStock.setOpeningStock(0);
                     newStock.setReorderLevel(0);
                     productStockRepository.save(newStock);
+                }
+
+                // Update Moving Average Cost
+                Optional<Product> prodOpt = productRepository.findById(poItem.getProductId());
+                if (prodOpt.isPresent()) {
+                    Product p = prodOpt.get();
+                    BigDecimal oldCost = p.getCostPrice() != null ? p.getCostPrice() : BigDecimal.ZERO;
+                    BigDecimal newCostPrice = poItem.getUnitPrice() != null ? poItem.getUnitPrice() : BigDecimal.ZERO;
+                    
+                    int receivedQty = receivedItem.getQuantityReceived();
+                    int newTotalStock = oldTotalStock + receivedQty;
+                    
+                    if (newTotalStock > 0) {
+                        BigDecimal oldTotalVal = oldCost.multiply(BigDecimal.valueOf(oldTotalStock));
+                        BigDecimal newVal = newCostPrice.multiply(BigDecimal.valueOf(receivedQty));
+                        BigDecimal avgCost = oldTotalVal.add(newVal).divide(BigDecimal.valueOf(newTotalStock), 2, RoundingMode.HALF_UP);
+                        p.setCostPrice(avgCost);
+                        productRepository.save(p);
+                    }
                 }
             }
         }
@@ -298,10 +333,19 @@ public class PurchaseOrderService {
                 .map(i -> {
                     BigDecimal qty = BigDecimal.valueOf(i.getQuantityOrdered() != null ? i.getQuantityOrdered() : 0);
                     BigDecimal price = i.getUnitPrice() != null ? i.getUnitPrice() : BigDecimal.ZERO;
+                    return price.multiply(qty);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal computeDiscount(List<PurchaseOrderRequestDTO.POItemRequest> items) {
+        return items.stream()
+                .map(i -> {
+                    BigDecimal qty = BigDecimal.valueOf(i.getQuantityOrdered() != null ? i.getQuantityOrdered() : 0);
+                    BigDecimal price = i.getUnitPrice() != null ? i.getUnitPrice() : BigDecimal.ZERO;
                     BigDecimal disc = i.getDiscountPercent() != null ? i.getDiscountPercent() : BigDecimal.ZERO;
                     BigDecimal line = price.multiply(qty);
-                    BigDecimal discAmt = line.multiply(disc).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-                    return line.subtract(discAmt);
+                    return line.multiply(disc).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }

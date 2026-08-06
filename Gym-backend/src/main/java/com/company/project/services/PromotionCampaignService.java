@@ -18,12 +18,13 @@ import com.company.project.repositories.ReceiptRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.math.BigDecimal;
 
 @Service
 @Transactional
@@ -279,6 +280,24 @@ public class PromotionCampaignService {
         if (savings != null) {
             BigDecimal currentSav = promotion.getTotalSavings() != null ? promotion.getTotalSavings() : BigDecimal.ZERO;
             promotion.setTotalSavings(currentSav.add(savings));
+        }
+
+        int newCount = promotion.getUsageCount();
+        // Average order value: real revenue per redemption, not tracked anywhere else.
+        if (promotion.getTotalRevenue() != null && newCount > 0) {
+            promotion.setAverageOrderValue(
+                    promotion.getTotalRevenue().divide(BigDecimal.valueOf(newCount), 2, RoundingMode.HALF_UP));
+        }
+        // Redemption rate: only meaningful against a known ceiling (usageLimit). With no cap
+        // set, there's no real denominator to compute a rate against, so it's left at 0 rather
+        // than faked — clickCount/conversionRate stay 0 for the same reason (no click-tracking
+        // surface exists yet, e.g. a public promo link/pixel).
+        if (promotion.getUsageLimit() != null && promotion.getUsageLimit() > 0) {
+            promotion.setRedemptionRate(
+                    BigDecimal.valueOf(newCount)
+                            .divide(BigDecimal.valueOf(promotion.getUsageLimit()), 4, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(100))
+                            .setScale(1, RoundingMode.HALF_UP));
         }
 
         return PromotionCampaignResponseDTO.fromEntity(promotionRepository.save(promotion));

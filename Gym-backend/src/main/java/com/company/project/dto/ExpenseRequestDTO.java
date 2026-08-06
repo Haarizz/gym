@@ -15,6 +15,7 @@ public class ExpenseRequestDTO {
     private String notes;
     private String status;
     private String receiptUrl;
+    private String paymentStatus;
 
     public ExpenseRequestDTO() {}
 
@@ -47,4 +48,7 @@ public class ExpenseRequestDTO {
 
     public String getReceiptUrl() { return receiptUrl; }
     public void setReceiptUrl(String receiptUrl) { this.receiptUrl = receiptUrl; }
+
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { plansService, Plan as MembershipPlanData } from '../utils/supabase/plans-service';
 import { membersService } from '../utils/supabase/members-service';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
@@ -128,8 +128,13 @@ const calculateAge = (dob: string): number | null => {
 export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { memberId: routeMemberId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { currencyCode } = useCurrency();
   const isEditMode = Boolean(routeMemberId);
+
+  // A lead converted on the Leads page hands its contact info off here via router state
+  // instead of the member being fabricated with no plan/payment info.
+  const prefillLead = (location.state as { prefillLead?: { leadId: string; firstName: string; lastName: string; email: string; phone: string } } | null)?.prefillLead;
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
@@ -290,12 +295,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     return Math.round(discounted * 100) / 100;
   };
 
-  // The selected primary-member plan, and whether it's a Family plan configured
-  // for "family_head" billing — every family member (adult or minor) then folds
-  // into ONE invoice on the head instead of adults billing independently.
+  // The selected primary-member plan, and whether it's a Family/Couple plan
+  // configured for "family_head" billing — every family/couple member (adult
+  // or minor) then folds into ONE invoice on the head instead of adults
+  // billing independently.
   const getSelectedPrimaryPlan = () => apiPlans.find(p => p.id.toString() === formData.membershipPlan);
   const isFamilyHeadBillingMode = (): boolean =>
-    formData.membershipType === 'family'
+    (formData.membershipType === 'family' || formData.membershipType === 'couple')
     && getSelectedPrimaryPlan()?.familyBillingMode === 'family_head';
 
   // Mirrors MemberService.memberPriceForIndex() on the backend: price_per_member
@@ -692,10 +698,10 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     membershipType: '', // Individual, Family, Corporate
     regDocNumber: '',
     regDocDate: '',
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
+    firstName: prefillLead?.firstName ?? '',
+    lastName: prefillLead?.lastName ?? '',
+    email: prefillLead?.email ?? '',
+    phone: prefillLead?.phone ?? '',
     address: '',
     nationality: '',
     gender: '',
@@ -722,7 +728,14 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     appUsername: '',
     appPassword: '',
   });
-  
+
+  useEffect(() => {
+    if (prefillLead) {
+      toast.info(`Pre-filled from converted lead: ${prefillLead.firstName} ${prefillLead.lastName}`.trim());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Family members state — adults get a fully independent membership (own plan/
   // fee/payment); minors are billed to the family head instead of carrying their
   // own balance.
@@ -2224,7 +2237,9 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </h3>
                       <p className="text-xs text-gray-600">
                         {formData.membershipType === 'couple'
-                          ? 'Add the one member connected to this membership — billed independently, linked together'
+                          ? (isFamilyHeadBillingMode()
+                              ? 'Add the one member connected to this membership — billed together with the couple head on one invoice'
+                              : 'Add the one member connected to this membership — billed independently, linked together')
                           : 'Add additional family members to this membership'}
                       </p>
                     </div>
@@ -2522,7 +2537,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-primary">
-                            Family Head Billing — one combined invoice
+                            {formData.membershipType === 'couple' ? 'Couple Head Billing' : 'Family Head Billing'} — one combined invoice
                           </span>
                           <span className="text-sm font-bold text-primary">
                             {currencyCode} {(Number(getSelectedPrimaryPlan()?.pricePerMember) || 0)} × {familyMembers.length + 1} ={' '}
@@ -2530,7 +2545,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                           </span>
                         </div>
                         <p className="text-xs text-primary/70">
-                          This total is captured once, below, as {`${formData.firstName} ${formData.lastName}`.trim() || 'the primary member'}'s own payment — family members above don't need a separate payment.
+                          This total is captured once, below, as {`${formData.firstName} ${formData.lastName}`.trim() || 'the primary member'}'s own payment — {formData.membershipType === 'couple' ? 'the connected member' : 'family members'} above don't need a separate payment.
                         </p>
                       </div>
                     )}

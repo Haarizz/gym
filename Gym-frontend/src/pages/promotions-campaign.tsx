@@ -1422,22 +1422,23 @@ export function PromotionsCampaign() {
                         <p className="font-medium text-2xl text-orange-600"><CurrencyGlyph /> {selectedPromotion.totalSavings.toLocaleString()}</p>
                       </div>
                       <div>
-                        <Label className="text-sm text-muted-foreground">Conversion Rate</Label>
-                        <p className="font-medium text-xl">{selectedPromotion.conversionRate.toFixed(1)}%</p>
-                      </div>
-                      <div>
                         <Label className="text-sm text-muted-foreground">Avg Order Value</Label>
-                        <p className="font-medium text-xl"><CurrencyGlyph /> {selectedPromotion.averageOrderValue}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm text-muted-foreground">Click Count</Label>
-                        <p className="font-medium">{selectedPromotion.clickCount.toLocaleString()}</p>
+                        <p className="font-medium text-xl"><CurrencyGlyph /> {selectedPromotion.averageOrderValue.toFixed(2)}</p>
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Redemption Rate</Label>
-                        <p className="font-medium">{selectedPromotion.redemptionRate}%</p>
+                        <p className="font-medium text-xl">
+                          {selectedPromotion.usageLimit ? `${selectedPromotion.redemptionRate}%` : '— (no usage limit set)'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-sm text-muted-foreground">Times Redeemed</Label>
+                        <p className="font-medium">{selectedPromotion.usageCount.toLocaleString()}{selectedPromotion.usageLimit ? ` / ${selectedPromotion.usageLimit}` : ''}</p>
                       </div>
                     </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Click count and conversion rate aren't shown — this promotion has no public tracking link, so there's nothing real to measure them from.
+                    </p>
                   </CardContent>
                 </Card>
 

@@ -160,7 +160,16 @@ export const followUpService = {
   async getStats(): Promise<FollowUpStats> {
     const res = await fetch(`${BASE_URL}/follow-ups/stats`, { headers: await getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch follow-up stats');
-    return res.json();
+    const raw = await res.json();
+    return {
+      totalFollowUps: raw.total_follow_ups ?? 0,
+      pendingFollowUps: raw.pending_follow_ups ?? 0,
+      overdueFollowUps: raw.overdue_follow_ups ?? 0,
+      completedFollowUps: raw.completed_follow_ups ?? 0,
+      cancelledFollowUps: raw.cancelled_follow_ups ?? 0,
+      rescheduledFollowUps: raw.rescheduled_follow_ups ?? 0,
+      completionRate: raw.completion_rate ?? 0,
+    };
   },
 
   async getById(id: number): Promise<FollowUpResponse> {

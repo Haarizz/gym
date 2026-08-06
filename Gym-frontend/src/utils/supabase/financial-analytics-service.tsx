@@ -8,6 +8,8 @@ export interface AnalyticsDashboard {
   netIncome: number;
   profitMargin: number;
   pendingTaxObligations: number;
+  outstandingPayments: number;
+  pendingReconciliations: number;
 }
 
 export interface MonthlyTrendPoint {
@@ -42,6 +44,8 @@ class FinancialAnalyticsService {
       netIncome: d.net_income ?? 0,
       profitMargin: d.profit_margin ?? 0,
       pendingTaxObligations: d.pending_tax_obligations ?? 0,
+      outstandingPayments: d.outstanding_payments ?? 0,
+      pendingReconciliations: d.pending_reconciliations ?? 0,
     };
   }
 

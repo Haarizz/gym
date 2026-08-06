@@ -24,6 +24,9 @@ public class SupplierBill extends BaseEntity {
     @Column(name = "supplier_name")
     private String supplierName;
 
+    @Column(name = "purchase_order_id")
+    private Long purchaseOrderId;
+
     @Column(name = "invoice_number")
     private String invoiceNumber;
 
@@ -99,6 +102,9 @@ public class SupplierBill extends BaseEntity {
 
     public String getSupplierName() { return supplierName; }
     public void setSupplierName(String supplierName) { this.supplierName = supplierName; }
+
+    public Long getPurchaseOrderId() { return purchaseOrderId; }
+    public void setPurchaseOrderId(Long purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }
 
     public String getInvoiceNumber() { return invoiceNumber; }
     public void setInvoiceNumber(String invoiceNumber) { this.invoiceNumber = invoiceNumber; }

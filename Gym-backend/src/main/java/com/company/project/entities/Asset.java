@@ -42,6 +42,15 @@ public class Asset extends BaseEntity {
     @Column(name = "depreciation_rate", precision = 6, scale = 2)
     private BigDecimal depreciationRate;
 
+    @Column(name = "salvage_value", precision = 12, scale = 2)
+    private BigDecimal salvageValue = BigDecimal.ZERO;
+
+    @Column(name = "useful_life_months")
+    private Integer usefulLifeMonths;
+
+    @Column(name = "accumulated_depreciation", precision = 12, scale = 2)
+    private BigDecimal accumulatedDepreciation = BigDecimal.ZERO;
+
     @Column(name = "location")
     private String location;
 
@@ -117,6 +126,15 @@ public class Asset extends BaseEntity {
 
     public BigDecimal getDepreciationRate() { return depreciationRate; }
     public void setDepreciationRate(BigDecimal depreciationRate) { this.depreciationRate = depreciationRate; }
+
+    public BigDecimal getSalvageValue() { return salvageValue; }
+    public void setSalvageValue(BigDecimal salvageValue) { this.salvageValue = salvageValue; }
+
+    public Integer getUsefulLifeMonths() { return usefulLifeMonths; }
+    public void setUsefulLifeMonths(Integer usefulLifeMonths) { this.usefulLifeMonths = usefulLifeMonths; }
+
+    public BigDecimal getAccumulatedDepreciation() { return accumulatedDepreciation; }
+    public void setAccumulatedDepreciation(BigDecimal accumulatedDepreciation) { this.accumulatedDepreciation = accumulatedDepreciation; }
 
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }

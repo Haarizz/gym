@@ -57,6 +57,7 @@ import java.util.Optional;
  *   5200  Purchase / COGS
  *   5300  Referral & Loyalty Rewards Expense
  *   5700  Miscellaneous Expense
+ *   5800  Depreciation Expense
  */
 @Service
 @Transactional
@@ -68,6 +69,7 @@ public class FinancialEventService {
     public static final String ACC_CASH_IN_HAND       = "1000";
     public static final String ACC_CASH_AT_BANK        = "1001";
     public static final String ACC_RECEIVABLE          = "1100";
+    public static final String ACC_INVENTORY_ASSET     = "1200";
     public static final String ACC_SALARY_ADVANCE_REC  = "1400";
     public static final String ACC_FIXED_ASSETS        = "1500";
     public static final String ACC_ACCUM_DEPRECIATION  = "1600";
@@ -83,24 +85,82 @@ public class FinancialEventService {
     public static final String ACC_PURCHASE_COGS       = "5200";
     public static final String ACC_REWARD_EXPENSE      = "5300";
     public static final String ACC_MISC_EXPENSE        = "5700";
+    public static final String ACC_DEPRECIATION_EXPENSE = "5800";
     public static final String ACC_REWARD_LIABILITY    = "2400";
 
     private final JournalVoucherRepository          jvRepo;
     private final JournalVoucherLineRepository      lineRepo;
     private final AccountHeadRepository             accountRepo;
     private final JournalEntrySourceRepository      sourceRepo;
+    private final TaxCodeRepository                 taxCodeRepo;
+    private final FinancialSettingRepository        settingRepo;
     private final VoucherNumberService              voucherNumberService;
+    private final DeferredRevenueScheduleService    deferredRevenueScheduleService;
+    private final FiscalPeriodService               fiscalPeriodService;
+    private final FinancialAuditLogService          financialAuditLogService;
+
+    // UAE VAT — no CGST/SGST/IGST split, one flat rate. Configurable via
+    // FinancialSettings("standard_vat_rate", category TAX) so a rate change
+    // (or a future zero-rated/exempt product line) doesn't require a deploy;
+    // defaults to the current UAE standard rate if unset.
+    private static final String VAT_RATE_SETTING_KEY = "standard_vat_rate";
+    private static final BigDecimal DEFAULT_VAT_RATE = new BigDecimal("5.00");
 
     public FinancialEventService(JournalVoucherRepository jvRepo,
                                  JournalVoucherLineRepository lineRepo,
                                  AccountHeadRepository accountRepo,
                                  JournalEntrySourceRepository sourceRepo,
-                                 VoucherNumberService voucherNumberService) {
+                                 TaxCodeRepository taxCodeRepo,
+                                 FinancialSettingRepository settingRepo,
+                                 VoucherNumberService voucherNumberService,
+                                 DeferredRevenueScheduleService deferredRevenueScheduleService,
+                                 FiscalPeriodService fiscalPeriodService,
+                                 FinancialAuditLogService financialAuditLogService) {
         this.jvRepo      = jvRepo;
         this.lineRepo    = lineRepo;
         this.accountRepo = accountRepo;
         this.sourceRepo  = sourceRepo;
+        this.taxCodeRepo = taxCodeRepo;
+        this.settingRepo = settingRepo;
         this.voucherNumberService = voucherNumberService;
+        this.deferredRevenueScheduleService = deferredRevenueScheduleService;
+        this.fiscalPeriodService = fiscalPeriodService;
+        this.financialAuditLogService = financialAuditLogService;
+    }
+
+    /** Standard UAE VAT rate (%), e.g. 5.00 — see VAT_RATE_SETTING_KEY. */
+    private BigDecimal getStandardVatRate() {
+        return settingRepo.findBySettingKey(VAT_RATE_SETTING_KEY)
+                .map(FinancialSetting::getSettingValue)
+                .filter(v -> v != null && !v.isBlank())
+                .map(v -> {
+                    try {
+                        return new BigDecimal(v);
+                    } catch (NumberFormatException e) {
+                        return DEFAULT_VAT_RATE;
+                    }
+                })
+                .orElse(DEFAULT_VAT_RATE);
+    }
+
+    /**
+     * Splits a VAT-inclusive amount into [net, vat] using the standard rate —
+     * prices across this app (memberships, add-ons) are quoted VAT-inclusive
+     * (see plans-services-catalog.tsx: "All prices ... inclusive of VAT"), so
+     * the member never pays more; this only determines how much of what they
+     * already paid must be remitted to the FTA vs. recognized as revenue. vat
+     * is computed as the remainder (amount - net) rather than independently
+     * rounded, so the two lines always sum back to the original amount.
+     */
+    private BigDecimal[] splitVatInclusive(BigDecimal grossAmount) {
+        BigDecimal rate = getStandardVatRate();
+        if (rate.compareTo(BigDecimal.ZERO) <= 0) {
+            return new BigDecimal[] { grossAmount, BigDecimal.ZERO };
+        }
+        BigDecimal divisor = BigDecimal.ONE.add(rate.divide(BigDecimal.valueOf(100), 6, java.math.RoundingMode.HALF_UP));
+        BigDecimal net = grossAmount.divide(divisor, 2, java.math.RoundingMode.HALF_UP);
+        BigDecimal vat = grossAmount.subtract(net);
+        return new BigDecimal[] { net, vat };
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -110,7 +170,11 @@ public class FinancialEventService {
     /**
      * BILLING — Member payment received.
      * DR  Cash/Bank                    (paidAmount)
-     * CR  Membership Revenue           (paidAmount)
+     * CR  Membership Revenue           (paidAmount, net of VAT)   — single-month plans
+     *   or CR  Deferred Revenue        (paidAmount, net of VAT)   — multi-month plans,
+     *          recognized ratably later by DeferredRevenueRecognitionScheduler
+     * CR  Tax / GST Payable            (VAT portion)   — UAE, 5% VAT-inclusive pricing,
+     *                                    always recognized immediately, never deferred
      */
     public void onMemberPaymentReceived(Receipt receipt) {
         if (alreadyJournaled("Receipt", receipt.getId())) return;
@@ -126,7 +190,27 @@ public class FinancialEventService {
                 receipt.getPaymentMethod(), receipt.getPaymentBreakdown(),
                 receipt.getBankAccountCode(), receipt.getBankAccountName(), amount, true,
                 "Member payment — " + receipt.getMemberName()));
-        lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", amount, "Revenue recognition"));
+
+        boolean defer = false;
+        BigDecimal deferredNet = BigDecimal.ZERO;
+        if (receipt.getInvoiceId() != null) {
+            // Revenue and VAT were already recognized when the invoice itself was
+            // issued (onInvoiceIssued) — this only settles the receivable.
+            lines.add(cr(ACC_RECEIVABLE, "Accounts Receivable", amount, "Invoice payment"));
+        } else {
+            BigDecimal[] split = splitVatInclusive(amount);
+            defer = deferredRevenueScheduleService.qualifiesForDeferral(receipt);
+            if (defer) {
+                deferredNet = split[0];
+                lines.add(cr(ACC_DEFERRED_REVENUE, "Deferred Revenue", split[0],
+                        "Membership payment held as deferred revenue"));
+            } else {
+                lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", split[0], "Revenue recognition"));
+            }
+            if (split[1].compareTo(BigDecimal.ZERO) > 0) {
+                lines.add(cr(ACC_TAX_PAYABLE, "Tax / GST Payable", split[1], "VAT on membership payment"));
+            }
+        }
 
         LocalDate date = receipt.getTransactionDate() != null
                 ? receipt.getTransactionDate().toLocalDate() : LocalDate.now();
@@ -137,6 +221,73 @@ public class FinancialEventService {
                 date, lines, "BILLING");
 
         registerSource("Receipt", receipt.getId(), "BILLING", jv.getId());
+
+        if (defer) {
+            deferredRevenueScheduleService.createSchedule(receipt, deferredNet, jv.getId());
+        }
+    }
+
+    /**
+     * DEFERRED REVENUE — one monthly bucket of a multi-month membership recognized.
+     * DR  Deferred Revenue             (line amount)
+     * CR  Membership Revenue           (line amount)
+     *
+     * Posted by DeferredRevenueRecognitionScheduler once a bucket's periodEnd has
+     * elapsed. Known limitation: membership freeze/cancellation does not currently
+     * adjust or write off an in-flight schedule — lines keep recognizing on their
+     * original calendar dates regardless of freeze state (tracked as follow-up work).
+     */
+    public void onDeferredRevenueRecognized(DeferredRevenueRecognitionLine line, DeferredRevenueSchedule schedule) {
+        if (alreadyJournaled("DeferredRevenueLine", line.getId())) return;
+
+        BigDecimal amount = safe(line.getAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = List.of(
+                dr(ACC_DEFERRED_REVENUE, "Deferred Revenue", amount,
+                        "Revenue recognition — " + schedule.getMemberName()
+                        + " period " + line.getPeriodNumber() + "/" + schedule.getTotalPeriods()),
+                cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", amount,
+                        "Revenue recognition — " + schedule.getMemberName())
+        );
+
+        JournalVoucher jv = createAndPost(
+                "Deferred Revenue Recognition: " + schedule.getMemberName()
+                + " (period " + line.getPeriodNumber() + "/" + schedule.getTotalPeriods() + ")",
+                line.getPeriodEnd(), lines, "DEFERRED_REVENUE");
+
+        registerSource("DeferredRevenueLine", line.getId(), "DEFERRED_REVENUE", jv.getId());
+        deferredRevenueScheduleService.markRecognized(line, jv.getId());
+    }
+
+    /**
+     * INVOICE — B2B or recurring subscription invoice issued.
+     * DR Accounts Receivable (totalAmount)
+     * CR Membership Revenue (subtotal)
+     * CR Tax / GST Payable (taxAmount)
+     */
+    public void onInvoiceIssued(Invoice invoice) {
+        if (alreadyJournaled("Invoice", invoice.getId())) return;
+
+        BigDecimal total = safe(invoice.getTotalAmount());
+        BigDecimal tax = safe(invoice.getTaxAmount());
+        BigDecimal subtotal = safe(invoice.getSubtotal());
+
+        if (total.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_RECEIVABLE, "Accounts Receivable", total, "Invoice " + invoice.getInvoiceNumber()));
+        lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", subtotal, "Invoice Revenue"));
+        
+        if (tax.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(cr(ACC_TAX_PAYABLE, "Tax / GST Payable", tax, "Invoice Tax"));
+        }
+
+        LocalDate date = invoice.getIssueDate() != null ? invoice.getIssueDate() : LocalDate.now();
+
+        JournalVoucher jv = createAndPost(
+                "Invoice Issued: " + invoice.getInvoiceNumber(), date, lines, "INVOICE");
+        registerSource("Invoice", invoice.getId(), "INVOICE", jv.getId());
     }
 
     /**
@@ -166,6 +317,13 @@ public class FinancialEventService {
 
         LocalDate date = sale.getCreatedAt() != null
                 ? sale.getCreatedAt().toLocalDate() : LocalDate.now();
+
+        // Perpetual Inventory: DR COGS, CR Inventory Asset
+        BigDecimal cogs = safe(sale.getTotalCogs());
+        if (cogs.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_PURCHASE_COGS, "Cost of Goods Sold", cogs, "COGS — " + sale.getTransactionNumber()));
+            lines.add(cr(ACC_INVENTORY_ASSET, "Inventory Asset", cogs, "Inventory reduction — " + sale.getTransactionNumber()));
+        }
 
         JournalVoucher jv = createAndPost(
                 "POS Sale: " + sale.getTransactionNumber(), date, lines, "SALES");
@@ -200,6 +358,13 @@ public class FinancialEventService {
         LocalDate date = sale.getUpdatedAt() != null
                 ? sale.getUpdatedAt().toLocalDate() : LocalDate.now();
 
+        // Perpetual Inventory Reversal: DR Inventory Asset, CR COGS
+        BigDecimal cogs = safe(sale.getTotalCogs());
+        if (cogs.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_INVENTORY_ASSET, "Inventory Asset", cogs, "Refund — inventory restoration"));
+            lines.add(cr(ACC_PURCHASE_COGS, "Cost of Goods Sold", cogs, "Refund — COGS reversal"));
+        }
+
         JournalVoucher jv = createAndPost(
                 "POS Refund: " + sale.getTransactionNumber(), date, lines, "SALES");
         registerSource("SaleTransactionRefund", sale.getId(), "SALES", jv.getId());
@@ -208,7 +373,8 @@ public class FinancialEventService {
     /**
      * SERVICE — Member add-on purchased (Training, Nutrition, Spa, Classes, ...).
      * DR  Cash/Bank                    (amount)
-     * CR  Service / Add-on Revenue     (amount)
+     * CR  Service / Add-on Revenue     (amount, net of VAT)
+     * CR  Tax / GST Payable            (VAT portion)   — UAE, 5% VAT-inclusive pricing
      */
     public void onAddonPaymentReceived(MemberAddon addon) {
         if (alreadyJournaled("MemberAddon", addon.getId())) return;
@@ -222,8 +388,12 @@ public class FinancialEventService {
         List<JvLine> lines = new ArrayList<>(buildMoneyLines(
                 addon.getPaymentMode(), addon.getPaymentBreakdown(), amount, true,
                 "Add-on purchase — " + addon.getMemberName()));
-        lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", amount,
+        BigDecimal[] split = splitVatInclusive(amount);
+        lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", split[0],
                 "Revenue recognition — " + addon.getAddonName()));
+        if (split[1].compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(cr(ACC_TAX_PAYABLE, "Tax / GST Payable", split[1], "VAT on add-on purchase"));
+        }
 
         LocalDate date = addon.getPurchaseDate() != null
                 ? addon.getPurchaseDate().toLocalDate() : LocalDate.now();
@@ -241,7 +411,8 @@ public class FinancialEventService {
      * EXPENSES — Operational expense approved.
      * DR  [Expense Category Account]   (amount excl. tax)
      * DR  GST Input Credit             (taxAmount)   — only if tax > 0
-     * CR  Cash in Hand / Accounts Payable  (totalAmount)
+     * CR  Cash in Hand                 (totalAmount)   — paymentStatus == PAID (default)
+     *   or CR  Accounts Payable        (totalAmount)   — paymentStatus == UNPAID/CREDIT
      */
     public void onExpenseApproved(Expense expense) {
         if (alreadyJournaled("Expense", expense.getId())) return;
@@ -261,10 +432,25 @@ public class FinancialEventService {
         List<JvLine> lines = new ArrayList<>();
         lines.add(dr(expenseCode, expenseName, amount, "Expense — " + expense.getVendorName()));
         if (tax.compareTo(BigDecimal.ZERO) > 0) {
-            lines.add(dr(ACC_GST_INPUT, "GST Input Credit", tax, "Input tax credit"));
+            String inputTaxAccount = ACC_GST_INPUT;
+            String inputTaxName = "GST Input Credit";
+            if (expense.getTaxCode() != null && !expense.getTaxCode().isBlank()) {
+                Optional<TaxCode> tc = taxCodeRepo.findByCode(expense.getTaxCode());
+                if (tc.isPresent() && tc.get().getPurchaseTaxAccountCode() != null && !tc.get().getPurchaseTaxAccountCode().isBlank()) {
+                    inputTaxAccount = tc.get().getPurchaseTaxAccountCode();
+                    inputTaxName = tc.get().getName() != null ? tc.get().getName() : inputTaxName;
+                }
+            }
+            lines.add(dr(inputTaxAccount, inputTaxName, tax, "Input tax credit"));
         }
-        // Credit cash by default; a full AP flow would use Accounts Payable
-        lines.add(cr(ACC_CASH_IN_HAND, "Cash in Hand", total, "Expense payment"));
+        boolean unpaid = "UNPAID".equalsIgnoreCase(expense.getPaymentStatus())
+                || "CREDIT".equalsIgnoreCase(expense.getPaymentStatus());
+        if (unpaid) {
+            lines.add(cr(ACC_ACCOUNTS_PAYABLE, "Accounts Payable", total,
+                    "Expense payable — " + expense.getVendorName()));
+        } else {
+            lines.add(cr(ACC_CASH_IN_HAND, "Cash in Hand", total, "Expense payment"));
+        }
 
         LocalDate date = expense.getDate() != null ? expense.getDate() : LocalDate.now();
 
@@ -366,6 +552,31 @@ public class FinancialEventService {
     }
 
     /**
+     * ASSETS — Fixed asset depreciated automatically.
+     * DR  Depreciation Expense         (amount)
+     * CR  Accumulated Depreciation     (amount)
+     */
+    public void onAssetDepreciated(Asset asset, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        String depExpenseAcc = ACC_DEPRECIATION_EXPENSE;
+        String accumDepAcc = ACC_ACCUM_DEPRECIATION;
+        
+        List<JvLine> lines = List.of(
+                dr(depExpenseAcc, "Depreciation Expense", amount,
+                        "Monthly depreciation — " + asset.getName() + " [" + asset.getCode() + "]"),
+                cr(accumDepAcc, "Accumulated Depreciation", amount,
+                        "Monthly depreciation — " + asset.getName() + " [" + asset.getCode() + "]")
+        );
+
+        JournalVoucher jv = createAndPost(
+                "Depreciation: " + asset.getName(), LocalDate.now(), lines, "ASSETS");
+        
+        // Use a unique source entity string so it doesn't conflict with purchase journal
+        registerSource("AssetDepreciation", asset.getId(), "ASSETS", jv.getId());
+    }
+
+    /**
      * PURCHASES — Supplier bill confirmed (goods received).
      * DR  Purchase / COGS              (subtotal after discount)
      * DR  GST Input Credit             (taxAmount)   — only if tax > 0
@@ -383,7 +594,7 @@ public class FinancialEventService {
         }
 
         List<JvLine> lines = new ArrayList<>();
-        lines.add(dr(ACC_PURCHASE_COGS, "Purchase / COGS", subtotal,
+        lines.add(dr(ACC_INVENTORY_ASSET, "Inventory Asset", subtotal,
                 "Goods received — " + bill.getSupplierName()));
         if (tax.compareTo(BigDecimal.ZERO) > 0) {
             lines.add(dr(ACC_GST_INPUT, "GST Input Credit", tax, "Input tax on purchase"));
@@ -553,6 +764,8 @@ public class FinancialEventService {
                     + " DR=" + totalDebit + " CR=" + totalCredit);
         }
 
+        fiscalPeriodService.assertPeriodOpen(date);
+
         JournalVoucher jv = new JournalVoucher();
         jv.setVoucherNo(voucherNumberService.next("JV"));
         jv.setDate(date);
@@ -578,6 +791,9 @@ public class FinancialEventService {
             // Update AccountHead.currentBalance immediately
             updateAccountBalance(l.code, l.name, l.debit, l.credit);
         }
+
+        financialAuditLogService.record("AUTO_POST", "JournalVoucher", jv.getId(), jv.getVoucherNo(),
+                module, "Auto-posted: DR=" + totalDebit + " CR=" + totalCredit + " — " + narration);
 
         return jv;
     }

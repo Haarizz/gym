@@ -100,10 +100,16 @@ public class ReferralService {
         ref.setDate(req.getDate() != null ? req.getDate() : LocalDate.now());
         ref.setStatus(req.getStatus() != null ? req.getStatus() : "pending");
 
-        // Generate unique referral code: first name + random 6 chars
-        String baseCode = (req.getReferrerName() != null ? req.getReferrerName().replaceAll("\\s+", "").toUpperCase() : "REF")
-                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
-        ref.setReferralCode(baseCode);
+        ReferralSettings settings = loadOrCreateSettings();
+        if (Boolean.FALSE.equals(settings.getAutoGenerateCodes()) && req.getReferralCode() != null && !req.getReferralCode().isBlank()) {
+            // Manual code entry — used verbatim (still uppercased for consistency with the auto-generated format).
+            ref.setReferralCode(req.getReferralCode().trim().toUpperCase());
+        } else {
+            String prefix = settings.getCodePrefix() != null && !settings.getCodePrefix().isBlank()
+                    ? settings.getCodePrefix().trim().toUpperCase()
+                    : (req.getReferrerName() != null ? req.getReferrerName().replaceAll("\\s+", "").toUpperCase() : "REF");
+            ref.setReferralCode(prefix + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+        }
 
         // Apply rule if provided, otherwise auto-assign an active one
         if (req.getRuleId() != null) {
@@ -423,7 +429,8 @@ public class ReferralService {
         dto.setRefereeEmail(ref.getRefereeEmail());
         dto.setRefereePhone(ref.getRefereePhone());
         dto.setReferralCode(ref.getReferralCode());
-        dto.setReferralLink("gymbios.app/ref/" + ref.getReferralCode());
+        String linkDomain = loadOrCreateSettings().getLinkDomain();
+        dto.setReferralLink((linkDomain != null && !linkDomain.isBlank() ? linkDomain : "gymbios.app/ref") + "/" + ref.getReferralCode());
         dto.setStatus(ref.getStatus());
         dto.setRewardAmount(ref.getRewardAmount());
         dto.setDate(ref.getDate());

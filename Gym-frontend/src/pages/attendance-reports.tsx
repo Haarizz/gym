@@ -10,6 +10,7 @@ import { Progress } from "../components/ui/progress";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Switch } from "../components/ui/switch";
+import { Input } from "../components/ui/input";
 import { Skeleton } from "../components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { motion } from "motion/react";
@@ -64,6 +65,7 @@ import {
 } from "../components/ui/breadcrumb";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { authService } from "../utils/supabase/auth-service";
+import { attendanceService } from "../utils/supabase/attendance-service";
 
 const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -429,6 +431,9 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
   });
   const [activeTab, setActiveTab] = useState("overview");
   const [automatedReports, setAutomatedReports] = useState(false);
+  const [reportRecipientEmail, setReportRecipientEmail] = useState("");
+  const [gymCapacity, setGymCapacity] = useState("150");
+  const [savingReportSettings, setSavingReportSettings] = useState(false);
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<ReportData | null>(null);
   const [trainers, setTrainers] = useState<TrainerRow[]>([]);
@@ -464,6 +469,60 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
   }, [startStr, endStr]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    attendanceService.getReportSettings()
+      .then(settings => {
+        setAutomatedReports(settings.enabled);
+        setReportRecipientEmail(settings.recipient_email || "");
+        if (settings.gym_capacity) setGymCapacity(String(settings.gym_capacity));
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveGymCapacity = async () => {
+    const capacity = parseInt(gymCapacity, 10);
+    if (!capacity || capacity <= 0) {
+      toast.error("Enter a valid gym capacity");
+      return;
+    }
+    setSavingReportSettings(true);
+    try {
+      await attendanceService.updateReportSettings({ enabled: automatedReports, gym_capacity: capacity });
+      toast.success("Gym capacity updated", { description: `Occupancy on Check-In is now calculated out of ${capacity}.` });
+    } catch (e: any) {
+      toast.error("Failed to update gym capacity", { description: e?.message || "Please try again." });
+    } finally {
+      setSavingReportSettings(false);
+    }
+  };
+
+  const handleToggleAutomatedReports = async (checked: boolean) => {
+    if (checked && !reportRecipientEmail.trim()) {
+      toast.error("Enter a recipient email first");
+      return;
+    }
+    setSavingReportSettings(true);
+    try {
+      await attendanceService.updateReportSettings({
+        enabled: checked,
+        recipient_email: reportRecipientEmail.trim() || undefined,
+      });
+      setAutomatedReports(checked);
+      toast[checked ? "success" : "info"](
+        checked ? "Automated Reports Enabled" : "Automated Reports Disabled",
+        {
+          description: checked
+            ? `A weekly attendance summary will be emailed to ${reportRecipientEmail.trim()} every Monday.`
+            : "Automated report delivery has been turned off.",
+        }
+      );
+    } catch (e: any) {
+      toast.error("Failed to update report settings", { description: e?.message || "Please try again." });
+    } finally {
+      setSavingReportSettings(false);
+    }
+  };
 
   // ── Sorted summary table ──────────────────────────────────────────────────
   const sortedSummary = useMemo(() => {
@@ -1357,7 +1416,26 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
           transition={{ duration: 0.5, delay: 0.6 }}
         >
           <Card className="border-primary/10 shadow-lg">
-            <CardContent className="p-6">
+            <CardContent className="p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1">
+                  <h4 className="font-semibold text-primary mb-1">Gym Capacity</h4>
+                  <p className="text-sm text-gray-600">Used to calculate the Check-In page's live occupancy %</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={gymCapacity}
+                    onChange={(e) => setGymCapacity(e.target.value)}
+                    style={{ maxWidth: '120px' }}
+                    disabled={savingReportSettings}
+                  />
+                  <Button variant="outline" className="border-primary/30" onClick={handleSaveGymCapacity} disabled={savingReportSettings}>
+                    Save
+                  </Button>
+                </div>
+              </div>
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                 <div className="flex items-center space-x-4">
                   <div className="bg-gradient-light p-3 rounded-lg">
@@ -1367,23 +1445,22 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
                     <h4 className="font-semibold text-primary mb-1">
                       Schedule Automated Reports
                     </h4>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 mb-2">
                       Receive weekly attendance reports via email every Monday
                     </p>
+                    <Input
+                      type="email"
+                      placeholder="recipient@example.com"
+                      value={reportRecipientEmail}
+                      onChange={(e) => setReportRecipientEmail(e.target.value)}
+                      className="max-w-xs"
+                      disabled={savingReportSettings}
+                    />
                   </div>
                   <Switch
                     checked={automatedReports}
-                    onCheckedChange={(checked) => {
-                      setAutomatedReports(checked);
-                      toast[checked ? "success" : "info"](
-                        checked ? "Automated Reports Enabled" : "Automated Reports Disabled",
-                        {
-                          description: checked
-                            ? "You will receive weekly attendance reports via email every Monday."
-                            : "Automated report delivery has been turned off.",
-                        }
-                      );
-                    }}
+                    disabled={savingReportSettings}
+                    onCheckedChange={handleToggleAutomatedReports}
                   />
                 </div>
 

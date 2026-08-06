@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -6,12 +6,10 @@ import { Input } from "../components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Progress } from "../components/ui/progress";
 import { Separator } from "../components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Checkbox } from "../components/ui/checkbox";
 import { Label } from "../components/ui/label";
 import { toast } from "sonner";
 import {
@@ -25,8 +23,6 @@ import {
   DollarSign,
   CreditCard,
   Wallet,
-  TrendingUp,
-  Download,
   MessageSquare,
   Target,
   Receipt,
@@ -34,13 +30,9 @@ import {
   Gift,
   Users,
   Activity,
-  BarChart3,
-  PieChart,
   CheckCircle,
   AlertCircle,
-  Flame,
-  Zap,
-  Trophy,
+  XCircle,
   Star,
   Share2,
   ShoppingCart,
@@ -53,20 +45,15 @@ import {
   Send,
   Filter,
   ChevronRight,
-  ExternalLink,
   X,
   UserX,
-  Camera,
-  Upload,
   Eye,
-  Printer,
-  Share,
   Snowflake,
+  Loader2,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Calendar as CalendarComponent } from "../components/ui/calendar";
-import { Switch } from "../components/ui/switch";
-import { format, addDays, differenceInDays } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import {
   LineChart,
   Line,
@@ -85,520 +72,504 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../components/ui/sheet";
 import { Textarea } from "../components/ui/textarea";
 
+import { membersService } from '../utils/supabase/members-service';
+import type { Member, MemberNote } from '../utils/supabase/members-service';
+import { billingService } from '../utils/supabase/billing-service';
+import type { MemberStatement } from '../utils/supabase/billing-service';
+import { attendanceService } from '../utils/supabase/attendance-service';
+import type { AttendanceListItem } from '../utils/supabase/attendance-service';
+import { workoutFeedbackService } from '../utils/supabase/workout-feedback-service';
+import type { WorkoutFeedback, WorkoutSession } from '../utils/supabase/workout-feedback-service';
+import { messagingService } from '../utils/supabase/messaging-service';
+import type { MessageHistoryApi } from '../utils/supabase/messaging-service';
+import { addonsService } from '../utils/supabase/addons-service';
+import type { MemberAddon } from '../utils/supabase/addons-service';
+import { promotionsService } from '../utils/supabase/promotions-service';
+import type { EligibleMemberApi } from '../utils/supabase/promotions-service';
+import { rewardService, walletService } from '../utils/supabase/reward-service';
+import type { ReferralReward, Wallet as RewardWallet } from '../utils/supabase/reward-service';
+import { referralService } from '../utils/supabase/referral-service';
+import type { ReferralResponse } from '../utils/supabase/referral-service';
+import { receiptsService } from '../utils/supabase/receipts-service';
+import { downloadReceiptInvoice } from '../utils/receipt-invoice';
+
 interface MemberHistoryAnalyticsProps {
-  onNavigate?: (section: string) => void;
+  onNavigate?: (section: string, params?: Record<string, any>) => void;
   memberId?: string;
 }
 
-// Sample member data
-const memberData = {
-  id: 'MBR-123456',
-  name: 'Ahmed Al-Mansoori',
-  email: 'ahmed.mansoori@email.com',
-  phone: '+971 50 123 4567',
-  joinDate: '10 Jan 2023',
-  photo: '/avatars/member-1.jpg',
-  status: 'active',
-  currentPlan: 'Premium Annual',
-  daysRemaining: 42,
-  planDuration: '12 Months',
-  totalTimeSpent: '182 hours',
-  totalIncome: 5840,
-  totalMemberships: 3,
-  lastRenewal: '05 Aug 2025',
-  source: 'Referral - Trainer Sara',
-  address: 'Dubai Marina, Dubai, UAE',
-  emergencyContact: '+971 50 987 6543',
-  totalTransactions: 18,
-  paymentBreakdown: {
-    cash: 2100,
-    card: 3200,
-    wallet: 540,
-  },
-  outstandingDues: 200,
-  attendance: {
-    totalHours: 182,
-    totalDays: 126,
-    avgDuration: 1.4,
-    purchasedHours: 480,
-    utilizationRate: 38,
-  },
-  referrals: 3,
-  ptSessions: 24,
-  posSpend: 1240,
-};
-
-// Sample attendance data
-const attendanceData = [
-  { month: 'Jan', hours: 28 },
-  { month: 'Feb', hours: 32 },
-  { month: 'Mar', hours: 24 },
-  { month: 'Apr', hours: 30 },
-  { month: 'May', hours: 26 },
-  { month: 'Jun', hours: 22 },
-  { month: 'Jul', hours: 20 },
-];
-
-// Sample activity timeline
-const activityTimeline = [
-  { date: '22 Jun 2024', event: 'Referral', detail: 'Brought new member "John Doe"', type: 'referral' },
-  { date: '10 Mar 2024', event: 'Payment', detail: 'AED 1,200 via Card', type: 'payment' },
-  { date: '15 Jan 2024', event: 'POS Purchase', detail: 'Protein Shake – AED 60', type: 'pos' },
-  { date: '10 Jul 2023', event: 'Renewed', detail: 'Upgraded to Premium', type: 'membership' },
-  { date: '10 Jan 2023', event: 'Joined', detail: '6-Month Basic Plan', type: 'membership' },
-];
-
-// Sample payment history
-const paymentHistory = [
-  { date: '15 Jul 2024', type: 'Due Collected', mode: 'Wallet', amount: 200, remarks: '-' },
-  { date: '02 Apr 2024', type: 'POS Purchase', mode: 'Cash', amount: 60, remarks: 'Protein Shake' },
-  { date: '10 Mar 2024', type: 'Membership Renewal', mode: 'Card', amount: 1200, remarks: 'Premium 6M' },
-];
-
-// Weekly heatmap data
-const weeklyData = [
-  { day: 'Mon', visits: 12 },
-  { day: 'Tue', visits: 15 },
-  { day: 'Wed', visits: 18 },
-  { day: 'Thu', visits: 14 },
-  { day: 'Fri', visits: 10 },
-  { day: 'Sat', visits: 8 },
-  { day: 'Sun', visits: 5 },
-];
-
-// Sample post-workout feedback data
-const workoutFeedback = [
-  {
-    id: 'FB-001',
-    date: '08 Oct 2025',
-    workoutType: 'Personal Training',
-    trainerName: 'Sara Johnson',
-    overallSatisfaction: 5,
-    workoutIntensity: 4,
-    trainerRating: 5,
-    equipmentQuality: 5,
-    facilityRating: 5,
-    recommendWorkout: 'yes',
-    difficultyLevel: 'just-right',
-    paceRating: 'just-right',
-    bestAspects: ['instruction', 'energy', 'variety'],
-    areasForImprovement: [],
-    comments: 'Excellent session! Sara really knows how to motivate and push me to my limits.',
-    suggestions: 'Would love more similar sessions in the evening slots.',
-    energyAfterWorkout: 'high',
-    likelyToReturn: 10,
-    wouldRecommendTrainer: 'yes',
-  },
-  {
-    id: 'FB-002',
-    date: '05 Oct 2025',
-    workoutType: 'Group Class',
-    className: 'HIIT Blast',
-    trainerName: 'Mike Anderson',
-    overallSatisfaction: 4,
-    workoutIntensity: 5,
-    trainerRating: 4,
-    equipmentQuality: 4,
-    facilityRating: 4,
-    recommendWorkout: 'yes',
-    difficultyLevel: 'too-hard',
-    paceRating: 'too-fast',
-    bestAspects: ['music', 'challenge', 'energy'],
-    areasForImprovement: ['temperature'],
-    comments: 'Great workout but the room was quite hot. Could use better ventilation.',
-    suggestions: 'Maybe add a beginner-friendly HIIT class option.',
-    energyAfterWorkout: 'medium',
-    likelyToReturn: 8,
-    wouldRecommendTrainer: 'yes',
-  },
-  {
-    id: 'FB-003',
-    date: '01 Oct 2025',
-    workoutType: 'Open Gym',
-    overallSatisfaction: 5,
-    workoutIntensity: 3,
-    equipmentQuality: 5,
-    facilityRating: 5,
-    recommendWorkout: 'yes',
-    difficultyLevel: 'just-right',
-    bestAspects: ['equipment', 'variety'],
-    areasForImprovement: [],
-    comments: 'Love the new equipment! Everything is clean and well-maintained.',
-    suggestions: '',
-    energyAfterWorkout: 'high',
-    likelyToReturn: 9,
-  },
-  {
-    id: 'FB-004',
-    date: '28 Sep 2025',
-    workoutType: 'Group Class',
-    className: 'Yoga Flow',
-    trainerName: 'Emma Wilson',
-    overallSatisfaction: 5,
-    workoutIntensity: 2,
-    trainerRating: 5,
-    equipmentQuality: 5,
-    facilityRating: 5,
-    recommendWorkout: 'yes',
-    difficultyLevel: 'just-right',
-    paceRating: 'just-right',
-    bestAspects: ['instruction', 'music', 'energy'],
-    areasForImprovement: [],
-    comments: 'Perfect for recovery day. Emma is an amazing instructor.',
-    suggestions: 'Would love more yoga class times throughout the week.',
-    energyAfterWorkout: 'medium',
-    likelyToReturn: 10,
-    wouldRecommendTrainer: 'yes',
-  },
-];
-
-// Communication history data
-const communicationHistory = [
-  {
-    id: 'MSG-001',
-    date: '10 Oct 2025',
-    time: '9:12 AM',
-    channel: 'sms',
-    type: 'transactional',
-    subject: 'Welcome Message',
-    content: 'Welcome to IronFit Gym! Your plan starts today.',
-    status: 'delivered',
-    sentBy: 'System',
-    deliveryReport: 'SMS-ID-78945612',
-  },
-  {
-    id: 'MSG-002',
-    date: '08 Oct 2025',
-    time: '6:30 PM',
-    channel: 'whatsapp',
-    type: 'campaign',
-    subject: 'New Boxing Classes – Enroll Now!',
-    content: 'Hey Ahmed! Exciting news - we just launched new Boxing classes. Limited spots available. Book now!',
-    status: 'read',
-    sentBy: 'Admin – Sara',
-    deliveryReport: 'WA-READ-10/08/2025-18:35',
-  },
-  {
-    id: 'MSG-003',
-    date: '05 Oct 2025',
-    time: '8:00 AM',
-    channel: 'email',
-    type: 'transactional',
-    subject: 'Renewal Reminder – Your plan ends soon',
-    content: 'Hi Ahmed, your Premium Annual plan expires on 20 Nov 2025. Renew now to continue enjoying our services.',
-    status: 'delivered',
-    sentBy: 'System',
-    deliveryReport: 'SMTP-DELIVERED',
-  },
-  {
-    id: 'MSG-004',
-    date: '30 Sep 2025',
-    time: '4:45 PM',
-    channel: 'whatsapp',
-    type: 'transactional',
-    subject: 'Class Reminder – Zumba starts at 6 PM',
-    content: 'Reminder: Your Zumba class starts in 1 hour at 6:00 PM. See you there!',
-    status: 'delivered',
-    sentBy: 'Scheduler',
-    deliveryReport: 'WA-DELIVERED-30/09/2025-16:45',
-  },
-  {
-    id: 'MSG-005',
-    date: '25 Sep 2025',
-    time: '12:05 PM',
-    channel: 'sms',
-    type: 'campaign',
-    subject: 'Referral Offer',
-    content: 'Bring a friend, get 1 week free! Share the love of fitness and earn rewards.',
-    status: 'sent',
-    sentBy: 'Marketing Bot',
-    deliveryReport: 'SMS-ID-78945601',
-  },
-  {
-    id: 'MSG-006',
-    date: '20 Sep 2025',
-    time: '9:00 AM',
-    channel: 'email',
-    type: 'transactional',
-    subject: 'Payment Confirmation',
-    content: 'Your payment of AED 1,200 has been received. Thank you!',
-    status: 'delivered',
-    sentBy: 'System',
-    deliveryReport: 'SMTP-DELIVERED',
-  },
-  {
-    id: 'MSG-007',
-    date: '15 Sep 2025',
-    time: '7:30 PM',
-    channel: 'whatsapp',
-    type: 'campaign',
-    subject: 'Special Offer – Personal Training',
-    content: 'Get 20% OFF on Personal Training packages this week only!',
-    status: 'read',
-    sentBy: 'Admin – Mike',
-    deliveryReport: 'WA-READ-15/09/2025-19:45',
-  },
-  {
-    id: 'MSG-008',
-    date: '10 Sep 2025',
-    time: '10:15 AM',
-    channel: 'sms',
-    type: 'transactional',
-    subject: 'Due Payment Reminder',
-    content: 'You have an outstanding balance of AED 200. Please pay by Sep 15.',
-    status: 'delivered',
-    sentBy: 'System',
-    deliveryReport: 'SMS-ID-78945589',
-  },
-];
-
 const COLORS = ['#0047AB', '#00c5cb', '#4CAF50', '#FFC107', '#F44336'];
+
+function safeDate(value?: string | null): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function fmtDate(value?: string | null): string {
+  const d = safeDate(value);
+  return d ? format(d, 'dd MMM yyyy') : '—';
+}
+
+function fmtDateTime(value?: string | null): string {
+  const d = safeDate(value);
+  return d ? format(d, 'dd MMM yyyy, h:mm a') : '—';
+}
+
+function initialsOf(name?: string | null): string {
+  if (!name) return '?';
+  return name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase();
+}
+
+interface TimelineItem {
+  date: Date;
+  event: string;
+  detail: string;
+  type: 'membership' | 'payment' | 'addon' | 'referral';
+}
 
 export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAnalyticsProps) {
   const { currencyCode } = useCurrency();
+
+  // ── Core data ──────────────────────────────────────────────────────────
+  const [member, setMember] = useState<Member | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [statement, setStatement] = useState<MemberStatement | null>(null);
+  const [attendance, setAttendance] = useState<AttendanceListItem[]>([]);
+  const [feedback, setFeedback] = useState<WorkoutFeedback[]>([]);
+  const [sessions, setSessions] = useState<WorkoutSession[]>([]);
+  const [communications, setCommunications] = useState<MessageHistoryApi[]>([]);
+  const [notes, setNotes] = useState<MemberNote[]>([]);
+  const [addons, setAddons] = useState<MemberAddon[]>([]);
+  const [eligibility, setEligibility] = useState<EligibleMemberApi | null>(null);
+  const [rewards, setRewards] = useState<ReferralReward[]>([]);
+  const [wallet, setWallet] = useState<RewardWallet | null>(null);
+  const [referrals, setReferrals] = useState<ReferralResponse[]>([]);
+
+  // ── Search bar (switch member) ────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMember, setSelectedMember] = useState(memberData);
-  const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const [searchResults, setSearchResults] = useState<Member[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // ── Communication tab ──────────────────────────────────────────────────
+  const [selectedMessage, setSelectedMessage] = useState<MessageHistoryApi | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [channelFilter, setChannelFilter] = useState('all');
-  const [messageTypeFilter, setMessageTypeFilter] = useState('all');
   const [communicationSearch, setCommunicationSearch] = useState('');
-  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
-  const [isMailCorporateModalOpen, setIsMailCorporateModalOpen] = useState(false);
-  const [isFreezeDialogOpen, setIsFreezeDialogOpen] = useState(false);
+
+  // ── Transactions tab ────────────────────────────────────────────────────
   const [transactionSearch, setTransactionSearch] = useState('');
   const [transactionDateFrom, setTransactionDateFrom] = useState('');
   const [transactionDateTo, setTransactionDateTo] = useState('');
   const [transactionTypeFilter, setTransactionTypeFilter] = useState('all');
-  const [mailCorporateForm, setMailCorporateForm] = useState({
-    dateFrom: '',
-    dateTo: '',
-    includeAll: true,
-    includeMembershipOnly: false,
-    attachPDFs: true,
-  });
+
+  // ── Notes tab ────────────────────────────────────────────────────────────
+  const [newNote, setNewNote] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+
+  // ── Dialogs ──────────────────────────────────────────────────────────────
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [isFreezeDialogOpen, setIsFreezeDialogOpen] = useState(false);
+
   const [transferForm, setTransferForm] = useState({
-    photo: null as File | null,
-    fullName: '',
-    mobileNumber: '',
-    email: '',
-    gender: '',
-    dateOfBirth: '',
-    transferFee: 100,
-    confirmTransfer: false,
+    fullName: '', mobileNumber: '', email: '', gender: '', dateOfBirth: '', confirmTransfer: false,
   });
+  const [savingTransfer, setSavingTransfer] = useState(false);
+
   const [deactivateForm, setDeactivateForm] = useState({
-    effectiveDate: new Date().toISOString().split('T')[0],
-    reason: '',
-    refundAmount: 0,
-    refundMode: 'cash',
-    returnPlan: false,
-    confirmDeactivation: false,
+    effectiveDate: new Date().toISOString().split('T')[0], reason: '', confirmDeactivation: false,
   });
+  const [savingDeactivate, setSavingDeactivate] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("selectedMemberAnalytics");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setSelectedMember((prev) => ({
-          ...prev,
-          ...parsed,
-        }));
-      } catch (error) {
-        console.error("Failed to parse selected member analytics data:", error);
-      }
+  const [freezeStartDate, setFreezeStartDate] = useState<Date | undefined>(undefined);
+  const [freezeEndDate, setFreezeEndDate] = useState<Date | undefined>(undefined);
+  const [freezeReason, setFreezeReason] = useState('');
+  const [savingFreeze, setSavingFreeze] = useState(false);
+
+  // ── Load everything for this member ─────────────────────────────────────
+  const loadAll = useCallback(async () => {
+    if (!memberId) { setLoading(false); return; }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const m = await membersService.getMemberById(String(memberId));
+      setMember(m);
+      const bizId = m.member_id || String(memberId);
+
+      const [
+        statementR, attendanceR, feedbackR, sessionsR, commsR, notesR,
+        addonsR, eligibilityR, rewardsR, walletR, referralsR,
+      ] = await Promise.allSettled([
+        billingService.getMemberStatement(Number(memberId)),
+        attendanceService.getMemberAttendanceHistory(memberId),
+        workoutFeedbackService.getMemberFeedback(memberId),
+        workoutFeedbackService.getMemberSessions(memberId),
+        messagingService.getMemberHistory(memberId),
+        membersService.getNotes(memberId),
+        addonsService.getAddons({ search: bizId, status: 'Active' }),
+        promotionsService.getEligibilityMembers(),
+        rewardService.getByMember(bizId),
+        walletService.getWallet(bizId),
+        referralService.getReferrals({ search: bizId, size: 50 }),
+      ]);
+
+      setStatement(statementR.status === 'fulfilled' ? statementR.value : null);
+      setAttendance(attendanceR.status === 'fulfilled' ? attendanceR.value : []);
+      setFeedback(feedbackR.status === 'fulfilled' ? feedbackR.value : []);
+      setSessions(sessionsR.status === 'fulfilled' ? sessionsR.value : []);
+      setCommunications(commsR.status === 'fulfilled' ? commsR.value : []);
+      setNotes(notesR.status === 'fulfilled' ? notesR.value : []);
+      setAddons(addonsR.status === 'fulfilled' ? addonsR.value.addons.filter(a => a.member_id === bizId) : []);
+      setEligibility(eligibilityR.status === 'fulfilled'
+        ? (eligibilityR.value.find(e => e.id === String(memberId)) ?? null) : null);
+      setRewards(rewardsR.status === 'fulfilled' ? rewardsR.value : []);
+      setWallet(walletR.status === 'fulfilled' ? walletR.value : null);
+      setReferrals(referralsR.status === 'fulfilled'
+        ? referralsR.value.referrals.filter(r => r.referrerMemberId === bizId) : []);
+    } catch (e) {
+      console.error('Failed to load member analytics:', e);
+      setLoadError('Failed to load this member. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [memberId]);
 
-  const paymentPieData = [
-    { name: 'Card', value: selectedMember.paymentBreakdown.card },
-    { name: 'Cash', value: selectedMember.paymentBreakdown.cash },
-    { name: 'Wallet', value: selectedMember.paymentBreakdown.wallet },
-  ];
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Filter communication history
-  const filteredCommunications = communicationHistory.filter(msg => {
-    const matchesChannel = channelFilter === 'all' || msg.channel === channelFilter;
-    const matchesType = messageTypeFilter === 'all' || msg.type === messageTypeFilter;
-    const matchesSearch = msg.subject.toLowerCase().includes(communicationSearch.toLowerCase()) ||
-                          msg.content.toLowerCase().includes(communicationSearch.toLowerCase());
-    return matchesChannel && matchesType && matchesSearch;
-  });
+  // ── Member search (switch to a different member) ────────────────────────
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) { setSearchResults([]); return; }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      membersService.searchMembers(searchQuery)
+        .then(results => { if (!cancelled) { setSearchResults(results); setSearchOpen(true); } })
+        .catch(() => { if (!cancelled) setSearchResults([]); });
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [searchQuery]);
 
-  // Communication stats
-  const communicationStats = {
-    total: communicationHistory.length,
-    transactional: communicationHistory.filter(m => m.type === 'transactional').length,
-    campaign: communicationHistory.filter(m => m.type === 'campaign').length,
-    delivered: communicationHistory.filter(m => m.status === 'delivered' || m.status === 'read').length,
-    failed: communicationHistory.filter(m => m.status === 'failed' || m.status === 'pending').length,
+  const switchToMember = (m: Member) => {
+    setSearchQuery('');
+    setSearchOpen(false);
+    setSearchResults([]);
+    onNavigate?.('member-history-analytics', { memberId: m.id });
   };
 
-  // Sample transactions data
-  const transactionsData = [
-    {
-      id: 1,
-      date: '10-Mar-2024',
-      transactionType: 'Membership Renewal',
-      invoiceNo: 'INV-2378',
-      mode: 'Card',
-      amount: 1200,
-      remarks: 'Premium 6M',
-    },
-    {
-      id: 2,
-      date: '12-Mar-2024',
-      transactionType: 'POS Purchase',
-      invoiceNo: 'INV-2385',
-      mode: 'Cash',
-      amount: 60,
-      remarks: 'Protein Shake',
-    },
-    {
-      id: 3,
-      date: '22-Mar-2024',
-      transactionType: 'Add-on Purchase',
-      invoiceNo: 'INV-2390',
-      mode: 'Card',
-      amount: 120,
-      remarks: 'Yoga Add-on',
-    },
-    {
-      id: 4,
-      date: '05-Apr-2024',
-      transactionType: 'Membership Renewal',
-      invoiceNo: 'INV-2456',
-      mode: 'Mixed',
-      amount: 1800,
-      remarks: 'Premium Annual',
-    },
-    {
-      id: 5,
-      date: '08-Apr-2024',
-      transactionType: 'POS Purchase',
-      invoiceNo: 'INV-2468',
-      mode: 'Card',
-      amount: 45,
-      remarks: 'Energy Bar',
-    },
-    {
-      id: 6,
-      date: '15-Apr-2024',
-      transactionType: 'Add-on Purchase',
-      invoiceNo: 'INV-2501',
-      mode: 'Cash',
-      amount: 300,
-      remarks: 'Personal Training 5 Sessions',
-    },
-    {
-      id: 7,
-      date: '20-Apr-2024',
-      transactionType: 'POS Purchase',
-      invoiceNo: 'INV-2523',
-      mode: 'Card',
-      amount: 85,
-      remarks: 'Gym Merchandise',
-    },
-    {
-      id: 8,
-      date: '25-Apr-2024',
-      transactionType: 'Dues Payment',
-      invoiceNo: 'INV-2548',
-      mode: 'Cash',
-      amount: 200,
-      remarks: 'Partial Payment',
-    },
-    {
-      id: 9,
-      date: '02-May-2024',
-      transactionType: 'POS Purchase',
-      invoiceNo: 'INV-2573',
-      mode: 'Card',
-      amount: 75,
-      remarks: 'Supplement Pack',
-    },
-    {
-      id: 10,
-      date: '10-May-2024',
-      transactionType: 'Upgrade',
-      invoiceNo: 'INV-2612',
-      mode: 'Card',
-      amount: 400,
-      remarks: 'Upgrade to Premium Plus',
-    },
-  ];
+  // ── Derived values ────────────────────────────────────────────────────
+  const daysRemaining = member?.expiry_date
+    ? differenceInDays(safeDate(member.expiry_date) as Date, new Date())
+    : null;
 
-  // Channel breakdown for pie chart
-  const channelBreakdown = [
-    { name: 'SMS', value: communicationHistory.filter(m => m.channel === 'sms').length },
-    { name: 'Email', value: communicationHistory.filter(m => m.channel === 'email').length },
-    { name: 'WhatsApp', value: communicationHistory.filter(m => m.channel === 'whatsapp').length },
-  ];
+  const statementLines = statement?.lines ?? [];
+  const totalPaid = statement?.total_paid ?? 0;
+  const outstandingDues = member?.outstanding_balance ?? 0;
+  const totalTransactions = statementLines.length;
 
-  // Message type breakdown for pie chart
-  const messageTypeBreakdown = [
-    { name: 'Transactional', value: communicationStats.transactional },
-    { name: 'Campaign', value: communicationStats.campaign },
-  ];
+  const paymentBreakdown = statementLines.reduce((acc, l) => {
+    if (l.credit > 0 && l.payment_method) {
+      acc[l.payment_method] = (acc[l.payment_method] || 0) + l.credit;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+  const paymentPieData = Object.entries(paymentBreakdown).map(([name, value]) => ({ name, value }));
 
-  // Get channel icon
+  const totalAttendanceMinutes = attendance.reduce((s, a) => s + (a.total_minutes || 0), 0);
+  const totalHours = Math.round((totalAttendanceMinutes / 60) * 10) / 10;
+  const totalVisitDays = new Set(attendance.map(a => (a.check_in_time || '').slice(0, 10))).size;
+  const avgDurationHours = attendance.length > 0
+    ? Math.round((totalAttendanceMinutes / attendance.length / 60) * 10) / 10 : 0;
+  const now = new Date();
+  const thisMonthVisits = attendance.filter(a => {
+    const d = safeDate(a.check_in_time);
+    return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+
+  const monthlyAttendanceMap: Record<string, number> = {};
+  attendance.forEach(a => {
+    const d = safeDate(a.check_in_time);
+    if (!d) return;
+    const key = format(d, 'MMM yyyy');
+    monthlyAttendanceMap[key] = (monthlyAttendanceMap[key] || 0) + (a.total_minutes || 0) / 60;
+  });
+  const attendanceChartData = Object.entries(monthlyAttendanceMap)
+    .map(([month, hours]) => ({ month, hours: Math.round(hours * 10) / 10 }))
+    .slice(-7);
+
+  const weeklyDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weeklyCounts = [0, 0, 0, 0, 0, 0, 0];
+  attendance.forEach(a => {
+    const d = safeDate(a.check_in_time);
+    if (d) weeklyCounts[d.getDay()]++;
+  });
+  const weeklyOrder = [1, 2, 3, 4, 5, 6, 0];
+  const weeklyData = weeklyOrder.map(i => ({ day: weeklyDayNames[i], visits: weeklyCounts[i] }));
+
+  const monthlyRevenueMap: Record<string, number> = {};
+  statementLines.forEach(l => {
+    if (l.credit > 0) {
+      const d = safeDate(l.date);
+      if (!d) return;
+      const key = format(d, 'MMM yyyy');
+      monthlyRevenueMap[key] = (monthlyRevenueMap[key] || 0) + l.credit;
+    }
+  });
+  const revenueChartData = Object.entries(monthlyRevenueMap)
+    .map(([month, amount]) => ({ month, amount: Math.round(amount * 100) / 100 }))
+    .slice(-7);
+
+  const timelineItems: TimelineItem[] = [];
+  statementLines.forEach(l => {
+    const d = safeDate(l.date);
+    if (!d) return;
+    if (l.type === 'Invoice') {
+      timelineItems.push({ date: d, event: 'Invoice', detail: l.description, type: 'membership' });
+    } else if (l.credit > 0) {
+      timelineItems.push({
+        date: d, event: 'Payment',
+        detail: `${currencyCode} ${l.credit.toLocaleString()} via ${l.payment_method || 'unknown method'}`,
+        type: 'payment',
+      });
+    }
+  });
+  addons.forEach(a => {
+    const d = safeDate(a.purchase_date);
+    if (d) timelineItems.push({ date: d, event: 'Add-on Purchase', detail: a.addon_name, type: 'addon' });
+  });
+  referrals.forEach(r => {
+    const d = safeDate(r.date || r.createdAt);
+    if (d) timelineItems.push({ date: d, event: 'Referral', detail: `Referred ${r.refereeName}`, type: 'referral' });
+  });
+  timelineItems.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const ptSessions = sessions.filter(s => (s.workout_type || '').toLowerCase().includes('personal')).length;
+
+  // ── Communication tab derived data ───────────────────────────────────────
+  const filteredCommunications = communications.filter(msg => {
+    const matchesChannel = channelFilter === 'all' || msg.type === channelFilter;
+    const q = communicationSearch.toLowerCase();
+    const matchesSearch = !q || msg.subject.toLowerCase().includes(q) || msg.content.toLowerCase().includes(q);
+    return matchesChannel && matchesSearch;
+  });
+  const communicationStats = {
+    total: communications.length,
+    sent: communications.filter(m => m.status === 'sent' || m.status === 'sending').length,
+    failedOrPending: communications.filter(m => m.status === 'failed' || m.status === 'scheduled' || m.status === 'partial').length,
+  };
+  const channelBreakdown = ['sms', 'email', 'whatsapp', 'in-app']
+    .map(ch => ({ name: ch, value: communications.filter(m => m.type === ch).length }))
+    .filter(c => c.value > 0);
+
+  // ── Transactions tab derived data ────────────────────────────────────────
+  const filteredTransactionLines = statementLines.filter(l => {
+    const d = safeDate(l.date);
+    if (transactionDateFrom && d && d < new Date(transactionDateFrom)) return false;
+    if (transactionDateTo && d && d > new Date(transactionDateTo)) return false;
+    if (transactionTypeFilter !== 'all') {
+      const desc = `${l.type} ${l.description}`.toLowerCase();
+      if (transactionTypeFilter === 'membership' && !desc.includes('invoice') && !desc.includes('plan')) return false;
+      if (transactionTypeFilter === 'payment' && l.type !== 'Payment') return false;
+    }
+    if (transactionSearch) {
+      const q = transactionSearch.toLowerCase();
+      if (!l.receipt_no.toLowerCase().includes(q) && !l.description.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  // ── Actions ───────────────────────────────────────────────────────────────
   const getChannelIcon = (channel: string) => {
     switch (channel) {
-      case 'sms':
-        return <MessageSquare className="h-4 w-4 text-blue-600" />;
-      case 'email':
-        return <Mail className="h-4 w-4 text-purple-600" />;
-      case 'whatsapp':
-        return <MessageSquare className="h-4 w-4 text-green-600" />;
-      default:
-        return <Send className="h-4 w-4" />;
+      case 'sms': return <MessageSquare className="h-4 w-4 text-blue-600" />;
+      case 'email': return <Mail className="h-4 w-4 text-purple-600" />;
+      case 'whatsapp': return <MessageSquare className="h-4 w-4 text-green-600" />;
+      default: return <Send className="h-4 w-4" />;
     }
   };
 
-  // Get status badge
-  const getStatusBadge = (status: string) => {
+  const getMessageStatusBadge = (status: string) => {
     switch (status) {
-      case 'delivered':
-        return (
-          <Badge className="bg-green-100 text-green-700 flex items-center gap-1">
-            <CheckCircle className="h-3.5 w-3.5" />
-            Delivered
-          </Badge>
-        );
-      case 'read':
-        return (
-          <Badge className="bg-blue-100 text-blue-700 flex items-center gap-1">
-            <Eye className="h-3.5 w-3.5" />
-            Read
-          </Badge>
-        );
       case 'sent':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-700 flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            Sent
-          </Badge>
-        );
+        return <Badge className="bg-green-100 text-green-700 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" />Sent</Badge>;
+      case 'sending':
+        return <Badge className="bg-yellow-100 text-yellow-700 flex items-center gap-1"><Clock className="h-3.5 w-3.5" />Sending</Badge>;
+      case 'scheduled':
+        return <Badge className="bg-gray-100 text-gray-700 flex items-center gap-1"><Clock className="h-3.5 w-3.5" />Scheduled</Badge>;
+      case 'partial':
+        return <Badge className="bg-orange-100 text-orange-700 flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" />Partial</Badge>;
       case 'failed':
-        return (
-          <Badge className="bg-red-100 text-red-700 flex items-center gap-1">
-            <XCircle className="h-3.5 w-3.5" />
-            Failed
-          </Badge>
-        );
-      case 'pending':
-        return (
-          <Badge className="bg-gray-100 text-gray-700 flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            Pending
-          </Badge>
-        );
+        return <Badge className="bg-red-100 text-red-700 flex items-center gap-1"><XCircle className="h-3.5 w-3.5" />Failed</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
   };
+
+  const handleFreeze = async () => {
+    if (!member || !memberId) return;
+    if (!freezeEndDate) { toast.error('Please select a freeze end date'); return; }
+    setSavingFreeze(true);
+    try {
+      const freezeUntil = freezeEndDate.toISOString().split('T')[0] + 'T00:00:00Z';
+      await membersService.freezeMember(String(memberId), { freezeUntil, reason: freezeReason || undefined });
+      toast.success('Membership frozen successfully');
+      setIsFreezeDialogOpen(false);
+      setFreezeStartDate(undefined);
+      setFreezeEndDate(undefined);
+      setFreezeReason('');
+      loadAll();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to freeze membership');
+    } finally {
+      setSavingFreeze(false);
+    }
+  };
+
+  const handleUnfreeze = async () => {
+    if (!memberId) return;
+    setSavingFreeze(true);
+    try {
+      await membersService.unfreezeMember(String(memberId));
+      toast.success('Membership unfrozen successfully');
+      setIsFreezeDialogOpen(false);
+      loadAll();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to unfreeze membership');
+    } finally {
+      setSavingFreeze(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!memberId) return;
+    if (!transferForm.fullName || !transferForm.mobileNumber || !transferForm.confirmTransfer) return;
+    setSavingTransfer(true);
+    try {
+      await membersService.updateMember(String(memberId), {
+        name: transferForm.fullName,
+        phone: transferForm.mobileNumber,
+        email: transferForm.email || undefined,
+        gender: transferForm.gender || undefined,
+        date_of_birth: transferForm.dateOfBirth || undefined,
+      } as Partial<Member>);
+      toast.success('Membership transferred successfully', {
+        description: `Updated to ${transferForm.fullName}`,
+      });
+      setIsTransferModalOpen(false);
+      setTransferForm({ fullName: '', mobileNumber: '', email: '', gender: '', dateOfBirth: '', confirmTransfer: false });
+      loadAll();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to transfer membership');
+    } finally {
+      setSavingTransfer(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!memberId || !deactivateForm.confirmDeactivation) return;
+    setSavingDeactivate(true);
+    try {
+      await membersService.updateMember(String(memberId), { membership_status: 'inactive' } as Partial<Member>);
+      if (deactivateForm.reason.trim()) {
+        await membersService.addNote(String(memberId),
+          `Deactivated on ${deactivateForm.effectiveDate}: ${deactivateForm.reason.trim()}`);
+      }
+      toast.success('Membership deactivated successfully');
+      setIsDeactivateModalOpen(false);
+      setDeactivateForm({ effectiveDate: new Date().toISOString().split('T')[0], reason: '', confirmDeactivation: false });
+      loadAll();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to deactivate membership');
+    } finally {
+      setSavingDeactivate(false);
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!memberId || !newNote.trim()) return;
+    setSavingNote(true);
+    try {
+      await membersService.addNote(String(memberId), newNote.trim());
+      setNewNote('');
+      const updated = await membersService.getNotes(String(memberId));
+      setNotes(updated);
+      toast.success('Note added');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to add note');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleViewReceiptLine = async (lineId?: number) => {
+    if (!lineId) { toast.error('No receipt available for this line'); return; }
+    try {
+      const receipt = await receiptsService.getReceiptById(String(lineId));
+      downloadReceiptInvoice(receipt, currencyCode);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to open receipt');
+    }
+  };
+
+  // ── Loading / empty states ───────────────────────────────────────────────
+  if (!memberId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
+        <div className="max-w-[1400px] mx-auto">
+          <Card className="overflow-hidden border-primary/20">
+            <CardContent className="p-12 text-center">
+              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600">No member selected. Open analytics from a member's profile.</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => onNavigate?.('members')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Members
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-gray-500">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p>Loading member analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !member) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
+        <div className="max-w-[1400px] mx-auto">
+          <Card className="overflow-hidden border-primary/20">
+            <CardContent className="p-12 text-center">
+              <AlertCircle className="h-12 w-12 text-red-300 mx-auto mb-4" />
+              <p className="text-gray-600">{loadError || 'Member not found.'}</p>
+              <div className="flex justify-center gap-2 mt-4">
+                <Button variant="outline" size="sm" onClick={() => onNavigate?.('members')}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Members
+                </Button>
+                <Button size="sm" className="btn-primary" onClick={loadAll}>
+                  <RefreshCcw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const isFrozen = member.membership_status === 'frozen';
+  const isActive = member.membership_status === 'active';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
@@ -617,69 +588,80 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               Back to Members
             </Button>
           </div>
-          <Button variant="outline" size="sm" className="self-start sm:self-auto">
-            <Download className="h-4 w-4 mr-2" />
-            Export Analytics
-          </Button>
         </div>
 
         {/* Search Bar */}
         <Card className="overflow-hidden border-primary/10 shadow-sm">
           <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center gap-4">
+            <div className="relative">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search member by name, mobile, or ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
                   className="pl-10 border-primary/20"
                 />
               </div>
+              {searchOpen && searchResults.length > 0 && (
+                <div className="absolute z-20 mt-1 w-full bg-white border border-primary/20 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                  {searchResults.map((r) => (
+                    <button
+                      key={r.id}
+                      className="w-full text-left px-4 py-2 hover:bg-gradient-light flex items-center space-x-3"
+                      onClick={() => switchToMember(r)}
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={r.photo_url} alt={r.name} />
+                        <AvatarFallback className="bg-gradient-primary text-white text-xs">{initialsOf(r.name)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-medium">{r.name}</p>
+                        <p className="text-xs text-gray-500">{r.member_id || r.id} • {r.phone}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
         {/* Current Member Summary Bar */}
-        {selectedMember && (
-          <Card className="overflow-hidden mt-4 border-primary/20 bg-gradient-light shadow-sm">
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-16 w-16 border-2 border-primary shadow-sm">
-                    <AvatarImage src={selectedMember.photo} alt={selectedMember.name} />
-                    <AvatarFallback className="bg-gradient-primary text-white">
-                      {selectedMember.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold text-lg">{selectedMember.name}</h3>
-                      <Badge className="bg-gradient-primary text-white">
-                        {selectedMember.status === 'active' ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-600">Member ID: {selectedMember.id}</p>
+        <Card className="overflow-hidden mt-4 border-primary/20 bg-gradient-light shadow-sm">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="flex items-center space-x-4">
+                <Avatar className="h-16 w-16 border-2 border-primary shadow-sm">
+                  <AvatarImage src={member.photo_url} alt={member.name} />
+                  <AvatarFallback className="bg-gradient-primary text-white">{initialsOf(member.name)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="font-semibold text-lg">{member.name}</h3>
+                    <Badge className="bg-gradient-primary text-white capitalize">{member.membership_status}</Badge>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                  <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
-                    <p className="text-gray-600">Current Plan</p>
-                    <p className="font-semibold text-primary">{selectedMember.currentPlan}</p>
-                  </div>
-                  <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
-                    <p className="text-gray-600">Days Remaining</p>
-                    <p className="font-semibold text-orange-600">{selectedMember.daysRemaining} days</p>
-                  </div>
-                  <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
-                    <p className="text-gray-600">Joined</p>
-                    <p className="font-semibold">{selectedMember.joinDate}</p>
-                  </div>
+                  <p className="text-sm text-gray-600">Member ID: {member.member_id || member.id}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
+                  <p className="text-gray-600">Current Plan</p>
+                  <p className="font-semibold text-primary">{member.membership_plan || member.membership_type || '—'}</p>
+                </div>
+                <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
+                  <p className="text-gray-600">Days Remaining</p>
+                  <p className="font-semibold text-orange-600">{daysRemaining !== null ? `${daysRemaining} days` : '—'}</p>
+                </div>
+                <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
+                  <p className="text-gray-600">Joined</p>
+                  <p className="font-semibold">{fmtDate(member.membership_start_date || member.join_date)}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Membership & Add-On Overview Card */}
@@ -698,7 +680,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 onClick={() => setIsFreezeDialogOpen(true)}
               >
                 <Snowflake className="h-4 w-4 mr-2" />
-                Freeze / Unfreeze
+                {isFrozen ? 'Unfreeze' : 'Freeze'}
               </Button>
               <Button
                 size="sm"
@@ -714,6 +696,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 variant="outline"
                 className="border-red-300 text-red-600 hover:bg-red-50"
                 onClick={() => setIsDeactivateModalOpen(true)}
+                disabled={!isActive && !isFrozen}
               >
                 <UserX className="h-4 w-4 mr-2" />
                 Deactivate
@@ -725,21 +708,30 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <p className="text-sm text-gray-600 mb-1">Current Plan</p>
-              <p className="font-semibold text-gray-900">{selectedMember.currentPlan}</p>
+              <p className="font-semibold text-gray-900">{member.membership_plan || member.membership_type || '—'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600 mb-1">Start Date</p>
-              <p className="font-semibold text-gray-900">05-Aug-2025</p>
+              <p className="font-semibold text-gray-900">{fmtDate(member.membership_start_date)}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600 mb-1">Expiry Date</p>
-              <p className="font-semibold text-gray-900">04-Feb-2026 <span className="text-green-600 text-xs">(118 days left)</span></p>
+              <p className="font-semibold text-gray-900">
+                {fmtDate(member.expiry_date)}{' '}
+                {daysRemaining !== null && (
+                  <span className={daysRemaining < 0 ? 'text-red-600 text-xs' : 'text-green-600 text-xs'}>
+                    ({daysRemaining} days {daysRemaining < 0 ? 'overdue' : 'left'})
+                  </span>
+                )}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-600 mb-1">Add-Ons</p>
               <div className="flex flex-wrap gap-1">
-                <Badge variant="outline" className="border-primary/30 text-xs">Sauna Access</Badge>
-                <Badge variant="outline" className="border-primary/30 text-xs">Diet Consultation</Badge>
+                {addons.length === 0 && <span className="text-sm text-gray-400">None</span>}
+                {addons.map(a => (
+                  <Badge key={a.id} variant="outline" className="border-primary/30 text-xs">{a.addon_name}</Badge>
+                ))}
               </div>
             </div>
           </div>
@@ -749,25 +741,28 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <p className="text-sm text-gray-600 mb-1">Status</p>
-              <Badge className="bg-green-100 text-green-700 flex items-center gap-1">
-                <CheckCircle className="h-3.5 w-3.5" />
-                Active
+              <Badge className={
+                isActive ? 'bg-green-100 text-green-700 flex items-center gap-1 w-fit'
+                  : isFrozen ? 'bg-blue-100 text-blue-700 flex items-center gap-1 w-fit'
+                    : 'bg-gray-100 text-gray-700 flex items-center gap-1 w-fit'
+              }>
+                {isActive ? <CheckCircle className="h-3.5 w-3.5" /> : <Snowflake className="h-3.5 w-3.5" />}
+                <span className="capitalize">{member.membership_status}</span>
               </Badge>
             </div>
             <div>
               <p className="text-sm text-gray-600 mb-1">Payment Mode</p>
-              <p className="font-semibold text-gray-900">Card</p>
+              <p className="font-semibold text-gray-900">{member.payment_method_used || '—'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Paid</p>
-              <p className="font-semibold text-gray-900"><CurrencyGlyph /> 1,800</p>
+              <p className="font-semibold text-gray-900"><CurrencyGlyph /> {totalPaid.toLocaleString()}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-1">Transferable</p>
-              <Badge className="bg-blue-100 text-blue-700 flex items-center gap-1">
-                <CheckCircle className="h-3.5 w-3.5" />
-                Yes (as per policy)
-              </Badge>
+              <p className="text-sm text-gray-600 mb-1">Outstanding Dues</p>
+              <p className={`font-semibold ${outstandingDues > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                <CurrencyGlyph /> {outstandingDues.toLocaleString()}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -788,13 +783,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             <CardContent className="p-6 space-y-4">
               <div className="flex flex-col items-center mb-4">
                 <Avatar className="h-24 w-24 mb-3 border-4 border-primary/20">
-                  <AvatarImage src={selectedMember.photo} alt={selectedMember.name} />
-                  <AvatarFallback className="bg-gradient-primary text-white text-2xl">
-                    {selectedMember.name.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
+                  <AvatarImage src={member.photo_url} alt={member.name} />
+                  <AvatarFallback className="bg-gradient-primary text-white text-2xl">{initialsOf(member.name)}</AvatarFallback>
                 </Avatar>
-                <h3 className="font-semibold text-lg">{selectedMember.name}</h3>
-                <p className="text-sm text-gray-600">{selectedMember.id}</p>
+                <h3 className="font-semibold text-lg">{member.name}</h3>
+                <p className="text-sm text-gray-600">{member.member_id || member.id}</p>
               </div>
 
               <Separator />
@@ -802,27 +795,27 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <div className="space-y-3">
                 <div className="flex items-center space-x-3 text-sm">
                   <Mail className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">{selectedMember.email}</span>
+                  <span className="text-gray-600">{member.email || '—'}</span>
                 </div>
                 <div className="flex items-center space-x-3 text-sm">
                   <Phone className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">{selectedMember.phone}</span>
+                  <span className="text-gray-600">{member.phone || '—'}</span>
                 </div>
-                <div className="flex items-center space-x-3 text-sm">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">{selectedMember.address}</span>
-                </div>
-                <div className="flex items-center space-x-3 text-sm">
-                  <Share2 className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">{selectedMember.source}</span>
-                </div>
+                {member.address && (
+                  <div className="flex items-center space-x-3 text-sm">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    <span className="text-gray-600">{member.address}</span>
+                  </div>
+                )}
+                {member.family_head_name && (
+                  <div className="flex items-center space-x-3 text-sm">
+                    <Users className="h-4 w-4 text-primary" />
+                    <span className="text-gray-600">Family Head: {member.family_head_name}</span>
+                  </div>
+                )}
                 <div className="flex items-center space-x-3 text-sm">
                   <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">Joined: {selectedMember.joinDate}</span>
-                </div>
-                <div className="flex items-center space-x-3 text-sm">
-                  <RefreshCcw className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">Last Renewal: {selectedMember.lastRenewal}</span>
+                  <span className="text-gray-600">Joined: {fmtDate(member.membership_start_date || member.join_date)}</span>
                 </div>
               </div>
 
@@ -832,19 +825,19 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-600 mb-1">Total Time</p>
-                  <p className="font-semibold text-primary">{selectedMember.totalTimeSpent}</p>
+                  <p className="font-semibold text-primary">{totalHours}h</p>
                 </div>
                 <div className="bg-green-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-600 mb-1">Total Income</p>
-                  <p className="font-semibold text-green-600"><CurrencyGlyph /> {selectedMember.totalIncome.toLocaleString()}</p>
+                  <p className="font-semibold text-green-600"><CurrencyGlyph /> {totalPaid.toLocaleString()}</p>
                 </div>
                 <div className="bg-purple-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">Memberships</p>
-                  <p className="font-semibold text-purple-600">{selectedMember.totalMemberships} plans</p>
+                  <p className="text-xs text-gray-600 mb-1">Total Visits</p>
+                  <p className="font-semibold text-purple-600">{member.total_visits ?? attendance.length}</p>
                 </div>
                 <div className="bg-orange-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-600 mb-1">Transactions</p>
-                  <p className="font-semibold text-orange-600">{selectedMember.totalTransactions}</p>
+                  <p className="font-semibold text-orange-600">{totalTransactions}</p>
                 </div>
               </div>
             </CardContent>
@@ -862,48 +855,53 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Total Transactions</span>
-                  <span className="font-semibold">{selectedMember.totalTransactions}</span>
+                  <span className="font-semibold">{totalTransactions}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">By Cash</span>
-                  <span className="font-semibold text-green-600"><CurrencyGlyph /> {selectedMember.paymentBreakdown.cash.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">By Card</span>
-                  <span className="font-semibold text-blue-600"><CurrencyGlyph /> {selectedMember.paymentBreakdown.card.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">By Wallet/UPI</span>
-                  <span className="font-semibold text-purple-600"><CurrencyGlyph /> {selectedMember.paymentBreakdown.wallet.toLocaleString()}</span>
-                </div>
+                {Object.entries(paymentBreakdown).map(([method, amount]) => (
+                  <div className="flex justify-between items-center" key={method}>
+                    <span className="text-sm text-gray-600 capitalize">By {method}</span>
+                    <span className="font-semibold text-blue-600"><CurrencyGlyph /> {amount.toLocaleString()}</span>
+                  </div>
+                ))}
+                {Object.keys(paymentBreakdown).length === 0 && (
+                  <p className="text-sm text-gray-400">No payments recorded yet</p>
+                )}
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-gray-900">Outstanding Dues</span>
-                  <span className="font-semibold text-red-600"><CurrencyGlyph /> {selectedMember.outstandingDues.toLocaleString()}</span>
+                  <span className="font-semibold text-red-600"><CurrencyGlyph /> {outstandingDues.toLocaleString()}</span>
                 </div>
               </div>
 
-              {/* Pie Chart */}
-              <div className="mt-4">
-                <ResponsiveContainer width="100%" height={150}>
-                  <RePieChart>
-                    <Pie
-                      data={paymentPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={60}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {paymentPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </RePieChart>
-                </ResponsiveContainer>
-              </div>
+              {paymentPieData.length > 0 && (
+                <div className="mt-4">
+                  <ResponsiveContainer width="100%" height={150}>
+                    <RePieChart>
+                      <Pie
+                        data={paymentPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={60}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {paymentPieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {wallet && wallet.balance > 0 && (
+                <div className="p-3 bg-purple-50 rounded-lg border border-purple-100 flex justify-between items-center">
+                  <span className="text-sm text-purple-800">Reward Wallet Balance</span>
+                  <span className="font-semibold text-purple-700"><CurrencyGlyph /> {wallet.balance.toLocaleString()}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -911,28 +909,28 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           <Card className="overflow-hidden border-primary/20">
             <CardHeader className="bg-gradient-light border-b border-primary/10">
               <CardTitle className="flex items-center space-x-2">
-                <Zap className="h-5 w-5 text-primary" />
+                <Target className="h-5 w-5 text-primary" />
                 <span>Quick Actions</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-2">
-              <Button variant="outline" className="w-full justify-start border-primary/20">
+              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('billing')}>
                 <Receipt className="h-4 w-4 mr-2" />
                 View Receipts
               </Button>
-              <Button variant="outline" className="w-full justify-start border-primary/20">
+              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('members')}>
                 <RefreshCcw className="h-4 w-4 mr-2" />
                 Renew / Upgrade Plan
               </Button>
-              <Button variant="outline" className="w-full justify-start border-primary/20">
+              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('plans-services-catalog')}>
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Purchase Add-On
               </Button>
-              <Button variant="outline" className="w-full justify-start border-primary/20">
-                <Target className="h-4 w-4 mr-2" />
+              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('promotions-campaign')}>
+                <Gift className="h-4 w-4 mr-2" />
                 Set Target / Offer Discount
               </Button>
-              <Button variant="outline" className="w-full justify-start border-primary/20">
+              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('messaging')}>
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Send Message
               </Button>
@@ -979,30 +977,37 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <CardContent className="p-6">
                 {/* Tab 1: Activity Timeline */}
                 <TabsContent value="timeline" className="space-y-4 mt-0">
-                  <div className="space-y-6">
-                    {activityTimeline.map((activity, index) => (
-                      <div key={index} className="flex items-start space-x-4">
-                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                          activity.type === 'membership' ? 'bg-purple-100' :
-                          activity.type === 'payment' ? 'bg-green-100' :
-                          activity.type === 'pos' ? 'bg-blue-100' :
-                          'bg-orange-100'
-                        }`}>
-                          {activity.type === 'membership' && <CreditCard className="h-5 w-5 text-purple-600" />}
-                          {activity.type === 'payment' && <DollarSign className="h-5 w-5 text-green-600" />}
-                          {activity.type === 'pos' && <ShoppingCart className="h-5 w-5 text-blue-600" />}
-                          {activity.type === 'referral' && <Share2 className="h-5 w-5 text-orange-600" />}
-                        </div>
-                        <div className="flex-1 border-l-2 border-gray-200 pl-4 pb-6">
-                          <div className="flex items-center justify-between mb-1">
-                            <h4 className="font-semibold text-gray-900">{activity.event}</h4>
-                            <span className="text-sm text-gray-500">{activity.date}</span>
+                  {timelineItems.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Activity className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-600">No activity recorded yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {timelineItems.slice(0, 30).map((activity, index) => (
+                        <div key={index} className="flex items-start space-x-4">
+                          <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                            activity.type === 'membership' ? 'bg-purple-100' :
+                            activity.type === 'payment' ? 'bg-green-100' :
+                            activity.type === 'addon' ? 'bg-blue-100' :
+                            'bg-orange-100'
+                          }`}>
+                            {activity.type === 'membership' && <CreditCard className="h-5 w-5 text-purple-600" />}
+                            {activity.type === 'payment' && <DollarSign className="h-5 w-5 text-green-600" />}
+                            {activity.type === 'addon' && <ShoppingCart className="h-5 w-5 text-blue-600" />}
+                            {activity.type === 'referral' && <Share2 className="h-5 w-5 text-orange-600" />}
                           </div>
-                          <p className="text-sm text-gray-600">{activity.detail}</p>
+                          <div className="flex-1 border-l-2 border-gray-200 pl-4 pb-6">
+                            <div className="flex items-center justify-between mb-1">
+                              <h4 className="font-semibold text-gray-900">{activity.event}</h4>
+                              <span className="text-sm text-gray-500">{format(activity.date, 'dd MMM yyyy')}</span>
+                            </div>
+                            <p className="text-sm text-gray-600">{activity.detail}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Tab 2: Financial & Payment History */}
@@ -1019,34 +1024,35 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         </tr>
                       </thead>
                       <tbody>
-                        {paymentHistory.map((payment, index) => (
+                        {statementLines.map((line, index) => (
                           <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="p-3 text-sm">{payment.date}</td>
-                            <td className="p-3 text-sm">{payment.type}</td>
+                            <td className="p-3 text-sm">{fmtDate(line.date)}</td>
+                            <td className="p-3 text-sm">{line.type}</td>
                             <td className="p-3 text-sm">
-                              <Badge variant="outline" className="border-primary/30">
-                                {payment.mode}
-                              </Badge>
+                              <Badge variant="outline" className="border-primary/30">{line.payment_method || '—'}</Badge>
                             </td>
-                            <td className="p-3 text-sm text-right font-semibold text-green-600">
-                              <CurrencyGlyph /> {payment.amount.toLocaleString()}
+                            <td className={`p-3 text-sm text-right font-semibold ${line.credit > 0 ? 'text-green-600' : 'text-gray-700'}`}>
+                              <CurrencyGlyph /> {(line.credit > 0 ? line.credit : line.debit).toLocaleString()}
                             </td>
-                            <td className="p-3 text-sm text-gray-600">{payment.remarks}</td>
+                            <td className="p-3 text-sm text-gray-600">{line.description}</td>
                           </tr>
                         ))}
+                        {statementLines.length === 0 && (
+                          <tr><td colSpan={5} className="p-6 text-center text-gray-500">No financial history yet</td></tr>
+                        )}
                       </tbody>
                       <tfoot>
                         <tr className="bg-gradient-light border-t-2 border-primary/20">
                           <td colSpan={3} className="p-3 text-sm font-semibold">Total Paid</td>
                           <td className="p-3 text-sm text-right font-semibold text-green-600">
-                            <CurrencyGlyph /> {selectedMember.totalIncome.toLocaleString()}
+                            <CurrencyGlyph /> {totalPaid.toLocaleString()}
                           </td>
                           <td></td>
                         </tr>
                         <tr className="bg-red-50">
                           <td colSpan={3} className="p-3 text-sm font-semibold">Outstanding</td>
                           <td className="p-3 text-sm text-right font-semibold text-red-600">
-                            <CurrencyGlyph /> {selectedMember.outstandingDues.toLocaleString()}
+                            <CurrencyGlyph /> {outstandingDues.toLocaleString()}
                           </td>
                           <td></td>
                         </tr>
@@ -1054,32 +1060,32 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     </table>
                   </div>
 
-                  {/* Income Over Time Chart */}
-                  <div className="mt-6">
-                    <h4 className="font-semibold mb-4">Income Over Time</h4>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={attendanceData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="hours" fill="#0047AB" name={`Monthly Revenue (${currencyCode})`} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {revenueChartData.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-semibold mb-4">Income Over Time</h4>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={revenueChartData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="amount" fill="#0047AB" name={`Revenue (${currencyCode})`} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Tab 3: Gym Usage Analytics */}
                 <TabsContent value="usage" className="space-y-6 mt-0">
-                  {/* KPI Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <Card className="overflow-hidden border-primary/20 bg-blue-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs text-gray-600 mb-1">Total Hours</p>
-                            <p className="text-2xl font-bold text-primary">{memberData.attendance.totalHours}</p>
+                            <p className="text-2xl font-bold text-primary">{totalHours}</p>
                           </div>
                           <Clock className="h-8 w-8 text-primary/40" />
                         </div>
@@ -1090,7 +1096,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs text-gray-600 mb-1">Total Days</p>
-                            <p className="text-2xl font-bold text-green-600">{memberData.attendance.totalDays}</p>
+                            <p className="text-2xl font-bold text-green-600">{totalVisitDays}</p>
                           </div>
                           <Calendar className="h-8 w-8 text-green-600/40" />
                         </div>
@@ -1101,7 +1107,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs text-gray-600 mb-1">Avg Duration</p>
-                            <p className="text-2xl font-bold text-purple-600">{memberData.attendance.avgDuration}h</p>
+                            <p className="text-2xl font-bold text-purple-600">{avgDurationHours}h</p>
                           </div>
                           <Activity className="h-8 w-8 text-purple-600/40" />
                         </div>
@@ -1111,8 +1117,8 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-gray-600 mb-1">Utilization</p>
-                            <p className="text-2xl font-bold text-orange-600">{memberData.attendance.utilizationRate}%</p>
+                            <p className="text-xs text-gray-600 mb-1">This Month</p>
+                            <p className="text-2xl font-bold text-orange-600">{thisMonthVisits}</p>
                           </div>
                           <Percent className="h-8 w-8 text-orange-600/40" />
                         </div>
@@ -1120,34 +1126,43 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     </Card>
                   </div>
 
-                  {/* Attendance Chart */}
-                  <div>
-                    <h4 className="font-semibold mb-4">Attendance Over Time</h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={attendanceData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="hours" stroke="#0047AB" strokeWidth={2} name="Hours" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {attendanceChartData.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-4">Attendance Over Time</h4>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={attendanceChartData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="hours" stroke="#0047AB" strokeWidth={2} name="Hours" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
 
-                  {/* Weekly Heatmap */}
-                  <div>
-                    <h4 className="font-semibold mb-4">Most Active Days</h4>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={weeklyData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="day" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="visits" fill="#00c5cb" name="Visits" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {attendance.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-4">Most Active Days</h4>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={weeklyData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="day" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="visits" fill="#00c5cb" name="Visits" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {attendance.length === 0 && (
+                    <div className="text-center py-12">
+                      <Activity className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-600">No attendance records yet</p>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Tab 4: Performance & Engagement */}
@@ -1156,149 +1171,124 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-6 text-center">
                         <Share2 className="h-12 w-12 mx-auto mb-3 text-orange-600" />
-                        <p className="text-3xl font-bold text-orange-600 mb-1">{memberData.referrals}</p>
+                        <p className="text-3xl font-bold text-orange-600 mb-1">{referrals.length}</p>
                         <p className="text-sm text-gray-600">Referrals Made</p>
                       </CardContent>
                     </Card>
                     <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-6 text-center">
                         <Users className="h-12 w-12 mx-auto mb-3 text-purple-600" />
-                        <p className="text-3xl font-bold text-purple-600 mb-1">{memberData.ptSessions}</p>
+                        <p className="text-3xl font-bold text-purple-600 mb-1">{ptSessions}</p>
                         <p className="text-sm text-gray-600">PT Sessions</p>
                       </CardContent>
                     </Card>
                     <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-6 text-center">
-                        <ShoppingCart className="h-12 w-12 mx-auto mb-3 text-blue-600" />
-                        <p className="text-3xl font-bold text-blue-600 mb-1"><CurrencyGlyph /> {memberData.posSpend}</p>
-                        <p className="text-sm text-gray-600">POS Purchases</p>
+                        <Dumbbell className="h-12 w-12 mx-auto mb-3 text-blue-600" />
+                        <p className="text-3xl font-bold text-blue-600 mb-1">{sessions.length}</p>
+                        <p className="text-sm text-gray-600">Total Workout Sessions</p>
                       </CardContent>
                     </Card>
                   </div>
 
-                  {/* Engagement Score */}
-                  <Card className="overflow-hidden border-primary/20 bg-gradient-light">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold">Overall Engagement Score</h4>
-                        <Badge className="bg-gradient-primary text-white">
-                          <Star className="h-3 w-3 mr-1" />
-                          Excellent
-                        </Badge>
-                      </div>
-                      <Progress value={85} className="h-3 mb-2" />
-                      <p className="text-sm text-gray-600">85% - Highly engaged member</p>
-                    </CardContent>
-                  </Card>
-
-                  {/* Consistency Metrics */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <Card className="overflow-hidden border-primary/20">
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-3">
-                          <Flame className="h-8 w-8 text-orange-600" />
-                          <div>
-                            <p className="text-sm text-gray-600">Current Streak</p>
-                            <p className="text-xl font-bold">12 days</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card className="overflow-hidden border-primary/20">
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-3">
-                          <Trophy className="h-8 w-8 text-yellow-600" />
-                          <div>
-                            <p className="text-sm text-gray-600">Best Streak</p>
-                            <p className="text-xl font-bold">28 days</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
+                  {referrals.length === 0 && ptSessions === 0 && sessions.length === 0 && (
+                    <div className="text-center py-6">
+                      <p className="text-sm text-gray-500">No performance activity recorded yet for this member.</p>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Tab 5: Promotion & Discount Eligibility */}
                 <TabsContent value="promotions" className="space-y-6 mt-0">
-                  {/* AI Insight Card */}
-                  <Card className="overflow-hidden border-green-200 bg-green-50">
-                    <CardContent className="p-6">
-                      <div className="flex items-start space-x-4">
-                        <div className="flex-shrink-0 w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
-                          <Gift className="h-6 w-6 text-white" />
+                  {/* Loyalty eligibility */}
+                  {eligibility ? (
+                    <Card className="overflow-hidden border-green-200 bg-green-50">
+                      <CardContent className="p-6">
+                        <div className="flex items-start space-x-4">
+                          <div className="flex-shrink-0 w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+                            <Gift className="h-6 w-6 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-green-900 mb-2 flex items-center gap-2">
+                              <Star className="h-4 w-4" />
+                              <span>This member is a candidate for a loyalty promotion</span>
+                            </h4>
+                            <ul className="space-y-2 text-sm text-green-800 mb-4">
+                              <li className="flex items-center space-x-2">
+                                <CheckCircle className="h-4 w-4" />
+                                <span>{eligibility.renewalCount ?? 0} renewals completed</span>
+                              </li>
+                              <li className="flex items-center space-x-2">
+                                <CheckCircle className="h-4 w-4" />
+                                <span>Lifetime spend <CurrencyGlyph /> {totalPaid.toLocaleString()}</span>
+                              </li>
+                              {eligibility.currentPlan && (
+                                <li className="flex items-center space-x-2">
+                                  <CheckCircle className="h-4 w-4" />
+                                  <span>Current plan: {eligibility.currentPlan.name}</span>
+                                </li>
+                              )}
+                            </ul>
+                            <Badge className="bg-green-600 text-white">Eligible for loyalty promotions</Badge>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-green-900 mb-2 flex items-center gap-2">
-                            <Star className="h-4 w-4" />
-                            <span>This member is a strong candidate for a Loyalty Discount</span>
-                          </h4>
-                          <ul className="space-y-2 text-sm text-green-800 mb-4">
-                            <li className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4" />
-                              <span>3 renewals completed</span>
-                            </li>
-                            <li className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4" />
-                              <span>Consistent attendance (avg. 4x per week)</span>
-                            </li>
-                            <li className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4" />
-                              <span>Lifetime spend <CurrencyGlyph /> {selectedMember.totalIncome.toLocaleString()}</span>
-                            </li>
-                          </ul>
-                          <Badge className="bg-green-600 text-white">
-                            Eligible for: 10% Renewal Discount
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card className="overflow-hidden border-primary/20 bg-gray-50">
+                      <CardContent className="p-6 flex items-center space-x-3">
+                        <AlertCircle className="h-5 w-5 text-gray-400" />
+                        <p className="text-sm text-gray-600">Not currently eligible for a loyalty promotion.</p>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                  {/* Promotion History */}
+                  {/* Reward / Promotion History */}
                   <Card className="overflow-hidden border-primary/20">
                     <CardHeader>
-                      <CardTitle className="text-lg">Promotion History</CardTitle>
+                      <CardTitle className="text-lg">Promotion &amp; Reward History</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div>
-                            <p className="font-medium">Early Bird Discount</p>
-                            <p className="text-sm text-gray-600">Applied on Jan 2024</p>
-                          </div>
-                          <Badge variant="outline" className="border-green-600 text-green-600">
-                            15% OFF
-                          </Badge>
+                      {rewards.length === 0 ? (
+                        <p className="text-sm text-gray-500 py-4 text-center">No promotions or rewards yet</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {rewards.map((r) => (
+                            <div key={r.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium">{r.rewardName}</p>
+                                <p className="text-sm text-gray-600">
+                                  {fmtDate(r.generatedDate)}{r.couponCode ? ` • Coupon: ${r.couponCode}` : ''}
+                                </p>
+                              </div>
+                              <Badge variant="outline" className={
+                                r.status === 'REDEEMED' || r.status === 'CLAIMED'
+                                  ? 'border-green-600 text-green-600'
+                                  : r.status === 'EXPIRED' || r.status === 'CANCELLED'
+                                    ? 'border-red-500 text-red-500'
+                                    : 'border-blue-600 text-blue-600'
+                              }>
+                                {r.rewardValue ? `${currencyCode} ${r.rewardValue}` : r.status}
+                              </Badge>
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div>
-                            <p className="font-medium">Referral Bonus</p>
-                            <p className="text-sm text-gray-600">Applied on Jul 2023</p>
-                          </div>
-                          <Badge variant="outline" className="border-blue-600 text-blue-600">
-                            <CurrencyGlyph /> 200 Credit
-                          </Badge>
-                        </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
 
-                  {/* Suggested Upsell */}
-                  <Card className="overflow-hidden border-purple-200 bg-purple-50">
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-3 mb-3">
-                        <TrendingUp className="h-6 w-6 text-purple-600" />
-                        <h4 className="font-semibold text-purple-900">Suggested Upsell</h4>
-                      </div>
-                      <p className="text-sm text-purple-800 mb-4">
-                        Based on their usage patterns, this member might benefit from upgrading to an Annual Pro Plan with PT sessions included.
-                      </p>
-                      <Button className="btn-primary">
-                        <Target className="h-4 w-4 mr-2" />
-                        Create Upsell Offer
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  {wallet && (
+                    <Card className="overflow-hidden border-purple-200 bg-purple-50">
+                      <CardContent className="p-6">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <Wallet className="h-6 w-6 text-purple-600" />
+                          <h4 className="font-semibold text-purple-900">Reward Wallet</h4>
+                        </div>
+                        <p className="text-2xl font-bold text-purple-800 mb-1"><CurrencyGlyph /> {wallet.balance.toLocaleString()}</p>
+                        <p className="text-sm text-purple-700">Current balance • {wallet.transactions.length} transactions</p>
+                      </CardContent>
+                    </Card>
+                  )}
                 </TabsContent>
 
                 {/* Tab 6: Workout Feedback */}
@@ -1308,250 +1298,165 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       <h4 className="font-semibold">Post-Workout Feedback</h4>
                       <p className="text-sm text-gray-600">Member satisfaction and workout reviews</p>
                     </div>
-                    <Badge className="bg-gradient-primary text-white">
-                      {workoutFeedback.length} Total Reviews
-                    </Badge>
+                    <Badge className="bg-gradient-primary text-white">{feedback.length} Total Reviews</Badge>
                   </div>
 
-                  {/* Average Ratings Summary */}
-                  <Card className="overflow-hidden border-primary/20 bg-gradient-light">
-                    <CardContent className="p-6">
-                      <h4 className="font-semibold mb-4">Average Ratings</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div className="text-center">
-                          <div className="flex items-center justify-center mb-2">
-                            <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                          </div>
-                          <p className="text-2xl font-bold text-primary">
-                            {(workoutFeedback.reduce((acc, f) => acc + f.overallSatisfaction, 0) / workoutFeedback.length).toFixed(1)}
-                          </p>
-                          <p className="text-xs text-gray-600">Overall</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center mb-2">
-                            <Activity className="h-5 w-5 text-orange-500" />
-                          </div>
-                          <p className="text-2xl font-bold text-orange-600">
-                            {(workoutFeedback.reduce((acc, f) => acc + f.workoutIntensity, 0) / workoutFeedback.length).toFixed(1)}
-                          </p>
-                          <p className="text-xs text-gray-600">Intensity</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center mb-2">
-                            <Users className="h-5 w-5 text-purple-500" />
-                          </div>
-                          <p className="text-2xl font-bold text-purple-600">
-                            {(workoutFeedback.filter(f => f.trainerRating).reduce((acc, f) => acc + (f.trainerRating || 0), 0) / workoutFeedback.filter(f => f.trainerRating).length).toFixed(1)}
-                          </p>
-                          <p className="text-xs text-gray-600">Trainer</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center mb-2">
-                            <Dumbbell className="h-5 w-5 text-blue-500" />
-                          </div>
-                          <p className="text-2xl font-bold text-blue-600">
-                            {(workoutFeedback.reduce((acc, f) => acc + f.equipmentQuality, 0) / workoutFeedback.length).toFixed(1)}
-                          </p>
-                          <p className="text-xs text-gray-600">Equipment</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center mb-2">
-                            <Building className="h-5 w-5 text-green-500" />
-                          </div>
-                          <p className="text-2xl font-bold text-green-600">
-                            {(workoutFeedback.reduce((acc, f) => acc + f.facilityRating, 0) / workoutFeedback.length).toFixed(1)}
-                          </p>
-                          <p className="text-xs text-gray-600">Facility</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Individual Feedback Cards */}
-                  <div className="space-y-4">
-                    {workoutFeedback.map((feedback) => (
-                      <Card key={feedback.id} className="border-primary/20">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <Badge className="bg-gradient-primary text-white">
-                                  {feedback.workoutType}
-                                </Badge>
-                                {feedback.className && (
-                                  <Badge variant="outline" className="border-primary/30">
-                                    {feedback.className}
-                                  </Badge>
-                                )}
-                              </div>
-                              <CardTitle className="text-base flex items-center space-x-2">
-                                <span>{feedback.trainerName || 'Self-Guided'}</span>
-                                {feedback.trainerRating && (
-                                  <div className="flex items-center">
-                                    {[...Array(5)].map((_, i) => (
-                                      <Star
-                                        key={i}
-                                        className={`h-3 w-3 ${
-                                          i < feedback.trainerRating!
-                                            ? 'text-yellow-500 fill-yellow-500'
-                                            : 'text-gray-300'
-                                        }`}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                              </CardTitle>
-                              <CardDescription>{feedback.date}</CardDescription>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="flex items-center space-x-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={`h-4 w-4 ${
-                                      i < feedback.overallSatisfaction
-                                        ? 'text-yellow-500 fill-yellow-500'
-                                        : 'text-gray-300'
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          {/* Ratings Grid */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-lg">
-                            <div>
-                              <p className="text-xs text-gray-600 mb-1">Intensity</p>
-                              <div className="flex items-center space-x-1">
-                                <Activity className="h-3 w-3 text-orange-500" />
-                                <span className="text-sm font-semibold">{feedback.workoutIntensity}/5</span>
-                              </div>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-600 mb-1">Equipment</p>
-                              <div className="flex items-center space-x-1">
-                                <Dumbbell className="h-3 w-3 text-blue-500" />
-                                <span className="text-sm font-semibold">{feedback.equipmentQuality}/5</span>
-                              </div>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-600 mb-1">Facility</p>
-                              <div className="flex items-center space-x-1">
-                                <Building className="h-3 w-3 text-green-500" />
-                                <span className="text-sm font-semibold">{feedback.facilityRating}/5</span>
-                              </div>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-600 mb-1">Difficulty</p>
-                              <Badge variant="outline" className="text-xs border-primary/30">
-                                {feedback.difficultyLevel.replace('-', ' ')}
-                              </Badge>
-                            </div>
-                          </div>
-
-                          {/* Best Aspects */}
-                          {feedback.bestAspects.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                                <CheckCircle className="h-4 w-4 text-green-600 mr-1" />
-                                Best Aspects
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {feedback.bestAspects.map((aspect, idx) => (
-                                  <Badge key={idx} className="bg-green-100 text-green-700 border-green-200">
-                                    {aspect}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Areas for Improvement */}
-                          {feedback.areasForImprovement.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                                <AlertCircle className="h-4 w-4 text-orange-600 mr-1" />
-                                Areas for Improvement
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {feedback.areasForImprovement.map((area, idx) => (
-                                  <Badge key={idx} className="bg-orange-100 text-orange-700 border-orange-200">
-                                    {area}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Comments */}
-                          {feedback.comments && (
-                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                              <p className="text-sm font-medium text-blue-900 mb-1 flex items-center">
-                                <MessageSquare className="h-4 w-4 mr-1" />
-                                Member Comments
-                              </p>
-                              <p className="text-sm text-blue-800">{feedback.comments}</p>
-                            </div>
-                          )}
-
-                          {/* Suggestions */}
-                          {feedback.suggestions && (
-                            <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
-                              <p className="text-sm font-medium text-purple-900 mb-1 flex items-center">
-                                <Gift className="h-4 w-4 mr-1" />
-                                Suggestions
-                              </p>
-                              <p className="text-sm text-purple-800">{feedback.suggestions}</p>
-                            </div>
-                          )}
-
-                          {/* Additional Metrics */}
-                          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-200">
+                  {feedback.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Star className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-600">No workout feedback submitted yet</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Card className="overflow-hidden border-primary/20 bg-gradient-light">
+                        <CardContent className="p-6">
+                          <h4 className="font-semibold mb-4">Average Ratings</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="text-center">
-                              <p className="text-xs text-gray-600 mb-1">Energy After</p>
-                              <Badge
-                                className={
-                                  feedback.energyAfterWorkout === 'high'
-                                    ? 'bg-green-100 text-green-700'
-                                    : feedback.energyAfterWorkout === 'medium'
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-red-100 text-red-700'
-                                }
-                              >
-                                {feedback.energyAfterWorkout}
-                              </Badge>
+                              <div className="flex items-center justify-center mb-2">
+                                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                              </div>
+                              <p className="text-2xl font-bold text-primary">
+                                {(feedback.reduce((acc, f) => acc + (f.overall_satisfaction || 0), 0) / feedback.length).toFixed(1)}
+                              </p>
+                              <p className="text-xs text-gray-600">Overall</p>
                             </div>
                             <div className="text-center">
-                              <p className="text-xs text-gray-600 mb-1">Likely to Return</p>
-                              <p className="text-sm font-semibold text-primary">{feedback.likelyToReturn}/10</p>
+                              <div className="flex items-center justify-center mb-2">
+                                <Activity className="h-5 w-5 text-orange-500" />
+                              </div>
+                              <p className="text-2xl font-bold text-orange-600">
+                                {(feedback.reduce((acc, f) => acc + (f.workout_intensity || 0), 0) / feedback.length).toFixed(1)}
+                              </p>
+                              <p className="text-xs text-gray-600">Intensity</p>
                             </div>
                             <div className="text-center">
-                              <p className="text-xs text-gray-600 mb-1">Recommend</p>
-                              <Badge
-                                className={
-                                  feedback.recommendWorkout === 'yes'
-                                    ? 'bg-green-100 text-green-700'
-                                    : feedback.recommendWorkout === 'maybe'
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-red-100 text-red-700'
-                                }
-                              >
-                                {feedback.recommendWorkout}
-                              </Badge>
+                              <div className="flex items-center justify-center mb-2">
+                                <Dumbbell className="h-5 w-5 text-blue-500" />
+                              </div>
+                              <p className="text-2xl font-bold text-blue-600">
+                                {(feedback.reduce((acc, f) => acc + (f.equipment_quality || 0), 0) / feedback.length).toFixed(1)}
+                              </p>
+                              <p className="text-xs text-gray-600">Equipment</p>
+                            </div>
+                            <div className="text-center">
+                              <div className="flex items-center justify-center mb-2">
+                                <Building className="h-5 w-5 text-green-500" />
+                              </div>
+                              <p className="text-2xl font-bold text-green-600">
+                                {(feedback.reduce((acc, f) => acc + (f.facility_rating || 0), 0) / feedback.length).toFixed(1)}
+                              </p>
+                              <p className="text-xs text-gray-600">Facility</p>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
-                  </div>
+
+                      <div className="space-y-4">
+                        {feedback.map((f) => (
+                          <Card key={f.id} className="border-primary/20">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <Badge className="bg-gradient-primary text-white">{f.workout_type || 'Workout'}</Badge>
+                                    {f.class_name && <Badge variant="outline" className="border-primary/30">{f.class_name}</Badge>}
+                                  </div>
+                                  <CardTitle className="text-base">{f.trainer_name || 'Self-Guided'}</CardTitle>
+                                  <CardDescription>{fmtDate(f.submitted_at)}</CardDescription>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star key={i} className={`h-4 w-4 ${i < (f.overall_satisfaction || 0) ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                                  ))}
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-lg">
+                                <div>
+                                  <p className="text-xs text-gray-600 mb-1">Intensity</p>
+                                  <span className="text-sm font-semibold">{f.workout_intensity ?? '—'}/5</span>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-600 mb-1">Equipment</p>
+                                  <span className="text-sm font-semibold">{f.equipment_quality ?? '—'}/5</span>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-600 mb-1">Facility</p>
+                                  <span className="text-sm font-semibold">{f.facility_rating ?? '—'}/5</span>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-600 mb-1">Difficulty</p>
+                                  <Badge variant="outline" className="text-xs border-primary/30">{(f.difficulty_level || '—').replace('-', ' ')}</Badge>
+                                </div>
+                              </div>
+
+                              {f.best_aspects && f.best_aspects.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                    <CheckCircle className="h-4 w-4 text-green-600 mr-1" />
+                                    Best Aspects
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {f.best_aspects.map((aspect, idx) => (
+                                      <Badge key={idx} className="bg-green-100 text-green-700 border-green-200">{aspect}</Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {f.areas_for_improvement && f.areas_for_improvement.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                    <AlertCircle className="h-4 w-4 text-orange-600 mr-1" />
+                                    Areas for Improvement
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {f.areas_for_improvement.map((area, idx) => (
+                                      <Badge key={idx} className="bg-orange-100 text-orange-700 border-orange-200">{area}</Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {f.comments && (
+                                <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                  <p className="text-sm font-medium text-blue-900 mb-1 flex items-center">
+                                    <MessageSquare className="h-4 w-4 mr-1" />
+                                    Member Comments
+                                  </p>
+                                  <p className="text-sm text-blue-800">{f.comments}</p>
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-200">
+                                <div className="text-center">
+                                  <p className="text-xs text-gray-600 mb-1">Likely to Return</p>
+                                  <p className="text-sm font-semibold text-primary">{f.likely_to_return ?? '—'}/10</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-xs text-gray-600 mb-1">Recommend</p>
+                                  <Badge className={
+                                    f.recommend_workout === 'yes' ? 'bg-green-100 text-green-700'
+                                      : f.recommend_workout === 'maybe' ? 'bg-yellow-100 text-yellow-700'
+                                        : 'bg-red-100 text-red-700'
+                                  }>
+                                    {f.recommend_workout || '—'}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </TabsContent>
 
                 {/* Tab 7: Communication History */}
                 <TabsContent value="communication" className="space-y-6 mt-0">
-                  {/* Analytics Summary Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <Card className="overflow-hidden border-primary/20">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -1563,49 +1468,23 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         </div>
                       </CardContent>
                     </Card>
-
-                    <Card className="overflow-hidden border-blue-200 bg-blue-50">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs text-blue-600 mb-1">Transactional</p>
-                            <p className="text-2xl font-bold text-blue-700">{communicationStats.transactional}</p>
-                          </div>
-                          <CheckCircle className="h-8 w-8 text-blue-300" />
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="overflow-hidden border-purple-200 bg-purple-50">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs text-purple-600 mb-1">Campaign</p>
-                            <p className="text-2xl font-bold text-purple-700">{communicationStats.campaign}</p>
-                          </div>
-                          <Gift className="h-8 w-8 text-purple-300" />
-                        </div>
-                      </CardContent>
-                    </Card>
-
                     <Card className="overflow-hidden border-green-200 bg-green-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-green-600 mb-1">Delivered</p>
-                            <p className="text-2xl font-bold text-green-700">{communicationStats.delivered}</p>
+                            <p className="text-xs text-green-600 mb-1">Sent</p>
+                            <p className="text-2xl font-bold text-green-700">{communicationStats.sent}</p>
                           </div>
                           <CheckCircle className="h-8 w-8 text-green-300" />
                         </div>
                       </CardContent>
                     </Card>
-
                     <Card className="overflow-hidden border-red-200 bg-red-50">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs text-red-600 mb-1">Failed/Pending</p>
-                            <p className="text-2xl font-bold text-red-700">{communicationStats.failed}</p>
+                            <p className="text-2xl font-bold text-red-700">{communicationStats.failedOrPending}</p>
                           </div>
                           <AlertCircle className="h-8 w-8 text-red-300" />
                         </div>
@@ -1613,8 +1492,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     </Card>
                   </div>
 
-                  {/* Charts Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {channelBreakdown.length > 0 && (
                     <Card className="overflow-hidden border-primary/20">
                       <CardHeader>
                         <CardTitle className="text-base">Channel Distribution</CardTitle>
@@ -1622,84 +1500,21 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       <CardContent>
                         <ResponsiveContainer width="100%" height={200}>
                           <RePieChart>
-                            <Pie
-                              data={channelBreakdown}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={50}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              paddingAngle={5}
-                              dataKey="value"
-                              label
-                            >
+                            <Pie data={channelBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={5} dataKey="value" label>
                               {channelBreakdown.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={['#0047AB', '#9333EA', '#10B981'][index]} />
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>
                             <Tooltip />
                           </RePieChart>
                         </ResponsiveContainer>
-                        <div className="flex justify-center gap-4 mt-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-[#0047AB] rounded"></div>
-                            <span className="text-xs">SMS</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-[#9333EA] rounded"></div>
-                            <span className="text-xs">Email</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-[#10B981] rounded"></div>
-                            <span className="text-xs">WhatsApp</span>
-                          </div>
-                        </div>
                       </CardContent>
                     </Card>
+                  )}
 
-                    <Card className="overflow-hidden border-primary/20">
-                      <CardHeader>
-                        <CardTitle className="text-base">Message Type Breakdown</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                          <RePieChart>
-                            <Pie
-                              data={messageTypeBreakdown}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={50}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              paddingAngle={5}
-                              dataKey="value"
-                              label
-                            >
-                              {messageTypeBreakdown.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={['#0047AB', '#00c5cb'][index]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </RePieChart>
-                        </ResponsiveContainer>
-                        <div className="flex justify-center gap-4 mt-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-[#0047AB] rounded"></div>
-                            <span className="text-xs">Transactional</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-[#00c5cb] rounded"></div>
-                            <span className="text-xs">Campaign</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Filters Bar */}
                   <Card className="overflow-hidden border-primary/20 bg-gradient-light">
                     <CardContent className="p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-medium text-gray-700 mb-2 block">Channel</label>
                           <Select value={channelFilter} onValueChange={setChannelFilter}>
@@ -1711,25 +1526,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                               <SelectItem value="sms">SMS</SelectItem>
                               <SelectItem value="email">Email</SelectItem>
                               <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                              <SelectItem value="in-app">In-App</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-
                         <div>
-                          <label className="text-sm font-medium text-gray-700 mb-2 block">Message Type</label>
-                          <Select value={messageTypeFilter} onValueChange={setMessageTypeFilter}>
-                            <SelectTrigger className="bg-white">
-                              <SelectValue placeholder="All Types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Types</SelectItem>
-                              <SelectItem value="transactional">Transactional</SelectItem>
-                              <SelectItem value="campaign">Campaign</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="md:col-span-2">
                           <label className="text-sm font-medium text-gray-700 mb-2 block">Search Messages</label>
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1742,20 +1543,14 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           </div>
                         </div>
                       </div>
-
                       <div className="flex items-center justify-between mt-4 pt-4 border-t border-primary/10">
                         <p className="text-sm text-gray-600">
-                          Showing <span className="font-semibold text-primary">{filteredCommunications.length}</span> of {communicationHistory.length} messages
+                          Showing <span className="font-semibold text-primary">{filteredCommunications.length}</span> of {communications.length} messages
                         </p>
-                        <Button variant="outline" size="sm" className="border-primary/20">
-                          <Download className="h-4 w-4 mr-2" />
-                          Export CSV
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
 
-                  {/* Message History Table */}
                   <Card className="overflow-hidden border-primary/20">
                     <CardHeader>
                       <CardTitle>Message History</CardTitle>
@@ -1767,45 +1562,33 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           <div
                             key={msg.id}
                             className="p-4 border border-gray-200 rounded-lg hover:border-primary/40 hover:bg-gradient-light cursor-pointer transition-all duration-200 group"
-                            onClick={() => {
-                              setSelectedMessage(msg);
-                              setIsDrawerOpen(true);
-                            }}
+                            onClick={() => { setSelectedMessage(msg); setIsDrawerOpen(true); }}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-3 flex-1">
-                                <div className="mt-1">
-                                  {getChannelIcon(msg.channel)}
-                                </div>
+                                <div className="mt-1">{getChannelIcon(msg.type)}</div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center space-x-2 mb-1">
                                     <h4 className="font-semibold text-gray-900 truncate">{msg.subject}</h4>
-                                    <Badge
-                                      variant="outline"
-                                      className={
-                                        msg.type === 'transactional'
-                                          ? 'border-blue-300 text-blue-700 text-xs'
-                                          : 'border-purple-300 text-purple-700 text-xs'
-                                      }
-                                    >
-                                      {msg.type}
-                                    </Badge>
+                                    <Badge variant="outline" className="border-blue-300 text-blue-700 text-xs capitalize">{msg.type}</Badge>
                                   </div>
                                   <p className="text-sm text-gray-600 truncate mb-2">{msg.content}</p>
                                   <div className="flex items-center space-x-4 text-xs text-gray-500">
                                     <span className="flex items-center">
                                       <Clock className="h-3 w-3 mr-1" />
-                                      {msg.date} at {msg.time}
+                                      {fmtDateTime(msg.sent_date || msg.scheduled_date)}
                                     </span>
-                                    <span className="flex items-center">
-                                      <User className="h-3 w-3 mr-1" />
-                                      {msg.sentBy}
-                                    </span>
+                                    {msg.sent_by && (
+                                      <span className="flex items-center">
+                                        <User className="h-3 w-3 mr-1" />
+                                        {msg.sent_by}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </div>
                               <div className="flex items-center space-x-2">
-                                {getStatusBadge(msg.status)}
+                                {getMessageStatusBadge(msg.status)}
                                 <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-primary transition-colors" />
                               </div>
                             </div>
@@ -1816,123 +1599,41 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       {filteredCommunications.length === 0 && (
                         <div className="text-center py-12">
                           <Send className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                          <p className="text-gray-600">No messages found matching your filters</p>
+                          <p className="text-gray-600">
+                            {communications.length === 0 ? 'No messages sent to this member yet' : 'No messages found matching your filters'}
+                          </p>
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Smart Insights Panel */}
-                  <Card className="overflow-hidden border-primary/20 bg-gradient-light">
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
-                        <Activity className="h-5 w-5 text-primary" />
-                        <span>Communication Effectiveness Insights</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-white rounded-lg border border-primary/10">
-                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
-                            <TrendingUp className="h-4 w-4 text-green-600 mr-2" />
-                            Highest Engagement
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            <span className="font-semibold text-green-700">WhatsApp</span> - 92% read rate
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">Best channel for urgent communications</p>
-                        </div>
-
-                        <div className="p-4 bg-white rounded-lg border border-primary/10">
-                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
-                            <AlertCircle className="h-4 w-4 text-orange-600 mr-2" />
-                            Least Responsive
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            <span className="font-semibold text-orange-700">Email</span> - 42% open rate
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">Consider SMS or WhatsApp for time-sensitive messages</p>
-                        </div>
-
-                        <div className="p-4 bg-white rounded-lg border border-primary/10">
-                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
-                            <Trophy className="h-4 w-4 text-purple-600 mr-2" />
-                            Most Engaged Campaign
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            <span className="font-semibold text-purple-700">"Referral Bonus – July"</span>
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">Generated 5 new member referrals</p>
-                        </div>
-
-                        <div className="p-4 bg-white rounded-lg border border-primary/10">
-                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
-                            <Target className="h-4 w-4 text-blue-600 mr-2" />
-                            Suggested Action
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            Send <span className="font-semibold text-blue-700">Renewal Discount Reminder</span>
-                          </p>
-                          <Button size="sm" className="btn-primary mt-2">
-                            <Send className="h-3 w-3 mr-1" />
-                            Send Now
-                          </Button>
-                        </div>
-                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>
 
                 {/* Tab 8: Transactions */}
                 <TabsContent value="transactions" className="space-y-6 mt-0">
-                  {/* Header with Description and Actions */}
-                  <div className="flex items-start justify-between mb-6">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Transactions</h3>
-                      <p className="text-sm text-gray-600">
-                        All recorded payments and financial activities of this member, including membership renewals, add-ons, and POS purchases.
-                      </p>
-                    </div>
-                    <Button
-                      className="btn-primary"
-                      onClick={() => setIsMailCorporateModalOpen(true)}
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      Mail to Corporate
-                    </Button>
+                  <div className="mb-6">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Transactions</h3>
+                    <p className="text-sm text-gray-600">
+                      All recorded payments and financial activities of this member, including membership renewals and add-ons.
+                    </p>
                   </div>
 
-                  {/* Filters */}
                   <Card className="overflow-hidden border-primary/20">
                     <CardContent className="p-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Date Range Filter */}
                         <div>
                           <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-gray-500" />
                             <span>From Date</span>
                           </label>
-                          <Input
-                            type="date"
-                            value={transactionDateFrom}
-                            onChange={(e) => setTransactionDateFrom(e.target.value)}
-                            className="w-full"
-                          />
+                          <Input type="date" value={transactionDateFrom} onChange={(e) => setTransactionDateFrom(e.target.value)} className="w-full" />
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-gray-500" />
                             <span>To Date</span>
                           </label>
-                          <Input
-                            type="date"
-                            value={transactionDateTo}
-                            onChange={(e) => setTransactionDateTo(e.target.value)}
-                            className="w-full"
-                          />
+                          <Input type="date" value={transactionDateTo} onChange={(e) => setTransactionDateTo(e.target.value)} className="w-full" />
                         </div>
-
-                        {/* Transaction Type Filter */}
                         <div>
                           <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                             <Filter className="h-4 w-4 text-gray-500" />
@@ -1944,21 +1645,17 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="all">All Transactions</SelectItem>
-                              <SelectItem value="membership">Membership Only</SelectItem>
-                              <SelectItem value="pos">POS Only</SelectItem>
-                              <SelectItem value="addon">Add-ons / Upgrades</SelectItem>
-                              <SelectItem value="dues">Dues / Refunds</SelectItem>
+                              <SelectItem value="membership">Membership / Invoices</SelectItem>
+                              <SelectItem value="payment">Payments</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                       </div>
-
-                      {/* Search and Reset */}
                       <div className="flex items-center gap-3 mt-4">
                         <div className="relative flex-1">
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                           <Input
-                            placeholder="Search by invoice number or keyword..."
+                            placeholder="Search by receipt number or keyword..."
                             value={transactionSearch}
                             onChange={(e) => setTransactionSearch(e.target.value)}
                             className="pl-10"
@@ -1980,13 +1677,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     </CardContent>
                   </Card>
 
-                  {/* Transactions Table */}
                   <Card className="border-primary/20 shadow-md rounded-2xl overflow-hidden">
                     <CardHeader className="bg-gradient-primary text-white">
                       <CardTitle>Transaction History</CardTitle>
-                      <CardDescription className="text-white/80">
-                        Complete financial activity log
-                      </CardDescription>
+                      <CardDescription className="text-white/80">Complete financial activity log</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
                       <div className="overflow-x-auto">
@@ -1994,8 +1688,8 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           <TableHeader className="bg-gray-50 sticky top-0 z-10">
                             <TableRow>
                               <TableHead className="table-header">Date</TableHead>
-                              <TableHead className="table-header">Transaction Type</TableHead>
-                              <TableHead className="table-header">Reference / Invoice No.</TableHead>
+                              <TableHead className="table-header">Type</TableHead>
+                              <TableHead className="table-header">Receipt No.</TableHead>
                               <TableHead className="table-header">Mode</TableHead>
                               <TableHead className="table-header text-right">Amount ({currencyCode})</TableHead>
                               <TableHead className="table-header">Remarks</TableHead>
@@ -2003,131 +1697,63 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {transactionsData.map((transaction, index) => (
-                              <TableRow
-                                key={transaction.id}
-                                className={`${
-                                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                } hover:bg-gradient-light transition-colors`}
-                              >
-                                <TableCell className="font-medium">{transaction.date}</TableCell>
+                            {filteredTransactionLines.map((line, index) => (
+                              <TableRow key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gradient-light transition-colors`}>
+                                <TableCell className="font-medium">{fmtDate(line.date)}</TableCell>
                                 <TableCell>
-                                  <Badge
-                                    className={
-                                      transaction.transactionType.includes('Membership')
-                                        ? 'bg-purple-100 text-purple-700'
-                                        : transaction.transactionType.includes('POS')
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : transaction.transactionType.includes('Add-on')
-                                        ? 'bg-orange-100 text-orange-700'
-                                        : transaction.transactionType.includes('Upgrade')
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-gray-100 text-gray-700'
-                                    }
-                                  >
-                                    {transaction.transactionType}
+                                  <Badge className={line.type === 'Invoice' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}>
+                                    {line.type}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant="outline" className="border-primary/30 font-mono">
-                                    {transaction.invoiceNo}
-                                  </Badge>
+                                  <Badge variant="outline" className="border-primary/30 font-mono">{line.receipt_no}</Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge
-                                    className={
-                                      transaction.mode === 'Card'
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : transaction.mode === 'Cash'
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-orange-100 text-orange-700'
-                                    }
-                                  >
-                                    {transaction.mode}
-                                  </Badge>
+                                  <Badge className="bg-blue-100 text-blue-700">{line.payment_method || '—'}</Badge>
                                 </TableCell>
-                                <TableCell className="text-right font-semibold text-green-600">
-                                  {transaction.amount.toLocaleString()}
+                                <TableCell className={`text-right font-semibold ${line.credit > 0 ? 'text-green-600' : 'text-gray-700'}`}>
+                                  {(line.credit > 0 ? line.credit : line.debit).toLocaleString()}
                                 </TableCell>
-                                <TableCell className="text-gray-600">{transaction.remarks}</TableCell>
+                                <TableCell className="text-gray-600">{line.description}</TableCell>
                                 <TableCell>
-                                  <div className="flex items-center justify-center space-x-1">
+                                  <div className="flex items-center justify-center">
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="h-8 w-8 p-0 hover:bg-blue-50 group"
-                                      onClick={() => toast.success('Opening receipt...')}
+                                      onClick={() => handleViewReceiptLine(line.id)}
                                     >
                                       <Eye className="h-4 w-4 text-gray-600 group-hover:text-blue-600" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0 hover:bg-green-50 group"
-                                      onClick={() =>
-                                        toast.success(`Downloading ${transaction.invoiceNo}...`)
-                                      }
-                                    >
-                                      <Download className="h-4 w-4 text-gray-600 group-hover:text-green-600" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0 hover:bg-purple-50 group"
-                                      onClick={() => {
-                                        window.print();
-                                        toast.success('Opening print dialog...');
-                                      }}
-                                    >
-                                      <Printer className="h-4 w-4 text-gray-600 group-hover:text-purple-600" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0 hover:bg-orange-50 group"
-                                      onClick={() => toast.success('Share options opened...')}
-                                    >
-                                      <Share className="h-4 w-4 text-gray-600 group-hover:text-orange-600" />
                                     </Button>
                                   </div>
                                 </TableCell>
                               </TableRow>
                             ))}
+                            {filteredTransactionLines.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={7} className="text-center text-gray-500 py-8">No transactions found</TableCell>
+                              </TableRow>
+                            )}
                           </TableBody>
                         </Table>
                       </div>
 
-                      {/* Summary Footer */}
                       <div className="border-t-2 border-primary/20 p-6 bg-gradient-light">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Total Transactions</p>
-                            <p className="text-2xl font-bold text-primary">{transactionsData.length}</p>
+                            <p className="text-2xl font-bold text-primary">{filteredTransactionLines.length}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-600 mb-1">Total Amount</p>
-                            <p className="text-2xl font-bold text-green-600">
-                              <CurrencyGlyph /> {transactionsData.reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600 mb-1">Membership Transactions</p>
+                            <p className="text-sm text-gray-600 mb-1">Total Billed</p>
                             <p className="text-2xl font-bold text-purple-600">
-                              <CurrencyGlyph />{' '}
-                              {transactionsData
-                                .filter((t) => t.transactionType.includes('Membership'))
-                                .reduce((sum, t) => sum + t.amount, 0)
-                                .toLocaleString()}
+                              <CurrencyGlyph /> {filteredTransactionLines.filter(l => l.type === 'Invoice').reduce((s, l) => s + l.debit, 0).toLocaleString()}
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-600 mb-1">POS Purchases</p>
-                            <p className="text-2xl font-bold text-blue-600">
-                              <CurrencyGlyph />{' '}
-                              {transactionsData
-                                .filter((t) => t.transactionType.includes('POS'))
-                                .reduce((sum, t) => sum + t.amount, 0)
-                                .toLocaleString()}
+                            <p className="text-sm text-gray-600 mb-1">Total Paid</p>
+                            <p className="text-2xl font-bold text-green-600">
+                              <CurrencyGlyph /> {filteredTransactionLines.reduce((s, l) => s + l.credit, 0).toLocaleString()}
                             </p>
                           </div>
                         </div>
@@ -2136,58 +1762,57 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   </Card>
                 </TabsContent>
 
-                {/* Tab 9: Notes / Attachments */}
+                {/* Tab 9: Notes */}
                 <TabsContent value="notes" className="space-y-4 mt-0">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold">Staff Notes</h4>
-                    <Button size="sm" className="btn-primary">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Note
-                    </Button>
+                  <div className="mb-4">
+                    <h4 className="font-semibold mb-2">Staff Notes</h4>
+                    <div className="flex gap-2">
+                      <Textarea
+                        placeholder="Add a note about this member..."
+                        rows={2}
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        className="btn-primary self-end"
+                        disabled={!newNote.trim() || savingNote}
+                        onClick={handleAddNote}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Note
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
-                    <Card className="overflow-hidden border-primary/20">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="bg-gradient-primary text-white text-xs">
-                                TS
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="text-sm font-medium">Trainer Sara</p>
-                              <p className="text-xs text-gray-500">09 Oct 2025</p>
+                    {notes.map((note) => (
+                      <Card key={note.id} className="overflow-hidden border-primary/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="bg-gradient-primary text-white text-xs">
+                                  {initialsOf(note.created_by || 'Staff')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium">{note.created_by || 'Staff'}</p>
+                                <p className="text-xs text-gray-500">{fmtDateTime(note.created_at)}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <p className="text-sm text-gray-700">
-                          Interested in Boxing Add-on. Follow up next week.
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="overflow-hidden border-primary/20">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="bg-gradient-primary text-white text-xs">
-                                AD
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="text-sm font-medium">Admin</p>
-                              <p className="text-xs text-gray-500">03 Oct 2025</p>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-700">
-                          Requested early morning slot. Scheduled for 6 AM sessions.
-                        </p>
-                      </CardContent>
-                    </Card>
+                          <p className="text-sm text-gray-700">{note.content}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                    {notes.length === 0 && (
+                      <div className="text-center py-12">
+                        <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                        <p className="text-gray-600">No notes yet — add the first one above</p>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
               </CardContent>
@@ -2204,14 +1829,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <SheetHeader>
                 <div className="flex items-center justify-between">
                   <SheetTitle className="flex items-center space-x-2">
-                    {getChannelIcon(selectedMessage.channel)}
+                    {getChannelIcon(selectedMessage.type)}
                     <span>Message Details</span>
                   </SheetTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsDrawerOpen(false)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setIsDrawerOpen(false)}>
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
@@ -2221,7 +1842,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               </SheetHeader>
 
               <div className="mt-6 space-y-6">
-                {/* Message Header */}
                 <Card className="overflow-hidden border-primary/20">
                   <CardContent className="p-4">
                     <div className="space-y-3">
@@ -2233,43 +1853,42 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Channel</span>
                         <div className="flex items-center space-x-2">
-                          {getChannelIcon(selectedMessage.channel)}
-                          <span className="font-semibold capitalize">{selectedMessage.channel}</span>
+                          {getChannelIcon(selectedMessage.type)}
+                          <span className="font-semibold capitalize">{selectedMessage.type}</span>
                         </div>
                       </div>
                       <Separator />
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Type</span>
-                        <Badge
-                          className={
-                            selectedMessage.type === 'transactional'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-purple-100 text-purple-700'
-                          }
-                        >
-                          {selectedMessage.type}
-                        </Badge>
-                      </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Status</span>
-                        {getStatusBadge(selectedMessage.status)}
+                        {getMessageStatusBadge(selectedMessage.status)}
                       </div>
                       <Separator />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Date Sent</span>
-                        <span className="font-semibold text-sm">{selectedMessage.date} at {selectedMessage.time}</span>
+                        <span className="font-semibold text-sm">{fmtDateTime(selectedMessage.sent_date || selectedMessage.scheduled_date)}</span>
                       </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Sent By</span>
-                        <Badge variant="outline">{selectedMessage.sentBy}</Badge>
-                      </div>
+                      {selectedMessage.sent_by && (
+                        <>
+                          <Separator />
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Sent By</span>
+                            <Badge variant="outline">{selectedMessage.sent_by}</Badge>
+                          </div>
+                        </>
+                      )}
+                      {selectedMessage.recipient_count != null && (
+                        <>
+                          <Separator />
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Recipients (campaign)</span>
+                            <span className="font-semibold text-sm">{selectedMessage.recipient_count}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Message Content */}
                 <Card className="overflow-hidden border-primary/20">
                   <CardHeader>
                     <CardTitle className="text-base">Message Content</CardTitle>
@@ -2286,34 +1905,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Delivery Report */}
-                <Card className="overflow-hidden border-primary/20 bg-gradient-light">
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center">
-                      <CheckCircle className="h-4 w-4 mr-2 text-primary" />
-                      Delivery Report
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="p-3 bg-white rounded-lg border border-primary/10">
-                      <p className="text-sm text-gray-600 mb-1">Report ID</p>
-                      <p className="text-sm font-mono text-primary">{selectedMessage.deliveryReport}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1 border-primary/20">
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    View in Channel
-                  </Button>
-                  <Button className="flex-1 btn-primary">
-                    <Send className="h-4 w-4 mr-2" />
-                    Resend Message
-                  </Button>
-                </div>
               </div>
             </>
           ) : null}
@@ -2329,35 +1920,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <span>Transfer Membership</span>
             </DialogTitle>
             <DialogDescription>
-              Transfer the remaining validity of this membership to a new member
+              Update this membership's holder details. This renames the membership in place — the current plan, dates and dues stay attached to it.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Photo Upload */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                📸 New Member Photo *
-              </Label>
-              <div className="border-2 border-dashed border-primary/30 rounded-lg p-6 text-center hover:border-primary transition-colors">
-                <div className="flex flex-col items-center space-y-2">
-                  <Camera className="h-12 w-12 text-primary/50" />
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" type="button">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Photo
-                    </Button>
-                    <Button variant="outline" size="sm" type="button">
-                      <Camera className="h-4 w-4 mr-2" />
-                      Capture
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-500">PNG, JPG up to 5MB</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Full Name */}
             <div>
               <Label htmlFor="fullName" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <User className="h-4 w-4 text-gray-500" />
@@ -2371,7 +1938,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               />
             </div>
 
-            {/* Mobile Number */}
             <div>
               <Label htmlFor="mobileNumber" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Phone className="h-4 w-4 text-gray-500" />
@@ -2386,7 +1952,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              {/* Email */}
               <div>
                 <Label htmlFor="email" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <Mail className="h-4 w-4 text-gray-500" />
@@ -2400,8 +1965,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   onChange={(e) => setTransferForm({ ...transferForm, email: e.target.value })}
                 />
               </div>
-
-              {/* Gender */}
               <div>
                 <Label htmlFor="gender" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-500" />
@@ -2420,61 +1983,42 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Date of Birth */}
-              <div>
-                <Label htmlFor="dob" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <span>Date of Birth (optional)</span>
-                </Label>
-                <Input
-                  id="dob"
-                  type="date"
-                  value={transferForm.dateOfBirth}
-                  onChange={(e) => setTransferForm({ ...transferForm, dateOfBirth: e.target.value })}
-                />
-              </div>
-
-              {/* Transfer Fee */}
-              <div>
-                <Label htmlFor="transferFee" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-gray-500" />
-                  <span>Transfer Fee ({currencyCode})</span>
-                </Label>
-                <Input
-                  id="transferFee"
-                  type="number"
-                  placeholder="100"
-                  value={transferForm.transferFee}
-                  onChange={(e) => setTransferForm({ ...transferForm, transferFee: Number(e.target.value) })}
-                />
-              </div>
+            <div>
+              <Label htmlFor="dob" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span>Date of Birth (optional)</span>
+              </Label>
+              <Input
+                id="dob"
+                type="date"
+                value={transferForm.dateOfBirth}
+                onChange={(e) => setTransferForm({ ...transferForm, dateOfBirth: e.target.value })}
+              />
             </div>
 
-            {/* Remaining Days Info */}
             <Card className="overflow-hidden border-primary/20 bg-gradient-light">
               <CardContent className="p-4">
                 <p className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-500" />
                   Remaining Plan Days
                 </p>
-                <p className="text-lg font-semibold text-primary">118 days will be transferred to the new member</p>
-                <p className="text-xs text-gray-600 mt-1">From: Ahmed Al-Mansoori → To: New Member</p>
+                <p className="text-lg font-semibold text-primary">
+                  {daysRemaining !== null ? `${daysRemaining} days will carry over to the new details` : 'No active expiry date on this membership'}
+                </p>
               </CardContent>
             </Card>
 
-            {/* Confirmation */}
             <div className="flex items-start space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <Checkbox
+              <input
+                type="checkbox"
                 id="confirmTransfer"
                 checked={transferForm.confirmTransfer}
-                onCheckedChange={(checked) => setTransferForm({ ...transferForm, confirmTransfer: checked as boolean })}
+                onChange={(e) => setTransferForm({ ...transferForm, confirmTransfer: e.target.checked })}
+                className="mt-1"
               />
               <Label htmlFor="confirmTransfer" className="text-sm text-blue-900 cursor-pointer flex items-start gap-2">
                 <CheckCircle className="h-4 w-4 mt-0.5" />
-                <span>
-                  I confirm to transfer membership to this person. The current member's plan will be deactivated and the new member will receive the remaining 118 days.
-                </span>
+                <span>I confirm these updated details for this membership.</span>
               </Label>
             </div>
           </div>
@@ -2484,240 +2028,18 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               variant="outline"
               onClick={() => {
                 setIsTransferModalOpen(false);
-                setTransferForm({
-                  photo: null,
-                  fullName: '',
-                  mobileNumber: '',
-                  email: '',
-                  gender: '',
-                  dateOfBirth: '',
-                  transferFee: 100,
-                  confirmTransfer: false,
-                });
+                setTransferForm({ fullName: '', mobileNumber: '', email: '', gender: '', dateOfBirth: '', confirmTransfer: false });
               }}
             >
               Cancel
             </Button>
             <Button
               className="btn-primary"
-              disabled={!transferForm.fullName || !transferForm.mobileNumber || !transferForm.confirmTransfer}
-              onClick={() => {
-                toast.success('Membership transferred successfully!', {
-                  description: `Transferred to ${transferForm.fullName}. Transfer fee: ${currencyCode} ${transferForm.transferFee}`,
-                });
-                setIsTransferModalOpen(false);
-                setTransferForm({
-                  photo: null,
-                  fullName: '',
-                  mobileNumber: '',
-                  email: '',
-                  gender: '',
-                  dateOfBirth: '',
-                  transferFee: 100,
-                  confirmTransfer: false,
-                });
-              }}
+              disabled={!transferForm.fullName || !transferForm.mobileNumber || !transferForm.confirmTransfer || savingTransfer}
+              onClick={handleTransfer}
             >
-              <RefreshCcw className="h-4 w-4 mr-2" />
+              {savingTransfer ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
               Transfer Membership
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Mail to Corporate Modal */}
-      <Dialog open={isMailCorporateModalOpen} onOpenChange={setIsMailCorporateModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Mail className="h-5 w-5 text-primary" />
-              <span>Send Transactions Summary to Corporate</span>
-            </DialogTitle>
-            <DialogDescription>
-              Choose which transactions to include in the corporate email
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {/* Date Range */}
-            <Card className="overflow-hidden border-primary/20 bg-gradient-light">
-              <CardContent className="p-4 space-y-3">
-                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  Date Range
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="mailDateFrom" className="text-sm text-gray-700 mb-2 block">
-                      From
-                    </Label>
-                    <Input
-                      id="mailDateFrom"
-                      type="date"
-                      value={mailCorporateForm.dateFrom}
-                      onChange={(e) =>
-                        setMailCorporateForm({ ...mailCorporateForm, dateFrom: e.target.value })
-                      }
-                      className="bg-white"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="mailDateTo" className="text-sm text-gray-700 mb-2 block">
-                      To
-                    </Label>
-                    <Input
-                      id="mailDateTo"
-                      type="date"
-                      value={mailCorporateForm.dateTo}
-                      onChange={(e) =>
-                        setMailCorporateForm({ ...mailCorporateForm, dateTo: e.target.value })
-                      }
-                      className="bg-white"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Filter Options */}
-            <Card className="overflow-hidden border-primary/20">
-              <CardContent className="p-4 space-y-3">
-                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-500" />
-                  Include
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id="includeAll"
-                      checked={mailCorporateForm.includeAll}
-                      onCheckedChange={(checked) =>
-                        setMailCorporateForm({
-                          ...mailCorporateForm,
-                          includeAll: checked as boolean,
-                          includeMembershipOnly: false,
-                        })
-                      }
-                    />
-                    <Label htmlFor="includeAll" className="text-sm cursor-pointer flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-gray-500" />
-                      <span>All Transactions</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id="includeMembership"
-                      checked={mailCorporateForm.includeMembershipOnly}
-                      onCheckedChange={(checked) =>
-                        setMailCorporateForm({
-                          ...mailCorporateForm,
-                          includeMembershipOnly: checked as boolean,
-                          includeAll: false,
-                        })
-                      }
-                    />
-                    <Label htmlFor="includeMembership" className="text-sm cursor-pointer flex items-center gap-2">
-                      <Receipt className="h-4 w-4 text-gray-500" />
-                      <span>Membership Transactions Only</span>
-                    </Label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Attach PDFs Option */}
-            <Card className="overflow-hidden border-primary/20 bg-blue-50">
-              <CardContent className="p-4">
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="attachPDFs"
-                    checked={mailCorporateForm.attachPDFs}
-                    onCheckedChange={(checked) =>
-                      setMailCorporateForm({ ...mailCorporateForm, attachPDFs: checked as boolean })
-                    }
-                  />
-                  <div>
-                    <Label htmlFor="attachPDFs" className="text-sm font-semibold text-blue-900 cursor-pointer flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-blue-700" />
-                      <span>Attach All PDFs Automatically</span>
-                    </Label>
-                    <p className="text-xs text-blue-700 mt-1">
-                      Automatically fetches and attaches all transaction receipts within the selected date range
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Summary Preview */}
-            <Card className="overflow-hidden border-primary/20">
-              <CardContent className="p-4">
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-gray-500" />
-                  Email Preview
-                </h4>
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2 text-sm">
-                  <p>
-                    <span className="font-medium">To:</span> corporate@gymbios.com
-                  </p>
-                  <p>
-                    <span className="font-medium">Subject:</span> Transaction Summary for {selectedMember.name} (
-                    {selectedMember.id})
-                  </p>
-                  <p>
-                    <span className="font-medium">Attachments:</span>{' '}
-                    {mailCorporateForm.attachPDFs ? `${transactionsData.length} PDFs` : 'None'}
-                  </p>
-                  <Separator className="my-2" />
-                  <p className="text-gray-600 italic">
-                    This email contains {mailCorporateForm.includeAll ? 'all' : 'membership-only'} transaction
-                    records
-                    {mailCorporateForm.dateFrom && mailCorporateForm.dateTo
-                      ? ` from ${mailCorporateForm.dateFrom} to ${mailCorporateForm.dateTo}`
-                      : ''}
-                    .
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsMailCorporateModalOpen(false);
-                setMailCorporateForm({
-                  dateFrom: '',
-                  dateTo: '',
-                  includeAll: true,
-                  includeMembershipOnly: false,
-                  attachPDFs: true,
-                });
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="btn-primary"
-              onClick={() => {
-                toast.success('Email sent to corporate successfully!', {
-                  description: `${transactionsData.length} transactions with ${
-                    mailCorporateForm.attachPDFs ? 'PDF attachments' : 'no attachments'
-                  }`,
-                });
-                setIsMailCorporateModalOpen(false);
-                setMailCorporateForm({
-                  dateFrom: '',
-                  dateTo: '',
-                  includeAll: true,
-                  includeMembershipOnly: false,
-                  attachPDFs: true,
-                });
-              }}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Send Mail to Corporate
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2731,13 +2053,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <UserX className="h-5 w-5" />
               <span>Deactivate Membership</span>
             </DialogTitle>
-            <DialogDescription>
-              Temporarily or permanently discontinue this member's active plan
-            </DialogDescription>
+            <DialogDescription>Mark this member's plan as inactive</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Effective Date */}
             <div>
               <Label htmlFor="effectiveDate" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-gray-500" />
@@ -2749,14 +2068,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 value={deactivateForm.effectiveDate}
                 onChange={(e) => setDeactivateForm({ ...deactivateForm, effectiveDate: e.target.value })}
               />
-              <p className="text-xs text-gray-500 mt-1">Default: Today</p>
             </div>
 
-            {/* Reason */}
             <div>
               <Label htmlFor="reason" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <FileText className="h-4 w-4 text-gray-500" />
-                <span>Reason for Deactivation (optional)</span>
+                <span>Reason for Deactivation (optional, saved as a note)</span>
               </Label>
               <Textarea
                 id="reason"
@@ -2767,98 +2084,37 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               />
             </div>
 
-            {/* Refund Section */}
-            <Card className="overflow-hidden border-orange-200 bg-orange-50">
-              <CardContent className="p-4 space-y-3">
-                <h4 className="font-semibold text-orange-900 flex items-center">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Refund Details
-                </h4>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Refund Amount */}
-                  <div>
-                    <Label htmlFor="refundAmount" className="text-sm font-medium text-orange-800 mb-2 flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-orange-700" />
-                      <span>Refund Amount ({currencyCode})</span>
-                    </Label>
-                    <Input
-                      id="refundAmount"
-                      type="number"
-                      placeholder="0"
-                      value={deactivateForm.refundAmount}
-                      onChange={(e) => setDeactivateForm({ ...deactivateForm, refundAmount: Number(e.target.value) })}
-                      className="bg-white"
-                    />
-                  </div>
-
-                  {/* Refund Mode */}
-                  <div>
-                    <Label htmlFor="refundMode" className="text-sm font-medium text-orange-800 mb-2 flex items-center gap-2">
-                      <Wallet className="h-4 w-4 text-orange-700" />
-                      <span>Refund Mode</span>
-                    </Label>
-                    <Select value={deactivateForm.refundMode} onValueChange={(value) => setDeactivateForm({ ...deactivateForm, refundMode: value })}>
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Select mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="card">Card</SelectItem>
-                        <SelectItem value="wallet">Wallet</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Return Plan Checkbox */}
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="returnPlan"
-                    checked={deactivateForm.returnPlan}
-                    onCheckedChange={(checked) => setDeactivateForm({ ...deactivateForm, returnPlan: checked as boolean })}
-                  />
-                  <Label htmlFor="returnPlan" className="text-sm text-orange-900 cursor-pointer flex items-start gap-2">
-                    <Receipt className="h-4 w-4 mt-0.5" />
-                    <span>Return purchased plan and process full/partial refund</span>
-                  </Label>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Member Stats Summary */}
             <Card className="overflow-hidden border-primary/20 bg-gradient-light">
               <CardContent className="p-4">
                 <h4 className="font-semibold text-gray-900 mb-3">Current Membership Summary</h4>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="text-gray-600">Plan</p>
-                    <p className="font-semibold">{selectedMember.currentPlan}</p>
+                    <p className="font-semibold">{member.membership_plan || member.membership_type || '—'}</p>
                   </div>
                   <div>
                     <p className="text-gray-600">Days Remaining</p>
-                    <p className="font-semibold text-orange-600">118 days</p>
+                    <p className="font-semibold text-orange-600">{daysRemaining !== null ? `${daysRemaining} days` : '—'}</p>
                   </div>
                   <div>
                     <p className="text-gray-600">Total Paid</p>
-                    <p className="font-semibold text-green-600"><CurrencyGlyph /> 1,800</p>
+                    <p className="font-semibold text-green-600"><CurrencyGlyph /> {totalPaid.toLocaleString()}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Confirmation */}
             <div className="flex items-start space-x-3 p-4 bg-red-50 rounded-lg border border-red-200">
-              <Checkbox
+              <input
+                type="checkbox"
                 id="confirmDeactivation"
                 checked={deactivateForm.confirmDeactivation}
-                onCheckedChange={(checked) => setDeactivateForm({ ...deactivateForm, confirmDeactivation: checked as boolean })}
+                onChange={(e) => setDeactivateForm({ ...deactivateForm, confirmDeactivation: e.target.checked })}
+                className="mt-1"
               />
               <Label htmlFor="confirmDeactivation" className="text-sm text-red-900 cursor-pointer flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 mt-0.5" />
-                <span>
-                  Confirm deactivation of this member's plan. This action will mark the membership as inactive{deactivateForm.refundAmount > 0 ? ` and process a refund of ${currencyCode} ${deactivateForm.refundAmount}` : ''}.
-                </span>
+                <span>Confirm deactivation of this member's plan. This action will mark the membership as inactive.</span>
               </Label>
             </div>
           </div>
@@ -2868,138 +2124,61 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               variant="outline"
               onClick={() => {
                 setIsDeactivateModalOpen(false);
-                setDeactivateForm({
-                  effectiveDate: new Date().toISOString().split('T')[0],
-                  reason: '',
-                  refundAmount: 0,
-                  refundMode: 'cash',
-                  returnPlan: false,
-                  confirmDeactivation: false,
-                });
+                setDeactivateForm({ effectiveDate: new Date().toISOString().split('T')[0], reason: '', confirmDeactivation: false });
               }}
             >
               Cancel
             </Button>
             <Button
               className="bg-red-600 hover:bg-red-700 text-white"
-              disabled={!deactivateForm.confirmDeactivation}
-              onClick={() => {
-                toast.success('Membership deactivated successfully!', {
-                  description: deactivateForm.refundAmount > 0 
-                    ? `Refund of ${currencyCode} ${deactivateForm.refundAmount} processed via ${deactivateForm.refundMode}`
-                    : 'Member plan has been deactivated',
-                });
-                setIsDeactivateModalOpen(false);
-                setDeactivateForm({
-                  effectiveDate: new Date().toISOString().split('T')[0],
-                  reason: '',
-                  refundAmount: 0,
-                  refundMode: 'cash',
-                  returnPlan: false,
-                  confirmDeactivation: false,
-                });
-              }}
+              disabled={!deactivateForm.confirmDeactivation || savingDeactivate}
+              onClick={handleDeactivate}
             >
-              <UserX className="h-4 w-4 mr-2" />
+              {savingDeactivate ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserX className="h-4 w-4 mr-2" />}
               Deactivate Membership
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Freeze / Unfreeze Membership Dialog */}
+      {/* Freeze / Unfreeze Modal */}
       <Dialog open={isFreezeDialogOpen} onOpenChange={setIsFreezeDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2 text-[#2B7A78]">
-              <Snowflake className="h-5 w-5" />
-              <span>Freeze / Unfreeze Membership</span>
+            <DialogTitle className="flex items-center space-x-2">
+              <Snowflake className="h-5 w-5 text-primary" />
+              <span>{isFrozen ? 'Unfreeze Membership' : 'Freeze Membership'}</span>
             </DialogTitle>
             <DialogDescription>
-              Temporarily pause this member's membership with plan-based limits
+              {isFrozen
+                ? 'Reactivate this membership immediately.'
+                : 'Temporarily pause this membership until a chosen date.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            {/* Member Info Card */}
-            <Card className="overflow-hidden border-[#2B7A78]/20 bg-[#DFF5F4]/30">
-              <CardContent className="p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-600">Member Name</p>
-                    <p className="font-semibold">{selectedMember.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Member ID</p>
-                    <p className="font-semibold font-mono">{selectedMember.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Current Plan</p>
-                    <p className="font-semibold text-[#2B7A78]">{selectedMember.currentPlan}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Status</p>
-                    <Badge className="bg-green-100 text-green-700">
-                      {selectedMember.status === 'active' ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Freeze Limits Info */}
-            <Card className="overflow-hidden border-[#2B7A78]/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Freeze Policy Limits</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-600">Maximum Freeze Days</p>
-                    <p className="font-bold text-[#2B7A78]">60 days</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Days Used</p>
-                    <p className="font-bold text-orange-600">0 days</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Freeze Occurrences Allowed</p>
-                    <p className="font-bold text-[#2B7A78]">2 times</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Freezes Used</p>
-                    <p className="font-bold text-orange-600">0 times</p>
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-[#2B7A78]/20">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-600">Balance Days Remaining</p>
-                    <p className="font-bold text-green-600">60 days</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Freeze Action */}
-            <div className="space-y-4">
+          {isFrozen ? (
+            <div className="py-4 space-y-4">
+              <Card className="overflow-hidden border-blue-200 bg-blue-50">
+                <CardContent className="p-4 text-sm text-blue-900">
+                  <p>This membership is currently frozen{member.freeze_reason ? `: ${member.freeze_reason}` : '.'}</p>
+                  {member.freeze_end_date && <p className="mt-1">Scheduled to end: {fmtDate(member.freeze_end_date)}</p>}
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Freeze Start Date *</Label>
+                  <Label>Freeze Start Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
+                      <Button variant="outline" className="w-full justify-start text-left">
                         <Calendar className="mr-2 h-4 w-4" />
-                        Select date
+                        {freezeStartDate ? format(freezeStartDate, 'dd MMM yyyy') : 'Select date'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        disabled={(date) => date < new Date()}
-                      />
+                      <CalendarComponent mode="single" selected={freezeStartDate} onSelect={setFreezeStartDate} />
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -3008,83 +2187,53 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                   <Label>Freeze End Date *</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
+                      <Button variant="outline" className="w-full justify-start text-left">
                         <Calendar className="mr-2 h-4 w-4" />
-                        Select date
+                        {freezeEndDate ? format(freezeEndDate, 'dd MMM yyyy') : 'Select date'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        disabled={(date) => date < new Date()}
-                      />
+                      <CalendarComponent mode="single" selected={freezeEndDate} onSelect={setFreezeEndDate} disabled={(date) => date < new Date()} />
                     </PopoverContent>
                   </Popover>
                 </div>
               </div>
 
-              {/* Auto Unfreeze Toggle */}
-              <div className="flex items-center justify-between p-4 border border-[#2B7A78]/20 rounded-lg bg-[#F9FAFB]">
-                <div>
-                  <Label className="text-sm font-medium">Auto Unfreeze on End Date</Label>
-                  <p className="text-xs text-gray-600 mt-1">
-                    Automatically reactivate membership when freeze period ends
-                  </p>
-                </div>
-                <Switch defaultChecked={true} />
-              </div>
-
-              {/* Notes */}
               <div className="space-y-2">
-                <Label>Notes (Optional)</Label>
+                <Label>Reason (Optional)</Label>
                 <Textarea
                   placeholder="Add reason or notes for this freeze..."
                   rows={3}
+                  value={freezeReason}
+                  onChange={(e) => setFreezeReason(e.target.value)}
                 />
               </div>
-
-              {/* Info Alert */}
-              <Card className="overflow-hidden border-blue-200 bg-blue-50">
-                <CardContent className="p-3">
-                  <div className="flex items-start space-x-2">
-                    <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-                    <div className="text-xs text-blue-900">
-                      <p className="font-medium mb-1">Freeze Policy Information</p>
-                      <ul className="list-disc list-inside space-y-0.5 text-blue-800">
-                        <li>This plan allows up to 60 days of freeze</li>
-                        <li>No charges for freeze days within the limit</li>
-                        <li>Additional days will be charged at <CurrencyGlyph /> 10/day</li>
-                        <li>Member can freeze membership up to 2 times during the plan period</li>
-                      </ul>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
-          </div>
+          )}
 
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsFreezeDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsFreezeDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              className="bg-[#E63946] hover:bg-[#d12935] text-white"
-              onClick={() => {
-                toast.success('Membership frozen successfully', {
-                  description: 'Member will receive notification via Email, SMS & WhatsApp',
-                });
-                setIsFreezeDialogOpen(false);
-              }}
-            >
-              <Snowflake className="h-4 w-4 mr-2" />
-              Freeze Membership
-            </Button>
+            {isFrozen ? (
+              <Button
+                className="bg-[#2B7A78] hover:bg-[#236664] text-white"
+                disabled={savingFreeze}
+                onClick={handleUnfreeze}
+              >
+                {savingFreeze ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Snowflake className="h-4 w-4 mr-2" />}
+                Unfreeze Membership
+              </Button>
+            ) : (
+              <Button
+                className="bg-[#E63946] hover:bg-[#d12935] text-white"
+                disabled={!freezeEndDate || savingFreeze}
+                onClick={handleFreeze}
+              >
+                {savingFreeze ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Snowflake className="h-4 w-4 mr-2" />}
+                Freeze Membership
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3092,5 +2241,3 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     </div>
   );
 }
-
-

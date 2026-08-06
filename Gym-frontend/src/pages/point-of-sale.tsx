@@ -130,6 +130,7 @@ interface CartItem {
   quantity: number;
   discount: number;
   total: number;
+  taxRate: number; // per-product tax rate (%), mirrors Product.taxRate — the backend is authoritative and recomputes this from the DB
   productId?: number; // database ID for API calls
   sku?: string;
 }
@@ -401,6 +402,7 @@ export function PointOfSale() {
           quantity: 1,
           discount: 0,
           total: product.sellingPrice ?? product.price,
+          taxRate: product.taxRate ?? 0,
           productId: typeof product.id === 'number' ? product.id : undefined,
           sku: product.sku,
         }];
@@ -456,9 +458,15 @@ export function PointOfSale() {
   const recalculateInvoice = (items: CartItem[]): Invoice => {
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const totalDiscount = items.reduce((sum, item) => sum + (item.price * item.quantity * item.discount / 100), 0);
-    const tax = (subtotal - totalDiscount) * 0.05;
+    // Tax is per line, using each product's own configured rate — not a flat cart-wide rate.
+    // This is a display estimate only; the backend recomputes and stores the authoritative
+    // figure from each product's DB tax rate when the sale is submitted.
+    const tax = items.reduce((sum, item) => {
+      const lineNet = item.price * item.quantity * (1 - item.discount / 100);
+      return sum + lineNet * ((item.taxRate ?? 0) / 100);
+    }, 0);
     const total = subtotal - totalDiscount + tax;
-    
+
     return { items, subtotal, totalDiscount, tax, total };
   };
 
@@ -664,7 +672,7 @@ export function PointOfSale() {
       <p>TXN: ${txn.transactionNumber}</p><p>Date: ${new Date(txn.createdAt).toLocaleString()}</p><p>Customer: ${txn.memberName}</p><p>Status: ${txn.status}</p><hr>
       <table><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>${items}</tbody></table><hr>
       <p class="right">Subtotal: ${currencyCode} ${Number(txn.subtotal).toFixed(2)}</p>
-      <p class="right">VAT (5%): ${currencyCode} ${Number(txn.taxAmount).toFixed(2)}</p>
+      <p class="right">Tax: ${currencyCode} ${Number(txn.taxAmount).toFixed(2)}</p>
       <p class="right" style="font-size:15px;font-weight:bold">TOTAL: ${currencyCode} ${Number(txn.totalAmount).toFixed(2)}</p>
       <p>Payment: ${txn.paymentMethod}</p><p style="text-align:center;margin-top:20px">Thank you for your visit!</p>
       </body></html>`);
@@ -1424,7 +1432,7 @@ export function PointOfSale() {
                   </div>
                 )}
                 <div className="flex justify-between text-sm text-gray-600">
-                  <span>VAT (5%):</span>
+                  <span>Tax:</span>
                   <span><CurrencyValue amount={currentInvoice.tax} /></span>
                 </div>
                 <Separator />

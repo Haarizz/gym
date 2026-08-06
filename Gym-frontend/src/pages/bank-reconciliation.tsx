@@ -8,6 +8,7 @@ import {
   MatchCandidate,
   AutoMatchSuggestion,
 } from "../utils/supabase/bank-reconciliation-service";
+import { accountHeadsService } from "../utils/supabase/account-heads-service";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -70,13 +71,6 @@ interface BankTransaction {
   type: "Credit" | "Debit";
 }
 
-interface BankAccount {
-  id: string;
-  name: string;
-  accountNumber: string;
-  bank: string;
-}
-
 interface LineForm {
   id?: number;
   transactionDate: string;
@@ -95,11 +89,8 @@ interface ReconciliationForm {
   lines: LineForm[];
 }
 
-const PREDEFINED_ACCOUNTS: BankAccount[] = [
-  { id: "BANK001", name: "Emirates NBD Current", accountNumber: "****-4521", bank: "Emirates NBD" },
-  { id: "BANK002", name: "ADCB Business Account", accountNumber: "****-8967", bank: "ADCB" },
-  { id: "BANK003", name: "FAB Operational Account", accountNumber: "****-1234", bank: "FAB" },
-];
+/** Sentinel for "show every bank account" in the account filter — real account names come from the reconciliations actually on file, never hardcoded. */
+const ALL_ACCOUNTS = "__ALL__";
 
 const emptyLine: LineForm = {
   transactionDate: new Date().toISOString().split("T")[0],
@@ -110,7 +101,7 @@ const emptyLine: LineForm = {
 };
 
 const emptyForm: ReconciliationForm = {
-  bankAccountName: PREDEFINED_ACCOUNTS[0].name,
+  bankAccountName: "",
   statementDate: new Date().toISOString().split("T")[0],
   openingBalance: "",
   closingBalance: "",
@@ -127,10 +118,11 @@ function formatDate(dateStr?: string) {
 
 export function BankReconciliation() {
   const { currencyCode } = useCurrency();
-  const [selectedAccount, setSelectedAccount] = useState<BankAccount>(PREDEFINED_ACCOUNTS[0]);
+  const [selectedAccountName, setSelectedAccountName] = useState<string>(ALL_ACCOUNTS);
   const [allReconciliations, setAllReconciliations] = useState<ApiReconciliation[]>([]);
   const [currentReconciliation, setCurrentReconciliation] = useState<ApiReconciliation | null>(null);
   const [allTransactions, setAllTransactions] = useState<BankTransaction[]>([]);
+  const [systemBankAccounts, setSystemBankAccounts] = useState<{name: string, code: string}[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   const [dateFilter, setDateFilter] = useState<string>("all");
@@ -192,24 +184,54 @@ export function BankReconciliation() {
   const loadReconciliations = useCallback(async () => {
     setLoadingData(true);
     try {
-      const data = await bankReconciliationService.getAll(selectedAccount.name);
+      // Always fetch every account — the bank account filter below is derived from whatever
+      // account names actually exist on file, not a fixed list, so we need the full set to know
+      // what those names are.
+      const [data, accounts] = await Promise.all([
+        bankReconciliationService.getAll(),
+        accountHeadsService.getBankAccounts().catch(() => [])
+      ]);
       setAllReconciliations(data);
-      if (data.length > 0) {
-        const rec = data[0];
-        setCurrentReconciliation(rec);
-        setAllTransactions(mapLinesToTransactions(rec));
-      } else {
-        setCurrentReconciliation(null);
-        setAllTransactions([]);
-      }
+      setSystemBankAccounts(accounts.map(a => ({ name: a.name, code: a.code })));
     } catch (err: any) {
       toast.error(err.message || "Failed to load reconciliations");
     } finally {
       setLoadingData(false);
     }
-  }, [selectedAccount.name]);
+  }, []);
 
   useEffect(() => { loadReconciliations(); }, [loadReconciliations]);
+
+  /** Real bank account names, taken from both system accounts and any existing reconciliations. */
+  const bankAccountNames = useMemo(
+    () => Array.from(new Set([...systemBankAccounts.map(a => a.name), ...allReconciliations.map(r => r.bankAccountName)])).sort(),
+    [allReconciliations, systemBankAccounts]
+  );
+  
+  const getAccountDisplayName = useCallback((name: string) => {
+    const acc = systemBankAccounts.find(a => a.name === name);
+    return acc ? `${acc.code} - ${name}` : name;
+  }, [systemBankAccounts]);
+
+  const visibleReconciliations = useMemo(
+    () => selectedAccountName === ALL_ACCOUNTS
+      ? allReconciliations
+      : allReconciliations.filter(r => r.bankAccountName === selectedAccountName),
+    [allReconciliations, selectedAccountName]
+  );
+
+  useEffect(() => {
+    // The selected account may no longer exist (its last reconciliation was just deleted) — fall
+    // back to "all accounts" instead of silently filtering to nothing.
+    if (selectedAccountName !== ALL_ACCOUNTS && !bankAccountNames.includes(selectedAccountName)) {
+      setSelectedAccountName(ALL_ACCOUNTS);
+      return;
+    }
+    const rec = visibleReconciliations[0] ?? null;
+    setCurrentReconciliation(rec);
+    setAllTransactions(rec ? mapLinesToTransactions(rec) : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleReconciliations, selectedAccountName, bankAccountNames]);
 
   const filteredAndSortedTransactions = useMemo(() => {
     let filtered = allTransactions.filter(transaction => {
@@ -429,6 +451,10 @@ export function BankReconciliation() {
       toast.error(`Cannot finalize — ${currentReconciliation.unmatchedCount} unmatched transactions remain`);
       return;
     }
+    if (Math.abs(currentReconciliation.difference) >= 0.01) {
+      toast.error(`Cannot finalize — bank and ledger balances differ by ${currencyCode} ${Math.abs(currentReconciliation.difference).toFixed(2)}`);
+      return;
+    }
     setCompletingRec(true);
     try {
       const updated = await bankReconciliationService.complete(currentReconciliation.id);
@@ -443,7 +469,7 @@ export function BankReconciliation() {
   };
 
   const openCreate = () => {
-    setForm({ ...emptyForm, bankAccountName: selectedAccount.name });
+    setForm({ ...emptyForm, bankAccountName: selectedAccountName !== ALL_ACCOUNTS ? selectedAccountName : "" });
     setShowCreateDialog(true);
   };
 
@@ -495,6 +521,7 @@ export function BankReconciliation() {
       setShowCreateDialog(false);
       setCurrentReconciliation(created);
       setAllTransactions(mapLinesToTransactions(created));
+      setSelectedAccountName(created.bankAccountName);
       await loadReconciliations();
     } catch (err: any) {
       toast.error(err.message || "Failed to create reconciliation");
@@ -512,6 +539,7 @@ export function BankReconciliation() {
       setShowEditDialog(false);
       setCurrentReconciliation(updated);
       setAllTransactions(mapLinesToTransactions(updated));
+      setSelectedAccountName(updated.bankAccountName);
       await loadReconciliations();
     } catch (err: any) {
       toast.error(err.message || "Failed to update reconciliation");
@@ -558,7 +586,9 @@ export function BankReconciliation() {
   };
 
   const canFinalize = currentReconciliation
-    ? currentReconciliation.unmatchedCount === 0 && currentReconciliation.status !== "COMPLETED"
+    ? currentReconciliation.unmatchedCount === 0
+      && Math.abs(currentReconciliation.difference) < 0.01
+      && currentReconciliation.status !== "COMPLETED"
     : false;
 
   const renderFormContent = () => (
@@ -566,14 +596,16 @@ export function BankReconciliation() {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Bank Account Name *</Label>
-          <Select value={form.bankAccountName} onValueChange={v => setForm(f => ({ ...f, bankAccountName: v }))}>
-            <SelectTrigger className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {PREDEFINED_ACCOUNTS.map(a => (
-                <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            list="bank-account-name-suggestions"
+            value={form.bankAccountName}
+            onChange={e => setForm(f => ({ ...f, bankAccountName: e.target.value }))}
+            placeholder="e.g. your actual bank + account name"
+            className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20"
+          />
+          <datalist id="bank-account-name-suggestions">
+            {bankAccountNames.map(name => <option key={name} value={name}>{getAccountDisplayName(name)}</option>)}
+          </datalist>
         </div>
         <div className="space-y-2">
           <Label>Statement Date *</Label>
@@ -617,29 +649,29 @@ export function BankReconciliation() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="p-2 text-left">Date</th>
-                  <th className="p-2 text-left">Description</th>
-                  <th className="p-2 text-right">Amount</th>
-                  <th className="p-2 text-left">Type</th>
-                  <th className="p-2 text-left">Reference</th>
-                  <th className="p-2"></th>
+                  <th className="p-2 text-left min-w-[130px]">Date</th>
+                  <th className="p-2 text-left min-w-[150px]">Description</th>
+                  <th className="p-2 text-right min-w-[100px]">Amount</th>
+                  <th className="p-2 text-left min-w-[110px]">Type</th>
+                  <th className="p-2 text-left min-w-[120px]">Reference</th>
+                  <th className="p-2 w-10"></th>
                 </tr>
               </thead>
               <tbody>
                 {form.lines.map((line, idx) => (
                   <tr key={idx} className="border-t border-gray-100">
                     <td className="p-1">
-                      <Input type="date" value={line.transactionDate} onChange={e => updateLine(idx, "transactionDate", e.target.value)} className="h-7 text-xs border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20" />
+                      <Input type="date" value={line.transactionDate} onChange={e => updateLine(idx, "transactionDate", e.target.value)} className="h-8 text-sm border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" />
                     </td>
                     <td className="p-1">
-                      <Input value={line.description} onChange={e => updateLine(idx, "description", e.target.value)} className="h-7 text-xs border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20" placeholder="Description" />
+                      <Input value={line.description} onChange={e => updateLine(idx, "description", e.target.value)} className="h-8 text-sm border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" placeholder="Description" />
                     </td>
                     <td className="p-1">
-                      <Input type="number" step="0.01" value={line.amount} onChange={e => updateLine(idx, "amount", e.target.value)} className="h-7 text-xs text-right border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20" />
+                      <Input type="number" step="0.01" value={line.amount} onChange={e => updateLine(idx, "amount", e.target.value)} className="h-8 text-sm text-right border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" />
                     </td>
                     <td className="p-1">
                       <Select value={line.type} onValueChange={v => updateLine(idx, "type", v)}>
-                        <SelectTrigger className="h-7 text-xs border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-sm border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="DEBIT">DEBIT</SelectItem>
                           <SelectItem value="CREDIT">CREDIT</SelectItem>
@@ -647,7 +679,7 @@ export function BankReconciliation() {
                       </Select>
                     </td>
                     <td className="p-1">
-                      <Input value={line.reference} onChange={e => updateLine(idx, "reference", e.target.value)} className="h-7 text-xs border-0 bg-white focus:ring-1 focus:ring-gymbios-primary/20" placeholder="Ref no." />
+                      <Input value={line.reference} onChange={e => updateLine(idx, "reference", e.target.value)} className="h-8 text-sm border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" placeholder="Ref no." />
                     </td>
                     <td className="p-1">
                       <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => removeLine(idx)}>
@@ -754,18 +786,14 @@ export function BankReconciliation() {
 
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gymbios-primary">Bank Account</Label>
-              <Select value={selectedAccount.id} onValueChange={(value) => {
-                const account = PREDEFINED_ACCOUNTS.find(acc => acc.id === value);
-                if (account) setSelectedAccount(account);
-              }}>
+              <Select value={selectedAccountName} onValueChange={setSelectedAccountName}>
                 <SelectTrigger className="border-0 bg-white focus:ring-2 focus:ring-gymbios-primary/20">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PREDEFINED_ACCOUNTS.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name} • {account.accountNumber}
-                    </SelectItem>
+                  <SelectItem value={ALL_ACCOUNTS}>All Bank Accounts</SelectItem>
+                  {bankAccountNames.map((name) => (
+                    <SelectItem key={name} value={name}>{getAccountDisplayName(name)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -829,11 +857,11 @@ export function BankReconciliation() {
                   onClick={() => setDeleteConfirmId(currentReconciliation.id)}>
                   <Trash2 className="h-3 w-3 mr-1" /> Delete
                 </Button>
-                {allReconciliations.length > 1 && (
+                {visibleReconciliations.length > 1 && (
                   <Select
                     value={String(currentReconciliation.id)}
                     onValueChange={v => {
-                      const rec = allReconciliations.find(r => r.id === parseInt(v));
+                      const rec = visibleReconciliations.find(r => r.id === parseInt(v));
                       if (rec) {
                         setCurrentReconciliation(rec);
                         setAllTransactions(mapLinesToTransactions(rec));
@@ -844,9 +872,9 @@ export function BankReconciliation() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {allReconciliations.map(r => (
+                      {visibleReconciliations.map(r => (
                         <SelectItem key={r.id} value={String(r.id)}>
-                          {formatDate(r.statementDate)} — {r.status}
+                          {r.bankAccountName} — {formatDate(r.statementDate)} — {r.status}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1198,10 +1226,15 @@ export function BankReconciliation() {
                     !currentReconciliation ? "No Reconciliation" :
                     currentReconciliation.status === "COMPLETED" ? "Already Completed" :
                     canFinalize ? "Finalize Reconciliation" :
-                    `${currentReconciliation.unmatchedCount} Unmatched Remain`}
+                    currentReconciliation.unmatchedCount > 0 ? `${currentReconciliation.unmatchedCount} Unmatched Remain` :
+                    "Balances Don't Match"}
                 </Button>
                 <p className="text-xs text-gray-500 mt-2">
-                  {canFinalize ? "All transactions are matched" : "Match all transactions before finalizing"}
+                  {canFinalize
+                    ? "All transactions are matched"
+                    : currentReconciliation && currentReconciliation.unmatchedCount === 0
+                      ? "All lines matched, but bank and ledger balances still differ — check for ledger entries with no matching statement line"
+                      : "Match all transactions before finalizing"}
                 </p>
               </div>
             </div>
@@ -1435,12 +1468,14 @@ export function BankReconciliation() {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="w-[96vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[96vw] max-w-4xl sm:max-w-4xl md:max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="text-left">
             <DialogTitle className="text-xl font-semibold text-gray-900">New Bank Reconciliation</DialogTitle>
           </DialogHeader>
-          {renderFormContent()}
-          <DialogFooter className="pt-2">
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {renderFormContent()}
+          </div>
+          <DialogFooter className="pt-4 border-t mt-2">
             <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={savingForm}>Cancel</Button>
             <Button className="btn-primary" onClick={handleCreate} disabled={savingForm}>
               {savingForm ? "Creating..." : "Create Reconciliation"}
@@ -1451,12 +1486,14 @@ export function BankReconciliation() {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="w-[96vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[96vw] max-w-4xl sm:max-w-4xl md:max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="text-left">
             <DialogTitle className="text-xl font-semibold text-gray-900">Edit Reconciliation</DialogTitle>
           </DialogHeader>
-          {renderFormContent()}
-          <DialogFooter className="pt-2">
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {renderFormContent()}
+          </div>
+          <DialogFooter className="pt-4 border-t mt-2">
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={savingForm}>Cancel</Button>
             <Button className="btn-primary" onClick={handleEdit} disabled={savingForm}>
               {savingForm ? "Saving..." : "Save Changes"}
@@ -1467,7 +1504,7 @@ export function BankReconciliation() {
 
       {/* Auto-Match Review */}
       <Dialog open={showAutoMatchDialog} onOpenChange={setShowAutoMatchDialog}>
-        <DialogContent className="w-[96vw] max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[96vw] max-w-3xl sm:max-w-3xl md:max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader className="text-left">
             <DialogTitle className="text-xl font-semibold text-gray-900">Auto-Match Suggestions</DialogTitle>
             <p className="text-sm text-muted-foreground">

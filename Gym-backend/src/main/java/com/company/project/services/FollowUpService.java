@@ -73,14 +73,24 @@ public class FollowUpService {
                 "FOLLOWUP_CREATED_" + saved.getId()
         );
 
+        if (saved.getLead() != null) syncLeadNextFollowUp(saved.getLead().getId());
+
         return toDTO(saved);
     }
 
     public FollowUpResponseDTO updateFollowUp(Long id, FollowUpRequestDTO req) {
         FollowUp fu = followUpRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + id));
+        Long previousLeadId = fu.getLead() != null ? fu.getLead().getId() : null;
         mapRequestToEntity(req, fu);
-        return toDTO(followUpRepository.save(fu));
+        FollowUp saved = followUpRepository.save(fu);
+
+        if (previousLeadId != null) syncLeadNextFollowUp(previousLeadId);
+        if (saved.getLead() != null && !saved.getLead().getId().equals(previousLeadId)) {
+            syncLeadNextFollowUp(saved.getLead().getId());
+        }
+
+        return toDTO(saved);
     }
 
     public FollowUpResponseDTO getById(Long id) {
@@ -107,14 +117,18 @@ public class FollowUpService {
             leadRepository.save(fu.getLead());
         }
 
-        return toDTO(followUpRepository.save(fu));
+        FollowUp saved = followUpRepository.save(fu);
+        if (saved.getLead() != null) syncLeadNextFollowUp(saved.getLead().getId());
+        return toDTO(saved);
     }
 
     public FollowUpResponseDTO cancel(Long id) {
         FollowUp fu = followUpRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + id));
         fu.setStatus("cancelled");
-        return toDTO(followUpRepository.save(fu));
+        FollowUp saved = followUpRepository.save(fu);
+        if (saved.getLead() != null) syncLeadNextFollowUp(saved.getLead().getId());
+        return toDTO(saved);
     }
 
     public FollowUpResponseDTO reschedule(Long id, LocalDateTime newDueDate) {
@@ -122,7 +136,19 @@ public class FollowUpService {
                 .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + id));
         fu.setStatus("rescheduled");
         fu.setDueDate(newDueDate);
-        return toDTO(followUpRepository.save(fu));
+        FollowUp saved = followUpRepository.save(fu);
+        if (saved.getLead() != null) syncLeadNextFollowUp(saved.getLead().getId());
+        return toDTO(saved);
+    }
+
+    /** Recompute Lead.nextFollowUp from the earliest still-active follow-up for that lead. */
+    private void syncLeadNextFollowUp(Long leadId) {
+        List<FollowUp> active = followUpRepository.findByLeadIdAndStatusNotInOrderByDueDateAsc(
+                leadId, List.of("completed", "cancelled"));
+        leadRepository.findById(leadId).ifPresent(lead -> {
+            lead.setNextFollowUp(active.isEmpty() ? null : active.get(0).getDueDate());
+            leadRepository.save(lead);
+        });
     }
 
     @Transactional(readOnly = true)

@@ -72,7 +72,11 @@ public class MessagingController {
     }
 
     @GetMapping("/history")
-    public ResponseEntity<List<MessageHistoryDTO>> getHistory() {
+    public ResponseEntity<List<MessageHistoryDTO>> getHistory(
+            @RequestParam(required = false) Long memberId) {
+        if (memberId != null) {
+            return ResponseEntity.ok(messagingService.getMemberHistory(memberId));
+        }
         return ResponseEntity.ok(messagingService.getHistory());
     }
 

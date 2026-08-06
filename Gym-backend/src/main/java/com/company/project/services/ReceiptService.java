@@ -8,6 +8,7 @@ import com.company.project.dto.ReceiptsPageResponseDTO;
 import com.company.project.dto.SettlePaymentRequestDTO;
 import com.company.project.entities.Member;
 import com.company.project.entities.Receipt;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.ReceiptRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -72,7 +73,7 @@ public class ReceiptService {
     @Transactional(readOnly = true)
     public ReceiptResponseDTO getReceiptById(Long id) {
         Receipt receipt = receiptRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Receipt not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Receipt not found with id: " + id));
         return ReceiptResponseDTO.fromEntity(receipt);
     }
 
@@ -117,7 +118,7 @@ public class ReceiptService {
     public com.company.project.dto.MemberStatementResponseDTO getMemberStatement(
             Long memberDbId, LocalDateTime from, LocalDateTime to) {
         Member member = memberRepository.findById(memberDbId)
-                .orElseThrow(() -> new RuntimeException("Member not found: " + memberDbId));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberDbId));
 
         com.company.project.dto.MemberStatementResponseDTO dto = new com.company.project.dto.MemberStatementResponseDTO();
         dto.setMemberDbId(String.valueOf(member.getId()));
@@ -185,6 +186,7 @@ public class ReceiptService {
             List<com.company.project.dto.MinorChargeDTO> billMinorCharges = b.getMinorCharges();
 
             com.company.project.dto.StatementLineDTO invoiceRow = new com.company.project.dto.StatementLineDTO();
+            invoiceRow.setId(b.getId());
             invoiceRow.setDate(txnDate != null ? txnDate.format(dateFmt) : null);
             invoiceRow.setReceiptNo(b.getReceiptNo());
             invoiceRow.setType("Invoice");
@@ -208,7 +210,7 @@ public class ReceiptService {
                     BigDecimal take = legAmount.min(remaining);
                     if (take.compareTo(BigDecimal.ZERO) <= 0) continue;
                     com.company.project.dto.StatementLineDTO payRow =
-                            buildPaymentRow(txnDate, dateFmt, b.getReceiptNo(), leg.getMethod(), take, b.getStatus());
+                            buildPaymentRow(txnDate, dateFmt, b.getId(), b.getReceiptNo(), leg.getMethod(), take, b.getStatus());
                     payRow.setMinorCharges(scaleMinorCharges(billMinorCharges, take));
                     allRows.add(payRow);
                     remaining = remaining.subtract(take);
@@ -216,7 +218,7 @@ public class ReceiptService {
             }
             if (remaining.compareTo(BigDecimal.ZERO) > 0) {
                 com.company.project.dto.StatementLineDTO payRow =
-                        buildPaymentRow(txnDate, dateFmt, b.getReceiptNo(), b.getPaymentMethod(), remaining, b.getStatus());
+                        buildPaymentRow(txnDate, dateFmt, b.getId(), b.getReceiptNo(), b.getPaymentMethod(), remaining, b.getStatus());
                 payRow.setMinorCharges(scaleMinorCharges(billMinorCharges, remaining));
                 allRows.add(payRow);
             }
@@ -238,7 +240,7 @@ public class ReceiptService {
                     BigDecimal legAmount = leg.getAmount() != null ? leg.getAmount() : BigDecimal.ZERO;
                     if (legAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
                     com.company.project.dto.StatementLineDTO payRow =
-                            buildPaymentRow(txnDate, dateFmt, s.getReceiptNo(), leg.getMethod(), legAmount, s.getStatus());
+                            buildPaymentRow(txnDate, dateFmt, s.getId(), s.getReceiptNo(), leg.getMethod(), legAmount, s.getStatus());
                     payRow.setMinorCharges(scaleMinorCharges(linkedMinorCharges, legAmount));
                     allRows.add(payRow);
                 }
@@ -246,7 +248,7 @@ public class ReceiptService {
                 BigDecimal amount = s.getAmount() != null ? s.getAmount() : BigDecimal.ZERO;
                 if (amount.compareTo(BigDecimal.ZERO) > 0) {
                     com.company.project.dto.StatementLineDTO payRow =
-                            buildPaymentRow(txnDate, dateFmt, s.getReceiptNo(), s.getPaymentMethod(), amount, s.getStatus());
+                            buildPaymentRow(txnDate, dateFmt, s.getId(), s.getReceiptNo(), s.getPaymentMethod(), amount, s.getStatus());
                     payRow.setMinorCharges(scaleMinorCharges(linkedMinorCharges, amount));
                     allRows.add(payRow);
                 }
@@ -292,9 +294,10 @@ public class ReceiptService {
     }
 
     private com.company.project.dto.StatementLineDTO buildPaymentRow(
-            LocalDateTime txnDate, DateTimeFormatter dateFmt, String receiptNo,
+            LocalDateTime txnDate, DateTimeFormatter dateFmt, Long receiptId, String receiptNo,
             String method, BigDecimal amount, String status) {
         com.company.project.dto.StatementLineDTO row = new com.company.project.dto.StatementLineDTO();
+        row.setId(receiptId);
         row.setDate(txnDate != null ? txnDate.format(dateFmt) : null);
         row.setReceiptNo(receiptNo);
         row.setType("Payment");
@@ -442,6 +445,51 @@ public class ReceiptService {
     }
 
     /**
+     * A walk-in/day-pass visitor has no Member row (memberDbId/memberId are left
+     * null), so this bypasses createReceiptForMember's Member-keyed logic entirely
+     * — but still lands in the same `receipts` table with transactionType
+     * "Daily Entry" (an existing, previously-unused category — see the field
+     * comment on Receipt.transactionType and the "Daily Entry" filter already
+     * present on the Billing/Member Receipts pages) so it shows up in Billing's
+     * Member Receipts list and Monthly Collection stat exactly like a member
+     * payment, instead of only being visible in the separate Receipt Voucher module.
+     */
+    public Receipt createWalkInReceipt(String visitorName, String visitorPhone, String planName,
+                                       BigDecimal amount, BigDecimal paidAmount, String paymentMethod,
+                                       List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+                                       String remarks) {
+        BigDecimal totalAmount = amount != null ? amount : BigDecimal.ZERO;
+        BigDecimal paid = paidAmount != null ? paidAmount.max(BigDecimal.ZERO).min(totalAmount) : BigDecimal.ZERO;
+
+        Receipt r = new Receipt();
+        r.setTransactionDate(LocalDateTime.now());
+        r.setMemberName(visitorName);
+        r.setMemberPhone(visitorPhone);
+        r.setTransactionType("Daily Entry");
+        r.setAmount(totalAmount);
+        r.setPaymentMethod(normalizePaymentMethod(paymentMethod));
+        r.setPaymentBreakdown(paymentBreakdown);
+        r.setPaidAmount(paid);
+        r.setTotalPaidToDate(paid);
+        r.setBalanceAfter(totalAmount.subtract(paid));
+        r.setStatus(paid.compareTo(BigDecimal.ZERO) <= 0 ? "Pending" : (paid.compareTo(totalAmount) >= 0 ? "Paid" : "Partial"));
+        r.setPlanName(planName);
+        r.setValidFrom(LocalDateTime.now());
+        r.setMembershipType("Walk-In");
+        r.setProcessedBy("Admin");
+        r.setRemarks(remarks);
+
+        Receipt saved = receiptRepository.save(r);
+        saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
+        saved = receiptRepository.save(saved);
+
+        if (paid.compareTo(BigDecimal.ZERO) > 0) {
+            financialEventService.onMemberPaymentReceived(saved);
+        }
+        return saved;
+    }
+
+    /**
      * Bills a single charge (e.g. a minor family member's renewal fee) onto their
      * guardian's account: the receipt's member fields are the guardian's — the
      * minor never gets their own receipt/ledger entry — with minorCharges
@@ -509,7 +557,7 @@ public class ReceiptService {
      */
     public ReceiptResponseDTO settlePayment(SettlePaymentRequestDTO req) {
         Member member = memberRepository.findById(req.getMemberDbId())
-                .orElseThrow(() -> new RuntimeException("Member not found: " + req.getMemberDbId()));
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + req.getMemberDbId()));
 
         BigDecimal totalPaid = BigDecimal.ZERO;
         Long soleBillId = null;
@@ -520,7 +568,7 @@ public class ReceiptService {
                 if (bp.getPayAmount() == null || bp.getPayAmount().compareTo(BigDecimal.ZERO) <= 0) continue;
 
                 Receipt existing = receiptRepository.findById(bp.getReceiptId())
-                        .orElseThrow(() -> new RuntimeException("Receipt not found: " + bp.getReceiptId()));
+                        .orElseThrow(() -> new EntityNotFoundException("Receipt not found: " + bp.getReceiptId()));
 
                 // The bill's own transaction facts — paidAmount, paymentMethod,
                 // paymentBreakdown, balanceAfter — are an immutable record of what
@@ -708,8 +756,13 @@ public class ReceiptService {
         dto.setMemberEmail(m.getEmail());
         dto.setMemberPhone(m.getPhone());
         dto.setMembership(m.getMembershipPlan());
-        dto.setAmount(m.getOutstandingBalance() != null && m.getOutstandingBalance().compareTo(BigDecimal.ZERO) > 0
-                ? m.getOutstandingBalance() : m.getMembershipFee());
+        boolean hasOwnBalance = m.getOutstandingBalance() != null && m.getOutstandingBalance().compareTo(BigDecimal.ZERO) > 0;
+        dto.setAmount(hasOwnBalance ? m.getOutstandingBalance() : m.getMembershipFee());
+        // Distinguishes an unpaid balance still owed on the CURRENT cycle (Membership
+        // Due — e.g. a partial payment at registration/last renewal) from a member
+        // who paid their current cycle in full but whose cycle is now ending/ended
+        // and needs to pay again to renew (Renewal Due).
+        dto.setDueType(hasOwnBalance ? "Membership Due" : "Renewal Due");
         dto.setDueDate(m.getNextPaymentDate() != null ? m.getNextPaymentDate().format(dateFmt) : null);
         dto.setStatus(status);
         if ("Overdue".equals(status) && m.getNextPaymentDate() != null) {

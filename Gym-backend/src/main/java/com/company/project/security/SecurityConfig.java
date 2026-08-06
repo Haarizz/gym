@@ -46,9 +46,10 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints — no token required (dev mode)
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/**").permitAll()
+
+                // Public auth endpoints — no token required (register/login/username-check)
+                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/check-username").permitAll()
 
                 // Admin-only endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -88,6 +89,11 @@ public class SecurityConfig {
                     "/api/referrals/**",
                     "/api/follow-ups/**"
                 ).authenticated()
+
+                // Everything else under /api (journal-vouchers, invoices, wallet, rewards,
+                // financial-reports, etc.) — not yet bucketed into a role above, but must
+                // never fall through to permitAll. Requires at least a valid session.
+                .requestMatchers("/api/**").authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider())

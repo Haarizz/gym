@@ -7,6 +7,7 @@ import com.company.project.entities.AccountHead;
 import com.company.project.entities.JournalVoucher;
 import com.company.project.entities.JournalVoucherLine;
 import com.company.project.repositories.AccountHeadRepository;
+import com.company.project.repositories.CostCenterRepository;
 import com.company.project.repositories.JournalVoucherLineRepository;
 import com.company.project.repositories.JournalVoucherRepository;
 import com.company.project.exceptions.BusinessRuleViolationException;
@@ -33,19 +34,28 @@ public class JournalVoucherService {
     private final JournalVoucherRepository journalVoucherRepository;
     private final JournalVoucherLineRepository lineRepository;
     private final AccountHeadRepository accountHeadRepository;
+    private final CostCenterRepository costCenterRepository;
     private final FinancialEventService financialEventService;
     private final VoucherNumberService voucherNumberService;
+    private final FiscalPeriodService fiscalPeriodService;
+    private final FinancialAuditLogService financialAuditLogService;
 
     public JournalVoucherService(JournalVoucherRepository journalVoucherRepository,
                                  JournalVoucherLineRepository lineRepository,
                                  AccountHeadRepository accountHeadRepository,
+                                 CostCenterRepository costCenterRepository,
                                  FinancialEventService financialEventService,
-                                 VoucherNumberService voucherNumberService) {
+                                 VoucherNumberService voucherNumberService,
+                                 FiscalPeriodService fiscalPeriodService,
+                                 FinancialAuditLogService financialAuditLogService) {
         this.journalVoucherRepository = journalVoucherRepository;
         this.lineRepository           = lineRepository;
         this.accountHeadRepository    = accountHeadRepository;
+        this.costCenterRepository     = costCenterRepository;
         this.financialEventService    = financialEventService;
         this.voucherNumberService     = voucherNumberService;
+        this.fiscalPeriodService      = fiscalPeriodService;
+        this.financialAuditLogService = financialAuditLogService;
     }
 
     /**
@@ -110,6 +120,8 @@ public class JournalVoucherService {
         jv.setTotalCredit(totalCredit);
         JournalVoucher saved = journalVoucherRepository.save(jv);
         List<JournalVoucherLine> lines = saveLines(saved.getId(), lineDTOs);
+        financialAuditLogService.record("CREATE", "JournalVoucher", saved.getId(), saved.getVoucherNo(),
+                "MANUAL", "Created as " + saved.getStatus());
         return JournalVoucherResponseDTO.fromEntity(saved, lines);
     }
 
@@ -136,6 +148,8 @@ public class JournalVoucherService {
         JournalVoucher saved = journalVoucherRepository.save(jv);
         lineRepository.deleteByJournalVoucherId(id);
         List<JournalVoucherLine> lines = saveLines(id, lineDTOs);
+        financialAuditLogService.record("UPDATE", "JournalVoucher", saved.getId(), saved.getVoucherNo(),
+                "MANUAL", "Updated");
         return JournalVoucherResponseDTO.fromEntity(saved, lines);
     }
 
@@ -160,6 +174,8 @@ public class JournalVoucherService {
                     "Cannot post: journal does not balance — DR=" + dr + " CR=" + cr);
         }
 
+        fiscalPeriodService.assertPeriodOpen(jv.getDate());
+
         jv.setStatus("POSTED");
         JournalVoucher saved = journalVoucherRepository.save(jv);
 
@@ -172,6 +188,9 @@ public class JournalVoucherService {
                     line.getCredit() != null ? line.getCredit() : BigDecimal.ZERO
             );
         }
+
+        financialAuditLogService.record("POST", "JournalVoucher", saved.getId(), saved.getVoucherNo(),
+                "MANUAL", "DRAFT -> POSTED — DR=" + dr + " CR=" + cr);
 
         return JournalVoucherResponseDTO.fromEntity(saved, lines);
     }
@@ -200,6 +219,8 @@ public class JournalVoucherService {
         String reversalNarration = "REVERSAL of " + original.getVoucherNo()
                 + (reason != null && !reason.isBlank() ? ": " + reason : "");
         LocalDate date = reversalDate != null ? reversalDate : LocalDate.now();
+
+        fiscalPeriodService.assertPeriodOpen(date);
 
         JournalVoucher reversal = new JournalVoucher();
         reversal.setVoucherNo(voucherNumberService.next("JV"));
@@ -242,6 +263,10 @@ public class JournalVoucherService {
         original.setReversedByVoucherId(reversal.getId());
         journalVoucherRepository.save(original);
 
+        financialAuditLogService.record("REVERSE", "JournalVoucher", original.getId(), original.getVoucherNo(),
+                "MANUAL", "Reversed by " + reversal.getVoucherNo()
+                        + (reason != null && !reason.isBlank() ? ": " + reason : ""));
+
         return JournalVoucherResponseDTO.fromEntity(reversal, reversalLines);
     }
 
@@ -257,6 +282,8 @@ public class JournalVoucherService {
         jv.setStatus("CANCELLED");
         JournalVoucher saved = journalVoucherRepository.save(jv);
         List<JournalVoucherLine> lines = lineRepository.findByJournalVoucherId(id);
+        financialAuditLogService.record("CANCEL", "JournalVoucher", saved.getId(), saved.getVoucherNo(),
+                "MANUAL", "Cancelled");
         return JournalVoucherResponseDTO.fromEntity(saved, lines);
     }
 
@@ -275,11 +302,14 @@ public class JournalVoucherService {
         }
         jv.setDeletedAt(LocalDateTime.now());
         journalVoucherRepository.save(jv);
+        financialAuditLogService.record("DELETE", "JournalVoucher", jv.getId(), jv.getVoucherNo(),
+                "MANUAL", "Soft-deleted");
     }
 
     private List<JournalVoucherLine> saveLines(Long journalVoucherId, List<JournalVoucherLineDTO> lineDTOs) {
         if (lineDTOs == null || lineDTOs.isEmpty()) return Collections.emptyList();
         return lineDTOs.stream().map(dto -> {
+            validateCostCenter(dto.getCostCenter());
             JournalVoucherLine line = new JournalVoucherLine();
             line.setJournalVoucherId(journalVoucherId);
             line.setAccountCode(dto.getAccountCode());
@@ -290,5 +320,13 @@ public class JournalVoucherService {
             line.setCostCenter(dto.getCostCenter());
             return lineRepository.save(line);
         }).collect(Collectors.toList());
+    }
+
+    /** Blank/null is allowed (no forced dimension tagging) — only rejects unknown codes. */
+    private void validateCostCenter(String costCenterCode) {
+        if (costCenterCode == null || costCenterCode.isBlank()) return;
+        if (costCenterRepository.findByCode(costCenterCode).isEmpty()) {
+            throw new BusinessRuleViolationException("Unknown cost center code: " + costCenterCode);
+        }
     }
 }

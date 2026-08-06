@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GymBIOS Financial Module — Handoff (2026-08-06)</title>
+<style>
+  :root{
+    --bg:#f3f4ef; --surface:#ffffff; --surface-2:#eceee7; --text:#1f241f; --text-muted:#5b6259;
+    --border:#dde0d6; --accent:#2f6f4f; --accent-strong:#204d37; --accent-soft:#e4efe8;
+    --done:#2f6f4f; --done-soft:#e4efe8; --next:#a8631e; --next-soft:#f6ead9;
+    --later:#5b6259; --later-soft:#eceee7; --code-bg:#eef0ea;
+    --shadow: 0 1px 2px rgba(31,36,31,0.06), 0 6px 20px rgba(31,36,31,0.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12140f; --surface:#181c15; --surface-2:#1f2419; --text:#e8ece3; --text-muted:#9aa393;
+      --border:#2b3125; --accent:#6bb98a; --accent-strong:#8fd1ab; --accent-soft:#1c2b20;
+      --done:#6bb98a; --done-soft:#1c2b20; --next:#e0ab6e; --next-soft:#332a19;
+      --later:#9aa393; --later-soft:#1f2419; --code-bg:#1c2018;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12140f; --surface:#181c15; --surface-2:#1f2419; --text:#e8ece3; --text-muted:#9aa393;
+    --border:#2b3125; --accent:#6bb98a; --accent-strong:#8fd1ab; --accent-soft:#1c2b20;
+    --done:#6bb98a; --done-soft:#1c2b20; --next:#e0ab6e; --next-soft:#332a19;
+    --later:#9aa393; --later-soft:#1f2419; --code-bg:#1c2018;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"]{
+    --bg:#f3f4ef; --surface:#ffffff; --surface-2:#eceee7; --text:#1f241f; --text-muted:#5b6259;
+    --border:#dde0d6; --accent:#2f6f4f; --accent-strong:#204d37; --accent-soft:#e4efe8;
+    --done:#2f6f4f; --done-soft:#e4efe8; --next:#a8631e; --next-soft:#f6ead9;
+    --later:#5b6259; --later-soft:#eceee7; --code-bg:#eef0ea;
+    --shadow: 0 1px 2px rgba(31,36,31,0.06), 0 6px 20px rgba(31,36,31,0.05);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,"Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+    line-height:1.65; font-size:16px;
+  }
+  h1,h2,h3{ font-family: ui-serif,"Iowan Old Style","Palatino Linotype",Georgia,serif; color:var(--text); font-weight:600; letter-spacing:-0.01em; }
+  code{ font-family: ui-monospace,"SF Mono","Cascadia Code",Consolas,monospace; font-size:0.86em; background:var(--code-bg); padding:0.1em 0.4em; border-radius:4px; color:var(--accent-strong); word-break:break-word; }
+  main{ max-width:900px; margin:0 auto; padding:3rem 1.5rem 6rem; }
+  header{ margin-bottom:2.25rem; border-bottom:1px solid var(--border); padding-bottom:1.5rem; }
+  header .eyebrow{ font-size:0.78rem; text-transform:uppercase; letter-spacing:0.09em; color:var(--accent-strong); font-weight:700; }
+  header h1{ font-size:2rem; margin:0.35rem 0 0.6rem; }
+  header p.dek{ color:var(--text-muted); font-size:1.02rem; max-width:64ch; margin:0; }
+
+  .resume-box{
+    background:var(--accent-soft); border:1px solid var(--border); border-left:4px solid var(--accent);
+    border-radius:8px; padding:1.25rem 1.5rem; margin:1.75rem 0 2.5rem;
+  }
+  .resume-box h2{ font-size:1.1rem; margin:0 0 0.6rem; }
+  .resume-box ol{ margin:0; padding-left:1.2rem; }
+  .resume-box li{ margin-bottom:0.4rem; }
+
+  section.block{ margin-bottom:2.75rem; }
+  section.block > h2{ font-size:1.4rem; margin:0 0 0.9rem; display:flex; align-items:center; gap:0.6rem; }
+  .status-pill{ font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:0.25rem 0.65rem; border-radius:99px; white-space:nowrap; }
+  .status-pill.done{ background:var(--done-soft); color:var(--done); }
+  .status-pill.next{ background:var(--next-soft); color:var(--next); }
+  .status-pill.later{ background:var(--later-soft); color:var(--later); }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.5rem 1.75rem; margin-bottom:1.25rem; box-shadow:var(--shadow); }
+  .card h3{ font-size:1.1rem; margin:0 0 0.5rem; }
+  .card p{ margin:0.5rem 0; }
+  .card .label{ font-size:0.7rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--accent-strong); font-weight:700; margin:1rem 0 0.35rem; }
+  .card ul{ margin:0.25rem 0; padding-left:1.2rem; }
+  .card li{ margin-bottom:0.3rem; font-size:0.94rem; }
+  .card .file-list{ list-style:none; padding:0; margin:0.4rem 0; }
+  .card .file-list li{ font-size:0.85rem; padding:0.1rem 0; }
+  .card .file-list li::before{ content:"›"; color:var(--accent); margin-right:0.4rem; font-weight:700; }
+  .card .note{ background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:0.7rem 0.9rem; font-size:0.88rem; color:var(--text-muted); margin-top:0.75rem; }
+  .card .note b{ color:var(--text); }
+
+  table.facts{ width:100%; border-collapse:collapse; font-size:0.88rem; margin:0.5rem 0; }
+  table.facts th, table.facts td{ text-align:left; padding:0.45rem 0.6rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  table.facts th{ font-size:0.7rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); width:220px; }
+
+  .deferred-list{ list-style:none; padding:0; margin:0; }
+  .deferred-list li{ background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:0.85rem 1.1rem; margin-bottom:0.7rem; font-size:0.92rem; }
+  .deferred-list li b{ display:block; margin-bottom:0.2rem; }
+  .deferred-list li span{ color:var(--text-muted); font-size:0.88rem; }
+
+  footer{ margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:0.82rem; }
+</style>
+</head>
+<body>
+<main>
+
+  <header>
+    <div class="eyebrow">GymBIOS · Financial Module Buildout</div>
+    <h1>Handoff — Session ending 2026-08-06</h1>
+    <p class="dek">Status snapshot for continuing the multi-phase ERP-financial-module implementation (branch <code>feature/aug4</code>) on Monday, after the daily usage limit resets. Two phases are complete and compiled; two are planned but not started.</p>
+  </header>
+
+  <div class="resume-box">
+    <h2>To resume this work in a new session</h2>
+    <ol>
+      <li>Point Claude at this file and say: <i>"Continue the GymBIOS financial module buildout — read this handoff, then implement Phase 3."</i></li>
+      <li>Nothing has been committed yet — Phase 1 and Phase 2 changes are sitting uncommitted on <code>feature/aug4</code>. Decide whether to commit them before starting Phase 3 (recommended, so the two phases are reviewable independently).</li>
+      <li>To compile the backend, <code>JAVA_HOME</code> must be set manually — no <code>mvnw</code> wrapper exists and the JDK isn't on <code>PATH</code> by default. A working JDK was found at <code>/c/openJdk-25</code> this session: <code>export JAVA_HOME=/c/openJdk-25 &amp;&amp; export PATH="$JAVA_HOME/bin:$PATH" &amp;&amp; mvn -q -DskipTests compile</code></li>
+      <li>The next Flyway migration number is <b>V11</b> (V1–V10 already exist under <code>Gym-backend/src/main/resources/db/migration/</code>).</li>
+      <li>The full architecture plan (all 4 phases, scoping rationale) is saved at <code>C:\Users\Gokul\.claude\plans\precious-seeking-backus.md</code> — currently holds the Phase 2 plan; Phase 3/4 plans should be written fresh the same way (explore → plan → get sign-off → implement) rather than assumed.</li>
+    </ol>
+  </div>
+
+  <section class="block">
+    <h2>Architecture — the one fact that governs everything <span class="status-pill later">Context</span></h2>
+    <div class="card">
+      <p><code>FinancialEventService</code> (<code>Gym-backend/src/main/java/com/company/project/services/FinancialEventService.java</code>) is the <b>sole posting path</b> for every module. No other service ever writes to <code>JournalVoucherRepository</code> directly for an automatic entry. It validates debit == credit before saving, posts inside one transaction, updates <code>AccountHead.currentBalance</code>, and guards idempotency via <code>JournalEntrySource</code>. Every new posting path added in future phases must go through it (an <code>onXxx()</code> handler) or through <code>JournalVoucherService</code> for manual entry — never around it.</p>
+      <p>This was <b>not</b> built from scratch this session — it already existed and was already mature. The original request asked for a full BillBull-style ERP financial architecture; a codebase survey found most of the core posting-engine requirements already satisfied, so work was scoped to the real, specific gaps instead of a rewrite.</p>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Phase 1 — Deferred Revenue Recognition <span class="status-pill done">Done · compiled</span></h2>
+    <div class="card">
+      <p>Membership revenue was previously recognized 100% immediately on receipt, even for a 12-month membership paid upfront. Now: a <code>Receipt</code> with <code>transactionType</code> <code>New</code>/<code>Renewal</code> and a <code>validFrom</code>/<code>validTill</code> span longer than one calendar month gets its net (VAT-excluded) amount credited to <b>Deferred Revenue</b> (account 2300) instead of Membership Revenue, amortized evenly across monthly buckets, and recognized automatically as each month elapses. A plain 1-month payment is untouched — behaves exactly as before.</p>
+
+      <div class="label">Built</div>
+      <ul>
+        <li><code>DeferredRevenueScheduleService.qualifiesForDeferral()</code> / <code>createSchedule()</code> — pure schedule bookkeeping, no dependency on the posting engine (avoids a dependency cycle)</li>
+        <li><code>FinancialEventService.onMemberPaymentReceived()</code> branches to Deferred Revenue when applicable; new <code>onDeferredRevenueRecognized()</code> handler posts each monthly bucket</li>
+        <li><code>DeferredRevenueRecognitionScheduler</code> — monthly cron (1st, 3am), mirrors the existing <code>AssetDepreciationScheduler</code> pattern</li>
+        <li>Report: <code>GET /api/financial-reports/deferred-revenue</code></li>
+        <li>Bundled bug fixes: seeded the missing <code>5800 Depreciation Expense</code> account (was hardcoded in code but never in the chart of accounts); gave <code>Expense</code> a <code>paymentStatus</code> field so <code>onExpenseApproved()</code> can credit Accounts Payable instead of always assuming instant cash</li>
+      </ul>
+
+      <div class="label">Files</div>
+      <ul class="file-list">
+        <li><code>entities/DeferredRevenueSchedule.java</code>, <code>entities/DeferredRevenueRecognitionLine.java</code></li>
+        <li><code>repositories/DeferredRevenueScheduleRepository.java</code>, <code>repositories/DeferredRevenueRecognitionLineRepository.java</code></li>
+        <li><code>services/DeferredRevenueScheduleService.java</code>, <code>services/DeferredRevenueRecognitionScheduler.java</code></li>
+        <li><code>db/migration/V9__deferred_revenue.sql</code></li>
+        <li>Modified: <code>FinancialEventService.java</code>, <code>FinancialReportService.java</code>, <code>FinancialReportController.java</code>, <code>Expense.java</code>, <code>ExpenseRequestDTO.java</code>, <code>ExpenseResponseDTO.java</code>, <code>ExpenseService.java</code>, <code>DataInitializer.java</code></li>
+      </ul>
+
+      <div class="note"><b>Known limitation (documented, not silently dropped):</b> membership freeze/cancellation does not currently pause or write off an in-flight deferred revenue schedule — buckets keep recognizing on their original calendar dates regardless of freeze state.</div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Phase 2 — Foundational Financial Infrastructure <span class="status-pill done">Done · compiled</span></h2>
+    <div class="card">
+      <p>Three independent pieces the later phases (and any serious accounting workflow) need underneath them: period locking, a general audit trail, and real dimension validation.</p>
+
+      <div class="label">Built</div>
+      <ul>
+        <li><b>Fiscal Year / Period locking</b> — <code>FiscalYear</code> auto-creates 12 monthly <code>FiscalPeriod</code> rows on creation. <code>FiscalPeriodService.assertPeriodOpen(date)</code> is enforced at all 3 places a journal can become POSTED: <code>FinancialEventService.createAndPost()</code>, <code>JournalVoucherService.postJournalVoucher()</code>, <code>reverseJournalVoucher()</code>. <b>Fails open</b> by design — if no period is configured for a date, posting is allowed (with a log warning); only rejects when a period explicitly exists and is <code>CLOSED</code>/<code>LOCKED</code>. Current calendar year is seeded OPEN out of the box.</li>
+        <li><b>General audit trail</b> — <code>FinancialAuditLog</code> (append-only: action/entity/voucher/module/performedBy/IP/summary) recorded on every <code>JournalVoucher</code> create/update/post/reverse/cancel/delete, and once inside <code>createAndPost()</code> so it covers <i>every</i> module's auto-postings as <code>AUTO_POST</code> rows in one hook. Not full before/after field diffs — this codebase has no entity-snapshotting infra to build that on, documented as a known limitation.</li>
+        <li><b>Cost center FK validation</b> — on manual Journal Voucher lines and Expense entry, a supplied cost-center code must resolve against the existing <code>CostCenter</code> master table or the request is rejected. Blank/null still allowed (no forced tagging).</li>
+        <li>New endpoints: <code>/api/fiscal-years</code> (+ <code>/{id}/close</code>, <code>/reopen</code>), <code>/api/fiscal-periods</code> (+ <code>/{id}/close</code>, <code>/lock</code>, <code>/reopen</code>), <code>/api/financial-audit-logs</code> (filterable by entity/module/date)</li>
+      </ul>
+
+      <div class="label">Files</div>
+      <ul class="file-list">
+        <li><code>entities/FiscalYear.java</code>, <code>FiscalPeriod.java</code>, <code>FinancialAuditLog.java</code></li>
+        <li><code>repositories/FiscalYearRepository.java</code>, <code>FiscalPeriodRepository.java</code>, <code>FinancialAuditLogRepository.java</code></li>
+        <li><code>services/FiscalYearService.java</code>, <code>FiscalPeriodService.java</code>, <code>FinancialAuditLogService.java</code></li>
+        <li><code>controllers/FiscalYearController.java</code>, <code>FiscalPeriodController.java</code>, <code>FinancialAuditLogController.java</code></li>
+        <li><code>dto/FiscalYearRequestDTO.java</code>, <code>FiscalYearResponseDTO.java</code>, <code>FiscalPeriodResponseDTO.java</code>, <code>FinancialAuditLogResponseDTO.java</code></li>
+        <li><code>db/migration/V10__fiscal_periods_and_audit_log.sql</code></li>
+        <li>Modified: <code>FinancialEventService.java</code>, <code>JournalVoucherService.java</code>, <code>ExpenseService.java</code>, <code>DataInitializer.java</code></li>
+      </ul>
+
+      <div class="note"><b>Explicitly out of scope this phase (flagged, not dropped):</b> Branch as a real dimension was <i>not</i> built — there is no <code>Branch</code> master table anywhere in the codebase, and <code>branch</code> is already loose free text scattered across 5 entities (<code>AccountHead</code>, <code>Asset</code>, <code>CostCenter</code>, <code>ReceiptVoucher</code>, <code>Staff</code>) with no canonical source of truth to validate against yet. Trainer/Department dimensions and year-end closing entries were deferred for the same reason.</div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Phase 3 — Missing Vouchers + Reports <span class="status-pill next">Not started</span></h2>
+    <div class="card">
+      <p>Round out the voucher set and report suite using the existing posting engine as-is — lowest architectural risk of the remaining phases since it doesn't touch <code>FinancialEventService</code>'s core posting logic.</p>
+      <div class="label">Scope</div>
+      <ul>
+        <li><b>Contra Voucher</b> — cash ↔ bank transfers (today this has no dedicated voucher type; must go through a manual Journal Voucher)</li>
+        <li><b>Debit Note</b> — supplier-side adjustments/returns (no entity exists)</li>
+        <li><b>Credit Note</b> — member/customer-side refund adjustments distinct from the POS-specific <code>onSaleRefunded()</code> (no entity exists)</li>
+        <li><b>Reports:</b> Cash Book, Day Book, a formal General Ledger report (distinct from the raw ledger-transaction list that already exists), Member Aging, Supplier Aging — none of these exist in <code>FinancialReportService</code> today</li>
+      </ul>
+      <div class="note">Model new vouchers on the existing <code>ReceiptVoucher</code>/<code>PaymentVoucher</code> entity+service+controller pattern, and route all posting through new <code>FinancialEventService.onXxx()</code> handlers exactly like every other module.</div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Phase 4 — Tax Engine Expansion <span class="status-pill next">Not started</span></h2>
+    <div class="card">
+      <p>Move beyond the current flat single-rate UAE VAT model (<code>FinancialEventService.splitVatInclusive()</code>, backed by one <code>standard_vat_rate</code> setting) to genuinely multi-tax-type support.</p>
+      <div class="label">Scope</div>
+      <ul>
+        <li>Route posting through <code>TaxCode</code> (already exists as an entity) instead of the single hardcoded VAT rate</li>
+        <li>CGST/SGST/IGST split support alongside flat VAT</li>
+        <li>Zero-rated / exempt classifications</li>
+        <li>Company tax registration fields (GST No, VAT No, TRN) surfaced on receipts/reports</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Everything else from the original request — deferred</h2>
+    <ul class="deferred-list">
+      <li><b>Year-end closing entries</b><span>Rolling P&amp;L into retained earnings at fiscal year-end — period <i>locking</i> shipped in Phase 2, the closing-entry automation itself did not.</span></li>
+      <li><b>Membership freeze/cancellation ↔ deferred revenue</b><span>An in-flight deferred revenue schedule doesn't pause or get written off when a membership is frozen or cancelled — noted in Phase 1.</span></li>
+      <li><b>Full Accounts Payable settlement flow for Expenses</b><span>An <code>UNPAID</code> expense posts to Accounts Payable now, but there's no auto-linked settlement back to the originating <code>Expense</code> row the way <code>SupplierBill</code> ↔ <code>PaymentVoucher</code> works — settling it today is a manual Journal/Payment Voucher entry.</span></li>
+      <li><b>Two parallel "campaign" concepts</b><span><code>PromotionCampaign</code> (older marketing-discount system) and <code>ReferralCampaign</code> (newer, built 2026-08-03) coexist with no reconciliation between them — noted during the original survey, not part of the financial-module scope directly.</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    Generated 2026-08-06 at the end of a Claude Code session on branch <code>feature/aug4</code>. Backend compiled cleanly (<code>mvn -q -DskipTests compile</code>, exit 0) as of Phase 2 completion. Nothing in this session has been committed or pushed.
+  </footer>
+
+</main>
+</body>
+</html>

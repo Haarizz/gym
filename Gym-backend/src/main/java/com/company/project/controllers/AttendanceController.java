@@ -1,5 +1,6 @@
 package com.company.project.controllers;
 
+import com.company.project.dto.AttendanceListItemDTO;
 import com.company.project.dto.AttendanceStatsDTO;
 import com.company.project.dto.CheckInResponse;
 import com.company.project.dto.CheckOutResponse;
@@ -8,6 +9,7 @@ import com.company.project.services.AttendanceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -35,6 +37,17 @@ public class AttendanceController {
             @RequestParam(defaultValue = "50") int size
     ) {
         return ResponseEntity.ok(attendanceService.getAttendance(date, startDate, endDate, search, page, size));
+    }
+
+    /**
+     * Full check-in history for a single member, most recent first — used by the
+     * member analytics page's Gym Usage tab.
+     *
+     * GET /api/attendance/member/{memberId}
+     */
+    @GetMapping("/member/{memberId}")
+    public ResponseEntity<List<AttendanceListItemDTO>> getMemberAttendance(@PathVariable Long memberId) {
+        return ResponseEntity.ok(attendanceService.getMemberAttendance(memberId));
     }
 
     /**
@@ -70,6 +83,23 @@ public class AttendanceController {
      *
      * GET /api/attendance/reports?startDate=2026-03-01&endDate=2026-04-08
      */
+    /**
+     * GET/PUT the "Schedule Automated Reports" toggle on the Attendance Reports
+     * page — previously pure client-side React state with no backend, so it
+     * silently reset on reload and no report was ever actually sent (see
+     * AttendanceReportScheduler for the weekly job this now enables).
+     */
+    @GetMapping("/report-settings")
+    public ResponseEntity<com.company.project.dto.AttendanceReportSettingsDTO> getReportSettings() {
+        return ResponseEntity.ok(attendanceService.getReportSettings());
+    }
+
+    @PutMapping("/report-settings")
+    public ResponseEntity<com.company.project.dto.AttendanceReportSettingsDTO> updateReportSettings(
+            @RequestBody com.company.project.dto.AttendanceReportSettingsDTO request) {
+        return ResponseEntity.ok(attendanceService.updateReportSettings(request));
+    }
+
     @GetMapping("/reports")
     public ResponseEntity<Map<String, Object>> getReport(
             @RequestParam(required = false) String startDate,

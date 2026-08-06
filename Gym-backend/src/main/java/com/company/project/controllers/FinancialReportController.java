@@ -51,4 +51,18 @@ public class FinancialReportController {
         if (to == null) to = LocalDate.now();
         return ResponseEntity.ok(financialReportService.getCashFlowStatement(from, to));
     }
+
+    @GetMapping("/tax-summary")
+    public ResponseEntity<Map<String, Object>> getTaxSummary(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        if (from == null) from = LocalDate.now().withDayOfMonth(1);
+        if (to == null) to = LocalDate.now();
+        return ResponseEntity.ok(financialReportService.getTaxSummary(from, to));
+    }
+
+    @GetMapping("/deferred-revenue")
+    public ResponseEntity<Map<String, Object>> getDeferredRevenueReport() {
+        return ResponseEntity.ok(financialReportService.getDeferredRevenueReport());
+    }
 }

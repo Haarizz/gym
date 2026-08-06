@@ -124,6 +124,9 @@ public class Receipt extends BaseEntity {
     @Column(name = "linked_bill_id")
     private Long linkedBillId;
 
+    @Column(name = "invoice_id")
+    private Long invoiceId;
+
     public Receipt() {}
 
     // ── Getters & Setters ────────────────────────────────────────────────────
@@ -205,4 +208,7 @@ public class Receipt extends BaseEntity {
 
     public Long getLinkedBillId() { return linkedBillId; }
     public void setLinkedBillId(Long linkedBillId) { this.linkedBillId = linkedBillId; }
+
+    public Long getInvoiceId() { return invoiceId; }
+    public void setInvoiceId(Long invoiceId) { this.invoiceId = invoiceId; }
 }

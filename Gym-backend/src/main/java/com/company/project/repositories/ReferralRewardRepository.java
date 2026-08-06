@@ -24,6 +24,9 @@ public interface ReferralRewardRepository extends JpaRepository<ReferralReward, 
 
     long countByMemberIdAndRewardRuleId(String memberId, Long rewardRuleId);
 
+    // Global cap enforcement (ReferralSettings.maxRewardsPerMember), independent of any one rule.
+    long countByMemberId(String memberId);
+
     // Expiry sweep: still-open rewards whose expiry date has passed.
     List<ReferralReward> findByStatusInAndExpiryDateBefore(List<RewardStatus> statuses, LocalDate date);
 

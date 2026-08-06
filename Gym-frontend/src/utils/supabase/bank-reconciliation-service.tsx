@@ -107,6 +107,18 @@ function mapSuggestion(r: any): AutoMatchSuggestion {
   };
 }
 
+/** Backend errors come back as a JSON body ({ message, error, status, timestamp }), not plain text. */
+async function extractErrorMessage(res: Response, fallback: string): Promise<string> {
+  const text = await res.text().catch(() => "");
+  if (!text) return fallback;
+  try {
+    const body = JSON.parse(text);
+    return body?.message || fallback;
+  } catch {
+    return text;
+  }
+}
+
 function toLineBody(line: Partial<BankStatementLine>): any {
   return {
     id: line.id ?? null,
@@ -127,7 +139,7 @@ class BankReconciliationService {
       `${BASE_URL}/bank-reconciliations${query}`,
       { method: "GET" }
     );
-    if (!res.ok) throw new Error("Failed to fetch bank reconciliations");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to fetch bank reconciliations"));
     return (await res.json()).map(mapReconciliation);
   }
 
@@ -136,7 +148,7 @@ class BankReconciliationService {
       `${BASE_URL}/bank-reconciliations/${id}`,
       { method: "GET" }
     );
-    if (!res.ok) throw new Error("Failed to fetch bank reconciliation");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to fetch bank reconciliation"));
     return mapReconciliation(await res.json());
   }
 
@@ -153,7 +165,7 @@ class BankReconciliationService {
         lines: (req.lines ?? []).map(toLineBody),
       }),
     });
-    if (!res.ok) throw new Error("Failed to create reconciliation");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to create reconciliation"));
     return mapReconciliation(await res.json());
   }
 
@@ -173,7 +185,7 @@ class BankReconciliationService {
         }),
       }
     );
-    if (!res.ok) throw new Error("Failed to update reconciliation");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to update reconciliation"));
     return mapReconciliation(await res.json());
   }
 
@@ -190,10 +202,7 @@ class BankReconciliationService {
         body: JSON.stringify({ journal_voucher_id: journalVoucherId }),
       }
     );
-    if (!res.ok) {
-      const err = await res.text().catch(() => "");
-      throw new Error(err || "Failed to match line");
-    }
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to match line"));
     return mapReconciliation(await res.json());
   }
 
@@ -205,7 +214,7 @@ class BankReconciliationService {
       `${BASE_URL}/bank-reconciliations/${reconciliationId}/lines/${lineId}/unmatch`,
       { method: "POST" }
     );
-    if (!res.ok) throw new Error("Failed to unmatch line");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to unmatch line"));
     return mapReconciliation(await res.json());
   }
 
@@ -215,7 +224,7 @@ class BankReconciliationService {
       `${BASE_URL}/bank-reconciliations/${reconciliationId}/lines/${lineId}/candidates`,
       { method: "GET" }
     );
-    if (!res.ok) throw new Error("Failed to fetch match candidates");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to fetch match candidates"));
     return (await res.json()).map(mapCandidate);
   }
 
@@ -225,7 +234,7 @@ class BankReconciliationService {
       `${BASE_URL}/bank-reconciliations/${reconciliationId}/auto-match`,
       { method: "GET" }
     );
-    if (!res.ok) throw new Error("Failed to compute auto-match suggestions");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to compute auto-match suggestions"));
     return (await res.json()).map(mapSuggestion);
   }
 
@@ -234,10 +243,7 @@ class BankReconciliationService {
       `${BASE_URL}/bank-reconciliations/${reconciliationId}/complete`,
       { method: "POST" }
     );
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err || "Failed to complete reconciliation");
-    }
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to complete reconciliation"));
     return mapReconciliation(await res.json());
   }
 
@@ -246,7 +252,7 @@ class BankReconciliationService {
       `${BASE_URL}/bank-reconciliations/${id}`,
       { method: "DELETE" }
     );
-    if (!res.ok) throw new Error("Failed to delete reconciliation");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to delete reconciliation"));
   }
 }
 
