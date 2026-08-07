@@ -135,7 +135,7 @@ public class SecurityConfig {
                 "http://localhost:8081",
                 "http://127.0.0.1:8081",
                 "http://127.0.0.1:9080",
-                "http://qa.gymbios.com"
+                "https://qa.gymbios.com"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         // Allow all headers so any header the frontend sends (Content-Type, Authorization, etc.) is accepted
