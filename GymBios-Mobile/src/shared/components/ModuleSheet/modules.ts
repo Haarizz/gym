@@ -43,4 +43,17 @@ export const moduleSections: ModuleSection[] = [
       },
     ],
   },
+  {
+    id: 'operations',
+    title: 'Operations',
+    items: [
+      {
+        id: 'attendance',
+        title: 'Attendance',
+        subtitle: 'Track member & staff attendance',
+        icon: 'clipboard',
+        route: '/attendance',
+      },
+    ],
+  },
 ];
