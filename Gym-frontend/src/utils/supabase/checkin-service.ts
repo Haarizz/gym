@@ -1,4 +1,5 @@
 import { authService } from './auth-service';
+import type { PaymentSplitLeg } from './billing-service';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
@@ -60,6 +61,13 @@ export interface WalkInCheckInRequest {
   email?: string;
   session_type?: string;
   payment_status?: string;
+  // The day-pass amount actually charged — when payment_status is "paid" and
+  // this is positive, the backend posts it to the ledger as service revenue.
+  amount?: number;
+  payment_method?: string;
+  // How the payment was actually received — card type, cheque number/bank/date,
+  // bank account, or online payment provider — same shape as a member's payment.
+  payment_breakdown?: PaymentSplitLeg[];
   device_id?: string;
   notes?: string;
 }

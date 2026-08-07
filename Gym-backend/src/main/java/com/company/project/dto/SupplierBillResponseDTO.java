@@ -17,6 +17,7 @@ public class SupplierBillResponseDTO {
     private String billNumber;
     private Long supplierId;
     private String supplierName;
+    private Long purchaseOrderId;
     private String invoiceNumber;
     private LocalDate billDate;
     private LocalDate dueDate;
@@ -48,6 +49,7 @@ public class SupplierBillResponseDTO {
         dto.setBillNumber(bill.getBillNumber());
         dto.setSupplierId(bill.getSupplierId());
         dto.setSupplierName(bill.getSupplierName());
+        dto.setPurchaseOrderId(bill.getPurchaseOrderId());
         dto.setInvoiceNumber(bill.getInvoiceNumber());
         dto.setBillDate(bill.getBillDate());
         dto.setDueDate(bill.getDueDate());
@@ -84,6 +86,9 @@ public class SupplierBillResponseDTO {
 
     public String getSupplierName() { return supplierName; }
     public void setSupplierName(String supplierName) { this.supplierName = supplierName; }
+
+    public Long getPurchaseOrderId() { return purchaseOrderId; }
+    public void setPurchaseOrderId(Long purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }
 
     public String getInvoiceNumber() { return invoiceNumber; }
     public void setInvoiceNumber(String invoiceNumber) { this.invoiceNumber = invoiceNumber; }

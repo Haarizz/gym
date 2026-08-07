@@ -53,6 +53,7 @@ public class RewardEngineService {
     private final RewardAuditLogRepository auditLogRepository;
     private final RewardRedemptionService redemptionService;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     public RewardEngineService(ReferralRewardRuleRepository ruleRepository,
                                 ReferralRewardRepository rewardRepository,
@@ -62,7 +63,8 @@ public class RewardEngineService {
                                 MemberRepository memberRepository,
                                 RewardAuditLogRepository auditLogRepository,
                                 RewardRedemptionService redemptionService,
-                                NotificationService notificationService) {
+                                NotificationService notificationService,
+                                EmailService emailService) {
         this.ruleRepository = ruleRepository;
         this.rewardRepository = rewardRepository;
         this.referralRepository = referralRepository;
@@ -72,6 +74,7 @@ public class RewardEngineService {
         this.auditLogRepository = auditLogRepository;
         this.redemptionService = redemptionService;
         this.notificationService = notificationService;
+        this.emailService = emailService;
     }
 
     public void generateRewardsForReferral(Referral referral) {
@@ -103,12 +106,12 @@ public class RewardEngineService {
             if (m != null) refereeMemberId = m.getMemberId();
         }
 
-        generateForSide(referral, rules, RewardMemberType.REFERRER, referral.getReferrerMemberId());
-        generateForSide(referral, rules, RewardMemberType.REFEREE, refereeMemberId);
+        generateForSide(referral, rules, RewardMemberType.REFERRER, referral.getReferrerMemberId(), settings);
+        generateForSide(referral, rules, RewardMemberType.REFEREE, refereeMemberId, settings);
     }
 
     private void generateForSide(Referral referral, List<ReferralRewardRule> rules,
-                                  RewardMemberType memberType, String memberId) {
+                                  RewardMemberType memberType, String memberId, ReferralSettings settings) {
         if (memberId == null || memberId.isBlank()) return;
 
         // Ensure we have the actual business memberId (e.g., MBR-...)
@@ -130,9 +133,9 @@ public class RewardEngineService {
 
         for (ReferralRewardRule rule : rules) {
             if (!eligibleFor(rule, memberType)) continue;
-            if (!passesValidation(rule, referral, memberType, finalMemberId, finalMember)) continue;
+            if (!passesValidation(rule, referral, memberType, finalMemberId, finalMember, settings)) continue;
 
-            createReward(referral, rule, memberType, finalMemberId);
+            createReward(referral, rule, memberType, finalMemberId, settings);
 
             if (!Boolean.TRUE.equals(rule.getStackable())) {
                 break; // exclusive match — first matching rule wins
@@ -151,12 +154,21 @@ public class RewardEngineService {
     }
 
     private boolean passesValidation(ReferralRewardRule rule, Referral referral,
-                                      RewardMemberType memberType, String memberId, Member member) {
+                                      RewardMemberType memberType, String memberId, Member member,
+                                      ReferralSettings settings) {
         if (!withinCampaignWindow(rule)) return false;
 
         if (rule.getMinPurchaseAmount() != null) {
             if (referral.getPurchaseAmount() == null
                     || referral.getPurchaseAmount().compareTo(rule.getMinPurchaseAmount()) < 0) {
+                return false;
+            }
+        }
+
+        // Program-wide floor (ReferralSettings.minPurchaseAmount), on top of any per-rule minimum above.
+        if (settings != null && settings.getMinPurchaseAmount() != null) {
+            if (referral.getPurchaseAmount() == null
+                    || referral.getPurchaseAmount().compareTo(settings.getMinPurchaseAmount()) < 0) {
                 return false;
             }
         }
@@ -169,6 +181,12 @@ public class RewardEngineService {
         if (rule.getMaxRewardsPerMember() != null) {
             long existing = rewardRepository.countByMemberIdAndRewardRuleId(memberId, rule.getId());
             if (existing >= rule.getMaxRewardsPerMember()) return false;
+        }
+
+        // Program-wide cap (ReferralSettings.maxRewardsPerMember) across all rules combined.
+        if (settings != null && settings.getMaxRewardsPerMember() != null) {
+            long totalExisting = rewardRepository.countByMemberId(memberId);
+            if (totalExisting >= settings.getMaxRewardsPerMember()) return false;
         }
 
         if (rewardRepository.existsByReferralIdAndRewardRuleIdAndMemberType(referral.getId(), rule.getId(), memberType)) {
@@ -209,7 +227,7 @@ public class RewardEngineService {
     }
 
     private void createReward(Referral referral, ReferralRewardRule rule,
-                               RewardMemberType memberType, String memberId) {
+                               RewardMemberType memberType, String memberId, ReferralSettings settings) {
         ReferralReward reward = new ReferralReward();
         reward.setReferralId(referral.getId());
         reward.setRewardRuleId(rule.getId());
@@ -228,7 +246,11 @@ public class RewardEngineService {
         reward.setCurrency(rule.getCurrency() != null ? rule.getCurrency() : "AED");
         reward.setRedemptionAction(rule.getRedemptionAction() != null ? rule.getRedemptionAction() : defaultActionFor(type));
 
-        boolean approvalRequired = Boolean.TRUE.equals(rule.getRequiresApproval());
+        // A per-rule approval requirement always applies; the program-wide "Auto-Process
+        // Rewards" toggle (ReferralSettings.autoProcessRewards) additionally forces manual
+        // review for every reward when disabled, regardless of the rule.
+        boolean approvalRequired = Boolean.TRUE.equals(rule.getRequiresApproval())
+                || (settings != null && Boolean.FALSE.equals(settings.getAutoProcessRewards()));
         reward.setApprovalRequired(approvalRequired);
         reward.setStatus(approvalRequired ? RewardStatus.PENDING : RewardStatus.AVAILABLE);
 
@@ -252,7 +274,7 @@ public class RewardEngineService {
         auditLogRepository.save(new RewardAuditLog(saved.getId(), RewardAuditAction.GENERATED, "SYSTEM",
                 "Generated by rule '" + rule.getName() + "'" + (rule.getStackable() != null && rule.getStackable() ? " (stacked)" : "")));
 
-        notifyRewardGenerated(saved);
+        notifyRewardGenerated(saved, settings);
 
         if (!approvalRequired) {
             redemptionService.autoProcessOnGeneration(saved);
@@ -283,7 +305,7 @@ public class RewardEngineService {
         };
     }
 
-    private void notifyRewardGenerated(ReferralReward reward) {
+    private void notifyRewardGenerated(ReferralReward reward, ReferralSettings settings) {
         String title = "New Reward Generated";
         String message = reward.getRewardName() + " (" + reward.getRewardType() + ") generated for " + reward.getMemberId()
                 + (Boolean.TRUE.equals(reward.getApprovalRequired()) ? " — awaiting approval." : " — now available.");
@@ -298,6 +320,14 @@ public class RewardEngineService {
                 notificationService.notifyUser(member.getUserId(), title, message,
                         "SUCCESS", priority, "REFERRALS", reward.getId(), "/my-rewards",
                         "REWARD_GENERATED_USER_" + reward.getId());
+            }
+
+            // ReferralSettings.emailNotifications gates this extra email on top of the
+            // in-app notification above, which always fires regardless of the setting.
+            boolean emailEnabled = settings == null || !Boolean.FALSE.equals(settings.getEmailNotifications());
+            if (emailEnabled && member.getEmail() != null && !member.getEmail().isBlank()) {
+                emailService.sendEmail(member.getEmail(), title,
+                        "<p>" + message + "</p><p>View it in the app under <strong>My Rewards</strong>.</p>");
             }
         });
     }

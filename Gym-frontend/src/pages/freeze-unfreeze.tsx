@@ -37,106 +37,6 @@ interface FreezeUnfreezeProps {
   onNavigate?: (section: string) => void;
 }
 
-const frozenMembersData = [
-  {
-    id: 'MBR-123456',
-    name: 'Ahmed Al-Mansoori',
-    planName: 'Premium Fitness',
-    freezeStartDate: '2024-10-15',
-    freezeEndDate: '2024-11-15',
-    daysFrozen: 31,
-    status: 'Frozen',
-    autoUnfreeze: true,
-    freezeCount: 1,
-    maxFreezeCount: 2,
-    maxFreezeDays: 60,
-    usedDays: 31,
-    phone: '+971 50 123 4567',
-  },
-  {
-    id: 'MBR-234567',
-    name: 'Fatima Hassan',
-    planName: 'Basic Gym',
-    freezeStartDate: '2024-10-20',
-    freezeEndDate: '2024-11-05',
-    daysFrozen: 16,
-    status: 'Frozen',
-    autoUnfreeze: true,
-    freezeCount: 1,
-    maxFreezeCount: 1,
-    maxFreezeDays: 30,
-    usedDays: 16,
-    phone: '+971 52 234 5678',
-  },
-  {
-    id: 'MBR-345678',
-    name: 'Mohammed Khalid',
-    planName: 'Premium Plus',
-    freezeStartDate: '2024-10-10',
-    freezeEndDate: '2024-12-10',
-    daysFrozen: 61,
-    status: 'Frozen',
-    autoUnfreeze: false,
-    freezeCount: 1,
-    maxFreezeCount: 3,
-    maxFreezeDays: 90,
-    usedDays: 61,
-    phone: '+971 55 345 6789',
-  },
-  {
-    id: 'MBR-456789',
-    name: 'Sara Abdullah',
-    planName: 'Family Plan',
-    freezeStartDate: '2024-10-18',
-    freezeEndDate: '2024-11-18',
-    daysFrozen: 31,
-    status: 'Frozen',
-    autoUnfreeze: true,
-    freezeCount: 2,
-    maxFreezeCount: 2,
-    maxFreezeDays: 60,
-    usedDays: 45,
-    phone: '+971 56 456 7890',
-  },
-];
-
-const allMembers = [
-  {
-    id: 'MBR-111111',
-    name: 'Ali Rashid',
-    phone: '+971 50 111 1111',
-    email: 'ali.rashid@email.com',
-    planName: 'Premium Fitness',
-    status: 'Active',
-    maxFreezeDays: 60,
-    maxFreezeCount: 2,
-    usedFreezeDays: 0,
-    usedFreezeCount: 0,
-    chargePerExtraDay: 10,
-    autoUnfreezeDefault: true,
-  },
-  {
-    id: 'MBR-222222',
-    name: 'Layla Ahmed',
-    phone: '+971 52 222 2222',
-    email: 'layla.ahmed@email.com',
-    planName: 'Basic Gym',
-    status: 'Active',
-    maxFreezeDays: 30,
-    maxFreezeCount: 1,
-    usedFreezeDays: 0,
-    usedFreezeCount: 0,
-    chargePerExtraDay: 5,
-    autoUnfreezeDefault: true,
-  },
-  ...frozenMembersData,
-];
-
-const freezeHistory = [
-  { id: 1, startDate: '2024-06-15', endDate: '2024-07-15', days: 30, reason: 'Travel', status: 'Completed', chargedAmount: 0 },
-  { id: 2, startDate: '2024-10-15', endDate: '2024-11-15', days: 31, reason: 'Medical', status: 'Active', chargedAmount: 0 },
-];
-
 export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
     const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<any>(null);
@@ -175,6 +75,22 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
   };
 
   const totalDays = calculateFreezeDays();
+
+  // Days a member has been frozen so far — from freeze_start_date up to now
+  // (or freeze_end_date, if that's already passed).
+  const daysFrozenSoFar = (m: Member): number => {
+    if (!m.freeze_start_date) return 0;
+    const start = new Date(m.freeze_start_date);
+    const scheduledEnd = m.freeze_end_date ? new Date(m.freeze_end_date) : null;
+    const end = scheduledEnd && scheduledEnd < new Date() ? scheduledEnd : new Date();
+    return Math.max(0, differenceInDays(end, start));
+  };
+  const totalFrozenDays = frozenMembers.reduce((acc, m) => acc + daysFrozenSoFar(m), 0);
+  const endingSoonCount = frozenMembers.filter(m => {
+    if (!m.freeze_end_date) return false;
+    const end = new Date(m.freeze_end_date);
+    return end >= new Date() && differenceInDays(end, new Date()) <= 7;
+  }).length;
 
   const filteredMembers = frozenMembers.filter((member) => {
     if (!searchQuery) return true;
@@ -262,10 +178,10 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
         {/* ── Summary Stats ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Total Frozen', value: frozenMembersData.length, sub: 'Active freeze requests', icon: <Snowflake className="h-5 w-5 text-blue-600" />, bg: 'bg-blue-100' },
-            { label: 'Auto Unfreeze', value: frozenMembersData.filter(m => m.autoUnfreeze).length, sub: 'Scheduled to unfreeze', icon: <RefreshCw className="h-5 w-5 text-green-600" />, bg: 'bg-green-100' },
-            { label: 'Total Days', value: frozenMembersData.reduce((acc, m) => acc + m.daysFrozen, 0), sub: 'Across all members', icon: <Clock className="h-5 w-5 text-orange-600" />, bg: 'bg-orange-100' },
-            { label: 'Avg Duration', value: `${Math.round(frozenMembersData.reduce((acc, m) => acc + m.daysFrozen, 0) / frozenMembersData.length)} days`, sub: 'Per frozen member', icon: <BarChart3 className="h-5 w-5 text-purple-600" />, bg: 'bg-purple-100' },
+            { label: 'Total Frozen', value: frozenMembers.length, sub: 'Active freeze requests', icon: <Snowflake className="h-5 w-5 text-blue-600" />, bg: 'bg-blue-100' },
+            { label: 'Ending Soon', value: endingSoonCount, sub: 'Within the next 7 days', icon: <RefreshCw className="h-5 w-5 text-green-600" />, bg: 'bg-green-100' },
+            { label: 'Total Days', value: totalFrozenDays, sub: 'Across all members', icon: <Clock className="h-5 w-5 text-orange-600" />, bg: 'bg-orange-100' },
+            { label: 'Avg Duration', value: frozenMembers.length > 0 ? `${Math.round(totalFrozenDays / frozenMembers.length)} days` : '0 days', sub: 'Per frozen member', icon: <BarChart3 className="h-5 w-5 text-purple-600" />, bg: 'bg-purple-100' },
           ].map(({ label, value, sub, icon, bg }) => (
             <Card key={label} className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -348,25 +264,25 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                         <X className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 divide-x divide-blue-100">
-                      <div className="px-4 py-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Plan</p>
+                    <div className="grid grid-cols-2">
+                      <div className="px-4 py-2.5 border-r border-blue-100">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Plan</p>
                         <p className="text-xs font-semibold">{selectedMember.membership_plan || selectedMember.planName || '—'}</p>
                       </div>
                       <div className="px-4 py-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Status</p>
-                        <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Status</p>
+                        <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">
                           {selectedMember.membership_status || selectedMember.status || '—'}
                         </Badge>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 divide-x divide-blue-100 border-t border-blue-100">
-                      <div className="px-4 py-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Member ID</p>
+                    <div className="grid grid-cols-2 border-t border-blue-100">
+                      <div className="px-4 py-2.5 border-r border-blue-100">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Member ID</p>
                         <p className="text-xs font-semibold text-primary">{selectedMember.member_id || selectedMember.id}</p>
                       </div>
                       <div className="px-4 py-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Phone</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Phone</p>
                         <p className="text-xs font-semibold">{selectedMember.phone || '—'}</p>
                       </div>
                     </div>
@@ -555,6 +471,14 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                                   <Button
                                     variant="outline"
                                     size="sm"
+                                    className="h-7 text-xs gap-1"
+                                    onClick={() => { setSelectedMemberHistory(member); setShowFreezeHistory(true); }}
+                                  >
+                                    <Eye className="h-3 w-3" />History
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
                                     className="h-7 text-xs gap-1 border-green-300 text-green-700 hover:bg-green-50"
                                     onClick={() => handleUnfreeze(member)}
                                   >
@@ -584,12 +508,12 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
 
       {/* ── Freeze History Dialog ── */}
       <Dialog open={showFreezeHistory} onOpenChange={setShowFreezeHistory}>
-        <DialogContent className="flex flex-col sm:!max-w-[640px] max-h-[85vh] p-0 gap-0 overflow-hidden">
+        <DialogContent className="flex flex-col sm:max-w-[600px] p-0 gap-0 overflow-hidden" style={{ maxHeight: '85vh' }}>
 
           {/* Header */}
           <div className="shrink-0 flex items-center gap-3 px-6 py-4 border-b bg-white">
             <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary shadow-sm shrink-0">
-              <Snowflake className="h-[18px] w-[18px] text-white" />
+              <Snowflake className="h-5 w-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-bold tracking-tight">Freeze History</h2>
@@ -604,13 +528,13 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
 
             {/* Member summary */}
             <div className="rounded-xl border border-blue-200 bg-blue-50/40 overflow-hidden">
-              <div className="grid grid-cols-3 divide-x divide-blue-100">
-                <div className="px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Current Plan</p>
+              <div className="grid grid-cols-3">
+                <div className="px-4 py-3 border-r border-blue-100">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Current Plan</p>
                   <p className="text-xs font-semibold">{selectedMemberHistory?.membership_plan || selectedMemberHistory?.planName || '—'}</p>
                 </div>
-                <div className="px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Freeze Start</p>
+                <div className="px-4 py-3 border-r border-blue-100">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Freeze Start</p>
                   <p className="text-xs font-semibold">
                     {selectedMemberHistory?.freeze_start_date
                       ? format(new Date(selectedMemberHistory.freeze_start_date), 'dd MMM yyyy')
@@ -618,7 +542,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                   </p>
                 </div>
                 <div className="px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Freeze Until</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Freeze Until</p>
                   <p className="text-xs font-semibold">
                     {selectedMemberHistory?.freeze_end_date
                       ? format(new Date(selectedMemberHistory.freeze_end_date), 'dd MMM yyyy')
@@ -628,7 +552,10 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
               </div>
             </div>
 
-            {/* History table */}
+            {/* History table — the backend only tracks the current freeze period on
+                the member record itself (freeze_start_date/end/reason), not a log
+                of past freeze cycles, so this shows that one real period rather
+                than fabricating a multi-entry history. */}
             <div className="rounded-xl border overflow-hidden">
               <Table>
                 <TableHeader className="bg-slate-50/50">
@@ -637,33 +564,31 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                     <TableHead>End Date</TableHead>
                     <TableHead>Days</TableHead>
                     <TableHead>Reason</TableHead>
-                    <TableHead>Charged</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {freezeHistory.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-slate-50/50">
-                      <TableCell className="text-sm">{format(new Date(record.startDate), 'dd MMM yyyy')}</TableCell>
-                      <TableCell className="text-sm">{format(new Date(record.endDate), 'dd MMM yyyy')}</TableCell>
-                      <TableCell>
-                        <Badge className="bg-blue-100 text-blue-700 border-blue-200">{record.days}d</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">{record.reason}</TableCell>
-                      <TableCell>
-                        {record.chargedAmount > 0 ? (
-                          <span className="text-sm font-medium text-red-600"><CurrencyGlyph /> {record.chargedAmount}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Free</span>
-                        )}
+                  {selectedMemberHistory?.freeze_start_date ? (
+                    <TableRow className="hover:bg-slate-50/50">
+                      <TableCell className="text-sm">{format(new Date(selectedMemberHistory.freeze_start_date), 'dd MMM yyyy')}</TableCell>
+                      <TableCell className="text-sm">
+                        {selectedMemberHistory.freeze_end_date ? format(new Date(selectedMemberHistory.freeze_end_date), 'dd MMM yyyy') : '—'}
                       </TableCell>
                       <TableCell>
-                        <Badge className={record.status === 'Active' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-green-100 text-green-700 border-green-200'}>
-                          {record.status}
-                        </Badge>
+                        <Badge className="bg-blue-100 text-blue-700 border-blue-200">{daysFrozenSoFar(selectedMemberHistory)}d</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">{selectedMemberHistory.freeze_reason || '—'}</TableCell>
+                      <TableCell>
+                        <Badge className="bg-blue-100 text-blue-700 border-blue-200">Active</Badge>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-sm text-muted-foreground">
+                        No freeze period on record for this member.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>

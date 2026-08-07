@@ -7,6 +7,7 @@ import java.util.List;
 public class SupplierBillRequestDTO {
 
     private Long supplierId;
+    private Long purchaseOrderId;
     private String invoiceNumber;
     private LocalDate billDate;
     private LocalDate dueDate;
@@ -23,6 +24,9 @@ public class SupplierBillRequestDTO {
 
     public Long getSupplierId() { return supplierId; }
     public void setSupplierId(Long supplierId) { this.supplierId = supplierId; }
+
+    public Long getPurchaseOrderId() { return purchaseOrderId; }
+    public void setPurchaseOrderId(Long purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }
 
     public String getInvoiceNumber() { return invoiceNumber; }
     public void setInvoiceNumber(String invoiceNumber) { this.invoiceNumber = invoiceNumber; }

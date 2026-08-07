@@ -584,7 +584,7 @@ export function ManagePlans() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
-              {plans.filter(p => p.planType === "Family").length}
+              {plans.filter(p => p.planType === "Family" || p.planType === "Couple").length}
             </div>
             <p className="text-xs text-muted-foreground">Multi-member plans</p>
           </CardContent>
@@ -632,6 +632,7 @@ export function ManagePlans() {
                   <SelectItem value="couple">Couple</SelectItem>
                   <SelectItem value="family">Family</SelectItem>
                   <SelectItem value="corporate">Corporate</SelectItem>
+                  <SelectItem value="walk-in">Walk-In</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -990,6 +991,7 @@ export function ManagePlans() {
                     <SelectItem value="Couple">Couple</SelectItem>
                     <SelectItem value="Family">Family</SelectItem>
                     <SelectItem value="Corporate">Corporate</SelectItem>
+                    <SelectItem value="Walk-In">Walk-In / Daily Visitor</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1611,8 +1613,8 @@ export function ManagePlans() {
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Family Plan Settings — only for planType === "Family" */}
-            {formData.planType === "Family" && (
+            {/* Family/Couple Plan Settings — only for planType === "Family" or "Couple" */}
+            {(formData.planType === "Family" || formData.planType === "Couple") && (
               <Collapsible
                 open={isFamilyPlanSettingsOpen}
                 onOpenChange={setIsFamilyPlanSettingsOpen}
@@ -1621,7 +1623,9 @@ export function ManagePlans() {
                 <CollapsibleTrigger className="flex items-center justify-between w-full">
                   <div className="flex items-center space-x-2">
                     <Users className="h-5 w-5 text-[#2B7A78]" />
-                    <Label className="text-base cursor-pointer">Family Plan Settings</Label>
+                    <Label className="text-base cursor-pointer">
+                      {formData.planType === "Couple" ? "Couple Plan Settings" : "Family Plan Settings"}
+                    </Label>
                   </div>
                   {isFamilyPlanSettingsOpen ? (
                     <ChevronUp className="h-4 w-4" />
@@ -1632,7 +1636,9 @@ export function ManagePlans() {
 
                 <CollapsibleContent className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Configure how this Family plan bills its members and how many members a family can have.
+                    {formData.planType === "Couple"
+                      ? "Configure how this Couple plan bills its two members."
+                      : "Configure how this Family plan bills its members and how many members a family can have."}
                   </p>
 
                   {/* Billing Mode */}
@@ -1646,13 +1652,22 @@ export function ManagePlans() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="individual">Individual — adults bill separately, minors bill to head</SelectItem>
-                        <SelectItem value="family_head">Family Head — everyone bills together on ONE invoice</SelectItem>
+                        {formData.planType === "Couple" ? (
+                          <>
+                            <SelectItem value="individual">Individual — each partner bills separately</SelectItem>
+                            <SelectItem value="family_head">Couple Head — both partners bill together on ONE invoice</SelectItem>
+                          </>
+                        ) : (
+                          <>
+                            <SelectItem value="individual">Individual — adults bill separately, minors bill to head</SelectItem>
+                            <SelectItem value="family_head">Family Head — everyone bills together on ONE invoice</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className={formData.planType === "Couple" ? "grid grid-cols-1 gap-4" : "grid grid-cols-2 gap-4"}>
                     <div className="space-y-2">
                       <Label htmlFor="pricePerMember">
                         Price Per Member
@@ -1668,66 +1683,73 @@ export function ManagePlans() {
                         onChange={(e) => setFormData({...formData, pricePerMember: e.target.value})}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="maxFamilyMembers">
-                        Maximum Family Members
-                        <span className="text-xs text-muted-foreground ml-2">(blank = unlimited)</span>
-                      </Label>
-                      <Input
-                        id="maxFamilyMembers"
-                        type="number"
-                        min="0"
-                        placeholder="e.g., 5"
-                        value={formData.maxFamilyMembers}
-                        onChange={(e) => setFormData({...formData, maxFamilyMembers: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="maxAdultMembers">
-                        Maximum Adult Members
-                        <span className="text-xs text-muted-foreground ml-2">(blank = unlimited)</span>
-                      </Label>
-                      <Input
-                        id="maxAdultMembers"
-                        type="number"
-                        min="0"
-                        placeholder="e.g., 2"
-                        value={formData.maxAdultMembers}
-                        onChange={(e) => setFormData({...formData, maxAdultMembers: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="maxChildMembers">
-                        Maximum Child Members
-                        <span className="text-xs text-muted-foreground ml-2">(blank = unlimited)</span>
-                      </Label>
-                      <Input
-                        id="maxChildMembers"
-                        type="number"
-                        min="0"
-                        placeholder="e.g., 3"
-                        value={formData.maxChildMembers}
-                        onChange={(e) => setFormData({...formData, maxChildMembers: e.target.value})}
-                      />
-                    </div>
+                    {formData.planType === "Family" && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="maxFamilyMembers">
+                            Maximum Family Members
+                            <span className="text-xs text-muted-foreground ml-2">(blank = unlimited)</span>
+                          </Label>
+                          <Input
+                            id="maxFamilyMembers"
+                            type="number"
+                            min="0"
+                            placeholder="e.g., 5"
+                            value={formData.maxFamilyMembers}
+                            onChange={(e) => setFormData({...formData, maxFamilyMembers: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="maxAdultMembers">
+                            Maximum Adult Members
+                            <span className="text-xs text-muted-foreground ml-2">(blank = unlimited)</span>
+                          </Label>
+                          <Input
+                            id="maxAdultMembers"
+                            type="number"
+                            min="0"
+                            placeholder="e.g., 2"
+                            value={formData.maxAdultMembers}
+                            onChange={(e) => setFormData({...formData, maxAdultMembers: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="maxChildMembers">
+                            Maximum Child Members
+                            <span className="text-xs text-muted-foreground ml-2">(blank = unlimited)</span>
+                          </Label>
+                          <Input
+                            id="maxChildMembers"
+                            type="number"
+                            min="0"
+                            placeholder="e.g., 3"
+                            value={formData.maxChildMembers}
+                            onChange={(e) => setFormData({...formData, maxChildMembers: e.target.value})}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {/* Allow Additional Members */}
-                  <div className="flex items-center justify-between p-3 border rounded-lg bg-[#F9FAFB]">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="allowAdditionalMembers" className="text-base">Allow Additional Members</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Let a family exceed Maximum Family Members, billed at the additional member price
-                      </p>
+                  {/* Allow Additional Members — a Couple is always exactly 2 members, so
+                      this only applies to Family plans */}
+                  {formData.planType === "Family" && (
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-[#F9FAFB]">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="allowAdditionalMembers" className="text-base">Allow Additional Members</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Let a family exceed Maximum Family Members, billed at the additional member price
+                        </p>
+                      </div>
+                      <Switch
+                        id="allowAdditionalMembers"
+                        checked={formData.allowAdditionalMembers}
+                        onCheckedChange={(checked) => setFormData({...formData, allowAdditionalMembers: checked})}
+                      />
                     </div>
-                    <Switch
-                      id="allowAdditionalMembers"
-                      checked={formData.allowAdditionalMembers}
-                      onCheckedChange={(checked) => setFormData({...formData, allowAdditionalMembers: checked})}
-                    />
-                  </div>
+                  )}
 
-                  {formData.allowAdditionalMembers && (
+                  {formData.planType === "Family" && formData.allowAdditionalMembers && (
                     <div className="space-y-2">
                       <Label htmlFor="additionalMemberPrice">
                         Additional Member Price
@@ -1765,10 +1787,18 @@ export function ManagePlans() {
                       <div className="flex items-start gap-2">
                         <Info className="h-5 w-5 text-[#2B7A78] flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-[#1E293B]">Family Head Billing Preview</p>
-                          <p className="text-xs text-gray-600 mt-1">
-                            Example: {formData.pricePerMember || "0"} × 5 members = {currencyCode} {((parseFloat(formData.pricePerMember as string) || 0) * 5).toFixed(2)} on ONE invoice billed only to the family head.
+                          <p className="text-sm font-medium text-[#1E293B]">
+                            {formData.planType === "Couple" ? "Couple Head Billing Preview" : "Family Head Billing Preview"}
                           </p>
+                          {formData.planType === "Couple" ? (
+                            <p className="text-xs text-gray-600 mt-1">
+                              Example: {formData.pricePerMember || "0"} × 2 members = {currencyCode} {((parseFloat(formData.pricePerMember as string) || 0) * 2).toFixed(2)} on ONE invoice billed only to the couple head.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-gray-600 mt-1">
+                              Example: {formData.pricePerMember || "0"} × 5 members = {currencyCode} {((parseFloat(formData.pricePerMember as string) || 0) * 5).toFixed(2)} on ONE invoice billed only to the family head.
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>

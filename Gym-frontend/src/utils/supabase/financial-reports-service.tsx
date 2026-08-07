@@ -45,6 +45,20 @@ export interface CashFlowData {
   outflowCount: number;
 }
 
+export interface TaxSummaryData {
+  periodFrom: string;
+  periodTo: string;
+  totalRevenue: number;
+  deductions: number;
+  taxableProfit: number;
+  corporateTaxZeroRateThreshold: number;
+  corporateTaxRate: number;
+  corporateTaxPayable: number;
+  outputVat: number;
+  inputVat: number;
+  netVatPayable: number;
+}
+
 class FinancialReportsService {
   async getIncomeStatement(from?: string, to?: string): Promise<IncomeStatementData> {
     const q = new URLSearchParams();
@@ -132,6 +146,31 @@ class FinancialReportsService {
       netCashFlow: d.net_cash_flow ?? 0,
       inflowCount: d.inflow_count ?? 0,
       outflowCount: d.outflow_count ?? 0,
+    };
+  }
+
+  async getTaxSummary(from?: string, to?: string): Promise<TaxSummaryData> {
+    const q = new URLSearchParams();
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/financial-reports/tax-summary${q.toString() ? "?" + q : ""}`,
+      { method: "GET" }
+    );
+    if (!res.ok) throw new Error("Failed to fetch tax summary");
+    const d = await res.json();
+    return {
+      periodFrom: d.period_from,
+      periodTo: d.period_to,
+      totalRevenue: d.total_revenue ?? 0,
+      deductions: d.deductions ?? 0,
+      taxableProfit: d.taxable_profit ?? 0,
+      corporateTaxZeroRateThreshold: d.corporate_tax_zero_rate_threshold ?? 0,
+      corporateTaxRate: d.corporate_tax_rate ?? 0,
+      corporateTaxPayable: d.corporate_tax_payable ?? 0,
+      outputVat: d.output_vat ?? 0,
+      inputVat: d.input_vat ?? 0,
+      netVatPayable: d.net_vat_payable ?? 0,
     };
   }
 }

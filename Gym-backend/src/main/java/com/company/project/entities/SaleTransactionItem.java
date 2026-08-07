@@ -21,6 +21,9 @@ public class SaleTransactionItem {
     @Column(name = "product_name")
     private String productName;
 
+    @Column(name = "warehouse_id")
+    private Long warehouseId;
+
     @Column(name = "product_sku")
     private String productSku;
 
@@ -57,6 +60,9 @@ public class SaleTransactionItem {
 
     public String getProductName() { return productName; }
     public void setProductName(String productName) { this.productName = productName; }
+
+    public Long getWarehouseId() { return warehouseId; }
+    public void setWarehouseId(Long warehouseId) { this.warehouseId = warehouseId; }
 
     public String getProductSku() { return productSku; }
     public void setProductSku(String productSku) { this.productSku = productSku; }

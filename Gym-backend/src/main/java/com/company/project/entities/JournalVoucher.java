@@ -25,6 +25,15 @@ public class JournalVoucher extends BaseEntity {
     @Column(name = "status")
     private String status;
 
+    @Column(name = "approval_status")
+    private String approvalStatus = "APPROVED"; // Auto-generated are APPROVED by default, manual are PENDING
+
+    @Column(name = "approved_by")
+    private String approvedBy;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @Column(name = "reference")
     private String reference;
 
@@ -33,6 +42,12 @@ public class JournalVoucher extends BaseEntity {
 
     @Column(name = "total_credit", precision = 12, scale = 2)
     private BigDecimal totalCredit;
+
+    @Column(name = "currency_code", length = 3)
+    private String currencyCode;
+
+    @Column(name = "exchange_rate", precision = 12, scale = 6)
+    private BigDecimal exchangeRate = BigDecimal.ONE;
 
     /**
      * True when this voucher was created automatically by FinancialEventService
@@ -82,6 +97,15 @@ public class JournalVoucher extends BaseEntity {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
+    public String getApprovalStatus() { return approvalStatus; }
+    public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+
     public String getReference() { return reference; }
     public void setReference(String reference) { this.reference = reference; }
 
@@ -90,6 +114,12 @@ public class JournalVoucher extends BaseEntity {
 
     public BigDecimal getTotalCredit() { return totalCredit; }
     public void setTotalCredit(BigDecimal totalCredit) { this.totalCredit = totalCredit; }
+
+    public String getCurrencyCode() { return currencyCode; }
+    public void setCurrencyCode(String currencyCode) { this.currencyCode = currencyCode; }
+
+    public BigDecimal getExchangeRate() { return exchangeRate; }
+    public void setExchangeRate(BigDecimal exchangeRate) { this.exchangeRate = exchangeRate; }
 
     public boolean isSystemGenerated() { return systemGenerated; }
     public void setSystemGenerated(boolean systemGenerated) { this.systemGenerated = systemGenerated; }

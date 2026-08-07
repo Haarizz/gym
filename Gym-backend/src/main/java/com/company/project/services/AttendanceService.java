@@ -23,11 +23,48 @@ public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final MemberRepository memberRepository;
+    private final ReceiptService receiptService;
+    private final com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository;
 
     public AttendanceService(AttendanceRepository attendanceRepository,
-                             MemberRepository memberRepository) {
+                             MemberRepository memberRepository,
+                             @org.springframework.context.annotation.Lazy ReceiptService receiptService,
+                             com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository) {
         this.attendanceRepository = attendanceRepository;
         this.memberRepository     = memberRepository;
+        this.receiptService       = receiptService;
+        this.reportSettingsRepository = reportSettingsRepository;
+    }
+
+    // ── Automated report settings ────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public com.company.project.dto.AttendanceReportSettingsDTO getReportSettings() {
+        var settings = reportSettingsRepository.findById(1L)
+                .orElseGet(com.company.project.entities.AttendanceReportSettings::new);
+        return new com.company.project.dto.AttendanceReportSettingsDTO(
+                Boolean.TRUE.equals(settings.getEnabled()), settings.getRecipientEmail(), settings.getGymCapacity());
+    }
+
+    @Transactional
+    public com.company.project.dto.AttendanceReportSettingsDTO updateReportSettings(
+            com.company.project.dto.AttendanceReportSettingsDTO request) {
+        var settings = reportSettingsRepository.findById(1L)
+                .orElseGet(com.company.project.entities.AttendanceReportSettings::new);
+        if (request.getEnabled() != null) settings.setEnabled(request.getEnabled());
+        if (request.getRecipientEmail() != null) settings.setRecipientEmail(request.getRecipientEmail());
+        if (request.getGymCapacity() != null) {
+            if (request.getGymCapacity() <= 0) {
+                throw new IllegalArgumentException("Gym capacity must be greater than zero.");
+            }
+            settings.setGymCapacity(request.getGymCapacity());
+        }
+        if (Boolean.TRUE.equals(settings.getEnabled()) && !StringUtils.hasText(settings.getRecipientEmail())) {
+            throw new IllegalArgumentException("A recipient email is required to enable automated reports.");
+        }
+        reportSettingsRepository.save(settings);
+        return new com.company.project.dto.AttendanceReportSettingsDTO(
+                Boolean.TRUE.equals(settings.getEnabled()), settings.getRecipientEmail(), settings.getGymCapacity());
     }
 
     // ── List / search ─────────────────────────────────────────────────────────
@@ -57,6 +94,15 @@ public class AttendanceService {
                 "size",       size,
                 "totalPages", pageResult.getTotalPages()
         );
+    }
+
+    // ── Member-scoped history ────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<AttendanceListItemDTO> getMemberAttendance(Long memberId) {
+        return attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(memberId).stream()
+                .map(this::toListItem)
+                .toList();
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────────
@@ -147,8 +193,25 @@ public class AttendanceService {
         record.setWalkInEmail(req.getEmail());
         record.setActivityType(req.getSessionType());
         record.setWalkInPaymentStatus(StringUtils.hasText(req.getPaymentStatus()) ? req.getPaymentStatus() : "pending");
+        record.setWalkInAmount(req.getAmount());
+        record.setWalkInPaymentMethod(req.getPaymentMethod());
         record.setNotes(req.getNotes());
         attendanceRepository.save(record);
+
+        // A day-pass sale is real revenue like any other — create a real Receipt
+        // (transactionType "Daily Entry", same category already filterable on the
+        // Billing/Member Receipts pages) so it shows up in Billing exactly like a
+        // member payment and posts to the ledger, instead of leaving it as an
+        // Attendance row with no financial trace.
+        boolean hasCharge = req.getAmount() != null && req.getAmount().compareTo(java.math.BigDecimal.ZERO) > 0;
+        if (hasCharge) {
+            boolean paid = "paid".equalsIgnoreCase(record.getWalkInPaymentStatus());
+            receiptService.createWalkInReceipt(
+                    req.getName(), req.getPhone(), req.getSessionType(),
+                    req.getAmount(), paid ? req.getAmount() : java.math.BigDecimal.ZERO,
+                    req.getPaymentMethod(), req.getPaymentBreakdown(),
+                    req.getNotes());
+        }
 
         CheckInResponse resp = new CheckInResponse();
         resp.setSuccess(true);

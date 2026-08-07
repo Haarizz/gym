@@ -69,6 +69,14 @@ public class Attendance extends BaseEntity {
     @Column(name = "walk_in_payment_status")
     private String walkInPaymentStatus;
 
+    // The day-pass amount, structured (not just embedded in notes text) so it can
+    // actually be posted to the ledger via ReceiptVoucherService/FinancialEventService.
+    @Column(name = "walk_in_amount", precision = 12, scale = 2)
+    private java.math.BigDecimal walkInAmount;
+
+    @Column(name = "walk_in_payment_method")
+    private String walkInPaymentMethod;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 
@@ -121,6 +129,12 @@ public class Attendance extends BaseEntity {
 
     public String getWalkInPaymentStatus() { return walkInPaymentStatus; }
     public void setWalkInPaymentStatus(String walkInPaymentStatus) { this.walkInPaymentStatus = walkInPaymentStatus; }
+
+    public java.math.BigDecimal getWalkInAmount() { return walkInAmount; }
+    public void setWalkInAmount(java.math.BigDecimal walkInAmount) { this.walkInAmount = walkInAmount; }
+
+    public String getWalkInPaymentMethod() { return walkInPaymentMethod; }
+    public void setWalkInPaymentMethod(String walkInPaymentMethod) { this.walkInPaymentMethod = walkInPaymentMethod; }
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }

@@ -1,6 +1,7 @@
 package com.company.project.services;
 
 import com.company.project.entities.AccountHead;
+import com.company.project.entities.DeferredRevenueSchedule;
 import com.company.project.entities.JournalVoucher;
 import com.company.project.entities.JournalVoucherLine;
 import com.company.project.repositories.AccountHeadRepository;
@@ -35,13 +36,16 @@ public class FinancialReportService {
     private final AccountHeadRepository        accountHeadRepository;
     private final JournalVoucherRepository     journalVoucherRepository;
     private final JournalVoucherLineRepository journalVoucherLineRepository;
+    private final DeferredRevenueScheduleService deferredRevenueScheduleService;
 
     public FinancialReportService(AccountHeadRepository accountHeadRepository,
                                    JournalVoucherRepository journalVoucherRepository,
-                                   JournalVoucherLineRepository journalVoucherLineRepository) {
+                                   JournalVoucherLineRepository journalVoucherLineRepository,
+                                   DeferredRevenueScheduleService deferredRevenueScheduleService) {
         this.accountHeadRepository        = accountHeadRepository;
         this.journalVoucherRepository     = journalVoucherRepository;
         this.journalVoucherLineRepository = journalVoucherLineRepository;
+        this.deferredRevenueScheduleService = deferredRevenueScheduleService;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -291,6 +295,129 @@ public class FinancialReportService {
         result.put("net_cash_flow",  netCashFlow);
         result.put("inflow_count",   inflowCount);
         result.put("outflow_count",  outflowCount);
+        return result;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TAX SUMMARY (UAE) — VAT Return + Corporate Tax, derived from the same
+    //  posted ledger lines as every other report here (no separate/mock path).
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Matches FinancialEventService.ACC_TAX_PAYABLE / ACC_GST_INPUT.
+    private static final String ACC_TAX_PAYABLE = "2100";
+    private static final String ACC_GST_INPUT   = "2200";
+
+    // UAE Corporate Tax: 0% on the first AED 375,000 of taxable profit in the
+    // period, 9% on the excess. No CGST/SGST/IGST split anywhere — UAE VAT is
+    // a single flat rate, unlike India's GST.
+    private static final BigDecimal CT_ZERO_RATE_THRESHOLD = new BigDecimal("375000");
+    private static final BigDecimal CT_RATE = new BigDecimal("0.09");
+
+    /**
+     * Output VAT  = net credit movement on Tax/GST Payable (2100) in the period
+     *               — VAT collected on membership, add-on, POS and invoice sales.
+     * Input VAT   = net debit movement on GST Input Credit (2200) in the period
+     *               — VAT paid on expenses and supplier bills, reclaimable.
+     * Net VAT     = Output − Input (what's actually owed to the FTA for the period).
+     * Corporate Tax reuses the same revenue/expense totals as the Income
+     * Statement, so it can never drift from that report.
+     */
+    public Map<String, Object> getTaxSummary(LocalDate from, LocalDate to) {
+        Set<Long> postedJvIds = getPostedJvIds(from, to);
+        Map<String, AccountHead> accountMap = buildAccountMap();
+
+        BigDecimal totalRevenue  = BigDecimal.ZERO;
+        BigDecimal totalExpenses = BigDecimal.ZERO;
+        BigDecimal outputVat     = BigDecimal.ZERO;
+        BigDecimal inputVat      = BigDecimal.ZERO;
+
+        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+            if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
+
+            String code = line.getAccountCode();
+            if (code == null) continue;
+
+            BigDecimal debit  = safe(line.getDebit());
+            BigDecimal credit = safe(line.getCredit());
+
+            if (ACC_TAX_PAYABLE.equals(code)) {
+                outputVat = outputVat.add(credit.subtract(debit));
+                continue;
+            }
+            if (ACC_GST_INPUT.equals(code)) {
+                inputVat = inputVat.add(debit.subtract(credit));
+                continue;
+            }
+
+            AccountHead account = accountMap.get(code);
+            if (account == null) continue;
+            String type = account.getType() != null ? account.getType().toUpperCase() : "";
+            if ("REVENUE".equals(type)) totalRevenue = totalRevenue.add(credit.subtract(debit));
+            else if ("EXPENSE".equals(type)) totalExpenses = totalExpenses.add(debit.subtract(credit));
+        }
+
+        BigDecimal netVatPayable = outputVat.subtract(inputVat);
+        BigDecimal taxableProfit = totalRevenue.subtract(totalExpenses);
+        BigDecimal ctTaxableBase = taxableProfit.subtract(CT_ZERO_RATE_THRESHOLD).max(BigDecimal.ZERO);
+        BigDecimal corporateTaxPayable = taxableProfit.compareTo(BigDecimal.ZERO) > 0
+                ? ctTaxableBase.multiply(CT_RATE).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("period_from", from);
+        result.put("period_to", to);
+        result.put("total_revenue", totalRevenue);
+        result.put("deductions", totalExpenses);
+        result.put("taxable_profit", taxableProfit);
+        result.put("corporate_tax_zero_rate_threshold", CT_ZERO_RATE_THRESHOLD);
+        result.put("corporate_tax_rate", CT_RATE);
+        result.put("corporate_tax_payable", corporateTaxPayable);
+        result.put("output_vat", outputVat);
+        result.put("input_vat", inputVat);
+        result.put("net_vat_payable", netVatPayable);
+        return result;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  DEFERRED REVENUE
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Matches FinancialEventService.ACC_DEFERRED_REVENUE.
+    private static final String ACC_DEFERRED_REVENUE = "2300";
+
+    /**
+     * Remaining unrecognized deferred revenue, from the ledger (2300 balance —
+     * the source of truth) and from the schedule/line records (the breakdown by
+     * member/plan). The two totals should always tie out to each other.
+     */
+    public Map<String, Object> getDeferredRevenueReport() {
+        BigDecimal ledgerBalance = accountHeadRepository.findByCode(ACC_DEFERRED_REVENUE)
+                .map(AccountHead::getCurrentBalance)
+                .orElse(BigDecimal.ZERO);
+
+        List<DeferredRevenueSchedule> active = deferredRevenueScheduleService.findActiveSchedules();
+        BigDecimal scheduledRemaining = BigDecimal.ZERO;
+        List<Map<String, Object>> scheduleLines = new ArrayList<>();
+        for (DeferredRevenueSchedule s : active) {
+            scheduledRemaining = scheduledRemaining.add(safe(s.getRemainingAmount()));
+            Map<String, Object> line = new LinkedHashMap<>();
+            line.put("schedule_id",       s.getId());
+            line.put("member_name",       s.getMemberName());
+            line.put("plan_name",         s.getPlanName());
+            line.put("start_date",        s.getStartDate());
+            line.put("end_date",          s.getEndDate());
+            line.put("total_periods",     s.getTotalPeriods());
+            line.put("total_amount",      s.getTotalAmount());
+            line.put("recognized_amount", s.getRecognizedAmount());
+            line.put("remaining_amount",  s.getRemainingAmount());
+            scheduleLines.add(line);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ledger_balance",        ledgerBalance);
+        result.put("scheduled_remaining",   scheduledRemaining);
+        result.put("active_schedule_count", active.size());
+        result.put("schedules",             scheduleLines);
         return result;
     }
 

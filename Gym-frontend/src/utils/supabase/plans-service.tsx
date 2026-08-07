@@ -1,4 +1,5 @@
 import { authService } from './auth-service';
+import { parseApiError } from './api-error';
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
@@ -88,7 +89,7 @@ class PlansService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/plans?${params.toString()}`
     );
-    if (!response.ok) throw new Error(`Failed to fetch plans: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch plans: ${response.status}`));
     return response.json();
   }
 
@@ -96,7 +97,7 @@ class PlansService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/plans/${id}`
     );
-    if (!response.ok) throw new Error(`Failed to fetch plan: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch plan: ${response.status}`));
     return response.json();
   }
 
@@ -108,7 +109,7 @@ class PlansService {
         body: JSON.stringify(data),
       }
     );
-    if (!response.ok) throw new Error(`Failed to create plan: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to create plan: ${response.status}`));
     return response.json();
   }
 
@@ -120,7 +121,7 @@ class PlansService {
         body: JSON.stringify(data),
       }
     );
-    if (!response.ok) throw new Error(`Failed to update plan: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to update plan: ${response.status}`));
     return response.json();
   }
 
@@ -129,7 +130,7 @@ class PlansService {
       `${backendBaseUrl}/plans/${id}`,
       { method: 'DELETE' }
     );
-    if (!response.ok) throw new Error(`Failed to delete plan: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to delete plan: ${response.status}`));
   }
 
   async duplicatePlan(id: number): Promise<Plan> {
@@ -137,7 +138,7 @@ class PlansService {
       `${backendBaseUrl}/plans/${id}/duplicate`,
       { method: 'POST' }
     );
-    if (!response.ok) throw new Error(`Failed to duplicate plan: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to duplicate plan: ${response.status}`));
     return response.json();
   }
 }

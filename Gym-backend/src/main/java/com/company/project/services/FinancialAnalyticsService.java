@@ -7,6 +7,10 @@ import com.company.project.repositories.AccountHeadRepository;
 import com.company.project.repositories.JournalVoucherLineRepository;
 import com.company.project.repositories.JournalVoucherRepository;
 import com.company.project.repositories.TaxComplianceRepository;
+import com.company.project.repositories.SupplierBillRepository;
+import com.company.project.repositories.BankReconciliationRepository;
+import com.company.project.entities.SupplierBill;
+import com.company.project.entities.BankReconciliation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,15 +38,21 @@ public class FinancialAnalyticsService {
     private final JournalVoucherRepository     journalVoucherRepository;
     private final JournalVoucherLineRepository journalVoucherLineRepository;
     private final TaxComplianceRepository      taxComplianceRepository;
+    private final SupplierBillRepository       supplierBillRepository;
+    private final BankReconciliationRepository bankReconciliationRepository;
 
     public FinancialAnalyticsService(AccountHeadRepository accountHeadRepository,
                                       JournalVoucherRepository journalVoucherRepository,
                                       JournalVoucherLineRepository journalVoucherLineRepository,
-                                      TaxComplianceRepository taxComplianceRepository) {
+                                      TaxComplianceRepository taxComplianceRepository,
+                                      SupplierBillRepository supplierBillRepository,
+                                      BankReconciliationRepository bankReconciliationRepository) {
         this.accountHeadRepository        = accountHeadRepository;
         this.journalVoucherRepository     = journalVoucherRepository;
         this.journalVoucherLineRepository = journalVoucherLineRepository;
         this.taxComplianceRepository      = taxComplianceRepository;
+        this.supplierBillRepository       = supplierBillRepository;
+        this.bankReconciliationRepository = bankReconciliationRepository;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -79,6 +89,15 @@ public class FinancialAnalyticsService {
 
         long pendingTaxCount = taxComplianceRepository.findByStatusOrderByDueDateDesc("PENDING").size()
                 + taxComplianceRepository.findByStatusOrderByDueDateDesc("OVERDUE").size();
+                
+        BigDecimal outstandingPayments = supplierBillRepository.findAll().stream()
+                .filter(b -> !"CANCELLED".equals(b.getStatus()) && !"PAID".equals(b.getPaymentStatus()))
+                .map(b -> safe(b.getTotalAmount()).subtract(safe(b.getAmountPaid())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                
+        long pendingReconciliations = bankReconciliationRepository.findAll().stream()
+                .filter(r -> "OPEN".equals(r.getStatus()) || "IN_PROGRESS".equals(r.getStatus()))
+                .count();
 
         Map<String, Object> dashboard = new LinkedHashMap<>();
         dashboard.put("total_revenue",          totalRevenue);
@@ -86,6 +105,8 @@ public class FinancialAnalyticsService {
         dashboard.put("net_income",             netIncome);
         dashboard.put("profit_margin",          profitMargin.setScale(2, RoundingMode.HALF_UP));
         dashboard.put("pending_tax_obligations", pendingTaxCount);
+        dashboard.put("outstanding_payments", outstandingPayments);
+        dashboard.put("pending_reconciliations", pendingReconciliations);
         return dashboard;
     }
 

@@ -85,7 +85,10 @@ public class FollowUpController {
     @PostMapping("/{id}/reschedule")
     public ResponseEntity<FollowUpResponseDTO> reschedule(@PathVariable Long id,
                                                            @RequestBody Map<String, String> body) {
-        LocalDateTime newDate = LocalDateTime.parse(body.get("dueDate"));
+        // The reschedule dialog only collects a date (e.g. "2026-08-10"), not a time,
+        // so pad it to midnight the same way create/edit already do before parsing.
+        String dueDate = body.get("dueDate");
+        LocalDateTime newDate = LocalDateTime.parse(dueDate.contains("T") ? dueDate : dueDate + "T00:00:00");
         return ResponseEntity.ok(followUpService.reschedule(id, newDate));
     }
 

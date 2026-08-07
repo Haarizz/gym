@@ -24,6 +24,7 @@ public class SaleTransactionRequestDTO {
         private Long productId;
         private String productName;
         private String productSku;
+        private Long warehouseId;
         private Integer quantity;
         private BigDecimal unitPrice;
         private BigDecimal discountPercent;
@@ -38,6 +39,9 @@ public class SaleTransactionRequestDTO {
 
         public String getProductSku() { return productSku; }
         public void setProductSku(String productSku) { this.productSku = productSku; }
+
+        public Long getWarehouseId() { return warehouseId; }
+        public void setWarehouseId(Long warehouseId) { this.warehouseId = warehouseId; }
 
         public Integer getQuantity() { return quantity; }
         public void setQuantity(Integer quantity) { this.quantity = quantity; }

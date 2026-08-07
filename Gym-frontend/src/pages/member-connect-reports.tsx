@@ -89,8 +89,18 @@ import { promotionsService, type PromotionApi } from '../utils/supabase/promotio
 import { referralService, type ReferralResponse } from '../utils/supabase/referral-service';
 import { followUpService, type FollowUpResponse } from '../utils/supabase/follow-up-service';
 import { messagingService, type MessagingAnalyticsApi, type MessageHistoryApi } from '../utils/supabase/messaging-service';
+import { membersService, type Member } from '../utils/supabase/members-service';
 
 // All interfaces now come from respective service files
+
+// Simple CSV field escaper - quotes fields containing commas, quotes, or newlines
+const csvEscape = (value: any): string => {
+  const str = value === null || value === undefined ? '' : String(value);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
 
 export function MemberConnectReports() {
     const [activeTab, setActiveTab] = useState('overview');
@@ -103,7 +113,7 @@ export function MemberConnectReports() {
   const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(undefined);
   const [customDateTo, setCustomDateTo] = useState<Date | undefined>(undefined);
   const [isExporting, setIsExporting] = useState(false);
-  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<PromotionApi | null>(null);
   const [showCampaignDetail, setShowCampaignDetail] = useState(false);
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
@@ -112,7 +122,8 @@ export function MemberConnectReports() {
   const [apiFollowUps, setApiFollowUps] = useState<FollowUpResponse[]>([]);
   const [apiMessagingStats, setApiMessagingStats] = useState<MessagingAnalyticsApi | null>(null);
   const [apiMessageHistory, setApiMessageHistory] = useState<MessageHistoryApi[]>([]);
-  
+  const [apiMembers, setApiMembers] = useState<Member[]>([]);
+
   const [apiReferralStats, setApiReferralStats] = useState({ totalReferrals: 0, successfulReferrals: 0 });
   const [apiFollowUpStats, setApiFollowUpStats] = useState({ totalFollowUps: 0, completedFollowUps: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -121,7 +132,7 @@ export function MemberConnectReports() {
     setIsLoading(true);
     try {
       const [
-        promos, refData, refStats, followData, followStats, msgStats, msgHist
+        promos, refData, refStats, followData, followStats, msgStats, msgHist, membersData
       ] = await Promise.all([
         promotionsService.getPromotions(),
         referralService.getReferrals({ size: 100 }),
@@ -129,7 +140,8 @@ export function MemberConnectReports() {
         followUpService.getFollowUps({ size: 100 }),
         followUpService.getStats(),
         messagingService.getAnalytics(),
-        messagingService.getHistory()
+        messagingService.getHistory(),
+        membersService.getMembers({}, { limit: 1000 })
       ]);
       setApiPromotions(promos || []);
       setApiReferrals(refData?.referrals || []);
@@ -138,6 +150,7 @@ export function MemberConnectReports() {
       setApiFollowUpStats({ totalFollowUps: followStats?.totalFollowUps || 0, completedFollowUps: followStats?.completedFollowUps || 0 });
       setApiMessagingStats(msgStats);
       setApiMessageHistory(msgHist || []);
+      setApiMembers(membersData?.members || []);
     } catch (e) {
       console.error('Error loading report data:', e);
     } finally {
@@ -157,25 +170,31 @@ export function MemberConnectReports() {
     const openRate = apiMessagingStats?.open_rate || 0;
     const clickRate = apiMessagingStats?.click_rate || 0;
     
-    // Derived approximations for now if we don't have exact metrics
+    // Derived approximations from real messaging stats (open/click rate come from the API)
     const totalOpened = Math.round(totalMessagesSent * (openRate / 100));
     const totalClicked = Math.round(totalOpened * (clickRate / 100));
-    const totalConversions = Math.round(totalClicked * 0.1); // approx 10% conversion from clicks
-    const conversionRate = totalMessagesSent > 0 ? (totalConversions / totalMessagesSent) * 100 : 0;
-    
+
+    // Real conversion rate, averaged from each promotion's actual conversionRate field
+    // (tracked by the backend on redemption) rather than an invented click-to-conversion ratio.
+    const promoConversionRates = apiPromotions
+      .map(p => p.conversionRate)
+      .filter((v): v is number => typeof v === 'number');
+    const conversionRate = promoConversionRates.length > 0
+      ? promoConversionRates.reduce((sum, v) => sum + v, 0) / promoConversionRates.length
+      : 0;
+
     const referralsGenerated = apiReferralStats.totalReferrals;
     const referralsConverted = apiReferralStats.successfulReferrals;
     const referralConversionRate = referralsGenerated > 0 ? (referralsConverted / referralsGenerated) * 100 : 0;
-    
+
     const followUpsCompleted = apiFollowUpStats.completedFollowUps;
     const totalFollowUps = apiFollowUpStats.totalFollowUps;
     const followUpCompletionRate = totalFollowUps > 0 ? (followUpsCompleted / totalFollowUps) * 100 : 0;
-    
-    const totalRevenue = apiPromotions.length * 5000; // Mock revenue since promotions don't track revenue directly
+
+    // Real revenue: sum of each promotion's actual totalRevenue, incremented server-side on redemption
+    const totalRevenue = apiPromotions.reduce((sum, p) => sum + (p.totalRevenue ?? 0), 0);
     const totalCost = apiMessagingStats?.total_cost || 0;
     const roi = totalCost > 0 ? ((totalRevenue - totalCost) / totalCost) * 100 : 0;
-    
-    const avgEngagementScore = 85; // Fixed score placeholder since we don't have member engagement scores API yet
 
     return {
       totalMembersEngaged,
@@ -192,21 +211,48 @@ export function MemberConnectReports() {
       followUpCompletionRate,
       totalRevenue,
       totalCost,
-      roi,
-      avgEngagementScore
+      roi
     };
   }, [apiPromotions, apiMessagingStats, apiReferralStats, apiFollowUpStats]);
 
-  // Handle export functionality
-  const handleExport = useCallback(async (format: 'csv' | 'pdf') => {
-    setIsExporting(true);
-    
-    // Simulate export process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    toast.success(`Member Connect reports exported as ${format.toUpperCase()}!`);
-    setIsExporting(false);
-  }, []);
+  // Real period-over-period trends (current calendar month vs previous), derived from
+  // actual message history timestamps. null when there's no prior-period data to compare.
+  const periodTrends = useMemo(() => {
+    const now = new Date();
+    const currentStart = startOfMonth(now);
+    const currentEnd = endOfMonth(now);
+    const prevMonth = subMonths(now, 1);
+    const prevStart = startOfMonth(prevMonth);
+    const prevEnd = endOfMonth(prevMonth);
+
+    const inRange = (dateStr: string | null | undefined, start: Date, end: Date) => {
+      if (!dateStr) return false;
+      return isWithinInterval(new Date(dateStr), { start, end });
+    };
+
+    const currentMsgs = apiMessageHistory.filter(m => inRange(m.sent_date, currentStart, currentEnd));
+    const prevMsgs = apiMessageHistory.filter(m => inRange(m.sent_date, prevStart, prevEnd));
+
+    const sumRecipients = (msgs: MessageHistoryApi[]) => msgs.reduce((s, m) => s + (m.recipient_count || 0), 0);
+    const avgClickRate = (msgs: MessageHistoryApi[]) => {
+      const rates = msgs.map(m => m.click_rate).filter((v): v is number => typeof v === 'number');
+      return rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
+    };
+
+    const currentRecipients = sumRecipients(currentMsgs);
+    const prevRecipients = sumRecipients(prevMsgs);
+    const membersEngagedDelta = prevMsgs.length > 0 && prevRecipients > 0
+      ? ((currentRecipients - prevRecipients) / prevRecipients) * 100
+      : null;
+
+    const currentClickRate = avgClickRate(currentMsgs);
+    const prevClickRate = avgClickRate(prevMsgs);
+    const clickRateDelta = currentClickRate !== null && prevClickRate !== null
+      ? currentClickRate - prevClickRate
+      : null;
+
+    return { membersEngagedDelta, clickRateDelta };
+  }, [apiMessageHistory]);
 
   // Get trend indicator
   const getTrendIcon = (value: number, reverse = false) => {
@@ -321,37 +367,141 @@ export function MemberConnectReports() {
     ].filter(d => d.value > 0);
   }, [apiPromotions]);
 
+  // Real per-member engagement derived from referrers: actual referral counts and the
+  // member's real membership plan/type (looked up from the members roster). There is no
+  // engagement-score API anywhere in the backend, so no such score is fabricated here.
   const memberEngagementsData = useMemo(() => {
-    // Derive mock engagement from actual referrers to show some data, as we don't have an engagement API
+    const membersById = new Map(apiMembers.map(m => [m.id, m]));
     const membersMap = new Map<string, any>();
-    
+
     apiReferrals.forEach(r => {
       const name = r.referrerName || 'Unknown Member';
+      const matchedMember = r.referrerMemberId ? membersById.get(r.referrerMemberId) : undefined;
+
       if (!membersMap.has(name)) {
         membersMap.set(name, {
           memberId: r.referrerMemberId || name,
           memberName: name,
-          membershipType: 'Standard',
-          totalInteractions: 1,
-          messagesReceived: 0,
-          messagesOpened: 0,
-          messagesClicked: 0,
-          campaignsParticipated: 0,
+          membershipType: matchedMember?.membership_plan || matchedMember?.membership_type || 'Unknown',
           referralsMade: 1,
-          engagementScore: 50,
-          lastEngagement: r.date,
-          communicationPreference: 'email'
+          lastEngagement: r.date
         });
       } else {
         const m = membersMap.get(name);
         m.referralsMade++;
-        m.totalInteractions++;
-        m.engagementScore = Math.min(100, m.engagementScore + 10);
+        if (r.date && (!m.lastEngagement || new Date(r.date) > new Date(m.lastEngagement))) {
+          m.lastEngagement = r.date;
+        }
       }
     });
 
     return Array.from(membersMap.values());
+  }, [apiReferrals, apiMembers]);
+
+  // Sum of real rewardAmount for referrals whose reward hasn't been paid out yet
+  const pendingReferralRewardValue = useMemo(() => {
+    return apiReferrals
+      .filter(r => !r.paymentDate)
+      .reduce((sum, r) => sum + (r.rewardAmount || 0), 0);
   }, [apiReferrals]);
+
+  // Build a CSV of whichever tab's real data is currently displayed
+  const buildExportCsv = useCallback((): { filename: string; content: string } => {
+    let header: string[] = [];
+    let rows: string[][] = [];
+    let filename = 'member-connect-overview.csv';
+
+    switch (activeTab) {
+      case 'campaigns':
+        filename = 'campaigns-report.csv';
+        header = ['Name', 'Type', 'Status', 'Start Date', 'End Date', 'Usage Count', 'Usage Limit', 'Redemption Rate (%)', 'Conversion Rate (%)', 'Total Revenue', 'Total Savings', 'Created By'];
+        rows = filteredCampaigns.map(c => [
+          c.name, c.type, c.status,
+          c.startDate ? format(new Date(c.startDate), 'yyyy-MM-dd') : '',
+          c.endDate ? format(new Date(c.endDate), 'yyyy-MM-dd') : '',
+          String(c.usageCount ?? 0), c.usageLimit != null ? String(c.usageLimit) : '',
+          String(c.redemptionRate ?? 0), String(c.conversionRate ?? 0),
+          String(c.totalRevenue ?? 0), String(c.totalSavings ?? 0), c.createdBy || ''
+        ].map(csvEscape));
+        break;
+      case 'engagement':
+        filename = 'member-engagement-report.csv';
+        header = ['Member', 'Membership Type', 'Referrals Made', 'Last Activity'];
+        rows = memberEngagementsData.map((m: any) => [
+          m.memberName, m.membershipType, String(m.referralsMade),
+          m.lastEngagement ? format(new Date(m.lastEngagement), 'yyyy-MM-dd') : ''
+        ].map(csvEscape));
+        break;
+      case 'referrals':
+        filename = 'referrals-report.csv';
+        header = ['Referrer', 'Referee', 'Referral Date', 'Status', 'Campaign', 'Reward Amount', 'Conversion Date'];
+        rows = apiReferrals.map(r => [
+          r.referrerName || '', r.refereeName || '',
+          r.date ? format(new Date(r.date), 'yyyy-MM-dd') : '',
+          r.status, r.ruleName || '', String(r.rewardAmount ?? 0),
+          r.paymentDate ? format(new Date(r.paymentDate), 'yyyy-MM-dd') : ''
+        ].map(csvEscape));
+        break;
+      case 'followups':
+        filename = 'follow-ups-report.csv';
+        header = ['Lead ID', 'Type', 'Scheduled', 'Completed', 'Status', 'Outcome', 'Assigned To', 'Notes'];
+        rows = apiFollowUps.map(f => {
+          const scheduled = f.dueDate || f.scheduledTime;
+          return [
+            String(f.leadId), f.type,
+            scheduled ? format(new Date(scheduled), 'yyyy-MM-dd') : '',
+            f.completedDate ? format(new Date(f.completedDate), 'yyyy-MM-dd') : '',
+            f.status, f.outcome || '', f.assignedStaff || '', f.notes || ''
+          ].map(csvEscape);
+        });
+        break;
+      default:
+        filename = 'member-connect-overview.csv';
+        header = ['Metric', 'Value'];
+        rows = [
+          ['Active Members Engaged', String(analytics.totalMembersEngaged)],
+          ['Campaigns Run', String(analytics.totalCampaigns)],
+          ['Active Campaigns', String(analytics.activeCampaigns)],
+          ['Messages Sent', String(analytics.totalMessagesSent)],
+          ['Open Rate (%)', analytics.openRate.toFixed(1)],
+          ['Click Rate (%)', analytics.clickRate.toFixed(1)],
+          ['Referrals Generated', String(analytics.referralsGenerated)],
+          ['Referral Conversion Rate (%)', analytics.referralConversionRate.toFixed(1)],
+          ['Follow-Ups Completed', String(analytics.followUpsCompleted)],
+          ['Follow-Up Completion Rate (%)', analytics.followUpCompletionRate.toFixed(1)],
+          ['Total Revenue', String(analytics.totalRevenue)],
+          ['Total Cost', String(analytics.totalCost)],
+          ['ROI (%)', analytics.roi.toFixed(1)],
+        ];
+    }
+
+    const content = [header.map(csvEscape).join(','), ...rows.map(r => r.join(','))].join('\n');
+    return { filename, content };
+  }, [activeTab, filteredCampaigns, memberEngagementsData, apiReferrals, apiFollowUps, analytics]);
+
+  // Handle export functionality - CSV is a real client-side export of the active tab's data.
+  // PDF generation isn't implemented (no PDF library in this codebase), so it's reported honestly
+  // instead of faking a success toast.
+  const handleExport = useCallback(async (exportFormat: 'csv' | 'pdf') => {
+    setIsExporting(true);
+    try {
+      if (exportFormat === 'csv') {
+        const { filename, content } = buildExportCsv();
+        const blob = new Blob([content], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Member Connect report exported as CSV!');
+      } else {
+        toast.info('PDF export is not available yet - use Export CSV instead.');
+      }
+    } finally {
+      setIsExporting(false);
+    }
+  }, [buildExportCsv]);
 
   return (
     <div className="p-6 space-y-6">
@@ -376,8 +526,8 @@ export function MemberConnectReports() {
             <FileText className="mr-2 h-4 w-4" />
             Export PDF
           </Button>
-          <Button onClick={() => toast.success('Data refreshed!')}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button onClick={async () => { await loadData(); toast.success('Data refreshed!'); }} disabled={isLoading}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
             Refresh
           </Button>
         </div>
@@ -542,10 +692,14 @@ export function MemberConnectReports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{analytics.totalMembersEngaged}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              {getTrendIcon(12.5)}
-              <span className={cn("ml-1", getTrendColor(12.5))}>12.5% vs last month</span>
-            </div>
+            {periodTrends.membersEngagedDelta !== null && (
+              <div className="flex items-center text-xs text-muted-foreground">
+                {getTrendIcon(periodTrends.membersEngagedDelta)}
+                <span className={cn("ml-1", getTrendColor(periodTrends.membersEngagedDelta))}>
+                  {Math.abs(periodTrends.membersEngagedDelta).toFixed(1)}% vs last month
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -584,10 +738,14 @@ export function MemberConnectReports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{analytics.clickRate.toFixed(1)}%</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              {getTrendIcon(3.2)}
-              <span className={cn("ml-1", getTrendColor(3.2))}>3.2% vs last month</span>
-            </div>
+            {periodTrends.clickRateDelta !== null && (
+              <div className="flex items-center text-xs text-muted-foreground">
+                {getTrendIcon(periodTrends.clickRateDelta)}
+                <span className={cn("ml-1", getTrendColor(periodTrends.clickRateDelta))}>
+                  {Math.abs(periodTrends.clickRateDelta).toFixed(1)} pts vs last month
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -740,12 +898,6 @@ export function MemberConnectReports() {
                     <span className="font-medium">{analytics.conversionRate.toFixed(2)}%</span>
                   </div>
                   <Progress value={analytics.conversionRate} className="h-2" />
-                  
-                  <div className="flex justify-between text-sm">
-                    <span>Average Engagement Score</span>
-                    <span className="font-medium">{analytics.avgEngagementScore.toFixed(0)}/100</span>
-                  </div>
-                  <Progress value={analytics.avgEngagementScore} className="h-2" />
                 </div>
               </CardContent>
             </Card>
@@ -758,7 +910,7 @@ export function MemberConnectReports() {
           <Card className={cardShell}>
 <CardHeader>
               <CardTitle>Campaign Performance Comparison</CardTitle>
-              <CardDescription>Delivery, open, and conversion rates across all campaigns</CardDescription>
+              <CardDescription>Usage, clicks, and conversion rate across all campaigns</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
@@ -769,9 +921,9 @@ export function MemberConnectReports() {
                   <YAxis yAxisId="right" orientation="right" />
                   <Tooltip />
                   <Legend />
-                  <Bar yAxisId="left" dataKey="delivered" fill="#3b82f6" name="Delivered" />
-                  <Bar yAxisId="left" dataKey="opened" fill="#10b981" name="Opened" />
-                  <Line yAxisId="right" type="monotone" dataKey="conversions" stroke="#f59e0b" strokeWidth={3} name="Conversions" />
+                  <Bar yAxisId="left" dataKey="usageCount" fill="#3b82f6" name="Usage Count" />
+                  <Bar yAxisId="left" dataKey="clickCount" fill="#10b981" name="Clicks" />
+                  <Line yAxisId="right" type="monotone" dataKey="conversionRate" stroke="#f59e0b" strokeWidth={3} name="Conversion Rate (%)" />
                 </ComposedChart>
               </ResponsiveContainer>
             </CardContent>
@@ -791,26 +943,23 @@ export function MemberConnectReports() {
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Period</TableHead>
-                    <TableHead>Targeted</TableHead>
-                    <TableHead>Open Rate</TableHead>
-                    <TableHead>Click Rate</TableHead>
-                    <TableHead>Conversions</TableHead>
-                    <TableHead>ROI</TableHead>
+                    <TableHead>Usage</TableHead>
+                    <TableHead>Redemption Rate</TableHead>
+                    <TableHead>Avg Order Value</TableHead>
+                    <TableHead>Revenue</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredCampaigns.map((campaign) => {
-                    const openRate = campaign.messagesSent > 0 ? (campaign.opened / campaign.messagesSent) * 100 : 0;
-                    const clickRate = campaign.opened > 0 ? (campaign.clicked / campaign.opened) * 100 : 0;
-                    const roi = campaign.cost > 0 ? ((campaign.revenue - campaign.cost) / campaign.cost) * 100 : 0;
+                    const redemptionRate = campaign.redemptionRate ?? 0;
 
                     return (
                       <TableRow className="transition-colors hover:bg-slate-50/50" key={campaign.id}>
                         <TableCell>
                           <div>
                             <p className="font-medium">{campaign.name}</p>
-                            <p className="text-sm text-muted-foreground">by {campaign.createdBy}</p>
+                            <p className="text-sm text-muted-foreground">by {campaign.createdBy || 'Unknown'}</p>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -830,46 +979,30 @@ export function MemberConnectReports() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            <p>{format(campaign.startDate, 'MMM dd')}</p>
-                            <p className="text-muted-foreground">to {format(campaign.endDate, 'MMM dd')}</p>
+                            <p>{campaign.startDate ? format(new Date(campaign.startDate), 'MMM dd') : '-'}</p>
+                            <p className="text-muted-foreground">to {campaign.endDate ? format(new Date(campaign.endDate), 'MMM dd') : '-'}</p>
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">{campaign.membersTargeted}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <span className={cn(
-                              "font-medium",
-                              openRate >= 30 ? "text-green-600" :
-                              openRate >= 20 ? "text-yellow-600" : "text-red-600"
-                            )}>
-                              {openRate.toFixed(1)}%
-                            </span>
-                            <Progress value={openRate} className="w-16 h-2" />
-                          </div>
+                        <TableCell className="font-medium">
+                          {campaign.usageCount ?? 0}{campaign.usageLimit != null ? ` / ${campaign.usageLimit}` : ''}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
                             <span className={cn(
                               "font-medium",
-                              clickRate >= 10 ? "text-green-600" :
-                              clickRate >= 5 ? "text-yellow-600" : "text-red-600"
+                              redemptionRate >= 30 ? "text-green-600" :
+                              redemptionRate >= 15 ? "text-yellow-600" : "text-red-600"
                             )}>
-                              {clickRate.toFixed(1)}%
+                              {redemptionRate.toFixed(1)}%
                             </span>
-                            <Progress value={clickRate} className="w-16 h-2" />
+                            <Progress value={redemptionRate} className="w-16 h-2" />
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium text-purple-600">{campaign.conversions}</span>
+                          <span className="font-medium"><CurrencyGlyph /> {(campaign.averageOrderValue ?? 0).toFixed(2)}</span>
                         </TableCell>
                         <TableCell>
-                          <span className={cn(
-                            "font-medium",
-                            roi > 200 ? "text-green-600" :
-                            roi > 100 ? "text-yellow-600" : "text-red-600"
-                          )}>
-                            {roi.toFixed(0)}%
-                          </span>
+                          <span className="font-medium text-green-600"><CurrencyGlyph /> {(campaign.totalRevenue ?? 0).toLocaleString()}</span>
                         </TableCell>
                         <TableCell>
                           <Button
@@ -894,67 +1027,14 @@ export function MemberConnectReports() {
 
         {/* Engagement Tab */}
         <TabsContent value="engagement" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
-          {/* Member Engagement Overview */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className={cardShell}>
-<CardHeader>
-                <CardTitle>Engagement Score Distribution</CardTitle>
-                <CardDescription>Distribution of member engagement scores</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={[
-                    { range: '90-100', count: 1, color: '#10b981' },
-                    { range: '80-89', count: 1, color: '#3b82f6' },
-                    { range: '70-79', count: 1, color: '#f59e0b' },
-                    { range: '60-69', count: 0, color: '#ef4444' },
-                    { range: '0-59', count: 1, color: '#991b1b' }
-                  ]}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="range" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#8b5cf6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className={cardShell}>
-<CardHeader>
-                <CardTitle>Communication Preferences</CardTitle>
-                <CardDescription>Preferred communication channels by members</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Email', value: 45, fill: '#3b82f6' },
-                        { name: 'SMS', value: 30, fill: '#10b981' },
-                        { name: 'Push', value: 15, fill: '#f59e0b' },
-                        { name: 'All Channels', value: 10, fill: '#8b5cf6' }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}%`}
-                    />
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Member Engagement Table */}
+          {/* Member Engagement Table — there's no engagement-score/message-open/campaign-participation
+              API anywhere in the backend, so this only shows what's genuinely derivable: real
+              referral activity per member (see memberEngagementsData above). No score or chart
+              is fabricated to fill the gap. */}
           <Card className={cardShell}>
 <CardHeader>
               <CardTitle>Member Engagement Details</CardTitle>
-              <CardDescription>Individual member engagement metrics and activity</CardDescription>
+              <CardDescription>Referral activity per member (the only engagement signal with real backend data)</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -962,19 +1042,14 @@ export function MemberConnectReports() {
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Membership</TableHead>
-                    <TableHead>Total Interactions</TableHead>
-                    <TableHead>Messages</TableHead>
-                    <TableHead>Campaigns</TableHead>
-                    <TableHead>Referrals</TableHead>
-                    <TableHead>Score</TableHead>
+                    <TableHead>Referrals Made</TableHead>
                     <TableHead>Last Activity</TableHead>
-                    <TableHead>Preference</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {memberEngagementsData.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-4 text-muted-foreground">
+                      <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
                         No engagement data available.
                       </TableCell>
                     </TableRow>
@@ -985,7 +1060,7 @@ export function MemberConnectReports() {
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
                             <AvatarFallback>
-                              {member.memberName.split(' ').map(n => n[0]).join('')}
+                              {member.memberName.split(' ').map((n: string) => n[0]).join('')}
                             </AvatarFallback>
                           </Avatar>
                           <p className="font-medium">{member.memberName}</p>
@@ -994,36 +1069,11 @@ export function MemberConnectReports() {
                       <TableCell>
                         <Badge variant="outline">{member.membershipType}</Badge>
                       </TableCell>
-                      <TableCell className="font-medium">{member.totalInteractions}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <p>{member.messagesOpened}/{member.messagesReceived}</p>
-                          <p className="text-muted-foreground">{member.messagesClicked} clicks</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{member.campaignsParticipated}</TableCell>
                       <TableCell className="font-medium">{member.referralsMade}</TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <span className={cn(
-                            "font-medium",
-                            member.engagementScore >= 80 ? "text-green-600" :
-                            member.engagementScore >= 60 ? "text-yellow-600" : "text-red-600"
-                          )}>
-                            {member.engagementScore}
-                          </span>
-                          <Progress value={member.engagementScore} className="w-16 h-2" />
-                        </div>
-                      </TableCell>
-                      <TableCell>
                         <span className="text-sm">
-                           {format(new Date(member.lastEngagement), 'MMM dd, yyyy')}
+                          {member.lastEngagement ? format(new Date(member.lastEngagement), 'MMM dd, yyyy') : '—'}
                         </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {member.communicationPreference}
-                        </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1050,10 +1100,6 @@ export function MemberConnectReports() {
                   <Users className="h-8 w-8 text-blue-200" />
                 </div>
                 <p className="text-sm text-muted-foreground">This month</p>
-                <div className="mt-4">
-                  <Progress value={75} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">75% of monthly target</p>
-                </div>
               </CardContent>
             </Card>
 
@@ -1093,12 +1139,6 @@ export function MemberConnectReports() {
                     <CurrencyGlyph /> {apiReferrals.reduce((sum, r) => sum + (r.rewardAmount || 0), 0)}
                   </p>
                   <p className="text-sm text-muted-foreground">Total rewards</p>
-                  <div className="mt-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Est. Value</span>
-                      <span className="font-medium"><CurrencyGlyph /> {0}</span>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1121,7 +1161,6 @@ export function MemberConnectReports() {
                     <TableHead>Campaign</TableHead>
                     <TableHead>Reward Given</TableHead>
                     <TableHead>Conversion Date</TableHead>
-                    <TableHead>Value</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1153,9 +1192,6 @@ export function MemberConnectReports() {
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium"><CurrencyGlyph /> {0}</span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1366,15 +1402,17 @@ export function MemberConnectReports() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Start Date</span>
-                        <span className="font-medium">{format(selectedCampaign.startDate, 'MMM dd, yyyy')}</span>
+                        <span className="font-medium">{selectedCampaign.startDate ? format(new Date(selectedCampaign.startDate), 'MMM dd, yyyy') : '—'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">End Date</span>
-                        <span className="font-medium">{format(selectedCampaign.endDate, 'MMM dd, yyyy')}</span>
+                        <span className="font-medium">{selectedCampaign.endDate ? format(new Date(selectedCampaign.endDate), 'MMM dd, yyyy') : '—'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Members Targeted</span>
-                        <span className="font-medium">{selectedCampaign.membersTargeted}</span>
+                        <span className="text-muted-foreground">Times Redeemed</span>
+                        <span className="font-medium">
+                          {(selectedCampaign.usageCount ?? 0).toLocaleString()}{selectedCampaign.usageLimit ? ` / ${selectedCampaign.usageLimit}` : ''}
+                        </span>
                       </div>
                     </CardContent>
                   </Card>
@@ -1385,30 +1423,14 @@ export function MemberConnectReports() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Messages Sent</span>
-                        <span className="font-medium">{selectedCampaign.messagesSent}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Delivery Rate</span>
+                        <span className="text-muted-foreground">Redemption Rate</span>
                         <span className="font-medium">
-                          {((selectedCampaign.delivered / selectedCampaign.messagesSent) * 100).toFixed(1)}%
+                          {selectedCampaign.usageLimit ? `${selectedCampaign.redemptionRate ?? 0}%` : '— (no usage limit set)'}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Open Rate</span>
-                        <span className="font-medium text-green-600">
-                          {((selectedCampaign.opened / selectedCampaign.messagesSent) * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Click Rate</span>
-                        <span className="font-medium text-blue-600">
-                          {((selectedCampaign.clicked / selectedCampaign.opened) * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Conversions</span>
-                        <span className="font-medium text-purple-600">{selectedCampaign.conversions}</span>
+                        <span className="text-muted-foreground">Avg Order Value</span>
+                        <span className="font-medium text-green-600"><CurrencyGlyph /> {(selectedCampaign.averageOrderValue ?? 0).toFixed(2)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -1420,33 +1442,30 @@ export function MemberConnectReports() {
                     <CardTitle>Financial Performance</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-red-50 dark:bg-red-950 rounded-lg">
-                        <p className="text-2xl font-bold text-red-600"><CurrencyGlyph /> {selectedCampaign.cost}</p>
-                        <p className="text-sm text-muted-foreground">Total Cost</p>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-                        <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {selectedCampaign.revenue}</p>
-                        <p className="text-sm text-muted-foreground">Revenue Generated</p>
+                        <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {(selectedCampaign.totalRevenue ?? 0).toLocaleString()}</p>
+                        <p className="text-sm text-muted-foreground">Total Revenue</p>
                       </div>
-                      <div className="text-center p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">
-                        <p className="text-2xl font-bold text-purple-600">
-                          {(((selectedCampaign.revenue - selectedCampaign.cost) / selectedCampaign.cost) * 100).toFixed(0)}%
-                        </p>
-                        <p className="text-sm text-muted-foreground">ROI</p>
+                      <div className="text-center p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                        <p className="text-2xl font-bold text-orange-600"><CurrencyGlyph /> {(selectedCampaign.totalSavings ?? 0).toLocaleString()}</p>
+                        <p className="text-sm text-muted-foreground">Total Savings (member discounts)</p>
                       </div>
                     </div>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Click count and conversion rate aren't shown — this promotion has no public tracking link, so there's nothing real to measure them from.
+                    </p>
                   </CardContent>
                 </Card>
 
                 {/* Notes */}
-                {selectedCampaign.notes && (
+                {selectedCampaign.description && (
                   <Card className={cardShell}>
 <CardHeader>
-                      <CardTitle>Notes</CardTitle>
+                      <CardTitle>Description</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-muted-foreground">{selectedCampaign.notes}</p>
+                      <p className="text-muted-foreground">{selectedCampaign.description}</p>
                     </CardContent>
                   </Card>
                 )}

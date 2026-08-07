@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -74,6 +74,7 @@ import {
   Calendar as CalendarAlt,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   MoreHorizontal,
   X,
   Info
@@ -81,75 +82,10 @@ import {
 import { toast } from "sonner";
 import { format, addDays, subDays, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { cn } from "../components/ui/utils";
-
-// Types and interfaces
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  membershipPlan: string;
-  joinDate: Date;
-  status: 'active' | 'inactive' | 'frozen' | 'expired';
-  acquisitionSource: 'referral' | 'campaign' | 'walk-in' | 'online' | 'social';
-  referredBy?: string;
-  lifetimeValue: number;
-  lastActivity: Date;
-  engagementScore: number;
-  totalSessions: number;
-  monthsSinceFlex: number;
-  avatar?: string;
-  branch: string;
-  campaignId?: string;
-}
-
-interface AcquisitionData {
-  month: string;
-  newMembers: number;
-  retainedMembers: number;
-  churnedMembers: number;
-  totalMembers: number;
-  acquisitionCost: number;
-  revenue: number;
-}
-
-interface RetentionCohort {
-  cohort: string;
-  month0: number;
-  month1: number;
-  month2: number;
-  month3: number;
-  month6: number;
-  month12: number;
-}
-
-interface EngagementMetric {
-  memberId: string;
-  memberName: string;
-  totalSessions: number;
-  lastActivity: Date;
-  avgSessionsPerWeek: number;
-  messageResponses: number;
-  campaignParticipation: number;
-  feedbackSubmissions: number;
-  engagementScore: number;
-  trend: 'up' | 'down' | 'stable';
-}
-
-interface CampaignAnalytics {
-  id: string;
-  name: string;
-  type: 'referral' | 'social' | 'email' | 'promo';
-  startDate: Date;
-  endDate: Date;
-  status: 'active' | 'completed' | 'draft';
-  reach: number;
-  engagement: number;
-  conversions: number;
-  cost: number;
-  revenue: number;
-  roi: number;
-}
+import { membersService, Member as ApiMember } from '../utils/supabase/members-service';
+import { leadService, LeadStats } from '../utils/supabase/lead-service';
+import { referralService, ReferralStats } from '../utils/supabase/referral-service';
+import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
 
 export function MemberConnectAnalytics() {
   const { currencyCode } = useCurrency();
@@ -162,192 +98,317 @@ export function MemberConnectAnalytics() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(undefined);
   const [customDateTo, setCustomDateTo] = useState<Date | undefined>(undefined);
-  const [isExporting, setIsExporting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
-  // Sample data - in real app this would come from your backend
-  const acquisitionData: AcquisitionData[] = [
-    { month: 'Jan', newMembers: 45, retainedMembers: 320, churnedMembers: 12, totalMembers: 353, acquisitionCost: 4500, revenue: 84000 },
-    { month: 'Feb', newMembers: 52, retainedMembers: 341, churnedMembers: 8, totalMembers: 385, acquisitionCost: 5200, revenue: 89000 },
-    { month: 'Mar', newMembers: 38, retainedMembers: 377, churnedMembers: 15, totalMembers: 400, acquisitionCost: 3800, revenue: 91000 },
-    { month: 'Apr', newMembers: 67, retainedMembers: 385, churnedMembers: 22, totalMembers: 430, acquisitionCost: 6700, revenue: 96000 },
-    { month: 'May', newMembers: 73, retainedMembers: 408, churnedMembers: 18, totalMembers: 463, acquisitionCost: 7300, revenue: 102000 },
-    { month: 'Jun', newMembers: 61, retainedMembers: 445, churnedMembers: 25, totalMembers: 481, acquisitionCost: 6100, revenue: 105000 }
-  ];
+  // ── Real data, fetched from the backend ─────────────────────────────────
+  const [members, setMembers] = useState<ApiMember[]>([]);
+  const [leadStats, setLeadStats] = useState<LeadStats | null>(null);
+  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
+  const [promotions, setPromotions] = useState<PromotionApi[]>([]);
 
-  const membershipDistribution = [
-    { name: 'Premium Annual', value: 186, percentage: 38.7, color: '#2563eb' },
-    { name: 'Premium Monthly', value: 134, percentage: 27.9, color: '#059669' },
-    { name: 'Standard Monthly', value: 89, percentage: 18.5, color: '#dc2626' },
-    { name: 'Basic', value: 72, percentage: 15.0, color: '#7c3aed' }
-  ];
+  const fetchAnalyticsData = useCallback(async () => {
+    const results = await Promise.allSettled([
+      membersService.getMembers({}, { limit: 1000 }),
+      leadService.getStats(),
+      referralService.getStats(),
+      promotionsService.getPromotions(),
+    ]);
 
-  const acquisitionSources = [
-    { name: 'Referrals', value: 142, percentage: 29.5, color: '#2563eb' },
-    { name: 'Online Marketing', value: 118, percentage: 24.5, color: '#059669' },
-    { name: 'Walk-ins', value: 95, percentage: 19.8, color: '#dc2626' },
-    { name: 'Social Media', value: 76, percentage: 15.8, color: '#7c3aed' },
-    { name: 'Campaigns', value: 50, percentage: 10.4, color: '#ea580c' }
-  ];
+    const [membersRes, leadRes, referralRes, promoRes] = results;
 
-  const retentionCohorts: RetentionCohort[] = [
-    { cohort: 'Jan 2024', month0: 45, month1: 42, month2: 38, month3: 35, month6: 28, month12: 0 },
-    { cohort: 'Feb 2024', month0: 52, month1: 48, month2: 44, month3: 40, month6: 32, month12: 0 },
-    { cohort: 'Mar 2024', month0: 38, month1: 35, month2: 32, month3: 29, month6: 0, month12: 0 },
-    { cohort: 'Apr 2024', month0: 67, month1: 61, month2: 56, month3: 0, month6: 0, month12: 0 },
-    { cohort: 'May 2024', month0: 73, month1: 68, month2: 0, month3: 0, month6: 0, month12: 0 },
-    { cohort: 'Jun 2024', month0: 61, month1: 0, month2: 0, month3: 0, month6: 0, month12: 0 }
-  ];
+    if (membersRes.status === 'fulfilled') setMembers(membersRes.value.members || []);
+    if (leadRes.status === 'fulfilled') setLeadStats(leadRes.value);
+    if (referralRes.status === 'fulfilled') setReferralStats(referralRes.value);
+    if (promoRes.status === 'fulfilled') setPromotions(promoRes.value || []);
 
-  const engagementMetrics: EngagementMetric[] = [
-    {
-      memberId: '1',
-      memberName: 'John Smith',
-      totalSessions: 24,
-      lastActivity: new Date(),
-      avgSessionsPerWeek: 4.2,
-      messageResponses: 15,
-      campaignParticipation: 8,
-      feedbackSubmissions: 12,
-      engagementScore: 92,
-      trend: 'up'
-    },
-    {
-      memberId: '2',
-      memberName: 'Sarah Johnson',
-      totalSessions: 18,
-      lastActivity: subDays(new Date(), 2),
-      avgSessionsPerWeek: 3.1,
-      messageResponses: 12,
-      campaignParticipation: 6,
-      feedbackSubmissions: 8,
-      engagementScore: 78,
-      trend: 'stable'
-    },
-    {
-      memberId: '3',
-      memberName: 'Mike Chen',
-      totalSessions: 31,
-      lastActivity: subDays(new Date(), 1),
-      avgSessionsPerWeek: 5.2,
-      messageResponses: 20,
-      campaignParticipation: 12,
-      feedbackSubmissions: 18,
-      engagementScore: 96,
-      trend: 'up'
-    },
-    {
-      memberId: '4',
-      memberName: 'Lisa Ahmed',
-      totalSessions: 8,
-      lastActivity: subDays(new Date(), 7),
-      avgSessionsPerWeek: 1.8,
-      messageResponses: 3,
-      campaignParticipation: 2,
-      feedbackSubmissions: 1,
-      engagementScore: 34,
-      trend: 'down'
+    const failedCount = results.filter(r => r.status === 'rejected').length;
+    setLoadError(failedCount > 0 ? `${failedCount} of 4 data source(s) failed to load — showing partial data.` : null);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      await fetchAnalyticsData();
+      if (!cancelled) setIsLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [fetchAnalyticsData]);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchAnalyticsData();
+      toast.success('Data refreshed!');
+    } catch {
+      toast.error('Failed to refresh some data');
+    } finally {
+      setIsRefreshing(false);
     }
-  ];
+  }, [fetchAnalyticsData]);
 
-  const campaignAnalytics: CampaignAnalytics[] = [
-    {
-      id: '1',
-      name: 'Summer Fitness Challenge',
-      type: 'promo',
-      startDate: subDays(new Date(), 30),
-      endDate: addDays(new Date(), 30),
-      status: 'active',
-      reach: 2400,
-      engagement: 450,
-      conversions: 67,
-      cost: 8500,
-      revenue: 25000,
-      roi: 194
-    },
-    {
-      id: '2',
-      name: 'Referral Rewards Program',
-      type: 'referral',
-      startDate: subDays(new Date(), 90),
-      endDate: addDays(new Date(), 270),
-      status: 'active',
-      reach: 1800,
-      engagement: 340,
-      conversions: 142,
-      cost: 12000,
-      revenue: 68000,
-      roi: 467
-    },
-    {
-      id: '3',
-      name: 'New Year Resolution',
-      type: 'social',
-      startDate: subDays(new Date(), 150),
-      endDate: subDays(new Date(), 90),
-      status: 'completed',
-      reach: 3200,
-      engagement: 680,
-      conversions: 89,
-      cost: 15000,
-      revenue: 42000,
-      roi: 180
-    }
-  ];
+  // ── Derived, real metrics (no fabricated data) ──────────────────────────
 
-  const funnelData = [
-    { name: 'Reached', value: 3200, fill: '#2563eb' },
-    { name: 'Engaged', value: 1200, fill: '#3b82f6' },
-    { name: 'Interested', value: 650, fill: '#60a5fa' },
-    { name: 'Trialed', value: 320, fill: '#93c5fd' },
-    { name: 'Converted', value: 142, fill: '#dbeafe' }
-  ];
+  // Monthly new-member counts + running total, bucketed from real join dates.
+  const acquisitionTrend = useMemo(() => {
+    const now = new Date();
+    const months = Array.from({ length: 6 }, (_, idx) => subMonths(now, 5 - idx));
+    const firstStart = startOfMonth(months[0]);
+    let cumulative = members.filter(m => m.join_date && new Date(m.join_date) < firstStart).length;
+    return months.map(d => {
+      const start = startOfMonth(d);
+      const end = endOfMonth(d);
+      const newMembers = members.filter(m => {
+        if (!m.join_date) return false;
+        const jd = new Date(m.join_date);
+        return jd >= start && jd <= end;
+      }).length;
+      cumulative += newMembers;
+      return { month: format(d, 'MMM'), newMembers, totalMembers: cumulative };
+    });
+  }, [members]);
 
-  // Calculate key metrics
+  // Real membership-plan (membership_type) distribution.
+  const membershipDistribution = useMemo(() => {
+    const palette = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#be185d'];
+    const counts = new Map<string, number>();
+    members.forEach(m => {
+      const key = m.membership_type || 'Unspecified';
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const total = members.length || 1;
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({
+        name,
+        value,
+        percentage: Number(((value / total) * 100).toFixed(1)),
+        color: palette[i % palette.length],
+      }));
+  }, [members]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { active: 0, inactive: 0, suspended: 0, expired: 0, frozen: 0 };
+    members.forEach(m => {
+      const key = (m.membership_status || '').toLowerCase();
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [members]);
+
+  const statusBreakdownChart = useMemo(() => (
+    Object.entries(statusCounts)
+      .filter(([, count]) => count > 0)
+      .map(([status, count]) => ({ status: status.charAt(0).toUpperCase() + status.slice(1), count }))
+  ), [statusCounts]);
+
+  // Most recently joined members, real names/emails/join dates/fees.
+  const recentMembers = useMemo(() => (
+    [...members]
+      .filter(m => !!m.join_date)
+      .sort((a, b) => new Date(b.join_date).getTime() - new Date(a.join_date).getTime())
+      .slice(0, 8)
+  ), [members]);
+
+  // Honest "retention" per signup cohort: of the members who joined in a given
+  // month, what % are still marked active TODAY. This is a current-state
+  // snapshot, not a true point-in-time month-0/1/2/3/6/12 retention curve
+  // (we don't have historical status snapshots for that).
+  const retentionCohorts = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, idx) => subMonths(now, 5 - idx)).map(d => {
+      const start = startOfMonth(d);
+      const end = endOfMonth(d);
+      const cohortMembers = members.filter(m => {
+        if (!m.join_date) return false;
+        const jd = new Date(m.join_date);
+        return jd >= start && jd <= end;
+      });
+      const active = cohortMembers.filter(m => (m.membership_status || '').toLowerCase() === 'active').length;
+      return {
+        cohort: format(d, 'MMM yyyy'),
+        newMembers: cohortMembers.length,
+        active,
+        retentionPct: cohortMembers.length ? (active / cohortMembers.length) * 100 : 0,
+      };
+    });
+  }, [members]);
+
+  const bestCohort = useMemo(() => {
+    const eligible = retentionCohorts.filter(c => c.newMembers >= 3);
+    const pool = eligible.length ? eligible : retentionCohorts.filter(c => c.newMembers > 0);
+    if (!pool.length) return null;
+    return pool.reduce((best, c) => (c.retentionPct > best.retentionPct ? c : best), pool[0]);
+  }, [retentionCohorts]);
+
+  // Real churn-risk signal: active members whose real expiry_date falls within 14 days.
+  const atRiskMembers = useMemo(() => {
+    const now = new Date();
+    const horizon = addDays(now, 14);
+    return members
+      .filter(m => (m.membership_status || '').toLowerCase() === 'active' && m.expiry_date && new Date(m.expiry_date) <= horizon)
+      .sort((a, b) => new Date(a.expiry_date as string).getTime() - new Date(b.expiry_date as string).getTime());
+  }, [members]);
+
+  // Real per-member visit counts (Member.totalVisits, incremented on every check-in).
+  const visitsDistribution = useMemo(() => {
+    const buckets: { range: string; test: (v: number) => boolean }[] = [
+      { range: '0', test: v => v === 0 },
+      { range: '1-10', test: v => v >= 1 && v <= 10 },
+      { range: '11-30', test: v => v >= 11 && v <= 30 },
+      { range: '31-60', test: v => v >= 31 && v <= 60 },
+      { range: '60+', test: v => v > 60 },
+    ];
+    return buckets.map(b => ({
+      range: b.range,
+      count: members.filter(m => b.test(m.total_visits ?? 0)).length,
+    }));
+  }, [members]);
+
+  const avgVisitsByPlan = useMemo(() => {
+    const map = new Map<string, { sum: number; count: number }>();
+    members.forEach(m => {
+      const key = m.membership_type || 'Unspecified';
+      const entry = map.get(key) || { sum: 0, count: 0 };
+      entry.sum += m.total_visits ?? 0;
+      entry.count += 1;
+      map.set(key, entry);
+    });
+    return Array.from(map.entries()).map(([type, { sum, count }]) => ({
+      type,
+      avgVisits: count ? Number((sum / count).toFixed(1)) : 0,
+    }));
+  }, [members]);
+
+  const topByVisits = useMemo(() => (
+    [...members].sort((a, b) => (b.total_visits ?? 0) - (a.total_visits ?? 0)).slice(0, 8)
+  ), [members]);
+
+  const avgVisits = useMemo(() => {
+    if (!members.length) return 0;
+    return members.reduce((sum, m) => sum + (m.total_visits ?? 0), 0) / members.length;
+  }, [members]);
+
+  // Real promotion/campaign fields only — no invented reach/engagement/cost/ROI.
+  const campaignCards = useMemo(() => (
+    promotions.map(p => ({
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      status: p.status,
+      startDate: p.startDate ? new Date(p.startDate) : null,
+      endDate: p.endDate ? new Date(p.endDate) : null,
+      usageCount: p.usageCount ?? 0,
+      usageLimit: p.usageLimit ?? null,
+      conversionRate: p.conversionRate ?? 0,
+      redemptionRate: p.redemptionRate ?? 0,
+      totalRevenue: p.totalRevenue ?? 0,
+      totalSavings: p.totalSavings ?? 0,
+      averageOrderValue: p.averageOrderValue ?? 0,
+    }))
+  ), [promotions]);
+
+  // Real lead-status counts from LeadStatsDTO.
+  const funnelData = useMemo(() => {
+    if (!leadStats) return [];
+    return [
+      { name: 'New', value: leadStats.newLeads, fill: '#2563eb' },
+      { name: 'Contacted', value: leadStats.contactedLeads, fill: '#3b82f6' },
+      { name: 'Follow-up', value: leadStats.followUpLeads, fill: '#60a5fa' },
+      { name: 'Converted', value: leadStats.convertedLeads, fill: '#93c5fd' },
+    ];
+  }, [leadStats]);
+
   const analytics = useMemo(() => {
-    const currentMonth = acquisitionData[acquisitionData.length - 1];
-    const previousMonth = acquisitionData[acquisitionData.length - 2];
-    
-    const totalMembers = currentMonth.totalMembers;
-    const newMembersThisMonth = currentMonth.newMembers;
-    const churnRate = (currentMonth.churnedMembers / (currentMonth.retainedMembers + currentMonth.churnedMembers)) * 100;
-    const retentionRate = 100 - churnRate;
-    const avgEngagement = engagementMetrics.reduce((sum, m) => sum + m.engagementScore, 0) / engagementMetrics.length;
-    
-    // Calculate growth rates
-    const memberGrowth = previousMonth ? ((currentMonth.totalMembers - previousMonth.totalMembers) / previousMonth.totalMembers) * 100 : 0;
-    const newMemberGrowth = previousMonth ? ((currentMonth.newMembers - previousMonth.newMembers) / previousMonth.newMembers) * 100 : 0;
-    const revenueGrowth = previousMonth ? ((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue) * 100 : 0;
-    
-    // Calculate acquisition cost and LTV
-    const avgAcquisitionCost = currentMonth.acquisitionCost / currentMonth.newMembers;
-    const avgLTV = currentMonth.revenue / currentMonth.totalMembers * 12; // Annualized
-    
+    const totalMembers = members.length;
+    const activeCount = statusCounts.active || 0;
+    const churnedCount = (statusCounts.expired || 0) + (statusCounts.suspended || 0) + (statusCounts.inactive || 0);
+    const retentionRate = totalMembers ? (activeCount / totalMembers) * 100 : 0;
+    const churnRate = totalMembers ? (churnedCount / totalMembers) * 100 : 0;
+
+    const currentMonth = acquisitionTrend[acquisitionTrend.length - 1];
+    const previousMonth = acquisitionTrend[acquisitionTrend.length - 2];
+    const newMembersThisMonth = currentMonth?.newMembers ?? 0;
+    const newMemberGrowth = previousMonth && previousMonth.newMembers > 0
+      ? ((currentMonth.newMembers - previousMonth.newMembers) / previousMonth.newMembers) * 100
+      : null;
+    const memberGrowth = previousMonth && previousMonth.totalMembers > 0
+      ? ((currentMonth.totalMembers - previousMonth.totalMembers) / previousMonth.totalMembers) * 100
+      : null;
+
     return {
       totalMembers,
       newMembersThisMonth,
-      churnRate,
       retentionRate,
-      avgEngagement,
+      churnRate,
+      avgVisits,
       memberGrowth,
       newMemberGrowth,
-      revenueGrowth,
-      avgAcquisitionCost,
-      avgLTV,
-      ltvcacRatio: avgLTV / avgAcquisitionCost
+      leadConversionRate: leadStats?.conversionRate ?? null,
     };
-  }, [acquisitionData, engagementMetrics]);
+  }, [members, statusCounts, acquisitionTrend, avgVisits, leadStats]);
 
-  // Handle export functionality
-  const handleExport = useCallback(async (format: 'csv' | 'pdf') => {
-    setIsExporting(true);
-    
-    // Simulate export process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    toast.success(`Analytics data exported as ${format.toUpperCase()}!`);
-    setIsExporting(false);
-  }, []);
+  // Real CSV export of whatever real data is currently loaded (mirrors leads.tsx's Blob pattern).
+  const handleExportCSV = useCallback(() => {
+    const lines: string[] = [];
+    lines.push('Member Connect Analytics Export');
+    lines.push(`Generated,${format(new Date(), 'yyyy-MM-dd HH:mm')}`);
+    lines.push('');
+
+    lines.push('KPI,Value');
+    lines.push(`Total Members,${analytics.totalMembers}`);
+    lines.push(`New Members This Month,${analytics.newMembersThisMonth}`);
+    lines.push(`Retention Rate,${analytics.retentionRate.toFixed(1)}%`);
+    lines.push(`Churn Rate,${analytics.churnRate.toFixed(1)}%`);
+    lines.push(`Avg Visits per Member,${analytics.avgVisits.toFixed(1)}`);
+    if (leadStats) lines.push(`Lead Conversion Rate,${leadStats.conversionRate.toFixed(1)}%`);
+    if (referralStats) lines.push(`Referral Conversion Rate,${referralStats.conversionRate.toFixed(1)}%`);
+    lines.push('');
+
+    lines.push('Membership Distribution');
+    lines.push('Plan Type,Members,Percentage');
+    membershipDistribution.forEach(d => lines.push(`${d.name},${d.value},${d.percentage}%`));
+    lines.push('');
+
+    lines.push('Recent New Members');
+    lines.push('Name,Email,Plan,Fee,Join Date,Status');
+    recentMembers.forEach(m => {
+      const fee = m.membership_fee ?? m.monthly_fee ?? 0;
+      lines.push(`${m.name},${m.email},${m.membership_plan || m.membership_type || ''},${fee},${format(new Date(m.join_date), 'yyyy-MM-dd')},${m.membership_status}`);
+    });
+    lines.push('');
+
+    lines.push('Retention by Signup Cohort');
+    lines.push('Cohort,New Members,Currently Active,Retention %');
+    retentionCohorts.forEach(c => lines.push(`${c.cohort},${c.newMembers},${c.active},${c.retentionPct.toFixed(1)}%`));
+    lines.push('');
+
+    lines.push('Lead Funnel');
+    lines.push('Stage,Count');
+    funnelData.forEach(f => lines.push(`${f.name},${f.value}`));
+    lines.push('');
+
+    if (campaignCards.length) {
+      lines.push('Campaigns / Promotions');
+      lines.push('Name,Type,Status,Usage,Conversion Rate,Redemption Rate,Total Revenue,Total Savings');
+      campaignCards.forEach(c => lines.push(
+        `${c.name},${c.type},${c.status},${c.usageCount}${c.usageLimit ? '/' + c.usageLimit : ''},${c.conversionRate}%,${c.redemptionRate}%,${c.totalRevenue},${c.totalSavings}`
+      ));
+    }
+
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `member-connect-analytics-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Analytics exported as CSV');
+  }, [analytics, leadStats, referralStats, membershipDistribution, recentMembers, retentionCohorts, funnelData, campaignCards]);
 
   // Get trend indicator
   const getTrendIcon = (value: number, reverse = false) => {
@@ -388,28 +449,27 @@ export function MemberConnectAnalytics() {
         <div>
           <h1 className="text-3xl font-bold">Member Connect Analytics</h1>
           <p className="text-muted-foreground mt-2">
-            Comprehensive insights into member acquisition, retention, and engagement
+            Real insights into member acquisition, retention, and engagement
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => handleExport('csv')} disabled={isExporting}>
-            {isExporting ? (
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="mr-2 h-4 w-4" />
             Export CSV
           </Button>
-          <Button variant="outline" onClick={() => handleExport('pdf')} disabled={isExporting}>
-            <Download className="mr-2 h-4 w-4" />
-            Export PDF
-          </Button>
-          <Button onClick={() => toast.success('Data refreshed!')}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", isRefreshing && "animate-spin")} />
             Refresh
           </Button>
         </div>
       </div>
+
+      {loadError && (
+        <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-900 px-4 py-2 text-sm text-yellow-800 dark:text-yellow-200 flex items-center">
+          <AlertCircle className="mr-2 h-4 w-4 shrink-0" />
+          {loadError}
+        </div>
+      )}
 
       {/* Filters Panel */}
       <Card className={cardShell}>
@@ -498,7 +558,7 @@ export function MemberConnectAnalytics() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <Label>Custom Date From</Label>
                   <Popover>
@@ -567,12 +627,16 @@ export function MemberConnectAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{analytics.totalMembers.toLocaleString()}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              {getTrendIcon(analytics.memberGrowth)}
-              <span className={cn("ml-1", getTrendColor(analytics.memberGrowth))}>
-                {Math.abs(analytics.memberGrowth).toFixed(1)}% vs last month
-              </span>
-            </div>
+            {analytics.memberGrowth !== null ? (
+              <div className="flex items-center text-xs text-muted-foreground">
+                {getTrendIcon(analytics.memberGrowth)}
+                <span className={cn("ml-1", getTrendColor(analytics.memberGrowth))}>
+                  {Math.abs(analytics.memberGrowth).toFixed(1)}% vs last month
+                </span>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">All-time count</p>
+            )}
           </CardContent>
         </Card>
 
@@ -585,12 +649,16 @@ export function MemberConnectAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{analytics.newMembersThisMonth}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              {getTrendIcon(analytics.newMemberGrowth)}
-              <span className={cn("ml-1", getTrendColor(analytics.newMemberGrowth))}>
-                {Math.abs(analytics.newMemberGrowth).toFixed(1)}% vs last month
-              </span>
-            </div>
+            {analytics.newMemberGrowth !== null ? (
+              <div className="flex items-center text-xs text-muted-foreground">
+                {getTrendIcon(analytics.newMemberGrowth)}
+                <span className={cn("ml-1", getTrendColor(analytics.newMemberGrowth))}>
+                  {Math.abs(analytics.newMemberGrowth).toFixed(1)}% vs last month
+                </span>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">This calendar month</p>
+            )}
           </CardContent>
         </Card>
 
@@ -603,10 +671,7 @@ export function MemberConnectAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">{analytics.retentionRate.toFixed(1)}%</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              {getTrendIcon(2.3)}
-              <span className="ml-1 text-green-600">2.3% vs last month</span>
-            </div>
+            <p className="text-xs text-muted-foreground">{statusCounts.active || 0} active of {analytics.totalMembers}</p>
           </CardContent>
         </Card>
 
@@ -619,42 +684,35 @@ export function MemberConnectAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{analytics.churnRate.toFixed(1)}%</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              {getTrendIcon(-1.2, true)}
-              <span className="ml-1 text-green-600">1.2% improvement</span>
-            </div>
+            <p className="text-xs text-muted-foreground">Expired, suspended or inactive</p>
           </CardContent>
         </Card>
 
         <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Avg Engagement</CardTitle>
+            <CardTitle className="text-sm font-medium text-primary">Avg Visits / Member</CardTitle>
             <div className="bg-orange-50 p-2 rounded-lg">
               <Activity className="h-4 w-4 text-orange-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{analytics.avgEngagement.toFixed(0)}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              {getTrendIcon(5.7)}
-              <span className="ml-1 text-green-600">5.7% vs last month</span>
-            </div>
+            <div className="text-2xl font-bold text-orange-600">{analytics.avgVisits.toFixed(1)}</div>
+            <p className="text-xs text-muted-foreground">Lifetime check-ins, average</p>
           </CardContent>
         </Card>
 
         <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">LTV:CAC Ratio</CardTitle>
+            <CardTitle className="text-sm font-medium text-primary">Lead Conversion</CardTitle>
             <div className="bg-indigo-50 p-2 rounded-lg">
               <Target className="h-4 w-4 text-indigo-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-indigo-600">{analytics.ltvcacRatio.toFixed(1)}:1</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              {getTrendIcon(12.5)}
-              <span className="ml-1 text-green-600">12.5% vs last month</span>
+            <div className="text-2xl font-bold text-indigo-600">
+              {analytics.leadConversionRate !== null ? `${analytics.leadConversionRate.toFixed(1)}%` : '—'}
             </div>
+            <p className="text-xs text-muted-foreground">Leads converted to members</p>
           </CardContent>
         </Card>
       </div>
@@ -674,23 +732,22 @@ export function MemberConnectAnalytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Member Growth Chart */}
             <Card className={cardShell}>
-<CardHeader>
+              <CardHeader>
                 <CardTitle className="flex items-center">
                   <LineChartIcon className="mr-2 h-5 w-5" />
                   Member Growth Trend
                 </CardTitle>
-                <CardDescription>New vs retained members over the last 6 months</CardDescription>
+                <CardDescription>New members and running total over the last 6 months (real join dates)</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={acquisitionData}>
+                  <LineChart data={acquisitionTrend}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Line type="monotone" dataKey="newMembers" stroke="#10b981" strokeWidth={3} name="New Members" />
-                    <Line type="monotone" dataKey="retainedMembers" stroke="#3b82f6" strokeWidth={3} name="Retained Members" />
                     <Line type="monotone" dataKey="totalMembers" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" name="Total Members" />
                   </LineChart>
                 </ResponsiveContainer>
@@ -699,7 +756,7 @@ export function MemberConnectAnalytics() {
 
             {/* Membership Distribution */}
             <Card className={cardShell}>
-<CardHeader>
+              <CardHeader>
                 <CardTitle className="flex items-center">
                   <PieChartIcon className="mr-2 h-5 w-5" />
                   Membership Distribution
@@ -707,73 +764,112 @@ export function MemberConnectAnalytics() {
                 <CardDescription>Current members by plan type</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={membershipDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {membershipDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+                {membershipDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={membershipDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {membershipDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-16 text-center">
+                    {isLoading ? 'Loading members…' : 'No members found.'}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Acquisition Sources */}
+            {/* Referral Outcomes (real breakdown of referral results) */}
             <Card className={cardShell}>
-<CardHeader>
-                <CardTitle>Acquisition Sources</CardTitle>
-                <CardDescription>Where new members are coming from</CardDescription>
+              <CardHeader>
+                <CardTitle>Referral Outcomes</CardTitle>
+                <CardDescription>Real referral results — GymBios doesn't track a per-member acquisition channel, so this covers referrals only</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {acquisitionSources.map((source) => (
-                  <div key={source.name} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{source.name}</span>
-                      <span className="text-muted-foreground">{source.value} ({source.percentage}%)</span>
+                {referralStats ? (
+                  <>
+                    {[
+                      { name: 'Successful', value: referralStats.successfulReferrals },
+                      { name: 'Pending', value: referralStats.pendingReferrals },
+                      { name: 'Expired', value: referralStats.expiredReferrals },
+                    ].map((row) => {
+                      const pct = referralStats.totalReferrals ? (row.value / referralStats.totalReferrals) * 100 : 0;
+                      return (
+                        <div key={row.name} className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium">{row.name}</span>
+                            <span className="text-muted-foreground">{row.value} ({pct.toFixed(1)}%)</span>
+                          </div>
+                          <Progress value={pct} className="h-2" />
+                        </div>
+                      );
+                    })}
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Total Referrals</p>
+                        <p className="font-semibold">{referralStats.totalReferrals}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Conversion Rate</p>
+                        <p className="font-semibold">{referralStats.conversionRate.toFixed(1)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Rewards Paid</p>
+                        <p className="font-semibold"><CurrencyGlyph /> {referralStats.totalRewards.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Active Reward Rules</p>
+                        <p className="font-semibold">{referralStats.activeRules}</p>
+                      </div>
                     </div>
-                    <Progress value={source.percentage} className="h-2" />
-                  </div>
-                ))}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-8 text-center">{isLoading ? 'Loading referral data…' : 'Referral data unavailable.'}</p>
+                )}
               </CardContent>
             </Card>
 
-            {/* Revenue Growth */}
+            {/* Membership Status Overview */}
             <Card className={cardShell}>
-<CardHeader>
+              <CardHeader>
                 <CardTitle className="flex items-center">
                   <BarChart3 className="mr-2 h-5 w-5" />
-                  Revenue Growth
+                  Membership Status Overview
                 </CardTitle>
-                <CardDescription>Monthly revenue and acquisition costs</CardDescription>
+                <CardDescription>Current members grouped by real membership status</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={acquisitionData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
-                      content={<CustomTooltip />}
-                    />
-                    <Legend />
-                    <Bar dataKey="revenue" fill="#10b981" name={`Revenue (${currencyCode})`} />
-                    <Bar dataKey="acquisitionCost" fill="#f59e0b" name={`Acquisition Cost (${currencyCode})`} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {statusBreakdownChart.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={statusBreakdownChart}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="status" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="count" fill="#3b82f6" name="Members" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-16 text-center">
+                    {isLoading ? 'Loading members…' : 'No members found.'}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -782,64 +878,70 @@ export function MemberConnectAnalytics() {
         {/* Acquisition Tab */}
         <TabsContent value="acquisition" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Acquisition Funnel */}
+            {/* Lead Funnel */}
             <Card className={cardShell}>
-<CardHeader>
-                <CardTitle>Acquisition Funnel</CardTitle>
-                <CardDescription>Member acquisition process breakdown</CardDescription>
+              <CardHeader>
+                <CardTitle>Lead Funnel</CardTitle>
+                <CardDescription>Current lead pipeline by status (real counts from Leads)</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <FunnelChart>
-                    <Tooltip />
-                    <Funnel
-                      dataKey="value"
-                      data={funnelData}
-                      isAnimationActive
-                    >
-                      <LabelList position="center" fill="#fff" stroke="none" />
-                    </Funnel>
-                  </FunnelChart>
-                </ResponsiveContainer>
+                {funnelData.length > 0 && funnelData.some(f => f.value > 0) ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <FunnelChart>
+                      <Tooltip />
+                      <Funnel
+                        dataKey="value"
+                        data={funnelData}
+                        isAnimationActive
+                      >
+                        <LabelList position="center" fill="#fff" stroke="none" />
+                      </Funnel>
+                    </FunnelChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-16 text-center">
+                    {isLoading ? 'Loading leads…' : 'No lead data available.'}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
             {/* Acquisition Metrics */}
             <Card className={cardShell}>
-<CardHeader>
+              <CardHeader>
                 <CardTitle>Acquisition Metrics</CardTitle>
-                <CardDescription>Key performance indicators for member acquisition</CardDescription>
+                <CardDescription>Real lead and referral performance</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600"><CurrencyGlyph /> {analytics.avgAcquisitionCost.toFixed(0)}</p>
-                    <p className="text-sm text-muted-foreground">Avg Cost per Acquisition</p>
+                    <p className="text-2xl font-bold text-blue-600">{leadStats ? leadStats.totalLeads : '—'}</p>
+                    <p className="text-sm text-muted-foreground">Total Leads</p>
                   </div>
                   <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600"><CurrencyGlyph /> {analytics.avgLTV.toFixed(0)}</p>
-                    <p className="text-sm text-muted-foreground">Avg Lifetime Value</p>
+                    <p className="text-2xl font-bold text-green-600">{leadStats ? `${leadStats.conversionRate.toFixed(1)}%` : '—'}</p>
+                    <p className="text-sm text-muted-foreground">Lead Conversion Rate</p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Conversion Rate</span>
-                    <span className="text-sm text-muted-foreground">4.4%</span>
+                    <span className="text-sm font-medium">Referral Conversion Rate</span>
+                    <span className="text-sm text-muted-foreground">{referralStats ? `${referralStats.conversionRate.toFixed(1)}%` : '—'}</span>
                   </div>
-                  <Progress value={4.4} className="h-2" />
+                  <Progress value={referralStats?.conversionRate ?? 0} className="h-2" />
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Trial to Membership</span>
-                    <span className="text-sm text-muted-foreground">44.4%</span>
+                    <span className="text-sm font-medium">Lead Conversion Rate</span>
+                    <span className="text-sm text-muted-foreground">{leadStats ? `${leadStats.conversionRate.toFixed(1)}%` : '—'}</span>
                   </div>
-                  <Progress value={44.4} className="h-2" />
+                  <Progress value={leadStats?.conversionRate ?? 0} className="h-2" />
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Lead Quality Score</span>
-                    <span className="text-sm text-muted-foreground">78%</span>
+                    <span className="text-sm font-medium">Member Retention Rate</span>
+                    <span className="text-sm text-muted-foreground">{analytics.retentionRate.toFixed(1)}%</span>
                   </div>
-                  <Progress value={78} className="h-2" />
+                  <Progress value={analytics.retentionRate} className="h-2" />
                 </div>
               </CardContent>
             </Card>
@@ -847,97 +949,64 @@ export function MemberConnectAnalytics() {
 
           {/* Recent Acquisitions Table */}
           <Card className={cardShell}>
-<CardHeader>
+            <CardHeader>
               <CardTitle>Recent New Members</CardTitle>
-              <CardDescription>Latest member acquisitions with source tracking</CardDescription>
+              <CardDescription>Latest member signups, most recent join date first (real data)</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Join Date</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow className="transition-colors hover:bg-slate-50/50">
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>JS</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">John Smith</p>
-                          <p className="text-sm text-muted-foreground">john@email.com</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Premium Annual</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-blue-100 text-blue-800">Referral</Badge>
-                    </TableCell>
-                    <TableCell>{format(new Date(), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell><CurrencyGlyph /> 2,400</TableCell>
-                    <TableCell>
-                      <Badge className="bg-green-100 text-green-800">Active</Badge>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow className="transition-colors hover:bg-slate-50/50">
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>SC</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">Sarah Chen</p>
-                          <p className="text-sm text-muted-foreground">sarah@email.com</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Premium Monthly</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-green-100 text-green-800">Online</Badge>
-                    </TableCell>
-                    <TableCell>{format(subDays(new Date(), 1), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell><CurrencyGlyph /> 250</TableCell>
-                    <TableCell>
-                      <Badge className="bg-green-100 text-green-800">Active</Badge>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow className="transition-colors hover:bg-slate-50/50">
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>MA</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">Mike Ahmed</p>
-                          <p className="text-sm text-muted-foreground">mike@email.com</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Standard Monthly</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-purple-100 text-purple-800">Walk-in</Badge>
-                    </TableCell>
-                    <TableCell>{format(subDays(new Date(), 2), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell><CurrencyGlyph /> 180</TableCell>
-                    <TableCell>
-                      <Badge className="bg-yellow-100 text-yellow-800">Trial</Badge>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              {recentMembers.length > 0 ? (
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow>
+                      <TableHead>Member</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Fee</TableHead>
+                      <TableHead>Join Date</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentMembers.map((m) => {
+                      const fee = m.membership_fee ?? m.monthly_fee ?? 0;
+                      const initials = m.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+                      return (
+                        <TableRow className="transition-colors hover:bg-slate-50/50" key={m.id}>
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback>{initials}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{m.name}</p>
+                                <p className="text-sm text-muted-foreground">{m.email}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{m.membership_plan || m.membership_type || 'N/A'}</Badge>
+                          </TableCell>
+                          <TableCell><CurrencyGlyph /> {Number(fee).toLocaleString()}</TableCell>
+                          <TableCell>{format(new Date(m.join_date), 'MMM dd, yyyy')}</TableCell>
+                          <TableCell>
+                            <Badge className={cn(
+                              m.membership_status === 'active' ? 'bg-green-100 text-green-800' :
+                              m.membership_status === 'frozen' ? 'bg-blue-100 text-blue-800' :
+                              (m.membership_status === 'expired' || m.membership_status === 'suspended') ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            )}>
+                              {m.membership_status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  {isLoading ? 'Loading members…' : 'No members found.'}
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -948,8 +1017,11 @@ export function MemberConnectAnalytics() {
             {/* Retention Cohort Analysis */}
             <Card className={`lg:col-span-2 ${cardShell}`}>
               <CardHeader>
-                <CardTitle>Cohort Retention Analysis</CardTitle>
-                <CardDescription>Member retention rates by signup month</CardDescription>
+                <CardTitle>Retention by Signup Cohort</CardTitle>
+                <CardDescription>
+                  Of the members who joined in a given month, the % still marked active today — a current-state
+                  snapshot from real join dates and statuses, not a historical month-by-month retention curve.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -957,83 +1029,26 @@ export function MemberConnectAnalytics() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-2 font-medium">Cohort</th>
-                        <th className="text-center p-2 font-medium">Month 0</th>
-                        <th className="text-center p-2 font-medium">Month 1</th>
-                        <th className="text-center p-2 font-medium">Month 2</th>
-                        <th className="text-center p-2 font-medium">Month 3</th>
-                        <th className="text-center p-2 font-medium">Month 6</th>
-                        <th className="text-center p-2 font-medium">Month 12</th>
+                        <th className="text-center p-2 font-medium">New Members</th>
+                        <th className="text-center p-2 font-medium">Currently Active</th>
+                        <th className="text-center p-2 font-medium">Retention</th>
                       </tr>
                     </thead>
                     <tbody>
                       {retentionCohorts.map((cohort) => (
                         <tr key={cohort.cohort} className="border-b">
                           <td className="p-2 font-medium">{cohort.cohort}</td>
+                          <td className="p-2 text-center">{cohort.newMembers}</td>
+                          <td className="p-2 text-center">{cohort.active}</td>
                           <td className="p-2 text-center">
-                            <div className="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-sm">
-                              {cohort.month0}
-                            </div>
-                          </td>
-                          <td className="p-2 text-center">
-                            {cohort.month1 > 0 ? (
+                            {cohort.newMembers > 0 ? (
                               <div className={cn(
-                                "px-2 py-1 rounded text-sm",
-                                (cohort.month1 / cohort.month0) >= 0.9 ? "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-200" :
-                                (cohort.month1 / cohort.month0) >= 0.7 ? "bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200" :
+                                "inline-block px-2 py-1 rounded text-sm",
+                                cohort.retentionPct >= 80 ? "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-200" :
+                                cohort.retentionPct >= 50 ? "bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200" :
                                 "bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-200"
                               )}>
-                                {cohort.month1} ({((cohort.month1 / cohort.month0) * 100).toFixed(0)}%)
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </td>
-                          <td className="p-2 text-center">
-                            {cohort.month2 > 0 ? (
-                              <div className={cn(
-                                "px-2 py-1 rounded text-sm",
-                                (cohort.month2 / cohort.month0) >= 0.8 ? "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-200" :
-                                (cohort.month2 / cohort.month0) >= 0.6 ? "bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200" :
-                                "bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-200"
-                              )}>
-                                {cohort.month2} ({((cohort.month2 / cohort.month0) * 100).toFixed(0)}%)
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </td>
-                          <td className="p-2 text-center">
-                            {cohort.month3 > 0 ? (
-                              <div className={cn(
-                                "px-2 py-1 rounded text-sm",
-                                (cohort.month3 / cohort.month0) >= 0.7 ? "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-200" :
-                                (cohort.month3 / cohort.month0) >= 0.5 ? "bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200" :
-                                "bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-200"
-                              )}>
-                                {cohort.month3} ({((cohort.month3 / cohort.month0) * 100).toFixed(0)}%)
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </td>
-                          <td className="p-2 text-center">
-                            {cohort.month6 > 0 ? (
-                              <div className={cn(
-                                "px-2 py-1 rounded text-sm",
-                                (cohort.month6 / cohort.month0) >= 0.6 ? "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-200" :
-                                (cohort.month6 / cohort.month0) >= 0.4 ? "bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200" :
-                                "bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-200"
-                              )}>
-                                {cohort.month6} ({((cohort.month6 / cohort.month0) * 100).toFixed(0)}%)
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </td>
-                          <td className="p-2 text-center">
-                            {cohort.month12 > 0 ? (
-                              <div className="bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-200 px-2 py-1 rounded text-sm">
-                                {cohort.month12} ({((cohort.month12 / cohort.month0) * 100).toFixed(0)}%)
+                                {cohort.retentionPct.toFixed(0)}%
                               </div>
                             ) : (
                               <span className="text-muted-foreground text-sm">-</span>
@@ -1051,32 +1066,36 @@ export function MemberConnectAnalytics() {
           {/* Retention Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className={cardShell}>
-<CardHeader>
+              <CardHeader>
                 <CardTitle className="flex items-center">
                   <Award className="mr-2 h-5 w-5 text-yellow-600" />
                   Best Performing Cohort
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">Feb 2024</p>
-                  <p className="text-sm text-muted-foreground">84% retention at 3 months</p>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Initial Size</span>
-                      <span className="font-medium">52 members</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Current Active</span>
-                      <span className="font-medium text-green-600">40 members</span>
+                {bestCohort ? (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-green-600">{bestCohort.cohort}</p>
+                    <p className="text-sm text-muted-foreground">{bestCohort.retentionPct.toFixed(0)}% still active today</p>
+                    <div className="mt-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Joined that month</span>
+                        <span className="font-medium">{bestCohort.newMembers} members</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Still Active</span>
+                        <span className="font-medium text-green-600">{bestCohort.active} members</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">Not enough signup data yet.</p>
+                )}
               </CardContent>
             </Card>
 
             <Card className={cardShell}>
-<CardHeader>
+              <CardHeader>
                 <CardTitle className="flex items-center">
                   <AlertCircle className="mr-2 h-5 w-5 text-red-600" />
                   At-Risk Members
@@ -1084,42 +1103,43 @@ export function MemberConnectAnalytics() {
               </CardHeader>
               <CardContent>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-red-600">23</p>
-                  <p className="text-sm text-muted-foreground">Members at risk of churning</p>
+                  <p className="text-2xl font-bold text-red-600">{atRiskMembers.length}</p>
+                  <p className="text-sm text-muted-foreground">Active members expiring within 14 days</p>
                   <div className="mt-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>No activity 14+ days</span>
-                      <span className="font-medium">15</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Low engagement score</span>
-                      <span className="font-medium">8</span>
-                    </div>
+                    {atRiskMembers.slice(0, 4).map((m) => (
+                      <div key={m.id} className="flex justify-between text-sm">
+                        <span className="truncate mr-2">{m.name}</span>
+                        <span className="font-medium shrink-0">{m.expiry_date ? format(new Date(m.expiry_date), 'MMM dd') : '-'}</span>
+                      </div>
+                    ))}
+                    {atRiskMembers.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No members expiring soon</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className={cardShell}>
-<CardHeader>
+              <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Sparkles className="mr-2 h-5 w-5 text-purple-600" />
-                  Retention Initiatives
+                  <UserX className="mr-2 h-5 w-5 text-blue-600" />
+                  Frozen &amp; Suspended
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Win-back Campaign</span>
-                    <Badge className="bg-green-100 text-green-800">Active</Badge>
+                    <span className="text-sm">Frozen Memberships</span>
+                    <Badge className="bg-blue-100 text-blue-800">{statusCounts.frozen || 0}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Loyalty Program</span>
-                    <Badge className="bg-blue-100 text-blue-800">Planning</Badge>
+                    <span className="text-sm">Suspended</span>
+                    <Badge className="bg-orange-100 text-orange-800">{statusCounts.suspended || 0}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Engagement Rewards</span>
-                    <Badge className="bg-green-100 text-green-800">Active</Badge>
+                    <span className="text-sm">Expired</span>
+                    <Badge className="bg-red-100 text-red-800">{statusCounts.expired || 0}</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -1130,132 +1150,100 @@ export function MemberConnectAnalytics() {
         {/* Engagement Tab */}
         <TabsContent value="engagement" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Engagement Score Distribution */}
+            {/* Visits Distribution (real, from Member.totalVisits) */}
             <Card className={cardShell}>
-<CardHeader>
-                <CardTitle>Engagement Score Distribution</CardTitle>
-                <CardDescription>Member engagement levels across your gym</CardDescription>
+              <CardHeader>
+                <CardTitle>Visits Distribution</CardTitle>
+                <CardDescription>Real lifetime check-in counts across all members</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={[
-                    { range: '90-100', count: 45, color: '#10b981' },
-                    { range: '80-89', count: 78, color: '#3b82f6' },
-                    { range: '70-79', count: 92, color: '#f59e0b' },
-                    { range: '60-69', count: 67, color: '#ef4444' },
-                    { range: '0-59', count: 23, color: '#991b1b' }
-                  ]}>
+                  <BarChart data={visitsDistribution}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="range" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#3b82f6" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="count" fill="#3b82f6" name="Members" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            {/* Engagement Trends */}
+            {/* Avg Visits by Plan */}
             <Card className={cardShell}>
-<CardHeader>
-                <CardTitle>Engagement Trends</CardTitle>
-                <CardDescription>Average engagement score over time</CardDescription>
+              <CardHeader>
+                <CardTitle>Avg Visits by Plan</CardTitle>
+                <CardDescription>Average lifetime check-ins per member, grouped by membership type</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={[
-                    { month: 'Jan', score: 74, sessions: 1250 },
-                    { month: 'Feb', score: 76, sessions: 1340 },
-                    { month: 'Mar', score: 78, sessions: 1420 },
-                    { month: 'Apr', score: 81, sessions: 1580 },
-                    { month: 'May', score: 83, sessions: 1650 },
-                    { month: 'Jun', score: 85, sessions: 1720 }
-                  ]}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="score" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.3} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {avgVisitsByPlan.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={avgVisitsByPlan}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="type" />
+                      <YAxis />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="avgVisits" fill="#8b5cf6" name="Avg Visits" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-16 text-center">
+                    {isLoading ? 'Loading members…' : 'No members found.'}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Engagement Details Table */}
+          {/* Top Members by Visits */}
           <Card className={cardShell}>
-<CardHeader>
-              <CardTitle>Member Engagement Details</CardTitle>
-              <CardDescription>Detailed engagement metrics for individual members</CardDescription>
+            <CardHeader>
+              <CardTitle>Top Members by Visits</CardTitle>
+              <CardDescription>Real check-in counts — highest lifetime visits first</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Sessions</TableHead>
-                    <TableHead>Avg/Week</TableHead>
-                    <TableHead>Messages</TableHead>
-                    <TableHead>Campaigns</TableHead>
-                    <TableHead>Feedback</TableHead>
-                    <TableHead>Score</TableHead>
-                    <TableHead>Trend</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {engagementMetrics.map((metric) => (
-                    <TableRow className="transition-colors hover:bg-slate-50/50" key={metric.memberId}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback>{metric.memberName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{metric.memberName}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Last active: {format(metric.lastActivity, 'MMM dd')}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{metric.totalSessions}</TableCell>
-                      <TableCell>{metric.avgSessionsPerWeek.toFixed(1)}</TableCell>
-                      <TableCell>{metric.messageResponses}</TableCell>
-                      <TableCell>{metric.campaignParticipation}</TableCell>
-                      <TableCell>{metric.feedbackSubmissions}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <span className={cn(
-                            "font-medium",
-                            metric.engagementScore >= 80 ? "text-green-600" :
-                            metric.engagementScore >= 60 ? "text-yellow-600" : "text-red-600"
-                          )}>
-                            {metric.engagementScore}
-                          </span>
-                          <Progress 
-                            value={metric.engagementScore} 
-                            className="w-16 h-2" 
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          {metric.trend === 'up' && <TrendingUp className="h-4 w-4 text-green-600" />}
-                          {metric.trend === 'down' && <TrendingDown className="h-4 w-4 text-red-600" />}
-                          {metric.trend === 'stable' && <div className="h-4 w-4 bg-gray-400 rounded-full"></div>}
-                          <span className={cn(
-                            "ml-2 text-sm",
-                            metric.trend === 'up' ? "text-green-600" :
-                            metric.trend === 'down' ? "text-red-600" : "text-gray-600"
-                          )}>
-                            {metric.trend}
-                          </span>
-                        </div>
-                      </TableCell>
+              {topByVisits.length > 0 ? (
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow>
+                      <TableHead>Member</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Total Visits</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {topByVisits.map((m) => (
+                      <TableRow className="transition-colors hover:bg-slate-50/50" key={m.id}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback>{m.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{m.name}</p>
+                              <p className="text-sm text-muted-foreground">{m.email}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{m.membership_plan || m.membership_type || 'N/A'}</TableCell>
+                        <TableCell className="font-medium">{m.total_visits ?? 0}</TableCell>
+                        <TableCell>
+                          <Badge className={cn(
+                            m.membership_status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          )}>
+                            {m.membership_status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  {isLoading ? 'Loading members…' : 'No members found.'}
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1263,8 +1251,8 @@ export function MemberConnectAnalytics() {
         {/* Campaigns Tab */}
         <TabsContent value="campaigns" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Campaign Performance Cards */}
-            {campaignAnalytics.map((campaign) => (
+            {/* Campaign Performance Cards (real PromotionApi fields only) */}
+            {campaignCards.map((campaign) => (
               <Card key={campaign.id} className={cardShell}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -1278,83 +1266,82 @@ export function MemberConnectAnalytics() {
                     </Badge>
                   </div>
                   <CardDescription>
-                    {format(campaign.startDate, 'MMM dd')} - {format(campaign.endDate, 'MMM dd, yyyy')}
+                    {campaign.startDate && campaign.endDate
+                      ? `${format(campaign.startDate, 'MMM dd')} - ${format(campaign.endDate, 'MMM dd, yyyy')}`
+                      : campaign.type}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                      <p className="text-xl font-bold text-blue-600">{campaign.reach.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">Reach</p>
+                      <p className="text-xl font-bold text-blue-600">
+                        {campaign.usageCount}{campaign.usageLimit ? ` / ${campaign.usageLimit}` : ''}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Redemptions</p>
                     </div>
                     <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded-lg">
-                      <p className="text-xl font-bold text-green-600">{campaign.conversions}</p>
-                      <p className="text-xs text-muted-foreground">Conversions</p>
+                      <p className="text-xl font-bold text-green-600">{campaign.conversionRate.toFixed(1)}%</p>
+                      <p className="text-xs text-muted-foreground">Conversion Rate</p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span>Engagement Rate</span>
-                      <span className="font-medium">{((campaign.engagement / campaign.reach) * 100).toFixed(1)}%</span>
+                      <span>Redemption Rate</span>
+                      <span className="font-medium">{campaign.redemptionRate.toFixed(1)}%</span>
                     </div>
-                    <Progress value={(campaign.engagement / campaign.reach) * 100} className="h-2" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Conversion Rate</span>
-                      <span className="font-medium">{((campaign.conversions / campaign.reach) * 100).toFixed(1)}%</span>
-                    </div>
-                    <Progress value={(campaign.conversions / campaign.reach) * 100} className="h-2" />
+                    <Progress value={campaign.redemptionRate} className="h-2" />
                   </div>
 
                   <Separator />
 
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span>Cost</span>
-                      <span className="font-medium"><CurrencyGlyph /> {campaign.cost.toLocaleString()}</span>
+                      <span>Total Revenue</span>
+                      <span className="font-medium text-green-600"><CurrencyGlyph /> {campaign.totalRevenue.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span>Revenue</span>
-                      <span className="font-medium text-green-600"><CurrencyGlyph /> {campaign.revenue.toLocaleString()}</span>
+                      <span>Total Savings Given</span>
+                      <span className="font-medium"><CurrencyGlyph /> {campaign.totalSavings.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium">ROI</span>
-                      <span className={cn(
-                        "font-bold",
-                        campaign.roi > 200 ? "text-green-600" :
-                        campaign.roi > 100 ? "text-yellow-600" : "text-red-600"
-                      )}>
-                        {campaign.roi}%
-                      </span>
+                    <div className="flex justify-between text-sm">
+                      <span>Avg Order Value</span>
+                      <span className="font-medium"><CurrencyGlyph /> {campaign.averageOrderValue.toLocaleString()}</span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
+            {campaignCards.length === 0 && (
+              <p className="text-sm text-muted-foreground py-8 text-center lg:col-span-3">
+                {isLoading ? 'Loading campaigns…' : 'No promotions/campaigns found.'}
+              </p>
+            )}
           </div>
 
-          {/* Campaign ROI Chart */}
+          {/* Campaign Comparison Chart */}
           <Card className={cardShell}>
-<CardHeader>
+            <CardHeader>
               <CardTitle>Campaign Performance Comparison</CardTitle>
-              <CardDescription>ROI and conversion rates across all campaigns</CardDescription>
+              <CardDescription>Real revenue and redemption counts across all campaigns</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={campaignAnalytics}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar yAxisId="left" dataKey="roi" fill="#10b981" name="ROI %" />
-                  <Bar yAxisId="right" dataKey="conversions" fill="#3b82f6" name="Conversions" />
-                </BarChart>
-              </ResponsiveContainer>
+              {campaignCards.length > 0 ? (
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={campaignCards}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
+                    <Tooltip />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="totalRevenue" fill="#10b981" name={`Revenue (${currencyCode})`} />
+                    <Bar yAxisId="right" dataKey="usageCount" fill="#3b82f6" name="Redemptions" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground py-8 text-center">No campaign data available.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1362,7 +1349,3 @@ export function MemberConnectAnalytics() {
     </div>
   );
 }
-
-
-
-

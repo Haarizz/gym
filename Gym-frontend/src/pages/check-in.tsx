@@ -33,6 +33,10 @@ import { membersService, type Member } from '../utils/supabase/members-service';
 import { staffService, type Staff } from '../utils/supabase/staff-service';
 import { checkInService, type TodayAttendanceRecord, type WalkInCheckInRequest } from '../utils/supabase/checkin-service';
 import { staffAttendanceService } from '../utils/supabase/staff-attendance-service';
+import { attendanceService } from '../utils/supabase/attendance-service';
+import { plansService, type Plan } from '../utils/supabase/plans-service';
+import { accountHeadsService, type AccountHead } from '../utils/supabase/account-heads-service';
+import type { PaymentSplitLeg } from '../utils/supabase/billing-service';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,16 +51,18 @@ interface PersonEntry {
   photoUrl?: string;
 }
 
-// ── Daily pass plans (static config) ─────────────────────────────────────────
+// ── Payment methods (mirrors add-member.tsx's canonical set, minus POS) ──────
 
-const dailyPlans = [
-  { id: 1, name: "Gym Only",       price: 50,  duration: "1 Day" },
-  { id: 2, name: "Gym + Pool",     price: 75,  duration: "1 Day" },
-  { id: 3, name: "Class Access",   price: 60,  duration: "1 Day" },
-  { id: 4, name: "Full Access",    price: 100, duration: "1 Day" },
-  { id: 5, name: "3-Hour Pass",    price: 35,  duration: "3 Hours" },
-  { id: 6, name: "Half Day (6hrs)",price: 65,  duration: "6 Hours" },
-];
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  check: 'Cheque',
+  'bank-transfer': 'Bank Transfer',
+  online: 'Online Payment',
+  credit: 'Credit',
+};
+const CARD_TYPE_OPTIONS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Maestro', 'Diners Club', 'Other'];
+const ONLINE_PAYMENT_TYPE_OPTIONS = ['Google Pay', 'PhonePe', 'Paytm', 'BHIM', 'Samsung Pay', 'Apple Pay', 'Amazon Pay', 'UPI', 'Other'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -113,16 +119,46 @@ export function CheckIn() {
   const [visitorName, setVisitorName]     = useState('');
   const [visitorMobile, setVisitorMobile] = useState('');
   const [visitorPhoto, setVisitorPhoto]   = useState<string | null>(null);
+  const [walkInPlans, setWalkInPlans]     = useState<Plan[]>([]);
   const [selectedPlan, setSelectedPlan]   = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [paymentDone, setPaymentDone]     = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [dailyCheckIns, setDailyCheckIns] = useState<any[]>([]);
   const [walkInsLoaded, setWalkInsLoaded] = useState(false);
+  const [bankAccounts, setBankAccounts]   = useState<AccountHead[]>([]);
+
+  // Payment-method-specific detail fields — matches Add Member's capture for
+  // Card/Cheque/Bank Transfer/Online Payment so a walk-in's payment record has
+  // the same detail as a member's.
+  const [paymentDetails, setPaymentDetails] = useState({
+    cardType: '', chequeNumber: '', chequeDate: '', bankName: '',
+    bankAccountId: '', onlinePaymentType: '', providerName: '',
+  });
+  const updatePaymentDetail = (field: string, value: string) =>
+    setPaymentDetails(prev => ({ ...prev, [field]: value }));
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef     = useRef<HTMLVideoElement>(null);
+
+  // Configurable gym floor capacity (Attendance Reports > report settings),
+  // defaulting to 150 only until the real value loads.
+  const [gymCapacity, setGymCapacity] = useState(150);
+  useEffect(() => {
+    attendanceService.getReportSettings()
+      .then(settings => { if (settings.gym_capacity) setGymCapacity(settings.gym_capacity); })
+      .catch(() => {});
+  }, []);
+
+  // Daily/walk-in passes are now real plans configured in Manage Plans under the
+  // "Walk-In / Daily Visitor" membership type, instead of a hardcoded list.
+  useEffect(() => {
+    plansService.getPlans('Active')
+      .then(all => setWalkInPlans(all.filter(p => p.planType === 'Walk-In')))
+      .catch(() => {});
+    accountHeadsService.getBankAccounts().then(setBankAccounts).catch(() => {});
+  }, []);
 
   // ── Load data ────────────────────────────────────────────────────────────────
 
@@ -205,9 +241,9 @@ export function CheckIn() {
 
   const todayCount  = todayAttendance.length + dailyCheckIns.length;
   const activeCount = todayAttendance.length + dailyCheckIns.filter(d => d.status === 'Active').length;
-  const occupancy   = Math.round((activeCount / 150) * 100);
+  const occupancy   = Math.round((activeCount / gymCapacity) * 100);
 
-  const selectedPlanDetails = dailyPlans.find(p => p.id.toString() === selectedPlan);
+  const selectedPlanDetails = walkInPlans.find(p => p.id.toString() === selectedPlan);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -322,22 +358,53 @@ export function CheckIn() {
     setTimeout(() => {
       setPaymentDone(true);
       setProcessingPayment(false);
-      toast.success(`Payment of ${currencyCode} ${selectedPlanDetails?.price} collected via ${paymentMethod}`);
+      const label = PAYMENT_METHOD_LABELS[paymentMethod] || paymentMethod;
+      toast.success(paymentMethod === 'credit'
+        ? `${currencyCode} ${selectedPlanDetails?.price} marked as Credit (unpaid)`
+        : `Payment of ${currencyCode} ${selectedPlanDetails?.price} collected via ${label}`);
     }, 1200);
+  };
+
+  // Mirrors add-member.tsx's buildFamilyMemberLeg — builds the single
+  // PaymentSplitDTO-shaped leg (snake_case) describing how this walk-in's
+  // payment was actually received.
+  const buildWalkInPaymentLeg = (amount: number): PaymentSplitLeg => {
+    const leg: PaymentSplitLeg = { method: PAYMENT_METHOD_LABELS[paymentMethod] || paymentMethod, amount };
+    if (paymentMethod === 'card') {
+      leg.card_type = paymentDetails.cardType;
+    } else if (paymentMethod === 'check') {
+      leg.cheque_number = paymentDetails.chequeNumber;
+      if (paymentDetails.bankName) leg.bank_name = paymentDetails.bankName;
+      if (paymentDetails.chequeDate) leg.cheque_date = paymentDetails.chequeDate;
+    } else if (paymentMethod === 'bank-transfer') {
+      const acct = bankAccounts.find(a => String(a.id) === paymentDetails.bankAccountId);
+      leg.bank_account_code = acct?.code;
+      leg.bank_account_name = acct?.name;
+    } else if (paymentMethod === 'online') {
+      leg.online_payment_type = paymentDetails.onlinePaymentType;
+      if (paymentDetails.onlinePaymentType === 'Other') leg.provider_name = paymentDetails.providerName;
+    }
+    return leg;
   };
 
   const handleGrantAccess = async () => {
     if (!paymentDone) { toast.error('Complete payment first'); return; }
     try {
+      const isCredit = paymentMethod === 'credit';
+      const amount = selectedPlanDetails?.price ?? 0;
+      const methodLabel = PAYMENT_METHOD_LABELS[paymentMethod] || 'Cash';
       const req: WalkInCheckInRequest = {
         name: visitorName,
         phone: visitorMobile,
         session_type: selectedPlanDetails?.name || 'gym',
-        payment_status: 'paid',
+        payment_status: isCredit ? 'pending' : 'paid',
+        amount,
+        payment_method: methodLabel,
+        payment_breakdown: isCredit ? undefined : [buildWalkInPaymentLeg(amount)],
         device_id: 'WEB',
-        notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${paymentMethod}, Amount: ${currencyCode} ${selectedPlanDetails?.price}`,
+        notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${methodLabel}, Amount: ${currencyCode} ${amount}`,
       };
-      await checkInService.walkInCheckIn(req);
+      const resp = await checkInService.walkInCheckIn(req);
 
       const visitor = {
         id: resp.attendance_id,
@@ -367,6 +434,7 @@ export function CheckIn() {
     setVisitorName(''); setVisitorMobile(''); setVisitorPhoto(null);
     setSelectedPlan(''); setPaymentMethod(''); setPaymentDone(false);
     setProcessingPayment(false);
+    setPaymentDetails({ cardType: '', chequeNumber: '', chequeDate: '', bankName: '', bankAccountId: '', onlinePaymentType: '', providerName: '' });
     if (isCameraActive && videoRef.current) {
       (videoRef.current.srcObject as MediaStream)?.getTracks().forEach(t => t.stop());
       setIsCameraActive(false);
@@ -438,7 +506,7 @@ export function CheckIn() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">{occupancy}%</div>
-            <p className="text-xs text-muted-foreground">of 150 capacity</p>
+            <p className="text-xs text-muted-foreground">of {gymCapacity} capacity</p>
           </CardContent>
         </Card>
 
@@ -504,7 +572,7 @@ export function CheckIn() {
                     {searchTerm ? `No results for "${searchTerm}"` : 'No members or staff found'}
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                  <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: '520px' }}>
                     {filtered.map(person => (
                       <PersonRow
                         key={`${person.kind}-${person.id}`}
@@ -535,7 +603,7 @@ export function CheckIn() {
                     <p className="text-sm">No check-ins yet today</p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                  <div className="space-y-3 overflow-y-auto pr-1" style={{ maxHeight: '520px' }}>
                     {todayAttendance.map(record => {
                       const name = record.member_name || record['walk_in_name'] || 'Visitor';
                       const isActive = record.status === 'active';
@@ -669,30 +737,112 @@ export function CheckIn() {
                     <div className="space-y-2">
                       <Label className="text-primary">Choose Daily Plan <span className="text-red-500">*</span></Label>
                       <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select a plan" /></SelectTrigger>
+                        <SelectTrigger className="border-primary/20">
+                          <SelectValue placeholder={walkInPlans.length === 0 ? "No walk-in plans configured" : "Select a plan"} />
+                        </SelectTrigger>
                         <SelectContent>
-                          {dailyPlans.map(p => (
+                          {walkInPlans.map(p => (
                             <SelectItem key={p.id} value={p.id.toString()}>
                               {p.name} — <CurrencyGlyph /> {p.price} ({p.duration})
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      {walkInPlans.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Add a plan under Manage Plans → Membership Type "Walk-In / Daily Visitor".
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-primary">Payment Method <span className="text-red-500">*</span></Label>
-                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <Select
+                        value={paymentMethod}
+                        onValueChange={(v) => {
+                          setPaymentMethod(v);
+                          setPaymentDetails({ cardType: '', chequeNumber: '', chequeDate: '', bankName: '', bankAccountId: '', onlinePaymentType: '', providerName: '' });
+                        }}
+                      >
                         <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select method" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="cash">💵 Cash</SelectItem>
-                          <SelectItem value="card">💳 Card</SelectItem>
-                          <SelectItem value="upi">📱 UPI</SelectItem>
-                          <SelectItem value="pos">🖥️ POS</SelectItem>
-                          <SelectItem value="wallet">👛 Wallet</SelectItem>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="card">Card</SelectItem>
+                          <SelectItem value="check">Cheque</SelectItem>
+                          <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="online">Online Payment</SelectItem>
+                          <SelectItem value="credit">Credit</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
+
+                  {/* Method-specific detail fields — mirrors add-member.tsx's renderPaymentMethodDetails */}
+                  {paymentMethod === 'card' && (
+                    <div>
+                      <Label className="text-sm text-gray-600 mb-1 block">Card Type</Label>
+                      <Select value={paymentDetails.cardType || undefined} onValueChange={(v) => updatePaymentDetail('cardType', v)}>
+                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select card type" /></SelectTrigger>
+                        <SelectContent>
+                          {CARD_TYPE_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {paymentMethod === 'check' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-sm text-gray-600 mb-1 block">Cheque Number</Label>
+                        <Input value={paymentDetails.chequeNumber} onChange={(e) => updatePaymentDetail('chequeNumber', e.target.value)} className="border-primary/20" />
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-600 mb-1 block">Bank Name</Label>
+                        <Input value={paymentDetails.bankName} onChange={(e) => updatePaymentDetail('bankName', e.target.value)} className="border-primary/20" />
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-600 mb-1 block">Cheque Date</Label>
+                        <Input type="date" value={paymentDetails.chequeDate} onChange={(e) => updatePaymentDetail('chequeDate', e.target.value)} className="border-primary/20" />
+                      </div>
+                    </div>
+                  )}
+                  {paymentMethod === 'bank-transfer' && (
+                    <div>
+                      <Label className="text-sm text-gray-600 mb-1 block">Bank Account</Label>
+                      <Select value={paymentDetails.bankAccountId || undefined} onValueChange={(v) => updatePaymentDetail('bankAccountId', v)}>
+                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select bank account" /></SelectTrigger>
+                        <SelectContent>
+                          {bankAccounts.length === 0 ? (
+                            <div className="px-2 py-1.5 text-sm text-gray-500">No bank accounts found in Chart of Accounts</div>
+                          ) : (
+                            bankAccounts.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.code} — {a.name}</SelectItem>)
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {paymentMethod === 'online' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-sm text-gray-600 mb-1 block">Online Payment Type</Label>
+                        <Select value={paymentDetails.onlinePaymentType || undefined} onValueChange={(v) => updatePaymentDetail('onlinePaymentType', v)}>
+                          <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select type" /></SelectTrigger>
+                          <SelectContent>
+                            {ONLINE_PAYMENT_TYPE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {paymentDetails.onlinePaymentType === 'Other' && (
+                        <div>
+                          <Label className="text-sm text-gray-600 mb-1 block">Provider Name</Label>
+                          <Input value={paymentDetails.providerName} onChange={(e) => updatePaymentDetail('providerName', e.target.value)} className="border-primary/20" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {paymentMethod === 'credit' && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                      Access will be granted with the charge left unpaid — no amount is collected now.
+                    </p>
+                  )}
 
                   {selectedPlan && (
                     <div className="p-4 bg-gradient-light border border-primary/20 rounded-lg flex items-center justify-between">
@@ -750,7 +900,7 @@ export function CheckIn() {
                     <p className="text-sm">No daily visitors yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-[520px] overflow-y-auto">
+                  <div className="space-y-3 overflow-y-auto" style={{ maxHeight: '520px' }}>
                     {dailyCheckIns.map(v => (
                       <div key={v.id} className="p-3 border border-primary/10 rounded-lg bg-gradient-light">
                         <div className="flex items-start justify-between mb-2">

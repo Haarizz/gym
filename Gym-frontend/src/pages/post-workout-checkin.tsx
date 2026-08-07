@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -65,9 +65,8 @@ import {
   PlayCircle, 
   PauseCircle, 
   Settings, 
-  Bookmark, 
-  Share, 
-  Bell, 
+  Bookmark,
+  Bell,
   AlertTriangle, 
   Info, 
   CheckSquare, 
@@ -154,6 +153,8 @@ import {
 import { toast } from "sonner";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, isYesterday, addWeeks, subDays, addHours, addMinutes, startOfDay, endOfDay } from "date-fns";
 import { cn } from "../components/ui/utils";
+import api from "../api/axiosConfig";
+import { staffService } from "../utils/supabase/staff-service";
 
 interface Member {
   id: string;
@@ -285,229 +286,130 @@ export function PostWorkoutCheckin() {
     wouldRecommendTrainer: 'yes'
   });
 
-  // Sample data - in real app this would come from your backend
-  const members: Member[] = [
-    {
-      id: '1',
-      name: 'John Smith',
-      email: 'john.smith@email.com',
-      phone: '+971 50 123 4567',
-      membershipId: 'MEM001',
-      membershipPlan: 'Premium Annual',
-      membershipStatus: 'active',
-      joinDate: new Date('2023-06-15'),
-      lastCheckIn: new Date(),
-      totalWorkouts: 156,
-      currentStreak: 7,
-      preferredTrainer: 'Sarah Johnson'
-    },
-    {
-      id: '2',
-      name: 'Lisa Chen',
-      email: 'lisa.chen@email.com',
-      phone: '+971 55 987 6543',
-      membershipId: 'MEM002',
-      membershipPlan: 'Standard Monthly',
-      membershipStatus: 'active',
-      joinDate: new Date('2024-01-10'),
-      lastCheckIn: subDays(new Date(), 1),
-      totalWorkouts: 89,
-      currentStreak: 3,
-      preferredTrainer: 'Mike Johnson'
-    },
-    {
-      id: '3',
-      name: 'Ahmed Hassan',
-      email: 'ahmed.hassan@email.com',
-      phone: '+971 52 456 7890',
-      membershipId: 'MEM003',
-      membershipPlan: 'Premium Monthly',
-      membershipStatus: 'active',
-      joinDate: new Date('2023-11-05'),
-      lastCheckIn: new Date(),
-      totalWorkouts: 203,
-      currentStreak: 12,
-      preferredTrainer: 'Emma Wilson'
+  const [recentSessions, setRecentSessions] = useState<WorkoutSession[]>([]);
+  const [feedbackResponses, setFeedbackResponses] = useState<FeedbackResponse[]>([]);
+  const [analytics, setAnalytics] = useState({
+      todayFeedback: 0,
+      totalFeedback: 0,
+      avgSatisfaction: 0,
+      recommendationRate: 0,
+      responseRate: 0,
+      flaggedCount: 0,
+      followUpCount: 0,
+      completedSessions: 0
+  });
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [memberSearchResults, setMemberSearchResults] = useState<any[]>([]);
+  const [isSearchingMembers, setIsSearchingMembers] = useState(false);
+  const [trainerOptions, setTrainerOptions] = useState<{ id: string; name: string }[]>([]);
+
+  // Notes dialog state (Staff Actions panel in the feedback detail sheet)
+  const [showAddNotes, setShowAddNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [followUpDraft, setFollowUpDraft] = useState(false);
+  const [flaggedDraft, setFlaggedDraft] = useState(false);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+
+  useEffect(() => {
+    staffService.getStaff({}, 1, 100)
+      .then(res => setTrainerOptions(
+        res.items
+          .filter(s => s.role?.toLowerCase().includes('trainer'))
+          .map(s => ({ id: String(s.id), name: s.name }))
+      ))
+      .catch(console.error);
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [sessionsRes, feedbacksRes, analyticsRes] = await Promise.all([
+        api.get('/workout-feedback/sessions'),
+        api.get('/workout-feedback'),
+        api.get('/workout-feedback/analytics')
+      ]);
+      
+      // Parse dates and handle potential snake_case from backend
+      const parsedSessions = sessionsRes.data.map((s: any) => ({
+        ...s,
+        id: s.id,
+        memberId: s.member_id || s.memberId,
+        memberName: s.member_name || s.memberName,
+        workoutType: s.workout_type || s.workoutType,
+        className: s.class_name || s.className,
+        trainerId: s.trainer_id || s.trainerId,
+        trainerName: s.trainer_name || s.trainerName,
+        startTime: s.start_time ? new Date(s.start_time) : (s.startTime ? new Date(s.startTime) : new Date()),
+        endTime: s.end_time ? new Date(s.end_time) : (s.endTime ? new Date(s.endTime) : new Date())
+      }));
+      setRecentSessions(parsedSessions);
+      
+      const parsedFeedbacks = feedbacksRes.data.map((f: any) => ({
+        ...f,
+        sessionId: f.session_id || f.sessionId,
+        memberId: f.member_id || f.memberId,
+        memberName: f.member_name || f.memberName,
+        workoutType: f.workout_type || f.workoutType,
+        className: f.class_name || f.className,
+        trainerId: f.trainer_id || f.trainerId,
+        trainerName: f.trainer_name || f.trainerName,
+        submittedAt: f.submitted_at ? new Date(f.submitted_at) : (f.submittedAt ? new Date(f.submittedAt) : new Date()),
+        overallSatisfaction: f.overall_satisfaction || f.overallSatisfaction,
+        workoutIntensity: f.workout_intensity || f.workoutIntensity,
+        trainerRating: f.trainer_rating || f.trainerRating,
+        equipmentQuality: f.equipment_quality || f.equipmentQuality,
+        facilityRating: f.facility_rating || f.facilityRating,
+        recommendWorkout: f.recommend_workout || f.recommendWorkout,
+        difficultyLevel: f.difficulty_level || f.difficultyLevel,
+        paceRating: f.pace_rating || f.paceRating,
+        bestAspects: f.best_aspects || f.bestAspects || [],
+        areasForImprovement: f.areas_for_improvement || f.areasForImprovement || [],
+        energyAfterWorkout: f.energy_after_workout || f.energyAfterWorkout,
+        likelyToReturn: f.likely_to_return || f.likelyToReturn,
+        wouldRecommendTrainer: f.would_recommend_trainer || f.wouldRecommendTrainer,
+        trainerNotes: f.trainer_notes || f.trainerNotes,
+        followUpRequired: f.follow_up_required !== undefined ? f.follow_up_required : f.followUpRequired,
+        flaggedForReview: f.flagged_for_review !== undefined ? f.flagged_for_review : f.flaggedForReview
+      }));
+      setFeedbackResponses(parsedFeedbacks);
+      
+      const a = analyticsRes.data;
+      setAnalytics({
+        todayFeedback: a.today_feedback || a.todayFeedback || 0,
+        totalFeedback: a.total_feedback || a.totalFeedback || 0,
+        avgSatisfaction: a.avg_satisfaction || a.avgSatisfaction || 0,
+        recommendationRate: a.recommendation_rate || a.recommendationRate || 0,
+        responseRate: a.response_rate || a.responseRate || 0,
+        flaggedCount: a.flagged_count || a.flaggedCount || 0,
+        followUpCount: a.follow_up_count || a.followUpCount || 0,
+        completedSessions: a.completed_sessions || a.completedSessions || 0
+      });
+    } catch (error) {
+      console.error("Error fetching data", error);
+      toast.error('Failed to load check-in data');
     }
-  ];
+  }, []);
 
-  const recentSessions: WorkoutSession[] = [
-    {
-      id: '1',
-      memberId: '1',
-      memberName: 'John Smith',
-      workoutType: 'personal-training',
-      trainerId: 'trainer1',
-      trainerName: 'Sarah Johnson',
-      startTime: addHours(new Date(), -2),
-      endTime: addHours(new Date(), -1),
-      duration: 60,
-      caloriesBurned: 450,
-      avgHeartRate: 145,
-      maxHeartRate: 175,
-      equipment: ['dumbbells', 'resistance-bands', 'bench'],
-      location: 'Training Zone A',
-      status: 'completed'
-    },
-    {
-      id: '2',
-      memberId: '2',
-      memberName: 'Lisa Chen',
-      workoutType: 'group-class',
-      className: 'HIIT Bootcamp',
-      trainerId: 'trainer2',
-      trainerName: 'Mike Johnson',
-      startTime: addHours(new Date(), -3),
-      endTime: addHours(new Date(), -2),
-      duration: 45,
-      caloriesBurned: 380,
-      avgHeartRate: 155,
-      maxHeartRate: 185,
-      location: 'Studio 1',
-      status: 'completed'
-    },
-    {
-      id: '3',
-      memberId: '3',
-      memberName: 'Ahmed Hassan',
-      workoutType: 'strength',
-      startTime: addHours(new Date(), -1),
-      endTime: addMinutes(new Date(), -15),
-      duration: 75,
-      caloriesBurned: 320,
-      avgHeartRate: 125,
-      maxHeartRate: 160,
-      equipment: ['barbell', 'squat-rack', 'bench'],
-      location: 'Weight Training Area',
-      status: 'completed'
-    },
-    {
-      id: '4',
-      memberId: '1',
-      memberName: 'John Smith',
-      workoutType: 'cardio',
-      startTime: new Date(),
-      endTime: addMinutes(new Date(), 30),
-      duration: 30,
-      location: 'Cardio Zone',
-      status: 'in-progress'
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Member lookup search
+  const handleMemberSearch = useCallback(async (query: string) => {
+    setMemberSearchTerm(query);
+    if (query.trim().length < 2) {
+      setMemberSearchResults([]);
+      return;
     }
-  ];
-
-  const feedbackResponses: FeedbackResponse[] = [
-    {
-      id: '1',
-      sessionId: '1',
-      memberId: '1',
-      memberName: 'John Smith',
-      workoutType: 'personal-training',
-      trainerId: 'trainer1',
-      trainerName: 'Sarah Johnson',
-      submittedAt: addMinutes(new Date(), -45),
-      overallSatisfaction: 5,
-      workoutIntensity: 4,
-      trainerRating: 5,
-      equipmentQuality: 5,
-      facilityRating: 4,
-      recommendWorkout: 'yes',
-      difficultyLevel: 'just-right',
-      paceRating: 'just-right',
-      bestAspects: ['instruction', 'energy', 'challenge'],
-      areasForImprovement: ['temperature'],
-      comments: 'Excellent session! Sarah really pushed me to my limits in a good way.',
-      suggestions: 'Maybe add some more variety to the warm-up routine.',
-      energyAfterWorkout: 'high',
-      likelyToReturn: 10,
-      wouldRecommendTrainer: 'yes',
-      trainerNotes: 'John showed great improvement in his form today. Increase weight next session.',
-      followUpRequired: false,
-      flaggedForReview: false
-    },
-    {
-      id: '2',
-      sessionId: '2',
-      memberId: '2',
-      memberName: 'Lisa Chen',
-      workoutType: 'group-class',
-      className: 'HIIT Bootcamp',
-      trainerId: 'trainer2',
-      trainerName: 'Mike Johnson',
-      submittedAt: addMinutes(new Date(), -75),
-      overallSatisfaction: 4,
-      workoutIntensity: 5,
-      trainerRating: 4,
-      equipmentQuality: 4,
-      facilityRating: 5,
-      recommendWorkout: 'yes',
-      difficultyLevel: 'too-hard',
-      paceRating: 'too-fast',
-      bestAspects: ['music', 'energy', 'challenge'],
-      areasForImprovement: ['timing', 'space'],
-      comments: 'Great workout but felt a bit rushed. Could use more recovery time between sets.',
-      suggestions: 'Maybe extend the class to 50 minutes to allow for better recovery.',
-      energyAfterWorkout: 'medium',
-      likelyToReturn: 8,
-      wouldRecommendTrainer: 'yes',
-      trainerNotes: 'Lisa struggled with the pace today. Consider modifications for next class.',
-      followUpRequired: true,
-      flaggedForReview: false
-    },
-    {
-      id: '3',
-      sessionId: '3',
-      memberId: '3',
-      memberName: 'Ahmed Hassan',
-      workoutType: 'strength',
-      submittedAt: addMinutes(new Date(), -30),
-      overallSatisfaction: 3,
-      workoutIntensity: 2,
-      trainerRating: 0,
-      equipmentQuality: 2,
-      facilityRating: 3,
-      recommendWorkout: 'maybe',
-      difficultyLevel: 'too-easy',
-      paceRating: 'too-slow',
-      bestAspects: ['variety'],
-      areasForImprovement: ['equipment', 'space', 'timing'],
-      comments: 'Equipment was not working properly. Several machines were out of order.',
-      suggestions: 'Please fix the cable machine and add more weight plates.',
-      energyAfterWorkout: 'low',
-      likelyToReturn: 6,
-      wouldRecommendTrainer: 'neutral',
-      followUpRequired: true,
-      flaggedForReview: true
+    setIsSearchingMembers(true);
+    try {
+      const res = await api.get(`/dashboard/search-members?q=${encodeURIComponent(query)}`);
+      setMemberSearchResults(res.data?.data || res.data || []);
+    } catch (error) {
+      console.error('Error searching members', error);
+    } finally {
+      setIsSearchingMembers(false);
     }
-  ];
-
-  // Calculate analytics
-  const analytics = useMemo(() => {
-    const today = new Date();
-    const todayFeedback = feedbackResponses.filter(f => isToday(f.submittedAt));
-    const weekFeedback = feedbackResponses.filter(f => f.submittedAt >= subDays(today, 7));
-    
-    const avgSatisfaction = feedbackResponses.length > 0 ? 
-      feedbackResponses.reduce((sum, f) => sum + f.overallSatisfaction, 0) / feedbackResponses.length : 0;
-    
-    const recommendationRate = feedbackResponses.length > 0 ? 
-      (feedbackResponses.filter(f => f.recommendWorkout === 'yes').length / feedbackResponses.length) * 100 : 0;
-    
-    const flaggedCount = feedbackResponses.filter(f => f.flaggedForReview).length;
-    const followUpCount = feedbackResponses.filter(f => f.followUpRequired).length;
-    
-    const completedSessions = recentSessions.filter(s => s.status === 'completed').length;
-    const responseRate = completedSessions > 0 ? (feedbackResponses.length / completedSessions) * 100 : 0;
-
-    return {
-      todayFeedback: todayFeedback.length,
-      totalFeedback: feedbackResponses.length,
-      avgSatisfaction,
-      recommendationRate,
-      responseRate,
-      flaggedCount,
-      followUpCount,
-      completedSessions
-    };
-  }, [feedbackResponses, recentSessions]);
+  }, []);
 
   // Get star rating component
   const StarRating = ({ rating, onRatingChange, size = 'md', readonly = false }: {
@@ -567,33 +469,57 @@ export function PostWorkoutCheckin() {
 
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsSubmitting(false);
-    toast.success('Feedback submitted successfully! Thank you for your input.');
-    
-    // Reset form
-    setCheckInForm({
-      sessionId: '',
-      overallSatisfaction: 5,
-      workoutIntensity: 3,
-      trainerRating: 5,
-      equipmentQuality: 5,
-      facilityRating: 5,
-      recommendWorkout: 'yes',
-      difficultyLevel: 'just-right',
-      paceRating: 'just-right',
-      bestAspects: [],
-      areasForImprovement: [],
-      comments: '',
-      suggestions: '',
-      energyAfterWorkout: 'high',
-      likelyToReturn: 10,
-      wouldRecommendTrainer: 'yes'
-    });
-    setSelectedSession(null);
-  }, [selectedSession, checkInForm]);
+    try {
+      await api.post('/workout-feedback', {
+        session_id: selectedSession.id,
+        overall_satisfaction: checkInForm.overallSatisfaction,
+        workout_intensity: checkInForm.workoutIntensity,
+        trainer_rating: checkInForm.trainerRating,
+        equipment_quality: checkInForm.equipmentQuality,
+        facility_rating: checkInForm.facilityRating,
+        recommend_workout: checkInForm.recommendWorkout,
+        difficulty_level: checkInForm.difficultyLevel,
+        pace_rating: checkInForm.paceRating,
+        best_aspects: checkInForm.bestAspects,
+        areas_for_improvement: checkInForm.areasForImprovement,
+        comments: checkInForm.comments,
+        suggestions: checkInForm.suggestions,
+        energy_after_workout: checkInForm.energyAfterWorkout,
+        likely_to_return: checkInForm.likelyToReturn,
+        would_recommend_trainer: checkInForm.wouldRecommendTrainer
+      });
+      toast.success('Feedback submitted successfully! Thank you for your input.');
+      
+      // Reset form
+      setCheckInForm({
+        sessionId: '',
+        overallSatisfaction: 5,
+        workoutIntensity: 3,
+        trainerRating: 5,
+        equipmentQuality: 5,
+        facilityRating: 5,
+        recommendWorkout: 'yes',
+        difficultyLevel: 'just-right',
+        paceRating: 'just-right',
+        bestAspects: [],
+        areasForImprovement: [],
+        comments: '',
+        suggestions: '',
+        energyAfterWorkout: 'high',
+        likelyToReturn: 10,
+        wouldRecommendTrainer: 'yes'
+      });
+      setSelectedSession(null);
+      
+      // Refresh data
+      fetchData();
+    } catch (error) {
+      console.error("Error submitting feedback", error);
+      toast.error('Failed to submit feedback');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [selectedSession, checkInForm, fetchData]);
 
   // Handle aspect selection
   const handleAspectToggle = useCallback((aspect: string, type: 'best' | 'improvement') => {
@@ -614,6 +540,46 @@ export function PostWorkoutCheckin() {
       }
     });
   }, []);
+
+  // Save trainer notes / follow-up / flagged-for-review status for the selected feedback
+  const handleSaveNotes = useCallback(async () => {
+    if (!selectedFeedback) return;
+    setIsSavingNotes(true);
+    try {
+      await api.patch(`/workout-feedback/${selectedFeedback.id}/notes`, {
+        trainer_notes: notesDraft,
+        follow_up_required: followUpDraft,
+        flagged_for_review: flaggedDraft
+      });
+      const updated = { ...selectedFeedback, trainerNotes: notesDraft, followUpRequired: followUpDraft, flaggedForReview: flaggedDraft };
+      setSelectedFeedback(updated);
+      setFeedbackResponses(prev => prev.map(f => f.id === updated.id ? updated : f));
+      toast.success('Notes saved');
+      setShowAddNotes(false);
+    } catch (error) {
+      console.error('Error saving notes', error);
+      toast.error('Failed to save notes');
+    } finally {
+      setIsSavingNotes(false);
+    }
+  }, [selectedFeedback, notesDraft, followUpDraft, flaggedDraft]);
+
+  // Quick action: flag this feedback as needing a follow-up without opening the full notes dialog
+  const handleQuickScheduleFollowUp = useCallback(async () => {
+    if (!selectedFeedback) return;
+    try {
+      await api.patch(`/workout-feedback/${selectedFeedback.id}/notes`, {
+        follow_up_required: true
+      });
+      const updated = { ...selectedFeedback, followUpRequired: true };
+      setSelectedFeedback(updated);
+      setFeedbackResponses(prev => prev.map(f => f.id === updated.id ? updated : f));
+      toast.success('Marked for follow-up');
+    } catch (error) {
+      console.error('Error scheduling follow-up', error);
+      toast.error('Failed to schedule follow-up');
+    }
+  }, [selectedFeedback]);
 
   // Filter feedback responses
   const filteredFeedback = useMemo(() => {
@@ -643,6 +609,78 @@ export function PostWorkoutCheckin() {
   }, [feedbackResponses, searchTerm, filterTrainer, filterWorkoutType, filterDateRange]);
   const selectedSatisfaction = selectedFeedback ? getSatisfactionEmoji(selectedFeedback.overallSatisfaction) : null;
 
+  // Real week-over-week deltas for the Analytics tab, derived from the already-fetched
+  // feedback list's submittedAt timestamps (no fabricated numbers).
+  const weekOverWeek = useMemo(() => {
+    const now = new Date();
+    const oneWeekAgo = subDays(now, 7);
+    const twoWeeksAgo = subDays(now, 14);
+
+    const currentWeek = feedbackResponses.filter(f => f.submittedAt >= oneWeekAgo);
+    const previousWeek = feedbackResponses.filter(f => f.submittedAt >= twoWeeksAgo && f.submittedAt < oneWeekAgo);
+
+    const totalFeedbackDelta = previousWeek.length > 0
+      ? ((currentWeek.length - previousWeek.length) / previousWeek.length) * 100
+      : null;
+
+    const avgSatCurrent = currentWeek.length > 0
+      ? currentWeek.reduce((sum, f) => sum + f.overallSatisfaction, 0) / currentWeek.length
+      : null;
+    const avgSatPrevious = previousWeek.length > 0
+      ? previousWeek.reduce((sum, f) => sum + f.overallSatisfaction, 0) / previousWeek.length
+      : null;
+    const avgSatisfactionDelta = (avgSatCurrent !== null && avgSatPrevious !== null)
+      ? avgSatCurrent - avgSatPrevious
+      : null;
+
+    const flaggedDelta = (currentWeek.length > 0 || previousWeek.length > 0)
+      ? currentWeek.filter(f => f.flaggedForReview).length - previousWeek.filter(f => f.flaggedForReview).length
+      : null;
+
+    return { totalFeedbackDelta, avgSatisfactionDelta, flaggedDelta };
+  }, [feedbackResponses]);
+
+  // Export the currently filtered feedback list as CSV
+  const handleExportData = useCallback(() => {
+    if (filteredFeedback.length === 0) {
+      toast.error('No feedback data to export');
+      return;
+    }
+    const header = 'Member,Workout Type,Class,Trainer,Submitted At,Overall Satisfaction,Workout Intensity,Trainer Rating,Equipment Quality,Facility Rating,Recommend Workout,Difficulty Level,Pace Rating,Energy After Workout,Likely To Return,Would Recommend Trainer,Flagged For Review,Follow Up Required,Comments,Suggestions';
+    const escape = (value: string) => `"${(value || '').replace(/"/g, '""')}"`;
+    const rows = filteredFeedback.map(f => [
+      escape(f.memberName),
+      f.workoutType,
+      f.className || '',
+      f.trainerName || '',
+      f.submittedAt.toISOString(),
+      f.overallSatisfaction,
+      f.workoutIntensity,
+      f.trainerRating ?? '',
+      f.equipmentQuality,
+      f.facilityRating,
+      f.recommendWorkout,
+      f.difficultyLevel,
+      f.paceRating,
+      f.energyAfterWorkout,
+      f.likelyToReturn,
+      f.wouldRecommendTrainer || '',
+      f.flaggedForReview ? 'Yes' : 'No',
+      f.followUpRequired ? 'Yes' : 'No',
+      escape(f.comments),
+      escape(f.suggestions)
+    ].join(','));
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `workout-feedback-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Feedback data exported');
+  }, [filteredFeedback]);
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -658,11 +696,11 @@ export function PostWorkoutCheckin() {
             <Search className="mr-2 h-4 w-4" />
             Member Lookup
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportData}>
             <Download className="mr-2 h-4 w-4" />
             Export Data
           </Button>
-          <Button>
+          <Button onClick={() => setActiveTab('check-in')}>
             <Plus className="mr-2 h-4 w-4" />
             New Check-in
           </Button>
@@ -818,7 +856,7 @@ export function PostWorkoutCheckin() {
                           <div className="flex-1">
                             <p className="font-medium">{session.memberName}</p>
                             <p className="text-sm text-muted-foreground">
-                              {members.find(m => m.id === session.memberId)?.membershipId}
+                              ID: {session.memberId}
                             </p>
                           </div>
                         </div>
@@ -1237,9 +1275,9 @@ export function PostWorkoutCheckin() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Trainers</SelectItem>
-                      <SelectItem value="Sarah Johnson">Sarah Johnson</SelectItem>
-                      <SelectItem value="Mike Johnson">Mike Johnson</SelectItem>
-                      <SelectItem value="Emma Wilson">Emma Wilson</SelectItem>
+                      {trainerOptions.map((trainer) => (
+                        <SelectItem key={trainer.id} value={trainer.name}>{trainer.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
 
@@ -1418,7 +1456,11 @@ export function PostWorkoutCheckin() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{feedbackResponses.length}</div>
-                <p className="text-xs text-muted-foreground">+12% from last week</p>
+                <p className="text-xs text-muted-foreground">
+                  {weekOverWeek.totalFeedbackDelta !== null
+                    ? `${weekOverWeek.totalFeedbackDelta >= 0 ? '+' : ''}${weekOverWeek.totalFeedbackDelta.toFixed(0)}% from last week`
+                    : 'No data from last week'}
+                </p>
               </CardContent>
             </Card>
             
@@ -1428,7 +1470,11 @@ export function PostWorkoutCheckin() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{analytics.avgSatisfaction.toFixed(1)}</div>
-                <p className="text-xs text-muted-foreground">+0.3 from last week</p>
+                <p className="text-xs text-muted-foreground">
+                  {weekOverWeek.avgSatisfactionDelta !== null
+                    ? `${weekOverWeek.avgSatisfactionDelta >= 0 ? '+' : ''}${weekOverWeek.avgSatisfactionDelta.toFixed(1)} from last week`
+                    : 'No data from last week'}
+                </p>
               </CardContent>
             </Card>
             
@@ -1438,7 +1484,7 @@ export function PostWorkoutCheckin() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{analytics.responseRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground">+5.2% from last week</p>
+                <p className="text-xs text-muted-foreground">Today's completed sessions with feedback</p>
               </CardContent>
             </Card>
             
@@ -1448,7 +1494,11 @@ export function PostWorkoutCheckin() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{analytics.flaggedCount}</div>
-                <p className="text-xs text-muted-foreground">-2 from last week</p>
+                <p className="text-xs text-muted-foreground">
+                  {weekOverWeek.flaggedDelta !== null
+                    ? `${weekOverWeek.flaggedDelta > 0 ? '+' : ''}${weekOverWeek.flaggedDelta} from last week`
+                    : 'No data from last week'}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -1582,7 +1632,7 @@ export function PostWorkoutCheckin() {
                             <div>
                               <p className="font-medium">{session.memberName}</p>
                               <p className="text-sm text-muted-foreground">
-                                {members.find(m => m.id === session.memberId)?.membershipId}
+                                ID: {session.memberId}
                               </p>
                             </div>
                           </div>
@@ -1933,17 +1983,26 @@ export function PostWorkoutCheckin() {
                     </div>
                     
                     <div className="flex space-x-2">
-                      <Button size="sm">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setNotesDraft(selectedFeedback.trainerNotes || '');
+                          setFollowUpDraft(selectedFeedback.followUpRequired);
+                          setFlaggedDraft(selectedFeedback.flaggedForReview);
+                          setShowAddNotes(true);
+                        }}
+                      >
                         <Edit className="mr-2 h-4 w-4" />
                         Add Notes
                       </Button>
-                      <Button size="sm" variant="outline">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleQuickScheduleFollowUp}
+                        disabled={selectedFeedback.followUpRequired}
+                      >
                         <Bell className="mr-2 h-4 w-4" />
-                        Schedule Follow-up
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Share className="mr-2 h-4 w-4" />
-                        Share with Trainer
+                        {selectedFeedback.followUpRequired ? 'Follow-up Scheduled' : 'Schedule Follow-up'}
                       </Button>
                     </div>
                   </CardContent>
@@ -1955,7 +2014,7 @@ export function PostWorkoutCheckin() {
       </Sheet>
 
       {/* Member Lookup Dialog */}
-      <Dialog open={showMemberLookup} onOpenChange={setShowMemberLookup}>
+      <Dialog open={showMemberLookup} onOpenChange={(open) => { setShowMemberLookup(open); if (!open) { setMemberSearchTerm(''); setMemberSearchResults([]); } }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Member Lookup</DialogTitle>
@@ -1968,50 +2027,125 @@ export function PostWorkoutCheckin() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, membership ID, email, or phone..."
+                placeholder="Search by name, email, or phone..."
                 className="pl-10"
+                value={memberSearchTerm}
+                onChange={(e) => handleMemberSearch(e.target.value)}
               />
             </div>
             
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {members.map((member) => (
-                <Card key={member.id} className={`${cardShell} cursor-pointer`}>
+              {isSearchingMembers ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+                </div>
+              ) : memberSearchResults.length > 0 ? memberSearchResults.map((member: any) => (
+                <Card key={member.id} className={`${cardShell} cursor-pointer`} onClick={() => {
+                  const matchingSession = recentSessions.find(
+                    s => s.status === 'completed' && s.memberId === String(member.id)
+                  );
+                  setShowMemberLookup(false);
+                  setMemberSearchTerm('');
+                  setMemberSearchResults([]);
+                  setActiveTab('check-in');
+                  if (matchingSession) {
+                    setSelectedSession(matchingSession);
+                    toast.success(`Loaded ${member.name}'s session for feedback`);
+                  } else {
+                    setSelectedSession(null);
+                    toast.info(`${member.name} has no recent completed session available for feedback yet.`);
+                  }
+                }}>
                   <CardContent className="p-4">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={member.avatar} />
                         <AvatarFallback>
-                          {member.name.split(' ').map(n => n[0]).join('')}
+                          {member.name?.split(' ').map((n: string) => n[0]).join('') || '?'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <h4 className="font-medium">{member.name}</h4>
                           <Badge className={cn(
-                            member.membershipStatus === 'active' ? 'bg-green-100 text-green-800' :
-                            member.membershipStatus === 'expired' ? 'bg-red-100 text-red-800' :
+                            member.status === 'active' ? 'bg-green-100 text-green-800' :
+                            member.status === 'expired' ? 'bg-red-100 text-red-800' :
                             'bg-yellow-100 text-yellow-800'
                           )}>
-                            {member.membershipStatus}
+                            {member.status}
                           </Badge>
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
-                          <span>ID: {member.membershipId}</span>
-                          <span>Plan: {member.membershipPlan}</span>
-                          <span>Workouts: {member.totalWorkouts}</span>
-                          <span>Streak: {member.currentStreak} days</span>
+                          <span>ID: {member.id}</span>
+                          <span>Plan: {member.membershipType || 'N/A'}</span>
+                          <span>{member.email}</span>
+                          <span>{member.phone}</span>
                         </div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              )) : memberSearchTerm.trim().length >= 2 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No members found matching "{memberSearchTerm}".</p>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">Type at least 2 characters to search.</p>
+              )}
             </div>
           </div>
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMemberLookup(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Notes Dialog */}
+      <Dialog open={showAddNotes} onOpenChange={setShowAddNotes}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Trainer Notes</DialogTitle>
+            <DialogDescription>
+              {selectedFeedback
+                ? `Record internal notes for ${selectedFeedback.memberName}'s feedback and update its review status.`
+                : 'Record internal notes for this feedback and update its review status.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="trainer-notes" className="text-sm font-medium">Notes</Label>
+              <Textarea
+                id="trainer-notes"
+                placeholder="Add internal notes about this feedback..."
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                rows={4}
+                className="mt-2"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="follow-up-toggle" className="text-sm">Follow-up Required</Label>
+              <Switch id="follow-up-toggle" checked={followUpDraft} onCheckedChange={setFollowUpDraft} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="flagged-toggle" className="text-sm">Flagged for Review</Label>
+              <Switch id="flagged-toggle" checked={flaggedDraft} onCheckedChange={setFlaggedDraft} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddNotes(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveNotes} disabled={isSavingNotes}>
+              {isSavingNotes ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Save Notes
             </Button>
           </DialogFooter>
         </DialogContent>

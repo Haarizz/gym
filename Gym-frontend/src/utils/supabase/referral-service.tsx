@@ -40,6 +40,7 @@ export interface ReferralRequest {
   paymentDate?: string;
   notes?: string;
   ruleId?: number;
+  referralCode?: string;
 }
 
 export interface ReferralStats {
@@ -216,7 +217,8 @@ export const referralService = {
       signup_date: request.signupDate,
       payment_date: request.paymentDate,
       notes: request.notes,
-      rule_id: request.ruleId
+      rule_id: request.ruleId,
+      referral_code: request.referralCode
     };
     const res = await fetch(`${BASE_URL}/referrals`, {
       method: 'POST',

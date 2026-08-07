@@ -1,5 +1,6 @@
 import { authService } from './auth-service';
 import { PaymentSplitLeg } from './billing-service';
+import { parseApiError } from './api-error';
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -40,6 +41,10 @@ export interface Member {
   last_payment_date?: string;
   next_payment_date?: string;
   payment_method?: string;
+  // The backend's MemberResponseDTO actually serializes this field as
+  // payment_method_used (Member.paymentMethodUsed) — payment_method above
+  // is never populated by GET /members/{id}; kept for other existing callers.
+  payment_method_used?: string;
   discount_applied?: number;
   reg_doc_number?: string;
   reg_doc_date?: string;
@@ -120,6 +125,15 @@ export interface MembersResponse {
   };
 }
 
+// Mirrors the backend's MemberNoteResponseDTO (global Jackson SNAKE_CASE strategy).
+export interface MemberNote {
+  id: number;
+  member_id: number;
+  content: string;
+  created_by?: string | null;
+  created_at: string;
+}
+
 class MembersService {
 
   async getMembers(filters: MemberFilters = {}, pagination: PaginationParams = {}): Promise<MembersResponse> {
@@ -135,7 +149,7 @@ class MembersService {
       `${backendBaseUrl}/members?${params.toString()}`
     );
 
-    if (!response.ok) throw new Error(`Failed to fetch members: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch members: ${response.status}`));
     return response.json();
   }
 
@@ -143,7 +157,7 @@ class MembersService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}`
     );
-    if (!response.ok) throw new Error(`Failed to fetch member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch member: ${response.status}`));
     return response.json();
   }
 
@@ -152,7 +166,7 @@ class MembersService {
       `${backendBaseUrl}/members`,
       { method: 'POST', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to create member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to create member: ${response.status}`));
     return response.json();
   }
 
@@ -161,7 +175,7 @@ class MembersService {
       `${backendBaseUrl}/members/${id}`,
       { method: 'PUT', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to update member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to update member: ${response.status}`));
     return response.json();
   }
 
@@ -170,7 +184,7 @@ class MembersService {
       `${backendBaseUrl}/members/${id}`,
       { method: 'DELETE' }
     );
-    if (!response.ok) throw new Error(`Failed to delete member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to delete member: ${response.status}`));
   }
 
   async setMemberCredentials(id: string, appUsername: string, appPassword: string): Promise<Member> {
@@ -178,10 +192,7 @@ class MembersService {
       `${backendBaseUrl}/members/${id}/set-credentials`,
       { method: 'POST', body: JSON.stringify({ appUsername, appPassword }) }
     );
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error((data as any) || `Failed to set credentials: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to set credentials: ${response.status}`));
     return response.json();
   }
 
@@ -190,7 +201,7 @@ class MembersService {
       `${backendBaseUrl}/members/${id}/toggle-access`,
       { method: 'PATCH', body: JSON.stringify({ enabled }) }
     );
-    if (!response.ok) throw new Error(`Failed to toggle member access: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to toggle member access: ${response.status}`));
     return response.json();
   }
 
@@ -211,7 +222,7 @@ class MembersService {
       `${backendBaseUrl}/members/${id}/renew`,
       { method: 'POST', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to renew member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to renew member: ${response.status}`));
     return response.json();
   }
 
@@ -220,7 +231,7 @@ class MembersService {
       `${backendBaseUrl}/members/${id}/freeze`,
       { method: 'POST', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to freeze member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to freeze member: ${response.status}`));
     return response.json();
   }
 
@@ -228,12 +239,17 @@ class MembersService {
     plan_name?: string;
     fee?: number;
     payment_status: string;
+    paid_amount?: number;
+    payment_method?: string;
+    payment_breakdown?: PaymentSplitLeg[];
+    bank_account_code?: string;
+    bank_account_name?: string;
   }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/renew-minor`,
       { method: 'POST', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to renew family member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to renew family member: ${response.status}`));
     return response.json();
   }
 
@@ -249,7 +265,7 @@ class MembersService {
       `${backendBaseUrl}/members/${headId}/renew-family`,
       { method: 'POST', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to renew family: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to renew family: ${response.status}`));
     return response.json();
   }
 
@@ -257,7 +273,7 @@ class MembersService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/family`
     );
-    if (!response.ok) throw new Error(`Failed to fetch family group: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch family group: ${response.status}`));
     return response.json();
   }
 
@@ -266,7 +282,7 @@ class MembersService {
       `${backendBaseUrl}/members/${headId}/family-members`,
       { method: 'POST', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to add family member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to add family member: ${response.status}`));
     return response.json();
   }
 
@@ -275,7 +291,7 @@ class MembersService {
       `${backendBaseUrl}/members/${id}/unfreeze`,
       { method: 'POST' }
     );
-    if (!response.ok) throw new Error(`Failed to unfreeze member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to unfreeze member: ${response.status}`));
     return response.json();
   }
 
@@ -283,6 +299,23 @@ class MembersService {
     if (!query.trim()) return [];
     const result = await this.getMembers({ search: query }, { limit: 10 });
     return result.members;
+  }
+
+  async getNotes(memberDbId: string | number): Promise<MemberNote[]> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${memberDbId}/notes`
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch notes: ${response.status}`));
+    return response.json();
+  }
+
+  async addNote(memberDbId: string | number, content: string): Promise<MemberNote> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${memberDbId}/notes`,
+      { method: 'POST', body: JSON.stringify({ content }) }
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to add note: ${response.status}`));
+    return response.json();
   }
 
   async getMembershipStats() {

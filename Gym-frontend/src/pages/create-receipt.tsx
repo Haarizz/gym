@@ -33,6 +33,8 @@ import {
   Split
 } from 'lucide-react';
 import { toast } from "sonner";
+import { getCompanyDetails, buildCompanyHeaderHtml, buildCompanyFooterHtml, COMPANY_HEADER_CSS } from "../utils/company-details";
+import { getVatRate, splitVatInclusive, DEFAULT_VAT_RATE } from "../utils/tax";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Checkbox } from "../components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
@@ -302,10 +304,21 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
 
   const handleDownloadPDF  = () => handlePrintReceipt();
 
-  const handlePrintReceipt = () => {
+  // Guards against a stray double-click (or the separate Print/Download PDF
+  // buttons both firing) opening two print windows/dialogs at once.
+  const printInFlightRef = useRef(false);
+
+  const handlePrintReceipt = async () => {
+    if (printInFlightRef.current) return;
+    printInFlightRef.current = true;
+
+    // window.open must happen synchronously within the click handler or popup
+    // blockers reject it, so open first and fill it in once company details load.
+    const win = window.open("", "_blank", "width=800,height=900");
+    const [company, vatRatePercent] = await Promise.all([getCompanyDetails(), getVatRate()]);
+
     const totalPaid   = calculateTotalPayment();
-    const vatAmount   = totalPaid * 5 / 105;
-    const preVat      = totalPaid - vatAmount;
+    const { net: subtotalExclVat, vat: vatAmount } = splitVatInclusive(totalPaid, vatRatePercent);
     const billedItems = pendingBills.filter(b => parseFloat(paymentAmounts[b.id] || "0") > 0);
     const dateStr     = new Date(paymentDate).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
     const txnDateStr  = new Date(paymentDate).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
@@ -324,68 +337,47 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
 <title>Tax Invoice - ${generatedReceiptNo}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a1a;background:#fff;padding:40px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}
-  .brand h1{font-size:28px;font-weight:800;color:#2B7A78}
-  .brand p{color:#666;font-size:13px;margin-top:2px}
-  .brand .address{margin-top:12px;font-size:12px;color:#444;line-height:1.6}
-  .verify-box{border:2px solid #2B7A78;border-radius:8px;padding:10px 14px;text-align:center;min-width:140px}
-  .verify-box .bolt{font-size:22px;color:#f4a30a}
-  .verify-box .label{font-size:10px;font-weight:700;color:#2B7A78;letter-spacing:1px;text-transform:uppercase;margin-top:4px}
-  .verify-box .rcpt{font-size:11px;color:#444;margin-top:2px}
-  hr.thick{border:none;border-top:3px solid #2B7A78;margin:16px 0}
-  hr.thin{border:none;border-top:1px solid #e5e7eb;margin:20px 0}
-  .title{text-align:center;font-size:22px;font-weight:700;margin:20px 0;color:#1a1a1a}
-  .meta-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0}
-  .meta-item .label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888}
-  .meta-item .value{font-size:15px;font-weight:700;color:#2B7A78;margin-top:4px}
+  @page{size:A4;margin:12mm}
+  body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a1a;background:#fff;padding:28px}
+  ${COMPANY_HEADER_CSS}
+  hr.thick{border:none;border-top:2px solid #2B7A78;margin:10px 0}
+  hr.thin{border:none;border-top:1px solid #e5e7eb;margin:12px 0}
+  .title{text-align:center;font-size:17px;font-weight:700;margin:10px 0;color:#1a1a1a}
+  .meta-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0}
+  .meta-item .label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888}
+  .meta-item .value{font-size:14px;font-weight:700;color:#2B7A78;margin-top:2px}
   .meta-item .value.black{color:#1a1a1a}
   .meta-item .status{display:inline-block;color:#16a34a;font-weight:600}
-  .bill-to{border-left:4px solid #2B7A78;padding-left:14px;margin:24px 0}
-  .bill-to .section-label{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#2B7A78;margin-bottom:8px}
-  .bill-to .name{font-size:17px;font-weight:700;margin-bottom:6px}
-  .bill-to .detail{font-size:13px;color:#444;margin:2px 0}
-  table{width:100%;border-collapse:collapse;margin:16px 0}
+  .bill-to{border-left:3px solid #2B7A78;padding-left:12px;margin:12px 0}
+  .bill-to .section-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#2B7A78;margin-bottom:4px}
+  .bill-to .name{font-size:15px;font-weight:700;margin-bottom:3px}
+  .bill-to .detail{font-size:12px;color:#444;margin:1px 0}
+  table{width:100%;border-collapse:collapse;margin:10px 0}
   thead tr{border-bottom:1px solid #e5e7eb}
-  thead th{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;padding:8px 4px;text-align:left}
+  thead th{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;padding:5px 4px;text-align:left}
   thead th:last-child{text-align:right}
-  tbody td{padding:12px 4px;font-size:13px;border-bottom:1px solid #f3f4f6;vertical-align:top}
+  tbody td{padding:7px 4px;font-size:12px;border-bottom:1px solid #f3f4f6;vertical-align:top}
   tbody td:last-child{text-align:right}
-  tbody td small{color:#888;font-size:11px}
-  .totals{margin-top:8px}
-  .totals .row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}
+  tbody td small{color:#888;font-size:10px}
+  .totals{margin-top:4px}
+  .totals .row{display:flex;justify-content:space-between;padding:3px 0;font-size:13px}
   .totals .row.bold{font-weight:700}
-  .totals .row.total-final{font-size:18px;font-weight:800;color:#2B7A78;padding-top:12px;border-top:2px solid #2B7A78;margin-top:6px}
-  .totals .row.total-paid{padding-top:8px;font-size:13px;color:#444}
-  .validity{font-size:12px;font-weight:600;color:#2B7A78;margin:16px 0}
-  .payment-box{border-left:4px solid #f4a30a;padding-left:12px;margin:16px 0}
-  .payment-box .row{font-size:13px;margin:4px 0}
+  .totals .row.total-final{font-size:16px;font-weight:800;color:#2B7A78;padding-top:8px;border-top:2px solid #2B7A78;margin-top:4px}
+  .totals .row.total-paid{padding-top:4px;font-size:12px;color:#444}
+  .validity{font-size:11px;font-weight:600;color:#2B7A78;margin:10px 0}
+  .payment-box{border-left:3px solid #f4a30a;padding-left:12px;margin:10px 0}
+  .payment-box .row{font-size:12px;margin:2px 0}
   .payment-box .row span{font-weight:700;color:#2B7A78;margin-left:4px}
-  .thank-you{text-align:center;margin:32px 0 16px}
-  .thank-you h3{font-size:18px;font-weight:700;color:#2B7A78}
-  .thank-you p{font-size:12px;color:#666;margin-top:6px;line-height:1.6}
-  .footer{border-top:1px solid #e5e7eb;padding-top:16px;text-align:center;font-size:12px;color:#888;line-height:1.8}
+  .thank-you{text-align:center;margin:14px 0 8px}
+  .thank-you h3{font-size:14px;font-weight:700;color:#2B7A78}
+  .thank-you p{font-size:11px;color:#666;margin-top:3px;line-height:1.4}
+  .footer{border-top:1px solid #e5e7eb;padding-top:10px;text-align:center;font-size:11px;color:#888;line-height:1.5}
   .footer strong{color:#1a1a1a}
-  @media print{body{padding:20px}}
+  @media print{body{padding:0}}
 </style>
 </head>
 <body>
-  <div class="header">
-    <div class="brand">
-      <h1>GymBios</h1>
-      <p>Wellness Services Operating System</p>
-      <div class="address">
-        Dubai, United Arab Emirates<br/>
-        Phone: +971 4 XXX XXXX | Email: billing@gymbios.ae<br/>
-        TRN: 100XXXXXXXX003
-      </div>
-    </div>
-    <div class="verify-box">
-      <div class="bolt">&#9889;</div>
-      <div class="label">Receipt Verification</div>
-      <div class="rcpt">${generatedReceiptNo}</div>
-    </div>
-  </div>
+  <div class="header">${buildCompanyHeaderHtml(company, generatedReceiptNo)}</div>
 
   <hr class="thick"/>
 
@@ -432,11 +424,10 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
   <hr class="thin"/>
 
   <div class="totals">
-    <div class="row"><span>Subscription Total (Incl. VAT):</span><span>${currencyCode} ${totalPaid.toFixed(2)}</span></div>
+    <div class="row"><span>Subtotal (Excl. VAT):</span><span>${currencyCode} ${subtotalExclVat.toFixed(2)}</span></div>
     <div class="row bold" style="color:#c00">Discount: <span>- ${currencyCode} 0.00</span></div>
-    <div class="row bold"><span>Gross Total:</span><span>${currencyCode} ${totalPaid.toFixed(2)}</span></div>
-    <div class="row"><span>VAT (5%):</span><span>${currencyCode} ${vatAmount.toFixed(2)}</span></div>
-    <div class="row total-final"><span>Invoice Amount:</span><span>${currencyCode} ${totalPaid.toFixed(2)}</span></div>
+    <div class="row"><span>VAT (${vatRatePercent}%):</span><span>${currencyCode} ${vatAmount.toFixed(2)}</span></div>
+    <div class="row total-final"><span>Invoice Amount (Incl. VAT):</span><span>${currencyCode} ${totalPaid.toFixed(2)}</span></div>
     <div class="row total-paid"><span>TOTAL PAID:</span><span>${currencyCode} ${totalPaid.toFixed(2)}</span></div>
   </div>
 
@@ -450,25 +441,20 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
 
   <div class="thank-you">
     <h3>Thank you for your business!</h3>
-    <p>This is an official receipt issued by GymBios. Please retain this receipt for your records.<br/>
+    <p>This is an official receipt issued by ${company.name}. Please retain this receipt for your records.<br/>
     For any queries regarding this transaction, please contact our billing department.</p>
   </div>
 
   <hr class="thin"/>
 
-  <div class="footer">
-    <strong>GymBios - Wellness Services Operating System</strong><br/>
-    Dubai, United Arab Emirates | Phone: +971 4 XXX XXXX<br/>
-    Email: support@gymbios.ae | Website: www.gymbios.ae<br/>
-    TRN: 100XXXXXXXX003
-  </div>
+  <div class="footer">${buildCompanyFooterHtml(company)}</div>
 
   <script>window.onload = function(){ window.print(); }</script>
 </body>
 </html>`;
 
-    const win = window.open("", "_blank", "width=800,height=900");
     if (win) { win.document.write(html); win.document.close(); }
+    printInFlightRef.current = false;
   };
   const handleSendSMS      = () => toast.success("Sending via SMS",     { description: `Sent to ${selectedMember?.phone}` });
   const handleSendEmail    = () => toast.success("Sending via Email",   { description: `Sent to ${selectedMember?.email}` });

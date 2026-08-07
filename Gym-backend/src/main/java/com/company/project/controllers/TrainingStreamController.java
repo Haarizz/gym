@@ -57,6 +57,18 @@ public class TrainingStreamController {
         return ResponseEntity.ok(streamService.endStream(id));
     }
 
+    // Joining/leaving a live stream's viewer count — enforces maxParticipants
+    // (see TrainingStreamService.joinStream).
+    @PostMapping("/{id}/join")
+    public ResponseEntity<TrainingStreamResponseDTO> joinStream(@PathVariable Long id) {
+        return ResponseEntity.ok(streamService.joinStream(id));
+    }
+
+    @PostMapping("/{id}/leave")
+    public ResponseEntity<TrainingStreamResponseDTO> leaveStream(@PathVariable Long id) {
+        return ResponseEntity.ok(streamService.leaveStream(id));
+    }
+
     @GetMapping("/analytics")
     public ResponseEntity<TrainingStreamAnalyticsDTO> getAnalytics() {
         return ResponseEntity.ok(streamService.getAnalytics());

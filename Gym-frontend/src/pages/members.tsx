@@ -122,7 +122,7 @@ const membershipPlans = [
 ];
 
 interface MembersProps {
-  onNavigate?: (section: string) => void;
+  onNavigate?: (section: string, params?: Record<string, any>) => void;
   initialTab?: string;
 }
 
@@ -378,9 +378,25 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const activeMembers = members.filter(m => m.membership_status === "active").length;
   const inactiveMembers = members.filter(m => m.membership_status === "inactive").length;
   const expiredMembers = members.filter(m => m.membership_status === "expired").length;
-  const frozenMembers = members.filter(m => m.membership_status === "frozen").length;
+  const frozenMembers = members.filter(m => m.membership_status === "frozen" || m.membership_status === "FROZEN").length;
   const suspendedMembers = members.filter(m => m.membership_status === "suspended").length;
 
+  const autoUnfreezePending = members.filter(m => {
+    const status = (m.membership_status || "").toLowerCase();
+    return status === "frozen" && m.freeze_end_date != null;
+  }).length;
+
+  const totalFreezeDays = members.reduce((total, m) => {
+    const status = (m.membership_status || "").toLowerCase();
+    if (status === "frozen" && m.freeze_start_date) {
+      const start = new Date(m.freeze_start_date);
+      const end = m.freeze_end_date ? new Date(m.freeze_end_date) : new Date();
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return total + diffDays;
+    }
+    return total;
+  }, 0);
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Active": return "bg-green-100 text-green-800";
@@ -545,6 +561,41 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const getMembershipStartDate = (member: Member) => member.membership_start_date || member.join_date;
   const getMembershipEndDate = (member: Member) => member.membership_end_date || member.expiry_date || '';
   const getMembershipFee = (member: Member) => member.membership_fee || member.monthly_fee;
+
+  // Mirrors MemberService.memberPriceForIndex() on the backend.
+  const memberPriceForIndex = (plan: Plan, index: number): number => {
+    const base = Number(plan.pricePerMember) || 0;
+    const max = plan.maxFamilyMembers != null && Number(plan.maxFamilyMembers) > 0
+      ? Number(plan.maxFamilyMembers) : null;
+    if (max === null || index < max) return base;
+    const extra = plan.additionalMemberPrice != null ? Number(plan.additionalMemberPrice) : base;
+    return extra;
+  };
+
+  // A family/couple head under "family_head" billing carries the COMBINED
+  // invoice total for every member billed to them as their own membership_fee
+  // (see MemberService.createMember) — for display, show just the head's own
+  // share instead, so it reads consistently with what each dependent's row
+  // already shows (their own share, not the family total).
+  const getDisplayFee = (member: Member): number => {
+    const fee = getMembershipFee(member) || 0;
+    if (!(member as any).is_family_head) return fee;
+    const plan = apiPlans.find(p => p.name === member.membership_plan);
+    if (!plan || plan.familyBillingMode !== 'family_head') return fee;
+    const autoCalc = plan.autoCalculateTotal !== false && plan.pricePerMember != null;
+    if (!autoCalc) return fee; // flat combined price — no per-member figure to show
+    return memberPriceForIndex(plan, 0);
+  };
+
+  // "Renew Family" (renewFamily/{headId}/renew-family) only works for a head
+  // whose plan uses family_head billing — for the far more common "individual"
+  // mode, adults renew independently via the regular Renew flow and minors via
+  // Renew Family Member, so the whole-family renewal endpoint would just fail.
+  const isFamilyHeadBillingHead = (member: Member): boolean => {
+    if (!(member as any).is_family_head) return false;
+    const plan = apiPlans.find(p => p.name === member.membership_plan);
+    return plan?.familyBillingMode === 'family_head';
+  };
   const getTotalVisits = (member: Member) => member.total_visits || 0;
   const avatarPool = ["/avatars/sarah.jpg", "/avatars/mike.jpg", "/avatars/emily.jpg"];
   const getMemberAvatar = (member: any) => {
@@ -609,15 +660,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     return '';
   };
 
-  // Function to open member history/analytics
+  // Function to open member history/analytics. member.id is the internal
+  // numeric database id (not the human-readable "MBR-..." member_id) — same
+  // convention dashboard.tsx already uses via router state, which the page
+  // now reads from its `memberId` prop instead of a sessionStorage handoff.
   const openMemberHistory = (member: Member) => {
-    const payload = {
-      id: getMemberId(member),
-      name: member.name,
-      photo: getMemberAvatar(member),
-    };
-    sessionStorage.setItem("selectedMemberAnalytics", JSON.stringify(payload));
-    onNavigate?.('member-history-analytics');
+    onNavigate?.('member-history-analytics', { memberId: member.id });
   };
 
   // Pending approval handlers
@@ -846,12 +894,18 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       // prefers the latter for display purposes, so it can't be used here.
       const memberId = selectedMemberForRenewal.id;
       if (isBilledToGuardian(selectedMemberForRenewal)) {
-        // TODO: the family-minor renewal endpoint doesn't yet accept rich
-        // payment fields or Credit — always renews as fully paid.
+        // Same payment inputs collected above for the regular renewal path
+        // (amountReceived/effectivePaymentMethod/paymentBreakdown) apply here
+        // too — whatever wasn't collected now folds onto the guardian's due.
         await membersService.renewFamilyMinor(String(memberId), {
           plan_name: selectedNewPlan.name,
           fee: totalAmount,
-          payment_status: 'paid',
+          payment_status: amountReceived >= totalAmount ? 'paid' : (amountReceived > 0 ? 'partial' : 'pending'),
+          paid_amount: amountReceived,
+          payment_method: amountReceived > 0 ? effectivePaymentMethod : undefined,
+          payment_breakdown: paymentBreakdown,
+          bank_account_code: bankAccountCode,
+          bank_account_name: bankAccountName,
         });
       } else {
         await membersService.renewMember(String(memberId), {
@@ -1199,7 +1253,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           <TableCell>
                             <div className="font-medium">{getMembershipPlan(member)}</div>
                             <div className="text-sm text-muted-foreground">
-                              <CurrencyGlyph /> {getMembershipFee(member)}
+                              <CurrencyGlyph /> {getDisplayFee(member)}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1208,7 +1262,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                             </span>
                           </TableCell>
                           <TableCell>
-                            {member.membership_type?.toLowerCase() === 'family' ? (
+                            {member.membership_type?.toLowerCase() === 'family' || member.membership_type?.toLowerCase() === 'couple' ? (
                               member.is_family_head ? (
                                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Head</span>
                               ) : (
@@ -1346,7 +1400,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                       <FaPlus className="h-4 w-4 mr-2" />
                                       Edit Member
                                     </DropdownMenuItem>
-                                    {member.is_family_head && (
+                                    {isFamilyHeadBillingHead(member) && (
                                       <DropdownMenuItem
                                         className="cursor-pointer"
                                         onClick={() => openFamilyRenewalDialog(member)}
@@ -2475,7 +2529,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       </div>
                     </div>
                     <p className="text-sm text-gray-600 mb-1">Currently Frozen</p>
-                    <p className="font-bold text-gray-900">4 Members</p>
+                    <p className="font-bold text-gray-900">{frozenMembers} Members</p>
                   </CardContent>
                 </Card>
 
@@ -2487,7 +2541,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       </div>
                     </div>
                     <p className="text-sm text-gray-600 mb-1">Auto Unfreeze Pending</p>
-                    <p className="font-bold text-gray-900">3 Members</p>
+                    <p className="font-bold text-gray-900">{autoUnfreezePending} Members</p>
                   </CardContent>
                 </Card>
 
@@ -2499,7 +2553,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       </div>
                     </div>
                     <p className="text-sm text-gray-600 mb-1">Total Freeze Days</p>
-                    <p className="font-bold text-gray-900">139 Days</p>
+                    <p className="font-bold text-gray-900">{totalFreezeDays} Days</p>
                   </CardContent>
                 </Card>
               </div>
@@ -2644,6 +2698,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <SelectContent>
                       <SelectItem value="all">All</SelectItem>
                       <SelectItem value="Individual">Individual</SelectItem>
+                      <SelectItem value="Couple">Couple</SelectItem>
                       <SelectItem value="Family">Family</SelectItem>
                       <SelectItem value="Corporate">Corporate</SelectItem>
                     </SelectContent>

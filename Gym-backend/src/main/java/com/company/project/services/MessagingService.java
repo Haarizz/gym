@@ -22,11 +22,13 @@ public class MessagingService {
 
     private final MemberRepository memberRepository;
     private final StaffRepository staffRepository;
+    private final LeadRepository leadRepository;
     private final MessageTemplateRepository templateRepository;
     private final MessageGroupRepository groupRepository;
     private final MessageCampaignRepository campaignRepository;
     private final MessageRecipientRepository recipientRepository;
     private final EmailService emailService;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
     @Value("${gym.name:GymBios Fitness}")
@@ -34,19 +36,23 @@ public class MessagingService {
 
     public MessagingService(MemberRepository memberRepository,
                             StaffRepository staffRepository,
+                            LeadRepository leadRepository,
                             MessageTemplateRepository templateRepository,
                             MessageGroupRepository groupRepository,
                             MessageCampaignRepository campaignRepository,
                             MessageRecipientRepository recipientRepository,
                             EmailService emailService,
+                            NotificationService notificationService,
                             ObjectMapper objectMapper) {
         this.memberRepository = memberRepository;
         this.staffRepository = staffRepository;
+        this.leadRepository = leadRepository;
         this.templateRepository = templateRepository;
         this.groupRepository = groupRepository;
         this.campaignRepository = campaignRepository;
         this.recipientRepository = recipientRepository;
         this.emailService = emailService;
+        this.notificationService = notificationService;
         this.objectMapper = objectMapper;
     }
 
@@ -70,7 +76,17 @@ public class MessagingService {
             }
         }
 
-        // prospects currently unsupported in backend - return empty list
+        if (type == null || type.equals("all") || type.equals("prospect") || type.equals("prospects")) {
+            for (Lead lead : leadRepository.findAll()) {
+                if ("converted".equalsIgnoreCase(lead.getStatus()) || "lost".equalsIgnoreCase(lead.getStatus())) continue;
+                String fullName = (lead.getFirstName() != null ? lead.getFirstName() : "")
+                        + (lead.getLastName() != null ? " " + lead.getLastName() : "");
+                if (matchesSearch(fullName.trim(), lead.getEmail(), lead.getPhone(), lowered)) {
+                    results.add(toRecipientDTO(lead));
+                }
+            }
+        }
+
         return results;
     }
 
@@ -156,6 +172,25 @@ public class MessagingService {
     public List<MessageHistoryDTO> getHistory() {
         List<MessageCampaign> campaigns = campaignRepository.findTop200ByOrderByCreatedAtDesc();
         return campaigns.stream().map(this::toHistoryDTO).collect(Collectors.toList());
+    }
+
+    // Member-scoped view for the member analytics page — a campaign has no direct
+    // member FK (it can target members/staff/prospects at once), so we resolve via
+    // the recipient rows instead: find every campaign this member was sent to, then
+    // reuse the same history mapping used for the unscoped list.
+    public List<MessageHistoryDTO> getMemberHistory(Long memberId) {
+        List<MessageRecipient> recipients = recipientRepository.findByRecipientTypeAndRecipientId(
+                "member", String.valueOf(memberId));
+        Set<Long> campaignIds = recipients.stream()
+                .map(r -> r.getCampaign().getId())
+                .collect(Collectors.toSet());
+        if (campaignIds.isEmpty()) return List.of();
+
+        return campaignRepository.findAllById(campaignIds).stream()
+                .sorted(Comparator.comparing(MessageCampaign::getCreatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(this::toHistoryDTO)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -317,8 +352,16 @@ public class MessagingService {
                     throw new RuntimeException("Recipient phone missing");
                 }
                 return "whatsapp-client";
-            case "in-app":
+            case "in-app": {
+                Long userId = resolveUserId(info);
+                if (userId == null) {
+                    throw new RuntimeException("Recipient has no linked app account");
+                }
+                notificationService.notifyUser(userId, StringUtils.hasText(subject) ? subject : "New Message",
+                        content, "INFO", "MEDIUM", "MESSAGING", null, "/messaging",
+                        "MESSAGE_" + info.type + "_" + info.id + "_" + System.currentTimeMillis());
                 return "in-app";
+            }
             default:
                 throw new RuntimeException("Unsupported message type: " + type);
         }
@@ -348,6 +391,20 @@ public class MessagingService {
         return new ArrayList<>(unique.values());
     }
 
+    /** Look up the app account linked to a recipient, for in-app delivery. */
+    private Long resolveUserId(RecipientInfo info) {
+        try {
+            if ("member".equals(info.type)) {
+                return memberRepository.findById(Long.parseLong(info.id)).map(Member::getUserId).orElse(null);
+            } else if ("staff".equals(info.type)) {
+                return staffRepository.findById(Long.parseLong(info.id)).map(Staff::getUserId).orElse(null);
+            }
+        } catch (NumberFormatException e) {
+            // ignore — falls through to null below
+        }
+        return null;
+    }
+
     private void addRecipient(Map<String, RecipientInfo> map, String type, String id) {
         String key = type + ":" + id;
         if (map.containsKey(key)) return;
@@ -355,6 +412,8 @@ public class MessagingService {
             memberRepository.findById(Long.parseLong(id)).ifPresent(member -> map.put(key, RecipientInfo.from(member)));
         } else if ("staff".equals(type)) {
             staffRepository.findById(Long.parseLong(id)).ifPresent(staff -> map.put(key, RecipientInfo.from(staff)));
+        } else if ("prospect".equals(type) || "prospects".equals(type)) {
+            leadRepository.findById(Long.parseLong(id)).ifPresent(lead -> map.put(key, RecipientInfo.from(lead)));
         }
     }
 
@@ -424,6 +483,20 @@ public class MessagingService {
         dto.setPhotoUrl(staff.getPhotoUrl());
         dto.setIsVip(false);
         dto.setTags(new ArrayList<>());
+        return dto;
+    }
+
+    private MessagingRecipientDTO toRecipientDTO(Lead lead) {
+        MessagingRecipientDTO dto = new MessagingRecipientDTO();
+        dto.setId(String.valueOf(lead.getId()));
+        dto.setName(((lead.getFirstName() != null ? lead.getFirstName() : "")
+                + (lead.getLastName() != null ? " " + lead.getLastName() : "")).trim());
+        dto.setEmail(lead.getEmail());
+        dto.setPhone(lead.getPhone());
+        dto.setType("prospect");
+        dto.setMembershipStatus(lead.getStatus());
+        dto.setIsVip(false);
+        dto.setTags(lead.getTags() != null ? new ArrayList<>(lead.getTags()) : new ArrayList<>());
         return dto;
     }
 
@@ -601,6 +674,23 @@ public class MessagingService {
                     null,
                     member.getJoinDate(),
                     member.getExpiryDate()
+            );
+        }
+
+        static RecipientInfo from(Lead lead) {
+            String fullName = ((lead.getFirstName() != null ? lead.getFirstName() : "")
+                    + (lead.getLastName() != null ? " " + lead.getLastName() : "")).trim();
+            return new RecipientInfo(
+                    String.valueOf(lead.getId()),
+                    "prospect",
+                    fullName,
+                    lead.getEmail(),
+                    lead.getPhone(),
+                    null,
+                    lead.getStatus(),
+                    null,
+                    null,
+                    null
             );
         }
 

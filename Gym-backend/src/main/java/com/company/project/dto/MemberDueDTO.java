@@ -19,6 +19,7 @@ public class MemberDueDTO {
     private int daysOverdue;   // 0 if not overdue
     private String lastPayment;// ISO date string or null
     private String status;     // "Overdue" | "Due Soon"
+    private String dueType;    // "Membership Due" (unpaid balance on the current cycle) | "Renewal Due" (fully paid but the cycle is ending/ended)
 
     // Getters & Setters
     public Long getId()                              { return id; }
@@ -53,4 +54,7 @@ public class MemberDueDTO {
 
     public String getStatus()                        { return status; }
     public void setStatus(String status)             { this.status = status; }
+
+    public String getDueType()                       { return dueType; }
+    public void setDueType(String dueType)           { this.dueType = dueType; }
 }

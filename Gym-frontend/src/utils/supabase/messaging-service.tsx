@@ -173,6 +173,16 @@ class MessagingService {
     return response.json();
   }
 
+  // Campaigns this specific member was a recipient of — used by the member
+  // analytics page's Communication History tab.
+  async getMemberHistory(memberDbId: string | number): Promise<MessageHistoryApi[]> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/messaging/history?memberId=${memberDbId}`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch member history: ${response.status}`);
+    return response.json();
+  }
+
   async deleteHistory(id: string): Promise<void> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/messaging/history/${id}`,

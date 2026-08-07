@@ -42,6 +42,9 @@ public class SaleTransaction extends BaseEntity {
     @Column(name = "total_amount", precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
+    @Column(name = "total_cogs", precision = 10, scale = 2)
+    private BigDecimal totalCogs = BigDecimal.ZERO;
+
     @Column(name = "received_amount", precision = 10, scale = 2)
     private BigDecimal receivedAmount;
 
@@ -92,6 +95,9 @@ public class SaleTransaction extends BaseEntity {
 
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+
+    public BigDecimal getTotalCogs() { return totalCogs; }
+    public void setTotalCogs(BigDecimal totalCogs) { this.totalCogs = totalCogs; }
 
     public BigDecimal getReceivedAmount() { return receivedAmount; }
     public void setReceivedAmount(BigDecimal receivedAmount) { this.receivedAmount = receivedAmount; }

@@ -167,21 +167,30 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     return dt ? dt >= prevStart && dt <= prevEnd : false;
   }), [receipts, prevStart, prevEnd]);
 
-  const newMembersInRange = useMemo(() => members.filter((m) => {
+  // A billed-to-head dependent (minor, or an adult under family_head billing)
+  // never generates their own receipt — the whole household is billed to the
+  // head — so counting them as full "members" inflates New Members/Churn and
+  // dilutes Avg Revenue/Member below. These use only the billing units.
+  const householdMembers = useMemo(
+    () => members.filter((m) => !((m as any).is_minor || (m as any).billed_to_head)),
+    [members]
+  );
+
+  const newMembersInRange = useMemo(() => householdMembers.filter((m) => {
     const dt = parseMemberJoinDate(m);
     return dt ? dt >= rangeStart && dt <= rangeEnd : false;
-  }), [members, rangeStart, rangeEnd]);
+  }), [householdMembers, rangeStart, rangeEnd]);
 
-  const newMembersInPrevRange = useMemo(() => members.filter((m) => {
+  const newMembersInPrevRange = useMemo(() => householdMembers.filter((m) => {
     const dt = parseMemberJoinDate(m);
     return dt ? dt >= prevStart && dt <= prevEnd : false;
-  }), [members, prevStart, prevEnd]);
+  }), [householdMembers, prevStart, prevEnd]);
 
-  const cancelledMembersInRange = useMemo(() => members.filter((m) => {
+  const cancelledMembersInRange = useMemo(() => householdMembers.filter((m) => {
     if (!isCancelledStatus(m.membership_status)) return false;
     const dt = parseMemberUpdatedDate(m);
     return dt ? dt >= rangeStart && dt <= rangeEnd : false;
-  }), [members, rangeStart, rangeEnd]);
+  }), [householdMembers, rangeStart, rangeEnd]);
 
   const membershipTrends: MembershipTrendPoint[] = useMemo(() => {
     const now = new Date();
@@ -216,9 +225,17 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     });
   }, [members]);
 
+  // Immutable receipts split a partially-paid-then-settled bill into multiple
+  // rows: the original bill row keeps its full invoice amount (r.amount) even
+  // after later settlements, while each settlement is its own separate row —
+  // so summing r.amount across all rows double-counts the settled portion.
+  // r.paid_amount is the actual cash each row received and never overlaps
+  // between rows, so it's the only field safe to sum for real revenue.
+  const revenueOf = (r: Receipt): number => Number(r.paid_amount) || 0;
+
   const buildRevenueBreakdown = useCallback((rows: Receipt[]): RevenueBucket[] => {
     const buckets: Record<string, number> = {};
-    const total = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const total = rows.reduce((sum, r) => sum + revenueOf(r), 0);
 
     const normalizeCategory = (r: Receipt) => {
       const t = (r.transaction_type || "").toLowerCase();
@@ -233,7 +250,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
 
     rows.forEach((r) => {
       const cat = normalizeCategory(r);
-      buckets[cat] = (buckets[cat] || 0) + (Number(r.amount) || 0);
+      buckets[cat] = (buckets[cat] || 0) + revenueOf(r);
     });
 
     const colors: Record<string, string> = {
@@ -262,7 +279,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       const dt = parseReceiptDate(r);
       if (!dt) return;
       const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
-      sums[key] = (sums[key] || 0) + (Number(r.amount) || 0);
+      sums[key] = (sums[key] || 0) + revenueOf(r);
     });
     return membershipTrends.map((m) => ({
       month: m.month,
@@ -275,7 +292,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     receiptsInRange.forEach((r) => {
       const plan = r.plan_name || r.transaction_type || "Unspecified";
       if (!buckets[plan]) buckets[plan] = { plan, revenue: 0, count: 0 };
-      buckets[plan].revenue += Number(r.amount) || 0;
+      buckets[plan].revenue += revenueOf(r);
       buckets[plan].count += 1;
     });
     return Object.values(buckets).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
@@ -342,10 +359,11 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     const activeMembers = members.filter((m) => m.membership_status === "active").length;
     const retention = totalMembers > 0 ? (activeMembers / totalMembers) * 100 : 0;
 
-    const periodRevenue = receiptsInRange.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-    const prevPeriodRevenue = receiptsInPrevRange.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-    const arpm = activeMembers > 0 ? periodRevenue / activeMembers : 0;
-    const prevArpm = activeMembers > 0 ? prevPeriodRevenue / activeMembers : 0;
+    const activeHouseholdMembers = householdMembers.filter((m) => m.membership_status === "active").length;
+    const periodRevenue = receiptsInRange.reduce((sum, r) => sum + revenueOf(r), 0);
+    const prevPeriodRevenue = receiptsInPrevRange.reduce((sum, r) => sum + revenueOf(r), 0);
+    const arpm = activeHouseholdMembers > 0 ? periodRevenue / activeHouseholdMembers : 0;
+    const prevArpm = activeHouseholdMembers > 0 ? prevPeriodRevenue / activeHouseholdMembers : 0;
     const arpmChange = hasComparison ? pctChange(arpm, prevArpm) : null;
 
     const newMembersChange = hasComparison ? pctChange(newMembersInRange.length, newMembersInPrevRange.length) : null;
@@ -410,7 +428,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         valueColor: "text-slate-700",
       },
     ];
-  }, [members, receiptsInRange, receiptsInPrevRange, newMembersInRange, newMembersInPrevRange, classAttendance, attendanceStats, currencyCode, hasComparison]);
+  }, [members, householdMembers, receiptsInRange, receiptsInPrevRange, newMembersInRange, newMembersInPrevRange, classAttendance, attendanceStats, currencyCode, hasComparison]);
 
   const membershipMetrics = useMemo(() => {
     const total = members.length;

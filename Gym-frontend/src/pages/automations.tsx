@@ -64,10 +64,9 @@ import {
   Save, 
   X, 
   Download, 
-  Upload, 
-  History, 
-  Layers, 
-  List, 
+  Upload,
+  History,
+  List,
   Grid, 
   SortAsc, 
   SortDesc, 
@@ -178,6 +177,8 @@ interface AutomationWorkflow {
     value: any;
   }[];
   frequency: 'once' | 'daily' | 'weekly' | 'monthly';
+  dayOfWeek?: number;
+  dayOfMonth?: number;
   createdDate: Date;
   lastRun?: Date;
   nextRun?: Date;
@@ -192,17 +193,23 @@ interface AutomationWorkflow {
   isSystem: boolean;
 }
 
-interface AutomationTemplate {
-  id: string;
-  name: string;
-  category: string;
-  trigger: string;
-  action: string;
-  subject: string;
-  content: string;
-  description: string;
-  usageCount: number;
+/** Convert JS Date.getDay() (0=Sun..6=Sat) to the backend's ISO convention (1=Mon..7=Sun). */
+function currentIsoDayOfWeek(): number {
+  const jsDay = new Date().getDay();
+  return jsDay === 0 ? 7 : jsDay;
 }
+
+/** Merge fields the backend actually substitutes (AutomationExecutorService.interpolate()).
+ *  Keep this list in sync with that method — anything not listed there renders literally. */
+const MERGE_FIELDS: { token: string; label: string }[] = [
+  { token: '{FirstName}', label: 'First Name' },
+  { token: '{FullName}', label: 'Full Name' },
+  { token: '{MembershipPlan}', label: 'Membership Plan' },
+  { token: '{MembershipType}', label: 'Membership Type' },
+  { token: '{ExpiryDate}', label: 'Expiry Date' },
+  { token: '{Phone}', label: 'Phone' },
+  { token: '{Email}', label: 'Email' },
+];
 
 export function Automations() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -213,8 +220,6 @@ export function Automations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
-  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
-  const [templates, setTemplates] = useState<AutomationWorkflow[]>([]);
   const [executionLogs, setExecutionLogs] = useState<any[]>([]);
   const [triggerFilter, setTriggerFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
@@ -231,8 +236,40 @@ export function Automations() {
     trigger: { type: '', parameters: {} },
     action: { type: '', content: '', subject: '', delay: 0, delayUnit: 'hours' as 'minutes' | 'hours' | 'days' },
     conditions: [],
-    frequency: 'once' as 'once' | 'daily' | 'weekly' | 'monthly'
+    frequency: 'once' as 'once' | 'daily' | 'weekly' | 'monthly',
+    dayOfWeek: currentIsoDayOfWeek(),
+    dayOfMonth: new Date().getDate()
   });
+
+  // Which action field a merge-field chip click should insert into.
+  // Looked up by DOM id (not a React ref) because the shared Textarea/Input
+  // components aren't wrapped in forwardRef, so a ref prop on them never attaches.
+  const [mergeFieldTarget, setMergeFieldTarget] = useState<'content' | 'subject'>('content');
+
+  const insertMergeField = useCallback((token: string) => {
+    const field = mergeFieldTarget;
+    const el = document.getElementById(
+      field === 'content' ? 'action-content' : 'action-subject'
+    ) as HTMLTextAreaElement | HTMLInputElement | null;
+
+    const current = workflowBuilder.action[field] ?? '';
+    const start = el?.selectionStart ?? current.length;
+    const end = el?.selectionEnd ?? current.length;
+    const nextValue = current.slice(0, start) + token + current.slice(end);
+
+    setWorkflowBuilder(prev => ({
+      ...prev,
+      action: { ...prev.action, [field]: nextValue }
+    }));
+
+    // Restore focus + cursor position after the value updates
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }, [mergeFieldTarget, workflowBuilder.action]);
 
   // Available triggers
   const automationTriggers: AutomationTrigger[] = [
@@ -401,6 +438,8 @@ export function Automations() {
       delayUnit: w.delayMinutes < 60 ? 'minutes' : w.delayMinutes < 1440 ? 'hours' : 'days'
     },
     frequency: w.frequency as AutomationWorkflow['frequency'],
+    dayOfWeek: w.dayOfWeek ?? undefined,
+    dayOfMonth: w.dayOfMonth ?? undefined,
     createdDate: new Date(w.createdAt),
     lastRun: w.lastRunAt ? new Date(w.lastRunAt) : undefined,
     nextRun: w.nextRunAt ? new Date(w.nextRunAt) : undefined,
@@ -419,8 +458,7 @@ export function Automations() {
     setIsLoading(true);
     try {
       const data = await automationService.getAll();
-      setWorkflows(data.filter(w => w.status !== 'template').map(mapApiWorkflow));
-      setTemplates(data.filter(w => w.status === 'template').map(mapApiWorkflow));
+      setWorkflows(data.map(mapApiWorkflow));
     } catch {
       toast.error('Failed to load automations');
     } finally {
@@ -429,43 +467,6 @@ export function Automations() {
   }, [mapApiWorkflow]);
 
   useEffect(() => { fetchWorkflows(); }, [fetchWorkflows]);
-
-  // Sample templates
-  const automationTemplates: AutomationTemplate[] = [
-    {
-      id: '1',
-      name: 'Welcome Email',
-      category: 'Onboarding',
-      trigger: 'new_signup',
-      action: 'send_email',
-      subject: 'Welcome to {GymName}!',
-      content: 'Hi {FirstName}, welcome to our fitness family! We\'re excited to help you achieve your fitness goals.',
-      description: 'Standard welcome email for new members',
-      usageCount: 145
-    },
-    {
-      id: '2',
-      name: 'Renewal Reminder',
-      category: 'Retention',
-      trigger: 'membership_expiry',
-      action: 'send_email',
-      subject: 'Your membership expires soon',
-      content: 'Hi {FirstName}, your {MembershipPlan} membership expires on {ExpiryDate}. Renew now!',
-      description: 'Membership renewal reminder email',
-      usageCount: 89
-    },
-    {
-      id: '3',
-      name: 'Comeback Message',
-      category: 'Re-engagement',
-      trigger: 'missed_workout',
-      action: 'send_sms',
-      subject: '',
-      content: 'Hi {FirstName}! We miss you at the gym. Your fitness journey awaits! 💪',
-      description: 'SMS to re-engage inactive members',
-      usageCount: 67
-    }
-  ];
 
   // Calculate analytics
   const analytics = useMemo(() => {
@@ -575,6 +576,8 @@ export function Automations() {
       },
       conditions: [],
       frequency: workflow.frequency,
+      dayOfWeek: workflow.dayOfWeek ?? currentIsoDayOfWeek(),
+      dayOfMonth: workflow.dayOfMonth ?? new Date().getDate(),
     });
     setCurrentStep(1);
   }, []);
@@ -602,7 +605,6 @@ export function Automations() {
       }
       case 'edit':
         setSelectedWorkflow(workflow);
-        setIsCreatingTemplate(false);
         populateBuilderFromWorkflow(workflow);
         setShowCreateWorkflow(true);
         break;
@@ -642,6 +644,8 @@ export function Automations() {
             },
             conditions: [],
             frequency: workflow.frequency,
+            dayOfWeek: workflow.dayOfWeek ?? currentIsoDayOfWeek(),
+            dayOfMonth: workflow.dayOfMonth ?? new Date().getDate(),
           });
           await automationService.create(payload);
           toast.success(`Duplicated "${workflow.name}"`);
@@ -663,11 +667,12 @@ export function Automations() {
       trigger: { type: '', parameters: {} },
       action: { type: '', content: '', subject: '', delay: 0, delayUnit: 'hours' },
       conditions: [],
-      frequency: 'once'
+      frequency: 'once',
+      dayOfWeek: currentIsoDayOfWeek(),
+      dayOfMonth: new Date().getDate()
     });
     setCurrentStep(1);
     setSelectedWorkflow(null);
-    setIsCreatingTemplate(false);
     setShowCreateWorkflow(true);
   }, []);
 
@@ -689,65 +694,22 @@ export function Automations() {
       return;
     }
 
-    const payload = {
-      ...automationService.buildPayload(workflowBuilder),
-      ...(isCreatingTemplate ? { status: 'template' } : {}),
-    };
+    const payload = automationService.buildPayload(workflowBuilder);
     try {
       if (selectedWorkflow) {
         await automationService.update(Number(selectedWorkflow.id), payload);
-        toast.success(isCreatingTemplate ? 'Template updated successfully' : 'Automation updated successfully');
+        toast.success('Automation updated successfully');
       } else {
         await automationService.create(payload);
-        toast.success(isCreatingTemplate ? 'Template created successfully' : 'Automation created successfully');
+        toast.success('Automation created successfully');
       }
       setShowCreateWorkflow(false);
       setCurrentStep(1);
-      setIsCreatingTemplate(false);
       fetchWorkflows();
     } catch {
       toast.error('Failed to save');
     }
-  }, [workflowBuilder, selectedWorkflow, isCreatingTemplate, fetchWorkflows]);
-
-  const handleCreateTemplate = useCallback(() => {
-    setWorkflowBuilder({
-      name: '',
-      description: '',
-      trigger: { type: '', parameters: {} },
-      action: { type: '', content: '', subject: '', delay: 0, delayUnit: 'hours' },
-      conditions: [],
-      frequency: 'once'
-    });
-    setCurrentStep(1);
-    setSelectedWorkflow(null);
-    setIsCreatingTemplate(true);
-    setShowCreateWorkflow(true);
-  }, []);
-
-  const handleUseTemplate = useCallback((template: AutomationWorkflow) => {
-    populateBuilderFromWorkflow(template);
-    setSelectedWorkflow(null);
-    setIsCreatingTemplate(false);
-    setShowCreateWorkflow(true);
-  }, [populateBuilderFromWorkflow]);
-
-  const handleEditTemplate = useCallback((template: AutomationWorkflow) => {
-    populateBuilderFromWorkflow(template);
-    setSelectedWorkflow(template);
-    setIsCreatingTemplate(true);
-    setShowCreateWorkflow(true);
-  }, [populateBuilderFromWorkflow]);
-
-  const handleDeleteTemplate = useCallback(async (template: AutomationWorkflow) => {
-    try {
-      await automationService.delete(Number(template.id));
-      setTemplates(prev => prev.filter(t => t.id !== template.id));
-      toast.success(`Template "${template.name}" deleted`);
-    } catch {
-      toast.error('Failed to delete template');
-    }
-  }, []);
+  }, [workflowBuilder, selectedWorkflow, fetchWorkflows]);
 
   const handleExport = useCallback(() => {
     const rows = [
@@ -807,13 +769,58 @@ export function Automations() {
                       <SelectValue placeholder="Select frequency" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="once">Once per member</SelectItem>
+                      <SelectItem value="once">Once (single run, then stops)</SelectItem>
                       <SelectItem value="daily">Daily</SelectItem>
                       <SelectItem value="weekly">Weekly</SelectItem>
                       <SelectItem value="monthly">Monthly</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {workflowBuilder.frequency === 'once' && 'Runs exactly once for whoever currently qualifies, then never runs again.'}
+                    {workflowBuilder.frequency === 'daily' && 'Checks for qualifying members every day.'}
+                    {workflowBuilder.frequency === 'weekly' && 'Checks for qualifying members once a week, on the day selected below.'}
+                    {workflowBuilder.frequency === 'monthly' && 'Checks for qualifying members once a month, on the day selected below.'}
+                  </p>
                 </div>
+                {workflowBuilder.frequency === 'weekly' && (
+                  <div>
+                    <Label htmlFor="workflow-day-of-week">Day of Week</Label>
+                    <Select
+                      value={String(workflowBuilder.dayOfWeek)}
+                      onValueChange={(value) => setWorkflowBuilder(prev => ({ ...prev, dayOfWeek: Number(value) }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select day" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Monday</SelectItem>
+                        <SelectItem value="2">Tuesday</SelectItem>
+                        <SelectItem value="3">Wednesday</SelectItem>
+                        <SelectItem value="4">Thursday</SelectItem>
+                        <SelectItem value="5">Friday</SelectItem>
+                        <SelectItem value="6">Saturday</SelectItem>
+                        <SelectItem value="7">Sunday</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {workflowBuilder.frequency === 'monthly' && (
+                  <div>
+                    <Label htmlFor="workflow-day-of-month">Day of Month</Label>
+                    <Input
+                      id="workflow-day-of-month"
+                      type="number"
+                      min={1}
+                      max={28}
+                      value={workflowBuilder.dayOfMonth}
+                      onChange={(e) => setWorkflowBuilder(prev => ({
+                        ...prev,
+                        dayOfMonth: Math.min(28, Math.max(1, Number(e.target.value) || 1))
+                      }))}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Choose 1–28 so it applies to every month.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -908,6 +915,7 @@ export function Automations() {
                           id="action-subject"
                           placeholder="Enter email subject"
                           value={workflowBuilder.action.subject}
+                          onFocus={() => setMergeFieldTarget('subject')}
                           onChange={(e) => setWorkflowBuilder(prev => ({
                             ...prev,
                             action: { ...prev.action, subject: e.target.value }
@@ -930,14 +938,32 @@ export function Automations() {
                         placeholder="Enter message content..."
                         rows={4}
                         value={workflowBuilder.action.content}
+                        onFocus={() => setMergeFieldTarget('content')}
                         onChange={(e) => setWorkflowBuilder(prev => ({
                           ...prev,
                           action: { ...prev.action, content: e.target.value }
                         }))}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Use merge fields like {'{FirstName}'}, {'{MembershipPlan}'}, {'{ExpiryDate}'}
-                      </p>
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground mb-1.5">
+                          Click to insert into {mergeFieldTarget === 'subject' ? 'the subject' : 'the message'} at your cursor:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {MERGE_FIELDS.map((field) => (
+                            <Button
+                              key={field.token}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs font-mono"
+                              onClick={() => insertMergeField(field.token)}
+                              title={`Insert ${field.label}`}
+                            >
+                              {field.token}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -1069,10 +1095,6 @@ export function Automations() {
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Export
-          </Button>
-          <Button variant="outline" onClick={() => setActiveTab('templates')}>
-            <Layers className="mr-2 h-4 w-4" />
-            Templates
           </Button>
           <Button onClick={handleCreateWorkflow} disabled={isLoading}>
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
@@ -1277,7 +1299,6 @@ export function Automations() {
         <TabsList className="w-full flex">
           <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
           <TabsTrigger value="workflows" className="flex-1">Workflows</TabsTrigger>
-          <TabsTrigger value="templates" className="flex-1">Templates</TabsTrigger>
           <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
         </TabsList>
 
@@ -1628,113 +1649,6 @@ export function Automations() {
           </div>
         </TabsContent>
 
-        <TabsContent value="templates" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-semibold">Automation Templates</h2>
-              <p className="text-sm text-muted-foreground mt-1">Save reusable workflow configurations as templates</p>
-            </div>
-            <Button onClick={handleCreateTemplate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Template
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map(i => (
-                <Card key={i} className={cardShell}>
-                  <CardContent className="p-6 space-y-3">
-                    <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
-                    <div className="h-3 bg-muted rounded animate-pulse w-full" />
-                    <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : templates.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4 text-muted-foreground">
-              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                <Layers className="h-8 w-8 opacity-50" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-foreground">No templates yet</p>
-                <p className="text-sm mt-1">Create a template to save and reuse workflow configurations</p>
-              </div>
-              <Button onClick={handleCreateTemplate} variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                Create your first template
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {templates.map((template) => (
-                <Card key={template.id} className={`${cardShell} group`}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">{template.name}</CardTitle>
-                      <Badge variant="outline" className="capitalize">{template.frequency}</Badge>
-                    </div>
-                    <CardDescription className="line-clamp-2">{template.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          {getTriggerIcon(template.trigger.type)}
-                          <span className="text-sm truncate">
-                            {automationTriggers.find(t => t.id === template.trigger.type)?.name ?? template.trigger.type}
-                          </span>
-                        </div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <div className="flex items-center space-x-2">
-                          {getActionIcon(template.action.type)}
-                          <span className="text-sm truncate">
-                            {automationActions.find(a => a.id === template.action.type)?.name ?? template.action.type}
-                          </span>
-                        </div>
-                      </div>
-
-                      {template.action.subject && (
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Subject</Label>
-                          <p className="text-sm font-medium truncate">{template.action.subject}</p>
-                        </div>
-                      )}
-
-                      {template.action.content && (
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Content Preview</Label>
-                          <p className="text-sm text-muted-foreground line-clamp-2">{template.action.content}</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button variant="default" size="sm" onClick={() => handleUseTemplate(template)}>
-                      <Play className="mr-1.5 h-3.5 w-3.5" />
-                      Use Template
-                    </Button>
-                    <div className="flex space-x-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleEditTemplate(template)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDeleteTemplate(template)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
         <TabsContent value="analytics" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className={cardShell}>
@@ -2082,14 +1996,10 @@ export function Automations() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {isCreatingTemplate
-                ? (selectedWorkflow ? 'Edit Template' : 'Create Template')
-                : (selectedWorkflow ? 'Edit Automation' : 'Create Automation Workflow')}
+              {selectedWorkflow ? 'Edit Automation' : 'Create Automation Workflow'}
             </DialogTitle>
             <DialogDescription>
-              {isCreatingTemplate
-                ? 'Save a reusable workflow configuration as a template'
-                : 'Set up an automated workflow to engage with your members'}
+              Set up an automated workflow to engage with your members
             </DialogDescription>
           </DialogHeader>
           
@@ -2134,7 +2044,7 @@ export function Automations() {
               {currentStep === 4 ? (
                 <Button onClick={handleSaveWorkflow}>
                   <Save className="mr-2 h-4 w-4" />
-                  {isCreatingTemplate ? 'Save Template' : 'Save Workflow'}
+                  Save Workflow
                 </Button>
               ) : (
                 <Button 

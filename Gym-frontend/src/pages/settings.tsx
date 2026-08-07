@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { financialSettingsService } from "../utils/supabase/financial-settings-service";
+import { invalidateCompanyDetailsCache } from "../utils/company-details";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Settings as SettingsIcon, Coins, Check, Building, MapPin, Mail, Phone, UploadCloud, Building2, Image as ImageIcon } from "lucide-react";
+import { Settings as SettingsIcon, Coins, Check, Building, MapPin, Mail, Phone, UploadCloud, Building2, Image as ImageIcon, Hash } from "lucide-react";
 import { useCurrency, CURRENCIES, CurrencyCode, CurrencyGlyph } from "../utils/currency";
 import { toast } from "sonner";
 import { Input } from "../components/ui/input";
@@ -30,7 +31,8 @@ export function AppSettings() {
     address: "",
     email: "",
     phone: "",
-    logoPreview: ""
+    logoPreview: "",
+    trn: ""
   });
   const [isCompanyLoading, setIsCompanyLoading] = useState(true);
   const [isCompanySaving, setIsCompanySaving] = useState(false);
@@ -44,7 +46,8 @@ export function AppSettings() {
           address: "",
           email: "",
           phone: "",
-          logoPreview: ""
+          logoPreview: "",
+          trn: ""
         };
         settings.forEach(s => {
           if (s.settingKey === "company_name") details.name = s.settingValue;
@@ -52,6 +55,7 @@ export function AppSettings() {
           if (s.settingKey === "company_email") details.email = s.settingValue;
           if (s.settingKey === "company_phone") details.phone = s.settingValue;
           if (s.settingKey === "company_logo") details.logoPreview = s.settingValue;
+          if (s.settingKey === "company_trn") details.trn = s.settingValue;
         });
         setCompanyDetails(details);
       } catch (err) {
@@ -96,9 +100,10 @@ export function AppSettings() {
         { key: "company_email", val: companyDetails.email },
         { key: "company_phone", val: companyDetails.phone },
         { key: "company_logo", val: companyDetails.logoPreview },
-      ];
-      
-      await Promise.all(keys.map(k => 
+        { key: "company_trn", val: companyDetails.trn },
+      ].filter(k => k.val.trim() !== "");
+
+      await Promise.all(keys.map(k =>
         financialSettingsService.upsertSetting({
           settingKey: k.key,
           settingValue: k.val,
@@ -106,7 +111,8 @@ export function AppSettings() {
           description: `Company ${k.key.split('_')[1]}`
         })
       ));
-      
+
+      invalidateCompanyDetailsCache();
       setIsCompanyDirty(false);
       toast.success("Company details saved to database!");
     } catch (err) {
@@ -284,13 +290,29 @@ export function AppSettings() {
                 <MapPin className="h-4 w-4 text-gray-500" />
                 Address
               </Label>
-              <Textarea 
-                id="address" 
-                placeholder="Enter complete company address" 
+              <Textarea
+                id="address"
+                placeholder="Enter complete company address"
                 rows={3}
                 value={companyDetails.address}
                 onChange={(e) => handleCompanyChange("address", e.target.value)}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="trn" className="flex items-center gap-2">
+                <Hash className="h-4 w-4 text-gray-500" />
+                Tax Registration Number (TRN)
+              </Label>
+              <Input
+                id="trn"
+                placeholder="e.g. 100123456700003"
+                value={companyDetails.trn}
+                onChange={(e) => handleCompanyChange("trn", e.target.value)}
+              />
+              <p className="text-xs text-gray-500">
+                Your UAE FTA Tax Registration Number. Printed on every Tax Invoice — required for it to be a valid tax document.
+              </p>
             </div>
           </div>
 
