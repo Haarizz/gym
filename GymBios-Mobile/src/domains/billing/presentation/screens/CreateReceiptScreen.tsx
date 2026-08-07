@@ -6,8 +6,10 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
+import type { Member } from '@/domains/members/domain/Member';
+import { useMemberSearch } from '@/domains/members/hooks/useMemberSearch';
 
-import { useMemberDues, usePendingBills, useReceipts } from '../../hooks/useBills';
+import { usePendingBills } from '../../hooks/useBills';
 import { useSettlePayment } from '../../hooks/useBillActions';
 import type { Bill } from '../../domain/Bill';
 import { PaymentMethod, type Receipt } from '../../domain/Receipt';
@@ -25,15 +27,6 @@ interface CreateReceiptScreenProps {
   onViewMemberProfile?: (memberId: number) => void;
 }
 
-interface MemberSearchOption {
-  id: number;
-  name: string;
-  memberIdStr?: string;
-  phone?: string;
-  email?: string;
-  membership?: string;
-}
-
 /**
  * Dedicated Create Receipt Screen.
  *
@@ -49,7 +42,7 @@ export function CreateReceiptScreen({
   onViewMemberProfile,
 }: CreateReceiptScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMember, setSelectedMember] = useState<MemberSearchOption | null>(null);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Selected bill IDs for payment
@@ -60,9 +53,8 @@ export function CreateReceiptScreen({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(PaymentMethod.Cash);
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
 
-  // Query member dues & receipts to supply search pool
-  const { dues } = useMemberDues();
-  const { receipts } = useReceipts({ limit: 50 });
+  // Debounced backend member search — the single source of truth for lookup.
+  const { members: searchPool, loading: searchLoading, empty: noResults } = useMemberSearch(searchQuery);
 
   // Query pending bills for selected member — disabled until a valid member is selected
   const { bills, loading: billsLoading, refresh: refreshBills } = usePendingBills(selectedMember?.id);
@@ -70,49 +62,7 @@ export function CreateReceiptScreen({
   // Mutation for settling payment
   const settlePaymentMutation = useSettlePayment();
 
-  // Search pool consolidation
-  const searchPool = useMemo(() => {
-    const map = new Map<number, MemberSearchOption>();
-
-    dues.forEach((d) => {
-      map.set(d.id, {
-        id: d.id,
-        name: d.memberName ?? 'Member',
-        memberIdStr: d.memberId,
-        phone: d.memberPhone,
-        email: d.memberEmail,
-        membership: d.membership,
-      });
-    });
-
-    receipts.forEach((r) => {
-      const numId = parseInt(r.memberId || r.id, 10) || 1;
-      if (!map.has(numId) && r.memberName) {
-        map.set(numId, {
-          id: numId,
-          name: r.memberName,
-          memberIdStr: r.memberId,
-          phone: r.memberPhone,
-          membership: r.planName,
-        });
-      }
-    });
-
-    const list = Array.from(map.values());
-    if (!searchQuery.trim()) return list.slice(0, 5);
-
-    const term = searchQuery.toLowerCase();
-    return list.filter(
-      (m) =>
-        m.name.toLowerCase().includes(term) ||
-        m.id.toString().includes(term) ||
-        (m.memberIdStr && m.memberIdStr.toLowerCase().includes(term)) ||
-        (m.phone && m.phone.includes(term)) ||
-        (m.email && m.email.toLowerCase().includes(term)),
-    );
-  }, [dues, receipts, searchQuery]);
-
-  const handleSelectMember = useCallback((member: MemberSearchOption) => {
+  const handleSelectMember = useCallback((member: Member) => {
     setSelectedMember(member);
     setSearchQuery(member.name);
     setShowSuggestions(false);
@@ -267,10 +217,16 @@ export function CreateReceiptScreen({
             )}
           </View>
 
-          {/* Suggestions Dropdown */}
+          {/* Suggestions Dropdown — populated from the Members domain */}
           {showSuggestions && !selectedMember && (
             <View style={styles.suggestionsContainer}>
-              {searchPool.length === 0 ? (
+              {searchLoading ? (
+                <View style={styles.noResultsItem}>
+                  <Typography variant="caption" color="textSecondary">
+                    Searching members...
+                  </Typography>
+                </View>
+              ) : noResults || searchPool.length === 0 ? (
                 <View style={styles.noResultsItem}>
                   <Typography variant="caption" color="textSecondary">
                     No matching members found.
@@ -291,7 +247,7 @@ export function CreateReceiptScreen({
                     <View style={styles.suggestionInfo}>
                       <Typography variant="bodySmallBold">{m.name}</Typography>
                       <Typography variant="caption" color="textSecondary">
-                        ID: {m.id} {m.phone ? `· ${m.phone}` : ''}
+                        ID: {m.memberId} {m.phone ? `· ${m.phone}` : ''}
                       </Typography>
                     </View>
                   </Pressable>
@@ -316,12 +272,12 @@ export function CreateReceiptScreen({
                   {selectedMember.name}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Member ID: {selectedMember.id} {selectedMember.phone ? `· ${selectedMember.phone}` : ''}
+                  Member ID: {selectedMember.memberId} {selectedMember.phone ? `· ${selectedMember.phone}` : ''}
                 </Typography>
-                {selectedMember.membership && (
+                {selectedMember.membershipType && (
                   <View style={styles.badgeChip}>
                     <Typography variant="caption" style={styles.badgeText}>
-                      {selectedMember.membership}
+                      {selectedMember.membershipType}
                     </Typography>
                   </View>
                 )}

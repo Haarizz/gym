@@ -1,15 +1,16 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
+import type { Member } from '@/domains/members/domain/Member';
+import { useMemberSearch } from '@/domains/members/hooks/useMemberSearch';
 
-import { useMemberDues, useMemberStatement, useReceipts } from '../../hooks/useBills';
+import { useMemberStatement } from '../../hooks/useBills';
 import {
-  BillingSection,
   BillingSkeleton,
   EmptyBillingState,
   MoneyText,
@@ -19,14 +20,6 @@ import {
 interface MemberStatementsScreenProps {
   onBack: () => void;
   onNavigateToMemberStatement?: (memberId: number, memberName?: string) => void;
-}
-
-interface MemberOption {
-  id: number;
-  name: string;
-  phone?: string;
-  membership?: string;
-  memberIdStr?: string;
 }
 
 /**
@@ -39,7 +32,7 @@ interface MemberOption {
  */
 export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMember, setSelectedMember] = useState<MemberOption | null>(null);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -48,8 +41,8 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
   const [activeMemberId, setActiveMemberId] = useState<number | null>(null);
   const [activeRange, setActiveRange] = useState<{ from?: string; to?: string } | undefined>(undefined);
 
-  const { dues } = useMemberDues();
-  const { receipts } = useReceipts({ limit: 50 });
+  // Debounced backend member search — the single source of truth for lookup.
+  const { members: memberSuggestions, loading: searchLoading, empty: noResults } = useMemberSearch(searchQuery);
 
   // statement query for active generated statement — disabled until "Generate Statement" is pressed
   const { statement, loading: statementLoading, refresh: refreshStatement } = useMemberStatement(
@@ -57,47 +50,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
     activeRange,
   );
 
-  // Consolidate member suggestions pool
-  const memberSuggestions = useMemo(() => {
-    const map = new Map<number, MemberOption>();
-
-    dues.forEach((d) => {
-      map.set(d.id, {
-        id: d.id,
-        name: d.memberName ?? 'Member',
-        phone: d.memberPhone,
-        membership: d.membership,
-        memberIdStr: d.memberId,
-      });
-    });
-
-    receipts.forEach((r) => {
-      const numId = parseInt(r.memberId || r.id, 10) || 1;
-      if (!map.has(numId) && r.memberName) {
-        map.set(numId, {
-          id: numId,
-          name: r.memberName,
-          phone: r.memberPhone,
-          membership: r.planName,
-          memberIdStr: r.memberId,
-        });
-      }
-    });
-
-    const list = Array.from(map.values());
-    if (!searchQuery.trim()) return list.slice(0, 5);
-
-    const term = searchQuery.toLowerCase();
-    return list.filter(
-      (m) =>
-        m.name.toLowerCase().includes(term) ||
-        m.id.toString().includes(term) ||
-        (m.memberIdStr && m.memberIdStr.toLowerCase().includes(term)) ||
-        (m.phone && m.phone.includes(term)),
-    );
-  }, [dues, receipts, searchQuery]);
-
-  const handleSelectMember = useCallback((member: MemberOption) => {
+  const handleSelectMember = useCallback((member: Member) => {
     setSelectedMember(member);
     setSearchQuery(member.name);
     setShowSuggestions(false);
@@ -107,6 +60,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
     setSelectedMember(null);
     setSearchQuery('');
     setActiveMemberId(null);
+    setActiveRange(undefined);
     setShowSuggestions(true);
   }, []);
 
@@ -195,10 +149,16 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
               )}
             </View>
 
-            {/* Autocomplete Suggestions Dropdown */}
+            {/* Autocomplete Suggestions Dropdown — populated from the Members domain */}
             {showSuggestions && !selectedMember && (
               <View style={styles.suggestionsContainer}>
-                {memberSuggestions.length === 0 ? (
+                {searchLoading ? (
+                  <View style={styles.noResultsItem}>
+                    <Typography variant="caption" color="textSecondary">
+                      Searching members...
+                    </Typography>
+                  </View>
+                ) : noResults || memberSuggestions.length === 0 ? (
                   <View style={styles.noResultsItem}>
                     <Typography variant="caption" color="textSecondary">
                       No matching members found. Try another search.
@@ -219,7 +179,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
                       <View style={styles.suggestionInfo}>
                         <Typography variant="bodySmallBold">{m.name}</Typography>
                         <Typography variant="caption" color="textSecondary">
-                          ID: {m.id} {m.phone ? `· ${m.phone}` : ''}
+                          ID: {m.memberId} {m.phone ? `· ${m.phone}` : ''}
                         </Typography>
                       </View>
                     </Pressable>

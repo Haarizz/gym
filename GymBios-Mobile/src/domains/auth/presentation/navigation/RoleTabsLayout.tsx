@@ -60,6 +60,7 @@ export function RoleTabsLayout({
     ['membership-plans', 'edit'],
     ['members', 'create'],
     ['members', 'edit'],
+    ['billing', 'create-receipt'],
   ] as const;
 
   // Module routes that should be accessible via navigation but hidden from the bottom tab bar.

@@ -76,7 +76,7 @@ interface MemberResponse {
 export class ApiMemberFamilyRepository implements MemberFamilyRepository {
   async getFamily(memberId: number): Promise<FamilyGroup> {
     const response = await apiClient.get<FamilyGroupResponse>(
-      `/api/members/${memberId}/family`,
+      `/members/${memberId}/family`,
     );
 
     const data = response.data;
@@ -97,7 +97,7 @@ export class ApiMemberFamilyRepository implements MemberFamilyRepository {
     request: AddFamilyMemberRequest,
   ): Promise<Member> {
     const response = await apiClient.post<MemberResponse>(
-      `/api/members/${headId}/family-members`,
+      `/members/${headId}/family-members`,
       this.toFamilyMemberRequest(request),
     );
 

@@ -53,6 +53,7 @@ export { ApiMemberAccessRepository } from './infrastructure/access/ApiMemberAcce
 
 // Hooks
 export { useMembers } from './hooks/useMembers';
+export { useMemberSearch } from './hooks/useMemberSearch';
 export { useMemberActions } from './hooks/useMemberActions';
 
 // Presentation
