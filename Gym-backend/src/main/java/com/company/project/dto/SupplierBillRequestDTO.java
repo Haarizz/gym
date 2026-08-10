@@ -16,6 +16,7 @@ public class SupplierBillRequestDTO {
     private Long warehouseId;
     private String notes;
     private String receivedBy;
+    private String taxCode;
     private List<SupplierBillItemDTO> items;
 
     public SupplierBillRequestDTO() {}
@@ -51,6 +52,9 @@ public class SupplierBillRequestDTO {
 
     public String getReceivedBy() { return receivedBy; }
     public void setReceivedBy(String receivedBy) { this.receivedBy = receivedBy; }
+
+    public String getTaxCode() { return taxCode; }
+    public void setTaxCode(String taxCode) { this.taxCode = taxCode; }
 
     public List<SupplierBillItemDTO> getItems() { return items; }
     public void setItems(List<SupplierBillItemDTO> items) { this.items = items; }

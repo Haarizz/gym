@@ -431,18 +431,7 @@ public class FinancialEventService {
 
         List<JvLine> lines = new ArrayList<>();
         lines.add(dr(expenseCode, expenseName, amount, "Expense — " + expense.getVendorName()));
-        if (tax.compareTo(BigDecimal.ZERO) > 0) {
-            String inputTaxAccount = ACC_GST_INPUT;
-            String inputTaxName = "GST Input Credit";
-            if (expense.getTaxCode() != null && !expense.getTaxCode().isBlank()) {
-                Optional<TaxCode> tc = taxCodeRepo.findByCode(expense.getTaxCode());
-                if (tc.isPresent() && tc.get().getPurchaseTaxAccountCode() != null && !tc.get().getPurchaseTaxAccountCode().isBlank()) {
-                    inputTaxAccount = tc.get().getPurchaseTaxAccountCode();
-                    inputTaxName = tc.get().getName() != null ? tc.get().getName() : inputTaxName;
-                }
-            }
-            lines.add(dr(inputTaxAccount, inputTaxName, tax, "Input tax credit"));
-        }
+        lines.addAll(buildInputTaxLines(tax, expense.getTaxCode()));
         boolean unpaid = "UNPAID".equalsIgnoreCase(expense.getPaymentStatus())
                 || "CREDIT".equalsIgnoreCase(expense.getPaymentStatus());
         if (unpaid) {
@@ -596,9 +585,7 @@ public class FinancialEventService {
         List<JvLine> lines = new ArrayList<>();
         lines.add(dr(ACC_INVENTORY_ASSET, "Inventory Asset", subtotal,
                 "Goods received — " + bill.getSupplierName()));
-        if (tax.compareTo(BigDecimal.ZERO) > 0) {
-            lines.add(dr(ACC_GST_INPUT, "GST Input Credit", tax, "Input tax on purchase"));
-        }
+        lines.addAll(buildInputTaxLines(tax, bill.getTaxCode()));
         lines.add(cr(ACC_ACCOUNTS_PAYABLE, "Accounts Payable", total,
                 "Payable to " + bill.getSupplierName() + " | " + bill.getBillNumber()));
 
@@ -742,6 +729,90 @@ public class FinancialEventService {
                 "Reward Cash Payout: " + reward.getRewardCode() + " — " + reward.getMemberId(),
                 LocalDate.now(), lines, "REWARDS");
         registerSource("ReferralRewardPayout", reward.getId(), "REWARDS", jv.getId());
+    }
+
+    /**
+     * CONTRA — cash/bank transfer (deposit, withdrawal, inter-account move).
+     * DR  [toAccount]      (amount)
+     * CR  [fromAccount]    (amount)
+     */
+    public void onContraVoucherPosted(ContraVoucher voucher) {
+        if (alreadyJournaled("ContraVoucher", voucher.getId())) return;
+
+        BigDecimal amount = safe(voucher.getAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = List.of(
+                dr(voucher.getToAccountCode(), voucher.getToAccountName(), amount,
+                        "Contra transfer — " + voucher.getVoucherNo()),
+                cr(voucher.getFromAccountCode(), voucher.getFromAccountName(), amount,
+                        "Contra transfer — " + voucher.getVoucherNo())
+        );
+
+        JournalVoucher jv = createAndPost(
+                "Contra: " + voucher.getVoucherNo()
+                + (voucher.getNarration() != null ? " — " + voucher.getNarration() : ""),
+                voucher.getDate(), lines, "CONTRA");
+        registerSource("ContraVoucher", voucher.getId(), "CONTRA", jv.getId());
+    }
+
+    /**
+     * PURCHASES — Debit Note issued to a supplier (return/adjustment).
+     * DR  Accounts Payable             (totalAmount)
+     * CR  Purchase / COGS              (subtotal)
+     * CR  GST Input Credit             (taxAmount)   — reverses input credit claimed on the original bill
+     */
+    public void onDebitNoteIssued(DebitNote note) {
+        if (alreadyJournaled("DebitNote", note.getId())) return;
+
+        BigDecimal subtotal = safe(note.getSubtotal());
+        BigDecimal tax      = safe(note.getTaxAmount());
+        BigDecimal total    = safe(note.getTotalAmount());
+        if (total.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_ACCOUNTS_PAYABLE, "Accounts Payable", total,
+                "Debit note — " + note.getSupplierName()));
+        lines.add(cr(ACC_PURCHASE_COGS, "Purchase / COGS", subtotal,
+                "Debit note — " + note.getVoucherNo()));
+        if (tax.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(cr(ACC_GST_INPUT, "GST Input Credit", tax, "Input tax reversal"));
+        }
+
+        JournalVoucher jv = createAndPost(
+                "Debit Note: " + note.getVoucherNo() + " — " + note.getSupplierName(),
+                note.getDate(), lines, "PURCHASES");
+        registerSource("DebitNote", note.getId(), "PURCHASES", jv.getId());
+    }
+
+    /**
+     * BILLING — Credit Note issued to a member (fee adjustment/refund not tied
+     * to a POS SaleTransaction — see onSaleRefunded() for that case).
+     * DR  Membership Revenue           (subtotal)
+     * DR  Tax / GST Payable            (taxAmount)   — only if tax > 0
+     * CR  Cash/Bank                    (totalAmount, per refundMethod)
+     */
+    public void onCreditNoteIssued(CreditNote note) {
+        if (alreadyJournaled("CreditNote", note.getId())) return;
+
+        BigDecimal subtotal = safe(note.getSubtotal());
+        BigDecimal tax      = safe(note.getTaxAmount());
+        BigDecimal total    = safe(note.getTotalAmount());
+        if (total.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", subtotal,
+                "Credit note — " + note.getMemberName()));
+        if (tax.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_TAX_PAYABLE, "Tax / GST Payable", tax, "Credit note — VAT reversal"));
+        }
+        lines.addAll(buildMoneyLines(note.getRefundMethod(), null, total, false,
+                "Credit note refund — " + note.getVoucherNo()));
+
+        JournalVoucher jv = createAndPost(
+                "Credit Note: " + note.getVoucherNo() + " — " + note.getMemberName(),
+                note.getDate(), lines, "BILLING");
+        registerSource("CreditNote", note.getId(), "BILLING", jv.getId());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -934,6 +1005,46 @@ public class FinancialEventService {
                     : cr(code, name, leg.getAmount(), desc));
         }
         return lines;
+    }
+
+    /**
+     * Builds the input-tax debit line(s) for a purchase-side transaction
+     * (Expense, SupplierBill). When the resolved TaxCode has a secondaryTaxCode
+     * (a CGST/SGST-style pair), the amount is split evenly across both
+     * accounts instead of a single "GST Input Credit" line. Falls back to the
+     * flat ACC_GST_INPUT account when no tax code is given or it doesn't
+     * resolve — unchanged behavior for every existing caller.
+     */
+    private List<JvLine> buildInputTaxLines(BigDecimal taxAmount, String taxCodeStr) {
+        if (taxAmount.compareTo(BigDecimal.ZERO) <= 0) return List.of();
+
+        Optional<TaxCode> primary = (taxCodeStr != null && !taxCodeStr.isBlank())
+                ? taxCodeRepo.findByCode(taxCodeStr) : Optional.empty();
+        if (primary.isEmpty()) {
+            return List.of(dr(ACC_GST_INPUT, "GST Input Credit", taxAmount, "Input tax credit"));
+        }
+
+        TaxCode tc = primary.get();
+        String primaryAccount = tc.getPurchaseTaxAccountCode() != null && !tc.getPurchaseTaxAccountCode().isBlank()
+                ? tc.getPurchaseTaxAccountCode() : ACC_GST_INPUT;
+        String primaryName = tc.getName() != null ? tc.getName() : "GST Input Credit";
+
+        if (tc.getSecondaryTaxCode() == null || tc.getSecondaryTaxCode().isBlank()) {
+            return List.of(dr(primaryAccount, primaryName, taxAmount, "Input tax credit — " + tc.getCode()));
+        }
+
+        Optional<TaxCode> secondary = taxCodeRepo.findByCode(tc.getSecondaryTaxCode());
+        String secondaryAccount = secondary.map(TaxCode::getPurchaseTaxAccountCode)
+                .filter(s -> s != null && !s.isBlank()).orElse(ACC_GST_INPUT);
+        String secondaryName = secondary.map(TaxCode::getName).orElse("GST Input Credit");
+
+        BigDecimal half = taxAmount.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+        BigDecimal remainder = taxAmount.subtract(half);
+
+        return List.of(
+                dr(primaryAccount, primaryName, half, "Input tax credit — " + tc.getCode()),
+                dr(secondaryAccount, secondaryName, remainder, "Input tax credit — " + tc.getSecondaryTaxCode())
+        );
     }
 
     /** Maps expense category to the most appropriate expense account code. */

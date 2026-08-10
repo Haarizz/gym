@@ -1,50 +1,37 @@
-package com.company.project.entities;
+package com.company.project.dto;
 
-import jakarta.persistence.*;
+import com.company.project.entities.TaxCode;
 import java.math.BigDecimal;
 
-@Entity
-@Table(name = "tax_codes")
-public class TaxCode extends BaseEntity {
+public class TaxCodeResponseDTO {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "code", unique = true, nullable = false)
     private String code;
-
-    @Column(name = "name", nullable = false)
     private String name;
-
-    @Column(name = "rate", precision = 5, scale = 2, nullable = false)
     private BigDecimal rate;
-
-    @Column(name = "sales_tax_account_code")
-    private String salesTaxAccountCode; // Account for Output Tax (e.g. 2100)
-
-    @Column(name = "purchase_tax_account_code")
-    private String purchaseTaxAccountCode; // Account for Input Tax (e.g. 2200)
-
-    @Column(name = "is_active", nullable = false)
-    private boolean active = true;
-
-    @Column(name = "description", columnDefinition = "TEXT")
+    private String salesTaxAccountCode;
+    private String purchaseTaxAccountCode;
+    private boolean active;
     private String description;
-
-    // STANDARD | ZERO_RATED | EXEMPT | CGST | SGST | IGST
-    @Column(name = "tax_type", nullable = false)
-    private String taxType = "STANDARD";
-
-    /** Paired code for a split tax (e.g. CGST paired with SGST) — the total tax
-     *  amount is split evenly between this code's account and the secondary's
-     *  when set. Null for a single-component tax (flat VAT, IGST, zero-rated). */
-    @Column(name = "secondary_tax_code")
+    private String taxType;
     private String secondaryTaxCode;
 
-    public TaxCode() {}
+    public TaxCodeResponseDTO() {}
 
-    // Getters and Setters
+    public static TaxCodeResponseDTO fromEntity(TaxCode t) {
+        TaxCodeResponseDTO dto = new TaxCodeResponseDTO();
+        dto.setId(t.getId());
+        dto.setCode(t.getCode());
+        dto.setName(t.getName());
+        dto.setRate(t.getRate());
+        dto.setSalesTaxAccountCode(t.getSalesTaxAccountCode());
+        dto.setPurchaseTaxAccountCode(t.getPurchaseTaxAccountCode());
+        dto.setActive(t.isActive());
+        dto.setDescription(t.getDescription());
+        dto.setTaxType(t.getTaxType());
+        dto.setSecondaryTaxCode(t.getSecondaryTaxCode());
+        return dto;
+    }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
