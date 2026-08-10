@@ -17,7 +17,7 @@ export function CheckInStatCard({ label, value, iconName, color, isLoading }: Ch
   if (isLoading) {
     return (
       <View style={[styles.card, styles.loadingCard]}>
-        <ActivityIndicator color={BrandColors.primary} />
+        <ActivityIndicator color={BrandColors.teal} />
       </View>
     );
   }

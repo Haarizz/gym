@@ -14,7 +14,7 @@ export function CheckInSummaryCard() {
             label="Total visits today"
             value={summary.total}
             iconName="log-in"
-            color={BrandColors.primary}
+            color={BrandColors.teal}
             isLoading={isLoading}
           />
         </View>
@@ -23,7 +23,7 @@ export function CheckInSummaryCard() {
             label="Members in gym"
             value={summary.active}
             iconName="activity"
-            color={BrandColors.success}
+            color={BrandColors.teal}
             isLoading={isLoading}
           />
         </View>
@@ -43,7 +43,7 @@ export function CheckInSummaryCard() {
             label="Walk-in passes today"
             value={summary.walkIns}
             iconName="user-plus"
-            color={BrandColors.info}
+            color={"#3b82f6"}
             isLoading={isLoading}
           />
         </View>

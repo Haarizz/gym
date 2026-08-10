@@ -8,13 +8,6 @@ export const moduleSections: ModuleSection[] = [
     title: 'Management',
     items: [
       {
-        id: 'staff',
-        title: 'Staff',
-        subtitle: 'Manage employees',
-        icon: 'users',
-        route: '/staff',
-      },
-      {
         id: 'members',
         title: 'Members',
         subtitle: 'View members',
@@ -53,6 +46,27 @@ export const moduleSections: ModuleSection[] = [
         subtitle: 'Track member & staff attendance',
         icon: 'clipboard',
         route: '/attendance',
+      },
+      {
+        id: 'check-in',
+        title: 'Check-in',
+        subtitle: 'Track member & staff Check-in',
+        icon: 'clipboard',
+        route: '/check-in',
+      },
+      {
+        id: 'training-streams',
+        title: 'Training Streams',
+        subtitle: 'Manage live and on-demand fitness content',
+        icon: 'video',
+        route: '/training-streams',
+      },
+      {
+        id: 'facilities',
+        title: 'Facilities',
+        subtitle: 'Manage your gym physical facilities',
+        icon: 'box',
+        route: '/facilities',
       },
     ],
   },

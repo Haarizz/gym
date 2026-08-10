@@ -17,7 +17,9 @@ export function WalkInVisitorCard({ visitor }: WalkInVisitorCardProps) {
 
   return (
     <Surface style={styles.card}>
-      <Avatar url={visitor.photoUrl} name={name} size={40} style={styles.avatar} />
+      <View style={styles.avatar}>
+        <Avatar imageUrl={visitor.photoUrl} initials={name.substring(0, 2).toUpperCase()} size={40} />
+      </View>
       <View style={styles.info}>
         <Typography variant="body" style={styles.name}>{name}</Typography>
         <Typography variant="caption" color="textSecondary">{phone}</Typography>

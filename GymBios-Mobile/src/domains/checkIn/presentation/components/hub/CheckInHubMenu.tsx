@@ -1,10 +1,10 @@
 import { View, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 
 import { CheckInHubCard } from './CheckInHubCard';
 
 export function CheckInHubMenu() {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
 
   return (
     <View style={styles.container}>
@@ -12,13 +12,13 @@ export function CheckInHubMenu() {
         title="Members & Staff"
         description="Search members and perform manual check-ins."
         iconName="users"
-        onPress={() => navigation.navigate('MembersStaffCheckIn')}
+        onPress={() => router.push('/(admin)/check-in/members-staff')}
       />
       <CheckInHubCard
         title="Walk-In / Daily Visitor"
         description="Register visitors and grant temporary access."
         iconName="user-plus"
-        onPress={() => navigation.navigate('WalkInCheckIn')}
+        onPress={() => router.push('/(admin)/check-in/walk-in')}
       />
     </View>
   );

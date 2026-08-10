@@ -35,13 +35,13 @@ export function CheckInConfirmationModal({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={styles.content}>
-              <Typography variant="h3" style={styles.title}>Confirm Check-in</Typography>
+              <Typography variant="subtitle" style={styles.title}>Confirm Check-in</Typography>
               <Typography variant="bodySmall" color="textSecondary" style={styles.subtitle}>
                 Checking in {name}
               </Typography>
               
               <View style={styles.memberInfoRow}>
-                <Avatar url={member.photoUrl} name={name} size={48} style={styles.avatar} />
+                <Avatar imageUrl={member.photoUrl} initials={name.substring(0, 2).toUpperCase()} size={48} />
                 <View style={styles.memberDetails}>
                   <Typography variant="subtitle" style={styles.memberName}>{name}</Typography>
                   <Typography variant="caption" color="textSecondary" style={styles.memberId}>{id}</Typography>
@@ -61,7 +61,7 @@ export function CheckInConfirmationModal({
               </View>
 
               <View style={styles.actions}>
-                <Button label="Cancel" variant="outline" onPress={onCancel} style={styles.cancelBtn} disabled={isLoading} />
+                <Button label="Cancel" variant="ghost" onPress={onCancel} style={styles.cancelBtn} disabled={isLoading} />
                 <Button label="Confirm Check-In" variant="primary" onPress={onConfirm} style={styles.confirmBtn} loading={isLoading} />
               </View>
             </View>
@@ -134,6 +134,6 @@ const styles = StyleSheet.create({
   },
   confirmBtn: {
     flex: 1,
-    backgroundColor: BrandColors.primary,
+    backgroundColor: BrandColors.teal,
   }
 });

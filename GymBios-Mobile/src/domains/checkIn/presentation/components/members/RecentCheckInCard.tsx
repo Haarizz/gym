@@ -23,10 +23,12 @@ export function RecentCheckInCard({ record, onCheckOut }: RecentCheckInCardProps
   
   const method = record.checkInMethod || 'Manual';
 
+  const initials = name.substring(0, 2).toUpperCase();
+
   return (
     <Surface style={styles.card}>
       <View style={styles.content}>
-        <Avatar url={avatarUrl} name={name} size={40} style={styles.avatar} />
+        <Avatar imageUrl={avatarUrl} initials={initials} size={40} />
         <View style={styles.info}>
           <Typography variant="body" style={styles.name}>{name}</Typography>
           <Typography variant="caption" color="textSecondary">
@@ -45,16 +47,15 @@ export function RecentCheckInCard({ record, onCheckOut }: RecentCheckInCardProps
           ) : (
             <>
               <View style={styles.inGymBadge}>
-                <Feather name="check-circle" size={12} color={BrandColors.success} style={styles.inGymIcon} />
+                <Feather name="check-circle" size={12} color={BrandColors.teal} style={styles.inGymIcon} />
                 <Typography variant="caption" style={styles.inGymText}>In Gym</Typography>
               </View>
               {onCheckOut && (
                 <Button 
                   label="Check Out" 
-                  variant="outline" 
+                  variant="ghost" 
                   onPress={() => onCheckOut(record)} 
                   style={styles.checkOutButton}
-                  textStyle={styles.checkOutButtonText}
                 />
               )}
             </>
@@ -104,17 +105,13 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   inGymText: {
-    color: BrandColors.success,
+    color: BrandColors.teal,
     fontWeight: '600',
   },
   checkOutButton: {
-    borderColor: BrandColors.error,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
     minHeight: 28,
-  },
-  checkOutButtonText: {
-    color: BrandColors.error,
-    fontSize: 12,
   }
 });

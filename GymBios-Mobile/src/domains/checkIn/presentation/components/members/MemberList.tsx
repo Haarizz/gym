@@ -3,18 +3,16 @@ import { MemberCheckInCard } from './MemberCheckInCard';
 import { EmptyState } from '../shared/EmptyState';
 import { Skeleton } from '../shared/Skeleton';
 import { Spacing } from '@/core/theme';
-import { useRecentCheckIns } from '../../hooks/useRecentCheckIns';
 
 interface MemberListProps {
   members: any[];
   isLoading: boolean;
   onCheckIn: (member: any) => void;
+  /** Set of memberDbId values that are currently checked in (active). */
+  activeIds?: Set<number>;
 }
 
-export function MemberList({ members, isLoading, onCheckIn }: MemberListProps) {
-  const { summary } = useRecentCheckIns(); 
-  // Ideally, active status comes from a backend list of active members or we cross-check with today's attendance
-
+export function MemberList({ members, isLoading, onCheckIn, activeIds }: MemberListProps) {
   if (isLoading) {
     return (
       <FlatList
@@ -34,23 +32,29 @@ export function MemberList({ members, isLoading, onCheckIn }: MemberListProps) {
     <FlatList
       data={members}
       keyExtractor={(item) => String(item.id || item.bizId)}
-      renderItem={({ item }) => (
-        <MemberCheckInCard 
-          member={item} 
-          onCheckIn={onCheckIn} 
-          // For mockup: assume active if member ID is 7 based on the web UI example, or just use a dummy logic
-          isActive={item.id === 7 || item.bizId === 'MBR-0000000007'} 
-        />
-      )}
+      renderItem={({ item }) => {
+        // Determine active status from the provided activeIds set
+        const memberId = item.id ?? item.memberDbId;
+        const isActive = activeIds ? activeIds.has(memberId) : false;
+        return (
+          <MemberCheckInCard
+            member={item}
+            onCheckIn={onCheckIn}
+            isActive={isActive}
+          />
+        );
+      }}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
-      scrollEnabled={false} // since it might be rendered inside a ScrollView
+      scrollEnabled={false} // rendered inside a ScrollView
     />
   );
 }
 
 const styles = StyleSheet.create({
   list: {
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.two,
   },
 });
+

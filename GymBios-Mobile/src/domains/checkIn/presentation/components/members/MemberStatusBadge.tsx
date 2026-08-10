@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   activeText: {
-    color: BrandColors.success,
+    color: BrandColors.teal,
   },
   inactiveText: {
     color: BrandColors.textSecondary,

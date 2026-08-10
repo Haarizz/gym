@@ -15,7 +15,7 @@ export function PaymentSummaryCard({ price, validityText, isPaid }: PaymentSumma
       <View style={styles.content}>
         <View>
           <Typography variant="caption" color="textSecondary">Total Charge</Typography>
-          <Typography variant="h3" style={styles.price}>Ð {price}</Typography>
+          <Typography variant="subtitle" style={styles.price}>Ð {price}</Typography>
           <Typography variant="caption" color="textSecondary">{validityText}</Typography>
         </View>
         <View style={styles.statusContainer}>

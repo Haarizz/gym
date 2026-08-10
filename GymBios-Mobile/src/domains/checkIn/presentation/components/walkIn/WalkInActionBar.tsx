@@ -12,7 +12,7 @@ interface WalkInActionBarProps {
 export function WalkInActionBar({ onCancel, onCollectPayment, onGrantAccess, isLoading }: WalkInActionBarProps) {
   return (
     <View style={styles.container}>
-      <Button label="Cancel" variant="outline" onPress={onCancel} style={styles.btn} disabled={isLoading} />
+      <Button label="Cancel" variant="ghost" onPress={onCancel} style={styles.btn} disabled={isLoading} />
       <Button label="Collect Payment" variant="secondary" onPress={onCollectPayment} style={styles.btn} disabled={isLoading} />
       <Button label="Grant Access" variant="primary" onPress={onGrantAccess} style={styles.btn} loading={isLoading} />
     </View>

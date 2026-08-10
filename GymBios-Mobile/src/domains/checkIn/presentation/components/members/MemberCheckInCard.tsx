@@ -21,7 +21,7 @@ export function MemberCheckInCard({ member, onCheckIn, isActive }: MemberCheckIn
   return (
     <Surface style={styles.card}>
       <View style={styles.leftContent}>
-        <Avatar url={avatarUrl} name={name} size={40} style={styles.avatar} />
+        <Avatar imageUrl={avatarUrl} initials={name.substring(0, 2).toUpperCase()} size={40} />
         <View style={styles.info}>
           <Typography variant="body" style={styles.name}>{name}</Typography>
           <Typography variant="caption" color="textSecondary">
@@ -36,9 +36,8 @@ export function MemberCheckInCard({ member, onCheckIn, isActive }: MemberCheckIn
           label={isActive ? "Checked In" : "Check In"} 
           onPress={() => !isActive && onCheckIn(member)}
           disabled={isActive}
-          variant={isActive ? "outline" : "primary"}
+          variant={isActive ? "ghost" : "primary"}
           style={[styles.button, isActive && styles.buttonDisabled]}
-          textStyle={styles.buttonText}
         />
       </View>
     </Surface>
@@ -81,8 +80,5 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
-  },
-  buttonText: {
-    fontSize: 12,
   }
 });

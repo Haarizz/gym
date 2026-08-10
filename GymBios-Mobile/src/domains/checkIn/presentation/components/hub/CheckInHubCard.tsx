@@ -17,7 +17,7 @@ export function CheckInHubCard({ title, description, iconName, onPress }: CheckI
     <Pressable onPress={onPress} style={({ pressed }) => [styles.pressable, pressed && styles.pressed]}>
       <Surface style={styles.card}>
         <View style={styles.iconContainer}>
-          <Feather name={iconName} size={24} color={BrandColors.primary} />
+          <Feather name={iconName} size={24} color={BrandColors.teal} />
         </View>
         <View style={styles.textContainer}>
           <Typography variant="subtitle" style={styles.title}>{title}</Typography>

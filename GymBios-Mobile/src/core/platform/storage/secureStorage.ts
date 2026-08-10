@@ -12,7 +12,11 @@ const memoryStore = new Map<string, string>();
 const secureStorageImpl: SecureStorage = {
   async getItem(key) {
     if (Platform.OS === 'web') {
-      return memoryStore.get(key) ?? null;
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return memoryStore.get(key) ?? null;
+      }
     }
 
     return SecureStore.getItemAsync(key);
@@ -20,7 +24,11 @@ const secureStorageImpl: SecureStorage = {
 
   async setItem(key, value) {
     if (Platform.OS === 'web') {
-      memoryStore.set(key, value);
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+        memoryStore.set(key, value);
+      }
       return;
     }
 
@@ -29,7 +37,11 @@ const secureStorageImpl: SecureStorage = {
 
   async removeItem(key) {
     if (Platform.OS === 'web') {
-      memoryStore.delete(key);
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        memoryStore.delete(key);
+      }
       return;
     }
 

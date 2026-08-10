@@ -3,6 +3,7 @@ import {
   ADMIN_TABS,
   RoleTabsLayout,
 } from '@/domains/auth/presentation/navigation/RoleTabsLayout';
+import { Stack } from 'expo-router';
 
 export default function AdminLayout() {
   return (

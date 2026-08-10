@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 
+import { setApiClientToken } from '@/core/network/apiClient';
+import { setHttpClientToken } from '@/core/platform/api/httpClient';
+
 import type { Session } from '../domain/entities/Session';
 import type { User } from '../domain/entities/User';
 import type { AppRole } from '../domain/valueObjects/AppRole';
@@ -24,16 +27,23 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   permissions: [],
   pendingRole: null,
   isHydrated: false,
-  setSession: (session) =>
+  setSession: (session) => {
+    setApiClientToken(session?.accessToken ?? null);
+    setHttpClientToken(session?.accessToken ?? null);
+    
     set({
       session,
       user: session?.user ?? null,
       appRole: session?.appRole ?? null,
       permissions: session ? [...session.permissions] : [],
-    }),
+    });
+  },
   setPendingRole: (pendingRole) => set({ pendingRole }),
   setHydrated: (isHydrated) => set({ isHydrated }),
-  reset: () =>
+  reset: () => {
+    setApiClientToken(null);
+    setHttpClientToken(null);
+    
     set({
       user: null,
       session: null,
@@ -41,7 +51,8 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       permissions: [],
       pendingRole: null,
       isHydrated: true,
-    }),
+    });
+  },
 }));
 
 export const selectIsAuthenticated = (state: AuthStoreState) => state.session !== null;
