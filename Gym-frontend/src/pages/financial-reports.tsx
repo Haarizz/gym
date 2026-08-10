@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
-import { financialReportsService, IncomeStatementData, BalanceSheetData, TrialBalanceData, CashFlowData } from "../utils/supabase/financial-reports-service";
+import {
+  financialReportsService, IncomeStatementData, BalanceSheetData, TrialBalanceData, CashFlowData,
+  CashBookData, DayBookData, GeneralLedgerData, AgingData, DeferredRevenueData,
+} from "../utils/supabase/financial-reports-service";
 import { toast } from "sonner";
 import {
   Card,
@@ -64,6 +67,11 @@ import {
   ArrowUpDown,
   CheckSquare,
   Clock,
+  Wallet,
+  ScrollText,
+  Users,
+  Truck,
+  Hourglass,
 } from "lucide-react";
 import { format, subMonths, subYears } from "date-fns";
 import { cn } from "../components/ui/utils";
@@ -143,12 +151,62 @@ const reportDefinitions: Report[] = [
   },
   {
     id: "day-book",
-    title: "Day Book (General Ledger)",
-    description: "Chronological record of all transactions by date",
+    title: "Day Book",
+    description: "Every posted line for a single date, across all accounts",
     icon: BookOpen,
     category: "supporting",
     ifrsCompliant: true,
     lastGenerated: "2025-09-30 14:20",
+    status: "ready",
+  },
+  {
+    id: "cash-book",
+    title: "Cash Book",
+    description: "Chronological ledger of the Cash/Bank accounts, with running balance",
+    icon: Wallet,
+    category: "supporting",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:22",
+    status: "ready",
+  },
+  {
+    id: "general-ledger",
+    title: "General Ledger",
+    description: "Every account's postings and running balance, grouped by account",
+    icon: ScrollText,
+    category: "supporting",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:24",
+    status: "ready",
+  },
+  {
+    id: "member-aging",
+    title: "Member Aging",
+    description: "Outstanding member balances bucketed by days overdue",
+    icon: Users,
+    category: "secondary",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:26",
+    status: "ready",
+  },
+  {
+    id: "supplier-aging",
+    title: "Supplier Aging",
+    description: "Outstanding supplier bills bucketed by days overdue",
+    icon: Truck,
+    category: "secondary",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:28",
+    status: "ready",
+  },
+  {
+    id: "deferred-revenue",
+    title: "Deferred Revenue",
+    description: "Unrecognized membership revenue balance and its amortization schedules",
+    icon: Hourglass,
+    category: "secondary",
+    ifrsCompliant: true,
+    lastGenerated: "2025-09-30 14:29",
     status: "ready",
   },
   {
@@ -275,6 +333,12 @@ export function FinancialReports() {
   const [balanceSheet, setBalanceSheet] = useState<BalanceSheetData | null>(null);
   const [trialBalance, setTrialBalance] = useState<TrialBalanceData | null>(null);
   const [cashFlow, setCashFlow] = useState<CashFlowData | null>(null);
+  const [cashBook, setCashBook] = useState<CashBookData | null>(null);
+  const [dayBook, setDayBook] = useState<DayBookData | null>(null);
+  const [generalLedger, setGeneralLedger] = useState<GeneralLedgerData | null>(null);
+  const [memberAging, setMemberAging] = useState<AgingData | null>(null);
+  const [supplierAging, setSupplierAging] = useState<AgingData | null>(null);
+  const [deferredRevenue, setDeferredRevenue] = useState<DeferredRevenueData | null>(null);
 
   // Filter reports based on category
   const filteredReports = reportDefinitions.filter(report =>
@@ -296,6 +360,12 @@ export function FinancialReports() {
     setBalanceSheet(null);
     setTrialBalance(null);
     setCashFlow(null);
+    setCashBook(null);
+    setDayBook(null);
+    setGeneralLedger(null);
+    setMemberAging(null);
+    setSupplierAging(null);
+    setDeferredRevenue(null);
     const { from, to } = getDateParams();
     try {
       if (reportId === "profit-loss") {
@@ -310,6 +380,24 @@ export function FinancialReports() {
       } else if (reportId === "cash-flow") {
         const data = await financialReportsService.getCashFlow(from, to);
         setCashFlow(data);
+      } else if (reportId === "cash-book") {
+        const data = await financialReportsService.getCashBook(from, to);
+        setCashBook(data);
+      } else if (reportId === "day-book") {
+        const data = await financialReportsService.getDayBook(to);
+        setDayBook(data);
+      } else if (reportId === "general-ledger") {
+        const data = await financialReportsService.getGeneralLedger(from, to);
+        setGeneralLedger(data);
+      } else if (reportId === "member-aging") {
+        const data = await financialReportsService.getMemberAging(to);
+        setMemberAging(data);
+      } else if (reportId === "supplier-aging") {
+        const data = await financialReportsService.getSupplierAging(to);
+        setSupplierAging(data);
+      } else if (reportId === "deferred-revenue") {
+        const data = await financialReportsService.getDeferredRevenue();
+        setDeferredRevenue(data);
       }
       toast.success("Report generated successfully");
     } catch (e: any) {
@@ -1017,7 +1105,198 @@ export function FinancialReports() {
                     </div>
                   )}
 
-                  {["day-book", "bank-book", "fund-flow", "pdc-report"].includes(selectedReport) && (
+                  {selectedReport === "cash-book" && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Cash Book</h3>
+                      {!cashBook ? (
+                        <div className="text-center py-8 text-gray-500"><Wallet className="h-12 w-12 mx-auto mb-4" /><p>Generate the report to view cash/bank ledger entries.</p></div>
+                      ) : (
+                        <>
+                          <div className="flex gap-6 text-sm">
+                            <span>Opening: <strong>{cashBook.openingBalance.toLocaleString()}</strong></span>
+                            <span>Closing: <strong>{cashBook.closingBalance.toLocaleString()}</strong></span>
+                          </div>
+                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                            <Table>
+                              <TableHeader><TableRow>
+                                <TableHead>Date</TableHead><TableHead>Voucher</TableHead><TableHead>Account</TableHead>
+                                <TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
+                                <TableHead className="text-right">Balance</TableHead>
+                              </TableRow></TableHeader>
+                              <TableBody>
+                                {cashBook.entries.map((e, i) => (
+                                  <TableRow key={i}>
+                                    <TableCell>{e.date}</TableCell>
+                                    <TableCell className="font-mono text-xs">{e.voucherNo}</TableCell>
+                                    <TableCell>{e.accountName}</TableCell>
+                                    <TableCell className="text-right">{e.debit > 0 ? e.debit.toLocaleString() : "-"}</TableCell>
+                                    <TableCell className="text-right">{e.credit > 0 ? e.credit.toLocaleString() : "-"}</TableCell>
+                                    <TableCell className="text-right">{(e.runningBalance ?? 0).toLocaleString()}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedReport === "day-book" && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Day Book</h3>
+                      {!dayBook ? (
+                        <div className="text-center py-8 text-gray-500"><BookOpen className="h-12 w-12 mx-auto mb-4" /><p>Generate the report to view today's postings (uses the "to" date above).</p></div>
+                      ) : (
+                        <>
+                          <div className="flex gap-6 text-sm">
+                            <span>Total Debit: <strong>{dayBook.totalDebit.toLocaleString()}</strong></span>
+                            <span>Total Credit: <strong>{dayBook.totalCredit.toLocaleString()}</strong></span>
+                          </div>
+                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                            <Table>
+                              <TableHeader><TableRow>
+                                <TableHead>Voucher</TableHead><TableHead>Account</TableHead><TableHead>Narration</TableHead>
+                                <TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
+                              </TableRow></TableHeader>
+                              <TableBody>
+                                {dayBook.entries.map((e, i) => (
+                                  <TableRow key={i}>
+                                    <TableCell className="font-mono text-xs">{e.voucherNo}</TableCell>
+                                    <TableCell>{e.accountName}</TableCell>
+                                    <TableCell className="max-w-[240px] truncate" title={e.narration}>{e.narration || "—"}</TableCell>
+                                    <TableCell className="text-right">{e.debit > 0 ? e.debit.toLocaleString() : "-"}</TableCell>
+                                    <TableCell className="text-right">{e.credit > 0 ? e.credit.toLocaleString() : "-"}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedReport === "general-ledger" && (
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold">General Ledger</h3>
+                      {!generalLedger || generalLedger.accounts.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500"><ScrollText className="h-12 w-12 mx-auto mb-4" /><p>Generate the report to view every account's postings.</p></div>
+                      ) : (
+                        generalLedger.accounts.map((acc) => (
+                          <div key={acc.accountCode} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-semibold text-primary">{acc.accountCode} — {acc.accountName}</h4>
+                              <span className="text-sm text-gray-500">Opening {acc.openingBalance.toLocaleString()} → Closing {acc.closingBalance.toLocaleString()}</span>
+                            </div>
+                            <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                              <Table>
+                                <TableHeader><TableRow>
+                                  <TableHead>Date</TableHead><TableHead>Voucher</TableHead>
+                                  <TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
+                                  <TableHead className="text-right">Balance</TableHead>
+                                </TableRow></TableHeader>
+                                <TableBody>
+                                  {acc.entries.map((e, i) => (
+                                    <TableRow key={i}>
+                                      <TableCell>{e.date}</TableCell>
+                                      <TableCell className="font-mono text-xs">{e.voucherNo}</TableCell>
+                                      <TableCell className="text-right">{e.debit > 0 ? e.debit.toLocaleString() : "-"}</TableCell>
+                                      <TableCell className="text-right">{e.credit > 0 ? e.credit.toLocaleString() : "-"}</TableCell>
+                                      <TableCell className="text-right">{(e.runningBalance ?? 0).toLocaleString()}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {(selectedReport === "member-aging" || selectedReport === "supplier-aging") && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">{selectedReport === "member-aging" ? "Member Aging" : "Supplier Aging"}</h3>
+                      {(() => {
+                        const data = selectedReport === "member-aging" ? memberAging : supplierAging;
+                        if (!data) {
+                          return <div className="text-center py-8 text-gray-500">{selectedReport === "member-aging" ? <Users className="h-12 w-12 mx-auto mb-4" /> : <Truck className="h-12 w-12 mx-auto mb-4" />}<p>Generate the report to view outstanding balances.</p></div>;
+                        }
+                        return (
+                          <>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                              <Card className="border-0 shadow-sm"><CardContent className="pt-4"><div className="text-xs text-gray-500">Total Outstanding</div><div className="text-lg font-semibold">{data.totalOutstanding.toLocaleString()}</div></CardContent></Card>
+                              {Object.entries(data.buckets).map(([bucket, amount]) => (
+                                <Card key={bucket} className="border-0 shadow-sm"><CardContent className="pt-4"><div className="text-xs text-gray-500">{bucket} days</div><div className="text-lg font-semibold">{Number(amount).toLocaleString()}</div></CardContent></Card>
+                              ))}
+                            </div>
+                            <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                              <Table>
+                                <TableHeader><TableRow>
+                                  <TableHead>{selectedReport === "member-aging" ? "Member" : "Supplier"}</TableHead>
+                                  <TableHead>Reference</TableHead><TableHead>Due Date</TableHead>
+                                  <TableHead className="text-right">Outstanding</TableHead>
+                                  <TableHead className="text-right">Days Overdue</TableHead><TableHead>Bucket</TableHead>
+                                </TableRow></TableHeader>
+                                <TableBody>
+                                  {data.rows.map((r, i) => (
+                                    <TableRow key={i}>
+                                      <TableCell>{r.name || "—"}</TableCell>
+                                      <TableCell className="font-mono text-xs">{r.reference || "—"}</TableCell>
+                                      <TableCell>{r.dueDate || "—"}</TableCell>
+                                      <TableCell className="text-right">{r.outstanding.toLocaleString()}</TableCell>
+                                      <TableCell className="text-right">{r.daysOverdue}</TableCell>
+                                      <TableCell><Badge variant="secondary">{r.bucket}</Badge></TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {selectedReport === "deferred-revenue" && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Deferred Revenue</h3>
+                      {!deferredRevenue ? (
+                        <div className="text-center py-8 text-gray-500"><Hourglass className="h-12 w-12 mx-auto mb-4" /><p>Generate the report to view unrecognized membership revenue.</p></div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <Card className="border-0 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Ledger Balance</CardTitle></CardHeader><CardContent><div className="text-2xl font-semibold"><CurrencyGlyph /> {deferredRevenue.ledgerBalance.toLocaleString()}</div></CardContent></Card>
+                            <Card className="border-0 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Scheduled Remaining</CardTitle></CardHeader><CardContent><div className="text-2xl font-semibold"><CurrencyGlyph /> {deferredRevenue.scheduledRemaining.toLocaleString()}</div></CardContent></Card>
+                            <Card className="border-0 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Active Schedules</CardTitle></CardHeader><CardContent><div className="text-2xl font-semibold">{deferredRevenue.activeScheduleCount}</div></CardContent></Card>
+                          </div>
+                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                            <Table>
+                              <TableHeader><TableRow>
+                                <TableHead>Member</TableHead><TableHead>Plan</TableHead><TableHead>Period</TableHead>
+                                <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Recognized</TableHead><TableHead className="text-right">Remaining</TableHead>
+                              </TableRow></TableHeader>
+                              <TableBody>
+                                {deferredRevenue.schedules.map((s) => (
+                                  <TableRow key={s.scheduleId}>
+                                    <TableCell>{s.memberName || "—"}</TableCell>
+                                    <TableCell>{s.planName || "—"}</TableCell>
+                                    <TableCell>{s.startDate} → {s.endDate}</TableCell>
+                                    <TableCell className="text-right">{s.totalAmount.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{s.recognizedAmount.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{s.remainingAmount.toLocaleString()}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {["bank-book", "fund-flow", "pdc-report"].includes(selectedReport) && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">
                         {reportDefinitions.find(r => r.id === selectedReport)?.title}

@@ -75,6 +75,13 @@ import { FinancialReports } from "./pages/financial-reports";
 import { FinancialAnalytics } from "./pages/financial-analytics";
 import { JournalVoucherPage } from "./pages/journal-voucher";
 import { FinancialSettings } from "./pages/financial-settings";
+import { ContraVoucherPage } from "./pages/contra-voucher";
+import { DebitNotePage } from "./pages/debit-note";
+import { CreditNotePage } from "./pages/credit-note";
+import { TaxCodesPage } from "./pages/tax-codes";
+import { CompanyTaxDetailsPage } from "./pages/company-tax-details";
+import { FinancialAuditLogPage } from "./pages/financial-audit-log";
+import { FiscalPeriodsPage } from "./pages/fiscal-periods";
 import { AddProduct } from "./pages/add-product";
 import { Products } from "./pages/products";
 import { WastageReturns } from "./pages/wastage-returns";
@@ -160,6 +167,12 @@ import {
   FileText,
   Briefcase,
   Clock,
+  FileMinus,
+  FileCheck2,
+  Percent,
+  IdCard,
+  History,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import {
@@ -399,6 +412,24 @@ const menuItems = [
         path: "/payment-voucher",
       },
       {
+        title: "Contra Voucher",
+        icon: ArrowLeftRight,
+        id: "contra-voucher",
+        path: "/contra-voucher",
+      },
+      {
+        title: "Debit Note",
+        icon: FileMinus,
+        id: "debit-note",
+        path: "/debit-note",
+      },
+      {
+        title: "Credit Note",
+        icon: FileCheck2,
+        id: "credit-note",
+        path: "/credit-note",
+      },
+      {
         title: "Bank Reconciliations",
         icon: Landmark,
         id: "bank-reconciliations",
@@ -411,10 +442,22 @@ const menuItems = [
         path: "/expenses",
       },
       {
+        title: "Tax Codes",
+        icon: Percent,
+        id: "tax-codes",
+        path: "/tax-codes",
+      },
+      {
         title: "Tax Compliance",
         icon: Receipt,
         id: "tax-compliance",
         path: "/tax-compliance",
+      },
+      {
+        title: "Company Tax Details",
+        icon: IdCard,
+        id: "company-tax-details",
+        path: "/company-tax-details",
       },
       {
         title: "Reports",
@@ -423,10 +466,22 @@ const menuItems = [
         path: "/financial-reports",
       },
       {
+        title: "Audit Log",
+        icon: History,
+        id: "financial-audit-log",
+        path: "/financial-audit-log",
+      },
+      {
         title: "Analytics",
         icon: PieChart,
         id: "financial-analytics",
         path: "/financial-analytics",
+      },
+      {
+        title: "Fiscal Periods",
+        icon: CalendarClock,
+        id: "fiscal-periods",
+        path: "/fiscal-periods",
       },
       {
         title: "Settings",
@@ -510,18 +565,6 @@ const menuItems = [
     icon: Brain,
     id: "bios",
     path: "/bios",
-  },
-  {
-    title: "Member Hub",
-    icon: Users,
-    id: "member-hub",
-    path: "/member-hub",
-  },
-  {
-    title: "GymBios Pricing",
-    icon: CreditCard,
-    id: "gymbios-pricing",
-    path: "/gymbios-pricing",
   },
   {
     title: "My Profile",
@@ -741,10 +784,18 @@ export default function App() {
         "receipt-voucher",
         "journal-voucher",
         "payment-voucher",
+        "contra-voucher",
+        "debit-note",
+        "credit-note",
         "bank-reconciliations",
         "expenses",
+        "tax-codes",
+        "tax-compliance",
+        "company-tax-details",
         "financial-reports",
+        "financial-audit-log",
         "financial-analytics",
+        "fiscal-periods",
         "financial-settings",
       ];
 
@@ -877,13 +928,20 @@ export default function App() {
       <Route path="/receipt-voucher" element={<ReceiptVoucher />} />
       <Route path="/journal-voucher" element={<JournalVoucherPage />} />
       <Route path="/payment-voucher" element={<PaymentVoucher />} />
+      <Route path="/contra-voucher" element={<ContraVoucherPage />} />
+      <Route path="/debit-note" element={<DebitNotePage />} />
+      <Route path="/credit-note" element={<CreditNotePage />} />
       <Route path="/bank-reconciliations" element={<BankReconciliation />} />
       <Route path="/expenses" element={<Expenses />} />
+      <Route path="/tax-codes" element={<TaxCodesPage />} />
       <Route path="/tax-compliance" element={<TaxCompliance />} />
+      <Route path="/company-tax-details" element={<CompanyTaxDetailsPage />} />
       <Route path="/financial-reports" element={<FinancialReports />} />
+      <Route path="/financial-audit-log" element={<FinancialAuditLogPage />} />
       <Route path="/financial-analytics" element={<FinancialAnalytics />} />
+      <Route path="/fiscal-periods" element={<FiscalPeriodsPage />} />
       <Route path="/financial-settings" element={<FinancialSettings />} />
-      
+
       <Route path="/payroll-employees" element={<PayrollEmployees />} />
       <Route path="/staffs-trainers" element={<StaffsTrainers onNavigate={handleNavClick} />} />
       <Route path="/set-targets" element={<SetTargets onNavigate={handleNavClick} />} />

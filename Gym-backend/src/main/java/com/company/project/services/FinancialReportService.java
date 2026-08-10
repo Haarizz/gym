@@ -4,15 +4,22 @@ import com.company.project.entities.AccountHead;
 import com.company.project.entities.DeferredRevenueSchedule;
 import com.company.project.entities.JournalVoucher;
 import com.company.project.entities.JournalVoucherLine;
+import com.company.project.entities.Receipt;
+import com.company.project.entities.SupplierBill;
+import com.company.project.entities.TaxCode;
 import com.company.project.repositories.AccountHeadRepository;
 import com.company.project.repositories.JournalVoucherLineRepository;
 import com.company.project.repositories.JournalVoucherRepository;
+import com.company.project.repositories.ReceiptRepository;
+import com.company.project.repositories.SupplierBillRepository;
+import com.company.project.repositories.TaxCodeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,15 +44,24 @@ public class FinancialReportService {
     private final JournalVoucherRepository     journalVoucherRepository;
     private final JournalVoucherLineRepository journalVoucherLineRepository;
     private final DeferredRevenueScheduleService deferredRevenueScheduleService;
+    private final ReceiptRepository             receiptRepository;
+    private final SupplierBillRepository        supplierBillRepository;
+    private final TaxCodeRepository             taxCodeRepository;
 
     public FinancialReportService(AccountHeadRepository accountHeadRepository,
                                    JournalVoucherRepository journalVoucherRepository,
                                    JournalVoucherLineRepository journalVoucherLineRepository,
-                                   DeferredRevenueScheduleService deferredRevenueScheduleService) {
+                                   DeferredRevenueScheduleService deferredRevenueScheduleService,
+                                   ReceiptRepository receiptRepository,
+                                   SupplierBillRepository supplierBillRepository,
+                                   TaxCodeRepository taxCodeRepository) {
         this.accountHeadRepository        = accountHeadRepository;
         this.journalVoucherRepository     = journalVoucherRepository;
         this.journalVoucherLineRepository = journalVoucherLineRepository;
         this.deferredRevenueScheduleService = deferredRevenueScheduleService;
+        this.receiptRepository            = receiptRepository;
+        this.supplierBillRepository       = supplierBillRepository;
+        this.taxCodeRepository            = taxCodeRepository;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -375,7 +391,43 @@ public class FinancialReportService {
         result.put("output_vat", outputVat);
         result.put("input_vat", inputVat);
         result.put("net_vat_payable", netVatPayable);
+        result.put("tax_by_code", getTaxByCodeBreakdown(from, to));
         return result;
+    }
+
+    /**
+     * Breaks down output/input tax by each configured TaxCode's own account(s)
+     * — beyond the flat 2100/2200 totals above, this surfaces CGST/SGST/IGST
+     * (or any other custom tax accounts an admin has configured via TaxCode)
+     * as distinct lines instead of lumping them into "VAT".
+     */
+    private List<Map<String, Object>> getTaxByCodeBreakdown(LocalDate from, LocalDate to) {
+        Set<Long> postedJvIds = getPostedJvIds(from, to);
+        Map<String, BigDecimal> netByAccount = new HashMap<>();
+        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+            if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
+            String code = line.getAccountCode();
+            if (code == null) continue;
+            netByAccount.merge(code, safe(line.getCredit()).subtract(safe(line.getDebit())), BigDecimal::add);
+        }
+
+        List<Map<String, Object>> breakdown = new ArrayList<>();
+        for (TaxCode tc : taxCodeRepository.findAll()) {
+            BigDecimal outputAmount = tc.getSalesTaxAccountCode() != null
+                    ? netByAccount.getOrDefault(tc.getSalesTaxAccountCode(), BigDecimal.ZERO) : BigDecimal.ZERO;
+            BigDecimal inputAmount = tc.getPurchaseTaxAccountCode() != null
+                    ? netByAccount.getOrDefault(tc.getPurchaseTaxAccountCode(), BigDecimal.ZERO).negate() : BigDecimal.ZERO;
+            if (outputAmount.compareTo(BigDecimal.ZERO) == 0 && inputAmount.compareTo(BigDecimal.ZERO) == 0) continue;
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("tax_code", tc.getCode());
+            row.put("name", tc.getName());
+            row.put("tax_type", tc.getTaxType());
+            row.put("output_amount", outputAmount);
+            row.put("input_amount", inputAmount);
+            breakdown.add(row);
+        }
+        return breakdown;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -422,6 +474,200 @@ public class FinancialReportService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  CASH BOOK — chronological ledger of the Cash/Bank accounts only
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public Map<String, Object> getCashBook(LocalDate from, LocalDate to) {
+        Map<Long, JournalVoucher> jvById = buildJvMap(from, to);
+        Map<String, AccountHead> accountMap = buildAccountMap();
+
+        List<JournalVoucherLine> cashLines = journalVoucherLineRepository.findAll().stream()
+                .filter(l -> jvById.containsKey(l.getJournalVoucherId()))
+                .filter(l -> isCashAccount(l.getAccountCode(), accountMap))
+                .sorted(Comparator.comparing((JournalVoucherLine l) -> jvById.get(l.getJournalVoucherId()).getDate())
+                        .thenComparing(JournalVoucherLine::getId))
+                .collect(Collectors.toList());
+
+        BigDecimal openingBalance = accountMap.values().stream()
+                .filter(a -> "ASSET".equalsIgnoreCase(a.getType())
+                        && a.getName() != null
+                        && (a.getName().toUpperCase().contains("CASH") || a.getName().toUpperCase().contains("BANK")))
+                .map(a -> safe(a.getOpeningBalance()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal running = openingBalance;
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (JournalVoucherLine l : cashLines) {
+            JournalVoucher jv = jvById.get(l.getJournalVoucherId());
+            running = running.add(safe(l.getDebit())).subtract(safe(l.getCredit()));
+            entries.add(ledgerEntry(jv, l, running));
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("period_from", from);
+        result.put("period_to", to);
+        result.put("opening_balance", openingBalance);
+        result.put("closing_balance", running);
+        result.put("entries", entries);
+        return result;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  DAY BOOK — every posted line for a single date, across all accounts
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public Map<String, Object> getDayBook(LocalDate date) {
+        Map<Long, JournalVoucher> jvById = buildJvMap(date, date);
+
+        List<Map<String, Object>> entries = journalVoucherLineRepository.findAll().stream()
+                .filter(l -> jvById.containsKey(l.getJournalVoucherId()))
+                .sorted(Comparator.comparing(JournalVoucherLine::getJournalVoucherId)
+                        .thenComparing(JournalVoucherLine::getId))
+                .map(l -> ledgerEntry(jvById.get(l.getJournalVoucherId()), l, null))
+                .collect(Collectors.toList());
+
+        BigDecimal totalDebit = entries.stream()
+                .map(e -> (BigDecimal) e.get("debit")).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalCredit = entries.stream()
+                .map(e -> (BigDecimal) e.get("credit")).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("date", date);
+        result.put("total_debit", totalDebit);
+        result.put("total_credit", totalCredit);
+        result.put("entries", entries);
+        return result;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  GENERAL LEDGER — every account's postings + running balance, grouped
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public Map<String, Object> getGeneralLedger(LocalDate from, LocalDate to, String accountCode) {
+        Map<Long, JournalVoucher> jvById = buildJvMap(from, to);
+        List<AccountHead> accounts = accountHeadRepository.findAllByOrderByCodeAsc().stream()
+                .filter(a -> accountCode == null || accountCode.isBlank() || accountCode.equals(a.getCode()))
+                .collect(Collectors.toList());
+
+        Map<String, List<JournalVoucherLine>> linesByAccount = journalVoucherLineRepository.findAll().stream()
+                .filter(l -> jvById.containsKey(l.getJournalVoucherId()))
+                .filter(l -> l.getAccountCode() != null)
+                .collect(Collectors.groupingBy(JournalVoucherLine::getAccountCode));
+
+        List<Map<String, Object>> ledgerAccounts = new ArrayList<>();
+        for (AccountHead a : accounts) {
+            List<JournalVoucherLine> lines = linesByAccount.getOrDefault(a.getCode(), List.of()).stream()
+                    .sorted(Comparator.comparing((JournalVoucherLine l) -> jvById.get(l.getJournalVoucherId()).getDate())
+                            .thenComparing(JournalVoucherLine::getId))
+                    .collect(Collectors.toList());
+            if (lines.isEmpty()) continue;
+
+            BigDecimal running = safe(a.getOpeningBalance());
+            List<Map<String, Object>> entries = new ArrayList<>();
+            for (JournalVoucherLine l : lines) {
+                running = running.add(safe(l.getDebit())).subtract(safe(l.getCredit()));
+                entries.add(ledgerEntry(jvById.get(l.getJournalVoucherId()), l, running));
+            }
+
+            Map<String, Object> accEntry = new LinkedHashMap<>();
+            accEntry.put("account_code", a.getCode());
+            accEntry.put("account_name", a.getName());
+            accEntry.put("opening_balance", safe(a.getOpeningBalance()));
+            accEntry.put("closing_balance", running);
+            accEntry.put("entries", entries);
+            ledgerAccounts.add(accEntry);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("period_from", from);
+        result.put("period_to", to);
+        result.put("accounts", ledgerAccounts);
+        return result;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  AGING REPORTS — member (receivables) and supplier (payables)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static final String[] AGING_BUCKET_LABELS = {"0-30", "31-60", "61-90", "90+"};
+
+    public Map<String, Object> getMemberAgingReport(LocalDate asOf) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        BigDecimal[] bucketTotals = new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+
+        for (Receipt r : receiptRepository.findAll()) {
+            if (!"Pending".equalsIgnoreCase(r.getStatus())) continue;
+            BigDecimal outstanding = safe(r.getAmount()).subtract(safe(r.getPaidAmount()));
+            if (outstanding.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            LocalDate dueDate = r.getDueDate() != null ? r.getDueDate().toLocalDate() : null;
+            int daysOverdue = dueDate != null ? (int) ChronoUnit.DAYS.between(dueDate, asOf) : 0;
+            int bucket = agingBucketIndex(daysOverdue);
+            bucketTotals[bucket] = bucketTotals[bucket].add(outstanding);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("member_name", r.getMemberName());
+            row.put("receipt_no", r.getReceiptNo());
+            row.put("due_date", dueDate);
+            row.put("outstanding", outstanding);
+            row.put("days_overdue", Math.max(daysOverdue, 0));
+            row.put("bucket", AGING_BUCKET_LABELS[bucket]);
+            rows.add(row);
+        }
+
+        return agingResult(asOf, rows, bucketTotals);
+    }
+
+    public Map<String, Object> getSupplierAgingReport(LocalDate asOf) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        BigDecimal[] bucketTotals = new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+
+        for (SupplierBill b : supplierBillRepository.findAll()) {
+            if ("PAID".equalsIgnoreCase(b.getPaymentStatus()) || "CANCELLED".equalsIgnoreCase(b.getStatus())) continue;
+            BigDecimal outstanding = safe(b.getTotalAmount()).subtract(safe(b.getAmountPaid()));
+            if (outstanding.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            LocalDate dueDate = b.getDueDate();
+            int daysOverdue = dueDate != null ? (int) ChronoUnit.DAYS.between(dueDate, asOf) : 0;
+            int bucket = agingBucketIndex(daysOverdue);
+            bucketTotals[bucket] = bucketTotals[bucket].add(outstanding);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("supplier_name", b.getSupplierName());
+            row.put("bill_number", b.getBillNumber());
+            row.put("due_date", dueDate);
+            row.put("outstanding", outstanding);
+            row.put("days_overdue", Math.max(daysOverdue, 0));
+            row.put("bucket", AGING_BUCKET_LABELS[bucket]);
+            rows.add(row);
+        }
+
+        return agingResult(asOf, rows, bucketTotals);
+    }
+
+    private static int agingBucketIndex(int daysOverdue) {
+        if (daysOverdue <= 30) return 0;
+        if (daysOverdue <= 60) return 1;
+        if (daysOverdue <= 90) return 2;
+        return 3;
+    }
+
+    private static Map<String, Object> agingResult(LocalDate asOf, List<Map<String, Object>> rows, BigDecimal[] bucketTotals) {
+        Map<String, Object> buckets = new LinkedHashMap<>();
+        for (int i = 0; i < AGING_BUCKET_LABELS.length; i++) {
+            buckets.put(AGING_BUCKET_LABELS[i], bucketTotals[i]);
+        }
+        BigDecimal total = Arrays.stream(bucketTotals).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("as_of", asOf);
+        result.put("total_outstanding", total);
+        result.put("buckets", buckets);
+        result.put("rows", rows);
+        return result;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -440,6 +686,40 @@ public class FinancialReportService {
                 })
                 .map(JournalVoucher::getId)
                 .collect(Collectors.toSet());
+    }
+
+    /** Posted JournalVouchers within [from, to], keyed by id — backs the ledger-style reports. */
+    private Map<Long, JournalVoucher> buildJvMap(LocalDate from, LocalDate to) {
+        return journalVoucherRepository.findByStatusOrderByDateDesc("POSTED").stream()
+                .filter(jv -> {
+                    if (jv.getDate() == null) return false;
+                    if (from != null && jv.getDate().isBefore(from)) return false;
+                    if (to   != null && jv.getDate().isAfter(to))   return false;
+                    return true;
+                })
+                .collect(Collectors.toMap(JournalVoucher::getId, jv -> jv, (a, b) -> a));
+    }
+
+    private static boolean isCashAccount(String code, Map<String, AccountHead> accountMap) {
+        AccountHead account = accountMap.get(code);
+        if (account == null) return false;
+        String type = account.getType() != null ? account.getType().toUpperCase() : "";
+        String name = account.getName() != null ? account.getName().toUpperCase() : "";
+        return "ASSET".equals(type) && (name.contains("CASH") || name.contains("BANK"));
+    }
+
+    /** One ledger-report row for a JournalVoucherLine — runningBalance is null where not applicable (Day Book). */
+    private static Map<String, Object> ledgerEntry(JournalVoucher jv, JournalVoucherLine line, BigDecimal runningBalance) {
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("date", jv.getDate());
+        entry.put("voucher_no", jv.getVoucherNo());
+        entry.put("narration", line.getDescription() != null ? line.getDescription() : jv.getNarration());
+        entry.put("account_code", line.getAccountCode());
+        entry.put("account_name", line.getAccountName());
+        entry.put("debit", safe(line.getDebit()));
+        entry.put("credit", safe(line.getCredit()));
+        if (runningBalance != null) entry.put("running_balance", runningBalance);
+        return entry;
     }
 
     /** Builds a code → AccountHead lookup map for fast line-level joins. */

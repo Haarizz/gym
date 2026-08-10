@@ -57,6 +57,95 @@ export interface TaxSummaryData {
   outputVat: number;
   inputVat: number;
   netVatPayable: number;
+  taxByCode: { taxCode: string; name: string; taxType: string; outputAmount: number; inputAmount: number }[];
+}
+
+export interface LedgerEntry {
+  date: string;
+  voucherNo: string;
+  narration?: string;
+  accountCode: string;
+  accountName: string;
+  debit: number;
+  credit: number;
+  runningBalance?: number;
+}
+
+export interface CashBookData {
+  periodFrom: string;
+  periodTo: string;
+  openingBalance: number;
+  closingBalance: number;
+  entries: LedgerEntry[];
+}
+
+export interface DayBookData {
+  date: string;
+  totalDebit: number;
+  totalCredit: number;
+  entries: LedgerEntry[];
+}
+
+export interface GeneralLedgerAccount {
+  accountCode: string;
+  accountName: string;
+  openingBalance: number;
+  closingBalance: number;
+  entries: LedgerEntry[];
+}
+
+export interface GeneralLedgerData {
+  periodFrom: string;
+  periodTo: string;
+  accounts: GeneralLedgerAccount[];
+}
+
+export interface AgingRow {
+  name: string;
+  reference?: string;
+  dueDate?: string;
+  outstanding: number;
+  daysOverdue: number;
+  bucket: string;
+}
+
+export interface AgingData {
+  asOf: string;
+  totalOutstanding: number;
+  buckets: Record<string, number>;
+  rows: AgingRow[];
+}
+
+export interface DeferredRevenueSchedule {
+  scheduleId: string;
+  memberName?: string;
+  planName?: string;
+  startDate: string;
+  endDate: string;
+  totalPeriods: number;
+  totalAmount: number;
+  recognizedAmount: number;
+  remainingAmount: number;
+}
+
+export interface DeferredRevenueData {
+  ledgerBalance: number;
+  scheduledRemaining: number;
+  activeScheduleCount: number;
+  schedules: DeferredRevenueSchedule[];
+}
+
+function mapLedgerEntry(l: any): LedgerEntry {
+  return {
+    date: l.date,
+    voucherNo: l.voucher_no,
+    narration: l.narration,
+    accountCode: l.account_code,
+    accountName: l.account_name,
+    debit: Number(l.debit ?? 0),
+    credit: Number(l.credit ?? 0),
+    runningBalance: l.running_balance != null ? Number(l.running_balance) : undefined,
+  };
 }
 
 class FinancialReportsService {
@@ -171,6 +260,119 @@ class FinancialReportsService {
       outputVat: d.output_vat ?? 0,
       inputVat: d.input_vat ?? 0,
       netVatPayable: d.net_vat_payable ?? 0,
+      taxByCode: (d.tax_by_code ?? []).map((t: any) => ({
+        taxCode: t.tax_code,
+        name: t.name,
+        taxType: t.tax_type,
+        outputAmount: Number(t.output_amount ?? 0),
+        inputAmount: Number(t.input_amount ?? 0),
+      })),
+    };
+  }
+
+  async getCashBook(from?: string, to?: string): Promise<CashBookData> {
+    const q = new URLSearchParams();
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/financial-reports/cash-book${q.toString() ? "?" + q : ""}`
+    );
+    if (!res.ok) throw new Error("Failed to fetch cash book");
+    const d = await res.json();
+    return {
+      periodFrom: d.period_from,
+      periodTo: d.period_to,
+      openingBalance: Number(d.opening_balance ?? 0),
+      closingBalance: Number(d.closing_balance ?? 0),
+      entries: (d.entries ?? []).map(mapLedgerEntry),
+    };
+  }
+
+  async getDayBook(date?: string): Promise<DayBookData> {
+    const q = date ? `?date=${date}` : "";
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/financial-reports/day-book${q}`);
+    if (!res.ok) throw new Error("Failed to fetch day book");
+    const d = await res.json();
+    return {
+      date: d.date,
+      totalDebit: Number(d.total_debit ?? 0),
+      totalCredit: Number(d.total_credit ?? 0),
+      entries: (d.entries ?? []).map(mapLedgerEntry),
+    };
+  }
+
+  async getGeneralLedger(from?: string, to?: string, accountCode?: string): Promise<GeneralLedgerData> {
+    const q = new URLSearchParams();
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+    if (accountCode) q.set("account_code", accountCode);
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/financial-reports/general-ledger${q.toString() ? "?" + q : ""}`
+    );
+    if (!res.ok) throw new Error("Failed to fetch general ledger");
+    const d = await res.json();
+    return {
+      periodFrom: d.period_from,
+      periodTo: d.period_to,
+      accounts: (d.accounts ?? []).map((a: any) => ({
+        accountCode: a.account_code,
+        accountName: a.account_name,
+        openingBalance: Number(a.opening_balance ?? 0),
+        closingBalance: Number(a.closing_balance ?? 0),
+        entries: (a.entries ?? []).map(mapLedgerEntry),
+      })),
+    };
+  }
+
+  private mapAging(d: any, nameKey: string, refKey: string): AgingData {
+    return {
+      asOf: d.as_of,
+      totalOutstanding: Number(d.total_outstanding ?? 0),
+      buckets: d.buckets ?? {},
+      rows: (d.rows ?? []).map((r: any) => ({
+        name: r[nameKey],
+        reference: r[refKey],
+        dueDate: r.due_date,
+        outstanding: Number(r.outstanding ?? 0),
+        daysOverdue: Number(r.days_overdue ?? 0),
+        bucket: r.bucket,
+      })),
+    };
+  }
+
+  async getMemberAging(asOf?: string): Promise<AgingData> {
+    const q = asOf ? `?as_of=${asOf}` : "";
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/financial-reports/member-aging${q}`);
+    if (!res.ok) throw new Error("Failed to fetch member aging report");
+    return this.mapAging(await res.json(), "member_name", "receipt_no");
+  }
+
+  async getSupplierAging(asOf?: string): Promise<AgingData> {
+    const q = asOf ? `?as_of=${asOf}` : "";
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/financial-reports/supplier-aging${q}`);
+    if (!res.ok) throw new Error("Failed to fetch supplier aging report");
+    return this.mapAging(await res.json(), "supplier_name", "bill_number");
+  }
+
+  async getDeferredRevenue(): Promise<DeferredRevenueData> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/financial-reports/deferred-revenue`);
+    if (!res.ok) throw new Error("Failed to fetch deferred revenue report");
+    const d = await res.json();
+    return {
+      ledgerBalance: Number(d.ledger_balance ?? 0),
+      scheduledRemaining: Number(d.scheduled_remaining ?? 0),
+      activeScheduleCount: Number(d.active_schedule_count ?? 0),
+      schedules: (d.schedules ?? []).map((s: any) => ({
+        scheduleId: String(s.schedule_id),
+        memberName: s.member_name,
+        planName: s.plan_name,
+        startDate: s.start_date,
+        endDate: s.end_date,
+        totalPeriods: Number(s.total_periods ?? 0),
+        totalAmount: Number(s.total_amount ?? 0),
+        recognizedAmount: Number(s.recognized_amount ?? 0),
+        remainingAmount: Number(s.remaining_amount ?? 0),
+      })),
     };
   }
 }

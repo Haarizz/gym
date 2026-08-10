@@ -87,6 +87,11 @@ public class SupplierBill extends BaseEntity {
     @Convert(converter = PaymentBreakdownConverter.class)
     private List<PaymentSplitDTO> paymentBreakdown;
 
+    /** TaxCode.code routing this bill's aggregate input tax to the right account(s)
+     *  (e.g. a CGST/SGST pair) — resolved by FinancialEventService.buildInputTaxLines(). */
+    @Column(name = "tax_code")
+    private String taxCode;
+
     public SupplierBill() {}
 
     // ── Getters & Setters ──────────────────────────────────────────────────
@@ -156,4 +161,7 @@ public class SupplierBill extends BaseEntity {
 
     public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
+
+    public String getTaxCode() { return taxCode; }
+    public void setTaxCode(String taxCode) { this.taxCode = taxCode; }
 }

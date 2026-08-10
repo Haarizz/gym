@@ -33,6 +33,7 @@ public class SupplierBillResponseDTO {
     private String priority;
     private String notes;
     private String receivedBy;
+    private String taxCode;
     private String paymentMethod;
     private List<PaymentSplitDTO> paymentBreakdown;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
@@ -65,6 +66,7 @@ public class SupplierBillResponseDTO {
         dto.setPriority(bill.getPriority());
         dto.setNotes(bill.getNotes());
         dto.setReceivedBy(bill.getReceivedBy());
+        dto.setTaxCode(bill.getTaxCode());
         dto.setPaymentMethod(bill.getPaymentMethod());
         dto.setPaymentBreakdown(bill.getPaymentBreakdown());
         dto.setCreatedAt(bill.getCreatedAt());
@@ -134,6 +136,9 @@ public class SupplierBillResponseDTO {
 
     public String getReceivedBy() { return receivedBy; }
     public void setReceivedBy(String receivedBy) { this.receivedBy = receivedBy; }
+
+    public String getTaxCode() { return taxCode; }
+    public void setTaxCode(String taxCode) { this.taxCode = taxCode; }
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }

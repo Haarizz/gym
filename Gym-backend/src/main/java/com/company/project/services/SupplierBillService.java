@@ -83,6 +83,7 @@ public class SupplierBillService {
         bill.setPriority(req.getPriority() != null ? req.getPriority() : "MEDIUM");
         bill.setNotes(req.getNotes());
         bill.setReceivedBy(req.getReceivedBy());
+        bill.setTaxCode(req.getTaxCode());
         bill.setStatus("DRAFT");
         bill.setPaymentStatus("UNPAID");
         bill.setAmountPaid(BigDecimal.ZERO);
@@ -131,6 +132,7 @@ public class SupplierBillService {
         if (req.getPriority() != null) bill.setPriority(req.getPriority());
         bill.setNotes(req.getNotes());
         bill.setReceivedBy(req.getReceivedBy());
+        bill.setTaxCode(req.getTaxCode());
 
         // Delete existing items and save new
         supplierBillItemRepository.deleteByBillId(bill.getId());

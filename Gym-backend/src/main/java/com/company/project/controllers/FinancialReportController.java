@@ -65,4 +65,46 @@ public class FinancialReportController {
     public ResponseEntity<Map<String, Object>> getDeferredRevenueReport() {
         return ResponseEntity.ok(financialReportService.getDeferredRevenueReport());
     }
+
+    @GetMapping("/cash-book")
+    public ResponseEntity<Map<String, Object>> getCashBook(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        if (from == null) from = LocalDate.now().withDayOfMonth(1);
+        if (to == null) to = LocalDate.now();
+        return ResponseEntity.ok(financialReportService.getCashBook(from, to));
+    }
+
+    @GetMapping("/day-book")
+    public ResponseEntity<Map<String, Object>> getDayBook(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        if (date == null) date = LocalDate.now();
+        return ResponseEntity.ok(financialReportService.getDayBook(date));
+    }
+
+    @GetMapping("/general-ledger")
+    public ResponseEntity<Map<String, Object>> getGeneralLedger(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(name = "account_code", required = false) String accountCode) {
+        if (from == null) from = LocalDate.now().withDayOfMonth(1);
+        if (to == null) to = LocalDate.now();
+        return ResponseEntity.ok(financialReportService.getGeneralLedger(from, to, accountCode));
+    }
+
+    @GetMapping("/member-aging")
+    public ResponseEntity<Map<String, Object>> getMemberAging(
+            @RequestParam(name = "as_of", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
+        if (asOf == null) asOf = LocalDate.now();
+        return ResponseEntity.ok(financialReportService.getMemberAgingReport(asOf));
+    }
+
+    @GetMapping("/supplier-aging")
+    public ResponseEntity<Map<String, Object>> getSupplierAging(
+            @RequestParam(name = "as_of", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
+        if (asOf == null) asOf = LocalDate.now();
+        return ResponseEntity.ok(financialReportService.getSupplierAgingReport(asOf));
+    }
 }

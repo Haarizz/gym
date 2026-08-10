@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GymBIOS Financial Module — Handoff (2026-08-06)</title>
+<title>GymBIOS Financial Module — All 4 Phases Complete</title>
 <style>
   :root{
     --bg:#f3f4ef; --surface:#ffffff; --surface-2:#eceee7; --text:#1f241f; --text-muted:#5b6259;
@@ -93,18 +93,17 @@
 
   <header>
     <div class="eyebrow">GymBIOS · Financial Module Buildout</div>
-    <h1>Handoff — Session ending 2026-08-06</h1>
-    <p class="dek">Status snapshot for continuing the multi-phase ERP-financial-module implementation (branch <code>feature/aug4</code>) on Monday, after the daily usage limit resets. Two phases are complete and compiled; two are planned but not started.</p>
+    <h1>All 4 phases complete</h1>
+    <p class="dek">Status snapshot for the multi-phase ERP-financial-module implementation (branch <code>feature/aug4</code>). All four planned phases are implemented and compile cleanly. This doc now serves as a reference for what exists and what remains explicitly out of scope, rather than a resume-work checklist.</p>
   </header>
 
   <div class="resume-box">
-    <h2>To resume this work in a new session</h2>
+    <h2>If picking this back up</h2>
     <ol>
-      <li>Point Claude at this file and say: <i>"Continue the GymBIOS financial module buildout — read this handoff, then implement Phase 3."</i></li>
-      <li>Nothing has been committed yet — Phase 1 and Phase 2 changes are sitting uncommitted on <code>feature/aug4</code>. Decide whether to commit them before starting Phase 3 (recommended, so the two phases are reviewable independently).</li>
-      <li>To compile the backend, <code>JAVA_HOME</code> must be set manually — no <code>mvnw</code> wrapper exists and the JDK isn't on <code>PATH</code> by default. A working JDK was found at <code>/c/openJdk-25</code> this session: <code>export JAVA_HOME=/c/openJdk-25 &amp;&amp; export PATH="$JAVA_HOME/bin:$PATH" &amp;&amp; mvn -q -DskipTests compile</code></li>
-      <li>The next Flyway migration number is <b>V11</b> (V1–V10 already exist under <code>Gym-backend/src/main/resources/db/migration/</code>).</li>
-      <li>The full architecture plan (all 4 phases, scoping rationale) is saved at <code>C:\Users\Gokul\.claude\plans\precious-seeking-backus.md</code> — currently holds the Phase 2 plan; Phase 3/4 plans should be written fresh the same way (explore → plan → get sign-off → implement) rather than assumed.</li>
+      <li>Nothing across any of the 4 phases has been committed by this session — check current <code>git status</code> before assuming anything is saved. (Note: something outside this session's own actions has been auto-checkpointing the working tree into commits on this branch in the past — verify with <code>git log</code> and <code>git show --stat &lt;hash&gt;</code> before assuming work is lost or duplicated.)</li>
+      <li>To compile the backend, <code>JAVA_HOME</code> must be set manually — no <code>mvnw</code> wrapper exists and the JDK isn't on <code>PATH</code> by default. A working JDK was found at <code>/c/openJdk-25</code>: <code>export JAVA_HOME=/c/openJdk-25 &amp;&amp; export PATH="$JAVA_HOME/bin:$PATH" &amp;&amp; mvn -q -DskipTests compile</code></li>
+      <li>The next Flyway migration number is <b>V13</b> (V1–V12 already exist under <code>Gym-backend/src/main/resources/db/migration/</code>).</li>
+      <li>Everything below "Everything else — deferred" was consciously cut, not missed — read that section before assuming something needs (re)building.</li>
     </ol>
   </div>
 
@@ -172,46 +171,66 @@
   </section>
 
   <section class="block">
-    <h2>Phase 3 — Missing Vouchers + Reports <span class="status-pill next">Not started</span></h2>
+    <h2>Phase 3 — Missing Vouchers + Reports <span class="status-pill done">Done · compiled</span></h2>
     <div class="card">
-      <p>Round out the voucher set and report suite using the existing posting engine as-is — lowest architectural risk of the remaining phases since it doesn't touch <code>FinancialEventService</code>'s core posting logic.</p>
-      <div class="label">Scope</div>
+      <p>Rounded out the voucher set and report suite using the existing posting engine as-is — no changes to <code>FinancialEventService</code>'s core posting logic, only new handlers on top of it.</p>
+
+      <div class="label">Built</div>
       <ul>
-        <li><b>Contra Voucher</b> — cash ↔ bank transfers (today this has no dedicated voucher type; must go through a manual Journal Voucher)</li>
-        <li><b>Debit Note</b> — supplier-side adjustments/returns (no entity exists)</li>
-        <li><b>Credit Note</b> — member/customer-side refund adjustments distinct from the POS-specific <code>onSaleRefunded()</code> (no entity exists)</li>
-        <li><b>Reports:</b> Cash Book, Day Book, a formal General Ledger report (distinct from the raw ledger-transaction list that already exists), Member Aging, Supplier Aging — none of these exist in <code>FinancialReportService</code> today</li>
+        <li><b>Contra Voucher</b> — cash ↔ bank transfers. <code>onContraVoucherPosted()</code>: DR to-account / CR from-account. Full DRAFT → POSTED/CANCELLED lifecycle.</li>
+        <li><b>Debit Note</b> — supplier-side adjustments/returns. <code>onDebitNoteIssued()</code>: DR Accounts Payable, CR Purchase/COGS, CR GST Input Credit (reverses the input credit claimed on the original bill).</li>
+        <li><b>Credit Note</b> — member-side refund/adjustment not tied to a POS sale. <code>onCreditNoteIssued()</code>: DR Membership Revenue, DR Tax Payable, CR Cash/Bank per a <code>refundMethod</code> field.</li>
+        <li><b>Reports</b> (all in <code>FinancialReportService</code>): <code>getCashBook()</code>, <code>getDayBook()</code>, <code>getGeneralLedger()</code> (per-account or all, with running balance), <code>getMemberAgingReport()</code> / <code>getSupplierAgingReport()</code> (0-30/31-60/61-90/90+ day buckets, from <code>Receipt</code>/<code>SupplierBill</code> outstanding balances).</li>
+        <li>Endpoints: <code>/api/contra-vouchers</code>, <code>/api/debit-notes</code>, <code>/api/credit-notes</code> (each with <code>/{id}/post</code>, <code>/{id}/cancel</code>); <code>/api/financial-reports/{cash-book,day-book,general-ledger,member-aging,supplier-aging}</code></li>
       </ul>
-      <div class="note">Model new vouchers on the existing <code>ReceiptVoucher</code>/<code>PaymentVoucher</code> entity+service+controller pattern, and route all posting through new <code>FinancialEventService.onXxx()</code> handlers exactly like every other module.</div>
+      <div class="label">Files</div>
+      <ul class="file-list">
+        <li><code>entities/ContraVoucher.java</code>, <code>DebitNote.java</code>, <code>CreditNote.java</code> + matching repositories/services/controllers/DTOs</li>
+        <li><code>db/migration/V11__contra_debit_credit_notes.sql</code></li>
+        <li>Modified: <code>FinancialEventService.java</code> (3 new handlers), <code>FinancialReportService.java</code> + <code>FinancialReportController.java</code> (5 new reports)</li>
+      </ul>
     </div>
   </section>
 
   <section class="block">
-    <h2>Phase 4 — Tax Engine Expansion <span class="status-pill next">Not started</span></h2>
+    <h2>Phase 4 — Tax Engine Expansion <span class="status-pill done">Done · compiled</span></h2>
     <div class="card">
-      <p>Move beyond the current flat single-rate UAE VAT model (<code>FinancialEventService.splitVatInclusive()</code>, backed by one <code>standard_vat_rate</code> setting) to genuinely multi-tax-type support.</p>
-      <div class="label">Scope</div>
+      <p>Extended beyond the flat single-rate UAE VAT model on the purchase side (Expense, SupplierBill) — the side that already referenced a <code>TaxCode</code> by string. Membership/POS/add-on checkout flows were <b>not</b> retrofitted to per-transaction tax codes — see the deferred list below.</p>
+
+      <div class="label">Built</div>
       <ul>
-        <li>Route posting through <code>TaxCode</code> (already exists as an entity) instead of the single hardcoded VAT rate</li>
-        <li>CGST/SGST/IGST split support alongside flat VAT</li>
-        <li>Zero-rated / exempt classifications</li>
-        <li>Company tax registration fields (GST No, VAT No, TRN) surfaced on receipts/reports</li>
+        <li><code>TaxCode</code> gained <code>taxType</code> (STANDARD/ZERO_RATED/EXEMPT/CGST/SGST/IGST) and <code>secondaryTaxCode</code> (pairs e.g. a CGST code with its SGST counterpart) — plus a CRUD service/controller, since none existed before (<code>/api/tax-codes</code>).</li>
+        <li><code>FinancialEventService.buildInputTaxLines()</code> — resolves a TaxCode and, when it has a secondary, splits the input tax evenly across both accounts instead of one flat "GST Input Credit" line. Falls back to the original single-line behavior when no tax code is given — zero change for existing callers.</li>
+        <li>Wired into <code>onExpenseApproved()</code> (already had <code>Expense.taxCode</code>) and <code>onSupplierBillConfirmed()</code> (added <code>SupplierBill.taxCode</code> to match).</li>
+        <li><code>CompanyTaxDetails</code> — single-row GST No / VAT No / TRN / legal name / address (<code>/api/company-tax-details</code>, GET/PUT upsert).</li>
+        <li><code>FinancialReportService.getTaxSummary()</code> gained a <code>tax_by_code</code> breakdown — output/input amounts per configured TaxCode's own account(s), not just the flat 2100/2200 totals.</li>
       </ul>
+      <div class="label">Files</div>
+      <ul class="file-list">
+        <li><code>entities/CompanyTaxDetails.java</code> + repository/service/controller/DTO</li>
+        <li><code>services/TaxCodeService.java</code>, <code>controllers/TaxCodeController.java</code>, <code>dto/TaxCodeRequestDTO.java</code>, <code>TaxCodeResponseDTO.java</code></li>
+        <li><code>db/migration/V12__tax_engine_expansion.sql</code></li>
+        <li>Modified: <code>entities/TaxCode.java</code>, <code>SupplierBill.java</code>, <code>dto/SupplierBillRequestDTO.java</code>/<code>ResponseDTO.java</code>, <code>services/SupplierBillService.java</code>, <code>FinancialEventService.java</code>, <code>FinancialReportService.java</code></li>
+      </ul>
+      <div class="note"><b>Known limitation (documented, not silently dropped):</b> Receipt (membership), SaleTransaction (POS) and MemberAddon still use the single flat <code>standard_vat_rate</code> setting via <code>splitVatInclusive()</code> — they were not retrofitted to select a per-transaction <code>TaxCode</code>. That would mean adding a tax-code field to those entities, their DTOs, and their frontend checkout forms — a larger, separate change than the purchase-side scope of this pass.</div>
     </div>
   </section>
 
   <section class="block">
     <h2>Everything else from the original request — deferred</h2>
     <ul class="deferred-list">
+      <li><b>Branch as a real dimension</b><span>No <code>Branch</code> master table exists anywhere in the codebase — <code>branch</code> is still loose free text on <code>AccountHead</code>, <code>Asset</code>, <code>CostCenter</code>, <code>ReceiptVoucher</code>, <code>Staff</code>. Same for Trainer/Department dimensions from the original request's "Dimensions" section.</span></li>
+      <li><b>Per-transaction TaxCode on the revenue side</b><span>Membership/POS/add-on checkout still uses the single flat <code>standard_vat_rate</code>, not a selectable <code>TaxCode</code> per transaction — see Phase 4's known limitation above.</span></li>
       <li><b>Year-end closing entries</b><span>Rolling P&amp;L into retained earnings at fiscal year-end — period <i>locking</i> shipped in Phase 2, the closing-entry automation itself did not.</span></li>
       <li><b>Membership freeze/cancellation ↔ deferred revenue</b><span>An in-flight deferred revenue schedule doesn't pause or get written off when a membership is frozen or cancelled — noted in Phase 1.</span></li>
       <li><b>Full Accounts Payable settlement flow for Expenses</b><span>An <code>UNPAID</code> expense posts to Accounts Payable now, but there's no auto-linked settlement back to the originating <code>Expense</code> row the way <code>SupplierBill</code> ↔ <code>PaymentVoucher</code> works — settling it today is a manual Journal/Payment Voucher entry.</span></li>
       <li><b>Two parallel "campaign" concepts</b><span><code>PromotionCampaign</code> (older marketing-discount system) and <code>ReferralCampaign</code> (newer, built 2026-08-03) coexist with no reconciliation between them — noted during the original survey, not part of the financial-module scope directly.</span></li>
+      <li><b>No frontend UI</b><span>Every phase in this buildout is backend-only (entities/services/controllers/reports). None of the new screens (vouchers, fiscal periods, audit log, tax codes, company tax details, new reports) have corresponding <code>Gym-frontend</code> pages yet.</span></li>
     </ul>
   </section>
 
   <footer>
-    Generated 2026-08-06 at the end of a Claude Code session on branch <code>feature/aug4</code>. Backend compiled cleanly (<code>mvn -q -DskipTests compile</code>, exit 0) as of Phase 2 completion. Nothing in this session has been committed or pushed.
+    Updated after Phase 3 + Phase 4 completion, branch <code>feature/aug4</code>. Backend compiled cleanly (<code>mvn -q -DskipTests compile</code>, exit 0) after each phase, including the final combined state. Commit status should be verified independently — see the resume box above.
   </footer>
 
 </main>
