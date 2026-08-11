@@ -61,10 +61,11 @@ export function RoleTabsLayout({
     ['members', 'create'],
     ['members', 'edit'],
     ['billing', 'create-receipt'],
+    ['create-community-post']
   ] as const;
 
   // Module routes that should be accessible via navigation but hidden from the bottom tab bar.
-  const MODULE_ROUTES = ['membership-plans', 'members', 'billing', 'attendance', 'check-in', 'training-streams', 'facilities'] as const;
+  const MODULE_ROUTES = ['membership-plans', 'members', 'billing', 'attendance', 'check-in', 'training-streams', 'facilities', 'community', 'create-community-post'] as const;
 
   const isFullScreen = FULL_SCREEN_ROUTES.some(
     ([feature, action]) =>
@@ -97,9 +98,15 @@ export function RoleTabsLayout({
 
     ['facilities','create'],
     ['facilities','[id]'],
+
+    ['analytics', 'community'],
+    ['analytics', 'community-advanced'],
   ] as const;
 
-  const showRoleHeader = !HIDE_ROLE_HEADER_ROUTES.some(
+  // Community is a top-level route so segments[2] is undefined — handle separately.
+  const isCommunityScreen = segments[1] === 'community';
+
+  const showRoleHeader = !isCommunityScreen && !HIDE_ROLE_HEADER_ROUTES.some(
     ([feature, page]) =>
       segments[1] === feature &&
       segments[2] === page,
@@ -161,7 +168,7 @@ export function RoleTabsLayout({
 
             tabBarStyle: [
               styles.tabBar,
-              isFullScreen && {
+              (isFullScreen || isCommunityScreen) && {
                 display: 'none',
               },
             ],
@@ -202,7 +209,7 @@ export function RoleTabsLayout({
           ))}
         </Tabs>
 
-        {!isFullScreen && (
+        {!isFullScreen && !isCommunityScreen && (
           <Pressable
             style={({ pressed }) => [
               styles.modulesFabContainer,

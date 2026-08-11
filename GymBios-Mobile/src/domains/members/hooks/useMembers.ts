@@ -101,6 +101,13 @@ export function useMembers(initialFilters?: MemberFilters) {
   };
 }
 
+export function useMembersList(filters?: MemberFilters) {
+  return useQuery({
+    queryKey: memberKeys.list(filters),
+    queryFn: () => directoryService.getMembers(filters),
+  });
+}
+
 export function useCreateMember() {
   const queryClient = useQueryClient();
 
@@ -113,6 +120,7 @@ export function useCreateMember() {
     },
   });
 }
+
 
 export function useUpdateMember() {
   const queryClient = useQueryClient();

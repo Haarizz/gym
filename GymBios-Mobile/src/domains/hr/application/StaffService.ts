@@ -5,6 +5,7 @@ import type {
   UpdateStaffRequest,
 } from './StaffRepository';
 import type { Staff, StaffPage } from '../domain/Staff';
+import type { StaffTarget, StaffTargetFilters } from '../domain/StaffTarget';
 
 export class StaffService {
   constructor(private readonly repository: StaffRepository) {}
@@ -30,5 +31,9 @@ export class StaffService {
 
   deleteStaff(id: string): Promise<void> {
     return this.repository.deleteStaff(id);
+  }
+
+  getTargets(filters?: StaffTargetFilters): Promise<StaffTarget[]> {
+    return this.repository.getTargets(filters);
   }
 }

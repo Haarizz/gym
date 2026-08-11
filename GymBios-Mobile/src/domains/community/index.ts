@@ -37,3 +37,7 @@ export {
   useArchiveCommunityPost,
   useUnarchiveCommunityPost,
 } from './hooks/useCommunityActions';
+
+// Presentation screens (consumed by Expo Router route files)
+export { CommunityScreen } from './presentation/screens/CommunityScreen';
+export { CreateCommunityPostScreen } from './presentation/screens/CreateCommunityPostScreen';

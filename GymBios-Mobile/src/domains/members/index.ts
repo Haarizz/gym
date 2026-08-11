@@ -52,9 +52,10 @@ export { ApiMemberFreezeRepository } from './infrastructure/freeze/ApiMemberFree
 export { ApiMemberAccessRepository } from './infrastructure/access/ApiMemberAccessRepository';
 
 // Hooks
-export { useMembers } from './hooks/useMembers';
+export { useMembers, useMembersList, memberKeys } from './hooks/useMembers';
 export { useMemberSearch } from './hooks/useMemberSearch';
 export { useMemberActions } from './hooks/useMemberActions';
+
 
 // Presentation
 export { MembersListScreen } from './presentation/screens/MembersListScreen';

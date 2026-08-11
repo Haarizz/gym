@@ -1,73 +1,98 @@
 // shared/components/ModuleSheet/modules.ts
 
-import type { ModuleSection } from './types';
+import type { ModuleItem } from './types';
 
-export const moduleSections: ModuleSection[] = [
+export const topLevelModules: ModuleItem[] = [
   {
-    id: 'management',
-    title: 'Management',
-    items: [
+    id: 'community',
+    title: 'Community',
+    icon: 'heart',
+    children: [
       {
         id: 'members',
         title: 'Members',
-        subtitle: 'View members',
-        icon: 'user',
+        icon: 'users',
         route: '/members',
+      },
+      {
+        id: 'billing',
+        title: 'Billing',
+        icon: 'file-text',
+        route: '/billing',
       },
       {
         id: 'membership-plans',
         title: 'Membership Plans',
-        subtitle: 'Manage plans',
         icon: 'credit-card',
         route: '/membership-plans',
       },
-    ],
-  },
-  {
-    id: 'finance',
-    title: 'Finance',
-    items: [
-      {
-        id: 'billing',
-        title: 'Billing',
-        subtitle: 'Receipts & Payments',
-        icon: 'credit-card',
-        route: '/billing',
-      },
-    ],
-  },
-  {
-    id: 'operations',
-    title: 'Operations',
-    items: [
       {
         id: 'attendance',
         title: 'Attendance',
-        subtitle: 'Track member & staff attendance',
-        icon: 'clipboard',
+        icon: 'user-check',
         route: '/attendance',
       },
       {
         id: 'check-in',
-        title: 'Check-in',
-        subtitle: 'Track member & staff Check-in',
-        icon: 'clipboard',
+        title: 'Check In',
+        icon: 'log-in',
         route: '/check-in',
       },
       {
         id: 'training-streams',
         title: 'Training Streams',
-        subtitle: 'Manage live and on-demand fitness content',
         icon: 'video',
         route: '/training-streams',
       },
       {
+        id: 'community-hub',
+        title: 'Community Hub',
+        icon: 'users',
+        route: '/community',
+      },
+    ],
+  },
+  {
+    id: 'member-connect',
+    title: 'Member Connect',
+    icon: 'user-plus',
+    route: '/member-connect',
+  },
+  {
+    id: 'sales-purchases',
+    title: 'Sales & Purchases',
+    icon: 'shopping-cart',
+    route: '/sales-purchases',
+  },
+  {
+    id: 'financials',
+    title: 'Financials',
+    icon: 'briefcase',
+    route: '/financials',
+  },
+  {
+    id: 'payroll-employees',
+    title: 'Payroll & Employees',
+    icon: 'users',
+    route: '/payroll-employees',
+  },
+  {
+    id: 'gymos',
+    title: 'GymOS',
+    icon: 'settings',
+    children: [
+      {
         id: 'facilities',
         title: 'Facilities',
-        subtitle: 'Manage your gym physical facilities',
         icon: 'box',
         route: '/facilities',
       },
     ],
+  },
+  {
+    id: 'bios',
+    title: 'BIOS',
+    icon: 'cpu',
+    route: '/bios',
   },
 ];

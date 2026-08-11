@@ -5,16 +5,17 @@ import Feather from '@expo/vector-icons/Feather';
 
 export type FeatherIconName = ComponentProps<typeof Feather>['name'];
 
-export interface ModuleItem {
+export interface ModuleChild {
   id: string;
   title: string;
-  subtitle?: string;
   icon: FeatherIconName;
   route: string;
 }
 
-export interface ModuleSection {
+export interface ModuleItem {
   id: string;
   title: string;
-  items: ModuleItem[];
+  icon: FeatherIconName;
+  route?: string;
+  children?: ModuleChild[];
 }
