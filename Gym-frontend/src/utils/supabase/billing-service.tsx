@@ -73,6 +73,11 @@ export interface StatementLine {
   id?: number;
   date: string;
   receipt_no: string;
+  // Only set on an "Invoice" line — the bill's own INV-{year}-{00001} number,
+  // distinct from receipt_no so a fully-paid-at-creation bill's Invoice and
+  // Payment lines don't display the exact same identifier. Absent on lines
+  // created before this field existed — fall back to receipt_no for those.
+  invoice_no?: string;
   type: string;
   description: string;
   debit: number;

@@ -59,6 +59,9 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedTransactionType, setSelectedTransactionType] = useState("all-transactions");
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+  const [billingTab, setBillingTab] = useState("receipts");
+  const [duesFilter, setDuesFilter] = useState<"all" | "overdue" | "due-soon">("all");
+  const [activeStatCard, setActiveStatCard] = useState<"monthly" | "overdue" | "due-soon" | "rate" | null>(null);
 
   // Send receipt dialog
   const [sendingReceipt, setSendingReceipt] = useState<Receipt | null>(null);
@@ -143,9 +146,10 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   const handleExportStatementCsv = () => {
     if (!soaStatement || soaStatement.lines.length === 0) { toast.info('No statement lines to export'); return; }
     const header = 'Date,Receipt #,Type,Description,Debit,Credit,Balance,Payment Method,Status\n';
-    const rows = soaStatement.lines.map(l =>
-      `"${l.date}","${l.receipt_no}","${l.type}","${l.description.replace(/"/g, '""')}","${l.debit.toFixed(2)}","${l.credit.toFixed(2)}","${l.balance.toFixed(2)}","${l.payment_method ?? ''}","${l.status}"`
-    ).join('\n');
+    const rows = soaStatement.lines.map(l => {
+      const docNo = l.type === 'Invoice' ? (l.invoice_no || l.receipt_no) : l.receipt_no;
+      return `"${l.date}","${docNo}","${l.type}","${l.description.replace(/"/g, '""')}","${l.debit.toFixed(2)}","${l.credit.toFixed(2)}","${l.balance.toFixed(2)}","${l.payment_method ?? ''}","${l.status}"`;
+    }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -270,6 +274,11 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   const collectionRate    = stats?.collection_rate    ?? 0;
   const monthlyCollection = stats?.monthly_collection ?? 0;
   const monthlyTarget     = stats?.monthly_target     ?? 50000;
+  const filteredDues = memberDues.filter((due) => {
+    if (duesFilter === 'overdue') return due.status === 'Overdue';
+    if (duesFilter === 'due-soon') return due.status === 'Due Soon';
+    return true;
+  });
   const chartData         = stats?.monthly_data?.map(d => ({
     month:     d.month,
     collected: Number(d.collected),
@@ -307,7 +316,16 @@ export function Billing({ onNavigate }: BillingProps = {}) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={activeStatCard === 'monthly' ? { boxShadow: '0 0 0 2px #6366f1' } : undefined}
+          onClick={() => {
+            const next = activeStatCard === 'monthly' ? null : 'monthly';
+            setActiveStatCard(next);
+            setBillingTab(next ? 'collection' : 'receipts');
+            setDuesFilter('all');
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Collection</CardTitle>
           </CardHeader>
@@ -321,7 +339,16 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={activeStatCard === 'overdue' ? { boxShadow: '0 0 0 2px #dc2626' } : undefined}
+          onClick={() => {
+            const next = activeStatCard === 'overdue' ? null : 'overdue';
+            setActiveStatCard(next);
+            setBillingTab(next ? 'dues' : 'receipts');
+            setDuesFilter(next ? 'overdue' : 'all');
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Payments</CardTitle>
             <div className="p-2 rounded-lg bg-red-100"><AlertCircle className="h-4 w-4 text-red-600" /></div>
@@ -336,7 +363,16 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={activeStatCard === 'due-soon' ? { boxShadow: '0 0 0 2px #ea580c' } : undefined}
+          onClick={() => {
+            const next = activeStatCard === 'due-soon' ? null : 'due-soon';
+            setActiveStatCard(next);
+            setBillingTab(next ? 'dues' : 'receipts');
+            setDuesFilter(next ? 'due-soon' : 'all');
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Due Soon</CardTitle>
             <div className="p-2 rounded-lg bg-orange-100"><Clock className="h-4 w-4 text-orange-600" /></div>
@@ -351,7 +387,16 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={activeStatCard === 'rate' ? { boxShadow: '0 0 0 2px #16a34a' } : undefined}
+          onClick={() => {
+            const next = activeStatCard === 'rate' ? null : 'rate';
+            setActiveStatCard(next);
+            setBillingTab(next ? 'collection' : 'receipts');
+            setDuesFilter('all');
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Collection Rate</CardTitle>
             <div className="p-2 rounded-lg bg-green-100"><CheckCircle className="h-4 w-4 text-green-600" /></div>
@@ -367,7 +412,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         </Card>
       </div>
 
-      <Tabs defaultValue="receipts" className="space-y-6">
+      <Tabs value={billingTab} onValueChange={(v) => { setBillingTab(v); setActiveStatCard(null); }} className="space-y-6">
         <TabsList className="w-full flex">
           <TabsTrigger value="receipts" className="flex-1">Member Receipts</TabsTrigger>
           <TabsTrigger value="dues" className="flex-1">Member Due</TabsTrigger>
@@ -587,6 +632,14 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                     All members are up to date. Members who are <strong>overdue</strong>, have a <strong>pending</strong> balance, or a payment due within 7 days will appear here.
                   </p>
                 </div>
+              ) : filteredDues.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-3" />
+                  <p className="text-lg font-medium mb-1">No matching dues</p>
+                  <p className="text-sm text-muted-foreground">
+                    No members match this filter. <button style={{ textDecoration: 'underline' }} onClick={() => setDuesFilter('all')}>Clear filter</button>
+                  </p>
+                </div>
               ) : (
                 <Table>
                   <TableHeader className="bg-slate-50/50">
@@ -603,7 +656,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {memberDues.map((due) => (
+                    {filteredDues.map((due) => (
                       <TableRow key={due.id} className="hover:bg-slate-50/50 transition-colors">
                         <TableCell>
                           <div className="flex items-center space-x-3">
@@ -928,7 +981,12 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         {soaStatement.lines.map((line, idx) => (
                           <TableRow key={idx} className="hover:bg-slate-50/50 transition-colors">
                             <TableCell>{line.date ? new Date(line.date).toLocaleDateString() : '-'}</TableCell>
-                            <TableCell className="font-medium">{line.receipt_no}</TableCell>
+                            <TableCell className="font-medium">
+                              {line.type === 'Invoice' ? (line.invoice_no || line.receipt_no) : line.receipt_no}
+                              {line.type === 'Payment' && line.invoice_no && (
+                                <div className="text-xs text-muted-foreground font-normal">Inv: {line.invoice_no}</div>
+                              )}
+                            </TableCell>
                             <TableCell><Badge variant="outline" className="text-xs">{line.type}</Badge></TableCell>
                             <TableCell>
                               <div>{line.description}</div>

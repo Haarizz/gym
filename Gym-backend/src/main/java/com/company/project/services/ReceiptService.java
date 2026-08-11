@@ -37,15 +37,18 @@ public class ReceiptService {
     private final MemberRepository memberRepository;
     private final FinancialEventService financialEventService;
     private final ReceiptVoucherService receiptVoucherService;
+    private final VoucherNumberService voucherNumberService;
 
     public ReceiptService(ReceiptRepository receiptRepository,
                           MemberRepository memberRepository,
                           FinancialEventService financialEventService,
-                          @Lazy ReceiptVoucherService receiptVoucherService) {
+                          @Lazy ReceiptVoucherService receiptVoucherService,
+                          VoucherNumberService voucherNumberService) {
         this.receiptRepository     = receiptRepository;
         this.memberRepository      = memberRepository;
         this.financialEventService = financialEventService;
         this.receiptVoucherService = receiptVoucherService;
+        this.voucherNumberService  = voucherNumberService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -189,6 +192,7 @@ public class ReceiptService {
             invoiceRow.setId(b.getId());
             invoiceRow.setDate(txnDate != null ? txnDate.format(dateFmt) : null);
             invoiceRow.setReceiptNo(b.getReceiptNo());
+            invoiceRow.setInvoiceNo(b.getInvoiceNo());
             invoiceRow.setType("Invoice");
             invoiceRow.setDescription(b.getPlanName() != null ? b.getPlanName() : b.getTransactionType());
             invoiceRow.setDebit(billAmount);
@@ -338,6 +342,7 @@ public class ReceiptService {
     public ReceiptResponseDTO createReceipt(Receipt receipt) {
         Receipt saved = receiptRepository.save(receipt);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
+        saved.setInvoiceNo(voucherNumberService.next("INV"));
         saved = receiptRepository.save(saved);
         return ReceiptResponseDTO.fromEntity(saved);
     }
@@ -441,6 +446,7 @@ public class ReceiptService {
 
         Receipt saved = receiptRepository.save(r);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
+        saved.setInvoiceNo(voucherNumberService.next("INV"));
         return receiptRepository.save(saved);
     }
 
@@ -481,6 +487,7 @@ public class ReceiptService {
 
         Receipt saved = receiptRepository.save(r);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
+        saved.setInvoiceNo(voucherNumberService.next("INV"));
         saved = receiptRepository.save(saved);
 
         if (paid.compareTo(BigDecimal.ZERO) > 0) {
@@ -548,6 +555,7 @@ public class ReceiptService {
 
         Receipt saved = receiptRepository.save(r);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
+        saved.setInvoiceNo(voucherNumberService.next("INV"));
         return receiptRepository.save(saved);
     }
 

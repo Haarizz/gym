@@ -17,6 +17,10 @@ public class StatementLineDTO {
     private Long id;
     private String date;
     private String receiptNo;
+    // Only set on an "Invoice" row — the bill's own INV-{year}-{00001} number,
+    // distinct from receiptNo so the Invoice and its Payment row(s) don't display
+    // the exact same identifier. Null on Payment rows.
+    private String invoiceNo;
     private String type;
     private String description;
     private BigDecimal debit;
@@ -37,6 +41,9 @@ public class StatementLineDTO {
 
     public String getReceiptNo() { return receiptNo; }
     public void setReceiptNo(String receiptNo) { this.receiptNo = receiptNo; }
+
+    public String getInvoiceNo() { return invoiceNo; }
+    public void setInvoiceNo(String invoiceNo) { this.invoiceNo = invoiceNo; }
 
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }

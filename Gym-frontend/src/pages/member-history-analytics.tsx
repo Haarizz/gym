@@ -75,7 +75,7 @@ import { Textarea } from "../components/ui/textarea";
 import { membersService } from '../utils/supabase/members-service';
 import type { Member, MemberNote } from '../utils/supabase/members-service';
 import { billingService } from '../utils/supabase/billing-service';
-import type { MemberStatement } from '../utils/supabase/billing-service';
+import type { MemberStatement, StatementLine } from '../utils/supabase/billing-service';
 import { attendanceService } from '../utils/supabase/attendance-service';
 import type { AttendanceListItem } from '../utils/supabase/attendance-service';
 import { workoutFeedbackService } from '../utils/supabase/workout-feedback-service';
@@ -109,6 +109,42 @@ function safeDate(value?: string | null): Date | null {
 function fmtDate(value?: string | null): string {
   const d = safeDate(value);
   return d ? format(d, 'dd MMM yyyy') : '—';
+}
+
+// A bill paid in full at the moment it was created (register a member, take
+// cash on the spot) produces an "Invoice" line and a "Payment" line sharing
+// the same underlying receipt id — two ledger rows for what was, from the
+// member's point of view, one single transaction. Collapse that specific pair
+// into one row; a partial/credit sale, a mixed-method split, or a payment
+// collected later (its own receipt id) still shows as separate rows, because
+// those really are separate events. Callers that need ledger totals (Total
+// Billed/Total Paid) should keep summing the un-merged lines — this is only
+// for "how many transactions actually happened" display purposes.
+function mergeTransactionLines(lines: StatementLine[]): StatementLine[] {
+  const groups = new Map<string, StatementLine[]>();
+  const ungrouped: StatementLine[] = [];
+  lines.forEach(l => {
+    if (l.id == null) { ungrouped.push(l); return; }
+    const key = String(l.id);
+    const group = groups.get(key);
+    if (group) group.push(l); else groups.set(key, [l]);
+  });
+  const merged: StatementLine[] = [...ungrouped];
+  groups.forEach(group => {
+    const invoiceLines = group.filter(l => l.type === 'Invoice');
+    const paymentLines = group.filter(l => l.type === 'Payment');
+    if (invoiceLines.length === 1 && paymentLines.length === 1
+        && Math.abs(paymentLines[0].credit - invoiceLines[0].debit) < 0.005) {
+      merged.push({
+        ...paymentLines[0],
+        description: invoiceLines[0].description,
+        invoice_no: invoiceLines[0].invoice_no,
+      });
+    } else {
+      merged.push(...group);
+    }
+  });
+  return merged.sort((a, b) => (safeDate(b.date)?.getTime() ?? 0) - (safeDate(a.date)?.getTime() ?? 0));
 }
 
 function fmtDateTime(value?: string | null): string {
@@ -266,7 +302,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   const statementLines = statement?.lines ?? [];
   const totalPaid = statement?.total_paid ?? 0;
   const outstandingDues = member?.outstanding_balance ?? 0;
-  const totalTransactions = statementLines.length;
+  const totalTransactions = mergeTransactionLines(statementLines).length;
 
   const paymentBreakdown = statementLines.reduce((acc, l) => {
     if (l.credit > 0 && l.payment_method) {
@@ -378,6 +414,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     }
     return true;
   });
+
+  // Total Billed/Total Paid below sum from the unmerged filteredTransactionLines
+  // so the ledger totals stay exact regardless of how rows are grouped for display.
+  const mergedTransactionLines = mergeTransactionLines(filteredTransactionLines);
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const getChannelIcon = (channel: string) => {
@@ -1000,7 +1040,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           <div className="flex-1 border-l-2 border-gray-200 pl-4 pb-6">
                             <div className="flex items-center justify-between mb-1">
                               <h4 className="font-semibold text-gray-900">{activity.event}</h4>
-                              <span className="text-sm text-gray-500">{format(activity.date, 'dd MMM yyyy')}</span>
+                              <span className="text-sm text-gray-500">{format(activity.date, 'dd MMM yyyy, h:mm a')}</span>
                             </div>
                             <p className="text-sm text-gray-600">{activity.detail}</p>
                           </div>
@@ -1697,7 +1737,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {filteredTransactionLines.map((line, index) => (
+                            {mergedTransactionLines.map((line, index) => (
                               <TableRow key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gradient-light transition-colors`}>
                                 <TableCell className="font-medium">{fmtDate(line.date)}</TableCell>
                                 <TableCell>
@@ -1706,7 +1746,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant="outline" className="border-primary/30 font-mono">{line.receipt_no}</Badge>
+                                  <Badge variant="outline" className="border-primary/30 font-mono">
+                                    {line.type === 'Invoice' ? (line.invoice_no || line.receipt_no) : line.receipt_no}
+                                  </Badge>
+                                  {line.type === 'Payment' && line.invoice_no && (
+                                    <div className="text-xs text-gray-400 mt-0.5 font-mono">Inv: {line.invoice_no}</div>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   <Badge className="bg-blue-100 text-blue-700">{line.payment_method || '—'}</Badge>
@@ -1729,7 +1774,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                                 </TableCell>
                               </TableRow>
                             ))}
-                            {filteredTransactionLines.length === 0 && (
+                            {mergedTransactionLines.length === 0 && (
                               <TableRow>
                                 <TableCell colSpan={7} className="text-center text-gray-500 py-8">No transactions found</TableCell>
                               </TableRow>
@@ -1742,7 +1787,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Total Transactions</p>
-                            <p className="text-2xl font-bold text-primary">{filteredTransactionLines.length}</p>
+                            <p className="text-2xl font-bold text-primary">{mergedTransactionLines.length}</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Total Billed</p>

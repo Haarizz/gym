@@ -79,6 +79,8 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [streamFilter, setStreamFilter] = useState("all");
+  const [streamsTab, setStreamsTab] = useState("streams");
+  const [streamSort, setStreamSort] = useState<"none" | "viewers-desc" | "views-desc">("none");
 
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -143,9 +145,14 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
     }
   };
 
-  const filteredStreams = streamFilter === "all"
-    ? streams
-    : streams.filter(s => s.status.toLowerCase() === streamFilter.toLowerCase());
+  const filteredStreams = (streamFilter === "all"
+    ? [...streams]
+    : streams.filter(s => s.status.toLowerCase() === streamFilter.toLowerCase())
+  ).sort((a, b) => {
+    if (streamSort === "viewers-desc") return b.participants - a.participants;
+    if (streamSort === "views-desc") return b.views - a.views;
+    return 0;
+  });
 
   const liveStreams = streams.filter(s => s.status === "Live");
   const scheduledStreams = streams.filter(s => s.status === "Scheduled");
@@ -462,7 +469,11 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-all cursor-pointer"
+          style={streamsTab === 'streams' && streamFilter === 'live' ? { boxShadow: '0 0 0 2px #dc2626' } : undefined}
+          onClick={() => { setStreamsTab('streams'); setStreamFilter(streamFilter === 'live' ? 'all' : 'live'); setStreamSort('none'); }}
+        >
           <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-primary">Live Streams</CardTitle>
             <div className="bg-red-50 p-2 rounded-lg">
@@ -475,7 +486,11 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-all cursor-pointer"
+          style={streamsTab === 'streams' && streamFilter === 'scheduled' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
+          onClick={() => { setStreamsTab('streams'); setStreamFilter(streamFilter === 'scheduled' ? 'all' : 'scheduled'); setStreamSort('none'); }}
+        >
           <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-primary">Scheduled Streams</CardTitle>
             <div className="bg-blue-50 p-2 rounded-lg">
@@ -488,7 +503,12 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-all cursor-pointer"
+          style={streamSort === 'viewers-desc' ? { boxShadow: '0 0 0 2px #059669' } : undefined}
+          title="Click to sort streams by active viewers"
+          onClick={() => { setStreamsTab('streams'); setStreamSort(streamSort === 'viewers-desc' ? 'none' : 'viewers-desc'); setStreamFilter('all'); }}
+        >
           <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-primary">Active Viewers</CardTitle>
             <div className="bg-emerald-50 p-2 rounded-lg">
@@ -501,7 +521,12 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-all cursor-pointer"
+          style={streamSort === 'views-desc' ? { boxShadow: '0 0 0 2px #475569' } : undefined}
+          title="Click to sort streams by total views"
+          onClick={() => { setStreamsTab('streams'); setStreamSort(streamSort === 'views-desc' ? 'none' : 'views-desc'); setStreamFilter('all'); }}
+        >
           <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-primary">Avg. Views</CardTitle>
             <div className="bg-slate-50 p-2 rounded-lg">
@@ -515,7 +540,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
         </Card>
       </div>
 
-      <Tabs defaultValue="streams" className="space-y-6">
+      <Tabs value={streamsTab} onValueChange={setStreamsTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="streams">All Streams</TabsTrigger>
           <TabsTrigger value="live">Live Streams</TabsTrigger>

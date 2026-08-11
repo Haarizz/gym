@@ -14,6 +14,9 @@ public class ReceiptResponseDTO {
 
     private String id;
     private String receiptNo;
+    // Set only on a bill (New/Renewal/Add-on/Daily Entry/minor charge) — null on
+    // a settlement/"Payment" receipt, which isn't itself an invoice.
+    private String invoiceNo;
     private String transactionDate;
     private String memberDbId;
     private String memberId;
@@ -48,6 +51,7 @@ public class ReceiptResponseDTO {
         ReceiptResponseDTO dto = new ReceiptResponseDTO();
         dto.id              = r.getId() != null ? String.valueOf(r.getId()) : null;
         dto.receiptNo       = r.getReceiptNo();
+        dto.invoiceNo       = r.getInvoiceNo();
         dto.transactionDate = r.getTransactionDate() != null ? r.getTransactionDate().format(ISO) + "Z" : null;
         dto.memberDbId      = r.getMemberDbId() != null ? String.valueOf(r.getMemberDbId()) : null;
         dto.memberId        = r.getMemberId();
@@ -88,6 +92,7 @@ public class ReceiptResponseDTO {
 
     public String getId() { return id; }
     public String getReceiptNo() { return receiptNo; }
+    public String getInvoiceNo() { return invoiceNo; }
     public String getTransactionDate() { return transactionDate; }
     public String getMemberDbId() { return memberDbId; }
     public String getMemberId() { return memberId; }

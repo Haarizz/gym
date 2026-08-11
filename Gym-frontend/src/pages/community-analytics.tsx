@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Badge } from "../components/ui/badge";
 import { Progress } from "../components/ui/progress";
@@ -91,7 +92,8 @@ const emptyData = {
   collections: {
     today: { membership: 0, addons: 0, pos: 0, total: 0 },
     yesterday: { membership: 0, addons: 0, pos: 0, total: 0 },
-    thisMonth: { membership: 0, addons: 0, pos: 0, total: 0 }
+    thisMonth: { membership: 0, addons: 0, pos: 0, total: 0 },
+    custom: { membership: 0, addons: 0, pos: 0, total: 0 }
   },
   trends: {
     daily: [] as { date: string; revenue: number; members: number }[],
@@ -128,9 +130,40 @@ const COLORS = {
   muted: "#9E9E9E"
 };
 
+// Shared with the "Custom" collections range below — immutable receipts split
+// a partially-paid-then-settled bill into separate rows (the bill row keeps
+// its full r.amount even after later settlements) — summing r.amount double-
+// counts the settled portion. r.paid_amount is the actual cash each row
+// received and never overlaps.
+const revenueOf = (r: Receipt): number => Number(r.paid_amount) || 0;
+
+const categorizeReceipt = (r: Receipt): "membership" | "addons" | "pos" => {
+  const t = (r.transaction_type || "").toLowerCase();
+  const plan = (r.plan_name || "").toLowerCase();
+  if (t.includes("new member") || t.includes("renew") || t.includes("upgrade") || plan.includes("membership")) return "membership";
+  if (t.includes("pos") || plan.includes("pos") || t.includes("product") || plan.includes("product")) return "pos";
+  return "addons";
+};
+
+const sumCollections = (receiptList: Receipt[], datePredicate: (d: string) => boolean) => {
+  const out = { membership: 0, addons: 0, pos: 0, total: 0 };
+  receiptList.forEach((r) => {
+    const dateStr = (r.transaction_date || "").split("T")[0];
+    if (!dateStr || !datePredicate(dateStr)) return;
+    const amount = revenueOf(r);
+    const cat = categorizeReceipt(r);
+    out[cat] += amount;
+    out.total += amount;
+  });
+  return out;
+};
+
 export function CommunityAnalytics() {
   const { currencyCode } = useCurrency();
   const [activeCollectionTab, setActiveCollectionTab] = useState("today");
+  const [advancedTab, setAdvancedTab] = useState("churn");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [data, setData] = useState(emptyData);
   const [members, setMembers] = useState<MemberApi[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -181,37 +214,14 @@ export function CommunityAnalytics() {
       const achieved = institution?.revenue_achieved ?? 0;
       const progress = institution?.percentage ?? (assigned > 0 ? (achieved / assigned) * 100 : 0);
 
-      // Immutable receipts split a partially-paid-then-settled bill into
-      // separate rows (the bill row keeps its full r.amount even after later
-      // settlements) — summing r.amount double-counts the settled portion.
-      // r.paid_amount is the actual cash each row received and never overlaps.
-      const revenueOf = (r: Receipt): number => Number(r.paid_amount) || 0;
-
-      const categorizeReceipt = (r: Receipt): "membership" | "addons" | "pos" => {
-        const t = (r.transaction_type || "").toLowerCase();
-        const plan = (r.plan_name || "").toLowerCase();
-        if (t.includes("new member") || t.includes("renew") || t.includes("upgrade") || plan.includes("membership")) return "membership";
-        if (t.includes("pos") || plan.includes("pos") || t.includes("product") || plan.includes("product")) return "pos";
-        return "addons";
-      };
-
-      const sumCollections = (datePredicate: (d: string) => boolean) => {
-        const out = { membership: 0, addons: 0, pos: 0, total: 0 };
-        receiptList.forEach((r) => {
-          const dateStr = (r.transaction_date || "").split("T")[0];
-          if (!dateStr || !datePredicate(dateStr)) return;
-          const amount = revenueOf(r);
-          const cat = categorizeReceipt(r);
-          out[cat] += amount;
-          out.total += amount;
-        });
-        return out;
-      };
-
       const collections = {
-        today: sumCollections((d) => d === todayStr),
-        yesterday: sumCollections((d) => d === yesterdayStr),
-        thisMonth: sumCollections((d) => d.startsWith(monthKey)),
+        today: sumCollections(receiptList, (d) => d === todayStr),
+        yesterday: sumCollections(receiptList, (d) => d === yesterdayStr),
+        thisMonth: sumCollections(receiptList, (d) => d.startsWith(monthKey)),
+        // Live-recomputed from `receipts` state below (independent of refreshData)
+        // so picking dates updates immediately without a full page refresh —
+        // this placeholder just keeps the shape/type consistent.
+        custom: { membership: 0, addons: 0, pos: 0, total: 0 },
       };
 
       const daily = Array.from({ length: 7 }).map((_, idx) => {
@@ -505,13 +515,28 @@ export function CommunityAnalytics() {
     refreshData();
   }, [refreshData]);
 
+  // Recomputed straight from the already-loaded `receipts` state whenever the
+  // custom From/To dates change — no network round-trip, so picking a date
+  // updates the breakdown immediately instead of only after "Refresh".
+  const customCollections = useMemo(() => {
+    if (!customFrom || !customTo) return emptyData.collections.today;
+    return sumCollections(receipts, (d) => d >= customFrom && d <= customTo);
+  }, [receipts, customFrom, customTo]);
+
+  const activeCollections = activeCollectionTab === "custom"
+    ? customCollections
+    : data.collections[activeCollectionTab as keyof typeof data.collections];
+
   // KPI Cards Data
   const kpiData = useMemo(() => {
     const { assigned, achieved, progress } = data.targets;
-    const collections = data.collections[activeCollectionTab as keyof typeof data.collections];
+    const collections = activeCollections;
     const activeMembers = members.filter((m) => m.membership_status === "active").length;
     const retention = members.length > 0 ? (activeMembers / members.length) * 100 : 0;
-    
+    const collectionsSubtitle = activeCollectionTab === "custom"
+      ? (customFrom && customTo ? `${customFrom} to ${customTo}` : "Pick a date range")
+      : activeCollectionTab.charAt(0).toUpperCase() + activeCollectionTab.slice(1);
+
     return [
       {
         title: "Target Progress",
@@ -526,7 +551,7 @@ export function CommunityAnalytics() {
       {
         title: "Total Collections",
         value: <><CurrencyGlyph /> {collections.total.toLocaleString()}</>,
-        subtitle: activeCollectionTab.charAt(0).toUpperCase() + activeCollectionTab.slice(1),
+        subtitle: collectionsSubtitle,
         change: "",
         trend: "up",
         icon: DollarSign,
@@ -549,19 +574,19 @@ export function CommunityAnalytics() {
         color: "success"
       }
     ];
-  }, [activeCollectionTab, data, members]);
+  }, [activeCollectionTab, activeCollections, data, members, customFrom, customTo]);
 
   const collectionBreakdownData = useMemo(() => {
-    const collections = data.collections[activeCollectionTab as keyof typeof data.collections];
+    const collections = activeCollections;
     return [
       { name: "Membership", value: collections.membership, color: COLORS.primary },
       { name: "Add-ons", value: collections.addons, color: COLORS.secondary },
       { name: "POS Sales", value: collections.pos, color: COLORS.success }
     ];
-  }, [activeCollectionTab, data]);
+  }, [activeCollections]);
 
   const handleExport = () => {
-    const collections = data.collections[activeCollectionTab as keyof typeof data.collections];
+    const collections = activeCollections;
     const rows: string[] = ['Section,Metric,Value'];
     rows.push(`KPI,Target Progress,${data.targets.progress.toFixed(1)}%`);
     rows.push(`KPI,Total Collections (${activeCollectionTab}),${collections.total}`);
@@ -652,8 +677,27 @@ export function CommunityAnalytics() {
         {kpiData.map((kpi, index) => {
           const IconComponent = kpi.icon;
           const theme = kpiThemes[kpi.color] ?? kpiThemes.primary;
+          const cycleCollectionTab = () =>
+            setActiveCollectionTab(prev => prev === "today" ? "yesterday" : prev === "yesterday" ? "thisMonth" : "today");
+          const cardAction = kpi.title === "Target Progress" || kpi.title === "Total Collections"
+            ? cycleCollectionTab
+            : kpi.title === "Member Retention"
+            ? () => setAdvancedTab("churn")
+            : kpi.title === "Active Members"
+            ? () => setAdvancedTab("engagement")
+            : undefined;
+          const cardHighlighted = (kpi.title === "Member Retention" && advancedTab === "churn")
+            || (kpi.title === "Active Members" && advancedTab === "engagement");
           return (
-            <Card key={index} className={statCardShell}>
+            <Card
+              key={index}
+              className={`${statCardShell} ${cardAction ? "cursor-pointer" : ""}`}
+              style={cardHighlighted ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+              title={kpi.title === "Target Progress" || kpi.title === "Total Collections"
+                ? "Click to cycle Today / Yesterday / This Month"
+                : cardAction ? `Click to view ${kpi.title === "Member Retention" ? "Churn Prediction" : "Engagement"}` : undefined}
+              onClick={cardAction}
+            >
               <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
                 <div>
                   <CardTitle className="text-sm font-medium text-primary">{kpi.title}</CardTitle>
@@ -706,22 +750,44 @@ export function CommunityAnalytics() {
               <CardDescription>Revenue breakdown by income source</CardDescription>
             </div>
             
-            <Tabs value={activeCollectionTab} onValueChange={setActiveCollectionTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="today">Today</TabsTrigger>
-                <TabsTrigger value="yesterday">Yesterday</TabsTrigger>
-                <TabsTrigger value="thisMonth">This Month</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="w-full space-y-3">
+              <Tabs value={activeCollectionTab} onValueChange={setActiveCollectionTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="today">Today</TabsTrigger>
+                  <TabsTrigger value="yesterday">Yesterday</TabsTrigger>
+                  <TabsTrigger value="thisMonth">This Month</TabsTrigger>
+                  <TabsTrigger value="custom">Custom</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {activeCollectionTab === "custom" && (
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <Input
+                    type="date"
+                    value={customFrom}
+                    max={customTo || undefined}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="sm:w-40"
+                  />
+                  <span className="text-sm text-muted-foreground text-center">to</span>
+                  <Input
+                    type="date"
+                    value={customTo}
+                    min={customFrom || undefined}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="sm:w-40"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Horizontal Bar Chart */}
             <div className="space-y-4">
               {collectionBreakdownData.map((item, index) => {
-                const collectionTotal = data.collections[activeCollectionTab as keyof typeof data.collections].total;
+                const collectionTotal = activeCollections.total;
                 const percentage = collectionTotal > 0 ? (item.value / collectionTotal) * 100 : 0;
                 return (
                   <div key={index} className="space-y-2">
@@ -933,7 +999,7 @@ export function CommunityAnalytics() {
           <Badge variant="outline" className="ml-2">AI Powered</Badge>
         </div>
 
-        <Tabs defaultValue="churn" className="space-y-6">
+        <Tabs value={advancedTab} onValueChange={setAdvancedTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="churn">Churn Prediction</TabsTrigger>
             <TabsTrigger value="trainers">Trainer Performance</TabsTrigger>

@@ -21,6 +21,12 @@ public class Receipt extends BaseEntity {
     @Column(name = "receipt_no", unique = true)
     private String receiptNo;
 
+    // auto-generated: INV-{year}-{00001}, via VoucherNumberService. Stamped only on
+    // bill rows (New/Renewal/Add-on/Daily Entry/minor charge) at creation — null on
+    // settlement/"Payment" rows, which are receipts for a payment, not invoices.
+    @Column(name = "invoice_no")
+    private String invoiceNo;
+
     @Column(name = "transaction_date")
     private LocalDateTime transactionDate;
 
@@ -136,6 +142,9 @@ public class Receipt extends BaseEntity {
 
     public String getReceiptNo() { return receiptNo; }
     public void setReceiptNo(String receiptNo) { this.receiptNo = receiptNo; }
+
+    public String getInvoiceNo() { return invoiceNo; }
+    public void setInvoiceNo(String invoiceNo) { this.invoiceNo = invoiceNo; }
 
     public LocalDateTime getTransactionDate() { return transactionDate; }
     public void setTransactionDate(LocalDateTime transactionDate) { this.transactionDate = transactionDate; }

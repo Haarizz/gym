@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { plansService, Plan } from '../utils/supabase/plans-service';
 import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
+import { facilitiesService, FacilityApi } from '../utils/supabase/facilities-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -55,13 +56,6 @@ const trainingStreams = [
   { id: 10, name: "Senior Fitness", category: "Specialized" }
 ];
 
-// Sample facilities data - only active facilities
-const availableFacilities = [
-  { id: "FAC-001", name: "Basketball Court", icon: Activity, status: "Active" },
-  { id: "FAC-002", name: "Swimming Pool", icon: Snowflake, status: "Active" },
-  { id: "FAC-003", name: "Padel Court", icon: Building2, status: "Active" },
-  { id: "FAC-004", name: "Football Ground", icon: Users, status: "Active" }
-];
 
 export function ManagePlans() {
   const { currencyCode } = useCurrency();
@@ -75,6 +69,7 @@ export function ManagePlans() {
   const [filterDuration, setFilterDuration] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [priceSort, setPriceSort] = useState<"none" | "asc" | "desc">("none");
 
   // Promotions & Campaigns loaded from Member Connect (real data, not mock)
   const [availablePromotions, setAvailablePromotions] = useState<{
@@ -85,6 +80,10 @@ export function ManagePlans() {
     status: string;
   }[]>([]);
   const [isLoadingPromotions, setIsLoadingPromotions] = useState(true);
+
+  // Facilities loaded from Facilities Management (real data, not mock)
+  const [availableFacilities, setAvailableFacilities] = useState<FacilityApi[]>([]);
+  const [isLoadingFacilities, setIsLoadingFacilities] = useState(true);
 
   // Form state for creating/editing plans
   const [formData, setFormData] = useState({
@@ -189,6 +188,21 @@ export function ManagePlans() {
     };
     loadPromotions();
   }, [currencyCode]);
+
+  useEffect(() => {
+    const loadFacilities = async () => {
+      try {
+        setIsLoadingFacilities(true);
+        const data = await facilitiesService.getFacilities({ status: 'Active' });
+        setAvailableFacilities(data);
+      } catch (err) {
+        console.error('Failed to load facilities:', err);
+      } finally {
+        setIsLoadingFacilities(false);
+      }
+    };
+    loadFacilities();
+  }, []);
 
   const resetForm = () => {
     setFormData({
@@ -419,11 +433,16 @@ export function ManagePlans() {
   const filteredPlans = plans.filter(plan => {
     const matchesSearch = plan.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDuration = filterDuration === "all" || plan.durationType.toLowerCase() === filterDuration.toLowerCase();
-    const matchesType = filterType === "all" || plan.planType.toLowerCase() === filterType.toLowerCase();
+    const matchesType = filterType === "all"
+      || plan.planType.toLowerCase() === filterType.toLowerCase()
+      || (filterType === "family" && plan.planType.toLowerCase() === "couple");
     const matchesStatus = filterStatus === "all" || plan.status.toLowerCase() === filterStatus.toLowerCase();
-    
+
     return matchesSearch && matchesDuration && matchesType && matchesStatus;
   });
+  if (priceSort !== "none") {
+    filteredPlans.sort((a, b) => priceSort === "asc" ? a.price - b.price : b.price - a.price);
+  }
 
   const handleCloseDialog = () => {
     setShowCreateDialog(false);
@@ -532,7 +551,11 @@ export function ManagePlans() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={filterType === 'all' && filterStatus === 'all' && priceSort === 'none' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
+          onClick={() => { setFilterType('all'); setFilterStatus('all'); setPriceSort('none'); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Plans</CardTitle>
             <div className="p-2 rounded-lg bg-blue-100">
@@ -545,7 +568,15 @@ export function ManagePlans() {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={filterStatus === 'active' ? { boxShadow: '0 0 0 2px #16a34a' } : undefined}
+          onClick={() => {
+            setFilterStatus(filterStatus === 'active' ? 'all' : 'active');
+            setFilterType('all');
+            setPriceSort('none');
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Active Plans</CardTitle>
             <div className="p-2 rounded-lg bg-green-100">
@@ -560,22 +591,39 @@ export function ManagePlans() {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={priceSort !== 'none' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
+          title="Click to sort plans by price"
+          onClick={() => {
+            setPriceSort(priceSort === 'desc' ? 'asc' : priceSort === 'asc' ? 'none' : 'desc');
+            setFilterStatus('all');
+            setFilterType('all');
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Average Price</CardTitle>
             <div className="p-2 rounded-lg bg-blue-100">
-              <DollarSign className="h-4 w-4 text-blue-600" />
+              {priceSort === 'asc' ? <ChevronUp className="h-4 w-4 text-blue-600" /> : priceSort === 'desc' ? <ChevronDown className="h-4 w-4 text-blue-600" /> : <DollarSign className="h-4 w-4 text-blue-600" />}
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
               <CurrencyGlyph /> {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
             </div>
-            <p className="text-xs text-muted-foreground">Across all plans</p>
+            <p className="text-xs text-muted-foreground">Across all plans{priceSort !== 'none' ? ` — sorted ${priceSort === 'asc' ? 'low to high' : 'high to low'}` : ''}</p>
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={filterType === 'family' ? { boxShadow: '0 0 0 2px #9333ea' } : undefined}
+          onClick={() => {
+            setFilterType(filterType === 'family' ? 'all' : 'family');
+            setFilterStatus('all');
+            setPriceSort('none');
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Family Plans</CardTitle>
             <div className="p-2 rounded-lg bg-purple-100">
@@ -1319,33 +1367,33 @@ export function ManagePlans() {
                   </div>
 
                   {/* Facilities grid */}
-                  {availableFacilities.length > 0 ? (
+                  {isLoadingFacilities ? (
+                    <div className="border rounded-md p-6 text-center text-sm text-muted-foreground">Loading facilities...</div>
+                  ) : availableFacilities.length > 0 ? (
                     <>
                       <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto border rounded-md p-3">
-                        {availableFacilities.map((facility) => {
-                          const FacilityIcon = facility.icon;
-                          return (
+                        {availableFacilities.map((facility) => (
                           <div key={facility.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`facility-${facility.id}`}
                               checked={formData.selectedFacilities.includes(facility.id)}
                               onCheckedChange={() => handleFacilityToggle(facility.id)}
                             />
-                            <Label 
+                            <Label
                               htmlFor={`facility-${facility.id}`}
                               className="text-sm cursor-pointer flex-1 flex items-center gap-2"
                             >
-                              <FacilityIcon className="h-4 w-4 text-primary" />
+                              <Building2 className="h-4 w-4 text-primary" />
                               <span>{facility.name}</span>
                             </Label>
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className="text-xs bg-green-50 text-green-700 border-green-200"
                             >
-                              Active
+                              {facility.status}
                             </Badge>
                           </div>
-                        )})}
+                        ))}
                       </div>
 
                       <div className="text-sm text-muted-foreground">

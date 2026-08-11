@@ -71,6 +71,7 @@ import { walletService } from "../utils/supabase/reward-service";
 import { membersService, Member as ApiMember } from "../utils/supabase/members-service";
 import { addonsService, MemberAddon } from "../utils/supabase/addons-service";
 import { addonPlansService, AddonPlan as ApiAddonPlan } from "../utils/supabase/addon-plans-service";
+import { facilitiesService, FacilityApi } from "../utils/supabase/facilities-service";
 import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
 import {
   EMPTY_SPLIT_DETAILS, EMPTY_SPLIT_PAYMENT, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
@@ -121,9 +122,11 @@ function toLocalMember(m: ApiMember): Member {
   };
 }
 
-// Same shape as the AddonPlan the backend catalog returns — kept as a local
-// alias since this file only ever deals with it in this shape.
-type Addon = ApiAddonPlan;
+// Same shape as the AddonPlan the backend catalog returns, widened to also
+// allow "Facility" — real facility access sold as an add-on (see
+// facilityAddonCards below) is synthesized into this exact shape so the
+// entire purchase/payment/creation pipeline needs no facility-specific code.
+type Addon = Omit<ApiAddonPlan, "category"> & { category: ApiAddonPlan["category"] | "Facility" };
 
 const getCategoryIcon = (category: string) => {
   const baseClass = "text-white block shrink-0";
@@ -132,6 +135,7 @@ const getCategoryIcon = (category: string) => {
     case "Nutrition": return <HiOutlineSparkles size={16} className={baseClass} />;
     case "Classes":   return <HiOutlineUserGroup size={16} className={baseClass} />;
     case "Spa":       return <HiOutlineHeart size={16} className={baseClass} />;
+    case "Facility":  return <Building2 size={16} className={baseClass} />;
     default:          return <HiOutlineCube size={16} className={baseClass} />;
   }
 };
@@ -142,9 +146,39 @@ const getCategoryColor = (category: string) => {
     case "Nutrition": return "from-green-500 to-emerald-600";
     case "Classes":   return "from-purple-500 to-violet-600";
     case "Spa":       return "from-pink-500 to-rose-600";
+    case "Facility":  return "from-cyan-500 to-teal-600";
     default:          return "from-gray-500 to-gray-600";
   }
 };
+
+// Turns "Pool Access" with rates {"Per Hour": 5, "Per Month": 50} into one
+// purchasable Addon card per rate tier — a facility isn't one fixed price
+// like a catalog add-on plan, so each tier becomes its own card. Same-day
+// tiers (hour/half day/full day) get a 1-day validity; anything billed "per
+// month" gets 30, matching how the rest of the app treats monthly access.
+const facilityRateValidityDays = (rateLabel: string): number =>
+  /month/i.test(rateLabel) ? 30 : 1;
+
+function buildFacilityAddonCards(facilities: FacilityApi[]): Addon[] {
+  const cards: Addon[] = [];
+  facilities.forEach((facility, fIdx) => {
+    Object.entries(facility.rates || {}).forEach(([rateLabel, amount], rIdx) => {
+      if (!amount || amount <= 0) return;
+      cards.push({
+        // Negative, deterministic — never collides with a real catalog plan's
+        // DB-assigned positive id, and stays stable across re-renders.
+        id: -1 - (fIdx * 100 + rIdx),
+        name: `${facility.name} — ${rateLabel}`,
+        description: `Facility access: ${rateLabel}`,
+        price: amount,
+        validity: facilityRateValidityDays(rateLabel),
+        category: "Facility",
+        isActive: facility.status === "Active",
+      });
+    });
+  });
+  return cards;
+}
 
 // Use the MemberAddon type from the API service directly
 
@@ -213,6 +247,15 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   };
 
   useEffect(() => { loadAddonPlans(); }, []);
+
+  // Facility access sold as an add-on — see buildFacilityAddonCards above.
+  const [facilities, setFacilities] = useState<FacilityApi[]>([]);
+  useEffect(() => {
+    facilitiesService.getFacilities({ status: "Active" })
+      .then(setFacilities)
+      .catch(() => {}); // non-fatal — the catalog add-ons still work without it
+  }, []);
+  const facilityAddonCards = useMemo(() => buildFacilityAddonCards(facilities), [facilities]);
 
   const handleOpenManageModal = () => {
     setEditingPlan(null);
@@ -374,7 +417,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   };
 
   const filteredAddons = useMemo(() => {
-    let active = addonPlans.filter((addon) => addon.isActive);
+    let active: Addon[] = [...addonPlans, ...facilityAddonCards].filter((addon) => addon.isActive);
     if (filterCategory !== "all") {
       active = active.filter((addon) => addon.category === filterCategory);
     }
@@ -385,7 +428,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       );
     }
     return active;
-  }, [addonPlans, filterCategory, addonSearchQuery]);
+  }, [addonPlans, facilityAddonCards, filterCategory, addonSearchQuery]);
 
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions];
@@ -909,6 +952,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                         <SelectItem value="Nutrition">Nutrition</SelectItem>
                         <SelectItem value="Classes">Group Classes</SelectItem>
                         <SelectItem value="Spa">Spa & Recovery</SelectItem>
+                        <SelectItem value="Facility">Facility Access</SelectItem>
                         <SelectItem value="Other">Other Services</SelectItem>
                       </SelectContent>
                     </Select>
