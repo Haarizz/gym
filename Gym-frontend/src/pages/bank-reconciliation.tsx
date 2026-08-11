@@ -92,6 +92,15 @@ interface ReconciliationForm {
 /** Sentinel for "show every bank account" in the account filter — real account names come from the reconciliations actually on file, never hardcoded. */
 const ALL_ACCOUNTS = "__ALL__";
 
+/**
+ * The "Bank Account Name" field on a reconciliation is free text (with autocomplete suggestions,
+ * not a strict picker), so two reconciliations for the same real bank can end up with slightly
+ * different casing/whitespace (e.g. "Cash at Bank" vs "cash at bank "). Comparing names for the
+ * account filter must ignore that or a reconciliation can silently vanish when a specific account
+ * is selected even though it's right there under "All Bank Accounts".
+ */
+const normalizeAccountName = (name: string) => name.trim().toLowerCase();
+
 const emptyLine: LineForm = {
   transactionDate: new Date().toISOString().split("T")[0],
   description: "",
@@ -202,28 +211,35 @@ export function BankReconciliation() {
 
   useEffect(() => { loadReconciliations(); }, [loadReconciliations]);
 
-  /** Real bank account names, taken from both system accounts and any existing reconciliations. */
-  const bankAccountNames = useMemo(
-    () => Array.from(new Set([...systemBankAccounts.map(a => a.name), ...allReconciliations.map(r => r.bankAccountName)])).sort(),
-    [allReconciliations, systemBankAccounts]
-  );
-  
+  /**
+   * Real bank account names, taken from both system accounts and any existing reconciliations,
+   * deduplicated case/whitespace-insensitively. When a system account and a reconciliation refer to
+   * the same bank under slightly different casing, the system account's canonical name wins so the
+   * dropdown always shows the "real" spelling.
+   */
+  const bankAccountNames = useMemo(() => {
+    const byKey = new Map<string, string>();
+    allReconciliations.forEach(r => byKey.set(normalizeAccountName(r.bankAccountName), r.bankAccountName));
+    systemBankAccounts.forEach(a => byKey.set(normalizeAccountName(a.name), a.name));
+    return Array.from(byKey.values()).sort();
+  }, [allReconciliations, systemBankAccounts]);
+
   const getAccountDisplayName = useCallback((name: string) => {
-    const acc = systemBankAccounts.find(a => a.name === name);
+    const acc = systemBankAccounts.find(a => normalizeAccountName(a.name) === normalizeAccountName(name));
     return acc ? `${acc.code} - ${name}` : name;
   }, [systemBankAccounts]);
 
   const visibleReconciliations = useMemo(
     () => selectedAccountName === ALL_ACCOUNTS
       ? allReconciliations
-      : allReconciliations.filter(r => r.bankAccountName === selectedAccountName),
+      : allReconciliations.filter(r => normalizeAccountName(r.bankAccountName) === normalizeAccountName(selectedAccountName)),
     [allReconciliations, selectedAccountName]
   );
 
   useEffect(() => {
     // The selected account may no longer exist (its last reconciliation was just deleted) — fall
     // back to "all accounts" instead of silently filtering to nothing.
-    if (selectedAccountName !== ALL_ACCOUNTS && !bankAccountNames.includes(selectedAccountName)) {
+    if (selectedAccountName !== ALL_ACCOUNTS && !bankAccountNames.some(n => normalizeAccountName(n) === normalizeAccountName(selectedAccountName))) {
       setSelectedAccountName(ALL_ACCOUNTS);
       return;
     }

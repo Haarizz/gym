@@ -145,8 +145,10 @@ export function FinancialAuditLogPage() {
             </Table>
           </div>
           {!loading && logs.length === 0 && (
-            <div className="text-center py-10">
-              <History className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <div className="text-center py-14">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                <History className="h-7 w-7 text-gray-400" />
+              </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No audit log entries found</h3>
               <p className="text-gray-600">Adjust the filters above, or check back after posting a voucher.</p>
             </div>

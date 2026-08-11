@@ -1,8 +1,8 @@
 package com.company.project.services;
 
+import com.company.project.dto.NotificationResponseDTO;
 import com.company.project.dto.dashboard.DashboardDTOs.*;
 import com.company.project.entities.Member;
-import com.company.project.entities.Notification;
 import com.company.project.entities.Receipt;
 import com.company.project.entities.Staff;
 import com.company.project.entities.TrainingSession;
@@ -27,7 +27,7 @@ public class DashboardService {
     private final ReceiptRepository receiptRepository;
     private final AttendanceRepository attendanceRepository;
     private final StaffRepository staffRepository;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final TrainingSessionRepository trainingSessionRepository;
     private final BookingRepository bookingRepository;
     private final LeadRepository leadRepository;
@@ -38,7 +38,7 @@ public class DashboardService {
             ReceiptRepository receiptRepository,
             AttendanceRepository attendanceRepository,
             StaffRepository staffRepository,
-            NotificationRepository notificationRepository,
+            NotificationService notificationService,
             TrainingSessionRepository trainingSessionRepository,
             BookingRepository bookingRepository,
             LeadRepository leadRepository,
@@ -47,7 +47,7 @@ public class DashboardService {
         this.receiptRepository = receiptRepository;
         this.attendanceRepository = attendanceRepository;
         this.staffRepository = staffRepository;
-        this.notificationRepository = notificationRepository;
+        this.notificationService = notificationService;
         this.trainingSessionRepository = trainingSessionRepository;
         this.bookingRepository = bookingRepository;
         this.leadRepository = leadRepository;
@@ -157,18 +157,29 @@ public class DashboardService {
     }
 
     public List<Object> getNotifications() {
-        List<Notification> notifs = notificationRepository.findTop5ByOrderByCreatedAtDesc();
+        List<NotificationResponseDTO> notifs = notificationService.getForCurrentUser(0, 5).getContent();
         return notifs.stream().map(n -> {
-            // Map entity to anonymous object for quick JSON
+            // Map DTO to anonymous object for quick JSON
             return new Object() {
                 public String id = n.getId().toString();
-                public String type = "info"; // default
+                public String type = mapNotificationType(n.getType());
                 public String title = n.getTitle();
                 public String message = n.getMessage();
                 public String timestamp = n.getCreatedAt().toString();
                 public boolean isRead = n.isRead();
+                public String actionUrl = n.getActionUrl();
             };
         }).collect(Collectors.toList());
+    }
+
+    private String mapNotificationType(String backendType) {
+        if (backendType == null) return "info";
+        return switch (backendType) {
+            case "DANGER" -> "alert";
+            case "WARNING" -> "warning";
+            case "SUCCESS" -> "success";
+            default -> "info";
+        };
     }
 
     public List<Object> getStaffStatus() {

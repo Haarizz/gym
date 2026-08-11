@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { paymentVoucherService, type PaymentVoucher as PVApiType, type PaymentVoucherCreateRequest } from "../utils/supabase/payment-voucher-service";
+import { purchaseService, type Supplier } from "../utils/supabase/purchase-service";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -13,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import { toast } from "sonner";
 import {
   CalendarIcon,
@@ -41,7 +43,9 @@ import {
   Calendar as CalendarBig,
   Users,
   Receipt,
-  Split
+  Split,
+  Check,
+  ChevronsUpDown
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
 import {
@@ -219,10 +223,18 @@ export function PaymentVoucher() {
   // Card Type / Digital Wallet details for the top-level (non-Mixed) Payment Method.
   const [methodDetails, setMethodDetails] = useState<SplitPaymentDetails>(emptyMethodDetails);
   const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const [supplierSearch, setSupplierSearch] = useState("");
+
   useEffect(() => {
     accountHeadsService.getBankAccounts()
       .then(setBankAccounts)
       .catch(err => console.error('Failed to load bank accounts:', err));
+      
+    purchaseService.getActiveSuppliers()
+      .then(setSuppliers)
+      .catch(err => console.error('Failed to load suppliers:', err));
   }, []);
   const [savingForm, setSavingForm] = useState(false);
   const [deletingVoucher, setDeletingVoucher] = useState(false);
@@ -555,11 +567,62 @@ export function PaymentVoucher() {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Supplier / Vendor Name *</Label>
-          <Input
-            value={form.supplierName}
-            onChange={e => setForm(f => ({ ...f, supplierName: e.target.value }))}
-            placeholder="Enter supplier name"
-          />
+          <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={supplierOpen}
+                className="w-full justify-between font-normal bg-white"
+              >
+                {form.supplierName || "Select or enter supplier..."}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent style={{ width: 'var(--radix-popover-trigger-width)' }} className="p-0" align="start">
+              <Command>
+                <CommandInput 
+                  placeholder="Search supplier..." 
+                  value={supplierSearch}
+                  onValueChange={setSupplierSearch}
+                />
+                <CommandList>
+                  <CommandEmpty>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start font-normal px-2 py-1.5 h-auto"
+                      onClick={() => {
+                        setForm(f => ({ ...f, supplierName: supplierSearch }));
+                        setSupplierOpen(false);
+                      }}
+                    >
+                      Use "{supplierSearch}"
+                    </Button>
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {suppliers.map((supplier) => (
+                      <CommandItem
+                        key={supplier.id}
+                        value={supplier.name}
+                        onSelect={(currentValue) => {
+                          setForm(f => ({ ...f, supplierName: supplier.name }));
+                          setSupplierOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            form.supplierName === supplier.name ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {supplier.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="space-y-2">
           <Label>Supplier Type</Label>

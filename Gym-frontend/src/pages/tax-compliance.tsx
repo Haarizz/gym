@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { taxComplianceService, TaxComplianceItem, TaxComplianceCreateRequest } from '../utils/supabase/tax-compliance-service';
 import { financialReportsService, TaxSummaryData } from '../utils/supabase/financial-reports-service';
+import { taxCodeService, TaxCode, TaxCodeRequest } from '../utils/supabase/tax-code-service';
 import { getVatRate, DEFAULT_VAT_RATE } from '../utils/tax';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { Switch } from "../components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
@@ -20,6 +22,27 @@ import {
   ChevronRight, Bell
 } from 'lucide-react';
 import { format } from 'date-fns';
+
+const taxTypeColors: Record<string, string> = {
+  STANDARD: "bg-blue-100 text-blue-800",
+  ZERO_RATED: "bg-gray-100 text-gray-800",
+  EXEMPT: "bg-gray-100 text-gray-800",
+  CGST: "bg-purple-100 text-purple-800",
+  SGST: "bg-indigo-100 text-indigo-800",
+  IGST: "bg-teal-100 text-teal-800",
+};
+
+const defaultTaxCodeForm: TaxCodeRequest = {
+  code: "",
+  name: "",
+  rate: 0,
+  salesTaxAccountCode: "",
+  purchaseTaxAccountCode: "",
+  active: true,
+  description: "",
+  taxType: "STANDARD",
+  secondaryTaxCode: "",
+};
 
 const TAX_TYPE_OPTIONS = [
   { value: "VAT", label: "VAT (Value Added Tax)" },
@@ -86,20 +109,6 @@ const defaultMarkFiledForm = {
   filingReference: "",
 };
 
-const defaultConfigForm = {
-  taxType: "",
-  filingFrequency: "Monthly",
-  rate: "",
-  linkedAccounts: "",
-  status: "Active",
-};
-
-const initialTaxTypeConfigs = [
-  { id: 1, taxType: "Corporate Tax", filingFrequency: "Quarterly", rate: "9%", linkedAccounts: ["Revenue", "Operating Expenses", "Depreciation"], status: "Active" },
-  { id: 2, taxType: "VAT", filingFrequency: "Monthly", rate: "5%", linkedAccounts: ["Sales Revenue", "Purchase Expenses"], status: "Active" },
-  { id: 3, taxType: "Excise Tax", filingFrequency: "Quarterly", rate: "50%", linkedAccounts: ["Excisable Goods Revenue"], status: "Active" },
-];
-
 export function TaxCompliance() {
   const { currencyCode } = useCurrency();
   const [filings, setFilings] = useState<TaxComplianceItem[]>([]);
@@ -126,11 +135,26 @@ export function TaxCompliance() {
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [viewingFiling, setViewingFiling] = useState<TaxComplianceItem | null>(null);
 
-  // Configuration tab — local state only (no backend entity for tax type config)
-  const [taxTypeConfigs, setTaxTypeConfigs] = useState(initialTaxTypeConfigs);
-  const [showConfigDialog, setShowConfigDialog] = useState(false);
-  const [editingConfig, setEditingConfig] = useState<typeof initialTaxTypeConfigs[0] | null>(null);
-  const [configForm, setConfigForm] = useState(defaultConfigForm);
+  // Configuration tab — Tax Codes, backed by TaxCodeService (VAT/GST rates,
+  // zero-rated/exempt, CGST/SGST/IGST pairing). Tax Codes used to be a
+  // separate module; it's folded in here since both screens configure the
+  // same underlying tax setup.
+  const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
+  const [taxCodesLoading, setTaxCodesLoading] = useState(false);
+  const [showTaxCodeDialog, setShowTaxCodeDialog] = useState(false);
+  const [editingTaxCode, setEditingTaxCode] = useState<TaxCode | null>(null);
+  const [taxCodeForm, setTaxCodeForm] = useState<TaxCodeRequest>(defaultTaxCodeForm);
+
+  const loadTaxCodes = useCallback(async () => {
+    setTaxCodesLoading(true);
+    try {
+      setTaxCodes(await taxCodeService.getAll());
+    } catch { /* silently degrade */ } finally {
+      setTaxCodesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadTaxCodes(); }, [loadTaxCodes]);
 
   // Reports tab — real figures derived from the posted ledger (see
   // FinancialReportService.getTaxSummary). Corporate Tax is annual so it's
@@ -290,39 +314,42 @@ export function TaxCompliance() {
     } catch { /* ignore */ }
   };
 
-  // ── Config tab (local only) ───────────────────────────────────────────
-  const openAddConfig = () => {
-    setEditingConfig(null);
-    setConfigForm(defaultConfigForm);
-    setShowConfigDialog(true);
+  // ── Tax Codes (Configuration tab) ───────────────────────────────────────
+  const openAddTaxCode = () => {
+    setEditingTaxCode(null);
+    setTaxCodeForm(defaultTaxCodeForm);
+    setShowTaxCodeDialog(true);
   };
 
-  const openEditConfig = (c: typeof initialTaxTypeConfigs[0]) => {
-    setEditingConfig(c);
-    setConfigForm({
-      taxType: c.taxType,
-      filingFrequency: c.filingFrequency,
-      rate: c.rate,
-      linkedAccounts: c.linkedAccounts.join(", "),
-      status: c.status,
+  const openEditTaxCode = (c: TaxCode) => {
+    setEditingTaxCode(c);
+    setTaxCodeForm({
+      code: c.code, name: c.name, rate: c.rate,
+      salesTaxAccountCode: c.salesTaxAccountCode ?? "", purchaseTaxAccountCode: c.purchaseTaxAccountCode ?? "",
+      active: c.active, description: c.description ?? "", taxType: c.taxType, secondaryTaxCode: c.secondaryTaxCode ?? "",
     });
-    setShowConfigDialog(true);
+    setShowTaxCodeDialog(true);
   };
 
-  const handleSaveConfig = () => {
-    const accounts = configForm.linkedAccounts.split(',').map(a => a.trim()).filter(Boolean);
-    if (editingConfig) {
-      setTaxTypeConfigs(prev => prev.map(c => c.id === editingConfig.id
-        ? { ...c, taxType: configForm.taxType, filingFrequency: configForm.filingFrequency, rate: configForm.rate, linkedAccounts: accounts, status: configForm.status }
-        : c));
-    } else {
-      setTaxTypeConfigs(prev => [...prev, { id: Date.now(), taxType: configForm.taxType, filingFrequency: configForm.filingFrequency, rate: configForm.rate, linkedAccounts: accounts, status: configForm.status }]);
-    }
-    setShowConfigDialog(false);
+  const handleSaveTaxCode = async () => {
+    if (!taxCodeForm.code || !taxCodeForm.name) return;
+    try {
+      if (editingTaxCode) {
+        await taxCodeService.update(editingTaxCode.id, taxCodeForm);
+      } else {
+        await taxCodeService.create(taxCodeForm);
+      }
+      setShowTaxCodeDialog(false);
+      await loadTaxCodes();
+    } catch { /* ignore */ }
   };
 
-  const handleDeleteConfig = (id: number) => {
-    setTaxTypeConfigs(prev => prev.filter(c => c.id !== id));
+  const handleDeleteTaxCode = async (id: string) => {
+    if (!window.confirm("Delete this tax code?")) return;
+    try {
+      await taxCodeService.delete(id);
+      await loadTaxCodes();
+    } catch { /* ignore */ }
   };
 
   return (
@@ -534,64 +561,67 @@ export function TaxCompliance() {
           </Card>
         </TabsContent>
 
-        {/* ── Configuration Tab (local only) ── */}
+        {/* ── Configuration Tab — Tax Codes ── */}
         <TabsContent value="configuration" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <Card className="bg-white border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Tax Type Configuration</CardTitle>
-                <CardDescription>Define tax types, filing frequencies, and linked accounts</CardDescription>
+                <CardTitle>Tax Codes</CardTitle>
+                <CardDescription>
+                  Configure VAT/GST rates, zero-rated/exempt classifications, and CGST/SGST/IGST pairs.
+                  Pairing a tax type with a secondary code splits the posted tax amount evenly across both accounts.
+                </CardDescription>
               </div>
-              <Button size="sm" onClick={openAddConfig}>
+              <Button size="sm" onClick={openAddTaxCode}>
                 <Plus className="mr-2 h-4 w-4" />
-                Add Tax Type
+                Add Tax Code
               </Button>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader className="bg-slate-50">
                   <TableRow>
-                    <TableHead>Tax Type</TableHead>
-                    <TableHead>Filing Frequency</TableHead>
-                    <TableHead>Rate</TableHead>
-                    <TableHead>Linked Accounts</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Rate (%)</TableHead>
+                    <TableHead>Paired With</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {taxTypeConfigs.map(c => (
+                  {taxCodes.map(c => (
                     <TableRow key={c.id}>
-                      <TableCell className="font-medium">{c.taxType}</TableCell>
-                      <TableCell><Badge variant="outline">{c.filingFrequency}</Badge></TableCell>
-                      <TableCell>{c.rate}</TableCell>
+                      <TableCell className="font-mono text-sm font-medium">{c.code}</TableCell>
+                      <TableCell>{c.name}</TableCell>
+                      <TableCell><Badge variant="secondary" className={taxTypeColors[c.taxType] ?? "bg-gray-100 text-gray-800"}>{c.taxType}</Badge></TableCell>
+                      <TableCell className="text-right">{c.rate.toFixed(2)}</TableCell>
+                      <TableCell className="font-mono text-sm">{c.secondaryTaxCode || "—"}</TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {c.linkedAccounts.slice(0, 2).map((a, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">{a}</Badge>
-                          ))}
-                          {c.linkedAccounts.length > 2 && (
-                            <Badge variant="outline" className="text-xs">+{c.linkedAccounts.length - 2} more</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={c.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                          {c.status}
+                        <Badge className={c.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                          {c.active ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => openEditConfig(c)}>
+                          <Button variant="outline" size="sm" onClick={() => openEditTaxCode(c)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleDeleteConfig(c.id)}>
+                          <Button variant="outline" size="sm" onClick={() => handleDeleteTaxCode(c.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
                   ))}
+                  {!taxCodesLoading && taxCodes.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        No tax codes yet. Click <strong>Add Tax Code</strong> to create the first one.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -962,53 +992,71 @@ export function TaxCompliance() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Tax Type Config Dialog (local only) ── */}
-      <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
+      {/* ── Tax Code Dialog ── */}
+      <Dialog open={showTaxCodeDialog} onOpenChange={setShowTaxCodeDialog}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>{editingConfig ? "Edit Tax Type" : "Add Tax Type"}</DialogTitle>
-            <DialogDescription>Configure tax type, filing frequency, and linked accounts</DialogDescription>
+            <DialogTitle>{editingTaxCode ? "Edit Tax Code" : "New Tax Code"}</DialogTitle>
+            <DialogDescription>
+              Pairing a tax type (e.g. CGST) with a secondary code (e.g. SGST) splits the posted
+              tax amount evenly across both accounts.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Tax Type *</Label>
-              <Input placeholder="e.g. VAT, Corporate Tax" value={configForm.taxType} onChange={e => setConfigForm(f => ({ ...f, taxType: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Code *</Label>
+                <Input value={taxCodeForm.code} onChange={e => setTaxCodeForm(f => ({ ...f, code: e.target.value }))} placeholder="e.g. VAT5" disabled={!!editingTaxCode} />
+              </div>
+              <div className="space-y-2">
+                <Label>Rate (%)</Label>
+                <Input type="number" step="0.01" min="0" value={taxCodeForm.rate || ""} onChange={e => setTaxCodeForm(f => ({ ...f, rate: parseFloat(e.target.value) || 0 }))} />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label>Filing Frequency *</Label>
-              <Select value={configForm.filingFrequency} onValueChange={v => setConfigForm(f => ({ ...f, filingFrequency: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Monthly">Monthly</SelectItem>
-                  <SelectItem value="Quarterly">Quarterly</SelectItem>
-                  <SelectItem value="Annually">Annually</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Name *</Label>
+              <Input value={taxCodeForm.name} onChange={e => setTaxCodeForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Standard VAT 5%" />
             </div>
-            <div className="space-y-2">
-              <Label>Tax Rate</Label>
-              <Input placeholder="e.g. 5%, 9%, 50%" value={configForm.rate} onChange={e => setConfigForm(f => ({ ...f, rate: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tax Type</Label>
+                <Select value={taxCodeForm.taxType ?? "STANDARD"} onValueChange={v => setTaxCodeForm(f => ({ ...f, taxType: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="STANDARD">Standard</SelectItem>
+                    <SelectItem value="ZERO_RATED">Zero Rated</SelectItem>
+                    <SelectItem value="EXEMPT">Exempt</SelectItem>
+                    <SelectItem value="CGST">CGST</SelectItem>
+                    <SelectItem value="SGST">SGST</SelectItem>
+                    <SelectItem value="IGST">IGST</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Secondary Tax Code (pair)</Label>
+                <Input value={taxCodeForm.secondaryTaxCode ?? ""} onChange={e => setTaxCodeForm(f => ({ ...f, secondaryTaxCode: e.target.value }))} placeholder="e.g. SGST9" />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Linked Accounts (comma-separated)</Label>
-              <Textarea placeholder="e.g. Revenue, Operating Expenses" rows={2} value={configForm.linkedAccounts} onChange={e => setConfigForm(f => ({ ...f, linkedAccounts: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Sales/Output Account Code</Label>
+                <Input value={taxCodeForm.salesTaxAccountCode ?? ""} onChange={e => setTaxCodeForm(f => ({ ...f, salesTaxAccountCode: e.target.value }))} placeholder="e.g. 2100" />
+              </div>
+              <div className="space-y-2">
+                <Label>Purchase/Input Account Code</Label>
+                <Input value={taxCodeForm.purchaseTaxAccountCode ?? ""} onChange={e => setTaxCodeForm(f => ({ ...f, purchaseTaxAccountCode: e.target.value }))} placeholder="e.g. 2200" />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={configForm.status} onValueChange={v => setConfigForm(f => ({ ...f, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <Label className="mb-0">Active</Label>
+              <Switch checked={taxCodeForm.active ?? true} onCheckedChange={v => setTaxCodeForm(f => ({ ...f, active: v }))} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfigDialog(false)}>Cancel</Button>
-            <Button onClick={handleSaveConfig} disabled={!configForm.taxType}
+            <Button variant="outline" onClick={() => setShowTaxCodeDialog(false)}>Cancel</Button>
+            <Button onClick={handleSaveTaxCode} disabled={!taxCodeForm.code || !taxCodeForm.name}
               style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
-              {editingConfig ? "Update" : "Add"}
+              {editingTaxCode ? "Save Changes" : "Create Tax Code"}
             </Button>
           </DialogFooter>
         </DialogContent>

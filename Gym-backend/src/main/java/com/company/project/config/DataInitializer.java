@@ -2,14 +2,18 @@ package com.company.project.config;
 
 import com.company.project.dto.ProductRequestDTO;
 import com.company.project.entities.AccountHead;
+import com.company.project.entities.Permission;
 import com.company.project.entities.ProductCategory;
 import com.company.project.entities.Role;
+import com.company.project.entities.RolePermission;
 import com.company.project.entities.User;
 import com.company.project.entities.UserRole;
 import com.company.project.entities.Warehouse;
 import com.company.project.repositories.AccountHeadRepository;
+import com.company.project.repositories.PermissionRepository;
 import com.company.project.repositories.ProductCategoryRepository;
 import com.company.project.repositories.ProductRepository;
+import com.company.project.repositories.RolePermissionRepository;
 import com.company.project.repositories.RoleRepository;
 import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
@@ -30,6 +34,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
@@ -49,6 +54,8 @@ public class DataInitializer implements CommandLineRunner {
     private final AccountHeadRepository accountHeadRepository;
     private final AddonPlanService addonPlanService;
     private final FiscalYearService fiscalYearService;
+    private final PermissionRepository permissionRepository;
+    private final RolePermissionRepository rolePermissionRepository;
 
     public DataInitializer(
             RoleRepository roleRepository,
@@ -65,7 +72,9 @@ public class DataInitializer implements CommandLineRunner {
             SupplierBillService supplierBillService,
             AccountHeadRepository accountHeadRepository,
             AddonPlanService addonPlanService,
-            FiscalYearService fiscalYearService
+            FiscalYearService fiscalYearService,
+            PermissionRepository permissionRepository,
+            RolePermissionRepository rolePermissionRepository
     ) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
@@ -82,13 +91,17 @@ public class DataInitializer implements CommandLineRunner {
         this.accountHeadRepository = accountHeadRepository;
         this.addonPlanService = addonPlanService;
         this.fiscalYearService = fiscalYearService;
+        this.permissionRepository = permissionRepository;
+        this.rolePermissionRepository = rolePermissionRepository;
     }
 
     @Override
     @Transactional
     public void run(String... args) throws Exception {
         // Seed Roles
-        List<String> rolesToSeed = List.of("ADMIN", "MANAGER", "USER", "ACCOUNTANT", "HR", "MEMBER", "STAFF");
+        List<String> rolesToSeed = List.of(
+                "ADMIN", "MANAGER", "USER", "ACCOUNTANT", "HR", "MEMBER", "STAFF",
+                "RECEPTIONIST", "TRAINER");
         for (String roleName : rolesToSeed) {
             if (roleRepository.findByRoleName(roleName).isEmpty()) {
                 Role role = new Role();
@@ -96,6 +109,10 @@ public class DataInitializer implements CommandLineRunner {
                 roleRepository.save(role);
             }
         }
+
+        // Administration module: seed the module x action permission catalog and each
+        // role's default permission set (see PermissionCatalog / RoleService).
+        seedPermissionsAndRolePermissions();
 
         // Seed Admin User
         if (!userRepository.existsByEmail("admin@gymbios.com")) {
@@ -149,6 +166,132 @@ public class DataInitializer implements CommandLineRunner {
         // Self-heal: apply stock-in for any CONFIRMED supplier bill that predates the purchase
         // form's warehouse field (idempotent — only touches bills still missing a warehouseId).
         supplierBillService.backfillMissingWarehouseStock();
+    }
+
+    // ── Administration: permission catalog + default role permissions ─────────────
+
+    /**
+     * Idempotent: only inserts catalog rows that don't exist yet, and only seeds a
+     * role's default permission set the first time (a role with any existing
+     * role_permissions rows is left alone, so an admin's edits via the Roles &
+     * Permissions UI are never overwritten on the next app restart). ADMIN is
+     * deliberately not seeded here — it always evaluates to "all permissions" via
+     * RoleService.getEffectivePermissionKeys(), regardless of stored rows.
+     */
+    private void seedPermissionsAndRolePermissions() {
+        for (Map.Entry<String, List<String>> entry : PermissionCatalog.MODULES.entrySet()) {
+            String module = entry.getKey();
+            for (String action : entry.getValue()) {
+                String key = PermissionCatalog.key(module, action);
+                if (permissionRepository.findByPermissionKey(key).isEmpty()) {
+                    permissionRepository.save(new Permission(key, module, action, module + " - " + action));
+                }
+            }
+        }
+
+        // These roles are wired into existing app logic (SecurityConfig role-based rules,
+        // the staff-login flow's default role) — protect them from deletion regardless of
+        // whether their permission set has been customized.
+        for (String name : List.of("ADMIN", "MANAGER", "USER", "ACCOUNTANT", "HR", "MEMBER", "STAFF")) {
+            roleRepository.findByRoleName(name).ifPresent(role -> {
+                if (!role.isSystem()) {
+                    role.setSystem(true);
+                    roleRepository.save(role);
+                }
+            });
+        }
+
+        seedDefaultRolePermissions("MANAGER", List.of(
+                "DASHBOARD_VIEW",
+                "MEMBERS_VIEW", "MEMBERS_CREATE", "MEMBERS_EDIT", "MEMBERS_EXPORT",
+                "MEMBER_CONNECT_VIEW", "MEMBER_CONNECT_CREATE", "MEMBER_CONNECT_EDIT", "MEMBER_CONNECT_EXPORT",
+                "COMMUNITY_VIEW", "COMMUNITY_CREATE", "COMMUNITY_EDIT", "COMMUNITY_EXPORT",
+                "ATTENDANCE_VIEW", "ATTENDANCE_CREATE", "ATTENDANCE_EDIT", "ATTENDANCE_EXPORT",
+                "BILLING_VIEW", "BILLING_CREATE", "BILLING_EDIT", "BILLING_EXPORT",
+                "PAYMENTS_VIEW", "PAYMENTS_CREATE", "PAYMENTS_EDIT", "PAYMENTS_EXPORT", "PAYMENTS_APPROVE",
+                "MEMBERSHIP_PLANS_VIEW", "MEMBERSHIP_PLANS_CREATE", "MEMBERSHIP_PLANS_EDIT", "MEMBERSHIP_PLANS_EXPORT",
+                "TRAINERS_VIEW", "TRAINERS_CREATE", "TRAINERS_EDIT", "TRAINERS_EXPORT",
+                "STAFF_VIEW", "STAFF_CREATE", "STAFF_EDIT", "STAFF_DELETE", "STAFF_EXPORT",
+                "PAYROLL_VIEW", "PAYROLL_CREATE", "PAYROLL_EDIT", "PAYROLL_EXPORT", "PAYROLL_APPROVE",
+                "REPORTS_VIEW", "REPORTS_EXPORT",
+                "ASSETS_VIEW", "ASSETS_CREATE", "ASSETS_EDIT", "ASSETS_EXPORT",
+                "SALES_PURCHASES_VIEW", "SALES_PURCHASES_CREATE", "SALES_PURCHASES_EDIT", "SALES_PURCHASES_EXPORT",
+                "FINANCIALS_VIEW", "FINANCIALS_CREATE", "FINANCIALS_EDIT", "FINANCIALS_EXPORT", "FINANCIALS_APPROVE",
+                "GYMOS_VIEW", "BIOS_VIEW",
+                "SETTINGS_VIEW", "SETTINGS_EDIT",
+                "ADMINISTRATION_VIEW"
+        ));
+
+        seedDefaultRolePermissions("ACCOUNTANT", List.of(
+                "DASHBOARD_VIEW",
+                "BILLING_VIEW", "BILLING_CREATE", "BILLING_EDIT", "BILLING_EXPORT",
+                "PAYMENTS_VIEW", "PAYMENTS_CREATE", "PAYMENTS_EDIT", "PAYMENTS_EXPORT",
+                "FINANCIALS_VIEW", "FINANCIALS_CREATE", "FINANCIALS_EDIT", "FINANCIALS_EXPORT", "FINANCIALS_APPROVE",
+                "SALES_PURCHASES_VIEW",
+                "REPORTS_VIEW", "REPORTS_EXPORT"
+        ));
+
+        seedDefaultRolePermissions("HR", List.of(
+                "DASHBOARD_VIEW",
+                "STAFF_VIEW", "STAFF_CREATE", "STAFF_EDIT", "STAFF_DELETE", "STAFF_EXPORT",
+                "PAYROLL_VIEW", "PAYROLL_CREATE", "PAYROLL_EDIT", "PAYROLL_EXPORT",
+                "REPORTS_VIEW"
+        ));
+
+        // Matches the spec's worked example exactly.
+        seedDefaultRolePermissions("RECEPTIONIST", List.of(
+                "DASHBOARD_VIEW",
+                "MEMBERS_VIEW", "MEMBERS_CREATE", "MEMBERS_EDIT",
+                "PAYMENTS_VIEW", "PAYMENTS_CREATE",
+                "REPORTS_VIEW"
+        ));
+
+        seedDefaultRolePermissions("TRAINER", List.of(
+                "DASHBOARD_VIEW",
+                "MEMBERS_VIEW",
+                "ATTENDANCE_VIEW", "ATTENDANCE_CREATE"
+        ));
+
+        seedDefaultRolePermissions("USER", List.of("DASHBOARD_VIEW"));
+        seedDefaultRolePermissions("MEMBER", List.of("DASHBOARD_VIEW"));
+        seedDefaultRolePermissions("STAFF", List.of("DASHBOARD_VIEW"));
+
+        // SALES_PURCHASES/FINANCIALS/GYMOS/BIOS were added to the catalog after the
+        // above per-role bulk seed had already run on existing installs (it skips a
+        // role entirely once it has any row, so those installs never got these new
+        // keys). Backfill them additively, one (role, key) pair at a time, so this
+        // self-heals an already-seeded database without touching any customization
+        // an admin made to a role's existing permissions via the Roles & Permissions UI.
+        for (String key : List.of(
+                "SALES_PURCHASES_VIEW", "SALES_PURCHASES_CREATE", "SALES_PURCHASES_EDIT", "SALES_PURCHASES_EXPORT",
+                "FINANCIALS_VIEW", "FINANCIALS_CREATE", "FINANCIALS_EDIT", "FINANCIALS_EXPORT", "FINANCIALS_APPROVE",
+                "GYMOS_VIEW", "BIOS_VIEW")) {
+            grantPermissionIfMissing("MANAGER", key);
+        }
+        for (String key : List.of(
+                "FINANCIALS_VIEW", "FINANCIALS_CREATE", "FINANCIALS_EDIT", "FINANCIALS_EXPORT", "FINANCIALS_APPROVE",
+                "SALES_PURCHASES_VIEW")) {
+            grantPermissionIfMissing("ACCOUNTANT", key);
+        }
+    }
+
+    private void seedDefaultRolePermissions(String roleName, List<String> permissionKeys) {
+        Role role = roleRepository.findByRoleName(roleName).orElse(null);
+        if (role == null) return;
+        if (rolePermissionRepository.countByRoleId(role.getId()) > 0) return;
+        for (String key : permissionKeys) {
+            permissionRepository.findByPermissionKey(key).ifPresent(permission ->
+                    rolePermissionRepository.save(new RolePermission(role, permission)));
+        }
+    }
+
+    private void grantPermissionIfMissing(String roleName, String permissionKey) {
+        Role role = roleRepository.findByRoleName(roleName).orElse(null);
+        if (role == null) return;
+        Permission permission = permissionRepository.findByPermissionKey(permissionKey).orElse(null);
+        if (permission == null) return;
+        if (rolePermissionRepository.existsByRoleIdAndPermissionId(role.getId(), permission.getId())) return;
+        rolePermissionRepository.save(new RolePermission(role, permission));
     }
 
     // ── Chart of Accounts ───────────────────────────────────────────────────────

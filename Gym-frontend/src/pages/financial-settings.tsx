@@ -25,12 +25,17 @@ import {
   RefreshCw,
   CheckCircle2,
   XCircle,
+  IdCard,
 } from 'lucide-react';
 import {
   financialSettingsService,
   FinancialSetting,
   FinancialSettingRequest,
 } from '../utils/supabase/financial-settings-service';
+import {
+  companyTaxDetailsService,
+  CompanyTaxDetails,
+} from '../utils/supabase/company-tax-details-service';
 
 const CATEGORIES = ['GENERAL', 'ACCOUNTING', 'TAX', 'BANK'] as const;
 type Category = typeof CATEGORIES[number];
@@ -51,6 +56,39 @@ export function FinancialSettings() {
   const [settings, setSettings] = useState<FinancialSetting[]>([]);
   const [activeTab, setActiveTab] = useState<string>('GENERAL');
   const [loading, setLoading] = useState(false);
+
+  // Company tax registration details — a single structured record (GST No/
+  // VAT No/TRN), not a generic key/value setting, so it gets its own card
+  // at the top of the TAX tab instead of living in the list below.
+  const [companyTaxDetails, setCompanyTaxDetails] = useState<CompanyTaxDetails>({});
+  const [companyTaxLoading, setCompanyTaxLoading] = useState(false);
+  const [companyTaxSaving, setCompanyTaxSaving] = useState(false);
+
+  const loadCompanyTaxDetails = useCallback(async () => {
+    setCompanyTaxLoading(true);
+    try {
+      setCompanyTaxDetails(await companyTaxDetailsService.get());
+    } catch {
+      toast.error('Failed to load company tax details');
+    } finally {
+      setCompanyTaxLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadCompanyTaxDetails(); }, [loadCompanyTaxDetails]);
+
+  const handleSaveCompanyTaxDetails = async () => {
+    try {
+      setCompanyTaxSaving(true);
+      const saved = await companyTaxDetailsService.update(companyTaxDetails);
+      setCompanyTaxDetails(saved);
+      toast.success('Company tax details saved');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save company tax details');
+    } finally {
+      setCompanyTaxSaving(false);
+    }
+  };
 
   // Dialog state
   const [showDialog, setShowDialog] = useState(false);
@@ -209,7 +247,67 @@ export function FinancialSettings() {
         </TabsList>
 
         {CATEGORIES.map(cat => (
-          <TabsContent key={cat} value={cat} className={cn("mt-4", tabContentShell)}>
+          <TabsContent key={cat} value={cat} className={cn("mt-4", tabContentShell, "space-y-6")}>
+            {cat === 'TAX' && (
+              <Card className={panelCardShell}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <IdCard className="h-4 w-4 text-orange-600" />
+                    Company Tax Registration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Legal Name</Label>
+                    <Input
+                      value={companyTaxDetails.legalName ?? ''}
+                      onChange={e => setCompanyTaxDetails(d => ({ ...d, legalName: e.target.value }))}
+                      placeholder="Registered company name"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>GST Number</Label>
+                      <Input
+                        value={companyTaxDetails.gstNumber ?? ''}
+                        onChange={e => setCompanyTaxDetails(d => ({ ...d, gstNumber: e.target.value }))}
+                        placeholder="GSTIN"
+                      />
+                    </div>
+                    <div>
+                      <Label>VAT Number</Label>
+                      <Input
+                        value={companyTaxDetails.vatNumber ?? ''}
+                        onChange={e => setCompanyTaxDetails(d => ({ ...d, vatNumber: e.target.value }))}
+                        placeholder="VAT registration number"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>TRN (Tax Registration Number)</Label>
+                    <Input
+                      value={companyTaxDetails.trn ?? ''}
+                      onChange={e => setCompanyTaxDetails(d => ({ ...d, trn: e.target.value }))}
+                      placeholder="e.g. 100XXXXXXXXXXX3"
+                    />
+                  </div>
+                  <div>
+                    <Label>Registered Address</Label>
+                    <Textarea
+                      value={companyTaxDetails.address ?? ''}
+                      onChange={e => setCompanyTaxDetails(d => ({ ...d, address: e.target.value }))}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button size="sm" onClick={handleSaveCompanyTaxDetails} disabled={companyTaxSaving || companyTaxLoading}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {companyTaxSaving ? 'Saving...' : 'Save Registration Details'}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card className={panelCardShell}>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
@@ -225,10 +323,12 @@ export function FinancialSettings() {
               </CardHeader>
               <CardContent>
                 {settingsForCategory(cat).length === 0 ? (
-                  <div className="text-center py-10 text-gray-500">
-                    <Building2 className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                  <div className="text-center py-14 text-gray-500">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                      <Building2 className="h-7 w-7 text-gray-400" />
+                    </div>
                     <p>No {categoryMeta[cat].label.toLowerCase()} settings yet</p>
-                    <Button size="sm" className="mt-3 shadow-sm hover:shadow-md transition-all" onClick={openAdd}>
+                    <Button size="sm" className="mt-4 shadow-sm hover:shadow-md transition-all" onClick={openAdd}>
                       <Plus className="h-4 w-4 mr-1" /> Add First Setting
                     </Button>
                   </div>

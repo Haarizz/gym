@@ -10,6 +10,8 @@ public interface AccountHeadRepository extends JpaRepository<AccountHead, Long> 
 
     Optional<AccountHead> findByCode(String code);
 
+    Optional<AccountHead> findByNameIgnoreCase(String name);
+
     List<AccountHead> findByTypeOrderByCodeAsc(String type);
 
     List<AccountHead> findByIsActiveTrueOrderByCodeAsc();

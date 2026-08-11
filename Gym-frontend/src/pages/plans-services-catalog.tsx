@@ -1174,7 +1174,8 @@ export function PlansServicesCatalog() {
           name: selectedPlan.name,
           price: selectedPlan.price,
           duration: selectedPlan.duration,
-          benefits: getPlanFeatures(selectedPlan)
+          benefits: getPlanFeatures(selectedPlan),
+          discount: selectedPlan.discount
         } : null}
         onSubmitDraft={(draftData) => {
           setPendingMembers(prev => [...prev, draftData]);

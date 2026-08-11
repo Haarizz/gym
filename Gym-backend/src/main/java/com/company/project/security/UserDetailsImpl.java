@@ -32,9 +32,22 @@ public class UserDetailsImpl implements UserDetails {
     }
 
     public static UserDetailsImpl build(User user) {
+        return build(user, java.util.List.of());
+    }
+
+    /**
+     * @param permissionKeys effective fine-grained permission keys (e.g. "MEMBERS_VIEW") for this
+     *                        user's role(s), granted as bare authorities alongside the existing
+     *                        "ROLE_*" ones. Additive only — hasRole()/hasAnyRole() in SecurityConfig
+     *                        match on the "ROLE_" prefix and are unaffected by these extra authorities.
+     */
+    public static UserDetailsImpl build(User user, Collection<String> permissionKeys) {
         List<GrantedAuthority> authorities = user.getUserRoles().stream()
                 .map(userRole -> new SimpleGrantedAuthority("ROLE_" + userRole.getRole().getRoleName()))
                 .collect(Collectors.toList());
+        for (String key : permissionKeys) {
+            authorities.add(new SimpleGrantedAuthority(key));
+        }
 
         return new UserDetailsImpl(
                 user.getId(),

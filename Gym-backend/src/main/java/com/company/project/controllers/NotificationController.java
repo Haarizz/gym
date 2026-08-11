@@ -20,7 +20,9 @@ public class NotificationController {
 
     /**
      * GET /api/notifications?page=0&size=20
-     * Returns paginated notifications for the authenticated user (role-filtered).
+     * Returns paginated notifications for the authenticated user — targeted to them
+     * personally or to one of their roles, and further filtered to modules their
+     * role currently has permission for (see NotificationService.isModuleVisible).
      */
     @GetMapping
     public ResponseEntity<Page<NotificationResponseDTO>> getNotifications(

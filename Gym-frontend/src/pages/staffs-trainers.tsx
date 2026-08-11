@@ -175,6 +175,9 @@ function AddCertificationsTab() {
 // ── Schedule sub-component ─────────────────────────────────────────────────
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SLOTS = ['Morning (6am–12pm)', 'Afternoon (12pm–5pm)', 'Evening (5pm–10pm)'];
+// Single set of roles used both as the employee's job role and their app login/RBAC role,
+// so Add/Edit Employee only asks for one "Role" instead of two confusingly similar fields.
+const SECURITY_ROLES = ['Admin', 'Receptionist', 'Trainer', 'Accountant', 'Manager'];
 
 function AddScheduleTab() {
   const [schedule, setSchedule] = React.useState<Record<string, string[]>>(() =>
@@ -478,6 +481,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         ...(newEmployeeBasicInfo.appUsername && newEmployeeBasicInfo.appPassword ? {
           app_username: newEmployeeBasicInfo.appUsername,
           app_password: newEmployeeBasicInfo.appPassword,
+          app_role: newEmployeeBasicInfo.role || undefined,
         } : {}),
       });
       setShowAddEmployee(false);
@@ -939,8 +943,10 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="trainer">Trainers</SelectItem>
                 <SelectItem value="reception">Reception</SelectItem>
+                <SelectItem value="accountant">Accountants</SelectItem>
                 <SelectItem value="manager">Managers</SelectItem>
               </SelectContent>
             </Select>
@@ -1455,7 +1461,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   />
                 </div>
                 <div>
-                  <Label>Role</Label>
+                  <Label>Role <span className="text-muted-foreground font-normal">(also controls app access)</span></Label>
                   <Select
                     value={newEmployeeBasicInfo.role}
                     onValueChange={v => setNewEmployeeBasicInfo(p => ({...p, role: v}))}
@@ -1464,10 +1470,9 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Fitness Trainer">Fitness Trainer</SelectItem>
-                      <SelectItem value="Senior Trainer">Senior Trainer</SelectItem>
-                      <SelectItem value="Reception Staff">Reception Staff</SelectItem>
-                      <SelectItem value="Manager">Manager</SelectItem>
+                      {SECURITY_ROLES.map(r => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1708,14 +1713,13 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       onChange={e => setEditEmployeeData(p => p ? {...p, email: e.target.value} : p)} />
                   </div>
                   <div>
-                    <Label>Role</Label>
+                    <Label>Role <span className="text-muted-foreground font-normal">(also controls app access)</span></Label>
                     <Select value={editEmployeeData.role} onValueChange={v => setEditEmployeeData(p => p ? {...p, role: v} : p)}>
                       <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Fitness Trainer">Fitness Trainer</SelectItem>
-                        <SelectItem value="Senior Trainer">Senior Trainer</SelectItem>
-                        <SelectItem value="Reception Staff">Reception Staff</SelectItem>
-                        <SelectItem value="Manager">Manager</SelectItem>
+                        {SECURITY_ROLES.map(r => (
+                          <SelectItem key={r} value={r}>{r}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1821,7 +1825,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   </div>
                   {/* Change password */}
                   <div>
-                    <Label className="text-xs text-muted-foreground">Change Password</Label>
+                    <Label className="text-xs text-muted-foreground">Change Password <span className="font-normal">(also applies the Role selected above)</span></Label>
                     <div className="flex gap-2 mt-1">
                       <div className="relative flex-1">
                         <Input
@@ -1847,7 +1851,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                         onClick={async () => {
                           setIsSavingStaffCredentials(true);
                           try {
-                            await staffService.setStaffCredentials(editEmployeeData.id, editEmployeeData.app_username!, editAppPassword);
+                            await staffService.setStaffCredentials(editEmployeeData.id, editEmployeeData.app_username!, editAppPassword, editEmployeeData.role || undefined);
                             setEditAppPassword('');
                             toast.success('Password updated');
                           } catch (e: any) {
@@ -1902,7 +1906,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     onClick={async () => {
                       setIsSavingStaffCredentials(true);
                       try {
-                        const updated = await staffService.setStaffCredentials(editEmployeeData.id, editAppUsername, editAppPassword);
+                        const updated = await staffService.setStaffCredentials(editEmployeeData.id, editAppUsername, editAppPassword, editEmployeeData.role || undefined);
                         setEditEmployeeData(p => p ? { ...p, user_id: updated.user_id, app_username: updated.app_username, app_access_enabled: updated.app_access_enabled } : p);
                         setEditAppUsername('');
                         setEditAppPassword('');

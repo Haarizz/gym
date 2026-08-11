@@ -7,6 +7,7 @@ import com.company.project.entities.Role;
 import com.company.project.entities.User;
 import com.company.project.entities.UserRole;
 import com.company.project.repositories.RoleRepository;
+import com.company.project.repositories.StaffRepository;
 import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
 import com.company.project.security.JwtService;
@@ -32,6 +33,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final StaffRepository staffRepository;
+    private final RoleService roleService;
 
     public AuthService(
             UserRepository userRepository,
@@ -39,7 +42,9 @@ public class AuthService {
             UserRoleRepository userRoleRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            AuthenticationManager authenticationManager
+            AuthenticationManager authenticationManager,
+            StaffRepository staffRepository,
+            RoleService roleService
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -47,6 +52,8 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
+        this.staffRepository = staffRepository;
+        this.roleService = roleService;
     }
 
     @Transactional
@@ -92,10 +99,7 @@ public class AuthService {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
         String jwt = jwtService.generateToken(userDetails);
-
-        List<String> roles = userDetails.getAuthorities().stream()
-                .map(item -> item.getAuthority().replace("ROLE_", ""))
-                .collect(Collectors.toList());
+        List<String> roles = extractRoles(userDetails);
 
         return AuthResponseDTO.builder()
                 .token(jwt)
@@ -103,6 +107,11 @@ public class AuthService {
                 .roles(roles)
                 .userId(userDetails.getId())
                 .enabled(userDetails.isEnabled())
+                .roleName(roles.stream().findFirst().orElse(null))
+                .staffName(staffRepository.findByUserId(userDetails.getId())
+                        .map(com.company.project.entities.Staff::getName)
+                        .orElse(null))
+                .permissions(extractPermissions(userDetails))
                 .build();
     }
 
@@ -117,14 +126,55 @@ public class AuthService {
             throw new RuntimeException("Not authenticated");
         }
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        List<String> roles = userDetails.getAuthorities().stream()
-                .map(item -> item.getAuthority().replace("ROLE_", ""))
-                .collect(Collectors.toList());
+        List<String> roles = extractRoles(userDetails);
         return AuthResponseDTO.builder()
                 .username(userDetails.getUsername())
                 .roles(roles)
                 .userId(userDetails.getId())
                 .enabled(userDetails.isEnabled())
+                .roleName(roles.stream().findFirst().orElse(null))
+                .staffName(staffRepository.findByUserId(userDetails.getId())
+                        .map(com.company.project.entities.Staff::getName)
+                        .orElse(null))
+                .permissions(extractPermissions(userDetails))
                 .build();
+    }
+
+    private List<String> extractRoles(UserDetailsImpl userDetails) {
+        return userDetails.getAuthorities().stream()
+                .map(item -> item.getAuthority())
+                .filter(authority -> authority.startsWith("ROLE_"))
+                .map(authority -> authority.replace("ROLE_", ""))
+                .collect(Collectors.toList());
+    }
+
+    private List<String> extractPermissions(UserDetailsImpl userDetails) {
+        return userDetails.getAuthorities().stream()
+                .map(item -> item.getAuthority())
+                .filter(authority -> !authority.startsWith("ROLE_"))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void changePassword(String currentPassword, String newPassword) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication.getPrincipal().equals("anonymousUser")) {
+            throw new RuntimeException("Not authenticated");
+        }
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        User user = userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new RuntimeException("Current password is incorrect");
+        }
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new RuntimeException("New password must be at least 8 characters");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
     }
 }

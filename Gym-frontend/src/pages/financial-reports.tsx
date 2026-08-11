@@ -73,7 +73,7 @@ import {
   Truck,
   Hourglass,
 } from "lucide-react";
-import { format, subMonths, subYears } from "date-fns";
+import { format, subMonths, subYears, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subQuarters } from "date-fns";
 import { cn } from "../components/ui/utils";
 
 // Types
@@ -339,6 +339,33 @@ export function FinancialReports() {
   const [memberAging, setMemberAging] = useState<AgingData | null>(null);
   const [supplierAging, setSupplierAging] = useState<AgingData | null>(null);
   const [deferredRevenue, setDeferredRevenue] = useState<DeferredRevenueData | null>(null);
+
+  useEffect(() => {
+    const now = new Date();
+    switch (selectedPeriod) {
+      case "current-month":
+        setDateRange({ from: startOfMonth(now), to: endOfMonth(now) });
+        break;
+      case "last-month":
+        const lastMo = subMonths(now, 1);
+        setDateRange({ from: startOfMonth(lastMo), to: endOfMonth(lastMo) });
+        break;
+      case "current-quarter":
+        setDateRange({ from: startOfQuarter(now), to: endOfQuarter(now) });
+        break;
+      case "last-quarter":
+        const lastQ = subQuarters(now, 1);
+        setDateRange({ from: startOfQuarter(lastQ), to: endOfQuarter(lastQ) });
+        break;
+      case "current-year":
+        setDateRange({ from: startOfYear(now), to: endOfYear(now) });
+        break;
+      case "last-year":
+        const lastYr = subYears(now, 1);
+        setDateRange({ from: startOfYear(lastYr), to: endOfYear(lastYr) });
+        break;
+    }
+  }, [selectedPeriod]);
 
   // Filter reports based on category
   const filteredReports = reportDefinitions.filter(report =>
@@ -679,7 +706,6 @@ export function FinancialReports() {
                       "w-full justify-start text-left font-normal",
                       !dateRange && "text-muted-foreground"
                     )}
-                    disabled={selectedPeriod !== "custom"}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dateRange?.from ? (
@@ -705,6 +731,9 @@ export function FinancialReports() {
                     onSelect={(range) => {
                       if (range) {
                         setDateRange(range as DateRange);
+                        if (range.from && range.to) {
+                          setSelectedPeriod("custom");
+                        }
                       }
                     }}
                     numberOfMonths={2}
@@ -776,7 +805,7 @@ export function FinancialReports() {
       {/* Report Viewer Dialog */}
       {selectedReport && (
         <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport("")}>
-          <DialogContent className="max-w-6xl max-h-[80vh] overflow-auto">
+          <DialogContent className="sm:max-w-6xl max-w-[95vw] max-h-[90vh] overflow-auto">
             <DialogHeader>
               <DialogTitle>
                 {reportDefinitions.find(r => r.id === selectedReport)?.title}
@@ -1064,8 +1093,10 @@ export function FinancialReports() {
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Statement of Cash Flows</h3>
                       {!cashFlow ? (
-                        <div className="text-center py-10 text-gray-500">
-                          <BarChart3 className="h-12 w-12 mx-auto mb-4" />
+                        <div className="text-center py-14 text-gray-500">
+                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                            <BarChart3 className="h-7 w-7 text-gray-400" />
+                          </div>
                           <p>Generate the report to view cash flow totals.</p>
                           <p className="text-sm">Uses your real transactions for the selected range.</p>
                         </div>
@@ -1109,7 +1140,12 @@ export function FinancialReports() {
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Cash Book</h3>
                       {!cashBook ? (
-                        <div className="text-center py-8 text-gray-500"><Wallet className="h-12 w-12 mx-auto mb-4" /><p>Generate the report to view cash/bank ledger entries.</p></div>
+                        <div className="text-center py-14 text-gray-500">
+                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                            <Wallet className="h-7 w-7 text-gray-400" />
+                          </div>
+                          <p>Generate the report to view cash/bank ledger entries.</p>
+                        </div>
                       ) : (
                         <>
                           <div className="flex gap-6 text-sm">
@@ -1146,7 +1182,12 @@ export function FinancialReports() {
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Day Book</h3>
                       {!dayBook ? (
-                        <div className="text-center py-8 text-gray-500"><BookOpen className="h-12 w-12 mx-auto mb-4" /><p>Generate the report to view today's postings (uses the "to" date above).</p></div>
+                        <div className="text-center py-14 text-gray-500">
+                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                            <BookOpen className="h-7 w-7 text-gray-400" />
+                          </div>
+                          <p>Generate the report to view today's postings (uses the "to" date above).</p>
+                        </div>
                       ) : (
                         <>
                           <div className="flex gap-6 text-sm">
@@ -1181,7 +1222,12 @@ export function FinancialReports() {
                     <div className="space-y-6">
                       <h3 className="text-lg font-semibold">General Ledger</h3>
                       {!generalLedger || generalLedger.accounts.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500"><ScrollText className="h-12 w-12 mx-auto mb-4" /><p>Generate the report to view every account's postings.</p></div>
+                        <div className="text-center py-14 text-gray-500">
+                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                            <ScrollText className="h-7 w-7 text-gray-400" />
+                          </div>
+                          <p>Generate the report to view every account's postings.</p>
+                        </div>
                       ) : (
                         generalLedger.accounts.map((acc) => (
                           <div key={acc.accountCode} className="space-y-2">
@@ -1221,7 +1267,14 @@ export function FinancialReports() {
                       {(() => {
                         const data = selectedReport === "member-aging" ? memberAging : supplierAging;
                         if (!data) {
-                          return <div className="text-center py-8 text-gray-500">{selectedReport === "member-aging" ? <Users className="h-12 w-12 mx-auto mb-4" /> : <Truck className="h-12 w-12 mx-auto mb-4" />}<p>Generate the report to view outstanding balances.</p></div>;
+                          return (
+                            <div className="text-center py-14 text-gray-500">
+                              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                                {selectedReport === "member-aging" ? <Users className="h-7 w-7 text-gray-400" /> : <Truck className="h-7 w-7 text-gray-400" />}
+                              </div>
+                              <p>Generate the report to view outstanding balances.</p>
+                            </div>
+                          );
                         }
                         return (
                           <>
@@ -1263,7 +1316,12 @@ export function FinancialReports() {
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Deferred Revenue</h3>
                       {!deferredRevenue ? (
-                        <div className="text-center py-8 text-gray-500"><Hourglass className="h-12 w-12 mx-auto mb-4" /><p>Generate the report to view unrecognized membership revenue.</p></div>
+                        <div className="text-center py-14 text-gray-500">
+                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                            <Hourglass className="h-7 w-7 text-gray-400" />
+                          </div>
+                          <p>Generate the report to view unrecognized membership revenue.</p>
+                        </div>
                       ) : (
                         <>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1301,8 +1359,10 @@ export function FinancialReports() {
                       <h3 className="text-lg font-semibold">
                         {reportDefinitions.find(r => r.id === selectedReport)?.title}
                       </h3>
-                      <div className="text-center py-8 text-gray-500">
-                        <FileText className="h-12 w-12 mx-auto mb-4" />
+                      <div className="text-center py-14 text-gray-500">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                          <FileText className="h-7 w-7 text-gray-400" />
+                        </div>
                         <p>Report implementation in progress</p>
                         <p className="text-sm">IFRS-compliant data structure ready</p>
                       </div>

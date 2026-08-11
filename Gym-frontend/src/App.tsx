@@ -78,8 +78,6 @@ import { FinancialSettings } from "./pages/financial-settings";
 import { ContraVoucherPage } from "./pages/contra-voucher";
 import { DebitNotePage } from "./pages/debit-note";
 import { CreditNotePage } from "./pages/credit-note";
-import { TaxCodesPage } from "./pages/tax-codes";
-import { CompanyTaxDetailsPage } from "./pages/company-tax-details";
 import { FinancialAuditLogPage } from "./pages/financial-audit-log";
 import { FiscalPeriodsPage } from "./pages/fiscal-periods";
 import { AddProduct } from "./pages/add-product";
@@ -113,6 +111,9 @@ import { EmergencyProfile } from "./pages/emergency-profile";
 import { Recruitment } from "./pages/recruitment";
 import { PayrollReports } from "./pages/payroll-reports";
 import { PayrollAnalytics } from "./pages/payroll-analytics";
+import { AdministrationStaff } from "./pages/administration-staff";
+import { RolesPermissions } from "./pages/roles-permissions";
+import { usePermissions, hasPermission } from "./utils/permissions";
 
 import ErrorBoundary from "./components/shared/error-boundary";
 import {
@@ -167,12 +168,9 @@ import {
   FileText,
   Briefcase,
   Clock,
-  FileMinus,
-  FileCheck2,
-  Percent,
-  IdCard,
-  History,
   CalendarClock,
+  Shield,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import {
@@ -188,60 +186,70 @@ const menuItems = [
     icon: LayoutDashboard,
     id: "dashboard",
     path: "/dashboard",
+    permission: "DASHBOARD_VIEW",
   },
   {
     title: "Community",
     icon: Heart,
     id: "community",
     path: "/community",
+    permission: "COMMUNITY_VIEW",
     subItems: [
       {
         title: "Members",
         icon: Users,
         id: "members",
         path: "/members",
+        permission: "MEMBERS_VIEW",
       },
       {
         title: "Billing",
         icon: Receipt,
         id: "billing",
         path: "/billing",
+        permission: "BILLING_VIEW",
       },
       {
         title: "Manage Plans",
         icon: Settings,
         id: "manage-plans",
         path: "/manage-plans",
+        permission: "MEMBERSHIP_PLANS_VIEW",
       },
       {
         title: "Attendance",
         icon: UserCheck,
         id: "attendance",
         path: "/attendance",
+        permission: "ATTENDANCE_VIEW",
       },
       {
         title: "Check In",
         icon: LogIn,
         id: "check-in",
         path: "/check-in",
+        permission: "ATTENDANCE_VIEW",
       },
       {
         title: "Training Streams",
         icon: Video,
         id: "training-streams",
         path: "/training-streams",
+        permission: "COMMUNITY_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "reports",
         path: "/reports",
+        permission: "REPORTS_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "analytics",
         path: "/analytics",
+        permission: "REPORTS_VIEW",
       },
     ],
   },
@@ -250,66 +258,70 @@ const menuItems = [
     icon: UserPlus,
     id: "member-connect",
     path: "/member-connect",
+    permission: "MEMBER_CONNECT_VIEW",
     subItems: [
       {
         title: "Promotions & Campaign",
         icon: Megaphone,
         id: "promotions-campaign",
         path: "/promotions-campaign",
+        permission: "MEMBER_CONNECT_VIEW",
       },
       {
         title: "Referrals",
         icon: Share,
         id: "referrals",
         path: "/referrals",
+        permission: "MEMBER_CONNECT_VIEW",
       },
       {
         title: "Leads",
         icon: Target,
         id: "leads",
         path: "/leads",
+        permission: "MEMBER_CONNECT_VIEW",
       },
       {
         title: "Follow-ups",
         icon: Phone,
         id: "follow-ups",
         path: "/follow-ups",
+        permission: "MEMBER_CONNECT_VIEW",
       },
       {
         title: "Messaging",
         icon: MessageSquare,
         id: "messaging",
         path: "/messaging",
+        permission: "MEMBER_CONNECT_VIEW",
       },
       {
         title: "Automations",
         icon: Zap,
         id: "automations",
         path: "/automations",
+        permission: "MEMBER_CONNECT_VIEW",
       },
       {
         title: "Post-Workout Check-in",
         icon: CheckCircle,
         id: "post-workout-checkin",
         path: "/post-workout-checkin",
-      },
-      {
-        title: "Plans & Services Catalog",
-        icon: BookOpen,
-        id: "plans-services-catalog",
-        path: "/plans-services-catalog",
+        permission: "MEMBER_CONNECT_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "member-connect-reports",
         path: "/member-connect-reports",
+        permission: "REPORTS_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "member-connect-analytics",
         path: "/member-connect-analytics",
+        permission: "REPORTS_VIEW",
       },
     ],
   },
@@ -318,66 +330,77 @@ const menuItems = [
     icon: ShoppingCart,
     id: "sales-purchases",
     path: "/sales-purchases",
+    permission: "SALES_PURCHASES_VIEW",
     subItems: [
       {
         title: "Point of Sale",
         icon: CreditCard,
         id: "point-of-sale",
         path: "/point-of-sale",
+        permission: "SALES_PURCHASES_VIEW",
       },
       {
         title: "Products",
         icon: Package,
         id: "products",
         path: "/products",
+        permission: "SALES_PURCHASES_VIEW",
       },
       {
         title: "Category",
         icon: Tag,
         id: "category",
         path: "/category",
+        permission: "SALES_PURCHASES_VIEW",
       },
       {
         title: "Purchase Order",
         icon: ClipboardList,
         id: "purchase-order",
         path: "/purchase-order",
+        permission: "SALES_PURCHASES_VIEW",
       },
       {
         title: "Purchase",
         icon: ShoppingBag,
         id: "purchase",
         path: "/purchase",
+        permission: "SALES_PURCHASES_VIEW",
       },
       {
         title: "Wastage / Returns",
         icon: ArrowLeftRight,
         id: "wastage-returns",
         path: "/wastage-returns",
+        permission: "SALES_PURCHASES_VIEW",
       },
       {
         title: "Production / Recipe",
         icon: ChefHat,
         id: "production-recipe",
         path: "/production-recipe",
+        permission: "SALES_PURCHASES_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "sales-reports",
         path: "/sales-reports",
+        permission: "SALES_PURCHASES_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "sales-analytics",
         path: "/sales-analytics",
+        permission: "SALES_PURCHASES_VIEW",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "sales-settings",
         path: "/sales-settings",
+        permission: "SALES_PURCHASES_VIEW",
       },
     ],
   },
@@ -386,108 +409,84 @@ const menuItems = [
     icon: Calculator,
     id: "financials",
     path: "/financials",
+    permission: "FINANCIALS_VIEW",
     subItems: [
       {
         title: "Ledgers",
         icon: BookOpen,
         id: "ledgers",
         path: "/ledgers",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Receipt Voucher",
         icon: Receipt,
         id: "receipt-voucher",
         path: "/receipt-voucher",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Journal Voucher",
         icon: FileText,
         id: "journal-voucher",
         path: "/journal-voucher",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Payment Voucher",
         icon: Banknote,
         id: "payment-voucher",
         path: "/payment-voucher",
-      },
-      {
-        title: "Contra Voucher",
-        icon: ArrowLeftRight,
-        id: "contra-voucher",
-        path: "/contra-voucher",
-      },
-      {
-        title: "Debit Note",
-        icon: FileMinus,
-        id: "debit-note",
-        path: "/debit-note",
-      },
-      {
-        title: "Credit Note",
-        icon: FileCheck2,
-        id: "credit-note",
-        path: "/credit-note",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Bank Reconciliations",
         icon: Landmark,
         id: "bank-reconciliations",
         path: "/bank-reconciliations",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Expenses",
         icon: TrendingDown,
         id: "expenses",
         path: "/expenses",
-      },
-      {
-        title: "Tax Codes",
-        icon: Percent,
-        id: "tax-codes",
-        path: "/tax-codes",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Tax Compliance",
         icon: Receipt,
         id: "tax-compliance",
         path: "/tax-compliance",
-      },
-      {
-        title: "Company Tax Details",
-        icon: IdCard,
-        id: "company-tax-details",
-        path: "/company-tax-details",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "financial-reports",
         path: "/financial-reports",
-      },
-      {
-        title: "Audit Log",
-        icon: History,
-        id: "financial-audit-log",
-        path: "/financial-audit-log",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "financial-analytics",
         path: "/financial-analytics",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Fiscal Periods",
         icon: CalendarClock,
         id: "fiscal-periods",
         path: "/fiscal-periods",
+        permission: "FINANCIALS_VIEW",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "financial-settings",
         path: "/financial-settings",
+        permission: "FINANCIALS_VIEW",
       },
     ],
   },
@@ -496,60 +495,70 @@ const menuItems = [
     icon: UserCog,
     id: "payroll-employees",
     path: "/payroll-employees",
+    permission: "PAYROLL_VIEW",
     subItems: [
       {
         title: "Staffs & Trainers",
         icon: Users,
         id: "staffs-trainers",
         path: "/staffs-trainers",
+        permission: "STAFF_VIEW",
       },
       {
         title: "Trainings & Classes",
         icon: GraduationCap,
         id: "trainings-classes",
         path: "/trainings-classes",
+        permission: "TRAINERS_VIEW",
       },
       {
         title: "Bookings",
         icon: Calendar,
         id: "bookings",
         path: "/bookings",
+        permission: "TRAINERS_VIEW",
       },
       {
         title: "Payroll",
         icon: DollarSign,
         id: "payroll",
         path: "/payroll",
+        permission: "PAYROLL_VIEW",
       },
       {
         title: "Salary Payments",
         icon: Wallet,
         id: "salary-payments",
         path: "/salary-payments",
+        permission: "PAYROLL_VIEW",
       },
       {
         title: "Salary Advances",
         icon: TrendingUp,
         id: "salary-advances",
         path: "/salary-advances",
+        permission: "PAYROLL_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "payroll-reports",
         path: "/payroll-reports",
+        permission: "REPORTS_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "payroll-analytics",
         path: "/payroll-analytics",
+        permission: "REPORTS_VIEW",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "payroll-settings",
         path: "/payroll-settings",
+        permission: "SETTINGS_VIEW",
       },
     ],
   },
@@ -559,12 +568,14 @@ const menuItems = [
     icon: Cog,
     id: "gymos",
     path: "/gymos",
+    permission: "GYMOS_VIEW",
   },
   {
     title: "BiOS",
     icon: Brain,
     id: "bios",
     path: "/bios",
+    permission: "BIOS_VIEW",
   },
   {
     title: "My Profile",
@@ -597,8 +608,81 @@ const menuItems = [
     icon: Settings,
     id: "settings",
     path: "/settings",
+    permission: "SETTINGS_VIEW",
+  },
+  {
+    title: "Plans & Services Catalog",
+    icon: BookOpen,
+    id: "plans-services-catalog",
+    path: "/plans-services-catalog",
+    permission: "MEMBERSHIP_PLANS_VIEW",
+  },
+  {
+    title: "Administration",
+    icon: Shield,
+    id: "administration",
+    path: "/administration/staff",
+    permission: "ADMINISTRATION_VIEW",
+    subItems: [
+      {
+        title: "Staff",
+        icon: Users,
+        id: "administration-staff",
+        path: "/administration/staff",
+        permission: "STAFF_VIEW",
+      },
+      {
+        title: "Roles & Permissions",
+        icon: ShieldCheck,
+        id: "roles-permissions",
+        path: "/administration/roles-permissions",
+        permission: "ADMINISTRATION_VIEW",
+      },
+    ],
   },
 ];
+
+/** Hides menu items/sub-items the user lacks VIEW permission for. A parent stays
+ * visible if either its own page is permitted or at least one child is —
+ * so e.g. a Receptionist without COMMUNITY_VIEW still sees "Community" for its
+ * permitted Members/Billing sub-items, just not the community feed itself. */
+function filterMenuByPermission(items: typeof menuItems, checkPermission: (key: string) => boolean) {
+  const isPermitted = (permission?: string) => !permission || checkPermission(permission);
+  return items.reduce<typeof menuItems>((acc, item) => {
+    const hasSubItems = !!(item as any).subItems;
+    const filteredSubItems = hasSubItems
+      ? (item as any).subItems.filter((sub: any) => isPermitted(sub.permission))
+      : undefined;
+    const hasVisibleChildren = !!filteredSubItems && filteredSubItems.length > 0;
+    // A container (has subItems) is only independently visible if it declares its
+    // own permission and passes it — an ungated container like "Payroll &
+    // Employees" (no single catalog module of its own) must never default to
+    // "always visible"; it should only show through permitted children. Leaf
+    // items with no permission (e.g. "My Profile" subpages) keep defaulting to visible.
+    const ownVisible = hasSubItems
+      ? !!(item as any).permission && isPermitted((item as any).permission)
+      : isPermitted((item as any).permission);
+    if (!ownVisible && !hasVisibleChildren) return acc;
+    acc.push(filteredSubItems ? ({ ...item, subItems: filteredSubItems } as any) : item);
+    return acc;
+  }, []);
+}
+
+/** Flat path -> required permission map, derived from menuItems, used to guard direct
+ * URL navigation to a gated page (sidebar hiding alone doesn't stop typing the URL). */
+function buildRoutePermissionMap(items: typeof menuItems): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const item of items as any[]) {
+    if (item.permission && item.path) map[item.path] = item.permission;
+    if (item.subItems) {
+      for (const sub of item.subItems) {
+        if (sub.permission && sub.path) map[sub.path] = sub.permission;
+      }
+    }
+  }
+  return map;
+}
+const routePermissionMap = buildRoutePermissionMap(menuItems);
 
 export default function App() {
   const navigate = useNavigate();
@@ -608,6 +692,23 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // User photo for sidebar and header
+  const [userPhoto, setUserPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.id) {
+      const updatePhoto = () => {
+        const saved = localStorage.getItem(`gymbios_photo_${user.id}`);
+        setUserPhoto(saved);
+      };
+      updatePhoto();
+      window.addEventListener('profile_photo_updated', updatePhoto);
+      return () => window.removeEventListener('profile_photo_updated', updatePhoto);
+    } else {
+      setUserPhoto(null);
+    }
+  }, [user]);
 
   // Online status
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -630,7 +731,19 @@ export default function App() {
   const [expandedItems, setExpandedItems] = useState<string[]>(
     [],
   );
-  
+
+  // Re-filters whenever permissions change (login, logout, or a live role edit).
+  const permissions = usePermissions();
+  const visibleMenuItems = useMemo(
+    () => filterMenuByPermission(menuItems, hasPermission),
+    [permissions],
+  );
+
+  // Blocks direct URL navigation to a gated page too — sidebar hiding alone
+  // doesn't stop typing e.g. /payroll-employees straight into the address bar.
+  const requiredRoutePermission = routePermissionMap[location.pathname];
+  const routeAllowed = !requiredRoutePermission || permissions.includes(requiredRoutePermission);
+
   // Provide navigation params from location state if available
   const navigationParams = location.state || {};
   
@@ -759,7 +872,6 @@ export default function App() {
         "messaging",
         "automations",
         "post-workout-checkin",
-        "plans-services-catalog",
         "member-connect-reports",
         "member-connect-analytics",
       ];
@@ -784,14 +896,11 @@ export default function App() {
         "receipt-voucher",
         "journal-voucher",
         "payment-voucher",
-        "contra-voucher",
         "debit-note",
         "credit-note",
         "bank-reconciliations",
         "expenses",
-        "tax-codes",
         "tax-compliance",
-        "company-tax-details",
         "financial-reports",
         "financial-audit-log",
         "financial-analytics",
@@ -933,9 +1042,7 @@ export default function App() {
       <Route path="/credit-note" element={<CreditNotePage />} />
       <Route path="/bank-reconciliations" element={<BankReconciliation />} />
       <Route path="/expenses" element={<Expenses />} />
-      <Route path="/tax-codes" element={<TaxCodesPage />} />
       <Route path="/tax-compliance" element={<TaxCompliance />} />
-      <Route path="/company-tax-details" element={<CompanyTaxDetailsPage />} />
       <Route path="/financial-reports" element={<FinancialReports />} />
       <Route path="/financial-audit-log" element={<FinancialAuditLogPage />} />
       <Route path="/financial-analytics" element={<FinancialAnalytics />} />
@@ -974,7 +1081,10 @@ export default function App() {
           </p>
         </div>
       } />
-      
+
+      <Route path="/administration/staff" element={<AdministrationStaff />} />
+      <Route path="/administration/roles-permissions" element={<RolesPermissions />} />
+
       <Route path="/assets" element={<Assets />} />
       <Route path="/manage-assets" element={<ManageAssets />} />
       <Route path="/asset-history" element={<AssetHistoryPage />} />
@@ -1073,7 +1183,7 @@ export default function App() {
 
           <SidebarContent className="p-4">
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {visibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     onClick={() => {
@@ -1133,7 +1243,7 @@ export default function App() {
             <div className="flex items-center space-x-3 mb-4">
               <div className="relative">
                 <Avatar className="h-8 w-8 border-2 border-white/20">
-                  <AvatarImage src="/avatars/admin.jpg" />
+                  <AvatarImage src={userPhoto || "/avatars/admin.jpg"} />
                   <AvatarFallback className="bg-white/20 text-white">
                     {user?.name
                       .split(" ")
@@ -1148,7 +1258,7 @@ export default function App() {
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate text-white">
+                <p className="text-sm font-medium truncate text-white capitalize">
                   {user?.name || "Gym Manager"}
                 </p>
                 <p className="text-xs text-white/70 truncate">
@@ -1184,6 +1294,7 @@ export default function App() {
               <NotificationBell className="mr-2" />
               <div className="relative">
                 <Avatar className="h-8 w-8 border-2 border-primary/20">
+                  <AvatarImage src={userPhoto || undefined} />
                   <AvatarFallback className="bg-gradient-primary text-white">
                     {user?.name
                       .split(" ")
@@ -1203,7 +1314,13 @@ export default function App() {
           <div className="flex-1">
             <ErrorBoundary>
               <ProtectedRoute isAuthenticated={isAuthenticated}>
-                {renderContent}
+                {routeAllowed ? renderContent : (
+                  <div className="p-6">
+                    <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
+                      You don't have permission to view this page.
+                    </div>
+                  </div>
+                )}
               </ProtectedRoute>
             </ErrorBoundary>
           </div>

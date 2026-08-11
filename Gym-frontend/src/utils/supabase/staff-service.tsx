@@ -59,6 +59,10 @@ export interface StaffRequestData {
   schedule: Record<string, string[]>;
   app_username?: string;
   app_password?: string;
+  enable_login?: boolean;
+  // Security role for the linked login account (Admin/Receptionist/Trainer/Accountant/Manager) —
+  // independent of `role` (job title, used for commission/target filtering).
+  app_role?: string;
 }
 
 export interface StaffFilters {
@@ -136,6 +140,16 @@ class StaffService {
     return response.json();
   }
 
+  /** Returns the staff record linked to the currently logged-in account, or null if none. */
+  async getMyProfile(): Promise<Staff | null> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff/me`
+    );
+    if (response.status === 404 || response.status === 401) return null;
+    if (!response.ok) throw new Error(`Failed to fetch my profile: ${response.status}`);
+    return response.json();
+  }
+
   async createStaff(data: StaffRequestData): Promise<Staff> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/staff`,
@@ -162,10 +176,10 @@ class StaffService {
     if (!response.ok) throw new Error(`Failed to delete staff member: ${response.status}`);
   }
 
-  async setStaffCredentials(id: string, appUsername: string, appPassword: string): Promise<Staff> {
+  async setStaffCredentials(id: string, appUsername: string, appPassword: string, appRole?: string): Promise<Staff> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/staff/${id}/set-credentials`,
-      { method: 'POST', body: JSON.stringify({ appUsername, appPassword }) }
+      { method: 'POST', body: JSON.stringify({ appUsername, appPassword, appRole }) }
     );
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));

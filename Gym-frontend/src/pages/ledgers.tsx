@@ -226,7 +226,7 @@ export function Ledgers() {
   const loadCostCenters = useCallback(async () => {
     try {
       const data = await ledgersService.getCostCenters();
-      setCostCenters(data.map(c => ({
+      const mapped = data.map(c => ({
         id: c.id,
         code: c.code,
         name: c.name,
@@ -238,7 +238,23 @@ export function Ledgers() {
         budget: c.budget,
         spent: c.spent,
         utilization: c.utilization,
-      })));
+      }));
+      if (!mapped.find(c => c.name === "General / Head Office")) {
+        mapped.unshift({
+          id: -1,
+          code: "HO-001",
+          name: "General / Head Office",
+          branch: "All Branches",
+          description: "Hardcoded default cost center",
+          linkedAccounts: 0,
+          status: "active",
+          manager: "-",
+          budget: 0,
+          spent: 0,
+          utilization: 0,
+        });
+      }
+      setCostCenters(mapped);
     } catch {
       toast.error('Failed to load cost centers');
     }
@@ -1024,27 +1040,29 @@ export function Ledgers() {
                           <BookOpen className="h-4 w-4 text-gray-400" />
                           <span className="text-sm">{costCenter.linkedAccounts} linked accounts</span>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setEditingCostCenter({...costCenter, budget: String(costCenter.budget)}); setShowEditCostCenter(true); }}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Cost Center
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleToggleCostCenter(costCenter)}>
-                              <Archive className="h-4 w-4 mr-2" />
-                              {costCenter.status === 'active' ? 'Archive' : 'Activate'}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteCostCenter(costCenter)} className="text-red-600">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {costCenter.id !== -1 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setEditingCostCenter({...costCenter, budget: String(costCenter.budget)}); setShowEditCostCenter(true); }}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Cost Center
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleToggleCostCenter(costCenter)}>
+                                <Archive className="h-4 w-4 mr-2" />
+                                {costCenter.status === 'active' ? 'Archive' : 'Activate'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeleteCostCenter(costCenter)} className="text-red-600">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </div>
                   </CardContent>
