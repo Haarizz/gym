@@ -47,6 +47,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import {
   Plus,
   Search,
@@ -63,11 +64,15 @@ import {
   CheckCircle,
   Clock,
   RefreshCw,
+  Check,
+  ChevronsUpDown
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../components/ui/utils";
 import { toast } from "sonner";
 import { expensesService, type Expense, type ExpenseCreateRequest, type ExpenseStats } from "../utils/supabase/expenses-service";
+import { purchaseService, type Supplier } from "../utils/supabase/purchase-service";
+import { ledgersService, type CostCenter } from "../utils/supabase/ledgers-service";
 
 // Category color mapping
 const categoryColors: Record<string, string> = {
@@ -117,25 +122,35 @@ export function Expenses() {
   const [selectedTaxRate, setSelectedTaxRate] = useState("all");
   const [formDate, setFormDate] = useState<Date>(new Date());
   const [form, setForm] = useState<ExpenseCreateRequest>(defaultForm);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [realCostCenters, setRealCostCenters] = useState<CostCenter[]>([]);
 
   const locations = ["Downtown", "Mall Branch", "Marina Branch", "All Locations"];
   const categories = ["Utilities", "Rent", "Equipment", "Operational", "Marketing", "Salaries", "Maintenance", "Other"];
-  const costCenters = [
-    "Gym Equipment", "Electric", "Facility", "Digital Marketing", "Cleaning",
-    "Water & Sewer", "Internet & Telecom", "Security", "Maintenance", "Administration"
-  ];
+  const costCenters = Array.from(new Set([
+    "General / Head Office",
+    ...(realCostCenters.length > 0
+      ? realCostCenters.map(c => c.name)
+      : ["Gym Equipment", "Electric", "Facility", "Digital Marketing", "Cleaning", "Water & Sewer", "Internet & Telecom", "Security", "Maintenance", "Administration"])
+  ]));
   const taxRates = ["0", "5", "10"];
   const statuses = ["pending", "paid", "approved", "rejected", "draft"];
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [expenseData, statsData] = await Promise.all([
+      const [expenseData, statsData, suppliersData, costCentersData] = await Promise.all([
         expensesService.getExpenses(),
         expensesService.getStats(),
+        purchaseService.getActiveSuppliers().catch(() => []),
+        ledgersService.getCostCenters().catch(() => []),
       ]);
       setExpenses(expenseData);
       setStats(statsData);
+      setSuppliers(suppliersData);
+      setRealCostCenters(costCentersData.filter(c => c.isActive !== false));
     } catch (err: any) {
       toast.error(err.message || "Failed to load expenses");
     } finally {
@@ -268,11 +283,62 @@ export function Expenses() {
 
       <div className="space-y-2">
         <Label>Vendor / Payee</Label>
-        <Input
-          value={form.vendorName}
-          onChange={(e) => setForm({ ...form, vendorName: e.target.value })}
-          placeholder="Enter vendor name"
-        />
+        <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={supplierOpen}
+              className="w-full justify-between font-normal bg-white"
+            >
+              {form.vendorName || "Select or enter vendor..."}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent style={{ width: 'var(--radix-popover-trigger-width)' }} className="p-0" align="start">
+            <Command>
+              <CommandInput 
+                placeholder="Search vendor..." 
+                value={supplierSearch}
+                onValueChange={setSupplierSearch}
+              />
+              <CommandList>
+                <CommandEmpty>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start font-normal px-2 py-1.5 h-auto"
+                    onClick={() => {
+                      setForm(f => ({ ...f, vendorName: supplierSearch }));
+                      setSupplierOpen(false);
+                    }}
+                  >
+                    Use "{supplierSearch}"
+                  </Button>
+                </CommandEmpty>
+                <CommandGroup>
+                  {suppliers.map((supplier) => (
+                    <CommandItem
+                      key={supplier.id}
+                      value={supplier.name}
+                      onSelect={(currentValue) => {
+                        setForm(f => ({ ...f, vendorName: supplier.name }));
+                        setSupplierOpen(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          form.vendorName === supplier.name ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      {supplier.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="space-y-2">
@@ -648,8 +714,10 @@ export function Expenses() {
           </div>
 
           {!loading && filteredExpenses.length === 0 && (
-            <div className="text-center py-8">
-              <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <div className="text-center py-14">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
+                <FileText className="h-7 w-7 text-gray-400" />
+              </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No expenses found</h3>
               <p className="text-gray-600 mb-4">
                 {expenses.length === 0

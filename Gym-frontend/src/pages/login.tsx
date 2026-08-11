@@ -49,10 +49,10 @@ export function Login({ onLogin }: LoginProps) {
     general: "",
   });
 
-  // Email validation
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  // Accepts either a proper email address or a plain username (e.g. staff
+  // logins created from Administration → Staff, which aren't emails at all).
+  const validateEmail = (value: string) => {
+    return !/\s/.test(value.trim());
   };
 
   // Handle input changes with validation
@@ -83,10 +83,10 @@ export function Login({ onLogin }: LoginProps) {
     const newErrors = { email: "", password: "", general: "" };
 
     if (!formData.email) {
-      newErrors.email = "Email address is required";
+      newErrors.email = "Username or email is required";
       hasErrors = true;
     } else if (!validateEmail(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
+      newErrors.email = "Username or email cannot contain spaces";
       hasErrors = true;
     }
 
@@ -288,13 +288,15 @@ export function Login({ onLogin }: LoginProps) {
                     htmlFor="email"
                     className="text-gray-700"
                   >
-                    Email Address
+                    Username or Email
                   </Label>
                   <div className="relative">
                     <Input
                       id="email"
-                      type="email"
-                      placeholder="you@example.com"
+                      type="text"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      placeholder="Username or you@example.com"
                       value={formData.email}
                       onChange={(e) =>
                         handleInputChange(

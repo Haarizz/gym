@@ -55,4 +55,24 @@ public class AuthController {
         boolean available = !authService.usernameExists(username);
         return ResponseEntity.ok(java.util.Map.of("available", available));
     }
+
+    /**
+     * POST /api/auth/change-password
+     * Body: { "currentPassword": "...", "newPassword": "..." }
+     * Self-service password change for the currently authenticated account.
+     */
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody java.util.Map<String, String> body) {
+        String currentPassword = body.get("currentPassword");
+        String newPassword = body.get("newPassword");
+        if (currentPassword == null || currentPassword.isBlank() || newPassword == null || newPassword.isBlank()) {
+            return ResponseEntity.badRequest().body("currentPassword and newPassword are required");
+        }
+        try {
+            authService.changePassword(currentPassword, newPassword);
+            return ResponseEntity.ok(java.util.Map.of("message", "Password changed successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

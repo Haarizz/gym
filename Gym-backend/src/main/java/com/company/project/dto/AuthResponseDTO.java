@@ -8,6 +8,9 @@ public class AuthResponseDTO {
     private List<String> roles;
     private Long userId;
     private Boolean enabled;
+    private String roleName;
+    private String staffName;
+    private List<String> permissions;
 
     public AuthResponseDTO() {}
 
@@ -26,6 +29,15 @@ public class AuthResponseDTO {
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
 
+    public String getRoleName() { return roleName; }
+    public void setRoleName(String roleName) { this.roleName = roleName; }
+
+    public String getStaffName() { return staffName; }
+    public void setStaffName(String staffName) { this.staffName = staffName; }
+
+    public List<String> getPermissions() { return permissions; }
+    public void setPermissions(List<String> permissions) { this.permissions = permissions; }
+
     // Manual Builder
     public static AuthResponseDTOBuilder builder() {
         return new AuthResponseDTOBuilder();
@@ -37,19 +49,28 @@ public class AuthResponseDTO {
         private List<String> roles;
         private Long userId;
         private Boolean enabled;
+        private String roleName;
+        private String staffName;
+        private List<String> permissions;
 
         public AuthResponseDTOBuilder token(String token) { this.token = token; return this; }
         public AuthResponseDTOBuilder username(String username) { this.username = username; return this; }
         public AuthResponseDTOBuilder roles(List<String> roles) { this.roles = roles; return this; }
         public AuthResponseDTOBuilder userId(Long userId) { this.userId = userId; return this; }
         public AuthResponseDTOBuilder enabled(Boolean enabled) { this.enabled = enabled; return this; }
+        public AuthResponseDTOBuilder roleName(String roleName) { this.roleName = roleName; return this; }
+        public AuthResponseDTOBuilder staffName(String staffName) { this.staffName = staffName; return this; }
+        public AuthResponseDTOBuilder permissions(List<String> permissions) { this.permissions = permissions; return this; }
         public AuthResponseDTO build() {
             AuthResponseDTO dto = new AuthResponseDTO();
-            dto.token    = this.token;
-            dto.username = this.username;
-            dto.roles    = this.roles;
-            dto.userId   = this.userId;
-            dto.enabled  = this.enabled;
+            dto.token       = this.token;
+            dto.username    = this.username;
+            dto.roles       = this.roles;
+            dto.userId      = this.userId;
+            dto.enabled     = this.enabled;
+            dto.roleName    = this.roleName;
+            dto.staffName   = this.staffName;
+            dto.permissions = this.permissions;
             return dto;
         }
     }

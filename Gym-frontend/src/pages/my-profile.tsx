@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -55,27 +55,23 @@ import {
   PieChart,
   ArrowUpRight,
   ArrowDownRight,
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, subDays, subMonths } from "date-fns";
+import { authService } from "../utils/supabase/auth-service";
+import { staffService, Staff } from "../utils/supabase/staff-service";
 
 interface MyProfileProps {
   onNavigate?: (section: string) => void;
 }
 
-interface UserProfile {
-  id: string;
+interface EditableProfileFields {
   name: string;
   email: string;
   phone: string;
   address: string;
-  avatar: string;
-  role: string;
-  department: string;
-  joinDate: Date;
-  membershipLevel: string;
-  employeeId: string;
 }
 
 interface UserStats {
@@ -119,21 +115,8 @@ interface Target {
   category: string;
 }
 
-// Trial Data
-const userProfile: UserProfile = {
-  id: "U001",
-  name: "Ahmed Al-Mahmoud",
-  email: "ahmed.mahmoud@gymbios.com",
-  phone: "+971 50 123 4567",
-  address: "Downtown Dubai, UAE",
-  avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
-  role: "Senior Personal Trainer",
-  department: "Training Department",
-  joinDate: new Date(2023, 2, 15),
-  membershipLevel: "Premium Staff",
-  employeeId: "EMP001"
-};
-
+// Trial Data — performance/targets/transactions are not yet backed by real
+// endpoints, so these stay illustrative until those modules are wired up.
 const userStats: UserStats = {
   currentTargets: 8,
   completedTargets: 24,
@@ -252,12 +235,36 @@ const currentTargets: Target[] = [
 
 export function MyProfile({ onNavigate }: MyProfileProps) {
   const { currencyCode } = useCurrency();
+  const authUser = useMemo(() => authService.getCurrentUser(), []);
+
   const [activeTab, setActiveTab] = useState("personal");
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [staffProfile, setStaffProfile] = useState<Staff | null>(null);
+
   const [isEditing, setIsEditing] = useState(false);
-  const [editedProfile, setEditedProfile] = useState(userProfile);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [editedProfile, setEditedProfile] = useState<EditableProfileFields>({
+    name: "", email: "", phone: "", address: ""
+  });
+
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [localPhoto, setLocalPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (authUser?.id) {
+      const savedPhoto = localStorage.getItem(`gymbios_photo_${authUser.id}`);
+      if (savedPhoto) setLocalPhoto(savedPhoto);
+    }
+  }, [authUser]);
+
   const [showPassword, setShowPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
   const [notificationSettings, setNotificationSettings] = useState({
     email: true,
     push: true,
@@ -267,36 +274,163 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
     payroll: true
   });
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingProfile(true);
+      try {
+        const profile = await staffService.getMyProfile();
+        if (!cancelled) setStaffProfile(profile);
+      } catch (error) {
+        console.error("Failed to load staff profile:", error);
+      } finally {
+        if (!cancelled) setLoadingProfile(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Real identity fields — staff record wins when linked, falls back to the account.
+  const displayName = staffProfile?.name || authUser?.name || "User";
+  const displayEmail = staffProfile?.email || authUser?.email || "";
+  const displayPhone = staffProfile?.phone || "";
+  const displayAddress = staffProfile?.address || "";
+  const displayRole = staffProfile?.role || (authUser?.role ? authUser.role.replace(/^\w/, c => c.toUpperCase()) : "");
+  const displayDepartment = staffProfile?.department || "";
+  const displayEmployeeId = staffProfile?.staff_id || "";
+  const displayJoinDate = staffProfile?.join_date ? new Date(staffProfile.join_date) : null;
+  const displayPhoto = staffProfile?.photo_url || localPhoto || "";
+  const displayInitials = displayName.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
   // Calculate progress percentages
   const targetsProgress = (userStats.completedTargets / userStats.totalTargets) * 100;
-  const performanceColor = userStats.performanceScore >= 90 ? 'text-green-600' : 
+  const performanceColor = userStats.performanceScore >= 90 ? 'text-green-600' :
                           userStats.performanceScore >= 75 ? 'text-yellow-600' : 'text-red-600';
 
-  const saveProfile = () => {
-    // Simulate API call
-    setTimeout(() => {
-      setIsEditing(false);
-      toast.success("Profile updated successfully!");
-    }, 1000);
+  const startEditing = () => {
+    setEditedProfile({
+      name: displayName,
+      email: displayEmail,
+      phone: displayPhone,
+      address: displayAddress
+    });
+    setIsEditing(true);
   };
 
-  const changePassword = () => {
+  const saveProfile = async () => {
+    if (!staffProfile) return;
+    if (!editedProfile.name.trim() || !editedProfile.email.trim()) {
+      toast.error("Name and email are required.");
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const updated = await staffService.updateStaff(staffProfile.id, {
+        name: editedProfile.name.trim(),
+        email: editedProfile.email.trim(),
+        phone: editedProfile.phone.trim(),
+        address: editedProfile.address.trim()
+      });
+      setStaffProfile(updated);
+      setIsEditing(false);
+      toast.success("Profile updated successfully!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update profile.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (!currentPassword) {
+      toast.error("Enter your current password.");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast.error("Passwords do not match!");
       return;
     }
-    
     if (newPassword.length < 8) {
       toast.error("Password must be at least 8 characters!");
       return;
     }
 
-    // Simulate API call
-    setTimeout(() => {
+    setChangingPassword(true);
+    const result = await authService.changePassword(currentPassword, newPassword);
+    setChangingPassword(false);
+
+    if (result.success) {
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       toast.success("Password changed successfully!");
-    }, 1000);
+    } else {
+      toast.error(result.error || "Failed to change password.");
+    }
+  };
+
+  const resizeImageToDataUrl = (file: File, size = 400): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Failed to read the selected file."));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Failed to load the selected image."));
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { reject(new Error("Canvas is not supported in this browser.")); return; }
+          const scale = Math.max(size / img.width, size / img.height);
+          const w = img.width * scale;
+          const h = img.height * scale;
+          ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5MB.");
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 400);
+      if (staffProfile) {
+        const updated = await staffService.updateStaff(staffProfile.id, { photo_url: dataUrl });
+        setStaffProfile(updated);
+      } else if (authUser?.id) {
+        localStorage.setItem(`gymbios_photo_${authUser.id}`, dataUrl);
+        setLocalPhoto(dataUrl);
+        window.dispatchEvent(new Event('profile_photo_updated'));
+      }
+      setAvatarDialogOpen(false);
+      toast.success("Profile picture updated!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update profile picture.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await authService.signOut();
+    window.location.href = "/";
   };
 
   const getAchievementIcon = (iconName: string) => {
@@ -339,11 +473,21 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
             <Bell className="h-4 w-4 mr-2" />
             Notifications
           </Button>
-          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
+          <Button
+            variant="outline"
+            size="sm"
+            className="shadow-sm hover:shadow-md transition-all"
+            onClick={() => onNavigate?.('settings')}
+          >
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
-          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
+          <Button
+            variant="outline"
+            size="sm"
+            className="shadow-sm hover:shadow-md transition-all"
+            onClick={handleSignOut}
+          >
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
           </Button>
@@ -359,14 +503,18 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
               <div className="text-center space-y-4">
                 <div className="relative inline-block">
                   <Avatar className="w-24 h-24 border-4 border-primary/20">
-                    <AvatarImage src={userProfile.avatar} alt={userProfile.name} />
+                    {displayPhoto && <AvatarImage src={displayPhoto} alt={displayName} />}
                     <AvatarFallback className="bg-gradient-primary text-white text-2xl">
-                      {userProfile.name.split(' ').map(n => n[0]).join('')}
+                      {displayInitials}
                     </AvatarFallback>
                   </Avatar>
-                  <Dialog>
+                  <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm" className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0 bg-gradient-primary">
+                      <Button
+                        size="sm"
+                        className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0 bg-gradient-primary"
+                        title="Update profile picture"
+                      >
                         <Camera className="h-4 w-4" />
                       </Button>
                     </DialogTrigger>
@@ -378,39 +526,66 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <div className="border-2 border-dashed border-primary/20 rounded-lg p-8 text-center">
-                          <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarFileChange}
+                        />
+                        <div
+                          className="border-2 border-dashed border-primary/20 rounded-lg p-8 text-center cursor-pointer hover:bg-gradient-light transition-colors"
+                          onClick={() => !uploadingPhoto && fileInputRef.current?.click()}
+                        >
+                          {uploadingPhoto ? (
+                            <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+                          ) : (
+                            <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          )}
+                          <p className="text-sm text-gray-600">
+                            {uploadingPhoto ? "Uploading..." : "Click to upload a photo"}
+                          </p>
                           <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
                         </div>
-                        <div className="flex space-x-3">
-                          <Button className="btn-primary flex-1">Upload Photo</Button>
-                          <Button variant="outline" className="flex-1">Cancel</Button>
-                        </div>
+                        <Button variant="outline" className="w-full" onClick={() => setAvatarDialogOpen(false)}>
+                          Cancel
+                        </Button>
                       </div>
                     </DialogContent>
                   </Dialog>
                 </div>
-                
+
                 <div>
-                  <h3 className="text-xl font-semibold">{userProfile.name}</h3>
-                  <p className="text-primary font-medium">{userProfile.role}</p>
-                  <p className="text-sm text-gray-600">{userProfile.department}</p>
-                  <Badge className="mt-2 bg-gradient-light text-primary border-primary/20">
-                    {userProfile.membershipLevel}
-                  </Badge>
+                  {loadingProfile ? (
+                    <div className="flex justify-center py-1">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="text-xl font-semibold capitalize">{displayName}</h3>
+                      {displayRole && <p className="text-primary font-medium">{displayRole}</p>}
+                      {displayDepartment && <p className="text-sm text-gray-600">{displayDepartment}</p>}
+                      {!staffProfile && (
+                        <Badge className="mt-2 bg-gradient-light text-primary border-primary/20">
+                          {(authUser?.role || "User").replace(/^\w/, c => c.toUpperCase())} Account
+                        </Badge>
+                      )}
+                    </>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <div className="text-gray-600">Employee ID</div>
-                    <div className="font-medium">{userProfile.employeeId}</div>
+                {staffProfile && (
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <div className="text-gray-600">Employee ID</div>
+                      <div className="font-medium">{displayEmployeeId || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600">Join Date</div>
+                      <div className="font-medium">{displayJoinDate ? format(displayJoinDate, 'MMM yyyy') : '—'}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-gray-600">Join Date</div>
-                    <div className="font-medium">{format(userProfile.joinDate, 'MMM yyyy')}</div>
-                  </div>
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -536,44 +711,61 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-primary">Personal Information</CardTitle>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => isEditing ? saveProfile() : setIsEditing(true)}
-                    >
-                      {isEditing ? (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Save Changes
-                        </>
-                      ) : (
-                        <>
-                          <Edit3 className="h-4 w-4 mr-2" />
-                          Edit
-                        </>
-                      )}
-                    </Button>
+                    {staffProfile && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={savingProfile}
+                        onClick={() => isEditing ? saveProfile() : startEditing()}
+                      >
+                        {savingProfile ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : isEditing ? (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </>
+                        ) : (
+                          <>
+                            <Edit3 className="h-4 w-4 mr-2" />
+                            Edit
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {!loadingProfile && !staffProfile && (
+                    <div className="flex items-start space-x-2 p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
+                      <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        No staff record is linked to this account, so name/phone/address 
+                        aren't editable here. You can still change your profile picture and password below.
+                      </span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <Label className="form-label">Full Name</Label>
                       {isEditing ? (
-                        <Input 
+                        <Input
                           value={editedProfile.name}
                           onChange={(e) => setEditedProfile({...editedProfile, name: e.target.value})}
                           className="input-focus"
                         />
                       ) : (
-                        <div className="p-3 bg-gradient-light rounded-lg">{userProfile.name}</div>
+                        <div className="p-3 bg-gradient-light rounded-lg capitalize">{displayName}</div>
                       )}
                     </div>
-                    
+
                     <div>
                       <Label className="form-label">Email Address</Label>
                       {isEditing ? (
-                        <Input 
+                        <Input
                           type="email"
                           value={editedProfile.email}
                           onChange={(e) => setEditedProfile({...editedProfile, email: e.target.value})}
@@ -582,15 +774,15 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                       ) : (
                         <div className="p-3 bg-gradient-light rounded-lg flex items-center">
                           <Mail className="h-4 w-4 mr-2 text-primary" />
-                          {userProfile.email}
+                          {displayEmail || '—'}
                         </div>
                       )}
                     </div>
-                    
+
                     <div>
                       <Label className="form-label">Phone Number</Label>
                       {isEditing ? (
-                        <Input 
+                        <Input
                           value={editedProfile.phone}
                           onChange={(e) => setEditedProfile({...editedProfile, phone: e.target.value})}
                           className="input-focus"
@@ -598,15 +790,15 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                       ) : (
                         <div className="p-3 bg-gradient-light rounded-lg flex items-center">
                           <Phone className="h-4 w-4 mr-2 text-primary" />
-                          {userProfile.phone}
+                          {displayPhone || '—'}
                         </div>
                       )}
                     </div>
-                    
+
                     <div>
                       <Label className="form-label">Address</Label>
                       {isEditing ? (
-                        <Input 
+                        <Input
                           value={editedProfile.address}
                           onChange={(e) => setEditedProfile({...editedProfile, address: e.target.value})}
                           className="input-focus"
@@ -614,7 +806,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                       ) : (
                         <div className="p-3 bg-gradient-light rounded-lg flex items-center">
                           <MapPin className="h-4 w-4 mr-2 text-primary" />
-                          {userProfile.address}
+                          {displayAddress || '—'}
                         </div>
                       )}
                     </div>
@@ -622,19 +814,22 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
 
                   {isEditing && (
                     <div className="flex space-x-3">
-                      <Button 
+                      <Button
                         className="btn-primary"
                         onClick={saveProfile}
+                        disabled={savingProfile}
                       >
-                        <Save className="h-4 w-4 mr-2" />
+                        {savingProfile ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
                         Save Changes
                       </Button>
-                      <Button 
+                      <Button
                         variant="outline"
-                        onClick={() => {
-                          setIsEditing(false);
-                          setEditedProfile(userProfile);
-                        }}
+                        disabled={savingProfile}
+                        onClick={() => setIsEditing(false)}
                       >
                         <X className="h-4 w-4 mr-2" />
                         Cancel
@@ -653,11 +848,21 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div>
+                    <Label className="form-label">Current Password</Label>
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Enter current password"
+                      className="input-focus"
+                    />
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="form-label">New Password</Label>
                       <div className="relative">
-                        <Input 
+                        <Input
                           type={showPassword ? "text" : "password"}
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
@@ -675,10 +880,10 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                         </Button>
                       </div>
                     </div>
-                    
+
                     <div>
                       <Label className="form-label">Confirm Password</Label>
-                      <Input 
+                      <Input
                         type={showPassword ? "text" : "password"}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -687,13 +892,17 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                       />
                     </div>
                   </div>
-                  
-                  <Button 
+
+                  <Button
                     className="btn-primary"
                     onClick={changePassword}
-                    disabled={!newPassword || !confirmPassword}
+                    disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
                   >
-                    <Lock className="h-4 w-4 mr-2" />
+                    {changingPassword ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Lock className="h-4 w-4 mr-2" />
+                    )}
                     Change Password
                   </Button>
                 </CardContent>
@@ -1096,7 +1305,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                       <Mail className="h-5 w-5 text-primary" />
                       <div>
                         <div className="font-medium">Email Account</div>
-                        <div className="text-sm text-gray-600">{userProfile.email}</div>
+                        <div className="text-sm text-gray-600">{displayEmail || '—'}</div>
                       </div>
                     </div>
                     <Badge className="bg-green-100 text-green-800">Connected</Badge>

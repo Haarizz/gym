@@ -91,6 +91,13 @@ public class StaffService {
         return StaffResponseDTO.fromEntity(staff);
     }
 
+    @Transactional(readOnly = true)
+    public StaffResponseDTO getStaffByUserId(Long userId) {
+        Staff staff = staffRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("No staff record linked to this account"));
+        return StaffResponseDTO.fromEntity(staff);
+    }
+
     public StaffResponseDTO createStaff(StaffRequestDTO req) {
         Staff staff = new Staff();
         applyRequest(req, staff);
@@ -102,43 +109,121 @@ public class StaffService {
         saved.setStaffId("EMP-" + String.format("%010d", saved.getId()));
         saved = staffRepository.save(saved);
 
-        // Auto-create app login account if credentials were provided
-        if (req.getAppUsername() != null && !req.getAppUsername().isBlank()
-                && req.getAppPassword() != null && !req.getAppPassword().isBlank()) {
+        saved = syncAppLogin(saved, req);
+
+        return StaffResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * Creates/updates/disables the linked login account based on the request's
+     * enableLogin flag (legacy callers that omit it fall back to "credentials
+     * were supplied" so the older set-credentials-style behavior keeps working).
+     */
+    private Staff syncAppLogin(Staff staff, StaffRequestDTO req) {
+        boolean hasCredentials = req.getAppUsername() != null && !req.getAppUsername().isBlank()
+                && req.getAppPassword() != null && !req.getAppPassword().isBlank();
+        boolean enableLogin = req.getEnableLogin() != null ? req.getEnableLogin() : hasCredentials;
+
+        if (!enableLogin) {
+            if (staff.getUserId() != null) {
+                // Don't delete the account — just disable it, mirroring toggleStaffAccess.
+                userRepository.findById(staff.getUserId()).ifPresent(user -> {
+                    user.setEnabled(false);
+                    userRepository.save(user);
+                });
+                staff.setAppAccessEnabled(false);
+                staff = staffRepository.save(staff);
+            }
+            return staff;
+        }
+
+        Role securityRole = resolveSecurityRole(
+                req.getAppRole() != null && !req.getAppRole().isBlank() ? req.getAppRole() : staff.getRole());
+
+        if (staff.getUserId() == null) {
+            if (!hasCredentials) {
+                throw new RuntimeException("Username and password are required to enable login");
+            }
             if (userRepository.existsByUsername(req.getAppUsername())) {
                 throw new RuntimeException("Username already taken: " + req.getAppUsername());
             }
             User user = new User();
             user.setUsername(req.getAppUsername());
-            user.setEmail(saved.getEmail());
+            user.setEmail(staff.getEmail());
             user.setPasswordHash(passwordEncoder.encode(req.getAppPassword()));
             user.setEnabled(true);
             user.setUserRoles(new java.util.HashSet<>());
             user = userRepository.save(user);
+            userRoleRepository.save(new UserRole(null, user, securityRole));
 
-            Role staffRole = roleRepository.findByRoleName("STAFF")
-                    .orElseThrow(() -> new RuntimeException("STAFF role not found"));
-            userRoleRepository.save(new UserRole(null, user, staffRole));
+            staff.setUserId(user.getId());
+            staff.setAppUsername(req.getAppUsername());
+            staff.setAppAccessEnabled(true);
+            staff = staffRepository.save(staff);
+        } else {
+            User user = userRepository.findById(staff.getUserId())
+                    .orElseThrow(() -> new RuntimeException("Linked user account not found"));
+            if (req.getAppUsername() != null && !req.getAppUsername().isBlank()
+                    && !req.getAppUsername().equals(user.getUsername())) {
+                if (userRepository.existsByUsername(req.getAppUsername())) {
+                    throw new RuntimeException("Username already taken: " + req.getAppUsername());
+                }
+                user.setUsername(req.getAppUsername());
+                staff.setAppUsername(req.getAppUsername());
+            }
+            if (req.getAppPassword() != null && !req.getAppPassword().isBlank()) {
+                user.setPasswordHash(passwordEncoder.encode(req.getAppPassword()));
+            }
+            user.setEnabled(true);
+            userRepository.save(user);
 
-            saved.setUserId(user.getId());
-            saved.setAppUsername(req.getAppUsername());
-            saved.setAppAccessEnabled(true);
-            saved = staffRepository.save(saved);
+            // Keep "one user, one role" in practice: replace rather than accumulate.
+            userRoleRepository.findByUserId(user.getId()).forEach(userRoleRepository::delete);
+            userRoleRepository.save(new UserRole(null, user, securityRole));
+
+            staff.setAppAccessEnabled(true);
+            staff = staffRepository.save(staff);
         }
 
-        return StaffResponseDTO.fromEntity(saved);
+        return staff;
+    }
+
+    /** Matches the Administration → Staff role dropdown value to a security Role, falling back to STAFF. */
+    private Role resolveSecurityRole(String staffRoleText) {
+        if (staffRoleText != null && !staffRoleText.isBlank()) {
+            Role match = roleRepository.findByRoleNameIgnoreCase(staffRoleText.trim()).orElse(null);
+            if (match != null) return match;
+        }
+        return roleRepository.findByRoleName("STAFF")
+                .orElseThrow(() -> new RuntimeException("STAFF role not found"));
     }
 
     public StaffResponseDTO setStaffCredentials(Long id, String appUsername, String appPassword) {
+        return setStaffCredentials(id, appUsername, appPassword, null);
+    }
+
+    /**
+     * @param appRole optional security role name (Admin/Receptionist/Trainer/Accountant/Manager).
+     *                A new account defaults to STAFF when omitted (unchanged legacy behavior);
+     *                an existing account's role is only reassigned when explicitly provided —
+     *                omitting it keeps this call a pure password reset, as before.
+     */
+    public StaffResponseDTO setStaffCredentials(Long id, String appUsername, String appPassword, String appRole) {
         Staff staff = staffRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Staff not found: " + id));
 
         if (staff.getUserId() != null) {
-            // Already has an account — just update the password
+            // Already has an account — update the password, and the role if one was given.
             User user = userRepository.findById(staff.getUserId())
                     .orElseThrow(() -> new RuntimeException("Linked user account not found"));
             user.setPasswordHash(passwordEncoder.encode(appPassword));
             userRepository.save(user);
+
+            if (appRole != null && !appRole.isBlank()) {
+                Role securityRole = resolveSecurityRole(appRole);
+                userRoleRepository.findByUserId(user.getId()).forEach(userRoleRepository::delete);
+                userRoleRepository.save(new UserRole(null, user, securityRole));
+            }
         } else {
             // No account yet — create one
             if (userRepository.existsByUsername(appUsername)) {
@@ -152,9 +237,8 @@ public class StaffService {
             user.setUserRoles(new java.util.HashSet<>());
             user = userRepository.save(user);
 
-            Role staffRole = roleRepository.findByRoleName("STAFF")
-                    .orElseThrow(() -> new RuntimeException("STAFF role not found"));
-            userRoleRepository.save(new UserRole(null, user, staffRole));
+            Role securityRole = resolveSecurityRole(appRole);
+            userRoleRepository.save(new UserRole(null, user, securityRole));
 
             staff.setUserId(user.getId());
             staff.setAppUsername(appUsername);
@@ -184,11 +268,26 @@ public class StaffService {
                 .orElseThrow(() -> new RuntimeException("Staff not found: " + id));
 
         // Clear and re-add certifications and schedule
-        staff.getCertifications().clear();
-        staff.getScheduleSlots().clear();
+        // Only reset certifications/schedule when the request actually carries them —
+        // the new Administration → Staff form doesn't manage either and must not wipe
+        // what was set via the Staffs & Trainers page just by saving basic-info edits.
+        if (req.getCertifications() != null) staff.getCertifications().clear();
+        if (req.getSchedule() != null) staff.getScheduleSlots().clear();
 
         applyRequest(req, staff);
-        return StaffResponseDTO.fromEntity(staffRepository.save(staff));
+        Staff saved = staffRepository.save(staff);
+
+        // Only touch login state if this request actually carries login info —
+        // the older "Staffs & Trainers" edit form doesn't send these fields at all,
+        // and must not silently disable an existing account just by saving HR edits.
+        boolean touchesLogin = req.getEnableLogin() != null
+                || (req.getAppUsername() != null && !req.getAppUsername().isBlank())
+                || (req.getAppPassword() != null && !req.getAppPassword().isBlank());
+        if (touchesLogin) {
+            saved = syncAppLogin(saved, req);
+        }
+
+        return StaffResponseDTO.fromEntity(saved);
     }
 
     public void deleteStaff(Long id) {

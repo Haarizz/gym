@@ -20,6 +20,7 @@ interface MemberDraftModalProps {
     price: number;
     duration: string;
     benefits: string[];
+    discount?: number;
   } | null;
   onSubmitDraft: (draftData: any) => void;
 }
@@ -59,7 +60,6 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
 
     // Required fields validation
     if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
-    if (!formData.nationalId.trim()) newErrors.nationalId = 'National ID is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Invalid email format';
@@ -70,8 +70,6 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
     }
     if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
     if (!formData.gender) newErrors.gender = 'Gender is required';
-    if (!formData.emergencyContactName.trim()) newErrors.emergencyContactName = 'Emergency contact name is required';
-    if (!formData.emergencyContactNumber.trim()) newErrors.emergencyContactNumber = 'Emergency contact number is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -142,7 +140,14 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
             <div className="p-4 bg-gradient-to-r from-[#2B7A78] to-[#21615f] text-white rounded-lg">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="text-lg font-semibold mb-1">{selectedPlan.name}</h3>
+                  <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
+                    {selectedPlan.name}
+                    {selectedPlan.discount && selectedPlan.discount > 0 ? (
+                      <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                        {selectedPlan.discount}% OFF
+                      </Badge>
+                    ) : null}
+                  </h3>
                   <p className="text-sm opacity-90">{selectedPlan.duration}</p>
                 </div>
                 <div className="text-right">
@@ -187,7 +192,7 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
               </div>
 
               <div>
-                <Label>National ID / Emirates ID *</Label>
+                <Label>National ID / Emirates ID</Label>
                 <Input
                   placeholder="Enter Emirates ID"
                   value={formData.nationalId}
@@ -352,7 +357,7 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
                 </div>
                 
                 <div>
-                  <Label>Emergency Contact Name *</Label>
+                  <Label>Emergency Contact Name</Label>
                   <Input
                     placeholder="Full name"
                     value={formData.emergencyContactName}
@@ -368,7 +373,7 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
                 </div>
 
                 <div>
-                  <Label>Emergency Contact Number *</Label>
+                  <Label>Emergency Contact Number</Label>
                   <Input
                     type="tel"
                     placeholder="+971 50 123 4567"

@@ -76,10 +76,23 @@ public class StaffRequestDTO {
     // App access credentials (optional — leave blank to not create app login)
     private String appUsername;
     private String appPassword;
+    private Boolean enableLogin;
+
+    // Security role for the linked login account (Admin/Receptionist/Trainer/Accountant/Manager).
+    // Independent of the free-text `role` (job title, used for commission/target filtering) —
+    // lets forms like the Staffs & Trainers "App Access" section pick a real RBAC role without
+    // disturbing the commission system's job-title values. Falls back to `role` if omitted.
+    private String appRole;
 
     public String getAppUsername() { return appUsername; }
     public void setAppUsername(String appUsername) { this.appUsername = appUsername; }
 
     public String getAppPassword() { return appPassword; }
     public void setAppPassword(String appPassword) { this.appPassword = appPassword; }
+
+    public Boolean getEnableLogin() { return enableLogin; }
+    public void setEnableLogin(Boolean enableLogin) { this.enableLogin = enableLogin; }
+
+    public String getAppRole() { return appRole; }
+    public void setAppRole(String appRole) { this.appRole = appRole; }
 }

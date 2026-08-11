@@ -34,10 +34,12 @@ import java.util.stream.Collectors;
 public class BankReconciliationService {
 
     /**
-     * The chart of accounts currently has a single bank ledger account (see
-     * FinancialEventService — every non-cash payment method posts here). Until
-     * the system supports one AccountHead per real bank, this is the only
-     * account a bank reconciliation can be checked against.
+     * Fallback bank ledger account for reconciliations whose bankAccountName doesn't resolve to a
+     * real AccountHead (e.g. legacy free-text rows entered before per-bank matching existed). Every
+     * reconciliation created against a real Chart-of-Accounts bank account is instead checked
+     * against *that specific account's* code — see {@link #resolveBankAccountCode(String)}. Without
+     * this resolution, a gym with more than one real bank account would have every reconciliation
+     * silently checked against the same generic bucket regardless of which bank was selected.
      */
     private static final String BANK_ACCOUNT_CODE = FinancialEventService.ACC_CASH_AT_BANK;
 
@@ -117,7 +119,7 @@ public class BankReconciliationService {
      */
     private void applyLiveBalance(BankReconciliation r, BankReconciliationResponseDTO dto) {
         if ("COMPLETED".equals(r.getStatus())) return;
-        BigDecimal systemBalance = computeSystemBalance(r.getStatementDate());
+        BigDecimal systemBalance = computeSystemBalance(r.getStatementDate(), resolveBankAccountCode(r.getBankAccountName()));
         BigDecimal closing = r.getClosingBalance() != null ? r.getClosingBalance() : BigDecimal.ZERO;
         dto.setSystemBalance(systemBalance);
         dto.setDifference(closing.subtract(systemBalance));
@@ -166,8 +168,11 @@ public class BankReconciliationService {
         if (!"POSTED".equals(jv.getStatus()) || jv.getDeletedAt() != null) {
             throw new IllegalStateException("Only posted journal vouchers can be matched to a bank statement line");
         }
+        BankReconciliation reconciliation = reconciliationRepository.findById(reconciliationId)
+                .orElseThrow(() -> new IllegalArgumentException("Reconciliation not found: " + reconciliationId));
+        String bankAccountCode = resolveBankAccountCode(reconciliation.getBankAccountName());
         boolean hitsBankAccount = journalVoucherLineRepository.findByJournalVoucherId(journalVoucherId).stream()
-                .anyMatch(l -> BANK_ACCOUNT_CODE.equals(l.getAccountCode()));
+                .anyMatch(l -> bankAccountCode.equals(l.getAccountCode()));
         if (!hitsBankAccount) {
             throw new IllegalStateException(
                     "Journal voucher " + jv.getVoucherNo() + " does not post to the bank account and cannot be matched");
@@ -212,7 +217,7 @@ public class BankReconciliationService {
         // account with no corresponding statement line, e.g. a dated/backdated entry or plain
         // mistake). Recompute one final time and refuse to lock in a reconciliation that doesn't
         // actually tie out; the whole point of reconciling is bank balance == ledger balance.
-        BigDecimal systemBalance = computeSystemBalance(r.getStatementDate());
+        BigDecimal systemBalance = computeSystemBalance(r.getStatementDate(), resolveBankAccountCode(r.getBankAccountName()));
         BigDecimal closing = r.getClosingBalance() != null ? r.getClosingBalance() : BigDecimal.ZERO;
         BigDecimal difference = closing.subtract(systemBalance);
         if (difference.abs().compareTo(AMOUNT_TOLERANCE) > 0) {
@@ -249,10 +254,12 @@ public class BankReconciliationService {
         if (!reconciliationId.equals(line.getReconciliationId())) {
             throw new IllegalArgumentException("Line " + lineId + " does not belong to reconciliation " + reconciliationId);
         }
+        BankReconciliation reconciliation = reconciliationRepository.findById(reconciliationId)
+                .orElseThrow(() -> new IllegalArgumentException("Reconciliation not found: " + reconciliationId));
 
         Map<Long, JournalVoucher> postedById = loadPostedVouchers();
         Set<Long> usedJvIds = alreadyMatchedJournalVoucherIds();
-        List<JournalVoucherLine> bankLines = journalVoucherLineRepository.findByAccountCode(BANK_ACCOUNT_CODE);
+        List<JournalVoucherLine> bankLines = journalVoucherLineRepository.findByAccountCode(resolveBankAccountCode(reconciliation.getBankAccountName()));
 
         boolean wantDebit = isBankCredit(line.getType());
         BigDecimal target = line.getAmount() != null ? line.getAmount() : BigDecimal.ZERO;
@@ -282,13 +289,12 @@ public class BankReconciliationService {
      */
     @Transactional(readOnly = true)
     public List<AutoMatchSuggestionDTO> suggestAutoMatches(Long reconciliationId) {
-        if (!reconciliationRepository.existsById(reconciliationId)) {
-            throw new IllegalArgumentException("Reconciliation not found: " + reconciliationId);
-        }
+        BankReconciliation reconciliation = reconciliationRepository.findById(reconciliationId)
+                .orElseThrow(() -> new IllegalArgumentException("Reconciliation not found: " + reconciliationId));
 
         Map<Long, JournalVoucher> postedById = loadPostedVouchers();
         Set<Long> usedJvIds = alreadyMatchedJournalVoucherIds();
-        List<JournalVoucherLine> bankLines = journalVoucherLineRepository.findByAccountCode(BANK_ACCOUNT_CODE);
+        List<JournalVoucherLine> bankLines = journalVoucherLineRepository.findByAccountCode(resolveBankAccountCode(reconciliation.getBankAccountName()));
 
         List<BankStatementLine> unmatchedLines = lineRepository
                 .findByReconciliationIdOrderByTransactionDateAsc(reconciliationId).stream()
@@ -334,7 +340,7 @@ public class BankReconciliationService {
         // always computed from the actual posted ledger as of the statement
         // date, otherwise "reconciling" would just be comparing the bank
         // statement to whatever number the user felt like typing.
-        BigDecimal systemBalance = computeSystemBalance(req.getStatementDate());
+        BigDecimal systemBalance = computeSystemBalance(req.getStatementDate(), resolveBankAccountCode(req.getBankAccountName()));
         r.setSystemBalance(systemBalance);
 
         BigDecimal closing = req.getClosingBalance() != null ? req.getClosingBalance() : BigDecimal.ZERO;
@@ -342,15 +348,30 @@ public class BankReconciliationService {
         r.setNotes(req.getNotes());
     }
 
+    /**
+     * Resolves a reconciliation's free-text bankAccountName to the real Chart-of-Accounts
+     * AccountHead it refers to (case/whitespace-insensitive, since the create/edit form is a plain
+     * text field with autocomplete suggestions, not a strict picker). Falls back to the generic
+     * Cash-at-Bank bucket ({@link #BANK_ACCOUNT_CODE}) when no matching account exists — e.g. for
+     * legacy reconciliations entered before real per-bank accounts existed, or a typo'd name —
+     * rather than failing closed and blocking reconciliation entirely.
+     */
+    private String resolveBankAccountCode(String bankAccountName) {
+        if (bankAccountName == null || bankAccountName.isBlank()) return BANK_ACCOUNT_CODE;
+        return accountHeadRepository.findByNameIgnoreCase(bankAccountName.trim())
+                .map(AccountHead::getCode)
+                .orElse(BANK_ACCOUNT_CODE);
+    }
+
     /** opening_balance(bank account) + net(debit-credit) of all ledger-effective lines on or before asOfDate. */
-    private BigDecimal computeSystemBalance(LocalDate asOfDate) {
-        AccountHead account = accountHeadRepository.findByCode(BANK_ACCOUNT_CODE).orElse(null);
+    private BigDecimal computeSystemBalance(LocalDate asOfDate, String accountCode) {
+        AccountHead account = accountHeadRepository.findByCode(accountCode).orElse(null);
         BigDecimal opening = account != null && account.getOpeningBalance() != null
                 ? account.getOpeningBalance() : BigDecimal.ZERO;
 
         Map<Long, JournalVoucher> effectiveById = loadLedgerEffectiveVouchers();
         BigDecimal net = BigDecimal.ZERO;
-        for (JournalVoucherLine line : journalVoucherLineRepository.findByAccountCode(BANK_ACCOUNT_CODE)) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByAccountCode(accountCode)) {
             JournalVoucher jv = effectiveById.get(line.getJournalVoucherId());
             if (jv == null || jv.getDate() == null) continue;
             if (asOfDate != null && jv.getDate().isAfter(asOfDate)) continue;

@@ -1,11 +1,13 @@
 package com.company.project.services;
 
+import com.company.project.config.PermissionCatalog;
 import com.company.project.dto.NotificationResponseDTO;
 import com.company.project.entities.Notification;
 import com.company.project.repositories.NotificationRepository;
 import com.company.project.security.UserDetailsImpl;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -15,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Core notification service. All public notify* methods are safe to call
@@ -29,9 +33,11 @@ public class NotificationService {
     private static final Long DEFAULT_COMPANY_ID = 1L;
 
     private final NotificationRepository notificationRepository;
+    private final RoleService roleService;
 
-    public NotificationService(NotificationRepository notificationRepository) {
+    public NotificationService(NotificationRepository notificationRepository, RoleService roleService) {
         this.notificationRepository = notificationRepository;
+        this.roleService = roleService;
     }
 
     // ── Public trigger methods ────────────────────────────────────────────────
@@ -100,16 +106,27 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public Page<NotificationResponseDTO> getForCurrentUser(int page, int size) {
         UserContext ctx = currentUserContext();
-        Page<Notification> raw = notificationRepository.findForUser(
-                ctx.companyId, ctx.userId, ctx.roles,
-                PageRequest.of(page, size));
-        return raw.map(this::toDTO);
+        Set<String> allowedModules = allowedModulesForRoles(ctx.roles);
+        List<Notification> visible = notificationRepository
+                .findAllForUser(ctx.companyId, ctx.userId, ctx.roles).stream()
+                .filter(n -> isModuleVisible(n.getModule(), allowedModules))
+                .toList();
+
+        int from = Math.min(page * size, visible.size());
+        int to = Math.min(from + size, visible.size());
+        List<NotificationResponseDTO> content = visible.subList(from, to).stream()
+                .map(this::toDTO)
+                .toList();
+        return new PageImpl<>(content, PageRequest.of(page, size), visible.size());
     }
 
     @Transactional(readOnly = true)
     public long getUnreadCount() {
         UserContext ctx = currentUserContext();
-        return notificationRepository.countUnread(ctx.companyId, ctx.userId, ctx.roles);
+        Set<String> allowedModules = allowedModulesForRoles(ctx.roles);
+        return notificationRepository.findUnreadForUser(ctx.companyId, ctx.userId, ctx.roles).stream()
+                .filter(n -> isModuleVisible(n.getModule(), allowedModules))
+                .count();
     }
 
     public void markRead(Long notificationId) {
@@ -176,8 +193,34 @@ public class NotificationService {
     private boolean isVisibleToCurrentUser(Notification n) {
         UserContext ctx = currentUserContext();
         if (!n.getCompanyId().equals(ctx.companyId)) return false;
-        if (n.getTargetUserId() != null) return n.getTargetUserId().equals(ctx.userId);
-        return ctx.roles.contains(n.getTargetRole());
+        boolean targeted = n.getTargetUserId() != null
+                ? n.getTargetUserId().equals(ctx.userId)
+                : ctx.roles.contains(n.getTargetRole());
+        if (!targeted) return false;
+        return isModuleVisible(n.getModule(), allowedModulesForRoles(ctx.roles));
+    }
+
+    /**
+     * Modules (from PermissionCatalog) the given roles have at least one permission for.
+     * ADMIN gets every catalog module, since RoleService.getEffectivePermissionKeys
+     * already special-cases ADMIN to "all permissions" regardless of stored rows.
+     */
+    private Set<String> allowedModulesForRoles(List<String> roles) {
+        List<String> permissionKeys = roleService.getEffectivePermissionKeysForRoleNames(roles);
+        return PermissionCatalog.MODULES.keySet().stream()
+                .filter(module -> permissionKeys.stream().anyMatch(key -> key.startsWith(module + "_")))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * A notification is visible if its module isn't gated by the permission catalog at all
+     * (e.g. "GENERAL", or a notification module — like "LEADS", "BOOKINGS" — that predates/
+     * isn't part of the Administration permission grid), or the user's roles have at least
+     * one permission for that module.
+     */
+    private boolean isModuleVisible(String module, Set<String> allowedModules) {
+        if (module == null || !PermissionCatalog.MODULES.containsKey(module)) return true;
+        return allowedModules.contains(module);
     }
 
     private UserContext currentUserContext() {

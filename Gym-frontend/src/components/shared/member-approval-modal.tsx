@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCurrency, CurrencyGlyph } from '../../utils/currency';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
@@ -9,6 +9,10 @@ import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { toast } from "sonner";
+import { accountHeadsService, AccountHead } from '../../utils/supabase/account-heads-service';
+
+const CARD_TYPE_OPTIONS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Maestro', 'Diners Club', 'Other'];
+const ONLINE_PAYMENT_TYPE_OPTIONS = ['Google Pay', 'PhonePe', 'Paytm', 'BHIM', 'Samsung Pay', 'Apple Pay', 'Amazon Pay', 'UPI', 'Other'];
 import { 
   CheckCircle, 
   User, 
@@ -69,8 +73,100 @@ export function MemberApprovalModal({
     discountAmount: 0,
     finalAmount: draftData?.planPrice || 0,
     transactionId: '',
-    notes: ''
+    notes: '',
+    cardType: '',
+    chequeNumber: '',
+    bankName: '',
+    chequeDate: '',
+    bankAccountId: '',
+    onlinePaymentType: '',
+    providerName: ''
   });
+
+  const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+  useEffect(() => {
+    accountHeadsService.getBankAccounts()
+      .then(setBankAccounts)
+      .catch(err => console.error('Failed to load bank accounts:', err));
+  }, []);
+
+  const renderPaymentMethodDetails = () => {
+    const method = paymentData.paymentMode;
+    const onChange = (field: string, value: string) => {
+      setPaymentData(prev => ({ ...prev, [field]: value }));
+    };
+
+    if (method === 'card') {
+      return (
+        <div className="mt-4">
+          <Label className="text-sm text-gray-600 mb-1 block">Card Type</Label>
+          <Select value={paymentData.cardType || undefined} onValueChange={(v) => onChange('cardType', v)}>
+            <SelectTrigger className="border-primary/20 bg-white"><SelectValue placeholder="Select card type" /></SelectTrigger>
+            <SelectContent>
+              {CARD_TYPE_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+    if (method === 'check') {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Cheque Number</Label>
+            <Input value={paymentData.chequeNumber} onChange={(e) => onChange('chequeNumber', e.target.value)} className="border-primary/20 bg-white" />
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Bank Name</Label>
+            <Input value={paymentData.bankName} onChange={(e) => onChange('bankName', e.target.value)} className="border-primary/20 bg-white" />
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Cheque Date</Label>
+            <Input type="date" value={paymentData.chequeDate} onChange={(e) => onChange('chequeDate', e.target.value)} className="border-primary/20 bg-white" />
+          </div>
+        </div>
+      );
+    }
+    if (method === 'bank-transfer') {
+      return (
+        <div className="mt-4">
+          <Label className="text-sm text-gray-600 mb-1 block">Bank Account</Label>
+          <Select value={paymentData.bankAccountId || undefined} onValueChange={(v) => onChange('bankAccountId', v)}>
+            <SelectTrigger className="border-primary/20 bg-white"><SelectValue placeholder="Select bank account" /></SelectTrigger>
+            <SelectContent>
+              {bankAccounts.length === 0 ? (
+                <div className="px-2 py-1.5 text-sm text-gray-500">No bank accounts found in Chart of Accounts</div>
+              ) : (
+                bankAccounts.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.code} — {a.name}</SelectItem>)
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+    if (method === 'online') {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+          <div>
+            <Label className="text-sm text-gray-600 mb-1 block">Online Payment Type</Label>
+            <Select value={paymentData.onlinePaymentType || undefined} onValueChange={(v) => onChange('onlinePaymentType', v)}>
+              <SelectTrigger className="border-primary/20 bg-white"><SelectValue placeholder="Select type" /></SelectTrigger>
+              <SelectContent>
+                {ONLINE_PAYMENT_TYPE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {paymentData.onlinePaymentType === 'Other' && (
+            <div>
+              <Label className="text-sm text-gray-600 mb-1 block">Provider Name</Label>
+              <Input value={paymentData.providerName} onChange={(e) => onChange('providerName', e.target.value)} className="border-primary/20 bg-white" />
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -175,7 +271,7 @@ export function MemberApprovalModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2 text-2xl">
             <UserCheck className="h-6 w-6 text-[#2B7A78]" />
@@ -350,16 +446,19 @@ export function MemberApprovalModal({
                     value={paymentData.paymentMode} 
                     onValueChange={(value) => setPaymentData(prev => ({ ...prev, paymentMode: value }))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white">
                       <SelectValue placeholder="Select payment mode" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="card">Credit/Debit Card</SelectItem>
-                      <SelectItem value="online">Online Transfer</SelectItem>
-                      <SelectItem value="wallet">Digital Wallet</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      <SelectItem value="check">Cheque</SelectItem>
+                      <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="online">Online Payment</SelectItem>
                     </SelectContent>
                   </Select>
+                  
+                  {renderPaymentMethodDetails()}
                 </div>
 
                 <div>
@@ -368,6 +467,7 @@ export function MemberApprovalModal({
                     placeholder="Enter transaction reference"
                     value={paymentData.transactionId}
                     onChange={(e) => setPaymentData(prev => ({ ...prev, transactionId: e.target.value }))}
+                    className="bg-white"
                   />
                 </div>
               </div>

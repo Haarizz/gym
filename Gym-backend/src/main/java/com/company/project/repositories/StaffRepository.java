@@ -9,6 +9,7 @@ import java.util.List;
 public interface StaffRepository extends JpaRepository<Staff, Long>, JpaSpecificationExecutor<Staff> {
     Optional<Staff> findByEmail(String email);
     Optional<Staff> findByStaffId(String staffId);
+    Optional<Staff> findByUserId(Long userId);
     boolean existsByEmail(String email);
     long countByStatus(String status);
     List<Staff> findTop5ByOrderByCreatedAtDesc();

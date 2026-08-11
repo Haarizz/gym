@@ -3,6 +3,8 @@
  * Supabase has been removed. All authentication goes through /api/auth/*.
  */
 
+import { setPermissions } from "../permissions";
+
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
 export interface User {
@@ -10,6 +12,8 @@ export interface User {
   email: string;
   name: string;
   role: string;
+  roleName?: string;
+  staffName?: string;
   backendUserId?: number;
 }
 
@@ -48,10 +52,20 @@ class AuthService {
       this.user = {
         id:    `backend_${username}`,
         email,
-        name:  username,
+        name:  sessionStorage.getItem("gymbios_staff_name") || username,
         role:  roles[0]?.toLowerCase() || "user",
+        roleName: sessionStorage.getItem("gymbios_role_name") || roles[0],
+        staffName: sessionStorage.getItem("gymbios_staff_name") || undefined,
         backendUserId: Number(sessionStorage.getItem("userId") ?? NaN) || undefined,
       };
+    }
+
+    // Restore the fine-grained permission cache alongside the session (survives refresh).
+    try {
+      const permissionsRaw = sessionStorage.getItem("gymbios_permissions");
+      setPermissions(permissionsRaw ? JSON.parse(permissionsRaw) : []);
+    } catch {
+      setPermissions([]);
     }
 
     this.accessToken = storedToken;
@@ -74,13 +88,18 @@ class AuthService {
       if (response.ok) {
         const result = await response.json();
         const roles: string[] = Array.isArray(result.roles) ? result.roles : [];
+        const permissions: string[] = Array.isArray(result.permissions) ? result.permissions : [];
+        const roleName: string | undefined = result.roleName ?? result.role_name ?? roles[0];
+        const staffName: string | undefined = result.staffName ?? result.staff_name;
         const username = result.username || email;
 
         this.user = {
           id:   `backend_${username}`,
           email,
-          name: username,
+          name: staffName || username,
           role: roles[0]?.toLowerCase() || "user",
+          roleName,
+          staffName,
           backendUserId:
             typeof (result.userId ?? result.user_id) === "number"
               ? (result.userId ?? result.user_id)
@@ -96,6 +115,9 @@ class AuthService {
         sessionStorage.setItem("gymbios_user",       JSON.stringify(this.user));
         sessionStorage.setItem("gymbios_auth",       "true");
         sessionStorage.setItem("gymbios_auth_source","backend");
+        if (roleName) sessionStorage.setItem("gymbios_role_name", roleName);
+        if (staffName) sessionStorage.setItem("gymbios_staff_name", staffName);
+        setPermissions(permissions);
 
         return { success: true };
       }
@@ -144,6 +166,9 @@ class AuthService {
     sessionStorage.removeItem("gymbios_auth");
     sessionStorage.removeItem("gymbios_auth_source");
     sessionStorage.removeItem("gymbios_demo_mode");
+    sessionStorage.removeItem("gymbios_role_name");
+    sessionStorage.removeItem("gymbios_staff_name");
+    setPermissions([]);
   }
 
   // ── State accessors ──────────────────────────────────────────────────────
@@ -172,6 +197,23 @@ class AuthService {
 
   getAuthSource(): "backend" | null {
     return this.isAuthenticated() ? "backend" : null;
+  }
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await this.makeAuthenticatedRequest(
+        `${backendBaseUrl}/auth/change-password`,
+        { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) }
+      );
+      if (response.ok) return { success: true };
+      const message = await response.text().catch(() => "");
+      return { success: false, error: message || "Failed to change password." };
+    } catch {
+      return { success: false, error: "Cannot connect to server. Please check your connection." };
+    }
   }
 
   // ── HTTP helper ──────────────────────────────────────────────────────────

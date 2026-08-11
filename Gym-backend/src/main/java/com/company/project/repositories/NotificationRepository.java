@@ -1,8 +1,6 @@
 package com.company.project.repositories;
 
 import com.company.project.entities.Notification;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,10 +15,13 @@ import java.util.Optional;
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
     /**
-     * Fetch all visible notifications for a user:
+     * Fetch all role/user-targeted notifications for a user:
      * - their own (targetUserId = uid) OR
      * - role-broadcast for any of their roles (targetRole IN roles AND no specific user)
-     * Sorted by priority then date (ORDER BY in @Query overrides Pageable sort for correctness).
+     * Sorted by priority then date. NOTE: this does NOT filter by module permissions —
+     * that's a further in-memory filter applied by NotificationService using the role's
+     * effective permission set, since it isn't expressible against the permission tables
+     * in this single query.
      */
     @Query("""
         SELECT n FROM Notification n
@@ -39,16 +40,15 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
           END ASC,
           n.createdAt DESC
         """)
-    Page<Notification> findForUser(
+    List<Notification> findAllForUser(
         @Param("cid") Long companyId,
         @Param("uid") Long userId,
-        @Param("roles") List<String> roles,
-        Pageable pageable
+        @Param("roles") List<String> roles
     );
 
-    /** Count unread notifications for the given user + roles. */
+    /** Unread role/user-targeted notifications for a user (see findAllForUser for the module-filter note). */
     @Query("""
-        SELECT COUNT(n) FROM Notification n
+        SELECT n FROM Notification n
         WHERE n.companyId = :cid
           AND n.isDeleted = false
           AND n.isRead = false
@@ -57,7 +57,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             OR (n.targetRole IN :roles AND n.targetUserId IS NULL)
           )
         """)
-    long countUnread(
+    List<Notification> findUnreadForUser(
         @Param("cid") Long companyId,
         @Param("uid") Long userId,
         @Param("roles") List<String> roles
