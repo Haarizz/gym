@@ -114,6 +114,7 @@ export function CheckIn() {
   const [searchTerm, setSearchTerm]       = useState('');
   const [activeTab, setActiveTab]         = useState('registered');
   const [selectedPerson, setSelectedPerson] = useState<PersonEntry | null>(null);
+  const [activeOnlyFilter, setActiveOnlyFilter] = useState(false);
 
   // ── Daily visitor form ───────────────────────────────────────────────────────
   const [visitorName, setVisitorName]     = useState('');
@@ -242,6 +243,9 @@ export function CheckIn() {
   const todayCount  = todayAttendance.length + dailyCheckIns.length;
   const activeCount = todayAttendance.length + dailyCheckIns.filter(d => d.status === 'Active').length;
   const occupancy   = Math.round((activeCount / gymCapacity) * 100);
+  const visibleTodayAttendance = activeOnlyFilter
+    ? todayAttendance.filter(r => r.status === 'active')
+    : todayAttendance;
 
   const selectedPlanDetails = walkInPlans.find(p => p.id.toString() === selectedPlan);
 
@@ -477,7 +481,11 @@ export function CheckIn() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-primary/10 shadow-md">
+        <Card
+          className="border-primary/10 shadow-md cursor-pointer"
+          style={activeTab === 'registered' && !activeOnlyFilter ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          onClick={() => { setActiveTab('registered'); setActiveOnlyFilter(false); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Today's Check-ins</CardTitle>
             <div className="bg-gradient-light p-2 rounded-lg"><LogIn className="h-4 w-4 text-primary" /></div>
@@ -488,7 +496,12 @@ export function CheckIn() {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md">
+        <Card
+          className="border-primary/10 shadow-md cursor-pointer"
+          style={activeOnlyFilter ? { boxShadow: '0 0 0 2px #16a34a' } : undefined}
+          title="Click to show only currently active check-ins"
+          onClick={() => { setActiveTab('registered'); setActiveOnlyFilter(v => !v); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Currently Active</CardTitle>
             <div className="bg-green-50 p-2 rounded-lg"><UserCheck className="h-4 w-4 text-green-600" /></div>
@@ -499,7 +512,10 @@ export function CheckIn() {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md">
+        <Card
+          className="border-primary/10 shadow-md cursor-pointer"
+          onClick={() => { setActiveTab('registered'); setActiveOnlyFilter(false); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Occupancy Rate</CardTitle>
             <div className="bg-gradient-light p-2 rounded-lg"><Users className="h-4 w-4 text-primary" /></div>
@@ -510,7 +526,11 @@ export function CheckIn() {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md">
+        <Card
+          className="border-primary/10 shadow-md cursor-pointer"
+          style={activeTab === 'daily' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
+          onClick={() => { setActiveTab('daily'); setActiveOnlyFilter(false); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Daily Visitors</CardTitle>
             <div className="bg-blue-50 p-2 rounded-lg"><UserPlus className="h-4 w-4 text-blue-600" /></div>
@@ -602,9 +622,15 @@ export function CheckIn() {
                     <UserCheck className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
                     <p className="text-sm">No check-ins yet today</p>
                   </div>
+                ) : visibleTodayAttendance.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <UserCheck className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
+                    <p className="text-sm">No one is currently active.</p>
+                    <Button variant="link" size="sm" onClick={() => setActiveOnlyFilter(false)}>Clear filter</Button>
+                  </div>
                 ) : (
                   <div className="space-y-3 overflow-y-auto pr-1" style={{ maxHeight: '520px' }}>
-                    {todayAttendance.map(record => {
+                    {visibleTodayAttendance.map(record => {
                       const name = record.member_name || record['walk_in_name'] || 'Visitor';
                       const isActive = record.status === 'active';
                       const isCheckingOut = checkingOutId === record.id;

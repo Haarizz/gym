@@ -83,6 +83,180 @@ function pctChange(current: number, previous: number): number | null {
   return null;
 }
 
+type PaymentModeBucket = { name: string; amount: number; value: number; color: string };
+type ReportPeriod = { key: string; label: string; start: Date; end: Date; total: number; categories: RevenueBucket[]; methods: PaymentModeBucket[] };
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Memberships: "#2B7A78",
+  "Personal Training": "#3b82f6",
+  "Group Classes": "#f59e0b",
+  Merchandise: "#8b5cf6",
+  "Other Services": "#64748b",
+};
+
+function categorizeReceipt(r: Receipt): string {
+  const t = (r.transaction_type || "").toLowerCase();
+  const plan = (r.plan_name || "").toLowerCase();
+  if (t.includes("renew") || t.includes("upgrade") || t.includes("new member") || plan.includes("membership")) return "Memberships";
+  if (t.includes("training") || plan.includes("pt") || plan.includes("personal")) return "Personal Training";
+  if (t.includes("class") || plan.includes("class")) return "Group Classes";
+  if (t.includes("pos") || t.includes("product") || plan.includes("product")) return "Merchandise";
+  return "Other Services";
+}
+
+// Immutable receipts split a partially-paid-then-settled bill into multiple
+// rows: the original bill row keeps its full invoice amount (r.amount) even
+// after later settlements, while each settlement is its own separate row —
+// so summing r.amount across all rows double-counts the settled portion.
+// r.paid_amount is the actual cash each row received and never overlaps
+// between rows, so it's the only field safe to sum for real revenue.
+function revenueOf(r: Receipt): number {
+  return Number(r.paid_amount) || 0;
+}
+
+function buildRevenueBreakdown(rows: Receipt[]): RevenueBucket[] {
+  const buckets: Record<string, number> = {};
+  const total = rows.reduce((sum, r) => sum + revenueOf(r), 0);
+
+  rows.forEach((r) => {
+    const cat = categorizeReceipt(r);
+    buckets[cat] = (buckets[cat] || 0) + revenueOf(r);
+  });
+
+  return Object.entries(buckets)
+    .map(([name, amount]) => ({
+      name,
+      amount,
+      value: total > 0 ? Math.round((amount / total) * 100) : 0,
+      color: CATEGORY_COLORS[name] ?? "#64748b",
+    }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+// Canonical payment-method display names, matching add-member.tsx / check-in.tsx's
+// PAYMENT_METHOD_LABELS — those pages already store the human label (e.g. "Cash",
+// "Bank Transfer") on the receipt, but older rows or raw keys ("bank-transfer") can
+// still show up, so this normalizes either shape to one consistent bucket name.
+const CANONICAL_METHOD_NAMES = ["Cash", "Card", "Cheque", "Bank Transfer", "Online Payment", "Credit"];
+const PAYMENT_METHOD_KEY_LABELS: Record<string, string> = {
+  cash: "Cash",
+  card: "Card",
+  check: "Cheque",
+  cheque: "Cheque",
+  "bank-transfer": "Bank Transfer",
+  banktransfer: "Bank Transfer",
+  online: "Online Payment",
+  credit: "Credit",
+};
+
+const PAYMENT_METHOD_COLORS: Record<string, string> = {
+  Cash: "#2B7A78",
+  Card: "#34d399",
+  Cheque: "#3b82f6",
+  "Bank Transfer": "#8b5cf6",
+  "Online Payment": "#06b6d4",
+  Credit: "#f59e0b",
+  "Credit Pending": "#f59e0b",
+};
+
+function paymentMethodLabel(method?: string): string {
+  if (!method) return "Other";
+  const trimmed = method.trim();
+  const exact = CANONICAL_METHOD_NAMES.find((n) => n.toLowerCase() === trimmed.toLowerCase());
+  if (exact) return exact;
+  const key = trimmed.toLowerCase().replace(/[\s_]/g, "-");
+  if (PAYMENT_METHOD_KEY_LABELS[key]) return PAYMENT_METHOD_KEY_LABELS[key];
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+// A bill's due_amount is the portion still uncollected as of that row — the only
+// safe "pending" figure, for the same reason r.amount can't be diffed across the
+// split rows an immutable receipt produces (see revenueOf above).
+function buildPaymentModeBreakdown(rows: Receipt[]): PaymentModeBucket[] {
+  const totals: Record<string, number> = {};
+
+  rows.forEach((r) => {
+    const legs = r.payment_breakdown;
+    if (legs && legs.length > 0) {
+      legs.forEach((leg) => {
+        const amt = Number(leg.amount) || 0;
+        if (amt <= 0) return;
+        const label = paymentMethodLabel(leg.method);
+        totals[label] = (totals[label] || 0) + amt;
+      });
+    } else {
+      const paid = revenueOf(r);
+      if (paid > 0) {
+        const label = paymentMethodLabel(r.payment_method);
+        totals[label] = (totals[label] || 0) + paid;
+      }
+    }
+
+    if (r.invoice_no && r.transaction_type !== "Payment") {
+      const due = Number(r.due_amount) || 0;
+      if (due > 0) totals["Credit Pending"] = (totals["Credit Pending"] || 0) + due;
+    }
+  });
+
+  const total = Object.values(totals).reduce((s, v) => s + v, 0);
+  return Object.entries(totals)
+    .map(([name, amount]) => ({
+      name,
+      amount,
+      value: total > 0 ? Math.round((amount / total) * 100) : 0,
+      color: PAYMENT_METHOD_COLORS[name] ?? "#64748b",
+    }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+// Buckets a date range into weeks (short ranges), months (up to ~2 years), or
+// years (longer / "all time"), so the custom revenue report's trend charts and
+// tables stay readable no matter which date-range preset is active.
+function getPeriodBuckets(start: Date, end: Date): { key: string; label: string; start: Date; end: Date }[] {
+  const durationDays = Math.max(1, (end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  const buckets: { key: string; label: string; start: Date; end: Date }[] = [];
+
+  if (durationDays <= 45) {
+    let cursor = new Date(start);
+    let idx = 1;
+    while (cursor <= end && idx <= 10) {
+      const bStart = new Date(cursor);
+      const bEnd = new Date(Math.min(end.getTime(), bStart.getTime() + 7 * 24 * 60 * 60 * 1000 - 1));
+      buckets.push({ key: `w${idx}`, label: `Week ${idx}`, start: bStart, end: bEnd });
+      cursor = new Date(bEnd.getTime() + 1);
+      idx += 1;
+    }
+  } else if (durationDays <= 731) {
+    let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    let guard = 0;
+    while (cursor <= end && guard < 24) {
+      const bStart = cursor < start ? start : cursor;
+      const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59, 999);
+      const bEnd = monthEnd > end ? end : monthEnd;
+      const label = cursor.toLocaleString(undefined, {
+        month: "short",
+        year: start.getFullYear() !== end.getFullYear() ? "2-digit" : undefined,
+      });
+      buckets.push({ key: `${cursor.getFullYear()}-${cursor.getMonth()}`, label, start: bStart, end: bEnd });
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      guard += 1;
+    }
+  } else {
+    let cursor = new Date(start.getFullYear(), 0, 1);
+    let guard = 0;
+    while (cursor <= end && guard < 15) {
+      const bStart = cursor < start ? start : cursor;
+      const yearEnd = new Date(cursor.getFullYear(), 11, 31, 23, 59, 59, 999);
+      const bEnd = yearEnd > end ? end : yearEnd;
+      buckets.push({ key: `${cursor.getFullYear()}`, label: `${cursor.getFullYear()}`, start: bStart, end: bEnd });
+      cursor = new Date(cursor.getFullYear() + 1, 0, 1);
+      guard += 1;
+    }
+  }
+
+  return buckets;
+}
+
 export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
   const { currencyCode } = useCurrency();
   const statCardShell =
@@ -100,9 +274,12 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
   const [rangeKey, setRangeKey] = useState<RangeKey>('30d');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [reportsTab, setReportsTab] = useState('overview');
+  const [activeKpiCard, setActiveKpiCard] = useState<number | null>(null);
 
   const [reportType, setReportType] = useState<'revenue' | 'membership' | 'attendance' | 'summary'>('summary');
   const [reportFormat, setReportFormat] = useState<'csv' | 'excel' | 'pdf'>('csv');
+  const [reportGenerated, setReportGenerated] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -192,6 +369,12 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     return dt ? dt >= rangeStart && dt <= rangeEnd : false;
   }), [householdMembers, rangeStart, rangeEnd]);
 
+  const cancelledMembersInPrevRange = useMemo(() => householdMembers.filter((m) => {
+    if (!isCancelledStatus(m.membership_status)) return false;
+    const dt = parseMemberUpdatedDate(m);
+    return dt ? dt >= prevStart && dt <= prevEnd : false;
+  }), [householdMembers, prevStart, prevEnd]);
+
   const membershipTrends: MembershipTrendPoint[] = useMemo(() => {
     const now = new Date();
     const months: { label: string; key: string; start: Date; end: Date }[] = [];
@@ -225,53 +408,85 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     });
   }, [members]);
 
-  // Immutable receipts split a partially-paid-then-settled bill into multiple
-  // rows: the original bill row keeps its full invoice amount (r.amount) even
-  // after later settlements, while each settlement is its own separate row —
-  // so summing r.amount across all rows double-counts the settled portion.
-  // r.paid_amount is the actual cash each row received and never overlaps
-  // between rows, so it's the only field safe to sum for real revenue.
-  const revenueOf = (r: Receipt): number => Number(r.paid_amount) || 0;
+  const revenueBreakdown = useMemo(() => buildRevenueBreakdown(receiptsInRange), [receiptsInRange]);
+  const revenueBreakdownPrev = useMemo(() => buildRevenueBreakdown(receiptsInPrevRange), [receiptsInPrevRange]);
 
-  const buildRevenueBreakdown = useCallback((rows: Receipt[]): RevenueBucket[] => {
-    const buckets: Record<string, number> = {};
-    const total = rows.reduce((sum, r) => sum + revenueOf(r), 0);
+  const paymentBreakdown = useMemo(() => buildPaymentModeBreakdown(receiptsInRange), [receiptsInRange]);
+  const paymentBreakdownPrev = useMemo(() => buildPaymentModeBreakdown(receiptsInPrevRange), [receiptsInPrevRange]);
 
-    const normalizeCategory = (r: Receipt) => {
-      const t = (r.transaction_type || "").toLowerCase();
-      const plan = (r.plan_name || "").toLowerCase();
-      if (t.includes("renew") || t.includes("upgrade") || t.includes("new member") || plan.includes("membership")) return "Memberships";
-      if (t.includes("training") || plan.includes("pt") || plan.includes("personal")) return "Personal Training";
-      if (t.includes("class") || plan.includes("class")) return "Group Classes";
-      if (t.includes("pos") || t.includes("product") || plan.includes("product")) return "Merchandise";
-      if (t.includes("add-on") || t.includes("addon") || plan.includes("add")) return "Other Services";
-      return "Other Services";
-    };
-
-    rows.forEach((r) => {
-      const cat = normalizeCategory(r);
-      buckets[cat] = (buckets[cat] || 0) + revenueOf(r);
+  const reportPeriods: ReportPeriod[] = useMemo(() => {
+    const buckets = getPeriodBuckets(rangeStart, rangeEnd);
+    return buckets.map((b) => {
+      const rows = receiptsInRange.filter((r) => {
+        const dt = parseReceiptDate(r);
+        return dt ? dt >= b.start && dt <= b.end : false;
+      });
+      return {
+        ...b,
+        total: rows.reduce((sum, r) => sum + revenueOf(r), 0),
+        categories: buildRevenueBreakdown(rows),
+        methods: buildPaymentModeBreakdown(rows),
+      };
     });
+  }, [receiptsInRange, rangeStart, rangeEnd]);
 
-    const colors: Record<string, string> = {
-      Memberships: "#2B7A78",
-      "Personal Training": "#3b82f6",
-      "Group Classes": "#f59e0b",
-      Merchandise: "#8b5cf6",
-      "Other Services": "#64748b",
-    };
+  const totalRevenuePeriod = useMemo(() => receiptsInRange.reduce((sum, r) => sum + revenueOf(r), 0), [receiptsInRange]);
+  const prevTotalRevenue = useMemo(() => receiptsInPrevRange.reduce((sum, r) => sum + revenueOf(r), 0), [receiptsInPrevRange]);
+  const avgPerTransaction = receiptsInRange.length > 0 ? totalRevenuePeriod / receiptsInRange.length : 0;
+  const prevAvgPerTransaction = receiptsInPrevRange.length > 0 ? prevTotalRevenue / receiptsInPrevRange.length : 0;
+  const membershipRevenue = revenueBreakdown.find((b) => b.name === "Memberships")?.amount ?? 0;
+  const prevMembershipRevenue = revenueBreakdownPrev.find((b) => b.name === "Memberships")?.amount ?? 0;
+  const trainingRevenue = revenueBreakdown.find((b) => b.name === "Personal Training")?.amount ?? 0;
+  const prevTrainingRevenue = revenueBreakdownPrev.find((b) => b.name === "Personal Training")?.amount ?? 0;
 
-    return Object.entries(buckets)
-      .map(([name, amount]) => ({
-        name,
-        amount,
-        value: total > 0 ? Math.round((amount / total) * 100) : 0,
-        color: colors[name] ?? "#64748b",
-      }))
-      .sort((a, b) => b.amount - a.amount);
-  }, []);
+  const revenueReportKpis = [
+    {
+      title: "Total Revenue",
+      value: `${currencyCode} ${Math.round(totalRevenuePeriod).toLocaleString()}`,
+      change: hasComparison ? pctChange(totalRevenuePeriod, prevTotalRevenue) : null,
+      icon: DollarSign,
+      iconShell: "bg-emerald-50",
+      iconColor: "text-emerald-600",
+    },
+    {
+      title: "Avg Per Transaction",
+      value: `${currencyCode} ${Math.round(avgPerTransaction).toLocaleString()}`,
+      change: hasComparison ? pctChange(avgPerTransaction, prevAvgPerTransaction) : null,
+      icon: TrendingUp,
+      iconShell: "bg-blue-50",
+      iconColor: "text-blue-600",
+    },
+    {
+      title: "Membership Revenue",
+      value: `${currencyCode} ${Math.round(membershipRevenue).toLocaleString()}`,
+      change: hasComparison ? pctChange(membershipRevenue, prevMembershipRevenue) : null,
+      icon: Users,
+      iconShell: "bg-purple-50",
+      iconColor: "text-purple-600",
+    },
+    {
+      title: "Training Revenue",
+      value: `${currencyCode} ${Math.round(trainingRevenue).toLocaleString()}`,
+      change: hasComparison ? pctChange(trainingRevenue, prevTrainingRevenue) : null,
+      icon: Activity,
+      iconShell: "bg-amber-50",
+      iconColor: "text-amber-600",
+    },
+  ];
 
-  const revenueBreakdown = useMemo(() => buildRevenueBreakdown(receiptsInRange), [receiptsInRange, buildRevenueBreakdown]);
+  const revenueTrendRows = useMemo(() => reportPeriods.map((p) => ({ period: p.label, revenue: p.total })), [reportPeriods]);
+
+  const paymentTrendRows = useMemo(
+    () =>
+      reportPeriods.map((p) => {
+        const row: Record<string, string | number> = { period: p.label };
+        paymentBreakdown.forEach((m) => {
+          row[m.name] = p.methods.find((x) => x.name === m.name)?.amount || 0;
+        });
+        return row;
+      }),
+    [reportPeriods, paymentBreakdown]
+  );
 
   const revenueTrend = useMemo(() => {
     const sums: Record<string, number> = {};
@@ -386,6 +601,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         iconShell: "bg-emerald-50",
         iconColor: "text-emerald-600",
         valueColor: "text-emerald-700",
+        tab: "membership",
       },
       {
         title: "Avg Revenue / Member",
@@ -396,6 +612,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         iconShell: "bg-blue-50",
         iconColor: "text-blue-600",
         valueColor: "text-blue-700",
+        tab: "revenue",
       },
       {
         title: "New Members",
@@ -406,6 +623,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         iconShell: "bg-indigo-50",
         iconColor: "text-indigo-600",
         valueColor: "text-indigo-700",
+        tab: "membership",
       },
       {
         title: "Class Utilization",
@@ -416,6 +634,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         iconShell: "bg-amber-50",
         iconColor: "text-amber-600",
         valueColor: "text-amber-700",
+        tab: "operations",
       },
       {
         title: "Today's Attendance",
@@ -424,6 +643,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         description: `vs 7-day daily avg`,
         icon: BarChart3,
         iconShell: "bg-slate-50",
+        tab: "operations",
         iconColor: "text-slate-600",
         valueColor: "text-slate-700",
       },
@@ -460,6 +680,118 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       avgMembershipMonths,
     };
   }, [members, attendanceStats]);
+
+  type ReportKpi = {
+    title: string;
+    value: string;
+    change: number | null;
+    icon: React.ComponentType<{ className?: string }>;
+    iconShell: string;
+    iconColor: string;
+    invert?: boolean;
+    description?: string;
+  };
+
+  const renderKpiRow = (kpis: ReportKpi[]) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {kpis.map((kpi, index) => (
+        <Card key={index} className={statCardShell}>
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-medium text-primary">{kpi.title}</CardTitle>
+            <div className={`${kpi.iconShell} p-2 rounded-lg`}>
+              <kpi.icon className={`h-4 w-4 ${kpi.iconColor}`} />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{kpi.value}</div>
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              {kpi.change !== null && (
+                <>
+                  {getTrendIcon(kpi.change, kpi.invert)}
+                  <span className={getTrendColor(kpi.change, kpi.invert)}>{Math.abs(kpi.change).toFixed(1)}%</span>
+                </>
+              )}
+              {kpi.description && <span>{kpi.description}</span>}
+            </p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
+  const membershipReportKpis: ReportKpi[] = [
+    {
+      title: "Total Members",
+      value: membershipMetrics.total.toLocaleString(),
+      change: null,
+      icon: Users,
+      iconShell: "bg-emerald-50",
+      iconColor: "text-emerald-600",
+    },
+    {
+      title: "Active Members",
+      value: membershipMetrics.active.toLocaleString(),
+      change: null,
+      icon: Activity,
+      iconShell: "bg-blue-50",
+      iconColor: "text-blue-600",
+      description: `${membershipMetrics.retention.toFixed(1)}% retention rate`,
+    },
+    {
+      title: "New Members",
+      value: newMembersInRange.length.toLocaleString(),
+      change: hasComparison ? pctChange(newMembersInRange.length, newMembersInPrevRange.length) : null,
+      icon: TrendingUp,
+      iconShell: "bg-indigo-50",
+      iconColor: "text-indigo-600",
+    },
+    {
+      title: "Cancellations",
+      value: cancelledMembersInRange.length.toLocaleString(),
+      change: hasComparison ? pctChange(cancelledMembersInRange.length, cancelledMembersInPrevRange.length) : null,
+      invert: true,
+      icon: ArrowDownRight,
+      iconShell: "bg-red-50",
+      iconColor: "text-red-600",
+    },
+  ];
+
+  const attendanceReportKpis: ReportKpi[] = [
+    {
+      title: "Classes Tracked",
+      value: classAttendance.length.toLocaleString(),
+      change: null,
+      icon: BarChart3,
+      iconShell: "bg-emerald-50",
+      iconColor: "text-emerald-600",
+    },
+    {
+      title: "Avg Class Utilization",
+      value: `${(classAttendance.length > 0 ? classAttendance.reduce((s, c) => s + (c.percentage || 0), 0) / classAttendance.length : 0).toFixed(0)}%`,
+      change: null,
+      icon: Activity,
+      iconShell: "bg-amber-50",
+      iconColor: "text-amber-600",
+    },
+    {
+      title: "Today's Attendance",
+      value: (attendanceStats?.totalToday ?? 0).toLocaleString(),
+      change: (attendanceStats?.totalThisWeek ?? 0) / 7 > 0
+        ? pctChange(attendanceStats?.totalToday ?? 0, (attendanceStats?.totalThisWeek ?? 0) / 7)
+        : null,
+      icon: TrendingUp,
+      iconShell: "bg-blue-50",
+      iconColor: "text-blue-600",
+    },
+    {
+      title: "Avg Visit Duration",
+      value: membershipMetrics.avgVisitMinutes ? `${membershipMetrics.avgVisitMinutes} min` : "—",
+      change: null,
+      icon: Users,
+      iconShell: "bg-purple-50",
+      iconColor: "text-purple-600",
+    },
+  ];
 
   const rangeLabel = useMemo(() => {
     if (rangeKey === 'custom') {
@@ -567,16 +899,99 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     runExport('summary', 'csv');
   }, [runExport]);
 
-  const getTrendIcon = (change: number | null) => {
+  const handleGenerateReport = useCallback(() => {
+    setReportGenerated(true);
+  }, []);
+
+  const handleScheduleReportClick = useCallback(() => {
+    toast.info("Report scheduling isn't available yet.", {
+      description: "You can generate and download reports on demand for now.",
+    });
+  }, []);
+
+  const downloadRevenueReportPdf = useCallback(() => {
+    const w = window.open("", "_blank");
+    if (!w) {
+      toast.error("Popup blocked. Please allow popups to export PDF.");
+      return;
+    }
+    const money = (n: number) => `${currencyCode} ${Math.round(n).toLocaleString()}`;
+
+    const kpiRows = revenueReportKpis.map((k) => [k.title, k.value]);
+
+    const paymentTableRows = paymentBreakdown
+      .map((m) => `<tr><td>${m.name}</td><td>${money(m.amount)}</td><td>${m.value}%</td></tr>`)
+      .join("");
+
+    const periodTableHeader = [...paymentBreakdown.map((m) => m.name), "Total"];
+    const periodTableRows = reportPeriods
+      .map((p) => {
+        const cells = paymentBreakdown
+          .map((m) => `<td>${money(p.methods.find((x) => x.name === m.name)?.amount || 0)}</td>`)
+          .join("");
+        return `<tr><td>${p.label}</td>${cells}<td><strong>${money(p.total)}</strong></td></tr>`;
+      })
+      .join("");
+
+    const categoryTableRows = revenueBreakdown
+      .map((c) => `<tr><td>${c.name}</td><td>${money(c.amount)}</td><td>${c.value}%</td></tr>`)
+      .join("");
+
+    const detailedTableHeader = [...revenueBreakdown.map((c) => c.name), "Total"];
+    const detailedTableRows = reportPeriods
+      .map((p) => {
+        const cells = revenueBreakdown
+          .map((c) => `<td>${money(p.categories.find((x) => x.name === c.name)?.amount || 0)}</td>`)
+          .join("");
+        return `<tr><td>${p.label}</td>${cells}<td><strong>${money(p.total)}</strong></td></tr>`;
+      })
+      .join("");
+
+    w.document.write(`
+      <html><head><meta charset="utf-8" /><title>Revenue Analysis Report</title>
+      <style>
+        body{font-family:ui-sans-serif,system-ui;padding:24px;color:#1f2937}
+        h1{margin:0 0 4px;font-size:20px}
+        h2{margin:24px 0 8px;font-size:15px}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
+        th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left}
+        th{background:#f9fafb}
+        .meta{color:#6b7280;font-size:12px;margin-bottom:16px}
+      </style>
+      </head><body>
+      <h1>Revenue Analysis Report</h1>
+      <div class="meta">Range: ${RANGE_LABELS[rangeKey]}</div>
+      <h2>Summary</h2>
+      <table>${kpiRows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
+      <h2>Payment Mode Performance</h2>
+      <table><tr><th>Method</th><th>Amount</th><th>Share</th></tr>${paymentTableRows}</table>
+      <h2>Period-wise Payment Mode Breakdown</h2>
+      <table><tr><th>Period</th>${periodTableHeader.map((h) => `<th>${h}</th>`).join("")}</tr>${periodTableRows}</table>
+      <h2>Revenue by Category</h2>
+      <table><tr><th>Category</th><th>Amount</th><th>Share</th></tr>${categoryTableRows}</table>
+      <h2>Detailed Revenue Breakdown</h2>
+      <table><tr><th>Period</th>${detailedTableHeader.map((h) => `<th>${h}</th>`).join("")}</tr>${detailedTableRows}</table>
+      <script>window.onload = () => window.print();</script>
+      </body></html>
+    `);
+    w.document.close();
+    toast.success("Print dialog opened (Save as PDF)");
+  }, [currencyCode, revenueReportKpis, paymentBreakdown, reportPeriods, revenueBreakdown, rangeKey]);
+
+  // `invert` flags metrics where a rise is bad news (e.g. cancellations) so the
+  // up/down arrow still colors green-for-good instead of green-for-increase.
+  const getTrendIcon = (change: number | null, invert = false) => {
     if (change === null) return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
+    const isGood = invert ? change <= 0 : change >= 0;
     return change >= 0
-      ? <ArrowUpRight className="h-3.5 w-3.5 text-green-600" />
-      : <ArrowDownRight className="h-3.5 w-3.5 text-red-600" />;
+      ? <ArrowUpRight className={`h-3.5 w-3.5 ${isGood ? "text-green-600" : "text-red-600"}`} />
+      : <ArrowDownRight className={`h-3.5 w-3.5 ${isGood ? "text-green-600" : "text-red-600"}`} />;
   };
 
-  const getTrendColor = (change: number | null) => {
+  const getTrendColor = (change: number | null, invert = false) => {
     if (change === null) return "text-muted-foreground";
-    return change >= 0 ? "text-green-600" : "text-red-600";
+    const isGood = invert ? change <= 0 : change >= 0;
+    return isGood ? "text-green-600" : "text-red-600";
   };
 
   if (loading && members.length === 0 && receipts.length === 0) {
@@ -645,7 +1060,13 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {kpiData.map((kpi, index) => (
-          <Card key={index} className={statCardShell}>
+          <Card
+            key={index}
+            className={`${statCardShell} cursor-pointer`}
+            style={activeKpiCard === index ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+            title={`Click to view ${kpi.tab} report`}
+            onClick={() => { setReportsTab(kpi.tab); setActiveKpiCard(index); }}
+          >
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-sm font-medium text-primary">{kpi.title}</CardTitle>
               <div className={`${kpi.iconShell} p-2 rounded-lg`}>
@@ -668,7 +1089,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         ))}
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={reportsTab} onValueChange={(v) => { setReportsTab(v); setActiveKpiCard(null); }} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="membership">Membership</TabsTrigger>
@@ -1035,14 +1456,36 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         <TabsContent value="custom" className={tabContentShell}>
           <Card className={panelCardShell}>
             <CardHeader>
-              <CardTitle>Quick Report Export</CardTitle>
-              <CardDescription>Export a filtered report for {RANGE_LABELS[rangeKey].toLowerCase()} in the format you need</CardDescription>
+              <CardTitle>Custom Report Builder</CardTitle>
+              <CardDescription>Create custom reports and analytics</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date Range</label>
+                  <Select value={rangeKey} onValueChange={(v) => { setRangeKey(v as RangeKey); setReportGenerated(false); }}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7d">Last 7 days</SelectItem>
+                      <SelectItem value="30d">Last 30 days</SelectItem>
+                      <SelectItem value="90d">Last 90 days</SelectItem>
+                      <SelectItem value="ytd">Year to date</SelectItem>
+                      <SelectItem value="all">All time</SelectItem>
+                      <SelectItem value="custom">Custom range</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {rangeKey === 'custom' && (
+                    <div className="flex gap-2 pt-1">
+                      <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="bg-white" />
+                      <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="bg-white" />
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Report Type</label>
-                  <Select value={reportType} onValueChange={(v) => setReportType(v as typeof reportType)}>
+                  <Select value={reportType} onValueChange={(v) => { setReportType(v as typeof reportType); setReportGenerated(false); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -1070,13 +1513,13 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Button className="shadow-sm hover:shadow-md transition-all" onClick={() => runExport(reportType, reportFormat)}>
-                  <Download className="mr-2 h-4 w-4" />
+                <Button className="shadow-sm hover:shadow-md transition-all" onClick={handleGenerateReport}>
+                  <BarChart3 className="mr-2 h-4 w-4" />
                   Generate Report
                 </Button>
-                <Button variant="outline" className="shadow-sm hover:shadow-md transition-all" onClick={() => onNavigate?.('custom-reports')}>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Open Full Custom Report Builder
+                <Button variant="outline" className="shadow-sm hover:shadow-md transition-all" onClick={handleScheduleReportClick}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Schedule Report
                 </Button>
               </div>
 
@@ -1100,6 +1543,551 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
               </div>
             </CardContent>
           </Card>
+
+          {reportGenerated && (
+            <div className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+              {reportType === 'revenue' && (
+                <>
+              {renderKpiRow(revenueReportKpis)}
+
+              <Card className={panelCardShell}>
+                <CardHeader>
+                  <CardTitle>Revenue Trend Analysis</CardTitle>
+                  <CardDescription>Revenue breakdown over {RANGE_LABELS[rangeKey].toLowerCase()}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart data={revenueTrendRows}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="period" />
+                      <YAxis />
+                      <Tooltip formatter={(v: number) => [`${currencyCode} ${Math.round(v).toLocaleString()}`, 'Revenue']} />
+                      <Area type="monotone" dataKey="revenue" stroke="#2B7A78" fill="#2B7A78" fillOpacity={0.15} strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className={panelCardShell}>
+                <CardHeader>
+                  <CardTitle>Payment Mode Performance</CardTitle>
+                  <CardDescription>Revenue collection breakdown by payment method</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {paymentBreakdown.length === 0 ? (
+                    <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+                      No payments recorded in this range.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+                      <ResponsiveContainer width="100%" height={260}>
+                        <PieChart>
+                          <Pie
+                            data={paymentBreakdown}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                            outerRadius={90}
+                            dataKey="amount"
+                          >
+                            {paymentBreakdown.map((entry, index) => (
+                              <Cell key={`pm-cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v: number) => `${currencyCode} ${Math.round(v).toLocaleString()}`} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-4">
+                        {paymentBreakdown.map((m, i) => {
+                          const prevAmount = paymentBreakdownPrev.find((p) => p.name === m.name)?.amount ?? 0;
+                          const change = hasComparison ? pctChange(m.amount, prevAmount) : null;
+                          return (
+                            <div key={i}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-medium">{m.name}</span>
+                                <div className="text-right">
+                                  <span className="font-medium"><CurrencyGlyph /> {Math.round(m.amount).toLocaleString()}</span>
+                                  {change !== null && (
+                                    <span className={`ml-2 text-xs ${getTrendColor(change)}`}>
+                                      {change >= 0 ? '+' : ''}{change.toFixed(1)}%
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div className="h-2 rounded-full" style={{ width: `${m.value}%`, backgroundColor: m.color }} />
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">{m.value}% of total revenue</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className={panelCardShell}>
+                <CardHeader>
+                  <CardTitle>Payment Mode Trends Over Time</CardTitle>
+                  <CardDescription>How each payment method trended across {RANGE_LABELS[rangeKey].toLowerCase()}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={paymentTrendRows}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="period" />
+                      <YAxis />
+                      <Tooltip formatter={(v: number) => `${currencyCode} ${Math.round(v).toLocaleString()}`} />
+                      {paymentBreakdown.map((m) => (
+                        <Line key={m.name} type="monotone" dataKey={m.name} stroke={m.color} strokeWidth={2} dot={{ r: 3 }} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className={panelCardShell}>
+                <CardHeader>
+                  <CardTitle>Period-wise Payment Mode Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow>
+                        <TableHead>Period</TableHead>
+                        {paymentBreakdown.map((m) => (
+                          <TableHead key={m.name}>{m.name}</TableHead>
+                        ))}
+                        <TableHead>Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportPeriods.map((p, i) => (
+                        <TableRow key={i} className="transition-colors hover:bg-slate-50/50">
+                          <TableCell className="font-medium">{p.label}</TableCell>
+                          {paymentBreakdown.map((m) => (
+                            <TableCell key={m.name}>
+                              <CurrencyGlyph /> {Math.round(p.methods.find((x) => x.name === m.name)?.amount || 0).toLocaleString()}
+                            </TableCell>
+                          ))}
+                          <TableCell className="font-semibold text-primary">
+                            <CurrencyGlyph /> {Math.round(p.total).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-slate-50/70 font-semibold">
+                        <TableCell>Total</TableCell>
+                        {paymentBreakdown.map((m) => (
+                          <TableCell key={m.name}><CurrencyGlyph /> {Math.round(m.amount).toLocaleString()}</TableCell>
+                        ))}
+                        <TableCell className="text-primary"><CurrencyGlyph /> {Math.round(totalRevenuePeriod).toLocaleString()}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className={panelCardShell}>
+                  <CardHeader>
+                    <CardTitle>Revenue by Category</CardTitle>
+                    <CardDescription>Percentage breakdown of revenue sources</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {revenueBreakdown.length === 0 ? (
+                      <div className="h-[260px] flex items-center justify-center text-sm text-muted-foreground">
+                        No receipts in this range.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={280}>
+                        <PieChart>
+                          <Pie
+                            data={revenueBreakdown}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                            outerRadius={90}
+                            dataKey="value"
+                          >
+                            {revenueBreakdown.map((entry, index) => (
+                              <Cell key={`cat-cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(_v: number, _n: string, p: any) => `${currencyCode} ${Math.round(p.payload.amount).toLocaleString()}`} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className={panelCardShell}>
+                  <CardHeader>
+                    <CardTitle>Category Performance</CardTitle>
+                    <CardDescription>Detailed revenue breakdown by source</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {revenueBreakdown.length === 0 ? (
+                      <div className="text-sm text-muted-foreground py-8 text-center">No receipts in this range.</div>
+                    ) : (
+                      revenueBreakdown.map((c, i) => {
+                        const prevAmount = revenueBreakdownPrev.find((p) => p.name === c.name)?.amount ?? 0;
+                        const change = hasComparison ? pctChange(c.amount, prevAmount) : null;
+                        return (
+                          <div key={i}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium">{c.name}</span>
+                              <div className="text-right">
+                                <span className="font-medium"><CurrencyGlyph /> {Math.round(c.amount).toLocaleString()}</span>
+                                {change !== null && (
+                                  <span className={`ml-2 text-xs ${getTrendColor(change)}`}>
+                                    {change >= 0 ? '+' : ''}{change.toFixed(1)}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div className="h-2 rounded-full" style={{ width: `${c.value}%`, backgroundColor: c.color }} />
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className={panelCardShell}>
+                <CardHeader>
+                  <CardTitle>Detailed Revenue Breakdown</CardTitle>
+                  <CardDescription>Period-by-period revenue analysis</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow>
+                        <TableHead>Period</TableHead>
+                        {revenueBreakdown.map((c) => (
+                          <TableHead key={c.name}>{c.name}</TableHead>
+                        ))}
+                        <TableHead>Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportPeriods.map((p, i) => (
+                        <TableRow key={i} className="transition-colors hover:bg-slate-50/50">
+                          <TableCell className="font-medium">{p.label}</TableCell>
+                          {revenueBreakdown.map((c) => (
+                            <TableCell key={c.name}>
+                              <CurrencyGlyph /> {Math.round(p.categories.find((x) => x.name === c.name)?.amount || 0).toLocaleString()}
+                            </TableCell>
+                          ))}
+                          <TableCell className="font-semibold text-primary">
+                            <CurrencyGlyph /> {Math.round(p.total).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-slate-50/70 font-semibold">
+                        <TableCell>Total</TableCell>
+                        {revenueBreakdown.map((c) => (
+                          <TableCell key={c.name}><CurrencyGlyph /> {Math.round(c.amount).toLocaleString()}</TableCell>
+                        ))}
+                        <TableCell className="text-primary"><CurrencyGlyph /> {Math.round(totalRevenuePeriod).toLocaleString()}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+                </>
+              )}
+
+              {reportType === 'membership' && (
+                <>
+                  {renderKpiRow(membershipReportKpis)}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card className={panelCardShell}>
+                      <CardHeader>
+                        <CardTitle>Member Acquisition vs Churn</CardTitle>
+                        <CardDescription>Monthly new members vs cancellations</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={280}>
+                          <BarChart data={membershipTrends}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="month" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="newMembers" fill="#82ca9d" name="New Members" />
+                            <Bar dataKey="cancelledMembers" fill="#ff7c7c" name="Cancelled" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card className={panelCardShell}>
+                      <CardHeader>
+                        <CardTitle>Member Demographics</CardTitle>
+                        <CardDescription>Age distribution of members</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {memberDemographics.length === 0 ? (
+                          <div className="text-sm text-muted-foreground py-8 text-center">
+                            Add member date-of-birth to see demographics.
+                          </div>
+                        ) : (
+                          memberDemographics.map((demo, index) => (
+                            <div key={index} className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <span className="text-sm font-medium">{demo.ageGroup}</span>
+                                <div className="w-32 bg-gray-200 rounded-full h-2">
+                                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${demo.percentage}%` }}></div>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm">{demo.count}</span>
+                                <Badge variant="secondary">{demo.percentage}%</Badge>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card className={panelCardShell}>
+                    <CardHeader>
+                      <CardTitle>Recent Signups & Cancellations</CardTitle>
+                      <CardDescription>Member events within {RANGE_LABELS[rangeKey].toLowerCase()}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {membershipEvents.length === 0 ? (
+                        <div className="text-sm text-muted-foreground py-8 text-center">
+                          No member events in this range.
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader className="bg-slate-50/50">
+                            <TableRow>
+                              <TableHead>Member</TableHead>
+                              <TableHead>Event</TableHead>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Detail</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {membershipEvents.map((e, i) => (
+                              <TableRow key={i} className="transition-colors hover:bg-slate-50/50">
+                                <TableCell className="font-medium">{e.name}</TableCell>
+                                <TableCell>
+                                  <Badge className={e.type === 'Joined' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                    {e.type}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{(e.date as Date).toLocaleDateString()}</TableCell>
+                                <TableCell className="text-muted-foreground">{e.detail}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {reportType === 'attendance' && (
+                <>
+                  {renderKpiRow(attendanceReportKpis)}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card className={panelCardShell}>
+                      <CardHeader>
+                        <CardTitle>Class Attendance</CardTitle>
+                        <CardDescription>Latest attendance distribution by class</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {classAttendance.length === 0 ? (
+                          <div className="h-[280px] flex items-center justify-center text-sm text-muted-foreground">
+                            No class attendance data available yet.
+                          </div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height={280}>
+                            <BarChart data={classAttendance}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="class" />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="percentage" fill="#2B7A78" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className={panelCardShell}>
+                      <CardHeader>
+                        <CardTitle>Peak Usage Hours</CardTitle>
+                        <CardDescription>Gym utilization throughout the day</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {peakHours.length === 0 ? (
+                          <div className="h-[280px] flex items-center justify-center text-sm text-muted-foreground">
+                            No attendance data available yet.
+                          </div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height={280}>
+                            <BarChart data={peakHours}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="hour" />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="usage" fill="#f59e0b" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card className={panelCardShell}>
+                    <CardHeader>
+                      <CardTitle>Class Attendance Detail</CardTitle>
+                      <CardDescription>Capacity vs actual attendance by class</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {classAttendance.length === 0 ? (
+                        <div className="text-sm text-muted-foreground py-8 text-center">
+                          No class attendance data available yet.
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader className="bg-slate-50/50">
+                            <TableRow>
+                              <TableHead>Class</TableHead>
+                              <TableHead>Capacity</TableHead>
+                              <TableHead>Attended</TableHead>
+                              <TableHead>Utilization</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {classAttendance.map((c: any, i: number) => (
+                              <TableRow key={i} className="transition-colors hover:bg-slate-50/50">
+                                <TableCell className="font-medium">{c.class}</TableCell>
+                                <TableCell>{c.capacity}</TableCell>
+                                <TableCell>{c.attended}</TableCell>
+                                <TableCell>
+                                  <Badge className={c.percentage >= 75 ? 'bg-green-100 text-green-800' : c.percentage >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}>
+                                    {c.percentage}%
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {reportType === 'summary' && (
+                <>
+                  {renderKpiRow(kpiData)}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card className={panelCardShell}>
+                      <CardHeader>
+                        <CardTitle>Revenue Trend</CardTitle>
+                        <CardDescription>Revenue over {RANGE_LABELS[rangeKey].toLowerCase()}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <AreaChart data={revenueTrendRows}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="period" />
+                            <YAxis />
+                            <Tooltip formatter={(v: number) => [`${currencyCode} ${Math.round(v).toLocaleString()}`, 'Revenue']} />
+                            <Area type="monotone" dataKey="revenue" stroke="#2B7A78" fill="#2B7A78" fillOpacity={0.15} strokeWidth={2} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card className={panelCardShell}>
+                      <CardHeader>
+                        <CardTitle>Membership Growth</CardTitle>
+                        <CardDescription>Total members over the last 6 months</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <AreaChart data={membershipTrends}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="month" />
+                            <YAxis />
+                            <Tooltip />
+                            <Area type="monotone" dataKey="totalMembers" stroke="#8884d8" fill="#8884d8" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card className={panelCardShell}>
+                    <CardHeader>
+                      <CardTitle>Top Performing Plans</CardTitle>
+                      <CardDescription>Highest revenue plans/transaction types within {RANGE_LABELS[rangeKey].toLowerCase()}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {topPlans.length === 0 ? (
+                        <div className="text-sm text-muted-foreground py-8 text-center">
+                          No transactions in this range.
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader className="bg-slate-50/50">
+                            <TableRow>
+                              <TableHead>Plan / Transaction Type</TableHead>
+                              <TableHead>Transactions</TableHead>
+                              <TableHead>Revenue</TableHead>
+                              <TableHead>Avg / Transaction</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {topPlans.map((p, i) => (
+                              <TableRow key={i} className="transition-colors hover:bg-slate-50/50">
+                                <TableCell className="font-medium">{p.plan}</TableCell>
+                                <TableCell>{p.count}</TableCell>
+                                <TableCell className="text-green-600 font-medium"><CurrencyGlyph /> {Math.round(p.revenue).toLocaleString()}</TableCell>
+                                <TableCell className="text-muted-foreground"><CurrencyGlyph /> {Math.round(p.revenue / p.count).toLocaleString()}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  className="shadow-sm hover:shadow-md transition-all"
+                  onClick={reportType === 'revenue' ? downloadRevenueReportPdf : () => runExport(reportType, reportFormat)}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {reportType === 'revenue' ? 'Download PDF Report' : 'Download Report'}
+                </Button>
+                <Button variant="outline" className="shadow-sm hover:shadow-md transition-all" onClick={() => setReportGenerated(false)}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Generate New Report
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -194,6 +194,38 @@ public class MemberAddonService {
                     saved.getNotes(),
                     saved.getPaymentBreakdown()
             );
+
+            // The two calls above post this purchase to the general ledger and to
+            // the internal Receipt Vouchers list, but neither creates a customer-
+            // facing Receipt row — so the add-on never showed up in Billing's
+            // Member SOA/Member Receipts or as a printable receipt, only in
+            // Financials. Add one here. financialEventService.onMemberPaymentReceived
+            // is deliberately NOT called on it — onAddonPaymentReceived above
+            // already posted this exact amount to the ledger, so posting again
+            // would double-count the revenue.
+            if (targetMember != null) {
+                Receipt receipt = new Receipt();
+                receipt.setTransactionDate(saved.getPurchaseDate());
+                receipt.setMemberDbId(targetMember.getId());
+                receipt.setMemberId(targetMember.getMemberId());
+                receipt.setMemberName(targetMember.getName());
+                receipt.setMemberPhone(targetMember.getPhone());
+                receipt.setTransactionType("Add-on");
+                receipt.setAmount(saved.getAmount());
+                receipt.setPaymentMethod(saved.getPaymentMode());
+                receipt.setPaymentBreakdown(saved.getPaymentBreakdown());
+                receipt.setPaidAmount(saved.getAmount());
+                receipt.setTotalPaidToDate(saved.getAmount());
+                receipt.setBalanceAfter(targetMember.getOutstandingBalance() != null
+                        ? targetMember.getOutstandingBalance() : BigDecimal.ZERO);
+                receipt.setStatus("Paid");
+                receipt.setPlanName(saved.getAddonName());
+                receipt.setValidFrom(saved.getStartDate());
+                receipt.setValidTill(saved.getExpiryDate());
+                receipt.setMembershipType(targetMember.getMembershipType());
+                receipt.setProcessedBy("Admin");
+                receiptService.createReceipt(receipt);
+            }
         }
 
         return MemberAddonResponseDTO.fromEntity(saved);

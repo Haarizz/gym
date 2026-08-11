@@ -208,7 +208,13 @@ public class DashboardService {
                 .limit(5)
                 .map(m -> {
                     DashboardMember dm = new DashboardMember();
-                    dm.setId(m.getMemberId());
+                    // The frontend passes this straight through as the numeric DB id
+                    // when opening /member-history-analytics (see dashboard.tsx's
+                    // handleMemberSelect) — the human-readable MBR-... business id
+                    // (m.getMemberId()) doesn't bind to that page's Long path
+                    // variable and 400s, which is what "Failed to load this member"
+                    // was actually coming from.
+                    dm.setId(String.valueOf(m.getId()));
                     dm.setName(m.getName());
                     dm.setEmail(m.getEmail());
                     dm.setPhone(m.getPhone());

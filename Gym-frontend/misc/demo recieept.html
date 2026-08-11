@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt - INV-2024-1001</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans', 'Noto Sans Arabic', sans-serif; padding: 20px; background: #f5f5f5; }
+        .invoice {
+          font-variant-numeric: tabular-nums lining-nums;
+          font-feature-settings: "tnum" 1, "lnum" 1;
+        }
+        .receipt-container { 
+            width: 210mm; 
+            min-height: 297mm; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20mm; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            position: relative;
+            box-sizing: border-box;
+        }
+        .header { border-bottom: 3px solid #327F74; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .header-left { flex: 1; }
+        .company-name { color: #327F74; font-size: 32px; font-weight: bold; margin-bottom: 5px; }
+        .company-tagline { color: #666; font-size: 14px; margin-bottom: 10px; }
+        .company-details { color: #888; font-size: 12px; line-height: 1.6; }
+        .qr-top-right { width: 120px; height: 120px; background: white; border: 2px solid #327F74; display: flex; align-items: center; justify-content: center; border-radius: 6px; flex-shrink: 0; }
+        .qr-inner { text-align: center; color: #327F74; }
+        .receipt-title { text-align: center; font-size: 28px; color: #333; margin: 30px 0; font-weight: 600; letter-spacing: 1px; }
+        .receipt-info { display: flex; justify-content: space-between; margin-bottom: 30px; padding: 20px; background: #f9fafb; border-radius: 6px; }
+        .info-block { flex: 1; }
+        .info-label { color: #888; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
+        .info-value { color: #333; font-size: 14px; font-weight: 600; }
+        .receipt-number { color: #327F74; font-size: 18px; font-weight: bold; }
+        .status-badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #dcfce7; color: #166534; }
+        .customer-section { margin-bottom: 30px; padding: 20px; background: #f9fafb; border-left: 4px solid #327F74; border-radius: 6px; }
+        .section-title { color: #327F74; font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px; }
+        .customer-name { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 5px; }
+        .customer-detail { color: #666; font-size: 14px; margin-bottom: 3px; }
+        .items-table { width: 100%; border-collapse: collapse; margin: 30px 0; }
+        .items-table thead { background: #327F74; color: white; }
+        .items-table th { padding: 15px; text-align: left; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .items-table td { padding: 15px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #333; }
+        .items-table tbody tr:hover { background: #f9fafb; }
+        .amount-cell { font-weight: 600; color: #327F74; }
+        .totals-section { margin-top: 30px; padding: 20px; background: #f9fafb; border-radius: 6px; }
+        .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 14px; }
+        .total-row.normal { color: #666; }
+        .total-row.discount { color: #E63946; font-weight: 600; }
+        .total-row.gross { color: #333; font-weight: 600; padding-top: 10px; border-top: 1px solid #e5e7eb; }
+        .total-row.vat { color: #666; }
+        .total-row.grand-total { font-size: 20px; font-weight: bold; color: #327F74; padding-top: 15px; margin-top: 10px; border-top: 2px solid #327F74; }
+        .payment-info { margin: 30px 0; padding: 20px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; }
+        .payment-method { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #333; }
+        .payment-label { font-weight: 600; color: #78350f; }
+        .footer { margin-top: 40px; padding-top: 30px; border-top: 2px solid #e5e7eb; text-align: center; }
+        .thank-you { font-size: 18px; color: #327F74; font-weight: 600; margin-bottom: 15px; }
+        .footer-note { color: #888; font-size: 12px; line-height: 1.6; margin-bottom: 10px; }
+        .contact-info { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #666; font-size: 12px; }
+        .print-info { margin-top: 30px; padding: 15px; background: #f3f4f6; border-radius: 6px; font-size: 11px; color: #666; text-align: center; }
+        @media print {
+            body { padding: 0; background: white; }
+            .receipt-container { 
+                box-shadow: none; 
+                width: 210mm; 
+                min-height: 297mm; 
+                margin: 0; 
+                border-radius: 0;
+                page-break-after: always;
+            }
+            .print-info { display: none; }
+            @page {
+                size: A4;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container invoice">
+        <div class="header">
+            <div class="header-left">
+                <div class="company-name">GymBios</div>
+                <div class="company-tagline">Wellness Services Operating System</div>
+                <div class="company-details">Dubai, United Arab Emirates<br>Phone: +971 4 XXX XXXX | Email: billing@gymbios.ae<br>TRN: 100XXXXXXXX0003</div>
+            </div>
+            <div class="qr-top-right">
+                <div class="qr-inner">
+                    <div style="font-size: 36px; margin-bottom: 5px;">⚡</div>
+                    <div style="font-size: 10px; font-weight: 600;">RECEIPT VERIFICATION</div>
+                    <div style="font-size: 9px; margin-top: 3px;">INV-2024-1001</div>
+                </div>
+            </div>
+        </div>
+        <div class="receipt-title">Tax Invoice فاتورة ضريبية</div>
+        <div class="receipt-info">
+            <div class="info-block"><div class="info-label">Receipt Number</div><div class="receipt-number">INV-2024-1001</div></div>
+            <div class="info-block"><div class="info-label">Date Issued</div><div class="info-value">September 24, 2024</div></div>
+            <div class="info-block"><div class="info-label">Status</div><div><span class="status-badge">Paid</span></div></div>
+        </div>
+        <div class="customer-section">
+            <div class="section-title">Bill To</div>
+            <div class="customer-name">Sarah Johnson</div>
+            <div class="customer-detail"><strong>Member ID:</strong> MEM-2024-001</div>
+            <div class="customer-detail"><strong>Email:</strong> sarah.j@email.com</div>
+            <div class="customer-detail"><strong>Phone:</strong> +971 50 123 4567</div>
+        </div>
+        <table class="items-table">
+            <thead><tr><th>Description</th><th>Type</th><th style="text-align: right;">Amount (Incl. VAT)</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>Premium Annual Membership</strong><br><span style="color: #888; font-size: 12px;">Transaction Type: Registration</span></td>
+                    <td>Registration</td>
+                    <td class="amount-cell" style="text-align: right;">AED 1200.00</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="totals-section">
+            <div class="total-row normal"><span>Subscription Total (Incl. VAT):</span><span>AED 1200.00</span></div>
+            <div class="total-row discount"><span>Discount:</span><span>- AED 100.00</span></div>
+            <div class="total-row gross"><span>Gross Total:</span><span>AED 1100.00</span></div>
+            <div class="total-row vat"><span>VAT (5%):</span><span>AED 55.00</span></div>
+            <div class="total-row grand-total"><span>Invoice Amount:</span><span>AED 1155.00</span></div>
+            <div class="total-row normal" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;"><span>TOTAL PAID:</span><span>AED 1155.00</span></div>
+            
+            <br><span style="color: #327F74; font-size: 12px; font-weight: 600;">Subscription validity: from Sep 24, 2024 To: Sep 24, 2025</span>
+        </div>
+        <div class="payment-info">
+            <div class="payment-method"><span class="payment-label">Payment Method:</span><span>Credit Card</span></div>
+            <div class="payment-method" style="margin-top: 8px;"><span class="payment-label">Transaction Date:</span><span>September 24, 2024 at 05:30 AM</span></div>
+        </div>
+        <div class="footer">
+            <div class="thank-you">Thank you for your business!</div>
+            <div class="footer-note">This is an official receipt issued by GymBios. Please retain this receipt for your records.<br>For any queries regarding this transaction, please contact our billing department.</div>
+            <div class="contact-info"><strong>GymBios - Wellness Services Operating System</strong><br>Dubai, United Arab Emirates | Phone: +971 4 XXX XXXX<br>Email: support@gymbios.ae | Website: www.gymbios.ae<br>TRN: 100XXXXXXXX0003</div>
+        </div>
+        <div class="print-info">Receipt generated on August 11, 2026 at 04:30 PM<br>This is a computer-generated receipt and is valid without signature.</div>
+    </div>
+</body>
+</html>

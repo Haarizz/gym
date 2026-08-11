@@ -34,6 +34,9 @@ export interface ReceiptMinorCharge {
 export interface Receipt {
   id: string;
   receipt_no: string;
+  // Only set on a bill (New/Renewal/Add-on/Daily Entry/minor charge) — null on
+  // a settlement/"Payment" receipt, which isn't itself an invoice.
+  invoice_no?: string;
   transaction_date: string;
   member_db_id: string;
   member_id: string;

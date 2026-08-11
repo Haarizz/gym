@@ -74,6 +74,9 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
   const [searchTerm, setSearchTerm]   = useState('');
   const [selectedDate, setSelectedDate] = useState('today');
   const [page, setPage]               = useState(0);
+  const [activeAttendanceTab, setActiveAttendanceTab] = useState('today');
+  const [recordSort, setRecordSort]   = useState<'none' | 'time-desc' | 'time-asc' | 'duration-desc' | 'duration-asc'>('none');
+  const [peakHourOnly, setPeakHourOnly] = useState(false);
 
   const [staffRecords, setStaffRecords]   = useState<StaffAttendanceRecord[]>([]);
   const [staffLoading, setStaffLoading]   = useState(true);
@@ -169,6 +172,31 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
   const busiestDay  = weeklyData.reduce((a, b) => b.visits > a.visits ? b : a, { day: '—', visits: 0, date: '' });
   const quietestDay = weeklyData.reduce((a, b) => b.visits < a.visits ? b : a, { day: '—', visits: Infinity, date: '' });
 
+  const peakHourNum = (() => {
+    const match = /^(\d{1,2}):\d{2}\s*(AM|PM)$/i.exec((stats?.peak_hour || '').trim());
+    if (!match) return null;
+    let h = parseInt(match[1], 10) % 12;
+    if (match[2].toUpperCase() === 'PM') h += 12;
+    return h;
+  })();
+
+  const durationMs = (r: AttendanceListItem) =>
+    (r.check_out_time ? new Date(r.check_out_time).getTime() : Date.now()) - new Date(r.check_in_time).getTime();
+
+  const visibleRecords = (peakHourOnly && peakHourNum !== null)
+    ? records.filter(r => new Date(r.check_in_time).getHours() === peakHourNum)
+    : records;
+
+  const sortedRecords = [...visibleRecords].sort((a, b) => {
+    switch (recordSort) {
+      case 'time-desc': return new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime();
+      case 'time-asc': return new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime();
+      case 'duration-desc': return durationMs(b) - durationMs(a);
+      case 'duration-asc': return durationMs(a) - durationMs(b);
+      default: return 0;
+    }
+  });
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -194,7 +222,16 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-primary/10 shadow-md">
+        <Card
+          className="border-primary/10 shadow-md cursor-pointer"
+          style={recordSort.startsWith('time') ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          title="Click to sort check-ins by time"
+          onClick={() => {
+            setActiveAttendanceTab('today');
+            setRecordSort(recordSort === 'time-desc' ? 'time-asc' : recordSort === 'time-asc' ? 'none' : 'time-desc');
+            setPeakHourOnly(false);
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Today's Visits</CardTitle>
             <div className="bg-gradient-light p-2 rounded-lg"><UserCheck className="h-4 w-4 text-primary" /></div>
@@ -209,7 +246,16 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md">
+        <Card
+          className="border-primary/10 shadow-md cursor-pointer"
+          style={recordSort.startsWith('duration') ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          title="Click to sort check-ins by duration"
+          onClick={() => {
+            setActiveAttendanceTab('today');
+            setRecordSort(recordSort === 'duration-desc' ? 'duration-asc' : recordSort === 'duration-asc' ? 'none' : 'duration-desc');
+            setPeakHourOnly(false);
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Average Duration</CardTitle>
             <div className="bg-gradient-light p-2 rounded-lg"><Clock className="h-4 w-4 text-primary" /></div>
@@ -222,7 +268,12 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md">
+        <Card
+          className="border-primary/10 shadow-md cursor-pointer"
+          style={peakHourOnly ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          title="Click to filter check-ins to the peak hour"
+          onClick={() => { setActiveAttendanceTab('today'); setPeakHourOnly(v => !v); setRecordSort('none'); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Peak Hours</CardTitle>
             <div className="bg-gradient-light p-2 rounded-lg"><TrendingUp className="h-4 w-4 text-primary" /></div>
@@ -235,7 +286,12 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md">
+        <Card
+          className="border-primary/10 shadow-md cursor-pointer"
+          style={activeAttendanceTab === 'weekly' ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          title="Click to view attendance trends"
+          onClick={() => { setActiveAttendanceTab('weekly'); setRecordSort('none'); setPeakHourOnly(false); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Attendance Rate</CardTitle>
             <div className="bg-gradient-light p-2 rounded-lg"><Users className="h-4 w-4 text-primary" /></div>
@@ -250,7 +306,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="today" className="space-y-6">
+      <Tabs value={activeAttendanceTab} onValueChange={setActiveAttendanceTab} className="space-y-6">
         <TabsList className="w-full flex">
           <TabsTrigger value="today" className="flex-1">
             Today's Attendance
@@ -312,6 +368,12 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
                   <UserCheck className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
                   <p className="text-sm">No attendance records found</p>
                 </div>
+              ) : sortedRecords.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  <UserCheck className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm">No check-ins in the peak hour yet.</p>
+                  <Button variant="link" size="sm" onClick={() => setPeakHourOnly(false)}>Clear filter</Button>
+                </div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -326,7 +388,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {records.map(record => {
+                    {sortedRecords.map(record => {
                       const name     = record.member_name || record.walk_in_name || 'Visitor';
                       const bizId    = record.member_biz_id || '';
                       const isActive = record.status === 'active';

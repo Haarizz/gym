@@ -41,6 +41,7 @@ import {
   ChevronRight,
   CheckCircle,
   TrendingUp,
+  TrendingDown,
   Banknote,
   CreditCard,
   Wallet,
@@ -56,10 +57,11 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
-import { FaCircleCheck, FaCircleArrowUp, FaArrowsRotate, FaArrowUp, FaArrowRight } from 'react-icons/fa6';
+import { FaCircleCheck, FaCircleArrowUp, FaCircleArrowDown, FaArrowsRotate, FaArrowUp, FaArrowDown, FaArrowRight } from 'react-icons/fa6';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
 import { plansService, Plan } from '../utils/supabase/plans-service';
+import { addonsService } from '../utils/supabase/addons-service';
 import { authService } from '../utils/supabase/auth-service';
 import { receiptsService, Receipt as ApiReceipt } from '../utils/supabase/receipts-service';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
@@ -195,6 +197,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // API Plans for Renewals tab
   const [apiPlans, setApiPlans] = useState<Plan[]>([]);
 
+  // Active add-ons per member (member_db_id -> add-on names), shown as
+  // "+ addon" under Plan Type in the member directory table.
+  const [memberActiveAddons, setMemberActiveAddons] = useState<Record<string, string[]>>({});
+
   // Renew Family dialog (family_head billing mode — one invoice for the whole
   // family, recalculated from the plan's price-per-member × current headcount)
   const [familyRenewalHead, setFamilyRenewalHead] = useState<Member | null>(null);
@@ -244,7 +250,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedMemberForRenewal, setSelectedMemberForRenewal] = useState<any>(null);
   const [selectedNewPlan, setSelectedNewPlan] = useState<any>(null);
-  const [operationType, setOperationType] = useState<"renewal" | "upgrade" | null>(null);
+  const [operationType, setOperationType] = useState<"renewal" | "upgrade" | "downgrade" | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [splitPayment, setSplitPayment] = useState(false);
   // Rich per-method detail (card type, online payment type, ...) for whichever
@@ -336,6 +342,21 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // Load active plans for Renewals tab
   useEffect(() => {
     plansService.getPlans('Active').then(setApiPlans).catch(() => {});
+  }, []);
+
+  // Load active add-ons so the directory table can show "+ addon" under Plan Type
+  useEffect(() => {
+    addonsService.getAddons({ status: 'Active' }, { limit: 500 })
+      .then(res => {
+        const map: Record<string, string[]> = {};
+        res.addons.forEach(addon => {
+          const key = String(addon.member_db_id);
+          if (!map[key]) map[key] = [];
+          map[key].push(addon.addon_name);
+        });
+        setMemberActiveAddons(map);
+      })
+      .catch(() => {});
   }, []);
 
   // Bank accounts for the Renewals & Upgrades payment panel's Bank Transfer leg
@@ -619,7 +640,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // Helper function to get plan type
   const getPlanDetails = (member: Member) => {
     const plan = getMembershipPlan(member);
-    return { plan, addons: [] as string[] };
+    const addons = memberActiveAddons[String(member.id)] || [];
+    return { plan, addons };
   };
 
   // Helper function to get amount due. Minors are billed to their family head and
@@ -758,7 +780,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       if (plan.name === currentPlanName) {
         setOperationType("renewal");
       } else {
-        setOperationType("upgrade");
+        const currentPlan = apiPlans.find(p => p.name === currentPlanName);
+        const currentPrice = currentPlan?.price ?? getDisplayFee(selectedMemberForRenewal);
+        setOperationType(plan.price < currentPrice ? "downgrade" : "upgrade");
       }
     }
   };
@@ -1031,7 +1055,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={selectedStatus === 'all' ? { boxShadow: '0 0 0 2px #6366f1' } : undefined}
+          onClick={() => { setActiveTab('members'); setSelectedStatus('all'); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Total Members</CardTitle>
             <div className="bg-gradient-light p-2 rounded-lg">
@@ -1044,7 +1072,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={selectedStatus === 'active' ? { boxShadow: '0 0 0 2px #16a34a' } : undefined}
+          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'active' ? 'all' : 'active'); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Active Members</CardTitle>
             <div className="bg-green-50 p-2 rounded-lg">
@@ -1057,7 +1089,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={selectedStatus === 'inactive' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
+          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'inactive' ? 'all' : 'inactive'); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Inactive</CardTitle>
             <div className="bg-blue-50 p-2 rounded-lg">
@@ -1070,7 +1106,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={selectedStatus === 'expired' ? { boxShadow: '0 0 0 2px #dc2626' } : undefined}
+          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'expired' ? 'all' : 'expired'); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Expired</CardTitle>
             <div className="bg-red-50 p-2 rounded-lg">
@@ -1083,7 +1123,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={selectedStatus === 'frozen' ? { boxShadow: '0 0 0 2px #0891b2' } : undefined}
+          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'frozen' ? 'all' : 'frozen'); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Freezed</CardTitle>
             <div className="bg-cyan-50 p-2 rounded-lg">
@@ -1096,7 +1140,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={selectedStatus === 'suspended' ? { boxShadow: '0 0 0 2px #ea580c' } : undefined}
+          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'suspended' ? 'all' : 'suspended'); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-primary">Suspended</CardTitle>
             <div className="bg-orange-50 p-2 rounded-lg">
@@ -1168,6 +1216,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <SelectItem value="inactive">Inactive</SelectItem>
                     <SelectItem value="suspended">Suspended</SelectItem>
                     <SelectItem value="expired">Expired</SelectItem>
+                    <SelectItem value="frozen">Frozen</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline">
@@ -1176,6 +1225,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 </Button>
               </div>
 
+              <style>{`
+                .member-row:hover {
+                  background-color: #f8fafc;
+                }
+              `}</style>
               <Table>
                 <TableHeader className="bg-slate-50/50">
                   <TableRow className="hover:bg-transparent">
@@ -1212,11 +1266,16 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       const membershipCategory = getMembershipCategory(member);
                       
                       return (
-                        <TableRow key={member.id} className="hover:bg-slate-50/50 transition-colors">
+                        <TableRow
+                          key={member.id}
+                          className="member-row transition-colors cursor-pointer"
+                          onClick={() => openMemberHistory(member)}
+                        >
                           <TableCell className="flex items-center space-x-3">
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setPhotoViewer({ src: getMemberAvatar(member), name: member.name });
                                 setIsPhotoViewerOpen(true);
                               }}
@@ -1333,7 +1392,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           <TableCell>
                             <span className="text-slate-600 font-medium">{getTotalVisits(member)}</span>
                           </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -1379,13 +1438,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                       onClick={() => openMemberHistory(member)}
                                     >
                                       <BarChart3 className="h-4 w-4 mr-2" />
-                                      View Analytics
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      className="cursor-pointer"
-                                      onClick={() => { setProfileMember(member); setIsProfileDialogOpen(true); }}
-                                    >
-                                      <Eye className="h-4 w-4 mr-2" />
                                       View Profile
                                     </DropdownMenuItem>
                                     <DropdownMenuItem className="cursor-pointer">
@@ -1922,28 +1974,52 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   <div className={`mt-4 rounded-xl border overflow-hidden ${
                     operationType === 'renewal'
                       ? 'border-green-200 bg-gradient-to-br from-green-50 via-white to-emerald-50/60'
+                      : operationType === 'downgrade'
+                      ? 'border-red-200 bg-red-50'
                       : 'border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50/60'
                   }`}>
-                    <div className={`h-0.5 w-full ${operationType === 'renewal' ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`} />
+                    <div className={`h-0.5 w-full ${
+                      operationType === 'renewal'
+                        ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                        : operationType === 'downgrade'
+                        ? 'bg-red-500'
+                        : 'bg-gradient-to-r from-orange-400 to-amber-500'
+                    }`} />
                     <div className="flex flex-col items-center text-center gap-2 px-6 py-4">
                       <div className={`flex items-center justify-center w-10 h-10 rounded-xl shadow-sm ${
                         operationType === 'renewal'
                           ? 'bg-gradient-to-br from-green-500 to-emerald-600'
+                          : operationType === 'downgrade'
+                          ? 'bg-red-500'
                           : 'bg-gradient-to-br from-orange-500 to-amber-600'
                       }`}>
                         {operationType === 'renewal'
                           ? <FaArrowsRotate size={17} className="text-white" />
+                          : operationType === 'downgrade'
+                          ? <FaCircleArrowDown size={17} className="text-white" />
                           : <FaCircleArrowUp size={17} className="text-white" />
                         }
                       </div>
-                      <p className={`text-sm font-semibold ${operationType === 'renewal' ? 'text-green-800' : 'text-orange-800'}`}>
-                        {operationType === 'renewal' ? 'Detected as Renewal' : 'Detected as Upgrade'}
+                      <p className={`text-sm font-semibold ${
+                        operationType === 'renewal'
+                          ? 'text-green-800'
+                          : operationType === 'downgrade'
+                          ? 'text-red-800'
+                          : 'text-orange-800'
+                      }`}>
+                        {operationType === 'renewal' ? 'Detected as Renewal' : operationType === 'downgrade' ? 'Detected as Downgrade' : 'Detected as Upgrade'}
                       </p>
                       {operationType === 'renewal' ? (
                         <p className="text-xs text-muted-foreground">
                           Member is renewing their current plan:{' '}
                           <span className={`font-medium text-green-700`}>{selectedNewPlan.name}</span>
                         </p>
+                      ) : operationType === 'downgrade' ? (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="font-medium text-red-700 px-1.5 py-0.5 bg-red-100 rounded-md">{getMembershipPlan(selectedMemberForRenewal)}</span>
+                          <FaArrowRight size={9} className="text-muted-foreground/60 shrink-0" />
+                          <span className="font-medium text-red-700 px-1.5 py-0.5 bg-red-100 rounded-md">{selectedNewPlan.name}</span>
+                        </div>
                       ) : (
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <span className="font-medium text-orange-700 px-1.5 py-0.5 bg-orange-100/80 rounded-md">{getMembershipPlan(selectedMemberForRenewal)}</span>
@@ -2352,10 +2428,18 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">Operation Type</Label>
-                      <Badge className={operationType === 'renewal' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                      <Badge className={
+                        operationType === 'renewal'
+                          ? 'bg-green-100 text-green-800'
+                          : operationType === 'downgrade'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-orange-100 text-orange-800'
+                      }>
                         <span className="flex items-center gap-1">
                           {operationType === 'renewal'
                             ? <><FaArrowsRotate size={12} /> Renewal</>
+                            : operationType === 'downgrade'
+                            ? <><FaArrowDown size={12} /> Downgrade</>
                             : <><FaArrowUp size={12} /> Upgrade</>}
                         </span>
                       </Badge>
@@ -2395,6 +2479,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                         <RefreshCw className="mr-2 h-5 w-5" />
                         Renew Membership
                       </>
+                    ) : operationType === 'downgrade' ? (
+                      <>
+                        <TrendingDown className="mr-2 h-5 w-5" />
+                        Downgrade Membership
+                      </>
                     ) : (
                       <>
                         <TrendingUp className="mr-2 h-5 w-5" />
@@ -2415,12 +2504,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   <CheckCircle className="h-12 w-12 text-white" />
                 </div>
                 <DialogTitle className="text-2xl mb-2">
-                  🎉 Membership Successfully {operationType === 'renewal' ? 'Renewed' : 'Upgraded'}!
+                  🎉 Membership Successfully {operationType === 'renewal' ? 'Renewed' : operationType === 'downgrade' ? 'Downgraded' : 'Upgraded'}!
                 </DialogTitle>
                 <div className="text-base mt-4">
                   <div className="bg-gradient-light p-4 rounded-lg space-y-2">
                     <div className="font-semibold text-foreground">
-                      {selectedMemberForRenewal?.name}'s membership has been successfully {operationType === 'renewal' ? 'renewed' : 'upgraded'}.
+                      {selectedMemberForRenewal?.name}'s membership has been successfully {operationType === 'renewal' ? 'renewed' : operationType === 'downgrade' ? 'downgraded' : 'upgraded'}.
                     </div>
                     <div className="text-sm">
                       New Plan: <span className="font-semibold text-primary">{selectedNewPlan?.name}</span>
