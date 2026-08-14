@@ -117,7 +117,14 @@ export const topLevelModules: ModuleItem[] = [
     id: 'payroll-employees',
     title: 'Payroll & Employees',
     icon: 'users',
-    route: '/payroll-employees',
+    children: [
+      {
+        id: 'roles-permissions',
+        title: 'Roles & Permissions',
+        icon: 'shield',
+        route: '/(admin)/roles',
+      },
+    ],
   },
   {
     id: 'gymos',

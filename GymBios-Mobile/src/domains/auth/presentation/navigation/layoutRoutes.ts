@@ -55,6 +55,7 @@ export const MODULE_ROUTES = [
   'messaging',
   'automations',
   'workout-feedback',
+  'roles'
 ] as const;
 
 /**
@@ -119,6 +120,8 @@ export const HIDE_ROLE_HEADER_ROUTES: readonly (readonly [string, string])[] = [
   ['workout-feedback','active-sessions'],
   ['workout-feedback','analytics'],
   ['workout-feedback','stats'],
+  
+  ['roles', '[id]']
 ] as const;
 
 /**

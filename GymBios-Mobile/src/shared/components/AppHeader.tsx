@@ -7,12 +7,13 @@ import { Typography } from '@/shared/components/Typography';
 
 interface AppHeaderProps {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   colors: [string, string] | [string, string, ...string[]];
   onBack?: () => void;
+  rightAction?: React.ReactNode;
 }
 
-export function AppHeader({ title, subtitle, colors, onBack }: AppHeaderProps) {
+export function AppHeader({ title, subtitle, colors, onBack, rightAction }: AppHeaderProps) {
   return (
     <LinearGradient colors={colors} style={styles.header}>
       {onBack ? (
@@ -26,10 +27,13 @@ export function AppHeader({ title, subtitle, colors, onBack }: AppHeaderProps) {
         <Typography variant="subtitle" style={styles.title}>
           {title}
         </Typography>
-        <Typography variant="bodySmall" style={styles.subtitle}>
-          {subtitle}
-        </Typography>
+        {subtitle ? (
+          <Typography variant="bodySmall" style={styles.subtitle}>
+            {subtitle}
+          </Typography>
+        ) : null}
       </View>
+      {rightAction}
     </LinearGradient>
   );
 }
