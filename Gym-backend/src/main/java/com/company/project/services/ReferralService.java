@@ -74,17 +74,21 @@ public class ReferralService {
         return ReferralSettingsDTO.fromEntity(loadOrCreateSettings());
     }
 
+    // The frontend always PUTs the complete settings object (not a partial patch),
+    // so every field is applied as-is — including null, which is how maxRewardsPerMember
+    // and minPurchaseAmount represent "unlimited"/"no minimum". Null-guarding those
+    // two used to make it impossible to clear them back to unlimited once set.
     public ReferralSettingsDTO updateSettings(ReferralSettingsDTO req) {
         ReferralSettings s = loadOrCreateSettings();
-        if (req.getProgramEnabled() != null) s.setProgramEnabled(req.getProgramEnabled());
-        if (req.getAutoGenerateCodes() != null) s.setAutoGenerateCodes(req.getAutoGenerateCodes());
-        if (req.getEmailNotifications() != null) s.setEmailNotifications(req.getEmailNotifications());
-        if (req.getAutoProcessRewards() != null) s.setAutoProcessRewards(req.getAutoProcessRewards());
-        if (req.getCodePrefix() != null) s.setCodePrefix(req.getCodePrefix());
-        if (req.getLinkDomain() != null) s.setLinkDomain(req.getLinkDomain());
-        if (req.getMaxRewardsPerMember() != null) s.setMaxRewardsPerMember(req.getMaxRewardsPerMember());
-        if (req.getExpiryDays() != null) s.setExpiryDays(req.getExpiryDays());
-        if (req.getMinPurchaseAmount() != null) s.setMinPurchaseAmount(req.getMinPurchaseAmount());
+        s.setProgramEnabled(req.getProgramEnabled());
+        s.setAutoGenerateCodes(req.getAutoGenerateCodes());
+        s.setEmailNotifications(req.getEmailNotifications());
+        s.setAutoProcessRewards(req.getAutoProcessRewards());
+        s.setCodePrefix(req.getCodePrefix());
+        s.setLinkDomain(req.getLinkDomain());
+        s.setMaxRewardsPerMember(req.getMaxRewardsPerMember());
+        s.setExpiryDays(req.getExpiryDays());
+        s.setMinPurchaseAmount(req.getMinPurchaseAmount());
         return ReferralSettingsDTO.fromEntity(settingsRepository.save(s));
     }
 
@@ -95,12 +99,16 @@ public class ReferralService {
     // ── Referrals ─────────────────────────────────────────────────────────────
 
     public ReferralResponseDTO createReferral(ReferralRequestDTO req) {
+        ReferralSettings settings = loadOrCreateSettings();
+        if (Boolean.FALSE.equals(settings.getProgramEnabled())) {
+            throw new IllegalStateException("The referral program is currently disabled. Enable it under Referrals → Settings to log new referrals.");
+        }
+
         Referral ref = new Referral();
         mapRequestToEntity(req, ref);
         ref.setDate(req.getDate() != null ? req.getDate() : LocalDate.now());
         ref.setStatus(req.getStatus() != null ? req.getStatus() : "pending");
 
-        ReferralSettings settings = loadOrCreateSettings();
         if (Boolean.FALSE.equals(settings.getAutoGenerateCodes()) && req.getReferralCode() != null && !req.getReferralCode().isBlank()) {
             // Manual code entry — used verbatim (still uppercased for consistency with the auto-generated format).
             ref.setReferralCode(req.getReferralCode().trim().toUpperCase());
@@ -400,9 +408,11 @@ public class ReferralService {
         if (req.getRefereeName() != null) ref.setRefereeName(req.getRefereeName());
         if (req.getRefereeEmail() != null) ref.setRefereeEmail(req.getRefereeEmail());
         if (req.getRefereePhone() != null) ref.setRefereePhone(req.getRefereePhone());
+        if (req.getRefereePhoto() != null) ref.setRefereePhoto(req.getRefereePhoto());
         if (req.getStatus() != null) ref.setStatus(req.getStatus());
         if (req.getRewardAmount() != null) ref.setRewardAmount(req.getRewardAmount());
         if (req.getDate() != null) ref.setDate(req.getDate());
+        if (req.getVisitDate() != null) ref.setVisitDate(req.getVisitDate());
         if (req.getSignupDate() != null) ref.setSignupDate(req.getSignupDate());
         if (req.getPaymentDate() != null) ref.setPaymentDate(req.getPaymentDate());
         if (req.getNotes() != null) ref.setNotes(req.getNotes());
@@ -428,12 +438,14 @@ public class ReferralService {
         dto.setRefereeName(ref.getRefereeName());
         dto.setRefereeEmail(ref.getRefereeEmail());
         dto.setRefereePhone(ref.getRefereePhone());
+        dto.setRefereePhoto(ref.getRefereePhoto());
         dto.setReferralCode(ref.getReferralCode());
         String linkDomain = loadOrCreateSettings().getLinkDomain();
         dto.setReferralLink((linkDomain != null && !linkDomain.isBlank() ? linkDomain : "gymbios.app/ref") + "/" + ref.getReferralCode());
         dto.setStatus(ref.getStatus());
         dto.setRewardAmount(ref.getRewardAmount());
         dto.setDate(ref.getDate());
+        dto.setVisitDate(ref.getVisitDate());
         dto.setSignupDate(ref.getSignupDate());
         dto.setPaymentDate(ref.getPaymentDate());
         dto.setNotes(ref.getNotes());

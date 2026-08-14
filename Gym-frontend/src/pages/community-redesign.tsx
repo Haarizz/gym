@@ -260,6 +260,11 @@ export function Community() {
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [postDraft, setPostDraft] = useState<CommunityPostDraft>(createEmptyPostDraft);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  // Guards against a slow, still-in-flight fetchFeed() (e.g. the initial
+  // page-load fetch, which is far more likely to be slow on a real deployed
+  // network than on localhost) resolving AFTER a newer local update — like the
+  // optimistic post-create prepend — and clobbering it back to the stale list.
+  const fetchRequestIdRef = useRef(0);
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
   const softButton = "border-0 bg-white text-slate-700 shadow-sm hover:bg-red-50 hover:text-red-600";
 
@@ -387,6 +392,7 @@ export function Community() {
   };
 
   const fetchFeed = async (q: string, type: string, view: "feed" | "archived") => {
+    const requestId = ++fetchRequestIdRef.current;
     setIsLoadingFeed(true);
     try {
       const response = await api.get("/community/posts", {
@@ -398,6 +404,11 @@ export function Community() {
           limit: 30,
         },
       });
+
+      // A newer fetch (or a local optimistic update, e.g. from creating a post)
+      // has since superseded this request — applying this stale response now
+      // would silently undo that newer state, so discard it.
+      if (requestId !== fetchRequestIdRef.current) return;
 
       const postsFromApi = (response.data?.posts ?? []).map((post: any): CommunityPost => ({
         id: post.id,
@@ -428,12 +439,13 @@ export function Community() {
 
       setFeedPosts(postsFromApi);
     } catch (error: any) {
+      if (requestId !== fetchRequestIdRef.current) return;
       console.error(error);
       toast.error("Unable to load community feed.", {
         description: "Check the backend is running on :8080 and you are logged in.",
       });
     } finally {
-      setIsLoadingFeed(false);
+      if (requestId === fetchRequestIdRef.current) setIsLoadingFeed(false);
     }
   };
 
@@ -599,6 +611,10 @@ export function Community() {
             : undefined,
         };
 
+        // Invalidate any fetchFeed() still in flight (most commonly the
+        // initial page-load fetch) so its response can't land after this and
+        // silently overwrite the feed back to a version without this post.
+        fetchRequestIdRef.current += 1;
         setFeedPosts((currentPosts) => [normalized, ...currentPosts]);
         setSearchTerm("");
         setFeedFilter("all");

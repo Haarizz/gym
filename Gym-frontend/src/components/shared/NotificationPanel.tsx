@@ -21,6 +21,7 @@ import {
   Zap,
   Inbox,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
 import { notificationService, AppNotification } from "../../utils/supabase/notification-service";
 import styles from "./NotificationPanel.module.css";
@@ -213,6 +214,12 @@ type FilterTab = "all" | "unread";
 
 export function NotificationPanel({ open, onClose, onCountChange }: Props) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  // Authoritative unread count from the server — NOT derived from `notifications`,
+  // since that array only ever holds whichever page(s) have been scrolled into
+  // view. Counting unread rows within that partial list was what made the panel's
+  // own header disagree with the sidebar bell (which always queries the true
+  // total). Both now read from the same /unread-count endpoint.
+  const [unreadCount, setUnreadCount] = useState(0);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -234,12 +241,23 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
     }
   }, []);
 
+  const refreshUnreadCount = useCallback(async () => {
+    try {
+      const count = await notificationService.getUnreadCount();
+      setUnreadCount(count);
+      onCountChange(count);
+    } catch {
+      // keep last known value rather than flashing to 0
+    }
+  }, [onCountChange]);
+
   useEffect(() => {
     if (open) {
       setPage(0);
       loadPage(0, true);
+      refreshUnreadCount();
     }
-  }, [open, loadPage]);
+  }, [open, loadPage, refreshUnreadCount]);
 
   useEffect(() => {
     if (!loaderRef.current || !hasMore) return;
@@ -258,26 +276,35 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
   }, [hasMore, loading, page, loadPage]);
 
   async function handleRead(id: number) {
-    await notificationService.markAsRead(id);
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
-    const newUnread = notifications.filter((n) => !n.isRead && n.id !== id).length;
-    onCountChange(newUnread);
+    try {
+      await notificationService.markAsRead(id);
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+      refreshUnreadCount();
+    } catch {
+      toast.error("Failed to mark notification as read");
+    }
   }
 
   async function handleDelete(id: number) {
-    await notificationService.deleteNotification(id);
-    const remaining = notifications.filter((n) => n.id !== id);
-    setNotifications(remaining);
-    onCountChange(remaining.filter((n) => !n.isRead).length);
+    try {
+      await notificationService.deleteNotification(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      refreshUnreadCount();
+    } catch {
+      toast.error("Failed to delete notification");
+    }
   }
 
   async function handleMarkAllRead() {
-    await notificationService.markAllRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    onCountChange(0);
+    try {
+      await notificationService.markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+      onCountChange(0);
+    } catch {
+      toast.error("Failed to mark all notifications as read");
+    }
   }
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const visible = filter === "unread"
     ? notifications.filter((n) => !n.isRead)
@@ -311,7 +338,7 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
 
               <div className={styles.headerActions}>
                 <button
-                  onClick={() => loadPage(0, true)}
+                  onClick={() => { loadPage(0, true); refreshUnreadCount(); }}
                   disabled={refreshing}
                   className={styles.iconBtn}
                   aria-label="Refresh"

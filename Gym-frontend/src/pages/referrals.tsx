@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
-import { referralService, type ReferralResponse, type RewardRuleResponse, type ReferralSettings } from '../utils/supabase/referral-service';
+import { referralService, type ReferralResponse, type ReferralSettings, type RewardRuleResponse } from '../utils/supabase/referral-service';
 import { rewardService } from '../utils/supabase/reward-service';
 import { membersService, type Member } from '../utils/supabase/members-service';
 import { MyRewards } from './my-rewards';
@@ -58,7 +58,10 @@ import {
   AlertCircle,
   Bell,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Camera,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { toast } from "sonner";
 
@@ -134,6 +137,7 @@ export function Referrals() {
   const [apiRewardStats, setApiRewardStats] = useState({ redeemed: 0, walletCreditsIssued: 0 });
   const [apiRules, setApiRules] = useState<RewardRuleResponse[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [openRewardRuleSignal, setOpenRewardRuleSignal] = useState(0);
 
   // Analytics tab — derived entirely from real referral data (no fabricated numbers).
   const analytics = useMemo(() => {
@@ -172,10 +176,12 @@ export function Referrals() {
   };
   const [settings, setSettings] = useState<ReferralSettings>(DEFAULT_SETTINGS);
   const [savingSettings, setSavingSettings] = useState(false);
+  // Loaded once on mount (not gated on the Settings tab being active) — the Add
+  // Referral dialog and other tabs need the real programEnabled/autoGenerateCodes
+  // values too, not just the hardcoded defaults, regardless of which tab is open.
   useEffect(() => {
-    if (activeTab !== 'settings') return;
     referralService.getSettings().then(setSettings).catch(() => toast.error('Failed to load settings'));
-  }, [activeTab]);
+  }, []);
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
@@ -189,14 +195,79 @@ export function Referrals() {
     }
   };
 
+  const handleOpenAddReferral = () => {
+    if (settings.programEnabled === false) {
+      toast.error('Referral program is disabled', { description: 'Enable it under Settings to log new referrals.' });
+      return;
+    }
+    setShowAddReferral(true);
+  };
+
   // Dropdown states
   const [addReferralOpen, setAddReferralOpen] = useState(false);
-  const [addRefereeOpen, setAddRefereeOpen] = useState(false);
   const [editReferralOpen, setEditReferralOpen] = useState(false);
-  const [editRefereeOpen, setEditRefereeOpen] = useState(false);
 
   // New referral form state
-  const [newReferral, setNewReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '', ruleId: 'auto', referralCode: '' });
+  const [newReferral, setNewReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', refereePhoto: '', date: new Date().toISOString().split('T')[0], visitDate: '', status: 'pending', notes: '', ruleId: 'auto', referralCode: '' });
+
+  // Referral photo — capture (camera) or upload, for gym access verification
+  const refPhotoFileInputRef = useRef<HTMLInputElement>(null);
+  const refPhotoVideoRef = useRef<HTMLVideoElement>(null);
+  const refPhotoCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [refPhotoCameraOpen, setRefPhotoCameraOpen] = useState(false);
+  const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const ACCEPTED_PHOTO_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+  const isAcceptedPhotoFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    const hasAcceptedExtension = ACCEPTED_PHOTO_EXTENSIONS.some((ext) => name.endsWith(ext));
+    if (file.type) return ACCEPTED_PHOTO_TYPES.includes(file.type.toLowerCase());
+    return hasAcceptedExtension;
+  };
+  const handleRefPhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!isAcceptedPhotoFile(file)) {
+      toast.error('Unsupported file type', { description: 'Please upload a JPG, JPEG, or PNG image.' });
+      event.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => setNewReferral(p => ({ ...p, refereePhoto: e.target?.result as string }));
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
+  const startRefPhotoCamera = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error('Camera not supported', { description: 'Please use the "Upload Photo" option instead.' });
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } });
+      if (refPhotoVideoRef.current) refPhotoVideoRef.current.srcObject = stream;
+      setRefPhotoCameraOpen(true);
+    } catch {
+      toast.error('Could not access camera', { description: 'Please allow camera access, or use the "Upload Photo" option instead.' });
+    }
+  };
+  const stopRefPhotoCamera = () => {
+    const stream = refPhotoVideoRef.current?.srcObject as MediaStream | null;
+    stream?.getTracks().forEach(track => track.stop());
+    if (refPhotoVideoRef.current) refPhotoVideoRef.current.srcObject = null;
+    setRefPhotoCameraOpen(false);
+  };
+  const captureRefPhoto = () => {
+    const video = refPhotoVideoRef.current;
+    const canvas = refPhotoCanvasRef.current;
+    if (!video || !canvas) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0);
+    setNewReferral(p => ({ ...p, refereePhoto: canvas.toDataURL('image/jpeg', 0.85) }));
+    stopRefPhotoCamera();
+  };
+
   const [editingReferral, setEditingReferral] = useState<ReferralResponse | null>(null);
   const [showEditReferral, setShowEditReferral] = useState(false);
   const [editReferral, setEditReferral] = useState({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: '', status: 'pending', notes: '' });
@@ -354,11 +425,20 @@ export function Referrals() {
             Export Data
           </Button>
           <Button
-            onClick={() => setShowAddReferral(true)}
-            className="bg-[#2B7A78] hover:bg-[#236763] text-white"
+            onClick={handleOpenAddReferral}
+            disabled={settings.programEnabled === false}
+            title={settings.programEnabled === false ? 'Referral program is disabled in Settings' : undefined}
+            className="bg-[#2B7A78] hover:bg-[#236763] text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="mr-2 h-4 w-4" />
             Add a Referral
+          </Button>
+          <Button
+            onClick={() => { setActiveTab('rewards'); setOpenRewardRuleSignal((s) => s + 1); }}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Reward Rule
           </Button>
         </div>
       </div>
@@ -565,7 +645,7 @@ export function Referrals() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={() => { setShowAddReferral(true); }}>
+                <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed" disabled={settings.programEnabled === false} onClick={handleOpenAddReferral}>
                   <Send className="h-6 w-6 text-blue-600" />
                   <span>Add Referral</span>
                 </Button>
@@ -839,7 +919,7 @@ export function Referrals() {
 
         {/* Rewards Tab */}
         <TabsContent value="rewards" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
-          <RewardRules />
+          <RewardRules autoOpenSignal={openRewardRuleSignal} />
         </TabsContent>
 
         {/* Analytics Tab */}
@@ -1009,13 +1089,13 @@ export function Referrals() {
                   <div>
                     <Label htmlFor="maxRewards">Maximum Rewards per Member</Label>
                     <Input id="maxRewards" type="number" value={settings.maxRewardsPerMember ?? ''} onChange={(e) => setSettings(p => ({ ...p, maxRewardsPerMember: e.target.value ? Number(e.target.value) : null }))} className="mt-1" />
-                    <p className="text-sm text-muted-foreground mt-1">Monthly limit in <CurrencyGlyph /></p>
+                    <p className="text-sm text-muted-foreground mt-1">Lifetime cap on the number of rewards a single member can receive across all rules. Leave blank for unlimited.</p>
                   </div>
 
                   <div>
                     <Label htmlFor="expiryDays">Default Reward Expiry</Label>
                     <Input id="expiryDays" type="number" value={settings.expiryDays} onChange={(e) => setSettings(p => ({ ...p, expiryDays: Number(e.target.value) }))} className="mt-1" />
-                    <p className="text-sm text-muted-foreground mt-1">Days until rewards expire</p>
+                    <p className="text-sm text-muted-foreground mt-1">Days until rewards expire — used when a reward rule doesn't set its own expiry.</p>
                   </div>
 
                   <div>
@@ -1165,53 +1245,13 @@ export function Referrals() {
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="flex flex-col">
-              <Label className="mb-1">Referee Name</Label>
-              <Popover open={editRefereeOpen} onOpenChange={setEditRefereeOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={editRefereeOpen}
-                    className="w-full justify-between"
-                  >
-                    {editReferral.refereeName || "Select a member..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] sm:w-[400px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search member..." />
-                    <CommandList>
-                      <CommandEmpty>No member found.</CommandEmpty>
-                      <CommandGroup>
-                        {members.map((member) => (
-                          <CommandItem
-                            key={member.id}
-                            value={`${member.name} ${member.email || ''} ${member.phone || ''}`}
-                            onSelect={() => {
-                              setEditReferral(p => ({ 
-                                ...p, 
-                                refereeName: member.name,
-                                refereeEmail: member.email || '',
-                                refereePhone: member.phone || ''
-                              }));
-                              setEditRefereeOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                editReferral.refereeName === member.name ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            {member.name} ({member.email || member.phone})
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+            <div>
+              <Label className="mb-1 block">Referee Name</Label>
+              <Input
+                placeholder="Full name"
+                value={editReferral.refereeName}
+                onChange={e => setEditReferral(p => ({ ...p, refereeName: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Referee Email</Label>
@@ -1264,7 +1304,7 @@ export function Referrals() {
 
           <div className="space-y-4 mt-2">
             <div className="flex flex-col">
-              <Label className="mb-1">Referrer Name (Existing Member)</Label>
+              <Label className="mb-1">Referrer (Existing Member)</Label>
               <Popover open={addReferralOpen} onOpenChange={setAddReferralOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -1306,65 +1346,55 @@ export function Referrals() {
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="flex flex-col">
-              <Label className="mb-1">Referred Person Name</Label>
-              <Popover open={addRefereeOpen} onOpenChange={setAddRefereeOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={addRefereeOpen}
-                    className="w-full justify-between"
-                  >
-                    {newReferral.refereeName || "Select a member..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] sm:w-[400px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search member..." />
-                    <CommandList>
-                      <CommandEmpty>No member found.</CommandEmpty>
-                      <CommandGroup>
-                        {members.map((member) => (
-                          <CommandItem
-                            key={member.id}
-                            value={`${member.name} ${member.email || ''} ${member.phone || ''}`}
-                            onSelect={() => {
-                              setNewReferral(p => ({ 
-                                ...p, 
-                                refereeName: member.name,
-                                refereeEmail: member.email || '',
-                                refereePhone: member.phone || ''
-                              }));
-                              setAddRefereeOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                newReferral.refereeName === member.name ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            {member.name} ({member.email || member.phone})
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+            <div>
+              <Label className="mb-1 block">Referred Member Name</Label>
+              <Input
+                placeholder="New member's full name"
+                value={newReferral.refereeName}
+                onChange={e => setNewReferral(p => ({ ...p, refereeName: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                They don't need to be a member yet — this just records who was referred.
+              </p>
             </div>
             <div>
-              <Label>Referred Person Email</Label>
+              <Label>Referred Member Email</Label>
               <Input placeholder="email@example.com" type="email" className="mt-1" value={newReferral.refereeEmail} onChange={e => setNewReferral(p => ({ ...p, refereeEmail: e.target.value }))} />
             </div>
             <div>
-              <Label>Referred Person Phone</Label>
+              <Label>Referred Member Phone</Label>
               <Input placeholder="+971 XX XXX XXXX" type="tel" className="mt-1" value={newReferral.refereePhone} onChange={e => setNewReferral(p => ({ ...p, refereePhone: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Referral Person Photo (For Access)</Label>
+              <p className="text-xs text-muted-foreground mb-1">Capture or upload a photo for gym access verification</p>
+              {newReferral.refereePhoto ? (
+                <div className="flex items-center gap-3 mt-1">
+                  <img src={newReferral.refereePhoto} alt="Referral" className="w-16 h-16 rounded-lg object-cover border" />
+                  <Button type="button" variant="outline" size="sm" className="gap-2 text-red-600 border-red-200 hover:bg-red-50" onClick={() => setNewReferral(p => ({ ...p, refereePhoto: '' }))}>
+                    <Trash2 size={14} /> Remove
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2 mt-1">
+                  <Button type="button" variant="outline" size="sm" className="flex-1 gap-2" onClick={startRefPhotoCamera}>
+                    <Camera size={14} /> Capture Photo
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="flex-1 gap-2" onClick={() => refPhotoFileInputRef.current?.click()}>
+                    <Upload size={14} /> Upload Photo
+                  </Button>
+                </div>
+              )}
+              <input ref={refPhotoFileInputRef} type="file" accept="image/*" onChange={handleRefPhotoUpload} className="hidden" />
             </div>
             <div>
               <Label>Referral Date</Label>
               <Input type="date" className="mt-1" value={newReferral.date} onChange={e => setNewReferral(p => ({ ...p, date: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Visit Date</Label>
+              <p className="text-xs text-muted-foreground mb-1">Date when the referral person will visit the gym</p>
+              <Input type="date" className="mt-1" value={newReferral.visitDate} onChange={e => setNewReferral(p => ({ ...p, visitDate: e.target.value }))} />
             </div>
             <div>
               <Label>Status</Label>
@@ -1378,7 +1408,7 @@ export function Referrals() {
               </Select>
             </div>
             <div>
-              <Label>Reward Rule (Optional)</Label>
+              <Label>Reward Rule</Label>
               <Select value={newReferral.ruleId} onValueChange={v => setNewReferral(p => ({ ...p, ruleId: v }))}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Auto-assign active rule" /></SelectTrigger>
                 <SelectContent>
@@ -1390,6 +1420,9 @@ export function Referrals() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Pick a specific rule to guarantee which reward the referrer gets, instead of letting the system auto-match one.
+              </p>
             </div>
             <div>
               <Label>Notes (Optional)</Label>
@@ -1416,12 +1449,12 @@ export function Referrals() {
                   return;
                 }
                 try {
-                  await referralService.create({ referrerMemberId: newReferral.referrerMemberId || undefined, referrerName: newReferral.referrerName, refereeName: newReferral.refereeName, refereeEmail: newReferral.refereeEmail || undefined, refereePhone: newReferral.refereePhone || undefined, date: newReferral.date, status: newReferral.status, notes: newReferral.notes || undefined, ruleId: newReferral.ruleId !== 'auto' ? Number(newReferral.ruleId) : undefined, referralCode: newReferral.referralCode || undefined });
+                  await referralService.create({ referrerMemberId: newReferral.referrerMemberId || undefined, referrerName: newReferral.referrerName, refereeName: newReferral.refereeName, refereeEmail: newReferral.refereeEmail || undefined, refereePhone: newReferral.refereePhone || undefined, refereePhoto: newReferral.refereePhoto || undefined, date: newReferral.date, visitDate: newReferral.visitDate || undefined, status: newReferral.status, notes: newReferral.notes || undefined, ruleId: newReferral.ruleId !== 'auto' ? Number(newReferral.ruleId) : undefined, referralCode: newReferral.referralCode || undefined });
                   toast.success('Referral Added!', { description: 'The new referral has been registered.' });
-                  setNewReferral({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', date: new Date().toISOString().split('T')[0], status: 'pending', notes: '', ruleId: 'auto', referralCode: '' });
+                  setNewReferral({ referrerMemberId: '', referrerName: '', refereeName: '', refereeEmail: '', refereePhone: '', refereePhoto: '', date: new Date().toISOString().split('T')[0], visitDate: '', status: 'pending', notes: '', ruleId: 'auto', referralCode: '' });
                   setShowAddReferral(false);
                   await loadData();
-                } catch { toast.error('Failed to create referral'); }
+                } catch (err: any) { toast.error(err?.message || 'Failed to create referral'); }
               }}
             >
               Save Referral
@@ -1429,6 +1462,24 @@ export function Referrals() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Referral Photo Capture Dialog */}
+      <Dialog open={refPhotoCameraOpen} onOpenChange={(open) => { if (!open) stopRefPhotoCamera(); }}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#2B7A78]">Capture Referral Photo</DialogTitle>
+            <DialogDescription>Center the referral person's face and capture.</DialogDescription>
+          </DialogHeader>
+          <video ref={refPhotoVideoRef} autoPlay playsInline muted className="w-full rounded-lg bg-black aspect-video" />
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={stopRefPhotoCamera}>Cancel</Button>
+            <Button className="bg-[#2B7A78] hover:bg-[#236763] text-white gap-2" onClick={captureRefPhoto}>
+              <Camera size={14} /> Capture
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <canvas ref={refPhotoCanvasRef} className="hidden" />
 
       {/* QR Code Dialog */}
       <Dialog open={!!qrDialogLink} onOpenChange={(open) => !open && setQrDialogLink(null)}>
