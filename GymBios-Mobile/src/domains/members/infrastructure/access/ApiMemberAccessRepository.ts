@@ -51,7 +51,7 @@ export class ApiMemberAccessRepository implements MemberAccessRepository {
     request: SetCredentialsRequest,
   ): Promise<Member> {
     const response = await apiClient.post<MemberResponse>(
-      `/api/members/${id}/set-credentials`,
+      `/members/${id}/set-credentials`,
       {
         appUsername: request.appUsername,
         appPassword: request.appPassword,
@@ -66,7 +66,7 @@ export class ApiMemberAccessRepository implements MemberAccessRepository {
     enabled: boolean,
   ): Promise<Member> {
     const response = await apiClient.patch<MemberResponse>(
-      `/api/members/${id}/toggle-access`,
+      `/members/${id}/toggle-access`,
       { enabled },
     );
 

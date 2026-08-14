@@ -51,7 +51,7 @@ export class ApiMemberFreezeRepository implements MemberFreezeRepository {
     request: FreezeRequest,
   ): Promise<Member> {
     const response = await apiClient.post<MemberResponse>(
-      `/api/members/${id}/freeze`,
+      `/members/${id}/freeze`,
       request,
     );
 
@@ -60,7 +60,7 @@ export class ApiMemberFreezeRepository implements MemberFreezeRepository {
 
   async unfreezeMember(id: number): Promise<Member> {
     const response = await apiClient.post<MemberResponse>(
-      `/api/members/${id}/unfreeze`,
+      `/members/${id}/unfreeze`,
     );
 
     return this.toDomain(response.data);

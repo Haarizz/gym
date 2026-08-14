@@ -18,12 +18,10 @@ import { MemberHeader } from '../components/sections/MemberHeader';
 import { MembershipSection } from '../components/sections/MembershipSection';
 import { PaymentSection } from '../components/sections/PaymentSection';
 import { QuickActionsSection } from '../components/sections/QuickActionsSection';
-import { MemberFamilyService } from '../../application/family/MemberFamilyService';
-import { ApiMemberFamilyRepository } from '../../infrastructure/family/ApiMemberFamilyRepository';
 import { useMembers } from '../../hooks/useMembers';
 import { useMemberActions } from '../../hooks/useMemberActions';
+import { useMemberFamily } from '../../hooks/useMemberFamily';
 import type { Member } from '../../domain/Member';
-import type { FamilyGroup } from '../../domain/FamilyGroup';
 import type { AddFamilyMemberRequest } from '../../application/family/MemberFamilyRepository';
 import type {
   RenewalRequest,
@@ -32,9 +30,6 @@ import type {
 } from '../../application/membership/MemberMembershipRepository';
 import type { FreezeRequest } from '../../application/freeze/MemberFreezeRepository';
 import type { SetCredentialsRequest } from '../../application/access/MemberAccessRepository';
-
-const familyRepository = new ApiMemberFamilyRepository();
-const familyService = new MemberFamilyService(familyRepository);
 
 interface MemberDetailsScreenProps {
   memberId: number;
@@ -58,15 +53,14 @@ export function MemberDetailsScreen({
     renewMember,
     renewMinor,
     renewFamily,
-    addFamilyMember,
     freezeMember,
     unfreezeMember,
     setCredentials,
     toggleAccess,
   } = useMemberActions();
 
-  const [family, setFamily] = useState<FamilyGroup | null>(null);
-  const [loadingFamily, setLoadingFamily] = useState(false);
+  const { family, loadingFamily, addFamilyMember: addFamilyMemberHook } =
+    useMemberFamily(memberId);
 
   const [renewVisible, setRenewVisible] = useState(false);
   const [freezeVisible, setFreezeVisible] = useState(false);
@@ -77,21 +71,6 @@ export function MemberDetailsScreen({
     loadMember(memberId).catch(() => { });
   }, [memberId, loadMember]);
 
-  useEffect(() => {
-    if (selectedMember?.membershipType.toUpperCase() === 'FAMILY' && !family) {
-      loadFamily();
-    }
-  }, [selectedMember, family]);
-
-  const loadFamily = useCallback(async () => {
-    try {
-      setLoadingFamily(true);
-      const result = await familyService.getFamily(memberId);
-      setFamily(result);
-    } finally {
-      setLoadingFamily(false);
-    }
-  }, [memberId]);
 
   const handleDelete = useCallback(() => {
     if (!selectedMember) return;
@@ -137,11 +116,9 @@ export function MemberDetailsScreen({
 
   const handleAddFamilyMember = useCallback(
     async (headId: number, request: AddFamilyMemberRequest) => {
-      await addFamilyMember(headId, request);
-      setFamily(null);
-      loadFamily();
+      await addFamilyMemberHook(headId, request);
     },
-    [addFamilyMember, loadFamily],
+    [addFamilyMemberHook],
   );
 
   const handleSetCredentials = useCallback(

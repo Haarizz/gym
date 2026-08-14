@@ -3,6 +3,7 @@ import { type ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { QueryProvider } from './QueryProvider';
+import { CurrencyProvider } from './CurrencyProvider';
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -13,9 +14,12 @@ export function AppProviders({ children }: AppProvidersProps) {
 
   return (
     <QueryProvider>
-      <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        {children}
-      </NavigationThemeProvider>
+      <CurrencyProvider>
+        <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          {children}
+        </NavigationThemeProvider>
+      </CurrencyProvider>
     </QueryProvider>
   );
 }
+

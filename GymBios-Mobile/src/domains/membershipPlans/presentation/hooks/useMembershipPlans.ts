@@ -1,81 +1,71 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { MembershipPlan } from '../../domain/MembershipPlan';
+import type { MembershipPlanRequest } from '../../application/MembershipPlanRepository';
 import { MembershipPlanService } from '../../application/MembershipPlanService';
 import { ApiMembershipPlanRepository } from '../../infrastructure/ApiMembershipPlanRepository';
 
 const repository = new ApiMembershipPlanRepository();
 const planService = new MembershipPlanService(repository);
 
+export const membershipPlanKeys = {
+  all: ['membershipPlans'] as const,
+  lists: () => [...membershipPlanKeys.all, 'list'] as const,
+  list: (status?: string) => [...membershipPlanKeys.lists(), status] as const,
+  details: () => [...membershipPlanKeys.all, 'detail'] as const,
+  detail: (id: number) => [...membershipPlanKeys.details(), id] as const,
+};
+
 export function useMembershipPlans(statusFilter?: string) {
-  const [plans, setPlans] = useState<MembershipPlan[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const queryClient = useQueryClient();
 
-  const refresh = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await planService.getPlans(statusFilter);
-      setPlans(result);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter]);
+  const plansQuery = useQuery({
+    queryKey: membershipPlanKeys.list(statusFilter),
+    queryFn: () => planService.getPlans(statusFilter),
+  });
 
-  const loadPlanById = useCallback(async (id: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      return await planService.getPlanById(id);
-    } catch (err) {
-      setError(err as Error);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const plans = plansQuery.data ?? [];
+  const loading = plansQuery.isFetching;
+  const error = plansQuery.error as Error | null;
 
-  const deletePlan = useCallback(async (id: number) => {
-    try {
-      setSubmitting(true);
-      setError(null);
-      await planService.deletePlan(id);
-      setPlans((prev) => prev.filter((p) => p.id !== id));
-    } catch (err) {
-      setError(err as Error);
-      throw err;
-    } finally {
-      setSubmitting(false);
-    }
-  }, []);
+  const refresh = useCallback(() => {
+    return plansQuery.refetch();
+  }, [plansQuery]);
 
-  const duplicatePlan = useCallback(async (id: number) => {
-    try {
-      setSubmitting(true);
-      setError(null);
-      const copy = await planService.duplicatePlan(id);
-      setPlans((prev) => [copy, ...prev]);
-      return copy;
-    } catch (err) {
-      setError(err as Error);
-      throw err;
-    } finally {
-      setSubmitting(false);
-    }
-  }, []);
+  const loadPlanById = useCallback(
+    async (id: number) => {
+      return queryClient.fetchQuery({
+        queryKey: membershipPlanKeys.detail(id),
+        queryFn: () => planService.getPlanById(id),
+      });
+    },
+    [queryClient],
+  );
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  const deletePlanMutation = useDeletePlan();
+
+  const deletePlan = useCallback(
+    async (id: number) => {
+      await deletePlanMutation.mutateAsync(id);
+    },
+    [deletePlanMutation],
+  );
+
+  const duplicatePlanMutation = useDuplicatePlan();
+
+  const duplicatePlan = useCallback(
+    async (id: number) => {
+      return duplicatePlanMutation.mutateAsync(id);
+    },
+    [duplicatePlanMutation],
+  );
 
   return {
     plans,
     loading,
-    submitting,
+    submitting:
+      deletePlanMutation.isPending || duplicatePlanMutation.isPending,
     error,
     refresh,
     loadPlanById,
@@ -83,3 +73,59 @@ export function useMembershipPlans(statusFilter?: string) {
     duplicatePlan,
   };
 }
+
+export function useCreatePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: MembershipPlanRequest) =>
+      planService.createPlan(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: membershipPlanKeys.all });
+    },
+  });
+}
+
+export function useUpdatePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      request,
+    }: {
+      id: number;
+      request: MembershipPlanRequest;
+    }) => planService.updatePlan(id, request),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: membershipPlanKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: membershipPlanKeys.detail(variables.id),
+      });
+    },
+  });
+}
+
+export function useDeletePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => planService.deletePlan(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: membershipPlanKeys.all });
+    },
+  });
+}
+
+export function useDuplicatePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => planService.duplicatePlan(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: membershipPlanKeys.all });
+    },
+  });
+}
+
+export type { MembershipPlan };

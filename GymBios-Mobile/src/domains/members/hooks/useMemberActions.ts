@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import type { Member } from '../domain/Member';
 import type {
@@ -14,8 +15,6 @@ import type {
   FamilyRenewalRequest,
 } from '../application/membership/MemberMembershipRepository';
 
-import { MemberDirectoryService } from '../application/directory/MemberDirectoryService';
-import { ApiMemberDirectoryRepository } from '../infrastructure/directory/ApiMemberDirectoryRepository';
 import { MemberMembershipService } from '../application/membership/MemberMembershipService';
 import { ApiMemberMembershipRepository } from '../infrastructure/membership/ApiMemberMembershipRepository';
 import { MemberFamilyService } from '../application/family/MemberFamilyService';
@@ -25,8 +24,12 @@ import { ApiMemberFreezeRepository } from '../infrastructure/freeze/ApiMemberFre
 import { MemberAccessService } from '../application/access/MemberAccessService';
 import { ApiMemberAccessRepository } from '../infrastructure/access/ApiMemberAccessRepository';
 
-const directoryRepository = new ApiMemberDirectoryRepository();
-const directoryService = new MemberDirectoryService(directoryRepository);
+import {
+  memberKeys,
+  useCreateMember,
+  useUpdateMember,
+  useDeleteMember,
+} from './useMembers';
 
 const membershipRepository = new ApiMemberMembershipRepository();
 const membershipService = new MemberMembershipService(membershipRepository);
@@ -41,113 +44,75 @@ const accessRepository = new ApiMemberAccessRepository();
 const accessService = new MemberAccessService(accessRepository);
 
 export function useMemberActions() {
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const queryClient = useQueryClient();
+  const createMemberMutation = useCreateMember();
+  const updateMemberMutation = useUpdateMember();
+  const deleteMemberMutation = useDeleteMember();
+
+  const invalidateMemberData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: memberKeys.all });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  }, [queryClient]);
+
+  const submitting =
+    createMemberMutation.isPending ||
+    updateMemberMutation.isPending ||
+    deleteMemberMutation.isPending;
+  const error =
+    (createMemberMutation.error ??
+      updateMemberMutation.error ??
+      deleteMemberMutation.error) as Error | null;
 
   // --- Directory ---
 
   const createMember = useCallback(
     async (request: CreateMemberRequest): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await directoryService.createMember(request);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      return createMemberMutation.mutateAsync(request);
     },
-    [],
+    [createMemberMutation],
   );
 
   const updateMember = useCallback(
     async (id: number, request: UpdateMemberRequest): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await directoryService.updateMember(id, request);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      return updateMemberMutation.mutateAsync({ id, request });
     },
-    [],
+    [updateMemberMutation],
   );
 
   const deleteMember = useCallback(
     async (id: number): Promise<void> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        await directoryService.deleteMember(id);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      await deleteMemberMutation.mutateAsync(id);
     },
-    [],
+    [deleteMemberMutation],
   );
 
   // --- Membership ---
 
   const renewMember = useCallback(
     async (id: number, request: RenewalRequest): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await membershipService.renewMember(id, request);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      const result = await membershipService.renewMember(id, request);
+      invalidateMemberData();
+      return result;
     },
-    [],
+    [invalidateMemberData],
   );
 
   const renewMinor = useCallback(
     async (id: number, request: MinorRenewalRequest): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await membershipService.renewMinor(id, request);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      const result = await membershipService.renewMinor(id, request);
+      invalidateMemberData();
+      return result;
     },
-    [],
+    [invalidateMemberData],
   );
 
   const renewFamily = useCallback(
     async (headId: number, request: FamilyRenewalRequest): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await membershipService.renewFamily(headId, request);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      const result = await membershipService.renewFamily(headId, request);
+      invalidateMemberData();
+      return result;
     },
-    [],
+    [invalidateMemberData],
   );
 
   // --- Family ---
@@ -157,91 +122,52 @@ export function useMemberActions() {
       headId: number,
       request: AddFamilyMemberRequest,
     ): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await familyService.addFamilyMember(headId, request);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      const result = await familyService.addFamilyMember(headId, request);
+      queryClient.invalidateQueries({ queryKey: ['memberFamily'] });
+      invalidateMemberData();
+      return result;
     },
-    [],
+    [queryClient, invalidateMemberData],
   );
 
   // --- Freeze ---
 
   const freezeMember = useCallback(
     async (id: number, request: FreezeRequest): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await freezeService.freezeMember(id, request);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      const result = await freezeService.freezeMember(id, request);
+      invalidateMemberData();
+      return result;
     },
-    [],
+    [invalidateMemberData],
   );
 
   const unfreezeMember = useCallback(
     async (id: number): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await freezeService.unfreezeMember(id);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      const result = await freezeService.unfreezeMember(id);
+      invalidateMemberData();
+      return result;
     },
-    [],
+    [invalidateMemberData],
   );
 
   // --- Access ---
 
   const setCredentials = useCallback(
     async (id: number, request: SetCredentialsRequest): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await accessService.setCredentials(id, request);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      const result = await accessService.setCredentials(id, request);
+      invalidateMemberData();
+      return result;
     },
-    [],
+    [invalidateMemberData],
   );
 
   const toggleAccess = useCallback(
     async (id: number, enabled: boolean): Promise<Member> => {
-      try {
-        setSubmitting(true);
-        setError(null);
-
-        return await accessService.toggleAccess(id, enabled);
-      } catch (err) {
-        setError(err as Error);
-        throw err;
-      } finally {
-        setSubmitting(false);
-      }
+      const result = await accessService.toggleAccess(id, enabled);
+      invalidateMemberData();
+      return result;
     },
-    [],
+    [invalidateMemberData],
   );
 
   return {

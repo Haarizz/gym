@@ -4,67 +4,92 @@ import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 export const styles = StyleSheet.create({
   container: {
-    gap: Spacing.four,
+    // Basic container style if needed
+  },
+
+  // Level 1: List
+  listViewContainer: {
     paddingBottom: Spacing.four,
   },
-
-  section: {
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    backgroundColor: BrandColors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BrandColors.neutral[200],
+  },
+  listItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.three,
   },
-
-  sectionTitle: {
-    fontSize: TypographyScale.subtitle,
-    fontWeight: '700',
-    color: BrandColors.textPrimary,
-    paddingHorizontal: Spacing.one,
-  },
-
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: Spacing.three,
-  },
-
-  card: {
-    width: '48%',
-    minHeight: 130,
-
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
-
-    padding: Spacing.three,
-
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BrandColors.neutral[200],
-  },
-
-  iconContainer: {
-    width: 48,
-    height: 48,
+  listIconContainer: {
+    width: 36,
+    height: 36,
     borderRadius: Radius.full,
-
     backgroundColor: BrandColors.screenBackgroundAlt,
-
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  cardTitle: {
-    marginTop: Spacing.three,
-
-    fontSize: TypographyScale.subtitle,
-    fontWeight: '600',
-
+  listItemTitle: {
+    fontSize: TypographyScale.body,
+    fontWeight: '500',
     color: BrandColors.textPrimary,
   },
 
-  cardSubtitle: {
-    marginTop: Spacing.two,
-
+  // Level 2: Submodules
+  submoduleViewContainer: {
+    paddingBottom: Spacing.four,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    marginBottom: Spacing.three,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  headerTitle: {
+    fontSize: TypographyScale.subtitle,
+    fontWeight: '600',
+    color: BrandColors.textPrimary,
+  },
+  closeButton: {
+    padding: Spacing.one,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: Spacing.two,
+  },
+  gridItem: {
+    width: '33.33%',
+    alignItems: 'center',
+    padding: Spacing.two,
+    gap: Spacing.two,
+  },
+  gridIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.full,
+    backgroundColor: BrandColors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: BrandColors.neutral[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridItemTitle: {
     fontSize: TypographyScale.small,
-
-    color: BrandColors.textSecondary,
-    lineHeight: 18,
+    fontWeight: '500',
+    color: BrandColors.textPrimary,
+    textAlign: 'center',
   },
 });

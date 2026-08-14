@@ -6,5 +6,11 @@
  * where the useMembershipPlans hook already holds the data, and these actions
  * need to be passed down to MembershipPlanCard.
  */
-export { useMembershipPlans } from './useMembershipPlans';
 export { useMembershipPlanWizard } from './useMembershipPlanWizard';
+export {
+  useMembershipPlans,
+  useCreatePlan,
+  useUpdatePlan,
+  useDeletePlan,
+  useDuplicatePlan,
+} from './useMembershipPlans';

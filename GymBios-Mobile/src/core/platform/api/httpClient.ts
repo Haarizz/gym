@@ -15,15 +15,13 @@ export const httpClient = axios.create({
   },
 });
 
-httpClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const token = await secureStorage.getItem(StorageKeys.accessToken);
-
+export function setHttpClientToken(token: string | null) {
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    httpClient.defaults.headers.common.Authorization = `Bearer ${token}`;
+  } else {
+    delete httpClient.defaults.headers.common.Authorization;
   }
-
-  return config;
-});
+}
 
 httpClient.interceptors.response.use(
   (response) => response,

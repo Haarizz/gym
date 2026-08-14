@@ -1,0 +1,1 @@
+export { TrendInsightCard } from './TrendInsightCard';
