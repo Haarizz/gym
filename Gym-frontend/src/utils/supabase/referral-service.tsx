@@ -12,11 +12,13 @@ export interface ReferralResponse {
   refereeName: string;
   refereeEmail?: string;
   refereePhone?: string;
+  refereePhoto?: string;
   referralCode: string;
   referralLink: string;
   status: 'pending' | 'successful' | 'expired';
   rewardAmount?: number;
   date: string;
+  visitDate?: string;
   signupDate?: string;
   paymentDate?: string;
   notes?: string;
@@ -33,9 +35,11 @@ export interface ReferralRequest {
   refereeName: string;
   refereeEmail?: string;
   refereePhone?: string;
+  refereePhoto?: string;
   status?: string;
   rewardAmount?: number;
   date?: string;
+  visitDate?: string;
   signupDate?: string;
   paymentDate?: string;
   notes?: string;
@@ -140,9 +144,11 @@ export const referralService = {
         refereeName: r.referee_name,
         refereeEmail: r.referee_email,
         refereePhone: r.referee_phone,
+        refereePhoto: r.referee_photo,
         referralCode: r.referral_code,
         referralLink: r.referral_link,
         rewardAmount: r.reward_amount,
+        visitDate: r.visit_date,
         signupDate: r.signup_date,
         paymentDate: r.payment_date,
         ruleId: r.rule_id,
@@ -192,9 +198,11 @@ export const referralService = {
       refereeName: r.referee_name,
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
+      refereePhoto: r.referee_photo,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
+      visitDate: r.visit_date,
       signupDate: r.signup_date,
       paymentDate: r.payment_date,
       ruleId: r.rule_id,
@@ -211,9 +219,11 @@ export const referralService = {
       referee_name: request.refereeName,
       referee_email: request.refereeEmail,
       referee_phone: request.refereePhone,
+      referee_photo: request.refereePhoto,
       status: request.status,
       reward_amount: request.rewardAmount,
       date: request.date,
+      visit_date: request.visitDate,
       signup_date: request.signupDate,
       payment_date: request.paymentDate,
       notes: request.notes,
@@ -225,7 +235,10 @@ export const referralService = {
       headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error('Failed to create referral');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || 'Failed to create referral');
+    }
     const r = await res.json();
     return {
       ...r,
@@ -234,9 +247,11 @@ export const referralService = {
       refereeName: r.referee_name,
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
+      refereePhoto: r.referee_photo,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
+      visitDate: r.visit_date,
       signupDate: r.signup_date,
       paymentDate: r.payment_date,
       ruleId: r.rule_id,
@@ -253,9 +268,11 @@ export const referralService = {
       referee_name: request.refereeName,
       referee_email: request.refereeEmail,
       referee_phone: request.refereePhone,
+      referee_photo: request.refereePhoto,
       status: request.status,
       reward_amount: request.rewardAmount,
       date: request.date,
+      visit_date: request.visitDate,
       signup_date: request.signupDate,
       payment_date: request.paymentDate,
       notes: request.notes,
@@ -275,9 +292,11 @@ export const referralService = {
       refereeName: r.referee_name,
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
+      refereePhoto: r.referee_photo,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
+      visitDate: r.visit_date,
       signupDate: r.signup_date,
       paymentDate: r.payment_date,
       ruleId: r.rule_id,
@@ -318,9 +337,11 @@ export const referralService = {
       refereeName: r.referee_name,
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
+      refereePhoto: r.referee_photo,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
+      visitDate: r.visit_date,
       signupDate: r.signup_date,
       paymentDate: r.payment_date,
       ruleId: r.rule_id,
@@ -344,9 +365,11 @@ export const referralService = {
       refereeName: r.referee_name,
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
+      refereePhoto: r.referee_photo,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
+      visitDate: r.visit_date,
       signupDate: r.signup_date,
       paymentDate: r.payment_date,
       ruleId: r.rule_id,
@@ -375,9 +398,11 @@ export const referralService = {
       refereeName: r.referee_name,
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
+      refereePhoto: r.referee_photo,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
+      visitDate: r.visit_date,
       signupDate: r.signup_date,
       paymentDate: r.payment_date,
       ruleId: r.rule_id,
@@ -402,9 +427,11 @@ export const referralService = {
       refereeName: r.referee_name,
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
+      refereePhoto: r.referee_photo,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
+      visitDate: r.visit_date,
       signupDate: r.signup_date,
       paymentDate: r.payment_date,
       ruleId: r.rule_id,
@@ -436,6 +463,7 @@ export const referralService = {
         refereeName: r.referral.referee_name,
         refereeEmail: r.referral.referee_email,
         refereePhone: r.referral.referee_phone,
+        refereePhoto: r.referral.referee_photo,
         referralCode: r.referral.referral_code,
         referralLink: r.referral.referral_link,
         rewardAmount: r.referral.reward_amount,

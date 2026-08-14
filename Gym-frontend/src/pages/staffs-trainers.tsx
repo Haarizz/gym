@@ -72,6 +72,7 @@ import {
   Bell,
   Gauge
 } from 'lucide-react';
+import { PermissionGate, hasPermission } from "../utils/permissions";
 
 
 interface StaffsTrainersProps {
@@ -384,10 +385,11 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [newEmployeeBasicInfo, setNewEmployeeBasicInfo] = useState<{
     name: string; email: string; phone: string; role: string; department: string;
     branch: string; monthly_target: number; base_salary: number; address: string; photo_url?: string;
-    appUsername?: string; appPassword?: string;
+    join_date: string; appUsername?: string; appPassword?: string;
   }>({
     name: '', email: '', phone: '', role: '', department: '', branch: '',
-    monthly_target: 0, base_salary: 0, address: '', appUsername: '', appPassword: ''
+    monthly_target: 0, base_salary: 0, address: '', join_date: new Date().toISOString().split('T')[0],
+    appUsername: '', appPassword: ''
   });
   const [showNewEmpPassword, setShowNewEmpPassword] = useState(false);
   const [isTogglingStaffAccess, setIsTogglingStaffAccess] = useState(false);
@@ -474,7 +476,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
       await staffService.createStaff({
         ...newEmployeeBasicInfo,
         status: 'active',
-        join_date: new Date().toISOString().split('T')[0],
+        join_date: newEmployeeBasicInfo.join_date || new Date().toISOString().split('T')[0],
         certifications: [],
         schedule: {},
         photo_url: newEmployeeBasicInfo.photo_url,
@@ -485,7 +487,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         } : {}),
       });
       setShowAddEmployee(false);
-      setNewEmployeeBasicInfo({ name: '', email: '', phone: '', role: '', department: '', branch: '', monthly_target: 0, base_salary: 0, address: '', appUsername: '', appPassword: '' });
+      setNewEmployeeBasicInfo({ name: '', email: '', phone: '', role: '', department: '', branch: '', monthly_target: 0, base_salary: 0, address: '', join_date: new Date().toISOString().split('T')[0], appUsername: '', appPassword: '' });
       await loadStaff();
     } catch (e) { console.error('Failed to create employee', e); }
   };
@@ -538,6 +540,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         base_salary: editEmployeeData.base_salary,
         address: editEmployeeData.address,
         status: editEmployeeData.status,
+        join_date: editEmployeeData.join_date,
         photo_url: editEmployeeData.photo_url,
         certifications: editEmployeeData.certifications || [],
         schedule: editEmployeeData.schedule || {},
@@ -823,6 +826,16 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
     return 'bg-red-100 text-red-800';
   };
 
+  if (!hasPermission("STAFF_VIEW")) {
+    return (
+      <div className="p-6">
+        <Card className="p-8 text-center text-muted-foreground">
+          You don't have permission to view this page.
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
@@ -846,10 +859,12 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
-          <Button onClick={() => setShowAddEmployee(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Employee
-          </Button>
+          <PermissionGate permission="STAFF_CREATE">
+            <Button onClick={() => setShowAddEmployee(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Employee
+            </Button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -1153,14 +1168,16 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Profile
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setEditEmployeeData({...employee}); setEditAppUsername(''); setEditAppPassword(''); setShowEditAppPassword(false); setShowEditEmployee(true); }}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setStatusEmployee(employee)}>
-                                <Activity className="h-4 w-4 mr-2" />
-                                Change Status
-                              </DropdownMenuItem>
+                              <PermissionGate permission="STAFF_EDIT">
+                                <DropdownMenuItem onClick={() => { setEditEmployeeData({...employee}); setEditAppUsername(''); setEditAppPassword(''); setShowEditAppPassword(false); setShowEditEmployee(true); }}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setStatusEmployee(employee)}>
+                                  <Activity className="h-4 w-4 mr-2" />
+                                  Change Status
+                                </DropdownMenuItem>
+                              </PermissionGate>
                               <DropdownMenuItem onClick={() => { setScheduleViewEmployee(employee); setShowViewSchedule(true); }}>
                                 <CalendarIcon className="h-4 w-4 mr-2" />
                                 View Schedule
@@ -1169,10 +1186,12 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                                 <Target className="h-4 w-4 mr-2" />
                                 Set Target
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setDeleteConfirmEmployee(employee)} className="text-destructive focus:text-destructive">
-                                <X className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
+                              <PermissionGate permission="STAFF_DELETE">
+                                <DropdownMenuItem onClick={() => setDeleteConfirmEmployee(employee)} className="text-destructive focus:text-destructive">
+                                  <X className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </PermissionGate>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -1537,6 +1556,15 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     onChange={e => setNewEmployeeBasicInfo(p => ({...p, phone: e.target.value}))}
                   />
                 </div>
+                <div>
+                  <Label>Join Date</Label>
+                  <Input
+                    type="date"
+                    className="mt-1"
+                    value={newEmployeeBasicInfo.join_date}
+                    onChange={e => setNewEmployeeBasicInfo(p => ({...p, join_date: e.target.value}))}
+                  />
+                </div>
               </div>
               <div>
                 <Label>Address</Label>
@@ -1770,6 +1798,11 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     <Label>Phone Number</Label>
                     <Input className="mt-1" value={editEmployeeData.phone}
                       onChange={e => setEditEmployeeData(p => p ? {...p, phone: e.target.value} : p)} />
+                  </div>
+                  <div>
+                    <Label>Join Date</Label>
+                    <Input type="date" className="mt-1" value={editEmployeeData.join_date ? editEmployeeData.join_date.slice(0, 10) : ''}
+                      onChange={e => setEditEmployeeData(p => p ? {...p, join_date: e.target.value} : p)} />
                   </div>
                 </div>
                 <div>

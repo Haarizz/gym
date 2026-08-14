@@ -830,6 +830,9 @@ export function Leads() {
                         <Button size="sm" variant="ghost" onClick={() => handleQuickAction(lead, 'whatsapp')}>
                           <MessageSquare className="h-4 w-4" />
                         </Button>
+                        <Button size="sm" variant="ghost" title="Follow Up" onClick={() => handleQuickAction(lead, 'schedule')}>
+                          <CalendarIcon className="h-4 w-4" />
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => handleLeadClick(lead)}>
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -926,6 +929,12 @@ export function Leads() {
                             handleQuickAction(lead, 'whatsapp');
                           }}>
                             <MessageSquare className="h-3 w-3" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Follow Up" onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickAction(lead, 'schedule');
+                          }}>
+                            <CalendarIcon className="h-3 w-3" />
                           </Button>
                         </div>
                         {lead.assignedStaff && (
@@ -1073,6 +1082,10 @@ export function Leads() {
                       <Button onClick={() => handleQuickAction(selectedLead, 'whatsapp')} className="justify-start">
                         <MessageSquare className="mr-2 h-4 w-4" />
                         WhatsApp
+                      </Button>
+                      <Button onClick={() => handleQuickAction(selectedLead, 'schedule')} className="justify-start">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        Follow Up
                       </Button>
                       <Button onClick={() => { setStatusLeadId(selectedLead.id); setNewStatus(selectedLead.status === 'follow-up' ? 'follow_up' : selectedLead.status); setShowUpdateStatus(true); }} className="justify-start">
                         <RefreshCw className="mr-2 h-4 w-4" />

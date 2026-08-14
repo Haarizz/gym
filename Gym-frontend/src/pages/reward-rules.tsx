@@ -227,7 +227,7 @@ function campaignToForm(c: ReferralCampaign): CampaignFormState {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function RewardRules() {
+export function RewardRules({ autoOpenSignal }: { autoOpenSignal?: number } = {}) {
   const [rules, setRules] = useState<RewardRule[]>([]);
   const [campaigns, setCampaigns] = useState<ReferralCampaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,6 +265,12 @@ export function RewardRules() {
     setRuleForm(defaultRuleForm());
     setShowRuleDialog(true);
   }, []);
+
+  // Lets the parent Referrals page's "Add Reward Rule" header button open this
+  // dialog directly, without duplicating the create-rule form elsewhere.
+  useEffect(() => {
+    if (autoOpenSignal) openNewRule();
+  }, [autoOpenSignal, openNewRule]);
 
   const openEditRule = useCallback((rule: RewardRule) => {
     setEditingRuleId(rule.id);
@@ -607,11 +613,11 @@ export function RewardRules() {
 
       {/* ---------------- Reward Rule Dialog (create / edit) ---------------- */}
       <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle>{editingRuleId ? 'Edit Reward Rule' : 'New Reward Rule'}</DialogTitle>
+            <DialogTitle className="text-[#2B7A78]">{editingRuleId ? 'Edit Reward Rule' : 'Add Reward Rule'}</DialogTitle>
             <DialogDescription>
-              Define what reward a referral generates, who is eligible, and when it applies.
+              Define a new reward policy for referrals or achievements.
             </DialogDescription>
           </DialogHeader>
 
@@ -620,252 +626,87 @@ export function RewardRules() {
               <Label>Rule Name</Label>
               <Input
                 className="mt-1"
-                placeholder="e.g., Wallet credit on successful referral"
+                placeholder="e.g., 10% discount on next month"
                 value={ruleForm.name}
                 onChange={(e) => setRuleForm((p) => ({ ...p, name: e.target.value }))}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Eligibility</Label>
-                <Select
-                  value={ruleForm.eligibility}
-                  onValueChange={(v) => setRuleForm((p) => ({ ...p, eligibility: v as RuleFormState['eligibility'] }))}
-                >
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="referrer">Referrer Only</SelectItem>
-                    <SelectItem value="referee">Referee Only</SelectItem>
-                    <SelectItem value="both">Both Parties</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Trigger</Label>
-                <Select
-                  value={ruleForm.conditionTrigger}
-                  onValueChange={(v) => setRuleForm((p) => ({ ...p, conditionTrigger: v }))}
-                >
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="signup">On Signup</SelectItem>
-                    <SelectItem value="payment">On Payment</SelectItem>
-                    <SelectItem value="both">Both Signup & Payment</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Reward Type</Label>
-                <Select
-                  value={ruleForm.rewardType}
-                  onValueChange={(v) => setRuleForm((p) => ({
-                    ...p,
-                    rewardType: v as RewardType,
-                    redemptionAction: DEFAULT_REDEMPTION_ACTION[v as RewardType] ?? p.redemptionAction,
-                  }))}
-                >
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(REWARD_TYPE_LABELS) as RewardType[]).map((rt) => (
-                      <SelectItem key={rt} value={rt}>{REWARD_TYPE_LABELS[rt]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Redemption Action</Label>
-                <Select
-                  value={ruleForm.redemptionAction}
-                  onValueChange={(v) => setRuleForm((p) => ({ ...p, redemptionAction: v as RedemptionAction }))}
-                >
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(REDEMPTION_ACTION_LABELS) as RedemptionAction[]).map((ra) => (
-                      <SelectItem key={ra} value={ra}>{REDEMPTION_ACTION_LABELS[ra]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label>Reward Value</Label>
-                <Input
-                  className="mt-1"
-                  type="number"
-                  placeholder="e.g., 500"
-                  value={ruleForm.value}
-                  onChange={(e) => setRuleForm((p) => ({ ...p, value: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Unit</Label>
-                <Input
-                  className="mt-1"
-                  placeholder="%, session, points"
-                  value={ruleForm.unit}
-                  onChange={(e) => setRuleForm((p) => ({ ...p, unit: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Currency</Label>
-                <Input
-                  className="mt-1"
-                  placeholder="INR, USD"
-                  value={ruleForm.currency}
-                  onChange={(e) => setRuleForm((p) => ({ ...p, currency: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Priority</Label>
-                <Input
-                  className="mt-1"
-                  type="number"
-                  value={ruleForm.priority}
-                  onChange={(e) => setRuleForm((p) => ({ ...p, priority: e.target.value }))}
-                />
-                <p className="text-xs text-muted-foreground mt-1">Higher priority rules are evaluated first.</p>
-              </div>
-              <div>
-                <Label>Expiry (days)</Label>
-                <Input
-                  className="mt-1"
-                  type="number"
-                  placeholder="Optional"
-                  value={ruleForm.expiryDays}
-                  onChange={(e) => setRuleForm((p) => ({ ...p, expiryDays: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <div className="pr-4">
-                  <Label>Stackable</Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Allow this reward to combine with another matching rule instead of stopping evaluation.
-                  </p>
-                </div>
-                <Switch
-                  checked={ruleForm.stackable}
-                  onCheckedChange={(v) => setRuleForm((p) => ({ ...p, stackable: v === true }))}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <div className="pr-4">
-                  <Label>Requires Approval</Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Reward stays pending until a staff member approves it.
-                  </p>
-                </div>
-                <Switch
-                  checked={ruleForm.requiresApproval}
-                  onCheckedChange={(v) => setRuleForm((p) => ({ ...p, requiresApproval: v === true }))}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label>Min Purchase Amount</Label>
-                <Input
-                  className="mt-1"
-                  type="number"
-                  placeholder="Optional"
-                  value={ruleForm.minPurchaseAmount}
-                  onChange={(e) => setRuleForm((p) => ({ ...p, minPurchaseAmount: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Min Referral Count</Label>
-                <Input
-                  className="mt-1"
-                  type="number"
-                  placeholder="Optional"
-                  value={ruleForm.minReferralCount}
-                  onChange={(e) => setRuleForm((p) => ({ ...p, minReferralCount: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Max Rewards / Member</Label>
-                <Input
-                  className="mt-1"
-                  type="number"
-                  placeholder="Optional"
-                  value={ruleForm.maxRewardsPerMember}
-                  onChange={(e) => setRuleForm((p) => ({ ...p, maxRewardsPerMember: e.target.value }))}
-                />
-              </div>
-            </div>
-
             <div>
-              <Label>Target Membership Plan ID</Label>
-              <Input
-                className="mt-1"
-                type="number"
-                placeholder="Optional"
-                value={ruleForm.targetMembershipPlanId}
-                onChange={(e) => setRuleForm((p) => ({ ...p, targetMembershipPlanId: e.target.value }))}
-              />
-              <p className="text-xs text-muted-foreground mt-1">Leave blank to apply to any plan.</p>
-            </div>
-
-            <div>
-              <Label>Campaign</Label>
+              <Label>Reward Type</Label>
               <Select
-                value={ruleForm.campaignId || 'none'}
-                onValueChange={(v) => setRuleForm((p) => ({ ...p, campaignId: v === 'none' ? '' : v }))}
+                value={ruleForm.rewardType}
+                onValueChange={(v) => setRuleForm((p) => ({
+                  ...p,
+                  rewardType: v as RewardType,
+                  redemptionAction: DEFAULT_REDEMPTION_ACTION[v as RewardType] ?? p.redemptionAction,
+                }))}
               >
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None — evergreen rule</SelectItem>
-                  {campaigns.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  {(Object.keys(REWARD_TYPE_LABELS) as RewardType[]).map((rt) => (
+                    <SelectItem key={rt} value={rt}>{REWARD_TYPE_LABELS[rt]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {!ruleForm.campaignId && (
-              <div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Evergreen Start Date</Label>
-                    <Input
-                      className="mt-1"
-                      type="date"
-                      value={ruleForm.campaignStartDate}
-                      onChange={(e) => setRuleForm((p) => ({ ...p, campaignStartDate: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label>Evergreen End Date</Label>
-                    <Input
-                      className="mt-1"
-                      type="date"
-                      value={ruleForm.campaignEndDate}
-                      onChange={(e) => setRuleForm((p) => ({ ...p, campaignEndDate: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Optional time-boxed window for this rule when it isn't linked to a campaign.
-                </p>
-              </div>
-            )}
+            <div>
+              <Label>Reward Value</Label>
+              <Input
+                className="mt-1"
+                type="number"
+                placeholder="e.g., 25 AED / 10%"
+                value={ruleForm.value}
+                onChange={(e) => setRuleForm((p) => ({ ...p, value: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label>Eligibility</Label>
+              <Select
+                value={ruleForm.eligibility}
+                onValueChange={(v) => setRuleForm((p) => ({ ...p, eligibility: v as RuleFormState['eligibility'] }))}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="referrer">Referrer Only</SelectItem>
+                  <SelectItem value="referee">Referee Only</SelectItem>
+                  <SelectItem value="both">Both Parties</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Condition</Label>
+              <Select
+                value={ruleForm.conditionTrigger}
+                onValueChange={(v) => setRuleForm((p) => ({ ...p, conditionTrigger: v }))}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="signup">On Signup</SelectItem>
+                  <SelectItem value="payment">On Payment</SelectItem>
+                  <SelectItem value="both">Both Signup & Payment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Expiry Days</Label>
+              <Input
+                className="mt-1"
+                type="number"
+                placeholder="Optional"
+                value={ruleForm.expiryDays}
+                onChange={(e) => setRuleForm((p) => ({ ...p, expiryDays: e.target.value }))}
+              />
+            </div>
           </div>
 
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowRuleDialog(false)}>Cancel</Button>
-            <Button onClick={handleSaveRule}>{editingRuleId ? 'Save Changes' : 'Create Rule'}</Button>
+            <Button variant="outline" onClick={() => setShowRuleDialog(false)} className="border-red-600 text-red-600 hover:bg-red-50">Cancel</Button>
+            <Button onClick={handleSaveRule} className="bg-red-600 hover:bg-red-700 text-white">{editingRuleId ? 'Save Changes' : 'Save Rule'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

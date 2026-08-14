@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { plansService, Plan } from '../utils/supabase/plans-service';
 import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
 import { facilitiesService, FacilityApi } from '../utils/supabase/facilities-service';
+import { planGroupsService, PlanGroupApi } from '../utils/supabase/plan-groups-service';
+import { addonPlansService, AddonPlan } from '../utils/supabase/addon-plans-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
 import { Switch } from "../components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
@@ -41,21 +43,7 @@ import {
 import { Checkbox } from "../components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
 import exampleImage from 'figma:asset/362a2ed9c216cf9c38308e71b24d35a09379ac76.png';
-
-// Sample training streams data
-const trainingStreams = [
-  { id: 1, name: "Strength Training", category: "Fitness" },
-  { id: 2, name: "Cardio & HIIT", category: "Fitness" },
-  { id: 3, name: "Yoga & Mindfulness", category: "Wellness" },
-  { id: 4, name: "Pilates", category: "Wellness" },
-  { id: 5, name: "Group Classes", category: "Classes" },
-  { id: 6, name: "Personal Training", category: "Training" },
-  { id: 7, name: "Aqua Fitness", category: "Classes" },
-  { id: 8, name: "CrossFit", category: "Fitness" },
-  { id: 9, name: "Martial Arts", category: "Training" },
-  { id: 10, name: "Senior Fitness", category: "Specialized" }
-];
-
+import { toast } from "sonner";
 
 export function ManagePlans() {
   const { currencyCode } = useCurrency();
@@ -78,12 +66,35 @@ export function ManagePlans() {
     discount: string;
     validPeriod: string;
     status: string;
+    discountType: string | null;
+    discountValue: number | null;
+    maximumDiscount: number | null;
   }[]>([]);
   const [isLoadingPromotions, setIsLoadingPromotions] = useState(true);
 
   // Facilities loaded from Facilities Management (real data, not mock)
   const [availableFacilities, setAvailableFacilities] = useState<FacilityApi[]>([]);
   const [isLoadingFacilities, setIsLoadingFacilities] = useState(true);
+
+  // Plan Groups: admin-managed list (not hardcoded) — replaces the old fixed
+  // Membership/Class Package/Personal Training dropdown.
+  const [availablePlanGroups, setAvailablePlanGroups] = useState<PlanGroupApi[]>([]);
+  const [isLoadingPlanGroups, setIsLoadingPlanGroups] = useState(true);
+  const [showAddPlanGroupDialog, setShowAddPlanGroupDialog] = useState(false);
+  const [newPlanGroupName, setNewPlanGroupName] = useState("");
+  const [isSavingPlanGroup, setIsSavingPlanGroup] = useState(false);
+
+  // Training Streams: admin-managed, priced catalog (not hardcoded) — backed by
+  // the same AddonPlan catalog used to sell add-ons to members, filtered to the
+  // Training/Classes categories, so anything added here is also purchasable as
+  // a member add-on.
+  const [availableTrainingStreams, setAvailableTrainingStreams] = useState<AddonPlan[]>([]);
+  const [isLoadingTrainingStreams, setIsLoadingTrainingStreams] = useState(true);
+  const [showAddTrainingStreamDialog, setShowAddTrainingStreamDialog] = useState(false);
+  const [newTrainingStreamName, setNewTrainingStreamName] = useState("");
+  const [newTrainingStreamPrice, setNewTrainingStreamPrice] = useState("");
+  const [newTrainingStreamValidity, setNewTrainingStreamValidity] = useState("30");
+  const [isSavingTrainingStream, setIsSavingTrainingStream] = useState(false);
 
   // Form state for creating/editing plans
   const [formData, setFormData] = useState({
@@ -98,7 +109,7 @@ export function ManagePlans() {
     description: "",
     planType: "Individual",
     status: "Active",
-    trainingStreams: trainingStreams.map(stream => stream.id), // All selected by default
+    trainingStreams: [] as number[],
     membershipCapacity: "Unlimited", // Changed default to Unlimited
     maxCapacity: "0",
     attendanceLimit: "Unlimited", // Changed default to Unlimited
@@ -178,6 +189,9 @@ export function ManagePlans() {
             discount: discountLabel,
             validPeriod,
             status,
+            discountType: promo.discountType ?? null,
+            discountValue: promo.discountValue ?? null,
+            maximumDiscount: promo.maximumDiscount ?? null,
           };
         }));
       } catch (err) {
@@ -204,6 +218,104 @@ export function ManagePlans() {
     loadFacilities();
   }, []);
 
+  const loadPlanGroups = async () => {
+    try {
+      setIsLoadingPlanGroups(true);
+      const data = await planGroupsService.getPlanGroups();
+      setAvailablePlanGroups(data);
+      return data;
+    } catch (err) {
+      console.error('Failed to load plan groups:', err);
+      return [];
+    } finally {
+      setIsLoadingPlanGroups(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPlanGroups();
+  }, []);
+
+  const handleAddPlanGroup = async () => {
+    const name = newPlanGroupName.trim();
+    if (!name) {
+      toast.error("Plan group name is required");
+      return;
+    }
+    setIsSavingPlanGroup(true);
+    try {
+      const created = await planGroupsService.createPlanGroup(name);
+      setAvailablePlanGroups(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setFormData(prev => ({ ...prev, type: created.name }));
+      setNewPlanGroupName("");
+      setShowAddPlanGroupDialog(false);
+      toast.success(`Plan group "${created.name}" added`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to add plan group");
+    } finally {
+      setIsSavingPlanGroup(false);
+    }
+  };
+
+  const loadTrainingStreams = async () => {
+    try {
+      setIsLoadingTrainingStreams(true);
+      const data = await addonPlansService.getAll(true);
+      setAvailableTrainingStreams(
+        data
+          .filter(a => a.category === 'Training' || a.category === 'Classes')
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+    } catch (err) {
+      console.error('Failed to load training streams:', err);
+    } finally {
+      setIsLoadingTrainingStreams(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTrainingStreams();
+  }, []);
+
+  const handleAddTrainingStream = async () => {
+    const name = newTrainingStreamName.trim();
+    const price = parseFloat(newTrainingStreamPrice);
+    const validity = parseInt(newTrainingStreamValidity, 10);
+    if (!name) {
+      toast.error("Training stream name is required");
+      return;
+    }
+    if (!newTrainingStreamPrice || isNaN(price) || price < 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    if (!newTrainingStreamValidity || isNaN(validity) || validity <= 0) {
+      toast.error("Enter a valid validity in days");
+      return;
+    }
+    setIsSavingTrainingStream(true);
+    try {
+      const created = await addonPlansService.create({
+        name,
+        price,
+        validity,
+        category: 'Training',
+        isActive: true,
+      });
+      setAvailableTrainingStreams(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setFormData(prev => ({ ...prev, trainingStreams: [...prev.trainingStreams, created.id] }));
+      setNewTrainingStreamName("");
+      setNewTrainingStreamPrice("");
+      setNewTrainingStreamValidity("30");
+      setShowAddTrainingStreamDialog(false);
+      toast.success(`Training stream "${created.name}" added`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to add training stream");
+    } finally {
+      setIsSavingTrainingStream(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -217,7 +329,7 @@ export function ManagePlans() {
       description: "",
       planType: "Individual",
       status: "Active",
-      trainingStreams: trainingStreams.map(stream => stream.id), // All selected by default
+      trainingStreams: [],
       membershipCapacity: "Unlimited", // Changed default to Unlimited
       maxCapacity: "0",
       attendanceLimit: "Unlimited", // Changed default to Unlimited
@@ -418,7 +530,7 @@ export function ManagePlans() {
 
   // Helper functions to get names from IDs
   const getTrainingStreamNames = (streamIds: number[]) => {
-    return streamIds.map(id => trainingStreams.find(stream => stream.id === id)?.name).filter(Boolean);
+    return streamIds.map(id => availableTrainingStreams.find(stream => stream.id === id)?.name).filter(Boolean);
   };
 
   const getPromotionNames = (promotionIds: number[]) => {
@@ -427,6 +539,43 @@ export function ManagePlans() {
 
   const getFacilityNames = (facilityIds: string[]) => {
     return facilityIds.map(id => availableFacilities.find(facility => facility.id === id)?.name).filter(Boolean);
+  };
+
+  // Effective price after the best currently-active promotion attached to the
+  // plan. Discounts live on Promotions & Campaigns now (not a manual plan
+  // field), so this is the only place a plan's price reflects them.
+  const getPlanEffectivePrice = (plan: Plan) => {
+    const price = Number(plan.price) || 0;
+    const activePromotions = plan.selectedPromotions
+      .map(id => availablePromotions.find(promo => promo.id === id))
+      .filter((promo): promo is NonNullable<typeof promo> => !!promo && promo.status === "Active");
+
+    let bestDiscountAmount = 0;
+    let bestPromotion: typeof activePromotions[number] | null = null;
+
+    for (const promo of activePromotions) {
+      let amount = 0;
+      if (promo.discountType === "percentage") {
+        amount = price * (Number(promo.discountValue) || 0) / 100;
+        if (promo.maximumDiscount != null) amount = Math.min(amount, Number(promo.maximumDiscount));
+      } else if (promo.discountType === "free") {
+        amount = price;
+      } else if (promo.discountValue != null) {
+        amount = Number(promo.discountValue);
+      }
+      amount = Math.max(0, Math.min(amount, price));
+      if (amount > bestDiscountAmount) {
+        bestDiscountAmount = amount;
+        bestPromotion = promo;
+      }
+    }
+
+    return {
+      originalPrice: price,
+      effectivePrice: price - bestDiscountAmount,
+      discountAmount: bestDiscountAmount,
+      appliedPromotion: bestPromotion,
+    };
   };
 
   // Filter plans based on search and filters
@@ -463,7 +612,7 @@ export function ManagePlans() {
   const handleSelectAllTrainingStreams = () => {
     setFormData(prev => ({
       ...prev,
-      trainingStreams: trainingStreams.map(stream => stream.id)
+      trainingStreams: availableTrainingStreams.map(stream => stream.id)
     }));
   };
 
@@ -705,7 +854,7 @@ export function ManagePlans() {
                 <TableHead>Plan Name</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Price / Discounts</TableHead>
+                <TableHead>Price</TableHead>
                 <TableHead>Assigned Trainers</TableHead>
                 <TableHead>Training Streams</TableHead>
                 <TableHead>Facilities</TableHead>
@@ -735,12 +884,18 @@ export function ManagePlans() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div>
-                      <div className="font-medium"><CurrencyGlyph /> {plan.price}</div>
-                      {plan.discount > 0 && (
-                        <div className="text-sm text-green-600">{plan.discount}% off</div>
-                      )}
-                    </div>
+                    {(() => {
+                      const { effectivePrice, discountAmount, appliedPromotion } = getPlanEffectivePrice(plan);
+                      return discountAmount > 0 ? (
+                        <div>
+                          <div className="font-medium"><CurrencyGlyph /> {effectivePrice.toFixed(2)}</div>
+                          <div className="text-xs text-muted-foreground line-through"><CurrencyGlyph /> {plan.price}</div>
+                          <div className="text-xs text-green-600">{appliedPromotion?.name}</div>
+                        </div>
+                      ) : (
+                        <div className="font-medium"><CurrencyGlyph /> {plan.price}</div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
@@ -898,18 +1053,25 @@ export function ManagePlans() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg border bg-white">
                   <p className="text-xs text-muted-foreground">Duration</p>
                   <p className="font-semibold">{viewingPlan.duration}</p>
                 </div>
                 <div className="p-3 rounded-lg border bg-white">
                   <p className="text-xs text-muted-foreground">Price</p>
-                  <p className="font-semibold text-primary"><CurrencyGlyph /> {viewingPlan.price}</p>
-                </div>
-                <div className="p-3 rounded-lg border bg-white">
-                  <p className="text-xs text-muted-foreground">Discount</p>
-                  <p className="font-semibold">{viewingPlan.discount ? `${viewingPlan.discount}%` : "—"}</p>
+                  {(() => {
+                    const { effectivePrice, discountAmount, appliedPromotion } = getPlanEffectivePrice(viewingPlan);
+                    return discountAmount > 0 ? (
+                      <div>
+                        <p className="font-semibold text-primary"><CurrencyGlyph /> {effectivePrice.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground line-through"><CurrencyGlyph /> {viewingPlan.price}</p>
+                        <p className="text-xs text-green-600">{appliedPromotion?.name} applied</p>
+                      </div>
+                    ) : (
+                      <p className="font-semibold text-primary"><CurrencyGlyph /> {viewingPlan.price}</p>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1015,15 +1177,33 @@ export function ManagePlans() {
             {/* Plan Type and Duration */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="planType">Plan Type *</Label>
-                <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value})}>
+                <Label htmlFor="planType">Plan Group *</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) => {
+                    if (value === "__add_new__") {
+                      setNewPlanGroupName("");
+                      setShowAddPlanGroupDialog(true);
+                      return;
+                    }
+                    setFormData({...formData, type: value});
+                  }}
+                >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder={isLoadingPlanGroups ? "Loading plan groups..." : "Select plan group"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Membership">Membership</SelectItem>
-                    <SelectItem value="Class Package">Class Package</SelectItem>
-                    <SelectItem value="Personal Training">Personal Training</SelectItem>
+                    {formData.type && !availablePlanGroups.some(g => g.name === formData.type) && (
+                      <SelectItem value={formData.type}>{formData.type}</SelectItem>
+                    )}
+                    {availablePlanGroups.map((group) => (
+                      <SelectItem key={group.id} value={group.name}>{group.name}</SelectItem>
+                    ))}
+                    <SelectSeparator />
+                    <SelectItem value="__add_new__">
+                      <Plus className="h-4 w-4" />
+                      Add New Plan Group
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1075,30 +1255,17 @@ export function ManagePlans() {
               </div>
             </div>
 
-            {/* Price and Discount */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price">Price ({currencyCode}) *</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  placeholder="49.99"
-                  value={formData.price}
-                  onChange={(e) => setFormData({...formData, price: e.target.value})}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="discount">Discount (%)</Label>
-                <Input
-                  id="discount"
-                  type="number"
-                  placeholder="15"
-                  value={formData.discount}
-                  onChange={(e) => setFormData({...formData, discount: e.target.value})}
-                />
-              </div>
+            {/* Price */}
+            <div className="space-y-2">
+              <Label htmlFor="price">Price ({currencyCode}) *</Label>
+              <Input
+                id="price"
+                type="number"
+                step="0.01"
+                placeholder="49.99"
+                value={formData.price}
+                onChange={(e) => setFormData({...formData, price: e.target.value})}
+              />
             </div>
 
             {/* Max Sessions (optional) */}
@@ -1276,6 +1443,15 @@ export function ManagePlans() {
                         type="button"
                         variant="outline"
                         size="sm"
+                        onClick={() => setShowAddTrainingStreamDialog(true)}
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Add New
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={handleSelectAllTrainingStreams}
                       >
                         Select All
@@ -1290,31 +1466,49 @@ export function ManagePlans() {
                       </Button>
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground -mt-2">
+                    Priced items — a training stream added here also becomes available to sell as a member add-on.
+                  </p>
 
                   {/* Training streams grid */}
-                  <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto border rounded-md p-3">
-                    {trainingStreams.map((stream) => (
-                      <div key={stream.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`stream-${stream.id}`}
-                          checked={formData.trainingStreams.includes(stream.id)}
-                          onCheckedChange={() => handleTrainingStreamToggle(stream.id)}
-                        />
-                        <Label 
-                          htmlFor={`stream-${stream.id}`}
-                          className="text-sm cursor-pointer flex-1"
-                        >
-                          {stream.name}
-                        </Label>
-                        <Badge variant="outline" className="text-xs">
-                          {stream.category}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
+                  {isLoadingTrainingStreams ? (
+                    <div className="text-sm text-muted-foreground border rounded-md p-3">Loading training streams...</div>
+                  ) : availableTrainingStreams.length === 0 ? (
+                    <div className="text-sm text-muted-foreground border rounded-md p-4 text-center">
+                      No training streams yet.{" "}
+                      <button
+                        type="button"
+                        className="text-primary underline"
+                        onClick={() => setShowAddTrainingStreamDialog(true)}
+                      >
+                        Add your first one
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto border rounded-md p-3">
+                      {availableTrainingStreams.map((stream) => (
+                        <div key={stream.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`stream-${stream.id}`}
+                            checked={formData.trainingStreams.includes(stream.id)}
+                            onCheckedChange={() => handleTrainingStreamToggle(stream.id)}
+                          />
+                          <Label
+                            htmlFor={`stream-${stream.id}`}
+                            className="text-sm cursor-pointer flex-1"
+                          >
+                            {stream.name}
+                          </Label>
+                          <Badge variant="outline" className="text-xs whitespace-nowrap">
+                            <CurrencyGlyph /> {stream.price}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="text-sm text-muted-foreground">
-                    {formData.trainingStreams.length} of {trainingStreams.length} training streams selected
+                    {formData.trainingStreams.length} of {availableTrainingStreams.length} training streams selected
                   </div>
                 </div>
               </CollapsibleContent>
@@ -1873,6 +2067,89 @@ export function ManagePlans() {
                 Create Plan
               </Button>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Plan Group Dialog */}
+      <Dialog open={showAddPlanGroupDialog} onOpenChange={setShowAddPlanGroupDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Add New Plan Group</DialogTitle>
+            <DialogDescription>Create a plan group to classify plans (e.g., Membership, Class Package, Personal Training).</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="newPlanGroupName">Plan Group Name *</Label>
+            <Input
+              id="newPlanGroupName"
+              placeholder="e.g., Corporate Wellness"
+              value={newPlanGroupName}
+              onChange={(e) => setNewPlanGroupName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAddPlanGroup(); }}
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowAddPlanGroupDialog(false)}>Cancel</Button>
+            <Button onClick={handleAddPlanGroup} disabled={isSavingPlanGroup}>
+              {isSavingPlanGroup ? "Adding..." : "Add Plan Group"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Training Stream Dialog */}
+      <Dialog open={showAddTrainingStreamDialog} onOpenChange={setShowAddTrainingStreamDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Add New Training Stream</DialogTitle>
+            <DialogDescription>
+              Create a training stream with a price (e.g., Personal Training, Yoga Classes). It's saved to the
+              add-on catalog so it can also be sold directly to members.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="newTrainingStreamName">Name *</Label>
+              <Input
+                id="newTrainingStreamName"
+                placeholder="e.g., Strength Training"
+                value={newTrainingStreamName}
+                onChange={(e) => setNewTrainingStreamName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="newTrainingStreamPrice">Amount *</Label>
+                <Input
+                  id="newTrainingStreamPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={newTrainingStreamPrice}
+                  onChange={(e) => setNewTrainingStreamPrice(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newTrainingStreamValidity">Validity (days) *</Label>
+                <Input
+                  id="newTrainingStreamValidity"
+                  type="number"
+                  min="1"
+                  value={newTrainingStreamValidity}
+                  onChange={(e) => setNewTrainingStreamValidity(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddTrainingStream(); }}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowAddTrainingStreamDialog(false)}>Cancel</Button>
+            <Button onClick={handleAddTrainingStream} disabled={isSavingTrainingStream}>
+              {isSavingTrainingStream ? "Adding..." : "Add Training Stream"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

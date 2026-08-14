@@ -1166,7 +1166,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Recent Members</span>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={() => onNavigate?.('members')}>
                 <Eye className="h-4 w-4 mr-2" />
                 View All
               </Button>

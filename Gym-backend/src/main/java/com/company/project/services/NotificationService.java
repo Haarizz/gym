@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -45,7 +46,15 @@ public class NotificationService {
     /**
      * Broadcast an individual notification to all users that have the given role.
      * Uses DB-level unique constraint + catch for idempotency when eventKey is provided.
+     *
+     * REQUIRES_NEW: notify* is called mid-transaction from business services (e.g.
+     * RewardEngineService while generating a reward inside ReferralService.markSuccessful).
+     * A Postgres constraint violation aborts the whole physical transaction, not just the
+     * statement — so without its own transaction, a duplicate eventKey here would silently
+     * roll back the caller's real work (the reward, the wallet credit, the referral status
+     * change) even though saveIgnoreDuplicate() "catches" the exception in Java.
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifyRole(String role, String title, String message,
                            String type, String priority, String module,
                            Long referenceId, String actionUrl, String eventKey) {
@@ -54,7 +63,14 @@ public class NotificationService {
         saveIgnoreDuplicate(n);
     }
 
-    /** Broadcast to multiple roles — one row per role (each role-stream is independent). */
+    /**
+     * Broadcast to multiple roles — one row per role (each role-stream is independent).
+     * REQUIRES_NEW here too: this is the actual entry point RewardEngineService calls, and
+     * the internal notifyRole(...) call below is a same-class self-invocation that Spring's
+     * transactional proxy can't intercept, so notifyRole's own @Transactional would otherwise
+     * be silently skipped on this path.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifyRoles(List<String> roles, String title, String message,
                             String type, String priority, String module,
                             Long referenceId, String actionUrl, String eventKeyPrefix) {
@@ -65,6 +81,7 @@ public class NotificationService {
     }
 
     /** Send an individual notification to one specific user (e.g. a MEMBER's own event). */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifyUser(Long userId, String title, String message,
                            String type, String priority, String module,
                            Long referenceId, String actionUrl, String eventKey) {
@@ -79,6 +96,7 @@ public class NotificationService {
      * If a notification with the same eventKey already exists today, increments
      * its count and updates the message rather than inserting a duplicate.
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifyRoleAggregated(String role, String title, String message,
                                      String type, String priority, String module,
                                      String actionUrl, String eventKey, int batchCount) {

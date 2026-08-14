@@ -419,9 +419,21 @@ export function PromotionsCampaign() {
       return Number.isNaN(parsed) ? undefined : parsed;
     };
 
+    // active/scheduled/expired are date-derived, not manual choices — always
+    // recompute them from the (possibly just-edited) date range instead of
+    // resending the stale status the edit form was opened with. Otherwise
+    // extending an expired promotion's end date leaves it stuck "expired".
+    // "draft" and "paused" are genuine manual states and are left as-is.
+    const DATE_DRIVEN_STATUSES = ["active", "scheduled", "expired"];
+    const deriveStatusFromDates = () => {
+      const today = new Date().toISOString().slice(0, 10);
+      if (promotionForm.endDate && promotionForm.endDate < today) return "expired";
+      if (promotionForm.startDate && promotionForm.startDate > today) return "scheduled";
+      return "active";
+    };
     const status = statusOverride
-      || promotionForm.status
-      || (promotionForm.startDate && new Date(promotionForm.startDate) > new Date() ? "scheduled" : "active");
+      || (DATE_DRIVEN_STATUSES.includes(promotionForm.status) ? deriveStatusFromDates() : promotionForm.status)
+      || deriveStatusFromDates();
 
     const selectedType = promotionForm.type || promotionType || "discount";
     const selectedDiscountType = promotionForm.discountType || discountType || "percentage";

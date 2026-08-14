@@ -183,6 +183,19 @@ public class PromotionCampaignService {
         if (!changed.isEmpty()) promotionRepository.saveAll(changed);
     }
 
+    private static boolean isDateDrivenStatus(String status) {
+        return "active".equalsIgnoreCase(status)
+                || "scheduled".equalsIgnoreCase(status)
+                || "expired".equalsIgnoreCase(status);
+    }
+
+    private static String deriveStatusFromDates(LocalDate startDate, LocalDate endDate) {
+        LocalDate today = LocalDate.now();
+        if (endDate != null && endDate.isBefore(today)) return "expired";
+        if (startDate != null && startDate.isAfter(today)) return "scheduled";
+        return "active";
+    }
+
     // Helpers
     private void applyRequest(PromotionCampaign promotion, PromotionCampaignRequestDTO req, boolean isCreate) {
         if (req.getName() != null) promotion.setName(req.getName());
@@ -191,6 +204,19 @@ public class PromotionCampaignService {
         if (req.getDescription() != null) promotion.setDescription(req.getDescription());
         if (req.getStartDate() != null) promotion.setStartDate(LocalDate.parse(req.getStartDate()));
         if (req.getEndDate() != null) promotion.setEndDate(LocalDate.parse(req.getEndDate()));
+
+        // active/scheduled/expired are date-derived, not manual choices. Recompute
+        // from the (possibly just-edited) date range whenever the status lands on
+        // one of those three, so extending an expired promotion's end date
+        // reactivates it instead of leaving it stuck "expired" forever — the
+        // request may otherwise resend the stale status the edit form loaded
+        // before the dates changed, and autoTransitionStatuses() never revisits
+        // a promotion once it reaches "expired" (it only queries
+        // scheduled/active/paused). "draft" and "paused" are genuine manual
+        // states and are left untouched.
+        if (isDateDrivenStatus(promotion.getStatus())) {
+            promotion.setStatus(deriveStatusFromDates(promotion.getStartDate(), promotion.getEndDate()));
+        }
 
         if (req.getDiscountType() != null) promotion.setDiscountType(req.getDiscountType());
         if (req.getDiscountValue() != null) promotion.setDiscountValue(req.getDiscountValue());

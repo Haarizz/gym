@@ -19,6 +19,8 @@ import com.company.project.repositories.ReferralRewardRepository;
 import com.company.project.repositories.ReferralRewardRuleRepository;
 import com.company.project.repositories.ReferralSettingsRepository;
 import com.company.project.repositories.RewardAuditLogRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,8 @@ import java.math.BigDecimal;
 @Service
 @Transactional
 public class RewardEngineService {
+
+    private static final Logger log = LoggerFactory.getLogger(RewardEngineService.class);
 
     private final ReferralRewardRuleRepository ruleRepository;
     private final ReferralRewardRepository rewardRepository;
@@ -256,8 +260,12 @@ public class RewardEngineService {
 
         LocalDateTime now = LocalDateTime.now();
         reward.setGeneratedDate(now);
-        if (rule.getExpiryDays() != null) {
-            reward.setExpiryDate(LocalDate.now().plusDays(rule.getExpiryDays()));
+        // Per-rule expiry wins; otherwise fall back to the program-wide default
+        // (ReferralSettings.expiryDays) so that setting actually does something.
+        Integer expiryDays = rule.getExpiryDays() != null ? rule.getExpiryDays()
+                : (settings != null ? settings.getExpiryDays() : null);
+        if (expiryDays != null) {
+            reward.setExpiryDate(LocalDate.now().plusDays(expiryDays));
         }
 
         if (rule.getCampaignId() != null) {
@@ -311,23 +319,41 @@ public class RewardEngineService {
                 + (Boolean.TRUE.equals(reward.getApprovalRequired()) ? " — awaiting approval." : " — now available.");
         String priority = Boolean.TRUE.equals(reward.getApprovalRequired()) ? "MEDIUM" : "LOW";
 
-        notificationService.notifyRoles(List.of("ADMIN", "MANAGER"), title, message,
-                "SUCCESS", priority, "REFERRALS", reward.getId(), "/reward-queue",
-                "REWARD_GENERATED_" + reward.getId());
+        // Best-effort, same as the email below — notifyRoles/notifyUser already run in their
+        // own REQUIRES_NEW transaction so a duplicate-eventKey retry can't abort this method's
+        // caller transaction, but this try/catch is a second line of defense against anything
+        // notification-related ever reaching generateRewardsForReferral()'s transaction.
+        try {
+            notificationService.notifyRoles(List.of("ADMIN", "MANAGER"), title, message,
+                    "SUCCESS", priority, "REFERRALS", reward.getId(), "/reward-queue",
+                    "REWARD_GENERATED_" + reward.getId());
+        } catch (Exception ex) {
+            log.warn("Reward-generated role notification failed for reward {}: {}", reward.getId(), ex.getMessage());
+        }
 
         memberRepository.findByMemberId(reward.getMemberId()).ifPresent(member -> {
             if (member.getUserId() != null) {
-                notificationService.notifyUser(member.getUserId(), title, message,
-                        "SUCCESS", priority, "REFERRALS", reward.getId(), "/my-rewards",
-                        "REWARD_GENERATED_USER_" + reward.getId());
+                try {
+                    notificationService.notifyUser(member.getUserId(), title, message,
+                            "SUCCESS", priority, "REFERRALS", reward.getId(), "/my-rewards",
+                            "REWARD_GENERATED_USER_" + reward.getId());
+                } catch (Exception ex) {
+                    log.warn("Reward-generated user notification failed for member {}: {}", member.getMemberId(), ex.getMessage());
+                }
             }
 
             // ReferralSettings.emailNotifications gates this extra email on top of the
             // in-app notification above, which always fires regardless of the setting.
             boolean emailEnabled = settings == null || !Boolean.FALSE.equals(settings.getEmailNotifications());
             if (emailEnabled && member.getEmail() != null && !member.getEmail().isBlank()) {
-                emailService.sendEmail(member.getEmail(), title,
-                        "<p>" + message + "</p><p>View it in the app under <strong>My Rewards</strong>.</p>");
+                // Best-effort — an unconfigured/unreachable mail server must not roll back
+                // the referral-success + reward-generation transaction it's nested in.
+                try {
+                    emailService.sendEmail(member.getEmail(), title,
+                            "<p>" + message + "</p><p>View it in the app under <strong>My Rewards</strong>.</p>");
+                } catch (Exception ex) {
+                    log.warn("Reward-generated email notification failed for member {}: {}", member.getMemberId(), ex.getMessage());
+                }
             }
         });
     }
