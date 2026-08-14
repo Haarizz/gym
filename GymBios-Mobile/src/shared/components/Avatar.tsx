@@ -10,51 +10,73 @@ import { BrandColors } from '../../core/theme';
  * - Fully configurable size/colors with sensible defaults so it
  *   can be dropped in anywhere in the app without extra styling.
  */
+import type { ViewStyle, StyleProp } from 'react-native';
+
 interface AvatarProps {
   initials?: string;
+  name?: string;
   imageUrl?: string;
-  size?: number;
+  size?: number | 'sm' | 'md' | 'lg';
   backgroundColor?: string;
   textColor?: string;
+  style?: StyleProp<ViewStyle>;
 }
 
 const DEFAULT_SIZE = 40;
 const DEFAULT_INITIALS = '?';
 
+const getNumericSize = (size?: number | 'sm' | 'md' | 'lg'): number => {
+  if (typeof size === 'number') return size;
+  if (size === 'sm') return 32;
+  if (size === 'md') return 40;
+  if (size === 'lg') return 48;
+  return DEFAULT_SIZE;
+};
+
 export const Avatar: React.FC<AvatarProps> = ({
   initials,
+  name,
   imageUrl,
   size = DEFAULT_SIZE,
   backgroundColor = BrandColors.teal,
   textColor = BrandColors.white,
+  style,
 }) => {
-  const dimensionStyle: ImageStyle = {
-    width: size,
-    height: size,
-    borderRadius: size / 2,
+  const numericSize = getNumericSize(size);
+  const dimensionStyle = {
+    width: numericSize,
+    height: numericSize,
+    borderRadius: numericSize / 2,
   };
+
+  const computedInitials =
+    initials ||
+    (name
+      ? name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+      : DEFAULT_INITIALS);
 
   if (imageUrl) {
     return (
       <Image
         source={{ uri: imageUrl }}
-        style={[styles.image, dimensionStyle]}
+        style={[styles.image, dimensionStyle, style as ImageStyle]}
         accessibilityRole="image"
-        accessibilityLabel={initials ? `${initials} avatar` : 'User avatar'}
+        accessibilityLabel={computedInitials ? `${computedInitials} avatar` : 'User avatar'}
       />
     );
   }
 
-  // Scale font relative to avatar size so initials stay proportional
-  // at any requested size.
-  const fontSize = Math.round(size * 0.4);
-  const displayInitials = (initials?.trim() || DEFAULT_INITIALS)
+  const fontSize = Math.round(numericSize * 0.4);
+  const displayInitials = (computedInitials?.trim() || DEFAULT_INITIALS)
     .slice(0, 2)
     .toUpperCase();
 
   return (
     <View
-      style={[styles.container, dimensionStyle, { backgroundColor }]}
+      style={[styles.container, dimensionStyle, { backgroundColor }, style]}
       accessibilityRole="text"
       accessibilityLabel={`${displayInitials} avatar`}
     >

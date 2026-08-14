@@ -13,8 +13,9 @@ import { Radius, Spacing } from '@/core/theme';
 import { Typography } from './Typography';
 
 export interface ButtonProps extends Omit<PressableProps, 'style'> {
-  label: string;
-  variant?: 'primary' | 'secondary' | 'ghost';
+  label?: string;
+  title?: string;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline';
   size?: 'md' | 'lg';
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -22,6 +23,7 @@ export interface ButtonProps extends Omit<PressableProps, 'style'> {
 
 export function Button({
   label,
+  title,
   variant = 'primary',
   size = 'md',
   loading = false,
@@ -31,6 +33,7 @@ export function Button({
 }: ButtonProps) {
   const theme = useTheme();
   const isDisabled = disabled || loading;
+  const buttonText = title ?? label ?? '';
 
   const backgroundColor =
     variant === 'primary'
@@ -40,6 +43,8 @@ export function Button({
         : 'transparent';
 
   const textColor = variant === 'primary' ? theme.primaryText : theme.text;
+  const borderWidth = variant === 'outline' ? 1 : 0;
+  const borderColor = variant === 'outline' ? theme.border : 'transparent';
 
   return (
     <Pressable
@@ -48,7 +53,7 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         size === 'lg' ? styles.lg : styles.md,
-        { backgroundColor, opacity: isDisabled ? 0.6 : pressed ? 0.85 : 1 },
+        { backgroundColor, borderWidth, borderColor, opacity: isDisabled ? 0.6 : pressed ? 0.85 : 1 },
         style,
       ]}
       {...rest}>
@@ -58,7 +63,7 @@ export function Button({
         <Typography
           variant="bodySmallBold"
           style={[{ color: textColor }, size === 'lg' && styles.lgText]}>
-          {label}
+          {buttonText}
         </Typography>
       )}
     </Pressable>

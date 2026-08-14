@@ -31,3 +31,11 @@ export type {
   PromotionWizardStep,
   UsePromotionWizardOptions,
 } from './presentation/hooks/usePromotionWizard';
+
+// Presentation screens & components
+export { PromotionsScreen } from './presentation/screens/PromotionsScreen';
+export { PromotionFormScreen } from './presentation/screens/PromotionFormScreen';
+export { PromotionCard } from './presentation/components/PromotionCard';
+export { PromotionDetailsSheet } from './presentation/components/PromotionDetailsSheet';
+export { PromotionForm } from './presentation/components/PromotionForm';
+

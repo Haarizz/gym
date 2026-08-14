@@ -56,7 +56,32 @@ export const topLevelModules: ModuleItem[] = [
     id: 'member-connect',
     title: 'Member Connect',
     icon: 'user-plus',
-    route: '/member-connect',
+    children: [
+      {
+        id: 'leads',
+        title: 'Leads',
+        icon: 'target',
+        route: '/leads',
+      },
+      {
+        id: 'follow-ups',
+        title: 'Follow-ups',
+        icon: 'phone-call',
+        route: '/follow-ups',
+      },
+      {
+        id: 'promotions',
+        title: 'Promotions & Campaigns',
+        icon: 'tag',
+        route: '/(admin)/promotions',
+      },
+      {
+        id: 'referrals',
+        title: 'Referrals',
+        icon: 'share-2',
+        route: '/(admin)/referrals',
+      },
+    ],
   },
   {
     id: 'sales-purchases',

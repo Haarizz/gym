@@ -13,8 +13,17 @@ import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors } from '@/core/theme';
 import { AppBottomSheet, ModuleSheet } from '@/shared/components';
+import {
+  isCommunityRoute,
+  isFullScreenRoute,
+  isRoleHeaderHiddenRoute,
+  MODULE_ROUTES,
+} from './layoutRoutes';
+import { TabIcon } from './tabConfigs';
 
-type TabIcon = keyof typeof Feather.glyphMap;
+export type { TabIcon };
+export * from './layoutRoutes';
+export * from './tabConfigs';
 
 interface RoleTabsLayoutProps {
   title: string;
@@ -53,64 +62,9 @@ export function RoleTabsLayout({
   const segments = useSegments();
   const [isModulesOpen, setIsModulesOpen] = useState(false);
 
-  const FULL_SCREEN_ROUTES = [
-    ['staff', 'create'],
-    ['staff', 'edit'],
-    ['membership-plans', 'create'],
-    ['membership-plans', 'edit'],
-    ['members', 'create'],
-    ['members', 'edit'],
-    ['billing', 'create-receipt'],
-    ['create-community-post']
-  ] as const;
-
-  // Module routes that should be accessible via navigation but hidden from the bottom tab bar.
-  const MODULE_ROUTES = ['membership-plans', 'members', 'billing', 'attendance', 'check-in', 'training-streams', 'facilities', 'community', 'create-community-post'] as const;
-
-  const isFullScreen = FULL_SCREEN_ROUTES.some(
-    ([feature, action]) =>
-      segments[1] === feature &&
-      segments[2] === action,
-  );
-
-  const HIDE_ROLE_HEADER_ROUTES = [
-    ['billing', 'receipts'],
-    ['billing', 'dues'],
-    ['billing', 'statements'],
-    ['billing', 'members'],
-    ['billing', 'reports'],
-    ['billing', 'create-receipt'],
-
-    ['members', '[id]'],
-    ['staff', '[id]'],
-
-    ['attendance', 'staff'],
-    ['attendance', 'reports'],
-    ['attendance', 'trends'],
-    ['attendance', 'today'],
-    ['attendance', 'members'],
-
-    ['check-in', 'members-staff'],
-    ['check-in', 'walk-in'],
-
-    ['training-streams','create'],
-    ['training-streams','upload'],
-
-    ['facilities','create'],
-    ['facilities','[id]'],
-
-    ['analytics', 'community'],
-    ['analytics', 'community-advanced'],
-  ] as const;
-
-  // Community is a top-level route so segments[2] is undefined — handle separately.
-  const isCommunityScreen = segments[1] === 'community';
-
-  const showRoleHeader = !isCommunityScreen && !HIDE_ROLE_HEADER_ROUTES.some(
-    ([feature, page]) =>
-      segments[1] === feature &&
-      segments[2] === page,
-  );
+  const isFullScreen = isFullScreenRoute(segments);
+  const isCommunityScreen = isCommunityRoute(segments);
+  const showRoleHeader = !isCommunityScreen && !isRoleHeaderHiddenRoute(segments);
 
   const resolvedColors = (headerColors && headerColors.length > 0
     ? (headerColors.length === 1 ? [headerColors[0], headerColors[0]] : headerColors)
@@ -200,7 +154,7 @@ export function RoleTabsLayout({
           ))}
 
           {/* Module routes: accessible via navigation but hidden from the bottom tab bar */}
-          {MODULE_ROUTES.map((name) => (
+          {MODULE_ROUTES.filter(name => !tabs.some(t => t.name === name)).map((name) => (
             <Tabs.Screen
               key={name}
               name={name}
@@ -380,62 +334,3 @@ const styles = StyleSheet.create({
     color: BrandColors.textSecondary,
   },
 });
-
-export const ADMIN_TABS = [
-  { name: 'index', title: 'Dashboard', icon: 'grid' as const },
-  { name: 'staff', title: 'Staff', icon: 'users' as const },
-  { name: 'deals', title: 'Deals', icon: 'tag' as const },
-  { name: 'analytics', title: 'Analytics', icon: 'bar-chart-2' as const },
-];
-
-export const MEMBER_TABS = [
-  { name: 'index', title: 'Home', icon: 'home' as const },
-  { name: 'bookings', title: 'Bookings', icon: 'calendar' as const },
-  { name: 'centers', title: 'Centers', icon: 'map-pin' as const },
-  { name: 'membership', title: 'Membership', icon: 'credit-card' as const },
-  { name: 'profile', title: 'Profile', icon: 'user' as const },
-];
-
-export const TRAINER_TABS = [
-  { name: 'index', title: 'Home', icon: 'home' as const },
-  { name: 'schedule', title: 'Schedule', icon: 'calendar' as const },
-  { name: 'performance', title: 'Performance', icon: 'trending-up' as const },
-  { name: 'ledger', title: 'Ledger', icon: 'book-open' as const },
-  { name: 'profile', title: 'Profile', icon: 'user' as const },
-];
-
-export const STAFF_TABS = [
-  { name: 'index', title: 'Home', icon: 'home' as const },
-  { name: 'performance', title: 'Performance', icon: 'trending-up' as const },
-  { name: 'schedule', title: 'Schedule', icon: 'calendar' as const },
-  { name: 'ledger', title: 'Ledger', icon: 'book-open' as const },
-  { name: 'profile', title: 'Profile', icon: 'user' as const },
-];
-
-export const ADMIN_HEADER = {
-  title: 'Admin',
-  subtitle: 'Command Center',
-  headerColors: [BrandColors.teal, BrandColors.teal] as string[],
-  activeColor: BrandColors.teal,
-};
-
-export const MEMBER_HEADER = {
-  title: 'Member Portal',
-  subtitle: 'Your Fitness Journey',
-  headerColors: [BrandColors.memberGold, BrandColors.trainerAmber] as string[],
-  activeColor: BrandColors.memberGold,
-};
-
-export const TRAINER_HEADER = {
-  title: 'Trainer Portal',
-  subtitle: 'Coach Portal',
-  headerColors: [BrandColors.trainerAmber, '#ea580c'] as string[],
-  activeColor: BrandColors.trainerAmber,
-};
-
-export const STAFF_HEADER = {
-  title: 'Staff Portal',
-  subtitle: 'Front Desk',
-  headerColors: [BrandColors.teal, BrandColors.tealDark] as string[],
-  activeColor: BrandColors.teal,
-};
