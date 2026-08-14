@@ -10,9 +10,11 @@ public class ReferralRequestDTO {
     private String refereeName;
     private String refereeEmail;
     private String refereePhone;
+    private String refereePhoto;
     private String status;
     private BigDecimal rewardAmount;
     private LocalDate date;
+    private LocalDate visitDate;
     private LocalDate signupDate;
     private LocalDate paymentDate;
     private String notes;
@@ -36,6 +38,9 @@ public class ReferralRequestDTO {
     public String getRefereePhone() { return refereePhone; }
     public void setRefereePhone(String refereePhone) { this.refereePhone = refereePhone; }
 
+    public String getRefereePhoto() { return refereePhoto; }
+    public void setRefereePhoto(String refereePhoto) { this.refereePhoto = refereePhoto; }
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
@@ -44,6 +49,9 @@ public class ReferralRequestDTO {
 
     public LocalDate getDate() { return date; }
     public void setDate(LocalDate date) { this.date = date; }
+
+    public LocalDate getVisitDate() { return visitDate; }
+    public void setVisitDate(LocalDate visitDate) { this.visitDate = visitDate; }
 
     public LocalDate getSignupDate() { return signupDate; }
     public void setSignupDate(LocalDate signupDate) { this.signupDate = signupDate; }

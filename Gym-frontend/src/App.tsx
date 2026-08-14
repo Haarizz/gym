@@ -111,7 +111,6 @@ import { EmergencyProfile } from "./pages/emergency-profile";
 import { Recruitment } from "./pages/recruitment";
 import { PayrollReports } from "./pages/payroll-reports";
 import { PayrollAnalytics } from "./pages/payroll-analytics";
-import { AdministrationStaff } from "./pages/administration-staff";
 import { RolesPermissions } from "./pages/roles-permissions";
 import { usePermissions, hasPermission } from "./utils/permissions";
 
@@ -169,7 +168,6 @@ import {
   Briefcase,
   Clock,
   CalendarClock,
-  Shield,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
@@ -505,6 +503,13 @@ const menuItems = [
         permission: "STAFF_VIEW",
       },
       {
+        title: "Roles & Permissions",
+        icon: ShieldCheck,
+        id: "roles-permissions",
+        path: "/administration/roles-permissions",
+        permission: "ADMINISTRATION_VIEW",
+      },
+      {
         title: "Trainings & Classes",
         icon: GraduationCap,
         id: "trainings-classes",
@@ -616,29 +621,6 @@ const menuItems = [
     id: "plans-services-catalog",
     path: "/plans-services-catalog",
     permission: "MEMBERSHIP_PLANS_VIEW",
-  },
-  {
-    title: "Administration",
-    icon: Shield,
-    id: "administration",
-    path: "/administration/staff",
-    permission: "ADMINISTRATION_VIEW",
-    subItems: [
-      {
-        title: "Staff",
-        icon: Users,
-        id: "administration-staff",
-        path: "/administration/staff",
-        permission: "STAFF_VIEW",
-      },
-      {
-        title: "Roles & Permissions",
-        icon: ShieldCheck,
-        id: "roles-permissions",
-        path: "/administration/roles-permissions",
-        permission: "ADMINISTRATION_VIEW",
-      },
-    ],
   },
 ];
 
@@ -911,6 +893,7 @@ export default function App() {
       // Auto-expand Payroll & Employees for its sub-items
       const payrollEmployeesSubItems = [
         "staffs-trainers",
+        "roles-permissions",
         "trainings-classes",
         "bookings",
         "payroll",
@@ -1082,7 +1065,7 @@ export default function App() {
         </div>
       } />
 
-      <Route path="/administration/staff" element={<AdministrationStaff />} />
+      <Route path="/administration/staff" element={<Navigate to="/staffs-trainers" replace />} />
       <Route path="/administration/roles-permissions" element={<RolesPermissions />} />
 
       <Route path="/assets" element={<Assets />} />

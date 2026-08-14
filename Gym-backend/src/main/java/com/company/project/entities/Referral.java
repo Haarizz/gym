@@ -33,6 +33,12 @@ public class Referral extends BaseEntity {
     @Column(name = "referee_phone")
     private String refereePhone;
 
+    // Base64 data-URL photo of the referred person, captured/uploaded on the Add
+    // Referral form — used by front-desk staff for gym access verification.
+    // Stored the same way as Member.photoUrl (no separate file storage in this app).
+    @Column(name = "referee_photo", columnDefinition = "TEXT")
+    private String refereePhoto;
+
     // Unique referral code used by the referee to sign up
     @Column(name = "referral_code", unique = true)
     private String referralCode;
@@ -46,6 +52,10 @@ public class Referral extends BaseEntity {
 
     @Column(name = "date")
     private LocalDate date;
+
+    // When the referred person is expected to visit the gym (set at referral creation).
+    @Column(name = "visit_date")
+    private LocalDate visitDate;
 
     @Column(name = "signup_date")
     private LocalDate signupDate;
@@ -110,6 +120,9 @@ public class Referral extends BaseEntity {
     public String getRefereePhone() { return refereePhone; }
     public void setRefereePhone(String refereePhone) { this.refereePhone = refereePhone; }
 
+    public String getRefereePhoto() { return refereePhoto; }
+    public void setRefereePhoto(String refereePhoto) { this.refereePhoto = refereePhoto; }
+
     public String getReferralCode() { return referralCode; }
     public void setReferralCode(String referralCode) { this.referralCode = referralCode; }
 
@@ -121,6 +134,9 @@ public class Referral extends BaseEntity {
 
     public LocalDate getDate() { return date; }
     public void setDate(LocalDate date) { this.date = date; }
+
+    public LocalDate getVisitDate() { return visitDate; }
+    public void setVisitDate(LocalDate visitDate) { this.visitDate = visitDate; }
 
     public LocalDate getSignupDate() { return signupDate; }
     public void setSignupDate(LocalDate signupDate) { this.signupDate = signupDate; }

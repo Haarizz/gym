@@ -66,23 +66,26 @@ export const notificationService = {
   },
 
   async markAsRead(id: number): Promise<void> {
-    await authService.makeAuthenticatedRequest(
+    const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/notifications/${id}/read`,
       { method: "PUT" }
     );
+    if (!res.ok) throw new Error("Failed to mark notification as read");
   },
 
   async markAllRead(): Promise<void> {
-    await authService.makeAuthenticatedRequest(
+    const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/notifications/read-all`,
       { method: "PUT" }
     );
+    if (!res.ok) throw new Error("Failed to mark all notifications as read");
   },
 
   async deleteNotification(id: number): Promise<void> {
-    await authService.makeAuthenticatedRequest(
+    const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/notifications/${id}`,
       { method: "DELETE" }
     );
+    if (!res.ok) throw new Error("Failed to delete notification");
   },
 };

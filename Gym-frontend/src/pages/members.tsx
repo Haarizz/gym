@@ -134,6 +134,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const { currencyCode } = useCurrency();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  // Only gates the full-page skeleton on first mount. Search/filter/pagination
+  // re-fetches reuse `loading` for a small inline indicator instead, so the
+  // search input never unmounts (and loses focus) while the user is typing.
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
@@ -329,13 +333,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       }
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
   useEffect(() => {
     const timer = setTimeout(() => {
       loadMembers();
-    }, 100);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm, selectedStatus, currentPage]);
 
@@ -990,7 +995,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     return { text: 'Active', class: 'bg-green-100 text-green-800' };
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
@@ -1197,7 +1202,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               <div className="flex flex-col sm:flex-row gap-4 mb-6">
                 <div className="flex-1">
                   <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    {loading && !initialLoading ? (
+                      <Loader2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground animate-spin" />
+                    ) : (
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    )}
                     <Input
                       placeholder="Search members..."
                       className="pl-10"

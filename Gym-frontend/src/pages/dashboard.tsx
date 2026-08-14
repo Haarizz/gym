@@ -11,6 +11,7 @@ import { Separator } from "../components/ui/separator";
 import { Skeleton } from "../components/ui/skeleton";
 import { cn } from "../components/ui/utils";
 import { toast } from "sonner";
+import { NotificationPanel } from "../components/shared/NotificationPanel";
 import { 
   dashboardService, 
   type KPIData, 
@@ -160,6 +161,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [classAttendanceData, setClassAttendanceData] = useState<ClassAttendance[]>([]);
   const [recentMembers, setRecentMembers] = useState<Member[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [salesPipeline, setSalesPipeline] = useState<SalesPipelineData[]>([]);
   const [pendingTasks, setPendingTasks] = useState<PendingTaskData[]>([]);
@@ -1166,7 +1168,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Recent Members</span>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={() => onNavigate?.('members')}>
                 <Eye className="h-4 w-4 mr-2" />
                 View All
               </Button>
@@ -1325,7 +1327,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             
             <Separator className="my-4" />
             
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full" onClick={() => setIsNotificationPanelOpen(true)}>
               <Bell className="h-4 w-4 mr-2" />
               View All Notifications
             </Button>
@@ -1410,6 +1412,12 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           )}
         </CardContent>
       </Card>
+
+      <NotificationPanel
+        open={isNotificationPanelOpen}
+        onClose={() => setIsNotificationPanelOpen(false)}
+        onCountChange={() => {}}
+      />
     </div>
   );
 }

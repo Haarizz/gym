@@ -4,7 +4,7 @@ import { plansService, Plan as MembershipPlanData } from '../utils/supabase/plan
 import { membersService } from '../utils/supabase/members-service';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
 import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
-import { referralService } from '../utils/supabase/referral-service';
+import { referralService, ReferralResponse } from '../utils/supabase/referral-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -247,6 +247,36 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const [isValidatingReferralCode, setIsValidatingReferralCode] = useState(false);
   const [referralCodeApplied, setReferralCodeApplied] = useState(false);
   const [appliedReferralId, setAppliedReferralId] = useState<number | null>(null);
+  // Snapshot of the applied referral's referee photo/name — lets front-desk staff
+  // visually confirm the walk-in matches the photo captured when the referral was logged.
+  const [appliedReferralInfo, setAppliedReferralInfo] = useState<{ refereeName: string; referrerName: string; refereePhoto?: string } | null>(null);
+
+  // Find a pending referral by the new member's name/phone instead of requiring
+  // them to know a code — covers the common case where a staff member logged
+  // "referred by X" at referral-creation time but never handed out a code.
+  const [refereeSearchQuery, setRefereeSearchQuery] = useState('');
+  const [refereeSearchResults, setRefereeSearchResults] = useState<ReferralResponse[]>([]);
+  const [isSearchingReferee, setIsSearchingReferee] = useState(false);
+
+  useEffect(() => {
+    const query = refereeSearchQuery.trim();
+    if (query.length < 2 || referralCodeApplied) {
+      setRefereeSearchResults([]);
+      return;
+    }
+    setIsSearchingReferee(true);
+    const timer = setTimeout(async () => {
+      try {
+        const { referrals } = await referralService.getReferrals({ status: 'pending', search: query, size: 5 });
+        setRefereeSearchResults(referrals);
+      } catch {
+        setRefereeSearchResults([]);
+      } finally {
+        setIsSearchingReferee(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [refereeSearchQuery, referralCodeApplied]);
 
   // Track which promotion ID was used for redemption tracking
   const [appliedPromotionId, setAppliedPromotionId] = useState<number | null>(null);
@@ -880,9 +910,29 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     }
   };
 
+  const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const ACCEPTED_PHOTO_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+
+  const isAcceptedPhotoFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    const hasAcceptedExtension = ACCEPTED_PHOTO_EXTENSIONS.some((ext) => name.endsWith(ext));
+    // Some browsers/OSes report an empty file.type for certain uploads, so a file
+    // is only trusted when its MIME type is missing/unreliable AND the extension
+    // still checks out — never on extension alone, since MIME wins when present.
+    if (file.type) return ACCEPTED_PHOTO_TYPES.includes(file.type.toLowerCase());
+    return hasAcceptedExtension;
+  };
+
   const handlePhotoUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      if (!isAcceptedPhotoFile(file)) {
+        toast.error('Unsupported file type', {
+          description: 'Please upload a JPG, JPEG, or PNG image. Other file types (like PDF) are not allowed for the member photo.',
+        });
+        event.target.value = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
@@ -1134,15 +1184,17 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     }
   };
 
-  // Handle referral code apply
-  const handleApplyReferralCode = async () => {
-    if (!referralCodeInput.trim()) {
+  // Shared by both the "enter a code" and "search by name/phone" paths — both
+  // end up resolving a referral code and running it through the same
+  // validation/discount logic so they can't drift out of sync.
+  const applyReferralByCode = async (code: string) => {
+    if (!code.trim()) {
       toast.error('Please enter a referral code');
       return;
     }
     setIsValidatingReferralCode(true);
     try {
-      const result = await referralService.validateCode(referralCodeInput.trim());
+      const result = await referralService.validateCode(code.trim());
       const { referral, applicableRewardRules } = result;
       
       // Find the best applicable reward rule for the referee
@@ -1154,6 +1206,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       if (!discountRule) {
         toast.success(`Referral from ${referral.referrerName} applied! (No discount for new members)`);
         setAppliedReferralId(referral.id);
+        setAppliedReferralInfo({ refereeName: referral.refereeName, referrerName: referral.referrerName, refereePhoto: referral.refereePhoto });
         setReferralCodeApplied(true);
         setPromoCodeApplied(false);
         setPromoCodeInput('');
@@ -1183,6 +1236,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       });
       setSelectedDiscount(referralDiscount.id);
       setAppliedReferralId(referral.id);
+      setAppliedReferralInfo({ refereeName: referral.refereeName, referrerName: referral.referrerName, refereePhoto: referral.refereePhoto });
       setReferralCodeApplied(true);
       // Clear any promo code discount
       setPromoCodeApplied(false);
@@ -1203,6 +1257,15 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     } finally {
       setIsValidatingReferralCode(false);
     }
+  };
+
+  const handleApplyReferralCode = () => applyReferralByCode(referralCodeInput);
+
+  const handleSelectPendingReferral = (referral: ReferralResponse) => {
+    setReferralCodeInput(referral.referralCode);
+    setRefereeSearchQuery('');
+    setRefereeSearchResults([]);
+    applyReferralByCode(referral.referralCode);
   };
 
   // Handle payment method selection
@@ -1897,6 +1960,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     setIsValidatingReferralCode(false);
     setAppliedPromotionId(null);
     setAppliedReferralId(null);
+    setRefereeSearchQuery('');
+    setRefereeSearchResults([]);
   };
 
   return (
@@ -3623,6 +3688,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         setSelectedDiscount('');
                         setDiscountAmount(0);
                         setAppliedReferralId(null);
+                        setAppliedReferralInfo(null);
                         // Remove referral-* items from the discount list
                         setDiscountList(prev => prev.filter(d => !d.id.startsWith('referral-')));
                       }}
@@ -3648,7 +3714,80 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   )}
                 </div>
               </div>
-              
+
+              {/* Visual confirmation of who this referral was logged for — lets
+                  front-desk staff match the walk-in's face against the photo the
+                  referring staff captured at referral-creation time. */}
+              {referralCodeApplied && appliedReferralInfo && (
+                <div className="mt-3 flex items-center gap-3 bg-purple-50 border border-purple-200 rounded-lg p-3">
+                  {appliedReferralInfo.refereePhoto ? (
+                    <img src={appliedReferralInfo.refereePhoto} alt={appliedReferralInfo.refereeName} className="w-12 h-12 rounded-lg object-cover border border-purple-200 shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                      <FaUser className="text-purple-400" size={18} />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-purple-900 truncate">{appliedReferralInfo.refereeName}</p>
+                    <p className="text-xs text-purple-700">Referred by {appliedReferralInfo.referrerName}</p>
+                    {!appliedReferralInfo.refereePhoto && (
+                      <p className="text-xs text-purple-500">No photo was captured for this referral.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Find a pending referral by the new member's name/phone — for when
+                  staff logged "referred by X" at referral-creation time but never
+                  handed the person a code to type in above. */}
+              {!referralCodeApplied && (
+                <div className="mt-3">
+                  <Label className="text-sm text-gray-600 mb-1.5 block font-medium">
+                    Or find by referred person's name/phone
+                  </Label>
+                  <Input
+                    value={refereeSearchQuery}
+                    onChange={(e) => setRefereeSearchQuery(e.target.value)}
+                    placeholder="Search pending referrals..."
+                    className="border-primary/20"
+                  />
+                  {isSearchingReferee && (
+                    <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
+                      <FaArrowsRotate className="h-3 w-3 animate-spin" /> Searching...
+                    </p>
+                  )}
+                  {!isSearchingReferee && refereeSearchQuery.trim().length >= 2 && refereeSearchResults.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1.5">No pending referrals match.</p>
+                  )}
+                  {refereeSearchResults.length > 0 && (
+                    <div className="mt-1.5 border border-primary/20 rounded-lg divide-y divide-primary/10 overflow-hidden">
+                      {refereeSearchResults.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => handleSelectPendingReferral(r)}
+                          className="w-full text-left px-3 py-2 hover:bg-purple-50 transition-colors flex items-center gap-2.5"
+                        >
+                          {r.refereePhoto ? (
+                            <img src={r.refereePhoto} alt={r.refereeName} className="w-9 h-9 rounded-md object-cover border border-gray-200 shrink-0" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-md bg-gray-100 flex items-center justify-center shrink-0">
+                              <FaUser className="text-gray-300" size={14} />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{r.refereeName}</p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {r.refereePhone || r.refereeEmail || 'No contact info'} · Referred by {r.referrerName}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {selectedDiscount && discountAmount > 0 && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                   <div className="flex items-center justify-between text-sm">
