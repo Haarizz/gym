@@ -81,6 +81,24 @@ export const topLevelModules: ModuleItem[] = [
         icon: 'share-2',
         route: '/(admin)/referrals',
       },
+      {
+        id: 'messaging',
+        title: 'Messaging',
+        icon: 'message-circle',
+        route: '/(admin)/messaging',
+      },
+      {
+        id: 'automations',
+        title: 'Automations',
+        icon: 'zap',
+        route: '/(admin)/automations',
+      },
+      {
+        id: 'workout-feedback',
+        title: 'Workout Feedback',
+        icon: 'star',
+        route: '/(admin)/workout-feedback',
+      },
     ],
   },
   {

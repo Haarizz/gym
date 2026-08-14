@@ -32,6 +32,8 @@ export const FULL_SCREEN_ROUTES: readonly RoutePattern[] = [
   // Promotions
   ['promotions', 'create'],
   ['promotions', 'edit'],
+  ['messaging', 'compose-message'],
+  ['messaging', 'compose']
 ] as const;
 
 /**
@@ -50,6 +52,9 @@ export const MODULE_ROUTES = [
   'referrals',
   'leads',
   'follow-ups',
+  'messaging',
+  'automations',
+  'workout-feedback',
 ] as const;
 
 /**
@@ -98,7 +103,22 @@ export const HIDE_ROLE_HEADER_ROUTES: readonly (readonly [string, string])[] = [
   ['referrals','reward-rules'],
   ['referrals','reward-queue'],
   ['referrals','analytics'],
-  ['referrals','settings']
+  ['referrals','settings'],
+
+  ['messaging','history'],
+  ['messaging','compose'],
+  ['messaging','compose-message'],
+  ['messaging','templates'],
+  ['messaging','analytics'],
+  
+  ['automations','[id]'],
+  ['automations','create'],
+
+  ['workout-feedback','check-in'],
+  ['workout-feedback','recent'],
+  ['workout-feedback','active-sessions'],
+  ['workout-feedback','analytics'],
+  ['workout-feedback','stats'],
 ] as const;
 
 /**
