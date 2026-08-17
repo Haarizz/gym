@@ -36,7 +36,7 @@ export interface CreateStaffRequest {
   appPassword?: string;
 }
 
-export interface UpdateStaffRequest extends CreateStaffRequest {}
+export interface UpdateStaffRequest extends CreateStaffRequest { }
 
 export interface StaffRepository {
   getStaff(filters?: StaffFilters): Promise<StaffPage>;

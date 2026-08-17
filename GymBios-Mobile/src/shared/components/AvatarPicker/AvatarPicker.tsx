@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -6,6 +6,7 @@ import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
 import { Avatar } from '@/shared/components/Avatar';
 import { Typography } from '@/shared/components/Typography';
+import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 
 export interface AvatarPickerProps {
   photoUri?: string;
@@ -21,6 +22,7 @@ export function AvatarPicker({
   onChangePhoto,
 }: AvatarPickerProps) {
   const theme = useTheme();
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   const currentImage = photoUri || photoUrl;
 
@@ -91,27 +93,8 @@ export function AvatarPicker({
   }, [onChangePhoto]);
 
   const handlePress = useCallback(() => {
-    const options: {
-      text: string;
-      style?: 'default' | 'cancel' | 'destructive';
-      onPress?: () => void;
-    }[] = [
-      { text: 'Take Photo', onPress: handleTakePhoto },
-      { text: 'Choose from Gallery', onPress: handleChooseGallery },
-    ];
-
-    if (currentImage) {
-      options.push({
-        text: 'Remove Photo',
-        style: 'destructive',
-        onPress: handleRemovePhoto,
-      });
-    }
-
-    options.push({ text: 'Cancel', style: 'cancel' });
-
-    Alert.alert('Profile Photo', 'Choose an option', options);
-  }, [currentImage, handleTakePhoto, handleChooseGallery, handleRemovePhoto]);
+    setSheetVisible(true);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -136,6 +119,61 @@ export function AvatarPicker({
           {currentImage ? 'Tap to change photo' : 'Tap to add photo'}
         </Typography>
       </Pressable>
+
+      <AppBottomSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        title="Profile Photo"
+        subtitle="Choose an option"
+      >
+        <Pressable
+          style={({ pressed }) => [
+            styles.optionRow,
+            { borderBottomColor: theme.border },
+            pressed && { backgroundColor: theme.backgroundElement },
+          ]}
+          onPress={() => {
+            setSheetVisible(false);
+            handleTakePhoto();
+          }}
+        >
+          <Typography variant="body" style={{ color: theme.text }}>
+            Take Photo
+          </Typography>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.optionRow,
+            { borderBottomColor: theme.border },
+            pressed && { backgroundColor: theme.backgroundElement },
+          ]}
+          onPress={() => {
+            setSheetVisible(false);
+            handleChooseGallery();
+          }}
+        >
+          <Typography variant="body" style={{ color: theme.text }}>
+            Choose from Gallery
+          </Typography>
+        </Pressable>
+        {currentImage ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.optionRow,
+              { borderBottomColor: theme.border, borderBottomWidth: 0 },
+              pressed && { backgroundColor: theme.backgroundElement },
+            ]}
+            onPress={() => {
+              setSheetVisible(false);
+              handleRemovePhoto();
+            }}
+          >
+            <Typography variant="body" style={{ color: theme.error }}>
+              Remove Photo
+            </Typography>
+          </Pressable>
+        ) : null}
+      </AppBottomSheet>
     </View>
   );
 }
@@ -157,5 +195,10 @@ const styles = StyleSheet.create({
   hint: {
     textAlign: 'center',
     fontWeight: '600',
+  },
+  optionRow: {
+    paddingVertical: Spacing.four,
+    paddingHorizontal: Spacing.four,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
 });

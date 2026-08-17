@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Tabs, useRouter, useSegments } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   Platform,
   Pressable,
@@ -57,10 +56,11 @@ export function RoleTabsLayout({
   activeColor,
   tabs,
 }: RoleTabsLayoutProps) {
-  // router is kept for future use (e.g. avatar -> profile navigation)
   const router = useRouter();
   const segments = useSegments();
   const [isModulesOpen, setIsModulesOpen] = useState(false);
+
+  const roleGroup = segments[0] || '(admin)';
 
   const isFullScreen = isFullScreenRoute(segments);
   const isCommunityScreen = isCommunityRoute(segments);
@@ -78,31 +78,28 @@ export function RoleTabsLayout({
       style={[styles.safeArea, { backgroundColor: resolvedColors[0] }]}>
       <View style={styles.container}>
         {!isFullScreen && showRoleHeader && (
-          <LinearGradient
-            colors={resolvedColors}
-            style={styles.header}>
-            <View style={styles.headerTop}>
-              <Text style={styles.greeting}>{greeting}</Text>
-
+          <View style={[styles.header, { backgroundColor: resolvedColors[0] }]}>
+            <View style={styles.headerLeft}>
               <Pressable
                 hitSlop={12}
                 style={styles.avatarButton}
                 onPress={() => {
                   // Future: navigate to profile screen
                 }}>
-                <Feather
-                  name="user"
-                  size={20}
-                  color="#FFF"
-                />
+                <Text style={styles.avatarText}>A</Text>
               </Pressable>
+
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.greeting}>{greeting}</Text>
+                <Text style={styles.titleText}>{title} · All branches</Text>
+              </View>
             </View>
 
-            <View style={styles.headerBody}>
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.subtitle}>{subtitle}</Text>
-            </View>
-          </LinearGradient>
+            <Pressable hitSlop={12} style={styles.notificationButton}>
+              <Feather name="bell" size={20} color="#FFF" />
+              <View style={styles.notificationBadge} />
+            </Pressable>
+          </View>
         )}
 
         <Tabs
@@ -142,6 +139,7 @@ export function RoleTabsLayout({
               options={{
                 title: tab.title,
                 tabBarLabel: tab.title,
+                href: (tab.name === 'index' ? `/${roleGroup}` : `/${roleGroup}/${tab.name}`) as any,
                 tabBarIcon: ({ color, size }) => (
                   <Feather
                     name={tab.icon}
@@ -204,52 +202,64 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 28,
-
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
 
-  headerTop: {
+  headerLeft: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+  },
+
+  avatarButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginRight: 10,
+  },
+
+  avatarText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  headerTextContainer: {
+    justifyContent: 'center',
   },
 
   greeting: {
     fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.75)',
+    color: 'rgba(255,255,255,0.7)',
   },
 
-  avatarButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-
-  headerBody: {
-    marginTop: 18,
-  },
-
-  title: {
+  titleText: {
     color: '#FFF',
-    fontSize: 30,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
   },
 
-  subtitle: {
-    marginTop: 2,
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 14,
-    fontWeight: '500',
+  notificationButton: {
+    position: 'relative',
+    padding: 4,
+  },
+
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
   },
 
   tabBar: {

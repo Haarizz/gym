@@ -26,7 +26,7 @@ const ROLE_DISPLAY_NAMES: Record<AppRole, string> = {
 };
 
 export class AuthRemoteDataSource {
-  constructor(private readonly authApi: AuthApi) {}
+  constructor(private readonly authApi: AuthApi) { }
 
   async login(
     username: Username,
@@ -44,6 +44,9 @@ export class AuthRemoteDataSource {
       return { success: true, value: mapLoginResponseToSession(response.data, appRole.value) };
     } catch (error) {
       if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      if (error instanceof Error) {
         return { success: false, error: error.message };
       }
 

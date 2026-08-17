@@ -9,10 +9,15 @@ import type { LoginRequestApiModel, LoginResponseApiModel, StoredSessionApiModel
 const SPRING_ROLE_MAP: Record<string, AppRole> = {
   ROLE_ADMIN: 'admin',
   ADMIN: 'admin',
+  MANAGER: 'admin',
   ROLE_MEMBER: 'member',
   MEMBER: 'member',
+  USER: 'member',
   ROLE_STAFF: 'staff',
   STAFF: 'staff',
+  ACCOUNTANT: 'staff',
+  HR: 'staff',
+  RECEPTIONIST: 'staff',
   ROLE_TRAINER: 'trainer',
   TRAINER: 'trainer',
 };
@@ -41,6 +46,7 @@ export function mapSpringRoleToAppRole(roles: string[] | undefined, fallbackRole
     }
   }
 
+  // Custom role: fallback to the role they are trying to log into, but we will validate it heavily based on permissions later
   if (fallbackRole && isAppRole(fallbackRole)) {
     return fallbackRole;
   }
@@ -53,6 +59,26 @@ export function mapLoginResponseToSession(
   selectedRole?: AppRole,
 ): Session {
   const appRole = mapSpringRoleToAppRole(response.roles, selectedRole);
+
+  const isCustomRole = !response.roles?.some(r => SPRING_ROLE_MAP[r.toUpperCase()]);
+
+  // For mapped roles, ensure they don't cross boundaries
+  if (!isCustomRole && selectedRole && appRole !== selectedRole) {
+    throw new Error(`Access denied. Your role cannot access the ${selectedRole} section.`);
+  }
+
+  // For custom roles, enforce strict permission boundaries based on the section they want to access
+  if (isCustomRole && selectedRole) {
+    const perms = response.permissions || [];
+    
+    if (selectedRole === 'admin' && !perms.includes('ADMINISTRATION_VIEW') && !perms.includes('SETTINGS_VIEW')) {
+      throw new Error(`Access denied. Your custom role does not have admin privileges.`);
+    }
+    if ((selectedRole === 'staff' || selectedRole === 'trainer') && !response.staff_name) {
+      throw new Error(`Access denied. You are not registered as a staff member.`);
+    }
+  }
+
   const permissions = ROLE_PERMISSIONS[appRole];
   // 24-hour client session expiration window
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);

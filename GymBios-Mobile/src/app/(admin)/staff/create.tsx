@@ -7,7 +7,7 @@ export default function CreateStaffRoute() {
   const router = useRouter();
 
   const handleSuccess = useCallback(() => {
-    router.back();
+    router.replace('/(admin)/staff');
   }, [router]);
 
   return <StaffWizardScreen mode="create" onSuccess={handleSuccess} />;

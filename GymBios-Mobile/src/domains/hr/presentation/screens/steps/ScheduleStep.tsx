@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, ScrollView } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
@@ -7,10 +8,12 @@ import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { FormSection } from '@/shared/components/FormSection';
 import { Typography } from '@/shared/components/Typography';
+import { DatePicker } from '@/shared/components/DatePicker';
 import type { StaffCertification } from '@/domains/hr/domain/Staff';
 import type { StaffWizardData } from '../../hooks/useStaffWizard';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const SLOTS = ['Morning (6am–12pm)', 'Afternoon (12pm–5pm)', 'Evening (5pm–10pm)'];
 
 interface ScheduleStepProps {
   data: StaffWizardData;
@@ -32,14 +35,15 @@ export function ScheduleStep({
 }: ScheduleStepProps) {
   const theme = useTheme();
 
-  const addTimeRange = (day: string) => {
+  const toggleSlot = (day: string, slot: string) => {
     const current = data.schedule[day] ?? [];
-    updateField('schedule', { ...data.schedule, [day]: [...current, ''] });
-  };
-
-  const removeTimeRange = (day: string, index: number) => {
-    const current = data.schedule[day] ?? [];
-    const updated = current.filter((_, i) => i !== index);
+    const active = current.includes(slot);
+    let updated;
+    if (active) {
+      updated = current.filter((s) => s !== slot);
+    } else {
+      updated = [...current, slot];
+    }
     const newSchedule = { ...data.schedule };
     if (updated.length === 0) {
       delete newSchedule[day];
@@ -49,63 +53,107 @@ export function ScheduleStep({
     updateField('schedule', newSchedule);
   };
 
-  const updateTimeRange = (day: string, index: number, value: string) => {
-    const current = data.schedule[day] ?? [];
-    const updated = [...current];
-    updated[index] = value;
-    updateField('schedule', { ...data.schedule, [day]: updated });
+  const handlePickDocument = async (index: number) => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        onChangeCert(index, 'documentUrl', result.assets[0].uri);
+      }
+    } catch (err) {
+      console.log('Error picking document', err);
+    }
   };
 
   return (
     <View style={styles.container}>
       <FormSection title="Weekly Schedule">
-        {DAYS.map((day) => {
-          const timeRanges = data.schedule[day] ?? [];
-          return (
-            <View
-              key={day}
-              style={[styles.dayCard, { backgroundColor: theme.backgroundElement }]}
-            >
-              <Typography variant="bodySmallBold" style={styles.dayLabel}>
-                {day}
-              </Typography>
-              {timeRanges.map((range, index) => (
-                <View key={index} style={styles.timeRow}>
-                  <Input
-                    value={range}
-                    onChangeText={(value) => updateTimeRange(day, index, value)}
-                    placeholder="e.g. 09:00-12:00"
-                    style={styles.timeInput}
-                  />
-                  <Pressable
-                    hitSlop={8}
-                    onPress={() => removeTimeRange(day, index)}
-                    style={styles.removeTime}
-                  >
-                    <Feather name="x" size={16} color={theme.error} />
-                  </Pressable>
+        <Typography variant="bodySmall" style={{ color: theme.textSecondary, marginBottom: Spacing.two }}>
+          Select the working days and time slots for this employee
+        </Typography>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={[styles.gridContainer, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+            {/* Header */}
+            <View style={[styles.gridRow, { backgroundColor: theme.backgroundElement }]}>
+              <View style={[styles.gridCellDay, { borderBottomWidth: 1, borderRightWidth: 1, borderColor: theme.border }]}>
+                <Typography variant="bodySmallBold" style={{ color: theme.textSecondary }}>Day</Typography>
+              </View>
+              {SLOTS.map((slot) => (
+                <View key={slot} style={[styles.gridCellSlot, { borderBottomWidth: 1, borderRightWidth: 1, borderColor: theme.border }]}>
+                  <Typography variant="bodySmallBold" style={{ color: theme.textSecondary, textAlign: 'center' }}>
+                    {slot}
+                  </Typography>
                 </View>
               ))}
-              <Button
-                label="+ Add Time Range"
-                variant="ghost"
-                onPress={() => addTimeRange(day)}
-              />
             </View>
-          );
-        })}
+            
+            {/* Days */}
+            {DAYS.map((day, di) => {
+              const activeSlots = data.schedule[day] ?? [];
+              return (
+                <View key={day} style={[styles.gridRow, { backgroundColor: di % 2 === 0 ? theme.backgroundElement : theme.background }]}>
+                  <View style={[styles.gridCellDay, { borderRightWidth: 1, borderBottomWidth: di === DAYS.length - 1 ? 0 : 1, borderColor: theme.border }]}>
+                    <Typography variant="bodySmallBold">{day}</Typography>
+                  </View>
+                  {SLOTS.map((slot) => {
+                    const active = activeSlots.includes(slot);
+                    return (
+                      <View key={slot} style={[styles.gridCellSlot, { borderRightWidth: 1, borderBottomWidth: di === DAYS.length - 1 ? 0 : 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' }]}>
+                        <Pressable
+                          onPress={() => toggleSlot(day, slot)}
+                          style={[
+                            styles.checkbox,
+                            {
+                              borderColor: active ? theme.primary : theme.border,
+                              backgroundColor: active ? theme.primary : 'transparent',
+                            }
+                          ]}
+                        >
+                          {active && <Feather name="check" size={14} color="#fff" />}
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+        <View style={styles.legendContainer}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendBox, { backgroundColor: theme.primary }]} />
+            <Typography variant="caption" style={{ color: theme.textSecondary }}>Selected</Typography>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendBox, { borderColor: theme.border, borderWidth: 2 }]} />
+            <Typography variant="caption" style={{ color: theme.textSecondary }}>Not working</Typography>
+          </View>
+        </View>
       </FormSection>
 
       <FormSection title="Certifications">
+        {data.certifications.length === 0 && (
+          <Typography variant="bodySmall" style={{ color: theme.textSecondary, textAlign: 'center', paddingVertical: Spacing.four }}>
+            No certifications on file.
+          </Typography>
+        )}
         {data.certifications.map((cert, index) => (
           <View
             key={index}
-            style={[styles.certCard, { backgroundColor: theme.backgroundElement }]}
+            style={[styles.certCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border, borderWidth: 1 }]}
           >
             <View style={styles.certHeader}>
-              <Typography variant="bodySmallBold">
-                Certification {index + 1}
-              </Typography>
+              <View style={styles.certHeaderLeft}>
+                <View style={[styles.iconWrapper, { backgroundColor: theme.primary + '1a' }]}>
+                  <Feather name="award" size={16} color={theme.primary} />
+                </View>
+                <Typography variant="bodySmallBold">
+                  Certification {index + 1}
+                </Typography>
+              </View>
               <Pressable
                 hitSlop={8}
                 onPress={() => removeCertification(index)}
@@ -114,37 +162,54 @@ export function ScheduleStep({
                 <Feather name="x" size={16} color={theme.error} />
               </Pressable>
             </View>
-            <Input
-              label="Certification Name"
-              value={cert.certName}
-              onChangeText={(value) => onChangeCert(index, 'certName', value)}
-              placeholder="e.g. CPT"
-            />
-            <Input
-              label="Issuer"
-              value={cert.issuer}
-              onChangeText={(value) => onChangeCert(index, 'issuer', value)}
-              placeholder="e.g. ACE"
-            />
-            <Input
-              label="Issue Date"
-              value={cert.issueDate}
-              onChangeText={(value) => onChangeCert(index, 'issueDate', value)}
-              placeholder="YYYY-MM-DD"
-            />
-            <Input
-              label="Expiry Date"
-              value={cert.expiryDate}
-              onChangeText={(value) => onChangeCert(index, 'expiryDate', value)}
-              placeholder="YYYY-MM-DD"
-            />
-            <Input
-              label="Document URL"
-              value={cert.documentUrl}
-              onChangeText={(value) => onChangeCert(index, 'documentUrl', value)}
-              placeholder="URL to certificate"
-              autoCapitalize="none"
-            />
+            <View style={styles.certGrid}>
+              <View style={styles.certField}>
+                <Input
+                  label="Certification Name"
+                  value={cert.certName}
+                  onChangeText={(value) => onChangeCert(index, 'certName', value)}
+                  placeholder="e.g. CPT"
+                />
+              </View>
+              <View style={styles.certField}>
+                <Input
+                  label="Issuer"
+                  value={cert.issuer}
+                  onChangeText={(value) => onChangeCert(index, 'issuer', value)}
+                  placeholder="e.g. ACE"
+                />
+              </View>
+              <View style={styles.certField}>
+                <DatePicker
+                  label="Issue Date"
+                  value={cert.issueDate ? new Date(cert.issueDate) : undefined}
+                  onChange={(d) => d && onChangeCert(index, 'issueDate', d.toISOString().split('T')[0])}
+                  placeholder="Select Date"
+                />
+              </View>
+              <View style={styles.certField}>
+                <DatePicker
+                  label="Expiry Date"
+                  value={cert.expiryDate ? new Date(cert.expiryDate) : undefined}
+                  onChange={(d) => d && onChangeCert(index, 'expiryDate', d.toISOString().split('T')[0])}
+                  placeholder="Select Date"
+                />
+              </View>
+            </View>
+            
+            <View style={{ marginTop: Spacing.three }}>
+              <Typography variant="bodySmallBold" style={{ marginBottom: Spacing.one }}>Document</Typography>
+              <Button
+                variant="outline"
+                label={cert.documentUrl ? "Replace Document" : "Upload Document"}
+                onPress={() => handlePickDocument(index)}
+              />
+              {cert.documentUrl ? (
+                 <Typography variant="caption" style={{ color: theme.textSecondary, marginTop: Spacing.one }} numberOfLines={1}>
+                   {cert.documentUrl.split('/').pop()}
+                 </Typography>
+              ) : null}
+            </View>
           </View>
         ))}
         <Button
@@ -162,24 +227,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     gap: Spacing.four,
   },
-  dayCard: {
+  gridContainer: {
     borderRadius: Radius.md,
+    borderWidth: 1,
+    overflow: 'hidden',
+    minWidth: 460,
+  },
+  gridRow: {
+    flexDirection: 'row',
+  },
+  gridCellDay: {
+    width: 120,
     padding: Spacing.three,
-    gap: Spacing.two,
+    justifyContent: 'center',
   },
-  dayLabel: {
-    marginBottom: Spacing.one,
+  gridCellSlot: {
+    flex: 1,
+    minWidth: 100,
+    padding: Spacing.three,
+    justifyContent: 'center',
   },
-  timeRow: {
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: Radius.sm,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legendContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: Spacing.four,
+    marginTop: Spacing.two,
   },
-  timeInput: {
-    flex: 1,
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
   },
-  removeTime: {
-    padding: Spacing.half,
+  legendBox: {
+    width: 16,
+    height: 16,
+    borderRadius: Radius.sm,
   },
   certCard: {
     borderRadius: Radius.md,
@@ -192,7 +282,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.two,
   },
+  certHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  iconWrapper: {
+    padding: Spacing.one + Spacing.half,
+    borderRadius: Radius.sm,
+  },
   removeButton: {
     padding: Spacing.half,
+  },
+  certGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.three,
+  },
+  certField: {
+    width: '47%',
   },
 });

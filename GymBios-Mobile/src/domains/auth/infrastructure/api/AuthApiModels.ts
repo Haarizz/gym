@@ -11,6 +11,8 @@ export interface LoginResponseApiModel {
   roles: string[];
   userId: number;
   enabled: boolean;
+  staff_name?: string;
+  permissions?: string[];
 }
 
 export type MeResponseApiModel = LoginResponseApiModel;
