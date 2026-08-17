@@ -1,1 +1,3 @@
-export { StaffScheduleScreen as default } from '@/domains/auth';
+import { StaffScheduleScreen } from '@/domains/schedule';
+
+export default StaffScheduleScreen;

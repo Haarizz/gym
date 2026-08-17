@@ -1,1 +1,3 @@
-export { StaffLedgerScreen as default } from '@/domains/auth';
+import { StaffLedgerScreen } from '@/domains/ledger';
+
+export default StaffLedgerScreen;

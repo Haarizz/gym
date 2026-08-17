@@ -1,1 +1,3 @@
-export { StaffPerformanceScreen as default } from '@/domains/auth';
+import { StaffPerformanceScreen } from '@/domains/performance';
+
+export default StaffPerformanceScreen;

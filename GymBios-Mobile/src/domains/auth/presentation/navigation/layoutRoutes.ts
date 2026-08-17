@@ -33,7 +33,10 @@ export const FULL_SCREEN_ROUTES: readonly RoutePattern[] = [
   ['promotions', 'create'],
   ['promotions', 'edit'],
   ['messaging', 'compose-message'],
-  ['messaging', 'compose']
+  ['messaging', 'compose'],
+
+  // Profile Hub & Sub-screens
+  ['profile'],
 ] as const;
 
 /**
@@ -55,7 +58,8 @@ export const MODULE_ROUTES = [
   'messaging',
   'automations',
   'workout-feedback',
-  'roles'
+  'roles',
+  'profile',
 ] as const;
 
 /**

@@ -1,0 +1,10 @@
+export * from './domain/StaffDashboardData';
+export * from './infrastructure/ApiStaffDashboardRepository';
+export * from './hooks/useStaffDashboard';
+export { StaffDashboardScreen, StaffDashboardScreen as StaffHomeScreen } from './presentation/screens/StaffDashboardScreen';
+export * from './presentation/components/StaffWelcomeCard';
+export * from './presentation/components/StaffStatsGrid';
+export * from './presentation/components/StaffQuickActions';
+export * from './presentation/components/StaffUrgentFollowUpsCard';
+export * from './presentation/components/StaffRecentConversionsCard';
+export * from './presentation/components/StaffMonthSummaryCard';
