@@ -8,6 +8,7 @@ import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-
 import { ProtectedRoute } from "./components/shared/ProtectedRoute";
 import { NotificationBell } from "./components/shared/NotificationBell";
 import { authService, User } from "./utils/supabase/auth-service";
+import { useBranch } from "./utils/branch-context";
 import {
   Sidebar,
   SidebarContent,
@@ -57,6 +58,7 @@ import { PostWorkoutCheckin } from "./pages/post-workout-checkin";
 import { PlansServicesCatalog } from "./pages/plans-services-catalog";
 import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
+import { BranchManagement } from "./pages/branch-management";
 import { AssetTransactions } from "./pages/asset-transactions";
 import { AssetHistoryPage } from "./pages/asset-history";
 import { AssetReports } from "./pages/asset-reports";
@@ -609,6 +611,13 @@ const menuItems = [
     ],
   },
   {
+    title: "Branch Management",
+    icon: Building2,
+    id: "branch-management",
+    path: "/branch-management",
+    permission: "BRANCH_MANAGEMENT_VIEW",
+  },
+  {
     title: "Settings",
     icon: Settings,
     id: "settings",
@@ -709,6 +718,8 @@ export default function App() {
   // Use location.pathname to figure out active section for styling mostly
   const currentPath = location.pathname;
   const activeSectionPathId = currentPath === '/' ? 'dashboard' : currentPath.slice(1);
+
+  const { activeBranchId, accessibleBranches, setActiveBranch } = useBranch();
 
   const [expandedItems, setExpandedItems] = useState<string[]>(
     [],
@@ -1070,6 +1081,7 @@ export default function App() {
 
       <Route path="/assets" element={<Assets />} />
       <Route path="/manage-assets" element={<ManageAssets />} />
+      <Route path="/branch-management" element={<BranchManagement />} />
       <Route path="/asset-history" element={<AssetHistoryPage />} />
       <Route path="/asset-transactions" element={<AssetTransactions />} />
       <Route path="/asset-reports" element={<AssetReports />} />
@@ -1148,7 +1160,7 @@ export default function App() {
       <div className="flex w-full" style={{ minHeight: 'calc(100vh / 0.9)' }}>
         <Sidebar className="hidden md:flex bg-gradient-primary">
           <SidebarHeader className="border-b border-sidebar-border p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
                 <div className="bg-white/20 backdrop-blur-sm text-white rounded-xl p-3 shadow-lg">
                   <Dumbbell className="h-6 w-6" />
@@ -1161,6 +1173,31 @@ export default function App() {
                 </div>
               </div>
               <NotificationBell className="text-white/80 hover:text-white hover:bg-white/10" />
+            </div>
+            {/* Branch Selector */}
+            <div className="mt-2">
+              <select 
+                className="w-full bg-white/10 text-white border border-white/20 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer appearance-none"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 0.7rem top 50%',
+                  backgroundSize: '0.65rem auto',
+                }}
+                value={activeBranchId === null ? "null" : activeBranchId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setActiveBranch(val === "null" ? null : Number(val));
+                }}
+              >
+                {/* Admin user with "All Branches" access will have "null" as an option */}
+                {sessionStorage.getItem('gymbios_role_name')?.toLowerCase() === 'admin' && (
+                  <option value="null" className="text-gray-900 font-medium">🌐 All Branches</option>
+                )}
+                {accessibleBranches.map(b => (
+                  <option key={b.id} value={b.id} className="text-gray-900">{b.branchName}</option>
+                ))}
+              </select>
             </div>
           </SidebarHeader>
 
@@ -1297,7 +1334,11 @@ export default function App() {
           <div className="flex-1">
             <ErrorBoundary>
               <ProtectedRoute isAuthenticated={isAuthenticated}>
-                {routeAllowed ? renderContent : (
+                {routeAllowed ? (
+                  <React.Fragment key={`branch-${activeBranchId || 'all'}`}>
+                    {renderContent}
+                  </React.Fragment>
+                ) : (
                   <div className="p-6">
                     <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
                       You don't have permission to view this page.

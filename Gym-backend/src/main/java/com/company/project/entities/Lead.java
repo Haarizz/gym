@@ -2,11 +2,13 @@ package com.company.project.entities;
 
 import com.company.project.converters.JsonStringListConverter;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
 @Entity
 @Table(name = "leads")
 public class Lead extends BaseEntity {
@@ -150,4 +152,20 @@ public class Lead extends BaseEntity {
 
     public List<FollowUp> getFollowUps() { return followUps; }
     public void setFollowUps(List<FollowUp> followUps) { this.followUps = followUps; }
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
+
+    @jakarta.persistence.PrePersist
+    public void prePersistBranchId() {
+        if (this.branchId == null) {
+            Long activeBranch = com.company.project.security.BranchContextHolder.getActiveBranchId();
+            if (activeBranch != null) {
+                this.branchId = activeBranch;
+            }
+        }
+    }
 }

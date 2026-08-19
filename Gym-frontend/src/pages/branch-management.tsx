@@ -1,0 +1,201 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit2, CheckCircle2, XCircle, Search, Building2, Users } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Badge } from "../components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { branchApi, BranchDTO } from '../utils/supabase/branch-service';
+import { useBranch } from '../utils/branch-context';
+
+export function BranchManagement() {
+  const [branches, setBranches] = useState<BranchDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formData, setFormData] = useState({
+    branch_name: '',
+    branch_code: '',
+    address: '',
+    phone: '',
+    email: '',
+    status: 'ACTIVE'
+  });
+
+  const loadBranches = async () => {
+    try {
+      const data = await branchApi.getAllBranches();
+      setBranches(data);
+    } catch (error) {
+      console.error('Failed to load branches', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBranches();
+  }, []);
+
+  const { refreshBranches } = useBranch();
+  const handleAddBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await branchApi.createBranch(formData);
+      setShowAddModal(false);
+      setFormData({ branch_name: '', branch_code: '', address: '', phone: '', email: '', status: 'ACTIVE' });
+      loadBranches();
+      await refreshBranches();
+    } catch (error) {
+      console.error('Failed to add branch', error);
+      alert('Failed to add branch. Code must be unique.');
+    }
+  };
+
+  const toggleStatus = async (id: number, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      await branchApi.updateBranchStatus(id, newStatus);
+      loadBranches();
+    } catch (error) {
+      console.error('Failed to update status', error);
+    }
+  };
+
+  const filteredBranches = branches.filter(b => {
+    const name = b.branch_name || b.name || '';
+    const code = b.branch_code || b.code || '';
+    const q = searchQuery || '';
+    return name.toLowerCase().includes(q.toLowerCase()) || 
+           code.toLowerCase().includes(q.toLowerCase());
+  });
+
+  if (loading) return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div>
+          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
+            Branch Management
+          </h1>
+          <p className="text-gray-500 mt-1">Manage gym locations and assignments</p>
+        </div>
+        <Button onClick={() => setShowAddModal(true)} className="bg-primary hover:bg-primary/90 text-white rounded-xl shadow-md transition-all hover:scale-105">
+          <Plus className="w-5 h-5 mr-2" />
+          Add Branch
+        </Button>
+      </div>
+
+      <Card className="rounded-2xl shadow-md border-0 overflow-hidden">
+        <CardHeader className="bg-gray-50/50 border-b border-gray-100 flex flex-row items-center justify-between py-4">
+          <CardTitle className="text-lg flex items-center text-gray-800">
+            <Building2 className="w-5 h-5 mr-2 text-primary" />
+            Active Locations
+          </CardTitle>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search branches..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-[300px]"
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead className="w-[300px]">Branch Name</TableHead>
+                <TableHead>Code</TableHead>
+                <TableHead>Address</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredBranches.map(branch => (
+                <TableRow key={branch.id} className="hover:bg-muted/50 transition-colors group">
+                  <TableCell className="font-medium text-gray-900 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+                      {(branch.branch_code || branch.code || 'BR').substring(0, 2).toUpperCase()}
+                    </div>
+                    {branch.branch_name || branch.name}
+                    {branch.is_default && <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 ml-2">Default</Badge>}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground font-mono">{branch.branch_code || branch.code}</TableCell>
+                  <TableCell className="text-muted-foreground">{branch.address || '-'}</TableCell>
+                  <TableCell>
+                    <Badge variant={branch.status === 'ACTIVE' ? "default" : "destructive"} className={branch.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20" : ""}>
+                      {branch.status === 'ACTIVE' ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
+                      {branch.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => toggleStatus(branch.id, branch.status)} className="text-muted-foreground hover:text-foreground">
+                      Toggle Status
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filteredBranches.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                    No branches found matching your search.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Branch</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddBranch} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="branch_name">Branch Name</Label>
+              <Input 
+                id="branch_name"
+                required
+                value={formData.branch_name}
+                onChange={(e) => setFormData({...formData, branch_name: e.target.value})}
+                placeholder="e.g. Downtown Center"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="branch_code">Branch Code</Label>
+              <Input 
+                id="branch_code"
+                required
+                value={formData.branch_code}
+                onChange={(e) => setFormData({...formData, branch_code: e.target.value.toUpperCase()})}
+                className="uppercase"
+                placeholder="e.g. NYC"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Input 
+                id="address"
+                value={formData.address}
+                onChange={e => setFormData({...formData, address: e.target.value})}
+                placeholder="Full address"
+              />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
+              <Button type="submit">Save Branch</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

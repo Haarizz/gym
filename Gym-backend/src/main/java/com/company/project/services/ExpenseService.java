@@ -24,21 +24,26 @@ public class ExpenseService {
     private final NotificationService notificationService;
     private final FinancialEventService financialEventService;
     private final CostCenterRepository costCenterRepository;
+    private final BranchService branchService;
 
     public ExpenseService(ExpenseRepository expenseRepository,
                           NotificationService notificationService,
                           FinancialEventService financialEventService,
-                          CostCenterRepository costCenterRepository) {
+                          CostCenterRepository costCenterRepository,
+                          BranchService branchService) {
         this.expenseRepository    = expenseRepository;
         this.notificationService  = notificationService;
         this.financialEventService = financialEventService;
         this.costCenterRepository = costCenterRepository;
+        this.branchService = branchService;
     }
 
     public List<ExpenseResponseDTO> getExpenses(String search, String status, String category,
                                                 String location, LocalDate from, LocalDate to) {
+        Long branchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
         List<Expense> expenses = expenseRepository.findAllByOrderByDateDesc();
         return expenses.stream()
+                .filter(e -> branchId == null || branchId.equals(e.getBranchId()))
                 .filter(e -> {
                     if (search == null || search.isBlank()) return true;
                     String s = search.toLowerCase(Locale.ROOT);
@@ -59,19 +64,31 @@ public class ExpenseService {
     }
 
     public ExpenseStatsDTO getStats() {
-        List<Expense> all = expenseRepository.findAllByOrderByDateDesc();
-        BigDecimal totalAmount = expenseRepository.sumApprovedTotal();
-        BigDecimal totalTax = expenseRepository.sumApprovedTax();
-        long pending = expenseRepository.countByStatus("PENDING");
-        long approved = expenseRepository.countByStatus("APPROVED");
+        Long branchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
+        List<Expense> all = expenseRepository.findAllByOrderByDateDesc().stream()
+                .filter(e -> branchId == null || branchId.equals(e.getBranchId()))
+                .collect(Collectors.toList());
+        
+        BigDecimal totalAmount = all.stream()
+                .filter(e -> "APPROVED".equalsIgnoreCase(e.getStatus()))
+                .map(Expense::getTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                
+        BigDecimal totalTax = all.stream()
+                .filter(e -> "APPROVED".equalsIgnoreCase(e.getStatus()))
+                .map(Expense::getTaxAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                
+        long pending = all.stream().filter(e -> "PENDING".equalsIgnoreCase(e.getStatus())).count();
+        long approved = all.stream().filter(e -> "APPROVED".equalsIgnoreCase(e.getStatus())).count();
 
-        List<Object[]> byCatRaw = expenseRepository.sumByCategory();
         Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
-        for (Object[] row : byCatRaw) {
-            String cat = (String) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
-            if (cat != null) byCategory.put(cat, sum);
-        }
+        all.stream().filter(e -> "APPROVED".equalsIgnoreCase(e.getStatus())).forEach(e -> {
+            String cat = e.getCategory();
+            if (cat != null) {
+                byCategory.put(cat, byCategory.getOrDefault(cat, BigDecimal.ZERO).add(e.getTotalAmount()));
+            }
+        });
 
         ExpenseStatsDTO stats = new ExpenseStatsDTO();
         stats.setTotalAmount(totalAmount);
@@ -85,6 +102,11 @@ public class ExpenseService {
 
     public ExpenseResponseDTO createExpense(ExpenseRequestDTO req) {
         Expense expense = new Expense();
+        // Since ExpenseRequestDTO doesn't have branchId, assume frontend adds it or it uses active branch.
+        // Actually, we can just use the active branch. If it's null (All Branches), throw error.
+        Long branchId = branchService.resolveBranchForCreate(null); // Assuming DTO lacks branchId for now, we force active branch
+        expense.setBranchId(branchId);
+        
         applyRequest(expense, req);
         expense.setStatus(req.getStatus() != null && !req.getStatus().isBlank() ? req.getStatus() : "pending");
         Expense saved = expenseRepository.save(expense);

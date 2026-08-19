@@ -16,16 +16,22 @@ import java.util.stream.Collectors;
 public class MembershipPlanService {
 
     private final MembershipPlanRepository planRepository;
+    private final BranchService branchService;
 
-    public MembershipPlanService(MembershipPlanRepository planRepository) {
+    public MembershipPlanService(MembershipPlanRepository planRepository, BranchService branchService) {
         this.planRepository = planRepository;
+        this.branchService = branchService;
     }
 
     public List<MembershipPlanResponseDTO> getPlans(String status) {
+        Long activeBranchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
         List<MembershipPlan> plans = (status != null && !status.isBlank())
                 ? planRepository.findByStatus(status)
                 : planRepository.findAllByOrderByCreatedAtDesc();
-        return plans.stream().map(MembershipPlanResponseDTO::fromEntity).collect(Collectors.toList());
+        return plans.stream()
+                .filter(p -> activeBranchId == null || p.getBranchId() == null || activeBranchId.equals(p.getBranchId()))
+                .map(MembershipPlanResponseDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 
     public MembershipPlanResponseDTO getPlanById(Long id) {
@@ -36,6 +42,10 @@ public class MembershipPlanService {
 
     public MembershipPlanResponseDTO createPlan(MembershipPlanRequestDTO req) {
         MembershipPlan plan = new MembershipPlan();
+        
+        Long branchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
+        plan.setBranchId(branchId);
+        
         applyRequest(plan, req);
         return MembershipPlanResponseDTO.fromEntity(planRepository.save(plan));
     }
@@ -59,6 +69,7 @@ public class MembershipPlanService {
                 .orElseThrow(() -> new EntityNotFoundException("Plan not found: " + id));
 
         MembershipPlan copy = new MembershipPlan();
+        copy.setBranchId(original.getBranchId());
         copy.setName(original.getName() + " (Copy)");
         copy.setType(original.getType());
         copy.setPlanType(original.getPlanType());

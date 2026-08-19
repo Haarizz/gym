@@ -15,16 +15,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popove
 import { Calendar as CalendarComponent } from "../components/ui/calendar";
 import { Checkbox } from "../components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu";
+import { Tooltip, TooltipTrigger, TooltipContent } from "../components/ui/tooltip";
 import { MemberApprovalModal } from "../components/shared/member-approval-modal";
 import { MemberAddons } from "./member-addons";
 import { MemberReceipts } from "./member-receipts";
 import { rewardService, walletService, type ReferralReward, type Wallet as RewardWallet } from "../utils/supabase/reward-service";
-import { 
-  Plus, 
-  Search, 
-  UserPlus, 
-  Pause, 
-  Play, 
+import {
+  Plus,
+  Search,
+  UserPlus,
+  Pause,
+  Play,
   BarChart3,
   Phone,
   Mail,
@@ -51,6 +52,7 @@ import {
   MoreVertical,
   UserCheck,
   Eye,
+  Pencil,
   XCircle,
   Bell,
   ShieldBan,
@@ -81,45 +83,45 @@ const RENEWAL_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>
 };
 
 const membershipPlans = [
-  { 
+  {
     id: 1,
-    name: "Basic Monthly", 
-    price: 299, 
-    duration: "1 month", 
+    name: "Basic Monthly",
+    price: 299,
+    duration: "1 month",
     level: 1,
-    features: ["Gym access", "Locker room", "Basic equipment"] 
+    features: ["Gym access", "Locker room", "Basic equipment"]
   },
-  { 
+  {
     id: 2,
-    name: "Standard Monthly", 
-    price: 499, 
-    duration: "1 month", 
+    name: "Standard Monthly",
+    price: 499,
+    duration: "1 month",
     level: 2,
-    features: ["Basic + Group classes", "Guest pass", "Towel service"] 
+    features: ["Basic + Group classes", "Guest pass", "Towel service"]
   },
-  { 
+  {
     id: 3,
-    name: "Premium Monthly", 
-    price: 799, 
-    duration: "1 month", 
+    name: "Premium Monthly",
+    price: 799,
+    duration: "1 month",
     level: 3,
-    features: ["Standard + Personal training", "Nutrition consultation", "Priority booking"] 
+    features: ["Standard + Personal training", "Nutrition consultation", "Priority booking"]
   },
-  { 
+  {
     id: 4,
-    name: "Gold Quarterly", 
-    price: 2199, 
-    duration: "3 months", 
+    name: "Gold Quarterly",
+    price: 2199,
+    duration: "3 months",
     level: 4,
-    features: ["Premium benefits", "3 months access", "10% discount", "Free fitness assessment"] 
+    features: ["Premium benefits", "3 months access", "10% discount", "Free fitness assessment"]
   },
-  { 
+  {
     id: 5,
-    name: "Platinum Annual", 
-    price: 7999, 
-    duration: "12 months", 
+    name: "Platinum Annual",
+    price: 7999,
+    duration: "12 months",
     level: 5,
-    features: ["All Premium features", "2 months free", "VIP locker", "Complimentary massages", "Nutrition plan"] 
+    features: ["All Premium features", "2 months free", "VIP locker", "Complimentary massages", "Nutrition plan"]
   }
 ];
 
@@ -170,7 +172,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   }, [isProfileDialogOpen, profileMember]);
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
   const [photoViewer, setPhotoViewer] = useState<{ src: string; name: string } | null>(null);
-  
+
   // Membership Report states
   const [reportGenerated, setReportGenerated] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
@@ -179,7 +181,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [reportPageSize] = useState(20);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  
+
   // Report filters
   const [reportType, setReportType] = useState("membership");
   const [dateRange, setDateRange] = useState("last-30-days");
@@ -189,7 +191,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [transactionType, setTransactionType] = useState("all");
   const [payMode, setPayMode] = useState("all");
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
+
   // Schedule form states
   const [scheduleName, setScheduleName] = useState("");
   const [scheduleFrequency, setScheduleFrequency] = useState("weekly");
@@ -197,7 +199,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [scheduleRecipients, setScheduleRecipients] = useState("");
   const [includeSummary, setIncludeSummary] = useState(true);
   const [exportFormat, setExportFormat] = useState("excel");
-  
+
   // API Plans for Renewals tab
   const [apiPlans, setApiPlans] = useState<Plan[]>([]);
 
@@ -241,6 +243,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       });
       setFamilyRenewalHead(null);
       loadMembers();
+      loadStatusCounts();
     } catch (e: any) {
       toast.error('Failed to renew family', { description: e?.message || 'Please try again.' });
     } finally {
@@ -274,24 +277,30 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [couponCode, setCouponCode] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [planComparisonOpen, setPlanComparisonOpen] = useState(false);
-  
+
   // Pending approvals states
   const [pendingMembers, setPendingMembers] = useState<any[]>([]);
   const [selectedDraftForApproval, setSelectedDraftForApproval] = useState<any | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
 
+  // Status counts fetched independently (unfiltered) so KPI cards are always accurate
+  const [statusCounts, setStatusCounts] = useState<{
+    total: number; active: number; inactive: number;
+    expired: number; frozen: number; suspended: number;
+  }>({ total: 0, active: 0, inactive: 0, expired: 0, frozen: 0, suspended: 0 });
+
   const loadMembers = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const authState = {
         isAuthenticated: authService.isAuthenticated(),
         currentUser: authService.getCurrentUser(),
         hasAccessToken: !!authService.getAccessToken(),
         isDemoMode: authService.isDemoMode()
       };
-      
+
       if (!authState.isAuthenticated) {
         throw new Error('User not authenticated');
       }
@@ -300,7 +309,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         search: searchTerm || undefined,
         status: selectedStatus !== 'all' ? selectedStatus : undefined
       };
-      
+
       const pagination = {
         page: currentPage,
         limit: 20
@@ -313,7 +322,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         setTotalMembers(demoResponse.pagination.total);
         return;
       }
-      
+
       const response = await membersService.getMembers(filters, pagination);
       setMembers(response.members);
       setTotalPages(response.pagination.totalPages);
@@ -337,6 +346,34 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }
   };
 
+  // Fetch ALL members (no status/search filter, high limit) to compute accurate
+  // KPI status counts independent of the current page/filter.
+  const loadStatusCounts = async () => {
+    try {
+      const isDemoMode = authService.isDemoMode();
+      const fetcher = isDemoMode
+        ? membersService.getDemoMembersData({}, { limit: 10000 })
+        : membersService.getMembers({}, { limit: 10000 });
+      const res = await fetcher;
+      const all = res.members;
+      setStatusCounts({
+        total: all.length,
+        active: all.filter((m: Member) => m.membership_status === 'active').length,
+        inactive: all.filter((m: Member) => m.membership_status === 'inactive').length,
+        expired: all.filter((m: Member) => m.membership_status === 'expired').length,
+        frozen: all.filter((m: Member) => (m.membership_status || '').toLowerCase() === 'frozen').length,
+        suspended: all.filter((m: Member) => m.membership_status === 'suspended').length,
+      });
+    } catch (e) {
+      console.error('Failed to load status counts:', e);
+    }
+  };
+
+  // Load status counts on mount
+  useEffect(() => {
+    loadStatusCounts();
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       loadMembers();
@@ -346,7 +383,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   // Load active plans for Renewals tab
   useEffect(() => {
-    plansService.getPlans('Active').then(setApiPlans).catch(() => {});
+    plansService.getPlans('Active').then(setApiPlans).catch(() => { });
   }, []);
 
   // Load active add-ons so the directory table can show "+ addon" under Plan Type
@@ -361,12 +398,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         });
         setMemberActiveAddons(map);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Bank accounts for the Renewals & Upgrades payment panel's Bank Transfer leg
   useEffect(() => {
-    accountHeadsService.getBankAccounts().then(setRenewalBankAccounts).catch(() => {});
+    accountHeadsService.getBankAccounts().then(setRenewalBankAccounts).catch(() => { });
   }, []);
 
   // Load pending members from sessionStorage
@@ -400,12 +437,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }
   };
 
-  const totalMembersCount = totalMembers;
-  const activeMembers = members.filter(m => m.membership_status === "active").length;
-  const inactiveMembers = members.filter(m => m.membership_status === "inactive").length;
-  const expiredMembers = members.filter(m => m.membership_status === "expired").length;
-  const frozenMembers = members.filter(m => m.membership_status === "frozen" || m.membership_status === "FROZEN").length;
-  const suspendedMembers = members.filter(m => m.membership_status === "suspended").length;
+  // KPI counts come from the dedicated unfiltered fetch, not the current page
+  const totalMembersCount = statusCounts.total;
+  const activeMembers = statusCounts.active;
+  const inactiveMembers = statusCounts.inactive;
+  const expiredMembers = statusCounts.expired;
+  const frozenMembers = statusCounts.frozen;
+  const suspendedMembers = statusCounts.suspended;
 
   const autoUnfreezePending = members.filter(m => {
     const status = (m.membership_status || "").toLowerCase();
@@ -436,7 +474,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const handleAddMember = () => {
     navigate('/members/add');
   };
-  
+
   // Handle generate report
   const handleGenerateReport = async () => {
     setReportLoading(true);
@@ -514,7 +552,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       setReportLoading(false);
     }
   };
-  
+
   // Calculate report summary
   const reportSummary = reportData.reduce((acc, item) => {
     acc.totalRecords += 1;
@@ -530,20 +568,20 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     totalCard: 0,
     totalDue: 0,
   });
-  
+
   // Pagination for report
   const reportStartIndex = (reportPage - 1) * reportPageSize;
   const reportEndIndex = reportStartIndex + reportPageSize;
   const paginatedReportData = reportData.slice(reportStartIndex, reportEndIndex);
   const reportTotalPages = Math.ceil(reportData.length / reportPageSize);
-  
+
   // Handle export
   const handleExport = (format: string) => {
     toast.success(`Exporting as ${format.toUpperCase()}`, {
       description: 'Your report will be downloaded shortly.',
     });
   };
-  
+
   // Handle schedule save
   const handleScheduleSave = () => {
     if (!scheduleName || !scheduleRecipients) {
@@ -552,16 +590,16 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       });
       return;
     }
-    
+
     toast.success('Schedule Created', {
       description: `Report will be sent ${scheduleFrequency} to ${scheduleRecipients.split(',').length} recipient(s).`,
     });
-    
+
     setScheduleModalOpen(false);
     setScheduleName("");
     setScheduleRecipients("");
   };
-  
+
   const getTransactionTypeBadge = (type: string) => {
     const badges: Record<string, string> = {
       'New': 'bg-green-100 text-green-800',
@@ -571,7 +609,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     };
     return badges[type] || 'bg-gray-100 text-gray-800';
   };
-  
+
   const getPayModeBadge = (mode: string) => {
     const badges: Record<string, string> = {
       'Cash': 'bg-emerald-100 text-emerald-800',
@@ -580,7 +618,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     };
     return badges[mode] || 'bg-gray-100 text-gray-800';
   };
-  
+
   // Helper functions to safely access member properties
   const getMemberId = (member: Member) => member.member_id || member.id;
   const getMembershipPlan = (member: Member) => member.membership_plan || member.membership_type;
@@ -717,13 +755,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
     // Refresh members list
     loadMembers();
+    loadStatusCounts();
   };
 
   const handleRejectDraft = (draftId: string) => {
     const updated = pendingMembers.filter(m => m.memberId !== draftId);
     setPendingMembers(updated);
     sessionStorage.setItem('pendingMembers', JSON.stringify(updated));
-    
+
     // Notify other components
     window.dispatchEvent(new Event('pendingMembersUpdated'));
   };
@@ -748,7 +787,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       isPending: true,
       draftData: pm
     }));
-    
+
     return [...pending, ...members];
   }, [pendingMembers, members]);
 
@@ -768,7 +807,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       setShowSuggestions(false);
     }
   };
-  
+
   const selectMemberForRenewal = (member: any) => {
     setSelectedMemberForRenewal(member);
     setRenewalSearchTerm(member.name);
@@ -776,7 +815,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     setSelectedNewPlan(null);
     setOperationType(null);
   };
-  
+
   const handlePlanSelection = (plan: any) => {
     setSelectedNewPlan(plan);
 
@@ -791,19 +830,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       }
     }
   };
-  
+
   const calculateTotalAmount = () => {
     if (!selectedNewPlan) return 0;
-    
+
     let total = selectedNewPlan.price;
-    
+
     if (discountAmount) {
       total -= parseFloat(discountAmount);
     }
-    
+
     return Math.round(Math.max(0, total) * 100) / 100;
   };
-  
+
   const handleProcessRenewalUpgrade = async () => {
     if (!selectedMemberForRenewal || !selectedNewPlan) {
       toast.error('Missing Information', {
@@ -865,10 +904,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       const val = parseInt(durationValue);
       if (isNaN(val)) return '';
       switch ((durationType || '').toLowerCase()) {
-        case 'days':   start.setDate(start.getDate() + val); break;
-        case 'weeks':  start.setDate(start.getDate() + val * 7); break;
+        case 'days': start.setDate(start.getDate() + val); break;
+        case 'weeks': start.setDate(start.getDate() + val * 7); break;
         case 'months': start.setMonth(start.getMonth() + val); break;
-        case 'years':  start.setFullYear(start.getFullYear() + val); break;
+        case 'years': start.setFullYear(start.getFullYear() + val); break;
       }
       return start.toISOString().split('T')[0] + 'T00:00:00Z';
     };
@@ -953,6 +992,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       }
       // Refresh member list
       loadMembers();
+      loadStatusCounts();
     } catch (err) {
       toast.error('Failed to process renewal. Please try again.');
       return;
@@ -980,7 +1020,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       setCouponCode("");
     }, 3000);
   };
-  
+
   const getDaysLeft = (expiryDate: string) => {
     const expiry = new Date(expiryDate);
     const today = new Date();
@@ -988,7 +1028,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
-  
+
   const getStatusBadgeForRenewal = (daysLeft: number) => {
     if (daysLeft < 0) return { text: 'Expired', class: 'bg-red-100 text-red-800' };
     if (daysLeft <= 7) return { text: 'Expiring Soon', class: 'bg-orange-100 text-orange-800' };
@@ -1008,7 +1048,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
             Add Member
           </Button>
         </div>
-        
+
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
@@ -1032,7 +1072,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
             Add Member
           </Button>
         </div>
-        
+
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-red-600 mb-4">{error}</p>
@@ -1273,7 +1313,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       const amountDue = getAmountDue(member);
                       const paymentDueDate = getPaymentDueDate(member);
                       const membershipCategory = getMembershipCategory(member);
-                      
+
                       return (
                         <TableRow
                           key={member.id}
@@ -1361,23 +1401,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           </TableCell>
                           <TableCell>
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                member.membership_status === 'pending_approval'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : member.membership_status === 'active'
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${member.membership_status === 'pending_approval'
+                                ? 'bg-amber-100 text-amber-700'
+                                : member.membership_status === 'active'
                                   ? 'bg-emerald-100 text-emerald-700'
                                   : member.membership_status === 'inactive'
-                                  ? 'bg-slate-100 text-slate-600'
-                                  : member.membership_status === 'suspended'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : 'bg-rose-100 text-rose-700'
-                              }`}
+                                    ? 'bg-slate-100 text-slate-600'
+                                    : member.membership_status === 'suspended'
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : 'bg-rose-100 text-rose-700'
+                                }`}
                             >
                               {member.membership_status === 'pending_approval' ? 'Pending Approval' : member.membership_status}
                             </span>
                           </TableCell>
                           <TableCell>
-                            {getMembershipEndDate(member) ? 
+                            {getMembershipEndDate(member) ?
                               new Date(getMembershipEndDate(member)).toLocaleDateString('en-GB') : '—'}
                           </TableCell>
                           <TableCell>
@@ -1387,9 +1426,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                               </span>
                             ) : (
                               <span
-                                className={`font-medium ${
-                                  amountDue > 0 ? 'text-red-600' : 'text-emerald-600'
-                                }`}
+                                className={`font-medium ${amountDue > 0 ? 'text-red-600' : 'text-emerald-600'
+                                  }`}
                               >
                                 {amountDue > 0 ? `${currencyCode} ${amountDue.toFixed(2)}` : `${currencyCode} 0.00`}
                               </span>
@@ -1402,78 +1440,85 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                             <span className="text-slate-600 font-medium">{getTotalVisits(member)}</span>
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                  <span className="sr-only">Open menu</span>
-                                  <MoreVertical className="h-4 w-4 text-slate-500" />
+                            {member.membership_status === 'pending_approval' && (member as any).isPending ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreVertical className="h-4 w-4 text-slate-500" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent side="left" align="start" className="w-48">
+                                  <DropdownMenuItem
+                                    className="text-[#2B7A78] cursor-pointer"
+                                    onClick={() => handleApproveClick((member as any).draftData)}
+                                  >
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                    Approve to On-board
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onClick={() => handleApproveClick((member as any).draftData)}
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-red-600 cursor-pointer"
+                                    onClick={() => {
+                                      if (confirm('Are you sure you want to reject this draft request?')) {
+                                        handleRejectDraft((member as any).draftData.memberId);
+                                        toast.error('Draft request rejected');
+                                      }
+                                    }}
+                                  >
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Reject / Delete Draft
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  title="View Profile"
+                                  onClick={() => openMemberHistory(member)}
+                                >
+                                  <Eye className="h-4 w-4 text-slate-500" />
                                 </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                {member.membership_status === 'pending_approval' && (member as any).isPending ? (
-                                  <>
-                                    <DropdownMenuItem
-                                      className="text-[#2B7A78] cursor-pointer"
-                                      onClick={() => handleApproveClick((member as any).draftData)}
-                                    >
-                                      <UserCheck className="h-4 w-4 mr-2" />
-                                      Approve to On-board
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      className="cursor-pointer"
-                                      onClick={() => handleApproveClick((member as any).draftData)}
-                                    >
-                                      <Eye className="h-4 w-4 mr-2" />
-                                      View Details
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      className="text-red-600 cursor-pointer"
-                                      onClick={() => {
-                                        if (confirm('Are you sure you want to reject this draft request?')) {
-                                          handleRejectDraft((member as any).draftData.memberId);
-                                          toast.error('Draft request rejected');
-                                        }
-                                      }}
-                                    >
-                                      <XCircle className="h-4 w-4 mr-2" />
-                                      Reject / Delete Draft
-                                    </DropdownMenuItem>
-                                  </>
-                                ) : (
-                                  <>
-                                    <DropdownMenuItem
-                                      className="cursor-pointer"
-                                      onClick={() => openMemberHistory(member)}
-                                    >
-                                      <BarChart3 className="h-4 w-4 mr-2" />
-                                      View Profile
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="cursor-pointer">
-                                      <Mail className="h-4 w-4 mr-2" />
-                                      Send Message
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      className="cursor-pointer"
-                                      onClick={() => navigate(`/members/edit/${getMemberId(member)}`)}
-                                    >
-                                      <FaPlus className="h-4 w-4 mr-2" />
-                                      Edit Member
-                                    </DropdownMenuItem>
-                                    {isFamilyHeadBillingHead(member) && (
-                                      <DropdownMenuItem
-                                        className="cursor-pointer"
-                                        onClick={() => openFamilyRenewalDialog(member)}
-                                      >
-                                        <FaArrowsRotate className="h-4 w-4 mr-2" />
-                                        Renew Family
-                                      </DropdownMenuItem>
-                                    )}
-                                  </>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  title="Send Message"
+                                >
+                                  <Mail className="h-4 w-4 text-slate-500" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  title="Edit Member"
+                                  onClick={() => navigate(`/members/edit/${getMemberId(member)}`)}
+                                >
+                                  <Pencil className="h-4 w-4 text-slate-500" />
+                                </Button>
+                                {isFamilyHeadBillingHead(member) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    title="Renew Family"
+                                    onClick={() => openFamilyRenewalDialog(member)}
+                                  >
+                                    <FaArrowsRotate className="h-4 w-4 text-slate-500" />
+                                  </Button>
                                 )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -1692,9 +1737,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                         <Badge
                                           className={
                                             r.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' :
-                                            r.status === 'CLAIMED' ? 'bg-blue-100 text-blue-800' :
-                                            r.status === 'REDEEMED' ? 'bg-gray-100 text-gray-700' :
-                                            'bg-red-100 text-red-700'
+                                              r.status === 'CLAIMED' ? 'bg-blue-100 text-blue-800' :
+                                                r.status === 'REDEEMED' ? 'bg-gray-100 text-gray-700' :
+                                                  'bg-red-100 text-red-700'
                                           }
                                         >
                                           {r.status}
@@ -1776,7 +1821,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     className="pl-10 text-lg h-12"
                   />
                 </div>
-                
+
                 {/* Live Suggestions Dropdown */}
                 {showSuggestions && searchSuggestions.length > 0 && (
                   <Card className="absolute z-50 w-full mt-2 shadow-xl border-2">
@@ -1784,7 +1829,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       {searchSuggestions.map((member) => {
                         const daysLeft = getDaysLeft(getMembershipEndDate(member));
                         const statusBadge = getStatusBadgeForRenewal(daysLeft);
-                        
+
                         return (
                           <div
                             key={member.id}
@@ -1819,7 +1864,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   </Card>
                 )}
               </div>
-              
+
               {/* Selected Member Snapshot */}
               {selectedMemberForRenewal && (
                 <Card className="mt-6 bg-gradient-light border-2 border-primary/20">
@@ -1936,11 +1981,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     return (
                       <Card
                         key={plan.id}
-                        className={`cursor-pointer transition-all hover:shadow-lg ${
-                          isSelected
-                            ? 'border-2 border-primary shadow-lg scale-105'
-                            : 'border hover:border-primary/50'
-                        } ${isCurrentPlan ? 'bg-blue-50' : ''}`}
+                        className={`cursor-pointer transition-all hover:shadow-lg ${isSelected
+                          ? 'border-2 border-primary shadow-lg scale-105'
+                          : 'border hover:border-primary/50'
+                          } ${isCurrentPlan ? 'bg-blue-50' : ''}`}
                         onClick={() => handlePlanSelection(plan)}
                       >
                         <CardContent className="p-6">
@@ -1977,45 +2021,41 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     );
                   })}
                 </div>
-                
+
                 {/* Operation Type Indicator */}
                 {operationType && (
-                  <div className={`mt-4 rounded-xl border overflow-hidden ${
-                    operationType === 'renewal'
-                      ? 'border-green-200 bg-gradient-to-br from-green-50 via-white to-emerald-50/60'
-                      : operationType === 'downgrade'
+                  <div className={`mt-4 rounded-xl border overflow-hidden ${operationType === 'renewal'
+                    ? 'border-green-200 bg-gradient-to-br from-green-50 via-white to-emerald-50/60'
+                    : operationType === 'downgrade'
                       ? 'border-red-200 bg-red-50'
                       : 'border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50/60'
-                  }`}>
-                    <div className={`h-0.5 w-full ${
-                      operationType === 'renewal'
-                        ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                        : operationType === 'downgrade'
+                    }`}>
+                    <div className={`h-0.5 w-full ${operationType === 'renewal'
+                      ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                      : operationType === 'downgrade'
                         ? 'bg-red-500'
                         : 'bg-gradient-to-r from-orange-400 to-amber-500'
-                    }`} />
+                      }`} />
                     <div className="flex flex-col items-center text-center gap-2 px-6 py-4">
-                      <div className={`flex items-center justify-center w-10 h-10 rounded-xl shadow-sm ${
-                        operationType === 'renewal'
-                          ? 'bg-gradient-to-br from-green-500 to-emerald-600'
-                          : operationType === 'downgrade'
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-xl shadow-sm ${operationType === 'renewal'
+                        ? 'bg-gradient-to-br from-green-500 to-emerald-600'
+                        : operationType === 'downgrade'
                           ? 'bg-red-500'
                           : 'bg-gradient-to-br from-orange-500 to-amber-600'
-                      }`}>
+                        }`}>
                         {operationType === 'renewal'
                           ? <FaArrowsRotate size={17} className="text-white" />
                           : operationType === 'downgrade'
-                          ? <FaCircleArrowDown size={17} className="text-white" />
-                          : <FaCircleArrowUp size={17} className="text-white" />
+                            ? <FaCircleArrowDown size={17} className="text-white" />
+                            : <FaCircleArrowUp size={17} className="text-white" />
                         }
                       </div>
-                      <p className={`text-sm font-semibold ${
-                        operationType === 'renewal'
-                          ? 'text-green-800'
-                          : operationType === 'downgrade'
+                      <p className={`text-sm font-semibold ${operationType === 'renewal'
+                        ? 'text-green-800'
+                        : operationType === 'downgrade'
                           ? 'text-red-800'
                           : 'text-orange-800'
-                      }`}>
+                        }`}>
                         {operationType === 'renewal' ? 'Detected as Renewal' : operationType === 'downgrade' ? 'Detected as Downgrade' : 'Detected as Upgrade'}
                       </p>
                       {operationType === 'renewal' ? (
@@ -2077,7 +2117,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     </>
                   )}
                 </div>
-                
+
                 {/* Discount & Coupon */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -2102,7 +2142,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     />
                   </div>
                 </div>
-                
+
                 {/* Payment Method */}
                 <div>
                   <Label>Payment Method</Label>
@@ -2441,15 +2481,15 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                         operationType === 'renewal'
                           ? 'bg-green-100 text-green-800'
                           : operationType === 'downgrade'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-orange-100 text-orange-800'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-orange-100 text-orange-800'
                       }>
                         <span className="flex items-center gap-1">
                           {operationType === 'renewal'
                             ? <><FaArrowsRotate size={12} /> Renewal</>
                             : operationType === 'downgrade'
-                            ? <><FaArrowDown size={12} /> Downgrade</>
-                            : <><FaArrowUp size={12} /> Upgrade</>}
+                              ? <><FaArrowDown size={12} /> Downgrade</>
+                              : <><FaArrowUp size={12} /> Upgrade</>}
                         </span>
                       </Badge>
                     </div>
@@ -2478,7 +2518,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       </div>
                     )}
                   </div>
-                  
+
                   <Button
                     onClick={handleProcessRenewalUpgrade}
                     className="w-full h-12 text-lg bg-gradient-primary hover:bg-gradient-primary-hover"
@@ -2705,7 +2745,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
             <ChevronRight className="h-4 w-4" />
             <span className="text-foreground font-medium">Membership Report</span>
           </div>
-          
+
           <div className="flex items-center space-x-3 mb-6">
             <div>
               <h2 className="text-2xl font-bold">Membership Report</h2>
@@ -2738,7 +2778,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-start text-left">
                           <Calendar className="mr-2 h-4 w-4" />
-                          {customDateFrom && customDateTo 
+                          {customDateFrom && customDateTo
                             ? `${customDateFrom.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })} - ${customDateTo.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}`
                             : 'Select dates'}
                         </Button>
@@ -2839,8 +2879,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3">
-                <Button 
-                  onClick={handleGenerateReport} 
+                <Button
+                  onClick={handleGenerateReport}
                   disabled={reportLoading}
                   className="bg-gradient-primary hover:bg-gradient-primary-hover"
                 >
@@ -2890,7 +2930,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       )}
                     </div>
 
-                    <Button 
+                    <Button
                       variant="outline"
                       onClick={() => setScheduleModalOpen(true)}
                     >
@@ -3093,7 +3133,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   Set up automatic report generation and delivery
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="space-y-4 py-4">
                 <div>
                   <Label htmlFor="schedule-name">Schedule Name *</Label>
@@ -3212,7 +3252,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   </Badge>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Contact Information</Label>
@@ -3231,7 +3271,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     </div>
                   </div>
                 </div>
-                
+
                 <div>
                   <Label>Membership Details</Label>
                   <div className="mt-2 space-y-2">

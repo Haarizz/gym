@@ -39,24 +39,43 @@ public class StaffService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.company.project.repositories.StaffBranchRepository staffBranchRepository;
+    private final BranchService branchService;
 
     public StaffService(StaffRepository staffRepository,
                         UserRepository userRepository,
                         RoleRepository roleRepository,
                         UserRoleRepository userRoleRepository,
-                        PasswordEncoder passwordEncoder) {
-        this.staffRepository    = staffRepository;
-        this.userRepository     = userRepository;
-        this.roleRepository     = roleRepository;
-        this.userRoleRepository = userRoleRepository;
-        this.passwordEncoder    = passwordEncoder;
+                        PasswordEncoder passwordEncoder,
+                        com.company.project.repositories.StaffBranchRepository staffBranchRepository,
+                        BranchService branchService) {
+        this.staffRepository       = staffRepository;
+        this.userRepository        = userRepository;
+        this.roleRepository        = roleRepository;
+        this.userRoleRepository    = userRoleRepository;
+        this.passwordEncoder       = passwordEncoder;
+        this.staffBranchRepository = staffBranchRepository;
+        this.branchService         = branchService;
     }
 
     @Transactional(readOnly = true)
     public StaffPageResponseDTO getStaff(String search, String role, String department,
                                           String status, String branch, int page, int limit) {
+        
+        Long activeBranchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
+        List<Long> allowedStaffIds = activeBranchId != null ? staffBranchRepository.findStaffIdsByBranchId(activeBranchId) : null;
+
         Specification<Staff> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            
+            if (activeBranchId != null) {
+                if (allowedStaffIds.isEmpty()) {
+                    predicates.add(cb.disjunction()); // return none
+                } else {
+                    predicates.add(root.get("id").in(allowedStaffIds));
+                }
+            }
+
             if (search != null && !search.isBlank()) {
                 String like = "%" + search.toLowerCase() + "%";
                 predicates.add(cb.or(
@@ -100,6 +119,9 @@ public class StaffService {
 
     public StaffResponseDTO createStaff(StaffRequestDTO req) {
         Staff staff = new Staff();
+        Long branchId = branchService.resolveBranchForCreate(null); // primary/home branch
+        staff.setBranchId(branchId);
+        
         applyRequest(req, staff);
         staff.setStatus(staff.getStatus() != null ? staff.getStatus() : "active");
         staff.setJoinDate(staff.getJoinDate() != null ? staff.getJoinDate() : LocalDate.now());
@@ -108,6 +130,11 @@ public class StaffService {
         // Generate EMP-XXXXXXXXXX id
         saved.setStaffId("EMP-" + String.format("%010d", saved.getId()));
         saved = staffRepository.save(saved);
+        
+        // Auto-assign to home branch in multi-branch table
+        if (branchId != null) {
+            branchService.assignStaffToBranch(saved.getId(), branchId);
+        }
 
         saved = syncAppLogin(saved, req);
 

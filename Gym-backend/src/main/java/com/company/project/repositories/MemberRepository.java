@@ -14,6 +14,7 @@ import java.util.Optional;
 
 @Repository
 public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecificationExecutor<Member> {
+    long countByBranchId(Long branchId);
 
     boolean existsByEmail(String email);
 

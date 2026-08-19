@@ -35,6 +35,8 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final StaffRepository staffRepository;
     private final RoleService roleService;
+    private final com.company.project.repositories.UserBranchRepository userBranchRepository;
+    private final com.company.project.repositories.BranchRepository branchRepository;
 
     public AuthService(
             UserRepository userRepository,
@@ -44,7 +46,9 @@ public class AuthService {
             JwtService jwtService,
             AuthenticationManager authenticationManager,
             StaffRepository staffRepository,
-            RoleService roleService
+            RoleService roleService,
+            com.company.project.repositories.UserBranchRepository userBranchRepository,
+            com.company.project.repositories.BranchRepository branchRepository
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -54,6 +58,8 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
         this.staffRepository = staffRepository;
         this.roleService = roleService;
+        this.userBranchRepository = userBranchRepository;
+        this.branchRepository = branchRepository;
     }
 
     @Transactional
@@ -101,6 +107,13 @@ public class AuthService {
         String jwt = jwtService.generateToken(userDetails);
         List<String> roles = extractRoles(userDetails);
 
+        List<com.company.project.dto.BranchResponseDTO> accessibleBranches = fetchAccessibleBranches(userDetails);
+        Long defaultBranchId = accessibleBranches.stream()
+                .filter(com.company.project.dto.BranchResponseDTO::isDefault)
+                .map(com.company.project.dto.BranchResponseDTO::getId)
+                .findFirst()
+                .orElse(accessibleBranches.isEmpty() ? null : accessibleBranches.get(0).getId());
+
         return AuthResponseDTO.builder()
                 .token(jwt)
                 .username(userDetails.getUsername())
@@ -112,6 +125,8 @@ public class AuthService {
                         .map(com.company.project.entities.Staff::getName)
                         .orElse(null))
                 .permissions(extractPermissions(userDetails))
+                .accessibleBranches(accessibleBranches)
+                .defaultBranchId(defaultBranchId)
                 .build();
     }
 
@@ -127,6 +142,13 @@ public class AuthService {
         }
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         List<String> roles = extractRoles(userDetails);
+        List<com.company.project.dto.BranchResponseDTO> accessibleBranches = fetchAccessibleBranches(userDetails);
+        Long defaultBranchId = accessibleBranches.stream()
+                .filter(com.company.project.dto.BranchResponseDTO::isDefault)
+                .map(com.company.project.dto.BranchResponseDTO::getId)
+                .findFirst()
+                .orElse(accessibleBranches.isEmpty() ? null : accessibleBranches.get(0).getId());
+
         return AuthResponseDTO.builder()
                 .username(userDetails.getUsername())
                 .roles(roles)
@@ -137,7 +159,33 @@ public class AuthService {
                         .map(com.company.project.entities.Staff::getName)
                         .orElse(null))
                 .permissions(extractPermissions(userDetails))
+                .accessibleBranches(accessibleBranches)
+                .defaultBranchId(defaultBranchId)
                 .build();
+    }
+
+    private List<com.company.project.dto.BranchResponseDTO> fetchAccessibleBranches(UserDetailsImpl userDetails) {
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+        
+        List<com.company.project.entities.Branch> branches;
+        if (isAdmin) {
+            branches = branchRepository.findByStatus("ACTIVE");
+        } else {
+            List<Long> branchIds = userBranchRepository.findBranchIdsByUserId(userDetails.getId());
+            branches = branchRepository.findByIdIn(branchIds).stream()
+                    .filter(b -> "ACTIVE".equals(b.getStatus()))
+                    .collect(Collectors.toList());
+        }
+        
+        return branches.stream().map(b -> {
+            com.company.project.dto.BranchResponseDTO dto = new com.company.project.dto.BranchResponseDTO();
+            dto.setId(b.getId());
+            dto.setBranchName(b.getBranchName());
+            dto.setBranchCode(b.getBranchCode());
+            dto.setDefault(b.isDefault());
+            return dto;
+        }).collect(Collectors.toList());
     }
 
     private List<String> extractRoles(UserDetailsImpl userDetails) {

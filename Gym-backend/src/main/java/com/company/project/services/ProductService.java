@@ -44,25 +44,31 @@ public class ProductService {
     private final StockAdjustmentRepository adjustmentRepository;
     private final WarehouseRepository warehouseRepository;
     private final ProductUnitRepository unitRepository;
+    private final BranchService branchService;
 
     public ProductService(ProductRepository productRepository,
                           ProductCategoryRepository categoryRepository,
                           ProductStockRepository stockRepository,
                           StockAdjustmentRepository adjustmentRepository,
                           WarehouseRepository warehouseRepository,
-                          ProductUnitRepository unitRepository) {
+                          ProductUnitRepository unitRepository,
+                          BranchService branchService) {
         this.productRepository  = productRepository;
         this.categoryRepository = categoryRepository;
         this.stockRepository    = stockRepository;
         this.adjustmentRepository = adjustmentRepository;
         this.warehouseRepository  = warehouseRepository;
         this.unitRepository       = unitRepository;
+        this.branchService        = branchService;
     }
 
     // ── Create ──────────────────────────────────────────────────────────────
 
     public ProductResponseDTO createProduct(ProductRequestDTO req) {
         Product product = new Product();
+        Long branchId = branchService.resolveBranchForCreate(null);
+        product.setBranchId(branchId);
+        
         mapRequestToProduct(req, product);
         product = productRepository.save(product);
 
@@ -397,6 +403,11 @@ public class ProductService {
     private Specification<Product> buildSpec(String search, Long categoryId, String status, Boolean enabledForPos) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            Long activeBranchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
+            if (activeBranchId != null) {
+                predicates.add(cb.equal(root.get("branchId"), activeBranchId));
+            }
 
             if (search != null && !search.isBlank()) {
                 String pattern = "%" + search.toLowerCase() + "%";
