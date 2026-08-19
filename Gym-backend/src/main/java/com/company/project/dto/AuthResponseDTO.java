@@ -11,6 +11,8 @@ public class AuthResponseDTO {
     private String roleName;
     private String staffName;
     private List<String> permissions;
+    private List<BranchResponseDTO> accessibleBranches;
+    private Long defaultBranchId;
 
     public AuthResponseDTO() {}
 
@@ -38,6 +40,12 @@ public class AuthResponseDTO {
     public List<String> getPermissions() { return permissions; }
     public void setPermissions(List<String> permissions) { this.permissions = permissions; }
 
+    public List<BranchResponseDTO> getAccessibleBranches() { return accessibleBranches; }
+    public void setAccessibleBranches(List<BranchResponseDTO> accessibleBranches) { this.accessibleBranches = accessibleBranches; }
+
+    public Long getDefaultBranchId() { return defaultBranchId; }
+    public void setDefaultBranchId(Long defaultBranchId) { this.defaultBranchId = defaultBranchId; }
+
     // Manual Builder
     public static AuthResponseDTOBuilder builder() {
         return new AuthResponseDTOBuilder();
@@ -52,6 +60,8 @@ public class AuthResponseDTO {
         private String roleName;
         private String staffName;
         private List<String> permissions;
+        private List<BranchResponseDTO> accessibleBranches;
+        private Long defaultBranchId;
 
         public AuthResponseDTOBuilder token(String token) { this.token = token; return this; }
         public AuthResponseDTOBuilder username(String username) { this.username = username; return this; }
@@ -61,6 +71,9 @@ public class AuthResponseDTO {
         public AuthResponseDTOBuilder roleName(String roleName) { this.roleName = roleName; return this; }
         public AuthResponseDTOBuilder staffName(String staffName) { this.staffName = staffName; return this; }
         public AuthResponseDTOBuilder permissions(List<String> permissions) { this.permissions = permissions; return this; }
+        public AuthResponseDTOBuilder accessibleBranches(List<BranchResponseDTO> accessibleBranches) { this.accessibleBranches = accessibleBranches; return this; }
+        public AuthResponseDTOBuilder defaultBranchId(Long defaultBranchId) { this.defaultBranchId = defaultBranchId; return this; }
+
         public AuthResponseDTO build() {
             AuthResponseDTO dto = new AuthResponseDTO();
             dto.token       = this.token;
@@ -71,6 +84,8 @@ public class AuthResponseDTO {
             dto.roleName    = this.roleName;
             dto.staffName   = this.staffName;
             dto.permissions = this.permissions;
+            dto.accessibleBranches = this.accessibleBranches;
+            dto.defaultBranchId = this.defaultBranchId;
             return dto;
         }
     }

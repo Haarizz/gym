@@ -62,6 +62,7 @@ public class MemberService {
     private final AutomationExecutorService automationExecutorService;
     private final ReceiptVoucherService receiptVoucherService;
     private final FinancialEventService financialEventService;
+    private final BranchService branchService;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
@@ -73,7 +74,8 @@ public class MemberService {
                          NotificationService notificationService,
                          AutomationExecutorService automationExecutorService,
                          ReceiptVoucherService receiptVoucherService,
-                         FinancialEventService financialEventService) {
+                         FinancialEventService financialEventService,
+                         BranchService branchService) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
         this.receiptService            = receiptService;
@@ -85,6 +87,7 @@ public class MemberService {
         this.automationExecutorService = automationExecutorService;
         this.receiptVoucherService     = receiptVoucherService;
         this.financialEventService     = financialEventService;
+        this.branchService             = branchService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -135,6 +138,9 @@ public class MemberService {
 
     public MemberResponseDTO createMember(MemberRequestDTO request) {
         Member member = new Member();
+        Long branchId = branchService.resolveBranchForCreate(null); // Assume active branch
+        member.setBranchId(branchId);
+        
         applyRequest(request, member);
         if (member.getTotalVisits() == null) member.setTotalVisits(0);
 
@@ -1151,6 +1157,11 @@ public class MemberService {
                                             String membershipType, String paymentStatus) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            Long activeBranchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
+            if (activeBranchId != null) {
+                predicates.add(cb.equal(root.get("branchId"), activeBranchId));
+            }
 
             if (search != null && !search.isBlank()) {
                 String pattern = "%" + search.toLowerCase() + "%";

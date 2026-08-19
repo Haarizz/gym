@@ -8,9 +8,14 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem('token');
+    const activeBranchId = sessionStorage.getItem('activeBranchId');
 
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    if (activeBranchId && activeBranchId !== 'null') {
+      config.headers['X-Active-Branch-Id'] = activeBranchId;
     }
 
     return config;
@@ -29,6 +34,8 @@ api.interceptors.response.use(
       sessionStorage.removeItem('username');
       sessionStorage.removeItem('roles');
       sessionStorage.removeItem('userId');
+      sessionStorage.removeItem('activeBranchId');
+      sessionStorage.removeItem('accessibleBranches');
 
       // Redirect to login if not already there
       if (window.location.pathname !== '/login') {

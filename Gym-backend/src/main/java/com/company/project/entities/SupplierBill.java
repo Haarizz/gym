@@ -3,10 +3,12 @@ package com.company.project.entities;
 import com.company.project.converters.PaymentBreakdownConverter;
 import com.company.project.dto.PaymentSplitDTO;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
 @Entity
 @Table(name = "supplier_bills")
 public class SupplierBill extends BaseEntity {
@@ -164,4 +166,20 @@ public class SupplierBill extends BaseEntity {
 
     public String getTaxCode() { return taxCode; }
     public void setTaxCode(String taxCode) { this.taxCode = taxCode; }
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
+
+    @jakarta.persistence.PrePersist
+    public void prePersistBranchId() {
+        if (this.branchId == null) {
+            Long activeBranch = com.company.project.security.BranchContextHolder.getActiveBranchId();
+            if (activeBranch != null) {
+                this.branchId = activeBranch;
+            }
+        }
+    }
 }

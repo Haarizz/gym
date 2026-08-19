@@ -1,11 +1,13 @@
 package com.company.project.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
 @Entity
 @Table(name = "invoices")
 public class Invoice extends BaseEntity {
@@ -107,5 +109,21 @@ public class Invoice extends BaseEntity {
     public void removeLine(InvoiceLine line) {
         lines.remove(line);
         line.setInvoice(null);
+    }
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
+
+    @jakarta.persistence.PrePersist
+    public void prePersistBranchId() {
+        if (this.branchId == null) {
+            Long activeBranch = com.company.project.security.BranchContextHolder.getActiveBranchId();
+            if (activeBranch != null) {
+                this.branchId = activeBranch;
+            }
+        }
     }
 }

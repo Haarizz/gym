@@ -1,9 +1,11 @@
 package com.company.project.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
 @Entity
 @Table(name = "staff_targets")
 public class StaffTarget extends BaseEntity {
@@ -100,4 +102,20 @@ public class StaffTarget extends BaseEntity {
     public void setTrend(String trend) { this.trend = trend; }
     public Integer getForecast() { return forecast; }
     public void setForecast(Integer forecast) { this.forecast = forecast; }
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
+
+    @jakarta.persistence.PrePersist
+    public void prePersistBranchId() {
+        if (this.branchId == null) {
+            Long activeBranch = com.company.project.security.BranchContextHolder.getActiveBranchId();
+            if (activeBranch != null) {
+                this.branchId = activeBranch;
+            }
+        }
+    }
 }

@@ -1,8 +1,10 @@
 package com.company.project.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.time.LocalDateTime;
 
+@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
 @Entity
 @Table(
     name = "notifications",
@@ -120,4 +122,20 @@ public class Notification extends BaseEntity {
 
     public String getEventKey() { return eventKey; }
     public void setEventKey(String eventKey) { this.eventKey = eventKey; }
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
+
+    @jakarta.persistence.PrePersist
+    public void prePersistBranchId() {
+        if (this.branchId == null) {
+            Long activeBranch = com.company.project.security.BranchContextHolder.getActiveBranchId();
+            if (activeBranch != null) {
+                this.branchId = activeBranch;
+            }
+        }
+    }
 }

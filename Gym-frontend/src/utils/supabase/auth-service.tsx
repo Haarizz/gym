@@ -117,6 +117,30 @@ class AuthService {
         sessionStorage.setItem("gymbios_auth_source","backend");
         if (roleName) sessionStorage.setItem("gymbios_role_name", roleName);
         if (staffName) sessionStorage.setItem("gymbios_staff_name", staffName);
+        
+        // Branch context initialization
+        const accessibleBranchesRaw = result.accessibleBranches ?? result.accessible_branches;
+        if (accessibleBranchesRaw) {
+          const mappedBranches = accessibleBranchesRaw.map((b: any) => ({
+            id: b.id,
+            branchName: b.branchName ?? b.branch_name,
+            branchCode: b.branchCode ?? b.branch_code,
+            isDefault: b.isDefault ?? b.is_default
+          }));
+          sessionStorage.setItem("accessibleBranches", JSON.stringify(mappedBranches));
+        }
+        
+        const defaultBranchId = result.defaultBranchId ?? result.default_branch_id;
+        const canAccessAllBranches = result.canAccessAllBranches ?? result.can_access_all_branches;
+        
+        if (defaultBranchId) {
+          sessionStorage.setItem("activeBranchId", String(defaultBranchId));
+        } else if (accessibleBranchesRaw && accessibleBranchesRaw.length > 0) {
+          sessionStorage.setItem("activeBranchId", String(accessibleBranchesRaw[0].id));
+        } else if (canAccessAllBranches) {
+          sessionStorage.setItem("activeBranchId", "null");
+        }
+
         setPermissions(permissions);
 
         return { success: true };

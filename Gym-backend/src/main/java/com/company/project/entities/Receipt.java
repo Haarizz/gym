@@ -5,10 +5,12 @@ import com.company.project.converters.PaymentBreakdownConverter;
 import com.company.project.dto.MinorChargeDTO;
 import com.company.project.dto.PaymentSplitDTO;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
 @Entity
 @Table(name = "receipts")
 public class Receipt extends BaseEntity {
@@ -220,4 +222,20 @@ public class Receipt extends BaseEntity {
 
     public Long getInvoiceId() { return invoiceId; }
     public void setInvoiceId(Long invoiceId) { this.invoiceId = invoiceId; }
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
+
+    @jakarta.persistence.PrePersist
+    public void prePersistBranchId() {
+        if (this.branchId == null) {
+            Long activeBranch = com.company.project.security.BranchContextHolder.getActiveBranchId();
+            if (activeBranch != null) {
+                this.branchId = activeBranch;
+            }
+        }
+    }
 }

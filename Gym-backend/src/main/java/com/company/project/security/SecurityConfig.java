@@ -30,13 +30,16 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final DeviceAuthFilter deviceAuthFilter;
+    private final BranchContextFilter branchContextFilter;
     private final UserDetailsService userDetailsService;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
                           DeviceAuthFilter deviceAuthFilter,
+                          BranchContextFilter branchContextFilter,
                           UserDetailsService userDetailsService) {
         this.jwtAuthFilter    = jwtAuthFilter;
         this.deviceAuthFilter = deviceAuthFilter;
+        this.branchContextFilter = branchContextFilter;
         this.userDetailsService = userDetailsService;
     }
 
@@ -99,7 +102,9 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider())
             // Device key filter runs first so hardware devices are identified before JWT check
             .addFilterBefore(deviceAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(jwtAuthFilter, DeviceAuthFilter.class);
+            .addFilterBefore(jwtAuthFilter, DeviceAuthFilter.class)
+            // Branch context filter runs after JWT to read active branch header and validate access
+            .addFilterAfter(branchContextFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

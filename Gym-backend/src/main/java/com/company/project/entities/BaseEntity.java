@@ -11,6 +11,10 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
+import org.hibernate.annotations.FilterDef;
+import org.hibernate.annotations.ParamDef;
+
+@FilterDef(name = "branchFilter", parameters = @ParamDef(name = "branchId", type = Long.class))
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 public abstract class BaseEntity {

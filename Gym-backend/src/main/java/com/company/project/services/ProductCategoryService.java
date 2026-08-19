@@ -16,18 +16,23 @@ public class ProductCategoryService {
 
     private final ProductCategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private final BranchService branchService;
 
     public ProductCategoryService(ProductCategoryRepository categoryRepository,
-                                  ProductRepository productRepository) {
+                                  ProductRepository productRepository,
+                                  BranchService branchService) {
         this.categoryRepository = categoryRepository;
         this.productRepository  = productRepository;
+        this.branchService      = branchService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<ProductCategoryDTO> getAllCategories() {
+        Long activeBranchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
         return categoryRepository.findAllByOrderByNameAsc().stream()
+                .filter(c -> activeBranchId == null || c.getBranchId() == null || activeBranchId.equals(c.getBranchId()))
                 .map(c -> {
                     int count = productRepository.findByCategoryId(c.getId()).size();
                     return ProductCategoryDTO.fromEntity(c, count);
@@ -47,6 +52,11 @@ public class ProductCategoryService {
 
     public ProductCategoryDTO create(ProductCategoryDTO dto) {
         ProductCategory category = new ProductCategory();
+        
+        Long branchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
+        // Allow creating global categories if branchId is null (Admin mode)
+        category.setBranchId(branchId);
+
         category.setName(dto.getName());
         category.setCategoryType(dto.getCategoryType());
         category.setColor(dto.getColor());

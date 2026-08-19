@@ -104,4 +104,10 @@ public class Staff extends BaseEntity {
 
     public Boolean getAppAccessEnabled() { return appAccessEnabled; }
     public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 }

@@ -73,6 +73,7 @@ import {
   Gauge
 } from 'lucide-react';
 import { PermissionGate, hasPermission } from "../utils/permissions";
+import { useBranch } from "../utils/branch-context";
 
 
 interface StaffsTrainersProps {
@@ -409,6 +410,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [deleteConfirmEmployee, setDeleteConfirmEmployee] = useState<Staff | null>(null);
   const [statusEmployee, setStatusEmployee] = useState<Staff | null>(null);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const { accessibleBranches } = useBranch();
 
   // Photo states
   const [photoAdjustMode, setPhotoAdjustMode] = useState(false);
@@ -983,8 +985,9 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Branches</SelectItem>
-                <SelectItem value="Downtown Dubai">Downtown Dubai</SelectItem>
-                <SelectItem value="Marina Branch">Marina Branch</SelectItem>
+                {accessibleBranches.map(b => (
+                  <SelectItem key={b.id} value={b.branchName}>{b.branchName}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -1522,8 +1525,9 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Downtown Dubai">Downtown Dubai</SelectItem>
-                      <SelectItem value="Marina Branch">Marina Branch</SelectItem>
+                      {accessibleBranches.map(b => (
+                        <SelectItem key={b.id} value={b.branchName}>{b.branchName}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1768,8 +1772,9 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     <Select value={editEmployeeData.branch} onValueChange={v => setEditEmployeeData(p => p ? {...p, branch: v} : p)}>
                       <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Downtown Dubai">Downtown Dubai</SelectItem>
-                        <SelectItem value="Marina Branch">Marina Branch</SelectItem>
+                        {accessibleBranches.map(b => (
+                          <SelectItem key={b.id} value={b.branchName}>{b.branchName}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
