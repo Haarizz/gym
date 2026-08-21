@@ -1,1 +1,3 @@
-export { StaffHomeScreen as default } from '@/domains/auth';
+import { StaffDashboardScreen } from '@/domains/dashboard';
+
+export default StaffDashboardScreen;

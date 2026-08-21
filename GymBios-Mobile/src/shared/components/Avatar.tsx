@@ -1,15 +1,6 @@
-import React from 'react';
-import { View, Image, Text, StyleSheet, ImageStyle } from 'react-native';
+import React, { useState } from 'react';
+import { View, Image, Text, StyleSheet } from 'react-native';
 import { BrandColors } from '../../core/theme';
-
-/**
- * Generic, reusable avatar component.
- *
- * - Renders an Image when `imageUrl` is provided.
- * - Falls back to a circular badge with `initials` otherwise.
- * - Fully configurable size/colors with sensible defaults so it
- *   can be dropped in anywhere in the app without extra styling.
- */
 import type { ViewStyle, StyleProp } from 'react-native';
 
 interface AvatarProps {
@@ -42,6 +33,8 @@ export const Avatar: React.FC<AvatarProps> = ({
   textColor = BrandColors.white,
   style,
 }) => {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+
   const numericSize = getNumericSize(size);
   const dimensionStyle = {
     width: numericSize,
@@ -54,25 +47,31 @@ export const Avatar: React.FC<AvatarProps> = ({
     (name
       ? name
           .split(' ')
+          .filter(Boolean)
           .map((n) => n[0])
           .join('')
       : DEFAULT_INITIALS);
-
-  if (imageUrl) {
-    return (
-      <Image
-        source={{ uri: imageUrl }}
-        style={[styles.image, dimensionStyle, style as ImageStyle]}
-        accessibilityRole="image"
-        accessibilityLabel={computedInitials ? `${computedInitials} avatar` : 'User avatar'}
-      />
-    );
-  }
 
   const fontSize = Math.round(numericSize * 0.4);
   const displayInitials = (computedInitials?.trim() || DEFAULT_INITIALS)
     .slice(0, 2)
     .toUpperCase();
+
+  const isImageValid = Boolean(imageUrl && imageUrl.trim().length > 0 && failedUrl !== imageUrl);
+
+  if (isImageValid && imageUrl) {
+    return (
+      <View style={[styles.container, dimensionStyle, { backgroundColor }, style]}>
+        <Image
+          source={{ uri: imageUrl }}
+          style={[styles.image, dimensionStyle]}
+          onError={() => setFailedUrl(imageUrl)}
+          accessibilityRole="image"
+          accessibilityLabel={computedInitials ? `${computedInitials} avatar` : 'User avatar'}
+        />
+      </View>
+    );
+  }
 
   return (
     <View

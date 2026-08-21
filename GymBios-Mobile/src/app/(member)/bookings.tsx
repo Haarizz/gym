@@ -1,1 +1,3 @@
-export { MemberBookingsScreen as default } from '@/domains/auth';
+import { MemberBookingsScreen } from '@/domains/memberPortal';
+
+export default MemberBookingsScreen;

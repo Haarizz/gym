@@ -12,6 +12,12 @@ import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors } from '@/core/theme';
 import { AppBottomSheet, ModuleSheet } from '@/shared/components';
+import { Avatar } from '@/shared/components/Avatar';
+import {
+  NotificationPanel,
+  useProfile,
+  useUnreadNotificationCount,
+} from '@/domains/profile';
 import {
   isCommunityRoute,
   isFullScreenRoute,
@@ -59,6 +65,9 @@ export function RoleTabsLayout({
   const router = useRouter();
   const segments = useSegments();
   const [isModulesOpen, setIsModulesOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const { profile, initials } = useProfile();
+  const { count: unreadCount } = useUnreadNotificationCount();
 
   const roleGroup = segments[0] || '(admin)';
 
@@ -72,6 +81,8 @@ export function RoleTabsLayout({
 
   const greeting = getGreeting();
 
+  const isAdmin = roleGroup === '(admin)';
+
   return (
     <SafeAreaView
       edges={['top']}
@@ -84,20 +95,45 @@ export function RoleTabsLayout({
                 hitSlop={12}
                 style={styles.avatarButton}
                 onPress={() => {
-                  // Future: navigate to profile screen
-                }}>
-                <Text style={styles.avatarText}>A</Text>
+                  router.push(`/${roleGroup}/profile` as any);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Open profile hub"
+              >
+                <Avatar
+                  size={36}
+                  initials={initials}
+                  imageUrl={profile?.photoUrl}
+                  backgroundColor="rgba(255,255,255,0.2)"
+                  textColor="#FFFFFF"
+                />
               </Pressable>
 
               <View style={styles.headerTextContainer}>
                 <Text style={styles.greeting}>{greeting}</Text>
-                <Text style={styles.titleText}>{title} · All branches</Text>
+                <Text style={styles.titleText}>
+                  {profile?.name || title} · {profile?.branch || 'All branches'}
+                </Text>
               </View>
             </View>
 
-            <Pressable hitSlop={12} style={styles.notificationButton}>
+            <Pressable
+              hitSlop={12}
+              style={styles.notificationButton}
+              onPress={() => setIsNotificationsOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Notifications, ${unreadCount} unread`}
+            >
               <Feather name="bell" size={20} color="#FFF" />
-              <View style={styles.notificationBadge} />
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  {unreadCount > 1 && unreadCount <= 99 ? (
+                    <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
+                  ) : unreadCount > 99 ? (
+                    <Text style={styles.notificationBadgeText}>99+</Text>
+                  ) : null}
+                </View>
+              )}
             </Pressable>
           </View>
         )}
@@ -161,7 +197,7 @@ export function RoleTabsLayout({
           ))}
         </Tabs>
 
-        {!isFullScreen && !isCommunityScreen && (
+        {!isFullScreen && !isCommunityScreen && isAdmin && (
           <Pressable
             style={({ pressed }) => [
               styles.modulesFabContainer,
@@ -186,6 +222,11 @@ export function RoleTabsLayout({
         >
           <ModuleSheet onNavigate={() => setIsModulesOpen(false)} />
         </AppBottomSheet>
+
+        <NotificationPanel
+          visible={isNotificationsOpen}
+          onClose={() => setIsNotificationsOpen(false)}
+        />
       </View>
     </SafeAreaView>
   );
@@ -254,12 +295,22 @@ const styles = StyleSheet.create({
 
   notificationBadge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 0,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+
+  notificationBadgeText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 11,
   },
 
   tabBar: {
