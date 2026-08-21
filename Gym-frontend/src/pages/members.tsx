@@ -624,6 +624,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const getMembershipPlan = (member: Member) => member.membership_plan || member.membership_type;
   const getMembershipStartDate = (member: Member) => member.membership_start_date || member.join_date;
   const getMembershipEndDate = (member: Member) => member.membership_end_date || member.expiry_date || '';
+
+  const getComputedStatus = (member: Member) => {
+    if (member.membership_status === 'pending_approval') return 'pending_approval';
+    const endDateStr = getMembershipEndDate(member);
+    if (endDateStr) {
+      const end = new Date(endDateStr);
+      end.setHours(23, 59, 59, 999);
+      if (end < new Date()) {
+        return 'Expired';
+      }
+    }
+    return member.membership_status ? (member.membership_status.charAt(0).toUpperCase() + member.membership_status.slice(1)) : '';
+  };
   const getMembershipFee = (member: Member) => member.membership_fee || member.monthly_fee;
 
   // Mirrors MemberService.memberPriceForIndex() on the backend.
@@ -1401,18 +1414,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           </TableCell>
                           <TableCell>
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${member.membership_status === 'pending_approval'
-                                ? 'bg-amber-100 text-amber-700'
-                                : member.membership_status === 'active'
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : member.membership_status === 'inactive'
-                                    ? 'bg-slate-100 text-slate-600'
-                                    : member.membership_status === 'suspended'
-                                      ? 'bg-amber-100 text-amber-700'
-                                      : 'bg-rose-100 text-rose-700'
-                                }`}
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(getComputedStatus(member))}`}
                             >
-                              {member.membership_status === 'pending_approval' ? 'Pending Approval' : member.membership_status}
+                              {getComputedStatus(member) === 'pending_approval' ? 'Pending Approval' : getComputedStatus(member)}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -1634,8 +1638,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Status</Label>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(profileMember.membership_status)}`}>
-                            {profileMember.membership_status}
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(getComputedStatus(profileMember))}`}>
+                            {getComputedStatus(profileMember) === 'pending_approval' ? 'Pending Approval' : getComputedStatus(profileMember)}
                           </span>
                         </div>
                         <div className="space-y-1">

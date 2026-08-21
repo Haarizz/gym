@@ -92,7 +92,7 @@ public class FinancialReportService {
         Map<String, BigDecimal> revenueByAccount  = new LinkedHashMap<>();
         Map<String, BigDecimal> expenseByAccount  = new LinkedHashMap<>();
 
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
             if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
 
             String code = line.getAccountCode();
@@ -149,7 +149,7 @@ public class FinancialReportService {
         Map<String, BigDecimal> debitByCode  = new HashMap<>();
         Map<String, BigDecimal> creditByCode = new HashMap<>();
         if (!postedJvIds.isEmpty()) {
-            for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+            for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
                 if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
                 String code = line.getAccountCode();
                 if (code == null) continue;
@@ -209,7 +209,7 @@ public class FinancialReportService {
 
         Map<String, BigDecimal> debitByCode  = new HashMap<>();
         Map<String, BigDecimal> creditByCode = new HashMap<>();
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
             if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
             String code = line.getAccountCode();
             if (code == null) continue;
@@ -274,7 +274,7 @@ public class FinancialReportService {
         int inflowCount  = 0;
         int outflowCount = 0;
 
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
             if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
 
             String code = line.getAccountCode();
@@ -347,7 +347,7 @@ public class FinancialReportService {
         BigDecimal outputVat     = BigDecimal.ZERO;
         BigDecimal inputVat      = BigDecimal.ZERO;
 
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
             if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
 
             String code = line.getAccountCode();
@@ -404,7 +404,7 @@ public class FinancialReportService {
     private List<Map<String, Object>> getTaxByCodeBreakdown(LocalDate from, LocalDate to) {
         Set<Long> postedJvIds = getPostedJvIds(from, to);
         Map<String, BigDecimal> netByAccount = new HashMap<>();
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
             if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
             String code = line.getAccountCode();
             if (code == null) continue;
@@ -443,7 +443,7 @@ public class FinancialReportService {
      * member/plan). The two totals should always tie out to each other.
      */
     public Map<String, Object> getDeferredRevenueReport() {
-        BigDecimal ledgerBalance = accountHeadRepository.findByCode(ACC_DEFERRED_REVENUE)
+        BigDecimal ledgerBalance = accountHeadRepository.findFirstByCode(ACC_DEFERRED_REVENUE)
                 .map(AccountHead::getCurrentBalance)
                 .orElse(BigDecimal.ZERO);
 
@@ -481,7 +481,7 @@ public class FinancialReportService {
         Map<Long, JournalVoucher> jvById = buildJvMap(from, to);
         Map<String, AccountHead> accountMap = buildAccountMap();
 
-        List<JournalVoucherLine> cashLines = journalVoucherLineRepository.findAll().stream()
+        List<JournalVoucherLine> cashLines = journalVoucherLineRepository.findByJournalVoucherIdIn(jvById.keySet()).stream()
                 .filter(l -> jvById.containsKey(l.getJournalVoucherId()))
                 .filter(l -> isCashAccount(l.getAccountCode(), accountMap))
                 .sorted(Comparator.comparing((JournalVoucherLine l) -> jvById.get(l.getJournalVoucherId()).getDate())
@@ -519,7 +519,7 @@ public class FinancialReportService {
     public Map<String, Object> getDayBook(LocalDate date) {
         Map<Long, JournalVoucher> jvById = buildJvMap(date, date);
 
-        List<Map<String, Object>> entries = journalVoucherLineRepository.findAll().stream()
+        List<Map<String, Object>> entries = journalVoucherLineRepository.findByJournalVoucherIdIn(jvById.keySet()).stream()
                 .filter(l -> jvById.containsKey(l.getJournalVoucherId()))
                 .sorted(Comparator.comparing(JournalVoucherLine::getJournalVoucherId)
                         .thenComparing(JournalVoucherLine::getId))
@@ -549,7 +549,7 @@ public class FinancialReportService {
                 .filter(a -> accountCode == null || accountCode.isBlank() || accountCode.equals(a.getCode()))
                 .collect(Collectors.toList());
 
-        Map<String, List<JournalVoucherLine>> linesByAccount = journalVoucherLineRepository.findAll().stream()
+        Map<String, List<JournalVoucherLine>> linesByAccount = journalVoucherLineRepository.findByJournalVoucherIdIn(jvById.keySet()).stream()
                 .filter(l -> jvById.containsKey(l.getJournalVoucherId()))
                 .filter(l -> l.getAccountCode() != null)
                 .collect(Collectors.groupingBy(JournalVoucherLine::getAccountCode));

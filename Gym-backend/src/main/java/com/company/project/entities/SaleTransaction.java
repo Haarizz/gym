@@ -8,10 +8,10 @@ import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.util.List;
 
-@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "sale_transactions")
-public class SaleTransaction extends BaseEntity {
+public class SaleTransaction extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

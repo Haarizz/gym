@@ -27,6 +27,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         SELECT n FROM Notification n
         WHERE n.companyId = :cid
           AND n.isDeleted = false
+          AND (:branchId IS NULL OR n.branchId = :branchId)
           AND (
                n.targetUserId = :uid
             OR (n.targetRole IN :roles AND n.targetUserId IS NULL)
@@ -43,7 +44,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findAllForUser(
         @Param("cid") Long companyId,
         @Param("uid") Long userId,
-        @Param("roles") List<String> roles
+        @Param("roles") List<String> roles,
+        @Param("branchId") Long branchId
     );
 
     /** Unread role/user-targeted notifications for a user (see findAllForUser for the module-filter note). */
@@ -52,6 +54,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         WHERE n.companyId = :cid
           AND n.isDeleted = false
           AND n.isRead = false
+          AND (:branchId IS NULL OR n.branchId = :branchId)
           AND (
                n.targetUserId = :uid
             OR (n.targetRole IN :roles AND n.targetUserId IS NULL)
@@ -60,7 +63,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findUnreadForUser(
         @Param("cid") Long companyId,
         @Param("uid") Long userId,
-        @Param("roles") List<String> roles
+        @Param("roles") List<String> roles,
+        @Param("branchId") Long branchId
     );
 
     /** Mark all unread as read for the given user + roles. */
@@ -70,6 +74,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         WHERE n.companyId = :cid
           AND n.isDeleted = false
           AND n.isRead = false
+          AND (:branchId IS NULL OR n.branchId = :branchId)
           AND (
                n.targetUserId = :uid
             OR (n.targetRole IN :roles AND n.targetUserId IS NULL)
@@ -78,7 +83,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     void markAllReadForUser(
         @Param("cid") Long companyId,
         @Param("uid") Long userId,
-        @Param("roles") List<String> roles
+        @Param("roles") List<String> roles,
+        @Param("branchId") Long branchId
     );
 
     /** Idempotency: find existing notification by company + eventKey. */

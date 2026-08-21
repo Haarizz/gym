@@ -10,10 +10,10 @@ import java.time.LocalDate;
  * one money movement that isn't a revenue/expense event and previously had no
  * dedicated voucher type, forcing accountants through a manual Journal Voucher.
  */
-@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "contra_vouchers")
-public class ContraVoucher extends BaseEntity {
+public class ContraVoucher extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -4,6 +4,7 @@ import { promotionsService, PromotionApi } from '../utils/supabase/promotions-se
 import { facilitiesService, FacilityApi } from '../utils/supabase/facilities-service';
 import { planGroupsService, PlanGroupApi } from '../utils/supabase/plan-groups-service';
 import { addonPlansService, AddonPlan } from '../utils/supabase/addon-plans-service';
+import { useBranch } from '../utils/branch-context';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -46,6 +47,7 @@ import exampleImage from 'figma:asset/362a2ed9c216cf9c38308e71b24d35a09379ac76.p
 import { toast } from "sonner";
 
 export function ManagePlans() {
+  const { activeBranchId } = useBranch();
   const { currencyCode } = useCurrency();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -161,7 +163,7 @@ export function ManagePlans() {
       }
     };
     loadPlans();
-  }, []);
+  }, [activeBranchId]);
 
   useEffect(() => {
     const loadPromotions = async () => {
@@ -201,7 +203,7 @@ export function ManagePlans() {
       }
     };
     loadPromotions();
-  }, [currencyCode]);
+  }, [currencyCode, activeBranchId]);
 
   useEffect(() => {
     const loadFacilities = async () => {
@@ -216,7 +218,7 @@ export function ManagePlans() {
       }
     };
     loadFacilities();
-  }, []);
+  }, [activeBranchId]);
 
   const loadPlanGroups = async () => {
     try {
@@ -234,7 +236,7 @@ export function ManagePlans() {
 
   useEffect(() => {
     loadPlanGroups();
-  }, []);
+  }, [activeBranchId]);
 
   const handleAddPlanGroup = async () => {
     const name = newPlanGroupName.trim();
@@ -275,7 +277,7 @@ export function ManagePlans() {
 
   useEffect(() => {
     loadTrainingStreams();
-  }, []);
+  }, [activeBranchId]);
 
   const handleAddTrainingStream = async () => {
     const name = newTrainingStreamName.trim();
@@ -864,12 +866,22 @@ export function ManagePlans() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPlans.map((plan) => (
+              {filteredPlans.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="h-32 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <Search className="h-8 w-8 mb-2 opacity-20" />
+                      <p>No results found. Try a different search term.</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredPlans.map((plan) => (
                 <TableRow key={plan.id} className="hover:bg-slate-50/50 transition-colors">
                   <TableCell>
-                    <div>
-                      <div className="font-medium">{plan.name}</div>
-                      <div className="text-sm text-muted-foreground">{plan.type}</div>
+                    <div className="max-w-[200px]">
+                      <div className="font-medium truncate" title={plan.name}>{plan.name}</div>
+                      <div className="text-sm text-muted-foreground truncate" title={plan.type}>{plan.type}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -1026,7 +1038,7 @@ export function ManagePlans() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              )))}
             </TableBody>
           </Table>
         </CardContent>
@@ -1168,10 +1180,14 @@ export function ManagePlans() {
               <Label htmlFor="planName">Plan Name *</Label>
               <Input
                 id="planName"
+                maxLength={60}
                 placeholder="e.g., Premium Monthly"
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
               />
+              <p className="text-xs text-muted-foreground">
+                Plan name must be under 60 characters ({formData.name.length}/60)
+              </p>
             </div>
 
             {/* Plan Type and Duration */}

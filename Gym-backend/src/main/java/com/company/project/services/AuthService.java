@@ -104,6 +104,9 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
+        // Clear any previous branch context (from an old session's JWT) so that fetching the new user's profile doesn't fail
+        com.company.project.security.BranchContextHolder.clear();
+
         String jwt = jwtService.generateToken(userDetails);
         List<String> roles = extractRoles(userDetails);
 

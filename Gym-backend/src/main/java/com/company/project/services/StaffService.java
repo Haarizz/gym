@@ -187,6 +187,7 @@ public class StaffService {
             staff.setAppUsername(req.getAppUsername());
             staff.setAppAccessEnabled(true);
             staff = staffRepository.save(staff);
+            branchService.syncUserBranchesForStaff(staff.getId());
         } else {
             User user = userRepository.findById(staff.getUserId())
                     .orElseThrow(() -> new RuntimeException("Linked user account not found"));
@@ -271,6 +272,7 @@ public class StaffService {
             staff.setAppUsername(appUsername);
             staff.setAppAccessEnabled(true);
             staffRepository.save(staff);
+            branchService.syncUserBranchesForStaff(staff.getId());
         }
 
         return StaffResponseDTO.fromEntity(staffRepository.findById(id).orElseThrow());

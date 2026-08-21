@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.company.project.security.BranchContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -126,7 +127,7 @@ public class NotificationService {
         UserContext ctx = currentUserContext();
         Set<String> allowedModules = allowedModulesForRoles(ctx.roles);
         List<Notification> visible = notificationRepository
-                .findAllForUser(ctx.companyId, ctx.userId, ctx.roles).stream()
+                .findAllForUser(ctx.companyId, ctx.userId, ctx.roles, BranchContextHolder.getActiveBranchId()).stream()
                 .filter(n -> isModuleVisible(n.getModule(), allowedModules))
                 .toList();
 
@@ -142,7 +143,7 @@ public class NotificationService {
     public long getUnreadCount() {
         UserContext ctx = currentUserContext();
         Set<String> allowedModules = allowedModulesForRoles(ctx.roles);
-        return notificationRepository.findUnreadForUser(ctx.companyId, ctx.userId, ctx.roles).stream()
+        return notificationRepository.findUnreadForUser(ctx.companyId, ctx.userId, ctx.roles, BranchContextHolder.getActiveBranchId()).stream()
                 .filter(n -> isModuleVisible(n.getModule(), allowedModules))
                 .count();
     }
@@ -158,7 +159,7 @@ public class NotificationService {
 
     public void markAllRead() {
         UserContext ctx = currentUserContext();
-        notificationRepository.markAllReadForUser(ctx.companyId, ctx.userId, ctx.roles);
+        notificationRepository.markAllReadForUser(ctx.companyId, ctx.userId, ctx.roles, BranchContextHolder.getActiveBranchId());
     }
 
     public void softDelete(Long notificationId) {

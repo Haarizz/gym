@@ -16,7 +16,7 @@ import org.hibernate.annotations.ParamDef;
 
 @FilterDef(name = "branchFilter", parameters = @ParamDef(name = "branchId", type = Long.class))
 @MappedSuperclass
-@EntityListeners(AuditingEntityListener.class)
+@EntityListeners({AuditingEntityListener.class, com.company.project.security.BranchSecurityListener.class})
 public abstract class BaseEntity {
 
     @CreatedDate

@@ -877,7 +877,7 @@ public class FinancialEventService {
      */
     void updateAccountBalance(String code, String name, BigDecimal debit, BigDecimal credit) {
         if (code == null) return;
-        AccountHead account = accountRepo.findByCode(code).orElseGet(() -> {
+        AccountHead account = accountRepo.findFirstByCode(code).orElseGet(() -> {
             AccountHead a = new AccountHead();
             a.setCode(code);
             a.setName(name);

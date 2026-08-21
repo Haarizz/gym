@@ -6,10 +6,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "wastage_returns")
-public class WastageReturn extends BaseEntity {
+public class WastageReturn extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

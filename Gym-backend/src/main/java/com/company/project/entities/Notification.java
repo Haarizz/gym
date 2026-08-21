@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.time.LocalDateTime;
 
-@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(
     name = "notifications",
@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_notif_priority_date", columnList = "company_id, is_deleted, priority, created_at")
     }
 )
-public class Notification extends BaseEntity {
+public class Notification extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

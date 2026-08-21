@@ -66,7 +66,7 @@ public class FinancialAnalyticsService {
         BigDecimal totalRevenue  = BigDecimal.ZERO;
         BigDecimal totalExpenses = BigDecimal.ZERO;
 
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedIds)) {
             if (!postedIds.contains(line.getJournalVoucherId())) continue;
             String code = line.getAccountCode();
             if (code == null) continue;
@@ -145,7 +145,7 @@ public class FinancialAnalyticsService {
                         && !jv.getDate().isAfter(to))
                 .collect(Collectors.toMap(JournalVoucher::getId, JournalVoucher::getDate, (a, b) -> a));
 
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedIds)) {
             Long jvId = line.getJournalVoucherId();
             if (!postedIds.contains(jvId)) continue;
             LocalDate date = jvDateById.get(jvId);
@@ -198,7 +198,7 @@ public class FinancialAnalyticsService {
         Set<Long> postedIds = getAllPostedJvIds();
 
         Map<String, BigDecimal> bySource = new LinkedHashMap<>();
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedIds)) {
             if (!postedIds.contains(line.getJournalVoucherId())) continue;
             String code = line.getAccountCode();
             if (code == null) continue;
@@ -227,7 +227,7 @@ public class FinancialAnalyticsService {
         Set<Long> postedIds = getAllPostedJvIds();
 
         Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedIds)) {
             if (!postedIds.contains(line.getJournalVoucherId())) continue;
             String code = line.getAccountCode();
             if (code == null) continue;

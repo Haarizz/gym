@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useBranch } from '../utils/branch-context';
 import { useCurrency, CurrencyValue } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -35,6 +36,7 @@ const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b
 
 export function Financials() {
   const { currencyCode } = useCurrency();
+  const { activeBranchId } = useBranch();
   // ── Live data state ────────────────────────────────────────────────────────
   const [kpiData, setKpiData] = useState({
     totalIncome: 0,
@@ -111,7 +113,8 @@ export function Financials() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

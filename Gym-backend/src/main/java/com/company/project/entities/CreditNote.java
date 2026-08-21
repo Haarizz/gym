@@ -11,10 +11,10 @@ import java.time.LocalDate;
  * whole SaleTransaction); this covers membership/add-on fee adjustments that
  * have no POS transaction behind them.
  */
-@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "credit_notes")
-public class CreditNote extends BaseEntity {
+public class CreditNote extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

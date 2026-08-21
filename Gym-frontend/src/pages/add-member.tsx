@@ -990,14 +990,30 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     
     // Validation
     const isMemberIdValid = isEditMode ? !!formData.memberId : true;
-    if (!isMemberIdValid || !formData.firstName || !formData.lastName || !formData.membershipPlan) {
+    if (!isMemberIdValid || !formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.membershipPlan) {
       toast.error('Please fill in all required fields', {
         description: isEditMode 
-          ? 'Member ID, first name, last name, and membership plan are required.' 
-          : 'First name, last name, and membership plan are required.',
+          ? 'Member ID, first name, last name, email, phone, and membership plan are required.' 
+          : 'First name, last name, email, phone, and membership plan are required.',
         duration: 4000
       });
       return;
+    }
+
+    if (formData.joiningDate && formData.startDate) {
+      const joinD = new Date(formData.joiningDate);
+      const startD = new Date(formData.startDate);
+      // Strip time components for accurate date-only comparison
+      joinD.setHours(0, 0, 0, 0);
+      startD.setHours(0, 0, 0, 0);
+      
+      if (startD < joinD) {
+        toast.error('Invalid Dates', {
+          description: 'Start date cannot be earlier than joining date.',
+          duration: 4000
+        });
+        return;
+      }
     }
 
     // Family / Couple membership validation
@@ -1901,9 +1917,26 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       toast.success(isEditMode ? 'Member updated successfully!' : 'Member registered successfully!');
       onNavigate?.('members');
       navigate('/members');
-    } catch (err) {
+    } catch (err: any) {
       console.error(isEditMode ? 'Failed to update member:' : 'Failed to create member:', err);
-      toast.error(isEditMode ? 'Failed to update member. Please try again.' : 'Failed to create member. Please try again.');
+      
+      const is403 = err.message && err.message.includes('403');
+      const activeBranchId = sessionStorage.getItem('activeBranchId');
+      const isAllBranches = !activeBranchId || activeBranchId === 'null';
+
+      const title = isAllBranches && is403 
+        ? 'please switch to a branch to create member' 
+        : (isEditMode ? 'Failed to update member' : 'Failed to create member');
+        
+      const description = isAllBranches && is403 
+        ? '' 
+        : (err.message || 'Please try again.');
+
+      toast.error(title, {
+        description: description,
+        duration: 5000,
+        style: { color: 'black' }
+      });
       return;
     }
     
@@ -2233,7 +2266,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               </div>
               <div>
                 <Label htmlFor="phone" className="mb-1.5 block">Phone <span className="text-red-500">*</span></Label>
-                <Input id="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+971 XX XXX XXXX" required />
+                <Input id="phone" value={formData.phone} onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setFormData({...formData, phone: v}); }} placeholder="+971 XX XXX XXXX" required />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2507,7 +2540,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                                 <Label className="text-sm text-gray-600 mb-1 block">Phone (optional)</Label>
                                 <Input
                                   value={member.phone}
-                                  onChange={(e) => updateFamilyMemberField(member.id, 'phone', e.target.value)}
+                                  onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) updateFamilyMemberField(member.id, 'phone', v); }}
                                   className="border-primary/20"
                                 />
                               </div>
@@ -2643,7 +2676,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               </div>
               <div>
                 <Label htmlFor="startDate" className="mb-1.5 flex items-center gap-1.5"><FaCalendarDays className="h-3.5 w-3.5" />Start Date</Label>
-                <Input id="startDate" type="date" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
+                <Input id="startDate" type="date" min={formData.joiningDate} value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
                 <p className="text-xs text-muted-foreground mt-1">Membership service start date</p>
               </div>
             </div>
@@ -2981,7 +3014,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     <Input
                       id="emergencyContactPhone"
                       value={formData.emergencyContactPhone}
-                      onChange={(e) => setFormData({...formData, emergencyContactPhone: e.target.value})}
+                      onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setFormData({...formData, emergencyContactPhone: v}); }}
                       placeholder="+971 XX XXX XXXX"
                       className="bg-white border-red-200 focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     />

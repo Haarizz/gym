@@ -171,8 +171,14 @@ import {
   Clock,
   CalendarClock,
   ShieldCheck,
+  Globe,
+  Award,
+  Search,
+  Box,
+  Info
 } from "lucide-react";
 import { Button } from "./components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import {
   Avatar,
   AvatarFallback,
@@ -228,28 +234,28 @@ const menuItems = [
         icon: LogIn,
         id: "check-in",
         path: "/check-in",
-        permission: "ATTENDANCE_VIEW",
+        permission: "CHECK_IN_VIEW",
       },
       {
         title: "Training Streams",
         icon: Video,
         id: "training-streams",
         path: "/training-streams",
-        permission: "COMMUNITY_VIEW",
+        permission: "TRAINING_STREAMS_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "reports",
         path: "/reports",
-        permission: "REPORTS_VIEW",
+        permission: "COMMUNITY_REPORTS_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "analytics",
         path: "/analytics",
-        permission: "REPORTS_VIEW",
+        permission: "COMMUNITY_ANALYTICS_VIEW",
       },
     ],
   },
@@ -265,63 +271,63 @@ const menuItems = [
         icon: Megaphone,
         id: "promotions-campaign",
         path: "/promotions-campaign",
-        permission: "MEMBER_CONNECT_VIEW",
+        permission: "PROMOTIONS_CAMPAIGN_VIEW",
       },
       {
         title: "Referrals",
         icon: Share,
         id: "referrals",
         path: "/referrals",
-        permission: "MEMBER_CONNECT_VIEW",
+        permission: "REFERRALS_VIEW",
       },
       {
         title: "Leads",
         icon: Target,
         id: "leads",
         path: "/leads",
-        permission: "MEMBER_CONNECT_VIEW",
+        permission: "LEADS_VIEW",
       },
       {
         title: "Follow-ups",
         icon: Phone,
         id: "follow-ups",
         path: "/follow-ups",
-        permission: "MEMBER_CONNECT_VIEW",
+        permission: "FOLLOW_UPS_VIEW",
       },
       {
         title: "Messaging",
         icon: MessageSquare,
         id: "messaging",
         path: "/messaging",
-        permission: "MEMBER_CONNECT_VIEW",
+        permission: "MESSAGING_VIEW",
       },
       {
         title: "Automations",
         icon: Zap,
         id: "automations",
         path: "/automations",
-        permission: "MEMBER_CONNECT_VIEW",
+        permission: "AUTOMATIONS_VIEW",
       },
       {
         title: "Post-Workout Check-in",
         icon: CheckCircle,
         id: "post-workout-checkin",
         path: "/post-workout-checkin",
-        permission: "MEMBER_CONNECT_VIEW",
+        permission: "POST_WORKOUT_CHECKIN_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "member-connect-reports",
         path: "/member-connect-reports",
-        permission: "REPORTS_VIEW",
+        permission: "MEMBER_CONNECT_REPORTS_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "member-connect-analytics",
         path: "/member-connect-analytics",
-        permission: "REPORTS_VIEW",
+        permission: "MEMBER_CONNECT_ANALYTICS_VIEW",
       },
     ],
   },
@@ -337,70 +343,70 @@ const menuItems = [
         icon: CreditCard,
         id: "point-of-sale",
         path: "/point-of-sale",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "POINT_OF_SALE_VIEW",
       },
       {
         title: "Products",
         icon: Package,
         id: "products",
         path: "/products",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "PRODUCTS_VIEW",
       },
       {
         title: "Category",
         icon: Tag,
         id: "category",
         path: "/category",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "CATEGORY_VIEW",
       },
       {
         title: "Purchase Order",
         icon: ClipboardList,
         id: "purchase-order",
         path: "/purchase-order",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "PURCHASE_ORDER_VIEW",
       },
       {
         title: "Purchase",
         icon: ShoppingBag,
         id: "purchase",
         path: "/purchase",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "PURCHASE_VIEW",
       },
       {
         title: "Wastage / Returns",
         icon: ArrowLeftRight,
         id: "wastage-returns",
         path: "/wastage-returns",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "WASTAGE_RETURNS_VIEW",
       },
       {
         title: "Production / Recipe",
         icon: ChefHat,
         id: "production-recipe",
         path: "/production-recipe",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "PRODUCTION_RECIPE_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "sales-reports",
         path: "/sales-reports",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "SALES_REPORTS_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "sales-analytics",
         path: "/sales-analytics",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "SALES_ANALYTICS_VIEW",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "sales-settings",
         path: "/sales-settings",
-        permission: "SALES_PURCHASES_VIEW",
+        permission: "SETTINGS_VIEW",
       },
     ],
   },
@@ -416,77 +422,77 @@ const menuItems = [
         icon: BookOpen,
         id: "ledgers",
         path: "/ledgers",
-        permission: "FINANCIALS_VIEW",
+        permission: "LEDGERS_VIEW",
       },
       {
         title: "Receipt Voucher",
         icon: Receipt,
         id: "receipt-voucher",
         path: "/receipt-voucher",
-        permission: "FINANCIALS_VIEW",
+        permission: "RECEIPT_VOUCHER_VIEW",
       },
       {
         title: "Journal Voucher",
         icon: FileText,
         id: "journal-voucher",
         path: "/journal-voucher",
-        permission: "FINANCIALS_VIEW",
+        permission: "JOURNAL_VOUCHER_VIEW",
       },
       {
         title: "Payment Voucher",
         icon: Banknote,
         id: "payment-voucher",
         path: "/payment-voucher",
-        permission: "FINANCIALS_VIEW",
+        permission: "PAYMENT_VOUCHER_VIEW",
       },
       {
         title: "Bank Reconciliations",
         icon: Landmark,
         id: "bank-reconciliations",
         path: "/bank-reconciliations",
-        permission: "FINANCIALS_VIEW",
+        permission: "BANK_RECONCILIATIONS_VIEW",
       },
       {
         title: "Expenses",
         icon: TrendingDown,
         id: "expenses",
         path: "/expenses",
-        permission: "FINANCIALS_VIEW",
+        permission: "EXPENSES_VIEW",
       },
       {
         title: "Tax Compliance",
         icon: Receipt,
         id: "tax-compliance",
         path: "/tax-compliance",
-        permission: "FINANCIALS_VIEW",
+        permission: "TAX_COMPLIANCE_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "financial-reports",
         path: "/financial-reports",
-        permission: "FINANCIALS_VIEW",
+        permission: "FINANCIAL_REPORTS_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "financial-analytics",
         path: "/financial-analytics",
-        permission: "FINANCIALS_VIEW",
+        permission: "FINANCIAL_ANALYTICS_VIEW",
       },
       {
         title: "Fiscal Periods",
         icon: CalendarClock,
         id: "fiscal-periods",
         path: "/fiscal-periods",
-        permission: "FINANCIALS_VIEW",
+        permission: "FISCAL_PERIODS_VIEW",
       },
       {
         title: "Settings",
         icon: Settings,
         id: "financial-settings",
         path: "/financial-settings",
-        permission: "FINANCIALS_VIEW",
+        permission: "SETTINGS_VIEW",
       },
     ],
   },
@@ -516,14 +522,14 @@ const menuItems = [
         icon: GraduationCap,
         id: "trainings-classes",
         path: "/trainings-classes",
-        permission: "TRAINERS_VIEW",
+        permission: "TRAININGS_CLASSES_VIEW",
       },
       {
         title: "Bookings",
         icon: Calendar,
         id: "bookings",
         path: "/bookings",
-        permission: "TRAINERS_VIEW",
+        permission: "BOOKINGS_VIEW",
       },
       {
         title: "Payroll",
@@ -537,28 +543,28 @@ const menuItems = [
         icon: Wallet,
         id: "salary-payments",
         path: "/salary-payments",
-        permission: "PAYROLL_VIEW",
+        permission: "SALARY_PAYMENTS_VIEW",
       },
       {
         title: "Salary Advances",
         icon: TrendingUp,
         id: "salary-advances",
         path: "/salary-advances",
-        permission: "PAYROLL_VIEW",
+        permission: "SALARY_ADVANCES_VIEW",
       },
       {
         title: "Reports",
         icon: BarChart3,
         id: "payroll-reports",
         path: "/payroll-reports",
-        permission: "REPORTS_VIEW",
+        permission: "PAYROLL_REPORTS_VIEW",
       },
       {
         title: "Analytics",
         icon: PieChart,
         id: "payroll-analytics",
         path: "/payroll-analytics",
-        permission: "REPORTS_VIEW",
+        permission: "PAYROLL_ANALYTICS_VIEW",
       },
       {
         title: "Settings",
@@ -585,6 +591,27 @@ const menuItems = [
     permission: "BIOS_VIEW",
   },
   {
+    title: "Branch Management",
+    icon: Building2,
+    id: "branch-management",
+    path: "/branch-management",
+    permission: "BRANCH_MANAGEMENT_VIEW",
+  },
+  {
+    title: "Settings",
+    icon: Settings,
+    id: "settings",
+    path: "/settings",
+    permission: "SETTINGS_VIEW",
+  },
+  {
+    title: "Plans & Services Catalog",
+    icon: BookOpen,
+    id: "plans-services-catalog",
+    path: "/plans-services-catalog",
+    permission: "MEMBERSHIP_PLANS_VIEW",
+  },
+  {
     title: "My Profile",
     icon: UserIcon,
     id: "my-profile",
@@ -609,27 +636,6 @@ const menuItems = [
         path: "/profile-settings",
       },
     ],
-  },
-  {
-    title: "Branch Management",
-    icon: Building2,
-    id: "branch-management",
-    path: "/branch-management",
-    permission: "BRANCH_MANAGEMENT_VIEW",
-  },
-  {
-    title: "Settings",
-    icon: Settings,
-    id: "settings",
-    path: "/settings",
-    permission: "SETTINGS_VIEW",
-  },
-  {
-    title: "Plans & Services Catalog",
-    icon: BookOpen,
-    id: "plans-services-catalog",
-    path: "/plans-services-catalog",
-    permission: "MEMBERSHIP_PLANS_VIEW",
   },
 ];
 
@@ -719,7 +725,8 @@ export default function App() {
   const currentPath = location.pathname;
   const activeSectionPathId = currentPath === '/' ? 'dashboard' : currentPath.slice(1);
 
-  const { activeBranchId, accessibleBranches, setActiveBranch } = useBranch();
+  // Global state for branches
+  const { activeBranchId, accessibleBranches, setActiveBranch, isAllBranches, refreshBranches } = useBranch();
 
   const [expandedItems, setExpandedItems] = useState<string[]>(
     [],
@@ -796,6 +803,7 @@ export default function App() {
           const currentUser = authService.getCurrentUser();
           setIsAuthenticated(true);
           setUser(currentUser);
+          await refreshBranches(); // Force BranchProvider state refresh on login
           console.log('Login successful for user:', currentUser?.email);
           return { success: true };
         } else {
@@ -810,7 +818,7 @@ export default function App() {
         };
       }
     },
-    [],
+    [refreshBranches],
   );
 
   const handleLogout = useCallback(async () => {
@@ -1176,28 +1184,35 @@ export default function App() {
             </div>
             {/* Branch Selector */}
             <div className="mt-2">
-              <select 
-                className="w-full bg-white/10 text-white border border-white/20 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer appearance-none"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 0.7rem top 50%',
-                  backgroundSize: '0.65rem auto',
-                }}
-                value={activeBranchId === null ? "null" : activeBranchId}
-                onChange={(e) => {
-                  const val = e.target.value;
+              <Select
+                value={activeBranchId === null ? "null" : activeBranchId.toString()}
+                onValueChange={(val) => {
                   setActiveBranch(val === "null" ? null : Number(val));
                 }}
               >
-                {/* Admin user with "All Branches" access will have "null" as an option */}
-                {sessionStorage.getItem('gymbios_role_name')?.toLowerCase() === 'admin' && (
-                  <option value="null" className="text-gray-900 font-medium">🌐 All Branches</option>
-                )}
-                {accessibleBranches.map(b => (
-                  <option key={b.id} value={b.id} className="text-gray-900">{b.branchName}</option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full bg-white/10 text-white border-white/20 hover:bg-white/20 focus:ring-white/50 focus:ring-offset-0 focus:ring-offset-transparent transition-colors">
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* Admin user with "All Branches" access will have "null" as an option */}
+                  {sessionStorage.getItem('gymbios_role_name')?.toLowerCase() === 'admin' && (
+                    <SelectItem value="null">
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-blue-500" />
+                        <span>All Branches</span>
+                      </div>
+                    </SelectItem>
+                  )}
+                  {accessibleBranches.map(b => (
+                    <SelectItem key={b.id} value={b.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-blue-500" />
+                        <span>{b.branchName.replace(/[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim()}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </SidebarHeader>
 
@@ -1336,6 +1351,17 @@ export default function App() {
               <ProtectedRoute isAuthenticated={isAuthenticated}>
                 {routeAllowed ? (
                   <React.Fragment key={`branch-${activeBranchId || 'all'}`}>
+                    {isAllBranches && (
+                      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 m-4 rounded-r-md flex items-start shadow-sm">
+                        <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
+                        <div>
+                          <h3 className="text-sm font-medium text-blue-800">Viewing All Branches</h3>
+                          <p className="text-sm text-blue-700 mt-1">
+                            You are currently in read-only mode. Please select a specific branch from the sidebar to create, edit, or delete records.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {renderContent}
                   </React.Fragment>
                 ) : (

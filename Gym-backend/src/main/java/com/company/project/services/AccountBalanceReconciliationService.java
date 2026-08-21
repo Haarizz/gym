@@ -84,7 +84,7 @@ public class AccountBalanceReconciliationService {
         }
 
         Map<String, BigDecimal> netByAccountCode = new HashMap<>();
-        for (JournalVoucherLine line : journalVoucherLineRepository.findAll()) {
+        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
             if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
             String code = line.getAccountCode();
             if (code == null) continue;

@@ -12,10 +12,10 @@ import java.math.BigDecimal;
  * purchase time — editing or deleting a catalog entry here never touches
  * past purchase records.
  */
-@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "addon_plans")
-public class AddonPlan extends BaseEntity {
+public class AddonPlan extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

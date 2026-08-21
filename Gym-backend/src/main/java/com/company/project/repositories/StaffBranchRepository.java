@@ -3,6 +3,7 @@ package com.company.project.repositories;
 import com.company.project.entities.StaffBranch;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
@@ -15,7 +16,9 @@ public interface StaffBranchRepository extends JpaRepository<StaffBranch, Long> 
 
     void deleteByStaffIdAndBranchId(Long staffId, Long branchId);
 
-    void deleteByStaffId(Long staffId);
+    @Modifying
+    @Query("DELETE FROM StaffBranch sb WHERE sb.staffId = :staffId")
+    void deleteByStaffId(@Param("staffId") Long staffId);
 
     boolean existsByStaffIdAndBranchId(Long staffId, Long branchId);
 

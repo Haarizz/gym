@@ -180,10 +180,12 @@ public class BranchService {
         if (!staffBranchRepository.existsByStaffIdAndBranchId(staffId, branchId)) {
             staffBranchRepository.save(new StaffBranch(staffId, branchId));
         }
+        syncUserBranchesForStaff(staffId);
     }
 
     public void removeStaffFromBranch(Long staffId, Long branchId) {
         staffBranchRepository.deleteByStaffIdAndBranchId(staffId, branchId);
+        syncUserBranchesForStaff(staffId);
     }
 
     public void setStaffBranches(Long staffId, List<Long> branchIds) {
@@ -191,6 +193,16 @@ public class BranchService {
         for (Long branchId : branchIds) {
             staffBranchRepository.save(new StaffBranch(staffId, branchId));
         }
+        syncUserBranchesForStaff(staffId);
+    }
+
+    public void syncUserBranchesForStaff(Long staffId) {
+        staffRepository.findById(staffId).ifPresent(staff -> {
+            if (staff.getUserId() != null) {
+                List<Long> branchIds = staffBranchRepository.findBranchIdsByStaffId(staffId);
+                setUserBranches(staff.getUserId(), branchIds);
+            }
+        });
     }
 
     public List<Long> getStaffBranchIds(Long staffId) {

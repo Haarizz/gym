@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public interface AccountHeadRepository extends JpaRepository<AccountHead, Long> {
 
-    Optional<AccountHead> findByCode(String code);
+    Optional<AccountHead> findFirstByCode(String code);
 
     Optional<AccountHead> findByNameIgnoreCase(String name);
 

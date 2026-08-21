@@ -47,6 +47,16 @@ public class AccountHeadService {
         } else {
             all = accountHeadRepository.findAllByOrderByCodeAsc();
         }
+
+        // Fetch branch-specific balances
+        List<Object[]> balances = journalVoucherLineRepository.getAccountBalances();
+        java.util.Map<String, BigDecimal> balanceMap = new java.util.HashMap<>();
+        for (Object[] row : balances) {
+            String code = (String) row[0];
+            BigDecimal balance = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
+            balanceMap.put(code, balance);
+        }
+
         return all.stream()
                 .filter(a -> {
                     if (search == null || search.isBlank()) return true;
@@ -54,12 +64,30 @@ public class AccountHeadService {
                     return (a.getCode() != null && a.getCode().toLowerCase(Locale.ROOT).contains(s))
                             || (a.getName() != null && a.getName().toLowerCase(Locale.ROOT).contains(s));
                 })
-                .map(AccountHeadResponseDTO::fromEntity)
+                .map(a -> {
+                    AccountHeadResponseDTO dto = AccountHeadResponseDTO.fromEntity(a);
+                    BigDecimal opening = a.getOpeningBalance() != null ? a.getOpeningBalance() : BigDecimal.ZERO;
+                    BigDecimal netChange = balanceMap.getOrDefault(a.getCode(), BigDecimal.ZERO);
+                    
+                    // For Asset & Expense, normal balance is Debit (Debit - Credit)
+                    // For Liability, Equity, Revenue, normal balance is Credit (Credit - Debit)
+                    // Our query does Debit - Credit for all. 
+                    // Wait, if it's Liability, Debit - Credit is negative, so adding it to opening balance 
+                    // is technically subtracting it. But wait, `currentBalance` logic in `getLedgerEntries` 
+                    // does `balance.add(debit).subtract(credit)` for ALL accounts.
+                    // So we can just add `netChange` to `openingBalance` for ALL accounts, assuming `openingBalance` 
+                    // is stored consistently with `balance = debit - credit`.
+                    // Wait, let's verify `getLedgerEntries`:
+                    // balance = account.getOpeningBalance() + debit - credit;
+                    // It does exactly that for ALL accounts. So:
+                    dto.setCurrentBalance(opening.add(netChange));
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
     public AccountHeadResponseDTO createAccountHead(AccountHeadRequestDTO req) {
-        if (accountHeadRepository.findByCode(req.getCode()).isPresent()) {
+        if (accountHeadRepository.findFirstByCode(req.getCode()).isPresent()) {
             throw new IllegalArgumentException("Account code already exists: " + req.getCode());
         }
         AccountHead a = new AccountHead();
@@ -73,7 +101,7 @@ public class AccountHeadService {
     public AccountHeadResponseDTO updateAccountHead(Long id, AccountHeadRequestDTO req) {
         AccountHead a = accountHeadRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Account head not found: " + id));
-        if (!a.getCode().equals(req.getCode()) && accountHeadRepository.findByCode(req.getCode()).isPresent()) {
+        if (!a.getCode().equals(req.getCode()) && accountHeadRepository.findFirstByCode(req.getCode()).isPresent()) {
             throw new IllegalArgumentException("Account code already exists: " + req.getCode());
         }
         mapFromRequest(a, req);
@@ -95,19 +123,27 @@ public class AccountHeadService {
 
     @Transactional(readOnly = true)
     public List<LedgerEntryDTO> getAllLedgerEntries(LocalDate from, LocalDate to) {
-        List<JournalVoucherLine> allLines = journalVoucherLineRepository.findAll();
+        List<JournalVoucher> jvs;
+        if (from != null && to != null) {
+            jvs = journalVoucherRepository.findByStatusAndDateBetweenOrderByDateDesc("POSTED", from, to);
+        } else {
+            jvs = journalVoucherRepository.findByStatusOrderByDateDesc("POSTED");
+        }
+
         List<LedgerEntryDTO> entries = new ArrayList<>();
+        if (jvs.isEmpty()) {
+            return entries;
+        }
+
+        java.util.Map<Long, JournalVoucher> jvMap = jvs.stream().collect(java.util.stream.Collectors.toMap(JournalVoucher::getId, j -> j));
+        List<JournalVoucherLine> allLines = journalVoucherLineRepository.findByJournalVoucherIdIn(jvMap.keySet());
+
         for (JournalVoucherLine line : allLines) {
-            Optional<JournalVoucher> jvOpt = journalVoucherRepository.findById(line.getJournalVoucherId());
-            if (jvOpt.isEmpty()) continue;
-            JournalVoucher jv = jvOpt.get();
-            if (!"POSTED".equalsIgnoreCase(jv.getStatus())) continue;
-            LocalDate date = jv.getDate();
-            if (from != null && date.isBefore(from)) continue;
-            if (to != null && date.isAfter(to)) continue;
+            JournalVoucher jv = jvMap.get(line.getJournalVoucherId());
+            if (jv == null) continue;
 
             LedgerEntryDTO entry = new LedgerEntryDTO();
-            entry.setDate(date);
+            entry.setDate(jv.getDate());
             entry.setReference(jv.getVoucherNo());
             entry.setDescription(line.getDescription() != null ? line.getDescription() : jv.getNarration());
             entry.setDebit(line.getDebit() != null ? line.getDebit() : BigDecimal.ZERO);
@@ -116,7 +152,7 @@ public class AccountHeadService {
             entry.setSourceType("JOURNAL_VOUCHER");
             entry.setSourceId(jv.getId());
             entry.setAccountCode(line.getAccountCode());
-            accountHeadRepository.findByCode(line.getAccountCode())
+            accountHeadRepository.findFirstByCode(line.getAccountCode())
                     .ifPresent(a -> entry.setAccountName(a.getName()));
             entries.add(entry);
         }
@@ -126,23 +162,30 @@ public class AccountHeadService {
 
     @Transactional(readOnly = true)
     public List<LedgerEntryDTO> getLedgerEntries(String code, LocalDate from, LocalDate to) {
-        AccountHead account = accountHeadRepository.findByCode(code)
+        AccountHead account = accountHeadRepository.findFirstByCode(code)
                 .orElseThrow(() -> new IllegalArgumentException("Account not found: " + code));
 
-        List<JournalVoucherLine> lines = journalVoucherLineRepository.findByAccountCode(code);
+        List<JournalVoucher> jvs;
+        if (from != null && to != null) {
+            jvs = journalVoucherRepository.findByStatusAndDateBetweenOrderByDateDesc("POSTED", from, to);
+        } else {
+            jvs = journalVoucherRepository.findByStatusOrderByDateDesc("POSTED");
+        }
 
         List<LedgerEntryDTO> entries = new ArrayList<>();
+        if (jvs.isEmpty()) {
+            return entries;
+        }
+
+        java.util.Map<Long, JournalVoucher> jvMap = jvs.stream().collect(java.util.stream.Collectors.toMap(JournalVoucher::getId, j -> j));
+        List<JournalVoucherLine> lines = journalVoucherLineRepository.findByAccountCode(code);
+
         for (JournalVoucherLine line : lines) {
-            Optional<JournalVoucher> jvOpt = journalVoucherRepository.findById(line.getJournalVoucherId());
-            if (jvOpt.isEmpty()) continue;
-            JournalVoucher jv = jvOpt.get();
-            if (!"POSTED".equalsIgnoreCase(jv.getStatus())) continue;
-            LocalDate date = jv.getDate();
-            if (from != null && date.isBefore(from)) continue;
-            if (to != null && date.isAfter(to)) continue;
+            JournalVoucher jv = jvMap.get(line.getJournalVoucherId());
+            if (jv == null) continue;
 
             LedgerEntryDTO entry = new LedgerEntryDTO();
-            entry.setDate(date);
+            entry.setDate(jv.getDate());
             entry.setReference(jv.getVoucherNo());
             entry.setDescription(line.getDescription() != null ? line.getDescription() : jv.getNarration());
             entry.setDebit(line.getDebit() != null ? line.getDebit() : BigDecimal.ZERO);

@@ -18,29 +18,46 @@ CREATE TABLE voucher_sequences (
 
 -- Seed one row per prefix already in use, from the highest existing 5-digit
 -- sequence number, so numbering continues without collision or gaps.
-INSERT INTO voucher_sequences (prefix, last_value)
-SELECT LEFT(voucher_no, LENGTH(voucher_no) - 5) AS prefix,
-       MAX(CAST(RIGHT(voucher_no, 5) AS BIGINT)) AS last_value
-FROM journal_vouchers
-WHERE voucher_no ~ '^JV-[0-9]{4}-[0-9]{5}$'
-GROUP BY LEFT(voucher_no, LENGTH(voucher_no) - 5)
-ON CONFLICT (prefix) DO UPDATE
-    SET last_value = GREATEST(voucher_sequences.last_value, EXCLUDED.last_value);
+-- On a brand-new database there are no voucher tables yet, so the migration must
+-- skip those scans instead of crashing during startup.
+DO $$
+BEGIN
+    IF to_regclass('public.journal_vouchers') IS NOT NULL THEN
+        INSERT INTO voucher_sequences (prefix, last_value)
+        SELECT LEFT(voucher_no, LENGTH(voucher_no) - 5) AS prefix,
+               MAX(CAST(RIGHT(voucher_no, 5) AS BIGINT)) AS last_value
+        FROM public.journal_vouchers
+        WHERE voucher_no ~ '^JV-[0-9]{4}-[0-9]{5}$'
+        GROUP BY LEFT(voucher_no, LENGTH(voucher_no) - 5)
+        ON CONFLICT (prefix) DO UPDATE
+            SET last_value = GREATEST(voucher_sequences.last_value, EXCLUDED.last_value);
+    END IF;
+END $$;
 
-INSERT INTO voucher_sequences (prefix, last_value)
-SELECT LEFT(voucher_no, LENGTH(voucher_no) - 5),
-       MAX(CAST(RIGHT(voucher_no, 5) AS BIGINT))
-FROM payment_vouchers
-WHERE voucher_no ~ '^PV-[0-9]{4}-[0-9]{5}$'
-GROUP BY LEFT(voucher_no, LENGTH(voucher_no) - 5)
-ON CONFLICT (prefix) DO UPDATE
-    SET last_value = GREATEST(voucher_sequences.last_value, EXCLUDED.last_value);
+DO $$
+BEGIN
+    IF to_regclass('public.payment_vouchers') IS NOT NULL THEN
+        INSERT INTO voucher_sequences (prefix, last_value)
+        SELECT LEFT(voucher_no, LENGTH(voucher_no) - 5),
+               MAX(CAST(RIGHT(voucher_no, 5) AS BIGINT))
+        FROM public.payment_vouchers
+        WHERE voucher_no ~ '^PV-[0-9]{4}-[0-9]{5}$'
+        GROUP BY LEFT(voucher_no, LENGTH(voucher_no) - 5)
+        ON CONFLICT (prefix) DO UPDATE
+            SET last_value = GREATEST(voucher_sequences.last_value, EXCLUDED.last_value);
+    END IF;
+END $$;
 
-INSERT INTO voucher_sequences (prefix, last_value)
-SELECT LEFT(voucher_no, LENGTH(voucher_no) - 5),
-       MAX(CAST(RIGHT(voucher_no, 5) AS BIGINT))
-FROM receipt_vouchers
-WHERE voucher_no ~ '^RV-[0-9]{4}-[0-9]{5}$'
-GROUP BY LEFT(voucher_no, LENGTH(voucher_no) - 5)
-ON CONFLICT (prefix) DO UPDATE
-    SET last_value = GREATEST(voucher_sequences.last_value, EXCLUDED.last_value);
+DO $$
+BEGIN
+    IF to_regclass('public.receipt_vouchers') IS NOT NULL THEN
+        INSERT INTO voucher_sequences (prefix, last_value)
+        SELECT LEFT(voucher_no, LENGTH(voucher_no) - 5),
+               MAX(CAST(RIGHT(voucher_no, 5) AS BIGINT))
+        FROM public.receipt_vouchers
+        WHERE voucher_no ~ '^RV-[0-9]{4}-[0-9]{5}$'
+        GROUP BY LEFT(voucher_no, LENGTH(voucher_no) - 5)
+        ON CONFLICT (prefix) DO UPDATE
+            SET last_value = GREATEST(voucher_sequences.last_value, EXCLUDED.last_value);
+    END IF;
+END $$;

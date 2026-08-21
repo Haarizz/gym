@@ -4,13 +4,28 @@ const api = axios.create({
   baseURL: 'http://localhost:8080/api',
 });
 
-// Request interceptor to attach JWT token
+// Request interceptor to attach JWT token and Branch ID
 api.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem('token');
+    const activeBranchId = sessionStorage.getItem('activeBranchId');
+
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+    
+    if (activeBranchId && activeBranchId !== 'null') {
+      config.headers['X-Active-Branch-Id'] = activeBranchId;
+    } else {
+      // All Branches Mode
+      const isMutation = ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase());
+      
+      // Let backend decide on global routes if needed, but for safety we reject standard mutations in All Branches mode
+      if (isMutation && !config.url?.includes('/auth')) {
+        return Promise.reject(new Error("Please select a specific branch before creating or modifying this record."));
+      }
+    }
+
     return config;
   },
   (error) => {

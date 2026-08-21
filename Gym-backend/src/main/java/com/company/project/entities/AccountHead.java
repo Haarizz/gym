@@ -4,16 +4,18 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 
-@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
-@Table(name = "account_heads")
-public class AccountHead extends BaseEntity {
+@Table(name = "account_heads", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_account_heads_branch_code", columnNames = {"branch_id", "code"})
+})
+public class AccountHead extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "code", unique = true, nullable = false)
+    @Column(name = "code", nullable = false)
     private String code;
 
     @Column(name = "name", nullable = false)

@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_branches", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "branch_id"}))
-public class UserBranch {
+public class UserBranch implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

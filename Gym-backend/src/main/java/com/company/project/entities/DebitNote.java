@@ -11,10 +11,10 @@ import java.time.LocalDate;
  * Distinct from a Payment Voucher, which settles a bill in full/part rather
  * than adjusting what's owed.
  */
-@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "debit_notes")
-public class DebitNote extends BaseEntity {
+public class DebitNote extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

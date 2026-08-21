@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useBranch } from "../utils/branch-context";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { financialAnalyticsService, AnalyticsDashboard, MonthlyTrendPoint, RevenueBySource, ExpenseByCategory } from "../utils/supabase/financial-analytics-service";
 import {
@@ -265,6 +266,7 @@ const InsightCard: React.FC<{ insight: Insight }> = ({ insight }) => {
 
 export function FinancialAnalytics() {
   const { currencyCode } = useCurrency();
+  const { activeBranchId } = useBranch();
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [selectedPeriod, setSelectedPeriod] = useState("current-month");
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -293,7 +295,8 @@ export function FinancialAnalytics() {
       setApiRevenueBySource(revSrc);
       setApiExpenseByCategory(expCat);
     } catch (e) { console.error("Failed to load analytics", e); }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId]);
 
   useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
 

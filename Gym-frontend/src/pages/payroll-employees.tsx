@@ -32,167 +32,52 @@ import {
   BarChart3
 } from 'lucide-react';
 
-// Sample data for KPIs
-const kpiData = {
-  totalStaffTrainers: 48,
-  activeTrainingsClasses: 23,
-  upcomingBookings: 156,
-  monthlyPayroll: 185000,
-  pendingSalaryPayments: 8,
-  salaryAdvancesOutstanding: 15500
-};
-
-// Sample data for charts
-const classBookingTrends = [
-  { month: 'Jan', classes: 18, bookings: 142, payroll: 165000 },
-  { month: 'Feb', classes: 20, bookings: 156, payroll: 172000 },
-  { month: 'Mar', classes: 22, bookings: 168, payroll: 178000 },
-  { month: 'Apr', classes: 23, bookings: 156, payroll: 185000 },
-  { month: 'May', classes: 25, bookings: 189, payroll: 192000 },
-  { month: 'Jun', classes: 27, bookings: 201, payroll: 198000 }
-];
-
-const payrollDistribution = [
-  { category: 'Personal Trainers', amount: 78000, color: '#3b82f6' },
-  { category: 'Front Desk Staff', amount: 45000, color: '#10b981' },
-  { category: 'Cleaning & Maintenance', amount: 28000, color: '#f59e0b' },
-  { category: 'Management', amount: 34000, color: '#ef4444' }
-];
-
-const staffByDepartment = [
-  { department: 'Personal Training', count: 18, color: '#3b82f6' },
-  { department: 'Group Classes', count: 12, color: '#10b981' },
-  { department: 'Front Desk', count: 8, color: '#f59e0b' },
-  { department: 'Maintenance', count: 6, color: '#ef4444' },
-  { department: 'Management', count: 4, color: '#8b5cf6' }
-];
-
-// Sample data for tables
-const recentHires = [
-  {
-    id: 1,
-    name: 'Sarah Johnson',
-    position: 'Personal Trainer',
-    department: 'Personal Training',
-    hireDate: '2024-09-15',
-    salary: 4500,
-    status: 'Active'
-  },
-  {
-    id: 2,
-    name: 'Mike Chen',
-    position: 'Yoga Instructor',
-    department: 'Group Classes',
-    hireDate: '2024-09-10',
-    salary: 3800,
-    status: 'Active'
-  },
-  {
-    id: 3,
-    name: 'Lisa Rodriguez',
-    position: 'Front Desk Associate',
-    department: 'Front Desk',
-    hireDate: '2024-09-05',
-    salary: 3200,
-    status: 'Probation'
-  }
-];
-
-const upcomingPayments = [
-  {
-    id: 1,
-    employee: 'Ahmed Al Rashid',
-    position: 'Senior Personal Trainer',
-    amount: 6500,
-    dueDate: '2024-09-30',
-    type: 'Regular Salary',
-    status: 'Pending'
-  },
-  {
-    id: 2,
-    employee: 'Fatima Hassan',
-    position: 'Group Fitness Coordinator',
-    amount: 5200,
-    dueDate: '2024-09-30',
-    type: 'Regular Salary',
-    status: 'Pending'
-  },
-  {
-    id: 3,
-    employee: 'Omar Abdullah',
-    position: 'Maintenance Supervisor',
-    amount: 4800,
-    dueDate: '2024-09-30',
-    type: 'Regular Salary',
-    status: 'Approved'
-  }
-];
-
-const salaryAdvances = [
-  {
-    id: 1,
-    employee: 'Khalid Ibrahim',
-    position: 'Personal Trainer',
-    advanceAmount: 3500,
-    issueDate: '2024-09-10',
-    remainingBalance: 2100,
-    monthlyDeduction: 700,
-    status: 'Active'
-  },
-  {
-    id: 2,
-    employee: 'Mariam Ali',
-    position: 'Yoga Instructor',
-    advanceAmount: 2800,
-    issueDate: '2024-09-05',
-    remainingBalance: 1400,
-    monthlyDeduction: 700,
-    status: 'Active'
-  },
-  {
-    id: 3,
-    employee: 'Hassan Mohammed',
-    position: 'Front Desk Associate',
-    advanceAmount: 2000,
-    issueDate: '2024-08-25',
-    remainingBalance: 1000,
-    monthlyDeduction: 500,
-    status: 'Active'
-  }
-];
-
-const topPerformingClasses = [
-  {
-    id: 1,
-    className: 'HIIT Training',
-    instructor: 'Sarah Johnson',
-    bookings: 45,
-    capacity: 50,
-    revenue: 6750,
-    rating: 4.8
-  },
-  {
-    id: 2,
-    className: 'Yoga Flow',
-    instructor: 'Mike Chen',
-    bookings: 38,
-    capacity: 40,
-    revenue: 5700,
-    rating: 4.9
-  },
-  {
-    id: 3,
-    className: 'Strength Training',
-    instructor: 'Ahmed Al Rashid',
-    bookings: 42,
-    capacity: 45,
-    revenue: 6300,
-    rating: 4.7
-  }
-];
+import { useEffect, useState } from 'react';
+import { payrollAnalyticsService, PayrollDashboardData } from '../utils/supabase/payroll-analytics-service';
 
 export function PayrollEmployees() {
   const { currencyCode } = useCurrency();
+  const [data, setData] = useState<PayrollDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const res = await payrollAnalyticsService.getDashboardData();
+      setData(res);
+    } catch (error) {
+      console.error("Failed to load dashboard data", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || !data) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"></div>
+          <p className="text-gray-500 font-medium">Loading payroll and employee data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const {
+    kpiData,
+    classBookingTrends,
+    payrollDistribution,
+    staffByDepartment,
+    recentHires,
+    upcomingPayments,
+    salaryAdvances,
+    topPerformingClasses
+  } = data;
+
   const getCurrentPeriod = () => {
     return new Date().toLocaleDateString('en-GB', {
       month: 'long',

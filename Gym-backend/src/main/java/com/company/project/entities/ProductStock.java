@@ -3,11 +3,11 @@ package com.company.project.entities;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 
-@Filter(name = "branchFilter", condition = "branch_id = :branchId OR branch_id IS NULL")
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "product_stocks",
         uniqueConstraints = @UniqueConstraint(columnNames = {"product_id", "warehouse_id"}))
-public class ProductStock extends BaseEntity {
+public class ProductStock extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

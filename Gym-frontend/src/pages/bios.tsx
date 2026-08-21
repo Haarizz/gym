@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -57,6 +57,7 @@ import { attendanceService } from '../utils/supabase/attendance-service';
 import { expensesService } from '../utils/supabase/expenses-service';
 import { financialAnalyticsService } from '../utils/supabase/financial-analytics-service';
 import { membersService } from '../utils/supabase/members-service';
+import { useBranch } from '../utils/branch-context';
 import { useCurrency, CurrencyValue, CurrencyGlyph } from '../utils/currency';
 
 type RevenueChartPoint = {
@@ -331,6 +332,7 @@ const formatSegmentLabel = (value: string) =>
 
 export function BiOS() {
   const { formatCurrency, currencyCode } = useCurrency();
+  const { activeBranchId } = useBranch();
   const [gymData, setGymData] = useState<GymDataContext | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
   const [revenueChartData, setRevenueChartData] = useState<RevenueChartPoint[]>(revenueData);
@@ -458,7 +460,8 @@ export function BiOS() {
 
   useEffect(() => {
     loadRealData();
-  }, [loadRealData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId]);
 
   const handlePredict = async () => {
     if (!gymData) {

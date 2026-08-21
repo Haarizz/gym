@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useBranch } from "../utils/branch-context";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   financialReportsService, IncomeStatementData, BalanceSheetData, TrialBalanceData, CashFlowData,
@@ -319,6 +320,7 @@ const trialBalanceData = [
 
 export function FinancialReports() {
   const { currencyCode } = useCurrency();
+  const { activeBranchId } = useBranch();
   const [selectedReport, setSelectedReport] = useState<string>("");
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [selectedPeriod, setSelectedPeriod] = useState("current-month");
@@ -366,6 +368,14 @@ export function FinancialReports() {
         break;
     }
   }, [selectedPeriod]);
+
+  // Re-generate report if branch changes
+  useEffect(() => {
+    if (selectedReport) {
+      handleGenerateReport(selectedReport);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId]);
 
   // Filter reports based on category
   const filteredReports = reportDefinitions.filter(report =>

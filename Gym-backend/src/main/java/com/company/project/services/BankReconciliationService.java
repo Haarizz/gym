@@ -365,7 +365,7 @@ public class BankReconciliationService {
 
     /** opening_balance(bank account) + net(debit-credit) of all ledger-effective lines on or before asOfDate. */
     private BigDecimal computeSystemBalance(LocalDate asOfDate, String accountCode) {
-        AccountHead account = accountHeadRepository.findByCode(accountCode).orElse(null);
+        AccountHead account = accountHeadRepository.findFirstByCode(accountCode).orElse(null);
         BigDecimal opening = account != null && account.getOpeningBalance() != null
                 ? account.getOpeningBalance() : BigDecimal.ZERO;
 

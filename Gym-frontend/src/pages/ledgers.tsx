@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useCurrency, CurrencyValue } from '../utils/currency';
+import { useBranch } from '../utils/branch-context';
 import { toast } from 'sonner';
 import { ledgersService, AccountHead as ApiAccountHead, CostCenter as ApiCostCenter, LedgerTransaction } from '../utils/supabase/ledgers-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -97,6 +98,7 @@ import {
 
 export function Ledgers() {
   const { currencyCode } = useCurrency();
+  const { activeBranchId } = useBranch();
   const [activeTab, setActiveTab] = useState('chart-of-accounts');
   
   // Chart of Accounts state
@@ -133,7 +135,6 @@ export function Ledgers() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [groupFilter, setGroupFilter] = useState('all');
-  const [branchFilter, setBranchFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
   // New account form state
@@ -194,7 +195,7 @@ export function Ledgers() {
     } catch {
       toast.error('Failed to load account heads');
     }
-  }, []);
+  }, [activeBranchId]);
 
   const loadLedgerEntries = useCallback(async (code: string, from: string, to: string) => {
     try {
@@ -221,7 +222,7 @@ export function Ledgers() {
     } catch {
       toast.error('Failed to load ledger entries');
     }
-  }, [accounts]);
+  }, [accounts, activeBranchId]);
 
   const loadCostCenters = useCallback(async () => {
     try {
@@ -258,7 +259,7 @@ export function Ledgers() {
     } catch {
       toast.error('Failed to load cost centers');
     }
-  }, []);
+  }, [activeBranchId]);
 
   const loadTransactions = useCallback(async () => {
     setTxLoading(true);
@@ -275,7 +276,7 @@ export function Ledgers() {
     } finally {
       setTxLoading(false);
     }
-  }, [txDateFrom, txDateTo, txTypeFilter, txSearch]);
+  }, [txDateFrom, txDateTo, txTypeFilter, txSearch, activeBranchId]);
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
   useEffect(() => { loadCostCenters(); }, [loadCostCenters]);
@@ -344,13 +345,11 @@ export function Ledgers() {
       account.code.includes(searchTerm.toLowerCase());
     
     const matchesGroup = groupFilter === 'all' || account.group === groupFilter;
-    const matchesBranch = branchFilter === 'all' || 
-      account.branch.toLowerCase().includes(branchFilter.toLowerCase());
     const matchesStatus = statusFilter === 'all' || 
       (statusFilter === 'active' && account.status === 'active') ||
       (statusFilter === 'inactive' && account.status === 'inactive');
     
-    return matchesSearch && matchesGroup && matchesBranch && matchesStatus;
+    return matchesSearch && matchesGroup && matchesStatus;
   });
 
   const filteredCostCenters = costCenters.filter(cc => {
@@ -358,11 +357,9 @@ export function Ledgers() {
       cc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cc.code.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesBranch = branchFilter === 'all' || 
-      cc.branch.toLowerCase().includes(branchFilter.toLowerCase());
     const matchesStatus = statusFilter === 'all' || cc.status === statusFilter;
     
-    return matchesSearch && matchesBranch && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
   const filteredGLEntries = ledgerEntries.filter(entry => {
@@ -674,21 +671,6 @@ export function Ledgers() {
                         <SelectItem value="Income">Income</SelectItem>
                         <SelectItem value="Expenses">Expenses</SelectItem>
                         <SelectItem value="Equity">Equity</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Branch</Label>
-                    <Select value={branchFilter} onValueChange={setBranchFilter}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Branches</SelectItem>
-                        <SelectItem value="dubai">Dubai Branch</SelectItem>
-                        <SelectItem value="marina">Marina Branch</SelectItem>
-                        <SelectItem value="warehouse">Warehouse</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

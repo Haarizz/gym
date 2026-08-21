@@ -137,6 +137,18 @@ export function RolesPermissions() {
     });
   };
 
+  const toggleModuleAll = (module: string, actions: Set<string>, forceCheck: boolean) => {
+    setForm((f) => {
+      const next = new Set(f.permissionKeys);
+      actions.forEach((action) => {
+        const key = `${module}_${action}`;
+        if (forceCheck) next.add(key);
+        else next.delete(key);
+      });
+      return { ...f, permissionKeys: next };
+    });
+  };
+
   const handleSubmit = async () => {
     if (!form.role_name.trim()) {
       toast.error("Role name is required");
@@ -346,12 +358,12 @@ export function RolesPermissions() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{editingRole ? "Edit Role" : "Create Role"}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-5">
+          <div className="space-y-5 flex-1 overflow-y-auto pr-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Role Name *</Label>
@@ -378,9 +390,9 @@ export function RolesPermissions() {
 
             <div>
               <p className="font-medium mb-2">Module Permissions</p>
-              <div className="overflow-x-auto border rounded-lg">
+              <div className="overflow-auto max-h-[50vh] border rounded-lg">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
                       <TableHead>Module</TableHead>
                       {ACTION_COLUMNS.map((action) => (
@@ -388,6 +400,7 @@ export function RolesPermissions() {
                           {action.charAt(0) + action.slice(1).toLowerCase()}
                         </TableHead>
                       ))}
+                      <TableHead className="text-center border-l bg-muted/30">Select All</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -410,6 +423,19 @@ export function RolesPermissions() {
                               </TableCell>
                             );
                           })}
+                          <TableCell className="text-center border-l bg-muted/10">
+                            <Checkbox
+                              checked={
+                                applicableActions.get(mod.module)?.size! > 0 &&
+                                (editingIsAdmin ||
+                                  Array.from(applicableActions.get(mod.module)!).every((a) =>
+                                    form.permissionKeys.has(`${mod.module}_${a}`)
+                                  ))
+                              }
+                              disabled={editingIsAdmin || !applicableActions.get(mod.module)?.size}
+                              onCheckedChange={(c) => toggleModuleAll(mod.module, applicableActions.get(mod.module)!, !!c)}
+                            />
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -419,7 +445,7 @@ export function RolesPermissions() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 mt-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>

@@ -46,6 +46,11 @@ export function BranchProvider({ children }: { children: ReactNode }) {
               setActiveBranchIdState(mappedBranches[0].id);
               sessionStorage.setItem('activeBranchId', mappedBranches[0].id.toString());
           }
+      } else if (storedActiveBranchId !== "null") {
+          // Ensure state matches what was just set by authService.signIn
+          setActiveBranchIdState(Number(storedActiveBranchId));
+      } else {
+          setActiveBranchIdState(null);
       }
     } catch (e) {
       console.error("Failed to refresh branches", e);
@@ -84,7 +89,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
     // 2. Fetch fresh branches from backend if user is logged in
     if (sessionStorage.getItem('token')) {
-      refreshBranches();
+      refreshBranches().catch(e => console.error("Failed to refresh branches in background", e));
     }
   }, []);
 

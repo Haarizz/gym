@@ -106,6 +106,27 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
       toast.error('Please fill all required fields');
       return;
     }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const fStart = new Date(freezeStartDate);
+    fStart.setHours(0, 0, 0, 0);
+
+    const mStartStr = selectedMember.membership_start_date || selectedMember.join_date;
+    if (mStartStr) {
+      const mStart = new Date(mStartStr);
+      mStart.setHours(0, 0, 0, 0);
+      if (fStart < mStart) {
+        toast.error('Freeze start date cannot be before the membership start date');
+        return;
+      }
+    }
+
+    if (fStart < today) {
+      toast.error('Freeze start date cannot be in the past');
+      return;
+    }
+
     if (freezeStartDate >= freezeEndDate) {
       toast.error('End date must be after start date');
       return;

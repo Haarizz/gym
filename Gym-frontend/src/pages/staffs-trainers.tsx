@@ -410,7 +410,18 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [deleteConfirmEmployee, setDeleteConfirmEmployee] = useState<Staff | null>(null);
   const [statusEmployee, setStatusEmployee] = useState<Staff | null>(null);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
-  const { accessibleBranches } = useBranch();
+  const { accessibleBranches, activeBranchId, isAllBranches } = useBranch();
+  
+  // Only show the active branch if not in "All Branches" mode
+  const dropdownBranches = isAllBranches 
+    ? accessibleBranches 
+    : accessibleBranches.filter(b => b.id === activeBranchId);
+
+  useEffect(() => {
+    if (!isAllBranches && dropdownBranches.length === 1 && !newEmployeeBasicInfo.branch) {
+      setNewEmployeeBasicInfo(prev => ({ ...prev, branch: dropdownBranches[0].branchName }));
+    }
+  }, [isAllBranches, dropdownBranches, newEmployeeBasicInfo.branch]);
 
   // Photo states
   const [photoAdjustMode, setPhotoAdjustMode] = useState(false);
@@ -1525,7 +1536,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
-                      {accessibleBranches.map(b => (
+                      {dropdownBranches.map(b => (
                         <SelectItem key={b.id} value={b.branchName}>{b.branchName}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1772,7 +1783,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     <Select value={editEmployeeData.branch} onValueChange={v => setEditEmployeeData(p => p ? {...p, branch: v} : p)}>
                       <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {accessibleBranches.map(b => (
+                        {dropdownBranches.map(b => (
                           <SelectItem key={b.id} value={b.branchName}>{b.branchName}</SelectItem>
                         ))}
                       </SelectContent>

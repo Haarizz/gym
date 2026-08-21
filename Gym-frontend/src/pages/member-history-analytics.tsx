@@ -449,6 +449,28 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   const handleFreeze = async () => {
     if (!member || !memberId) return;
     if (!freezeEndDate) { toast.error('Please select a freeze end date'); return; }
+
+    if (freezeStartDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const fStart = new Date(freezeStartDate);
+      fStart.setHours(0, 0, 0, 0);
+
+      const mStartStr = member.membership_start_date || member.join_date;
+      if (mStartStr) {
+        const mStart = new Date(mStartStr);
+        mStart.setHours(0, 0, 0, 0);
+        if (fStart < mStart) {
+          toast.error('Freeze start date cannot be before the membership start date');
+          return;
+        }
+      }
+
+      if (fStart < today) {
+        toast.error('Freeze start date cannot be in the past');
+        return;
+      }
+    }
     setSavingFreeze(true);
     try {
       const freezeUntil = freezeEndDate.toISOString().split('T')[0] + 'T00:00:00Z';

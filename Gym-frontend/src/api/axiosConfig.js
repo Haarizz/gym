@@ -4,7 +4,7 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
 });
 
-// Request interceptor to attach JWT token
+// Request interceptor to attach JWT token and Branch ID
 api.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem('token');
@@ -16,6 +16,16 @@ api.interceptors.request.use(
     
     if (activeBranchId && activeBranchId !== 'null') {
       config.headers['X-Active-Branch-Id'] = activeBranchId;
+    } else {
+      // All Branches Mode
+      const isMutation = ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase());
+      const isGlobalRoute = config.url?.includes('/auth') || config.url?.match(/\/branches$/); // allow /branches but not /branches/.../staff maybe? Actually just allow /auth
+      
+      // Let backend decide on global routes if needed, but for safety we reject standard mutations in All Branches mode
+      if (isMutation && !config.url?.includes('/auth')) {
+        // We reject the request to prevent cross-branch mutation errors
+        return Promise.reject(new Error("Please select a specific branch before creating or modifying this record."));
+      }
     }
 
     return config;

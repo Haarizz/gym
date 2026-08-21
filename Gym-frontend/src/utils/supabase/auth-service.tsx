@@ -192,6 +192,8 @@ class AuthService {
     sessionStorage.removeItem("gymbios_demo_mode");
     sessionStorage.removeItem("gymbios_role_name");
     sessionStorage.removeItem("gymbios_staff_name");
+    sessionStorage.removeItem("accessibleBranches");
+    sessionStorage.removeItem("activeBranchId");
     setPermissions([]);
   }
 
@@ -248,11 +250,32 @@ class AuthService {
     options: RequestInit = {}
   ): Promise<Response> {
     const token = this.getAccessToken();
+    const activeBranchId = sessionStorage.getItem('activeBranchId');
+    const isAllBranches = activeBranchId === null || activeBranchId === 'null' || activeBranchId === 'undefined';
+    const branchHeader = !isAllBranches 
+      ? { "X-Active-Branch-Id": activeBranchId } 
+      : {};
+
+    // Block mutating requests when in "All Branches" mode
+    if (isAllBranches && options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase())) {
+      // Allow auth operations to pass through
+      if (!url.includes('/auth/')) {
+        return new Response(
+          JSON.stringify({ error: "All Branches mode is read-only. Please select a specific branch to make changes." }), 
+          {
+            status: 403,
+            statusText: "Forbidden",
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
 
     return fetch(url, {
       ...options,
       headers: {
         "Content-Type": "application/json",
+        ...branchHeader,
         ...(options.headers as Record<string, string>),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },

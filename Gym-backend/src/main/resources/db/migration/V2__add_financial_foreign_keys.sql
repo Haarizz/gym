@@ -17,46 +17,75 @@
 -- for the team, not something this migration performs automatically.
 
 -- ── journal_voucher_lines → journal_vouchers ──────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_jvl_journal_voucher_id ON journal_voucher_lines(journal_voucher_id);
-ALTER TABLE journal_voucher_lines
-    ADD CONSTRAINT fk_jvl_journal_voucher
-    FOREIGN KEY (journal_voucher_id) REFERENCES journal_vouchers(id)
-    ON DELETE RESTRICT
-    NOT VALID;
+DO $$
+BEGIN
+    IF to_regclass('public.journal_voucher_lines') IS NOT NULL
+       AND to_regclass('public.journal_vouchers') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_jvl_journal_voucher_id ON journal_voucher_lines(journal_voucher_id);
+        ALTER TABLE journal_voucher_lines
+            ADD CONSTRAINT fk_jvl_journal_voucher
+            FOREIGN KEY (journal_voucher_id) REFERENCES journal_vouchers(id)
+            ON DELETE RESTRICT
+            NOT VALID;
+    END IF;
+END $$;
 
 -- ── payment_voucher_bills → payment_vouchers ──────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_pvb_payment_voucher_id ON payment_voucher_bills(payment_voucher_id);
-ALTER TABLE payment_voucher_bills
-    ADD CONSTRAINT fk_pvb_payment_voucher
-    FOREIGN KEY (payment_voucher_id) REFERENCES payment_vouchers(id)
-    ON DELETE RESTRICT
-    NOT VALID;
+DO $$
+BEGIN
+    IF to_regclass('public.payment_voucher_bills') IS NOT NULL
+       AND to_regclass('public.payment_vouchers') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_pvb_payment_voucher_id ON payment_voucher_bills(payment_voucher_id);
+        ALTER TABLE payment_voucher_bills
+            ADD CONSTRAINT fk_pvb_payment_voucher
+            FOREIGN KEY (payment_voucher_id) REFERENCES payment_vouchers(id)
+            ON DELETE RESTRICT
+            NOT VALID;
+    END IF;
+END $$;
 
 -- ── bank_statement_lines → bank_reconciliations ───────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_bsl_reconciliation_id ON bank_statement_lines(reconciliation_id);
-ALTER TABLE bank_statement_lines
-    ADD CONSTRAINT fk_bsl_reconciliation
-    FOREIGN KEY (reconciliation_id) REFERENCES bank_reconciliations(id)
-    ON DELETE RESTRICT
-    NOT VALID;
+DO $$
+BEGIN
+    IF to_regclass('public.bank_statement_lines') IS NOT NULL
+       AND to_regclass('public.bank_reconciliations') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_bsl_reconciliation_id ON bank_statement_lines(reconciliation_id);
+        ALTER TABLE bank_statement_lines
+            ADD CONSTRAINT fk_bsl_reconciliation
+            FOREIGN KEY (reconciliation_id) REFERENCES bank_reconciliations(id)
+            ON DELETE RESTRICT
+            NOT VALID;
+    END IF;
+END $$;
 
 -- ── supplier_bill_items → supplier_bills ──────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_sbi_bill_id ON supplier_bill_items(bill_id);
-ALTER TABLE supplier_bill_items
-    ADD CONSTRAINT fk_sbi_supplier_bill
-    FOREIGN KEY (bill_id) REFERENCES supplier_bills(id)
-    ON DELETE RESTRICT
-    NOT VALID;
+DO $$
+BEGIN
+    IF to_regclass('public.supplier_bill_items') IS NOT NULL
+       AND to_regclass('public.supplier_bills') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_sbi_bill_id ON supplier_bill_items(bill_id);
+        ALTER TABLE supplier_bill_items
+            ADD CONSTRAINT fk_sbi_supplier_bill
+            FOREIGN KEY (bill_id) REFERENCES supplier_bills(id)
+            ON DELETE RESTRICT
+            NOT VALID;
+    END IF;
+END $$;
 
 -- ── account_heads.parent_id → account_heads.id (self-referencing hierarchy) ───────
 -- ON DELETE SET NULL: deleting a parent account should not cascade-delete its
 -- children, it should just orphan them back to the root level.
-CREATE INDEX IF NOT EXISTS idx_account_heads_parent_id ON account_heads(parent_id);
-ALTER TABLE account_heads
-    ADD CONSTRAINT fk_account_heads_parent
-    FOREIGN KEY (parent_id) REFERENCES account_heads(id)
-    ON DELETE SET NULL
-    NOT VALID;
+DO $$
+BEGIN
+    IF to_regclass('public.account_heads') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_account_heads_parent_id ON account_heads(parent_id);
+        ALTER TABLE account_heads
+            ADD CONSTRAINT fk_account_heads_parent
+            FOREIGN KEY (parent_id) REFERENCES account_heads(id)
+            ON DELETE SET NULL
+            NOT VALID;
+    END IF;
+END $$;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
