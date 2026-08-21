@@ -20,8 +20,9 @@ api.interceptors.request.use(
       // All Branches Mode
       const isMutation = ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase());
       
+      const isGlobalRoute = config.url?.includes('/auth') || config.url?.includes('/branches');
       // Let backend decide on global routes if needed, but for safety we reject standard mutations in All Branches mode
-      if (isMutation && !config.url?.includes('/auth')) {
+      if (isMutation && !isGlobalRoute) {
         return Promise.reject(new Error("Please select a specific branch before creating or modifying this record."));
       }
     }
