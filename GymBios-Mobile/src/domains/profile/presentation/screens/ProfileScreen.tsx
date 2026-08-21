@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 
-import { authOrchestrator } from '@/domains/auth';
+import { useRestoreSession } from '@/domains/auth';
 
 import { ProfileHubScreen } from './ProfileHubScreen';
 import { MyProfileScreen } from './MyProfileScreen';
@@ -20,16 +20,16 @@ export type ProfileView =
 
 export function ProfileScreen() {
   const router = useRouter();
+  const { logout } = useRestoreSession();
   const [activeView, setActiveView] = useState<ProfileView>('hub');
 
   const handleClose = useCallback(() => {
     router.back();
   }, [router]);
 
-  const handleLogout = useCallback(async () => {
-    await authOrchestrator.signOut();
-    router.replace('/role-selection' as any);
-  }, [router]);
+  const handleLogout = useCallback(() => {
+    logout();
+  }, [logout]);
 
   switch (activeView) {
     case 'my-profile':

@@ -38,6 +38,15 @@ const ROLE_DISPLAY_NAMES: Record<AppRole, string> = {
 
 export function mapSpringRoleToAppRole(roles: string[] | undefined, fallbackRole?: AppRole): AppRole {
   if (roles && Array.isArray(roles)) {
+    // If a fallbackRole is provided and the user possesses a backend role that maps to it, prioritize it
+    if (fallbackRole) {
+      const hasFallback = roles.some((roleStr) => SPRING_ROLE_MAP[roleStr.toUpperCase()] === fallbackRole);
+      if (hasFallback) {
+        return fallbackRole;
+      }
+    }
+
+    // Otherwise, return the first mapped role we find
     for (const roleStr of roles) {
       const mapped = SPRING_ROLE_MAP[roleStr.toUpperCase()];
       if (mapped) {

@@ -846,6 +846,7 @@ public class FinancialEventService {
         jv.setTotalDebit(totalDebit);
         jv.setTotalCredit(totalCredit);
         jv.setSystemGenerated(true);
+        jv.setCurrencyCode("AED");
         jv = jvRepo.save(jv);
 
         final Long jvId = jv.getId();

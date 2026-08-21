@@ -118,6 +118,7 @@ public class JournalVoucherService {
         jv.setReference(req.getReference());
         jv.setTotalDebit(totalDebit);
         jv.setTotalCredit(totalCredit);
+        jv.setCurrencyCode("AED");
         JournalVoucher saved = journalVoucherRepository.save(jv);
         List<JournalVoucherLine> lines = saveLines(saved.getId(), lineDTOs);
         financialAuditLogService.record("CREATE", "JournalVoucher", saved.getId(), saved.getVoucherNo(),
@@ -231,6 +232,7 @@ public class JournalVoucherService {
         reversal.setTotalDebit(original.getTotalCredit());
         reversal.setTotalCredit(original.getTotalDebit());
         reversal.setSystemGenerated(true);
+        reversal.setCurrencyCode(original.getCurrencyCode() != null ? original.getCurrencyCode() : "AED");
         reversal.setReversesVoucherId(original.getId());
         reversal = journalVoucherRepository.save(reversal);
 

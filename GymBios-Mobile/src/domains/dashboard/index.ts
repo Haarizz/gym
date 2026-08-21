@@ -1,10 +1,21 @@
+import { MemberHomeScreen } from '@/domains/auth';
+
 export * from './domain/StaffDashboardData';
-export * from './infrastructure/ApiStaffDashboardRepository';
+export * from './domain/TrainerDashboardData';
 export * from './hooks/useStaffDashboard';
+export * from './hooks/useTrainerDashboard';
 export { StaffDashboardScreen, StaffDashboardScreen as StaffHomeScreen } from './presentation/screens/StaffDashboardScreen';
+export { TrainerDashboardScreen, TrainerDashboardScreen as TrainerHomeScreen } from './presentation/screens/TrainerDashboardScreen';
+export const MemberDashboardScreen = MemberHomeScreen;
+export { MemberHomeScreen };
 export * from './presentation/components/StaffWelcomeCard';
 export * from './presentation/components/StaffStatsGrid';
 export * from './presentation/components/StaffQuickActions';
 export * from './presentation/components/StaffUrgentFollowUpsCard';
 export * from './presentation/components/StaffRecentConversionsCard';
 export * from './presentation/components/StaffMonthSummaryCard';
+export * from './presentation/components/TrainerWelcomeCard';
+export * from './presentation/components/TrainerStatsGrid';
+export * from './presentation/components/TrainerPendingTasksCard';
+export * from './presentation/components/TrainerTodayScheduleCard';
+export * from './presentation/components/TrainerQuickActions';

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +13,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
+import { ConfirmationModal } from '@/shared/components/ConfirmationModal';
+import { useRestoreSession } from '@/domains/auth';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProfileSummary } from '../../hooks/useProfileSummary';
@@ -28,7 +30,7 @@ interface ProfileHubScreenProps {
   onNavigateToPerformance: () => void;
   onNavigateToTransactions: () => void;
   onNavigateToSettings: () => void;
-  onLogout: () => void;
+  onLogout?: () => void;
 }
 
 export function ProfileHubScreen({
@@ -43,14 +45,15 @@ export function ProfileHubScreen({
   const { profile, initials, firstName } = useProfile();
   const { summary } = useProfileSummary();
   const { updatePhoto } = useProfileMutations();
+  const { logout, isLoggingOut } = useRestoreSession();
 
   const [photoSheetVisible, setPhotoSheetVisible] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const handleTakePhoto = useCallback(async () => {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Permission Required', 'Camera access is needed to take a profile photo.');
         return;
       }
 
@@ -65,7 +68,7 @@ export function ProfileHubScreen({
         await updatePhoto(result.assets[0].uri);
       }
     } catch {
-      Alert.alert('Error', 'Camera is unavailable or an error occurred.');
+      // Ignored
     }
   }, [updatePhoto]);
 
@@ -73,7 +76,6 @@ export function ProfileHubScreen({
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Permission Required', 'Gallery access is needed to select a photo.');
         return;
       }
 
@@ -88,20 +90,17 @@ export function ProfileHubScreen({
         await updatePhoto(result.assets[0].uri);
       }
     } catch {
-      Alert.alert('Error', 'Unable to open image gallery.');
+      // Ignored
     }
   }, [updatePhoto]);
 
   const handleConfirmLogout = useCallback(() => {
-    Alert.alert('Log out', 'Are you sure you want to log out of GymBios?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log out',
-        style: 'destructive',
-        onPress: onLogout,
-      },
-    ]);
-  }, [onLogout]);
+    if (onLogout) {
+      onLogout();
+    } else {
+      logout();
+    }
+  }, [onLogout, logout]);
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
@@ -172,18 +171,41 @@ export function ProfileHubScreen({
           {/* Distinct Logout Button */}
           <View style={styles.logoutContainer}>
             <Pressable
-              style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
-              onPress={handleConfirmLogout}
+              style={({ pressed }) => [
+                styles.logoutButton,
+                pressed && styles.logoutButtonPressed,
+                isLoggingOut && styles.logoutButtonDisabled,
+              ]}
+              onPress={() => setLogoutModalVisible(true)}
+              disabled={isLoggingOut}
               accessibilityRole="button"
               accessibilityLabel="Log out"
             >
-              <Feather name="log-out" size={18} color="#ef4444" style={styles.logoutIcon} />
+              {isLoggingOut ? (
+                <ActivityIndicator size="small" color="#ef4444" style={styles.logoutIcon} />
+              ) : (
+                <Feather name="log-out" size={18} color="#ef4444" style={styles.logoutIcon} />
+              )}
               <Typography variant="body" style={styles.logoutText}>
-                Log out
+                {isLoggingOut ? 'Logging out...' : 'Log out'}
               </Typography>
             </Pressable>
           </View>
         </ScrollView>
+
+        {/* Custom Confirmation Modal for Logout */}
+        <ConfirmationModal
+          visible={logoutModalVisible}
+          title="Log out of GymBios?"
+          message="Are you sure you want to log out? You will need to sign in again to access your account."
+          confirmText="Log out"
+          cancelText="Cancel"
+          variant="danger"
+          icon="log-out"
+          loading={isLoggingOut}
+          onConfirm={handleConfirmLogout}
+          onClose={() => setLogoutModalVisible(false)}
+        />
 
         {/* Photo Options Bottom Sheet */}
         <AppBottomSheet
@@ -258,6 +280,9 @@ const styles = StyleSheet.create({
   logoutButtonPressed: {
     backgroundColor: '#fee2e2',
     transform: [{ scale: 0.985 }],
+  },
+  logoutButtonDisabled: {
+    opacity: 0.6,
   },
   logoutIcon: {
     marginRight: Spacing.two,

@@ -43,7 +43,7 @@ public class JournalVoucher extends BaseEntity {
     @Column(name = "total_credit", precision = 12, scale = 2)
     private BigDecimal totalCredit;
 
-    @Column(name = "currency_code", length = 3)
+    @Column(name = "currency_code", length = 3, nullable = false)
     private String currencyCode;
 
     @Column(name = "exchange_rate", precision = 12, scale = 6)

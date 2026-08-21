@@ -60,6 +60,7 @@ export const MODULE_ROUTES = [
   'workout-feedback',
   'roles',
   'profile',
+  'trainer',
 ] as const;
 
 /**
