@@ -49,9 +49,10 @@ export function BranchManagement() {
       setFormData({ branch_name: '', branch_code: '', address: '', phone: '', email: '', status: 'ACTIVE' });
       loadBranches();
       await refreshBranches();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to add branch', error);
-      alert('Failed to add branch. Code must be unique.');
+      const msg = error.response?.data?.message || error.message || 'Code must be unique.';
+      alert(`Failed to add branch. ${msg}`);
     }
   };
 
