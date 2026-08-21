@@ -28,7 +28,6 @@ export const MEMBER_TABS: TabConfig[] = [
   { name: 'bookings', title: 'Bookings', icon: 'calendar' },
   { name: 'centers', title: 'Centers', icon: 'map-pin' },
   { name: 'membership', title: 'Membership', icon: 'credit-card' },
-  { name: 'profile', title: 'Profile', icon: 'user' },
 ];
 
 export const TRAINER_TABS: TabConfig[] = [
@@ -36,7 +35,6 @@ export const TRAINER_TABS: TabConfig[] = [
   { name: 'schedule', title: 'Schedule', icon: 'calendar' },
   { name: 'performance', title: 'Performance', icon: 'trending-up' },
   { name: 'ledger', title: 'Ledger', icon: 'book-open' },
-  { name: 'profile', title: 'Profile', icon: 'user' },
 ];
 
 export const STAFF_TABS: TabConfig[] = [
@@ -44,7 +42,6 @@ export const STAFF_TABS: TabConfig[] = [
   { name: 'performance', title: 'Performance', icon: 'trending-up' },
   { name: 'schedule', title: 'Schedule', icon: 'calendar' },
   { name: 'ledger', title: 'Ledger', icon: 'book-open' },
-  { name: 'profile', title: 'Profile', icon: 'user' },
 ];
 
 export const ADMIN_HEADER: HeaderConfig = {

@@ -6,6 +6,8 @@ export { Surface, Card, Divider, type SurfaceProps } from './Surface';
 export { Badge, type BadgeProps } from './Badge';
 export { RoleModeCard, ComingSoonCard } from './RoleModeCard';
 export { AppHeader, BrandHeader } from './AppHeader';
+export { TimePicker } from './TimePicker';
+export { DatePicker } from './DatePicker';
 export { StatCard, PlaceholderPanel } from './StatCard';
 export { StatusBadge } from './StatusBadge';
 export { SearchBar } from './SearchBar';
@@ -26,4 +28,10 @@ export {
 } from './Wizard';
 
 export * from './charts';
+export {
+  ConfirmationModal,
+  type ConfirmationModalProps,
+  type ConfirmationModalVariant,
+} from './ConfirmationModal';
+export { Pagination, type PaginationProps } from './Pagination';
 

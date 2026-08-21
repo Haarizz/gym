@@ -1013,7 +1013,7 @@ public class MemberService {
         member.setFreezeEndDate(freezeUntil);
         if (request.getReason() != null) member.setFreezeReason(request.getReason());
         Member saved = memberRepository.save(member);
-        cascadeFreezeStateToBilledToHeadDependents(saved, "frozen", freezeUntil, request.getReason());
+        cascadeFreezeStateToBilledToHeadDependents(saved, "frozen", freezeUntil, request.getReason(), 0);
 
         notificationService.notifyRoles(
                 List.of("ADMIN", "MANAGER"),
@@ -1040,12 +1040,29 @@ public class MemberService {
     public MemberResponseDTO unfreezeMember(Long id) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
+
+        long daysFrozen = 0;
+        if ("frozen".equalsIgnoreCase(member.getMembershipStatus()) && member.getFreezeStartDate() != null) {
+            daysFrozen = java.time.temporal.ChronoUnit.DAYS.between(member.getFreezeStartDate(), LocalDateTime.now());
+            if (daysFrozen > 0) {
+                if (member.getExpiryDate() != null) {
+                    member.setExpiryDate(member.getExpiryDate().plusDays(daysFrozen));
+                }
+                if (member.getMembershipEndDate() != null) {
+                    member.setMembershipEndDate(member.getMembershipEndDate().plusDays(daysFrozen));
+                }
+                if (member.getNextPaymentDate() != null) {
+                    member.setNextPaymentDate(member.getNextPaymentDate().plusDays(daysFrozen));
+                }
+            }
+        }
+
         member.setMembershipStatus("active");
         member.setFreezeStartDate(null);
         member.setFreezeEndDate(null);
         member.setFreezeReason(null);
         Member saved = memberRepository.save(member);
-        cascadeFreezeStateToBilledToHeadDependents(saved, "active", null, null);
+        cascadeFreezeStateToBilledToHeadDependents(saved, "active", null, null, daysFrozen);
 
         notificationService.notifyRoles(
                 List.of("ADMIN", "MANAGER"),
@@ -1080,7 +1097,7 @@ public class MemberService {
      * deliberately NOT touched — they manage their own membership/freeze status.
      */
     private void cascadeFreezeStateToBilledToHeadDependents(Member head, String status,
-                                                             LocalDateTime freezeUntil, String reason) {
+                                                             LocalDateTime freezeUntil, String reason, long daysFrozen) {
         if (!Boolean.TRUE.equals(head.getIsFamilyHead()) || head.getMemberId() == null) return;
         List<Member> dependents = memberRepository.findByFamilyHeadId(head.getMemberId());
         for (Member dep : dependents) {
@@ -1091,6 +1108,17 @@ public class MemberService {
                 dep.setFreezeEndDate(freezeUntil);
                 if (reason != null) dep.setFreezeReason(reason);
             } else {
+                if (daysFrozen > 0) {
+                    if (dep.getExpiryDate() != null) {
+                        dep.setExpiryDate(dep.getExpiryDate().plusDays(daysFrozen));
+                    }
+                    if (dep.getMembershipEndDate() != null) {
+                        dep.setMembershipEndDate(dep.getMembershipEndDate().plusDays(daysFrozen));
+                    }
+                    if (dep.getNextPaymentDate() != null) {
+                        dep.setNextPaymentDate(dep.getNextPaymentDate().plusDays(daysFrozen));
+                    }
+                }
                 dep.setFreezeStartDate(null);
                 dep.setFreezeEndDate(null);
                 dep.setFreezeReason(null);

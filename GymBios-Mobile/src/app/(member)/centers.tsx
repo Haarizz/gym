@@ -1,1 +1,3 @@
-export { MemberCentersScreen as default } from '@/domains/auth';
+import { MemberCentersScreen } from '@/domains/memberPortal';
+
+export default MemberCentersScreen;

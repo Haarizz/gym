@@ -1,1 +1,3 @@
-export { MemberHomeScreen as default } from '@/domains/auth';
+import { MemberDashboardScreen } from '@/domains/dashboard';
+
+export default MemberDashboardScreen;

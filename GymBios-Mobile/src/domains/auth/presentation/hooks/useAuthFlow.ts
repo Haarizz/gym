@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 
@@ -40,7 +40,6 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
   return function useLogin(role: AppRole) {
     const router = useRouter();
     const setSession = useAuthStore((state) => state.setSession);
-    const setPendingRole = useAuthStore((state) => state.setPendingRole);
     const [errorMessage, setErrorMessage] = useState<string>();
 
     const mutation = useMutation({
@@ -82,6 +81,7 @@ export function createUseRestoreSession(
 ) {
   return function useRestoreSession() {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const session = useAuthStore((state) => state.session);
     const isHydrated = useAuthStore((state) => state.isHydrated);
     const setSession = useAuthStore((state) => state.setSession);
@@ -103,13 +103,18 @@ export function createUseRestoreSession(
     });
 
     const logoutMutation = useMutation({
-      mutationFn: () => authOrchestrator.signOut(),
-      onSuccess: (result) => {
-        if (result.success) {
-          reset();
-          analytics.track({ name: 'auth_logout_success' });
-          router.replace(ROLE_SELECTION_HREF);
+      mutationFn: async () => {
+        try {
+          return await authOrchestrator.signOut();
+        } catch {
+          return { success: true, value: undefined };
         }
+      },
+      onSettled: () => {
+        queryClient.clear();
+        reset();
+        analytics.track({ name: 'auth_logout_success' });
+        router.replace(ROLE_SELECTION_HREF);
       },
     });
 
