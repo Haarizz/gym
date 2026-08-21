@@ -17,14 +17,8 @@ api.interceptors.request.use(
     if (activeBranchId && activeBranchId !== 'null') {
       config.headers['X-Active-Branch-Id'] = activeBranchId;
     } else {
-      // All Branches Mode
-      const isMutation = ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase());
-      
-      const isGlobalRoute = config.url?.includes('/auth') || config.url?.includes('/branches');
-      // Let backend decide on global routes if needed, but for safety we reject standard mutations in All Branches mode
-      if (isMutation && !isGlobalRoute) {
-        return Promise.reject(new Error("Please select a specific branch before creating or modifying this record."));
-      }
+      // We remove the blanket frontend block for mutations in All Branches mode.
+      // The backend will enforce this via BranchSecurityListener for BranchAware entities.
     }
 
     return config;
