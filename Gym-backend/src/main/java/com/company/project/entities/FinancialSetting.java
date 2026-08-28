@@ -10,8 +10,17 @@ public class FinancialSetting extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "setting_key", unique = true, nullable = false)
+    @Column(name = "setting_key", nullable = false)
     private String settingKey;
+
+    // Null for genuinely-global settings (GENERAL/ACCOUNTING/TAX/BANK categories).
+    // Set only for COMPANY-category and APP_PREFERENCES/currency_code rows, which
+    // are branch-scoped — see FinancialSettingService's BRANCH_SCOPED_CATEGORIES.
+    // Deliberately NOT a BranchAware entity: that would force every category into
+    // branch-scoping via the generic BranchSecurityListener, breaking the
+    // genuinely-shared GENERAL/ACCOUNTING/TAX/BANK settings.
+    @Column(name = "branch_id")
+    private Long branchId;
 
     @Column(name = "setting_value", columnDefinition = "TEXT")
     private String settingValue;
@@ -32,6 +41,9 @@ public class FinancialSetting extends BaseEntity {
 
     public String getSettingKey() { return settingKey; }
     public void setSettingKey(String settingKey) { this.settingKey = settingKey; }
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 
     public String getSettingValue() { return settingValue; }
     public void setSettingValue(String settingValue) { this.settingValue = settingValue; }

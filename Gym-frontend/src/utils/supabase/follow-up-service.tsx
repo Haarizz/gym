@@ -83,14 +83,6 @@ export interface FollowUpPage {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-async function getHeaders(): Promise<HeadersInit> {
-  const token = authService.getAccessToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 function mapToFollowUpResponse(f: any): FollowUpResponse {
   return {
     id: f.id,
@@ -141,7 +133,7 @@ export const followUpService = {
     if (params?.priority)      p.set('priority', params.priority);
     if (params?.assignedStaff) p.set('assignedStaff', params.assignedStaff);
     if (params?.search)        p.set('search', params.search);
-    const res = await fetch(`${BASE_URL}/follow-ups?${p}`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups?${p}`);
     if (!res.ok) throw new Error('Failed to fetch follow-ups');
     const raw = await res.json();
     const followUpsRaw = raw.follow_ups ?? raw.followUps ?? [];
@@ -158,7 +150,7 @@ export const followUpService = {
   },
 
   async getStats(): Promise<FollowUpStats> {
-    const res = await fetch(`${BASE_URL}/follow-ups/stats`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/stats`);
     if (!res.ok) throw new Error('Failed to fetch follow-up stats');
     const raw = await res.json();
     return {
@@ -173,7 +165,7 @@ export const followUpService = {
   },
 
   async getById(id: number): Promise<FollowUpResponse> {
-    const res = await fetch(`${BASE_URL}/follow-ups/${id}`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/${id}`);
     if (!res.ok) throw new Error('Failed to fetch follow-up');
     return mapToFollowUpResponse(await res.json());
   },
@@ -197,9 +189,8 @@ export const followUpService = {
       estimated_duration: request.estimatedDuration,
       outcome: request.outcome
     };
-    const res = await fetch(`${BASE_URL}/follow-ups`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups`, {
       method: 'POST',
-      headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -228,9 +219,8 @@ export const followUpService = {
       estimated_duration: request.estimatedDuration,
       outcome: request.outcome
     };
-    const res = await fetch(`${BASE_URL}/follow-ups/${id}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/${id}`, {
       method: 'PUT',
-      headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to update follow-up');
@@ -238,17 +228,15 @@ export const followUpService = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${BASE_URL}/follow-ups/${id}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/${id}`, {
       method: 'DELETE',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to delete follow-up');
   },
 
   async complete(id: number, outcome: string, notes?: string): Promise<FollowUpResponse> {
-    const res = await fetch(`${BASE_URL}/follow-ups/${id}/complete`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/${id}/complete`, {
       method: 'POST',
-      headers: await getHeaders(),
       body: JSON.stringify({ outcome, notes }),
     });
     if (!res.ok) throw new Error('Failed to complete follow-up');
@@ -256,18 +244,16 @@ export const followUpService = {
   },
 
   async cancel(id: number): Promise<FollowUpResponse> {
-    const res = await fetch(`${BASE_URL}/follow-ups/${id}/cancel`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/${id}/cancel`, {
       method: 'POST',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to cancel follow-up');
     return mapToFollowUpResponse(await res.json());
   },
 
   async reschedule(id: number, dueDate: string): Promise<FollowUpResponse> {
-    const res = await fetch(`${BASE_URL}/follow-ups/${id}/reschedule`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/${id}/reschedule`, {
       method: 'POST',
-      headers: await getHeaders(),
       body: JSON.stringify({ dueDate }),
     });
     if (!res.ok) throw new Error('Failed to reschedule follow-up');
@@ -275,16 +261,14 @@ export const followUpService = {
   },
 
   async markOverdue(): Promise<void> {
-    await fetch(`${BASE_URL}/follow-ups/mark-overdue`, {
+    await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/mark-overdue`, {
       method: 'POST',
-      headers: await getHeaders(),
     });
   },
 
   async addRecord(followUpId: number, record: CommunicationRecord): Promise<CommunicationRecord> {
-    const res = await fetch(`${BASE_URL}/follow-ups/${followUpId}/records`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/${followUpId}/records`, {
       method: 'POST',
-      headers: await getHeaders(),
       body: JSON.stringify(record),
     });
     if (!res.ok) throw new Error('Failed to add communication record');
@@ -292,9 +276,8 @@ export const followUpService = {
   },
 
   async deleteRecord(recordId: number): Promise<void> {
-    const res = await fetch(`${BASE_URL}/follow-ups/records/${recordId}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups/records/${recordId}`, {
       method: 'DELETE',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to delete communication record');
   },

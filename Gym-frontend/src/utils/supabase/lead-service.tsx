@@ -83,14 +83,6 @@ export interface LeadPage {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-async function getHeaders(): Promise<HeadersInit> {
-  const token = authService.getAccessToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 function mapToLeadResponse(l: any): LeadResponse {
   if (!l) return l;
   return {
@@ -140,7 +132,7 @@ export const leadService = {
     if (params?.source)   p.set('source', params.source);
     if (params?.priority) p.set('priority', params.priority);
     if (params?.search)   p.set('search', params.search);
-    const res = await fetch(`${BASE_URL}/leads?${p}`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads?${p}`);
     if (!res.ok) throw new Error('Failed to fetch leads');
     const raw = await res.json();
     const pg = raw.pagination ?? {};
@@ -156,7 +148,7 @@ export const leadService = {
   },
 
   async getStats(): Promise<LeadStats> {
-    const res = await fetch(`${BASE_URL}/leads/stats`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads/stats`);
     if (!res.ok) throw new Error('Failed to fetch lead stats');
     const raw = await res.json();
     return {
@@ -171,7 +163,7 @@ export const leadService = {
   },
 
   async getById(id: number): Promise<LeadResponse> {
-    const res = await fetch(`${BASE_URL}/leads/${id}`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads/${id}`);
     if (!res.ok) throw new Error('Failed to fetch lead');
     return mapToLeadResponse(await res.json());
   },
@@ -197,9 +189,8 @@ export const leadService = {
       lead_score: request.leadScore,
     };
 
-    const res = await fetch(`${BASE_URL}/leads`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads`, {
       method: 'POST',
-      headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to create lead');
@@ -227,9 +218,8 @@ export const leadService = {
       lead_score: request.leadScore,
     };
 
-    const res = await fetch(`${BASE_URL}/leads/${id}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads/${id}`, {
       method: 'PUT',
-      headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to update lead');
@@ -237,17 +227,15 @@ export const leadService = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${BASE_URL}/leads/${id}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads/${id}`, {
       method: 'DELETE',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to delete lead');
   },
 
   async updateStatus(id: number, status: string): Promise<LeadResponse> {
-    const res = await fetch(`${BASE_URL}/leads/${id}/status`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads/${id}/status`, {
       method: 'PATCH',
-      headers: await getHeaders(),
       body: JSON.stringify({ status }),
     });
     if (!res.ok) throw new Error('Failed to update lead status');
@@ -255,9 +243,8 @@ export const leadService = {
   },
 
   async addInteraction(leadId: number, interaction: LeadInteraction): Promise<LeadInteraction> {
-    const res = await fetch(`${BASE_URL}/leads/${leadId}/interactions`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads/${leadId}/interactions`, {
       method: 'POST',
-      headers: await getHeaders(),
       body: JSON.stringify(interaction),
     });
     if (!res.ok) throw new Error('Failed to add interaction');
@@ -265,9 +252,8 @@ export const leadService = {
   },
 
   async deleteInteraction(interactionId: number): Promise<void> {
-    const res = await fetch(`${BASE_URL}/leads/interactions/${interactionId}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads/interactions/${interactionId}`, {
       method: 'DELETE',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to delete interaction');
   },

@@ -67,6 +67,9 @@ export interface Member {
   user_id?: number;
   app_username?: string;
   app_access_enabled?: boolean;
+  // Which staff member actually handled this sale — credited toward their revenue
+  // target regardless of which account is logged in. Write-only (create/renew).
+  processed_by_staff_id?: number;
 }
 
 // One row in the Add Member "Family Members" section, or the payload for
@@ -96,6 +99,8 @@ export interface FamilyMemberInput {
   minor_payment_breakdown?: PaymentSplitLeg[];
   minor_bank_account_code?: string;
   minor_bank_account_name?: string;
+  // Which staff member actually handled this sale — see Member.processed_by_staff_id.
+  processed_by_staff_id?: number;
 }
 
 export interface FamilyGroup {
@@ -217,6 +222,7 @@ class MembersService {
     payment_breakdown?: PaymentSplitLeg[];
     bank_account_code?: string;
     bank_account_name?: string;
+    processed_by_staff_id?: number;
   }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/renew`,
@@ -226,7 +232,7 @@ class MembersService {
     return response.json();
   }
 
-  async freezeMember(id: string, data: { freezeUntil: string; reason?: string }): Promise<Member> {
+  async freezeMember(id: string, data: { freezeUntil: string; freezeStartDate?: string; reason?: string }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/freeze`,
       { method: 'POST', body: JSON.stringify(data) }
@@ -244,6 +250,7 @@ class MembersService {
     payment_breakdown?: PaymentSplitLeg[];
     bank_account_code?: string;
     bank_account_name?: string;
+    processed_by_staff_id?: number;
   }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/renew-minor`,
@@ -260,6 +267,7 @@ class MembersService {
     payment_breakdown?: PaymentSplitLeg[];
     bank_account_code?: string;
     bank_account_name?: string;
+    processed_by_staff_id?: number;
   }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${headId}/renew-family`,

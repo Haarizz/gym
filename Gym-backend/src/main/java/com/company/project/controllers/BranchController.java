@@ -42,6 +42,7 @@ public class BranchController {
 
     /** GET /api/branches/{id} */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('BRANCH_MANAGEMENT_VIEW')")
     public ResponseEntity<BranchResponseDTO> getBranchById(@PathVariable Long id) {
         return ResponseEntity.ok(branchService.getBranchById(id));
     }
@@ -117,6 +118,7 @@ public class BranchController {
 
     /** GET /api/branches/staff/{staffId}/branches — get branches for a staff member */
     @GetMapping("/staff/{staffId}/branches")
+    @PreAuthorize("hasAuthority('BRANCH_MANAGEMENT_VIEW')")
     public ResponseEntity<List<BranchResponseDTO>> getStaffBranches(@PathVariable Long staffId) {
         return ResponseEntity.ok(branchService.getStaffBranches(staffId));
     }

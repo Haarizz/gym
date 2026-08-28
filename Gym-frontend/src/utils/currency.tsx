@@ -56,24 +56,37 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    financialSettingsService
-      .getSettings(SETTING_CATEGORY)
-      .then((settings) => {
-        if (cancelled) return;
-        const saved = settings.find((s) => s.settingKey === SETTING_KEY)?.settingValue ?? null;
-        if (isCurrencyCode(saved) && saved !== currencyCode) {
-          setCurrencyCodeState(saved);
-          window.localStorage.setItem(STORAGE_KEY, saved);
-        }
-      })
-      .catch(() => {
-        // Not logged in yet, or backend unavailable — keep the cached/default value.
-      });
+    const fetchCurrency = () => {
+      financialSettingsService
+        .getSettings(SETTING_CATEGORY)
+        .then((settings) => {
+          if (cancelled) return;
+          const saved = settings.find((s) => s.settingKey === SETTING_KEY)?.settingValue ?? null;
+          // Falls back to the default currency (not merely "leave unchanged") once a
+          // branch context is active — the display currency is now branch-scoped, so
+          // switching to a branch with no saved override must not keep showing
+          // whichever branch's currency happened to be active before.
+          const resolved = isCurrencyCode(saved) ? saved : DEFAULT_CURRENCY;
+          setCurrencyCodeState((prev) => {
+            if (resolved === prev) return prev;
+            window.localStorage.setItem(STORAGE_KEY, resolved);
+            return resolved;
+          });
+        })
+        .catch(() => {
+          // Not logged in yet, or backend unavailable — keep the cached/default value.
+        });
+    };
+
+    fetchCurrency();
+    // Currency is branch-scoped — re-fetch whenever the active branch changes
+    // (branch-context.tsx dispatches this on every setActiveBranch call).
+    window.addEventListener("branchChanged", fetchCurrency);
 
     return () => {
       cancelled = true;
+      window.removeEventListener("branchChanged", fetchCurrency);
     };
-    // Only run once on mount; this hydrates the cached/default value from the backend.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1197,7 +1197,7 @@ export function Referrals() {
 
       {/* Edit Referral Dialog */}
       <Dialog open={showEditReferral} onOpenChange={setShowEditReferral}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#2B7A78]">Edit Referral</DialogTitle>
           </DialogHeader>
@@ -1294,7 +1294,7 @@ export function Referrals() {
 
       {/* ---------------- Add Referral Modal ---------------- */}
       <Dialog open={showAddReferral} onOpenChange={setShowAddReferral}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#2B7A78]">Add a Referral</DialogTitle>
             <DialogDescription>

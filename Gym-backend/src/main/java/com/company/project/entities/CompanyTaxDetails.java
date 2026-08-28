@@ -1,18 +1,30 @@
 package com.company.project.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 
 /**
- * Single-row company tax registration details (GST/VAT/TRN + legal identity),
- * surfaced on receipts/invoices/reports. Always id=1 — get()/update() in
- * CompanyTaxDetailsService upsert that one row rather than managing a list.
+ * One row per branch of company tax registration details (GST/VAT/TRN +
+ * legal identity), surfaced on receipts/invoices/reports — different
+ * branches/legal entities can carry their own TRN. Was a single global
+ * singleton (fixed id=1) before branch-scoping.
  */
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "company_tax_details")
-public class CompanyTaxDetails extends BaseEntity {
+public class CompanyTaxDetails extends BaseEntity implements BranchAware {
 
     @Id
-    private Long id = 1L;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    @Override
+    public Long getBranchId() { return branchId; }
+    @Override
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 
     @Column(name = "legal_name")
     private String legalName;

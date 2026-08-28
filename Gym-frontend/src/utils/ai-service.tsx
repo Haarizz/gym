@@ -239,6 +239,64 @@ class ClaudeAIService {
     ];
   }
 
+  /**
+   * A short written narrative summarizing the gym's current state — entirely
+   * rule-based from real numbers, no LLM call involved (works identically with
+   * or without VITE_CLAUDE_API_KEY configured), so BiOS always has something
+   * real to show instead of raw KPI tiles alone.
+   */
+  generateExecutiveSummary(ctx: GymDataContext): string {
+    const currency = ctx.currencyCode || 'AED';
+    const latestMonth = ctx.monthlyTrend[ctx.monthlyTrend.length - 1];
+    const previousMonth = ctx.monthlyTrend[ctx.monthlyTrend.length - 2];
+    const revenueChange = latestMonth && previousMonth
+      ? this.calculatePercentChange(latestMonth.revenue, previousMonth.revenue)
+      : 0;
+    const activeRatio = ctx.totalMembers > 0 ? (ctx.activeMembers / ctx.totalMembers) * 100 : 0;
+    const topRevenueSource = this.getTopRevenueSource(ctx);
+    const topExpenseCategory = this.getTopExpenseCategory(ctx);
+    const peakHour = this.getTopPeakHour(ctx);
+
+    const sentences: string[] = [];
+
+    if (ctx.totalRevenue > 0) {
+      const trendPhrase = latestMonth && previousMonth
+        ? (revenueChange >= 0
+            ? `up ${revenueChange.toFixed(1)}% from the prior month`
+            : `down ${Math.abs(revenueChange).toFixed(1)}% from the prior month`)
+        : 'holding steady';
+      sentences.push(
+        `Revenue stands at ${ctx.totalRevenue.toLocaleString()} ${currency} with a ${ctx.profitMargin.toFixed(1)}% profit margin, ${trendPhrase}.`
+      );
+    } else {
+      sentences.push('No revenue has been recorded yet for the current period.');
+    }
+
+    if (topRevenueSource) {
+      sentences.push(`${topRevenueSource.source} is the leading revenue driver.`);
+    }
+
+    if (ctx.totalMembers > 0) {
+      sentences.push(
+        `${ctx.activeMembers.toLocaleString()} of ${ctx.totalMembers.toLocaleString()} members are active (${activeRatio.toFixed(1)}%), with ${ctx.recentJoins} new join${ctx.recentJoins === 1 ? '' : 's'} this month.`
+      );
+      const atRisk = ctx.expiredMembers + ctx.overdueMembers;
+      if (atRisk > 0) {
+        sentences.push(`${atRisk} member${atRisk === 1 ? '' : 's'} are expired or overdue and worth a retention follow-up.`);
+      }
+    }
+
+    if (ctx.todayCheckIns > 0 && peakHour) {
+      sentences.push(`Today's traffic peaked around ${peakHour[0]} with ${peakHour[1]} check-ins.`);
+    }
+
+    if (topExpenseCategory) {
+      sentences.push(`${topExpenseCategory[0]} remains the largest expense category.`);
+    }
+
+    return sentences.join(' ');
+  }
+
   async generatePredictiveInsights(ctx: GymDataContext): Promise<AIInsight[]> {
     if (!this.isConfigured()) {
       return this.buildLocalInsights(ctx);

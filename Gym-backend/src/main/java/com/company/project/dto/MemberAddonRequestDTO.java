@@ -35,6 +35,8 @@ public class MemberAddonRequestDTO {
     // add-on itself, so the wallet balance and the ledger's Reward Wallet
     // Liability account can never drift apart (see WalletService.debit).
     private BigDecimal walletAmountApplied;
+    // Which staff member actually handled this sale — see MemberRequestDTO.processedByStaffId.
+    private Long processedByStaffId;
 
     public MemberAddonRequestDTO() {}
 
@@ -81,4 +83,7 @@ public class MemberAddonRequestDTO {
 
     public BigDecimal getWalletAmountApplied() { return walletAmountApplied; }
     public void setWalletAmountApplied(BigDecimal walletAmountApplied) { this.walletAmountApplied = walletAmountApplied; }
+
+    public Long getProcessedByStaffId() { return processedByStaffId; }
+    public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
 }

@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useBranch } from "../utils/branch-context";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   financialReportsService, IncomeStatementData, BalanceSheetData, TrialBalanceData, CashFlowData,
-  CashBookData, DayBookData, GeneralLedgerData, AgingData, DeferredRevenueData,
+  CashBookData, DayBookData, GeneralLedgerData, AgingData, DeferredRevenueData, TaxSummaryData,
 } from "../utils/supabase/financial-reports-service";
 import { toast } from "sonner";
 import {
@@ -24,14 +25,6 @@ import {
   TableRow,
 } from "../components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "../components/ui/dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -39,299 +32,285 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { Calendar } from "../components/ui/calendar";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../components/ui/popover";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import {
   FileText,
   Download,
-  Calendar as CalendarIcon,
   TrendingUp,
   Building2,
   DollarSign,
-  Receipt,
   BookOpen,
   Landmark,
-  CreditCard,
   BarChart3,
-  Filter,
   RefreshCw,
-  Eye,
-  ExternalLink,
-  PieChart,
   Calculator,
-  Banknote,
-  ArrowUpDown,
-  CheckSquare,
-  Clock,
   Wallet,
   ScrollText,
   Users,
   Truck,
   Hourglass,
+  Search,
+  ChevronRight,
+  SlidersHorizontal,
+  Clock,
+  ShoppingCart,
+  Banknote,
+  Package,
+  Megaphone,
+  Activity,
+  ExternalLink,
 } from "lucide-react";
-import { format, subMonths, subYears, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subQuarters } from "date-fns";
+import { format, subMonths, subYears, subDays, differenceInCalendarDays, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subQuarters } from "date-fns";
 import { cn } from "../components/ui/utils";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
 
-// Types
+const CHART_COLORS = ["#2563eb", "#16a34a", "#f97316", "#7c3aed", "#0891b2", "#dc2626", "#ca8a04", "#0d9488"];
+
+function sortByDate<T>(items: T[], getDate: (item: T) => string | undefined, order: "fifo" | "lifo"): T[] {
+  const sorted = [...items].sort((a, b) => {
+    const da = getDate(a) ? new Date(getDate(a) as string).getTime() : 0;
+    const db = getDate(b) ? new Date(getDate(b) as string).getTime() : 0;
+    return da - db;
+  });
+  return order === "lifo" ? sorted.reverse() : sorted;
+}
+
 interface DateRange {
   from: Date;
   to: Date;
 }
 
-interface ReportData {
-  id: string;
-  accountCode?: string;
-  accountName?: string;
-  debit?: number;
-  credit?: number;
-  balance?: number;
-  amount?: number;
-  description?: string;
-  date?: string;
-  category?: string;
-  period?: string;
-}
+type ReportKind = "chart" | "table";
 
-interface Report {
+interface ReportDefinition {
   id: string;
   title: string;
   description: string;
-  icon: React.ElementType;
-  category: "primary" | "secondary" | "supporting";
-  ifrsCompliant: boolean;
-  lastGenerated?: string;
-  status: "ready" | "generating" | "outdated";
+  group: string;
+  type: ReportKind;
+  tags: string[];
+  /** Reports that live on their own dedicated page elsewhere in the app, rather than rendering inline here. */
+  external?: { route: string; state?: Record<string, any> };
 }
 
-// Mock data for reports
-const reportDefinitions: Report[] = [
+const GROUP_META: Record<string, { icon: React.ElementType }> = {
+  "Profit & Loss": { icon: TrendingUp },
+  "Balance Sheet": { icon: Building2 },
+  "Cash Flow": { icon: DollarSign },
+  "Ledgers": { icon: ScrollText },
+  "Membership": { icon: Users },
+  "Sales & Revenue": { icon: ShoppingCart },
+  "Payroll": { icon: Banknote },
+  "Assets": { icon: Package },
+  "Member Connect": { icon: Megaphone },
+  "Aging & Recoverables": { icon: Clock },
+  "Revenue Recognition": { icon: Hourglass },
+  "Tax & Compliance": { icon: Landmark },
+  "Analytics & Custom": { icon: Activity },
+};
+
+const GROUP_ORDER = Object.keys(GROUP_META);
+
+const reportDefinitions: ReportDefinition[] = [
   {
     id: "profit-loss",
     title: "Statement of Profit or Loss (P&L)",
-    description: "Comprehensive income statement showing revenue, expenses, and profitability",
-    icon: TrendingUp,
-    category: "primary",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:30",
-    status: "ready",
+    description: "Revenue, expenses and net profit vs. the prior equivalent period",
+    group: "Profit & Loss",
+    type: "chart",
+    tags: ["IFRS", "income", "net profit"],
   },
   {
     id: "balance-sheet",
     title: "Statement of Financial Position",
-    description: "Balance sheet showing assets, liabilities, and equity position",
-    icon: Building2,
-    category: "primary",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:30",
-    status: "ready",
-  },
-  {
-    id: "cash-flow",
-    title: "Statement of Cash Flows",
-    description: "Cash flow analysis from operating, investing, and financing activities",
-    icon: DollarSign,
-    category: "primary",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:25",
-    status: "ready",
+    description: "Assets, liabilities and equity as of a selected date",
+    group: "Balance Sheet",
+    type: "table",
+    tags: ["IFRS", "assets", "equity"],
   },
   {
     id: "trial-balance",
     title: "Trial Balance",
-    description: "Complete listing of all account balances for verification",
-    icon: Calculator,
-    category: "secondary",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:35",
-    status: "ready",
+    description: "All account balances — debit and credit totals",
+    group: "Balance Sheet",
+    type: "table",
+    tags: ["ledger", "debit", "credit"],
+  },
+  {
+    id: "cash-flow",
+    title: "Statement of Cash Flows",
+    description: "Cash inflows and outflows for the selected period",
+    group: "Cash Flow",
+    type: "chart",
+    tags: ["cash", "inflow", "outflow"],
+  },
+  {
+    id: "cash-book",
+    title: "Cash Book",
+    description: "Chronological ledger of the cash/bank accounts, with running balance",
+    group: "Cash Flow",
+    type: "table",
+    tags: ["cash", "bank", "ledger"],
   },
   {
     id: "day-book",
     title: "Day Book",
     description: "Every posted line for a single date, across all accounts",
-    icon: BookOpen,
-    category: "supporting",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:20",
-    status: "ready",
-  },
-  {
-    id: "cash-book",
-    title: "Cash Book",
-    description: "Chronological ledger of the Cash/Bank accounts, with running balance",
-    icon: Wallet,
-    category: "supporting",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:22",
-    status: "ready",
+    group: "Cash Flow",
+    type: "table",
+    tags: ["daily", "postings"],
   },
   {
     id: "general-ledger",
     title: "General Ledger",
     description: "Every account's postings and running balance, grouped by account",
-    icon: ScrollText,
-    category: "supporting",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:24",
-    status: "ready",
+    group: "Ledgers",
+    type: "table",
+    tags: ["ledger", "postings"],
   },
   {
     id: "member-aging",
     title: "Member Aging",
     description: "Outstanding member balances bucketed by days overdue",
-    icon: Users,
-    category: "secondary",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:26",
-    status: "ready",
+    group: "Aging & Recoverables",
+    type: "table",
+    tags: ["receivables", "aging"],
   },
   {
     id: "supplier-aging",
     title: "Supplier Aging",
     description: "Outstanding supplier bills bucketed by days overdue",
-    icon: Truck,
-    category: "secondary",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:28",
-    status: "ready",
+    group: "Aging & Recoverables",
+    type: "table",
+    tags: ["payables", "aging"],
   },
   {
     id: "deferred-revenue",
     title: "Deferred Revenue",
-    description: "Unrecognized membership revenue balance and its amortization schedules",
-    icon: Hourglass,
-    category: "secondary",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:29",
-    status: "ready",
+    description: "Unrecognized membership revenue and its amortization schedules",
+    group: "Revenue Recognition",
+    type: "table",
+    tags: ["deferred", "membership"],
   },
   {
-    id: "bank-book",
-    title: "Bank Book",
-    description: "Bank transactions with reconciliation status and balances",
-    icon: Landmark,
-    category: "supporting",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:40",
-    status: "ready",
+    id: "tax-summary",
+    title: "Tax & VAT Summary",
+    description: "Output/input VAT and corporate tax computation for the period",
+    group: "Tax & Compliance",
+    type: "chart",
+    tags: ["VAT", "corporate tax"],
+  },
+
+  // Reports that live on their own dedicated pages elsewhere in the app.
+  {
+    id: "membership-report",
+    title: "Membership Report",
+    description: "Membership transactions by type, plan and payment mode",
+    group: "Membership",
+    type: "table",
+    tags: ["members", "transactions"],
+    external: { route: "/members", state: { tab: "reports" } },
   },
   {
-    id: "fund-flow",
-    title: "Fund Flow Statement",
-    description: "Sources and uses of funds analysis for working capital management",
-    icon: ArrowUpDown,
-    category: "secondary",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:15",
-    status: "ready",
+    id: "attendance-reports",
+    title: "Attendance Reports",
+    description: "Check-in trends, class attendance and member attendance stats",
+    group: "Membership",
+    type: "chart",
+    tags: ["attendance", "check-ins"],
+    external: { route: "/attendance-reports" },
   },
   {
-    id: "pdc-report",
-    title: "Post-Dated Cheques (PDC) Report",
-    description: "Incoming and outgoing PDCs with maturity and status tracking",
-    icon: Receipt,
-    category: "supporting",
-    ifrsCompliant: true,
-    lastGenerated: "2025-09-30 14:10",
-    status: "ready",
+    id: "sales-reports",
+    title: "Sales Reports",
+    description: "Sales register, weekly trend, category mix and top plans",
+    group: "Sales & Revenue",
+    type: "chart",
+    tags: ["sales", "receipts"],
+    external: { route: "/sales-reports" },
   },
-];
-
-// Mock P&L data
-const profitLossData = [
-  { category: "Revenue", accounts: [
-    { accountName: "Membership Revenue", currentPeriod: 125000, priorPeriod: 118000 },
-    { accountName: "Personal Training Revenue", currentPeriod: 35000, priorPeriod: 32000 },
-    { accountName: "Class & Drop-in Revenue", currentPeriod: 18000, priorPeriod: 16500 },
-    { accountName: "Retail & Merchandise Revenue", currentPeriod: 8500, priorPeriod: 7200 },
-    { accountName: "Other Operating Income", currentPeriod: 2500, priorPeriod: 2100 },
-  ]},
-  { category: "Cost of Sales", accounts: [
-    { accountName: "Cost of Goods Sold (Retail)", currentPeriod: -4250, priorPeriod: -3600 },
-    { accountName: "Trainer Commission", currentPeriod: -10500, priorPeriod: -9600 },
-  ]},
-  { category: "Operating Expenses", accounts: [
-    { accountName: "Employee Benefits Expense", currentPeriod: -45000, priorPeriod: -42000 },
-    { accountName: "Depreciation & Amortisation", currentPeriod: -8500, priorPeriod: -8200 },
-    { accountName: "Rent & Utilities", currentPeriod: -25000, priorPeriod: -24000 },
-    { accountName: "Marketing & Advertising", currentPeriod: -6500, priorPeriod: -5800 },
-    { accountName: "Repairs & Maintenance", currentPeriod: -3200, priorPeriod: -2900 },
-    { accountName: "Software & Hosting", currentPeriod: -2800, priorPeriod: -2600 },
-    { accountName: "Administrative Expenses", currentPeriod: -4200, priorPeriod: -3800 },
-  ]},
-  { category: "Finance", accounts: [
-    { accountName: "Finance Income", currentPeriod: 150, priorPeriod: 200 },
-    { accountName: "Finance Expense", currentPeriod: -1200, priorPeriod: -1100 },
-  ]},
-];
-
-// Mock Balance Sheet data
-const balanceSheetData = [
-  { category: "Non-current Assets", accounts: [
-    { accountName: "Property, Plant & Equipment", amount: 285000 },
-    { accountName: "Right-of-use Assets", amount: 45000 },
-    { accountName: "Intangible Assets", amount: 15000 },
-    { accountName: "Deferred Tax Assets", amount: 2500 },
-  ]},
-  { category: "Current Assets", accounts: [
-    { accountName: "Inventories", amount: 12000 },
-    { accountName: "Trade & Other Receivables", amount: 18500 },
-    { accountName: "Prepayments", amount: 8200 },
-    { accountName: "Cash & Cash Equivalents", amount: 45300 },
-  ]},
-  { category: "Equity", accounts: [
-    { accountName: "Share Capital", amount: 100000 },
-    { accountName: "Retained Earnings", amount: 165500 },
-    { accountName: "Other Reserves", amount: 12000 },
-  ]},
-  { category: "Non-current Liabilities", accounts: [
-    { accountName: "Long-term Borrowings", amount: 85000 },
-    { accountName: "Lease Liabilities", amount: 38000 },
-    { accountName: "Deferred Tax Liabilities", amount: 4200 },
-  ]},
-  { category: "Current Liabilities", accounts: [
-    { accountName: "Trade & Other Payables", amount: 15800 },
-    { accountName: "Contract Liabilities", amount: 22000 },
-    { accountName: "Short-term Borrowings", amount: 8000 },
-    { accountName: "Tax Payable", amount: 3500 },
-  ]},
-];
-
-// Mock Trial Balance data
-const trialBalanceData = [
-  { accountCode: "1000", accountName: "Cash at Bank", debit: 45300, credit: 0 },
-  { accountCode: "1100", accountName: "Trade Receivables", debit: 18500, credit: 0 },
-  { accountCode: "1200", accountName: "Inventory", debit: 12000, credit: 0 },
-  { accountCode: "1500", accountName: "Equipment", debit: 285000, credit: 0 },
-  { accountCode: "2000", accountName: "Trade Payables", debit: 0, credit: 15800 },
-  { accountCode: "2100", accountName: "Contract Liabilities", debit: 0, credit: 22000 },
-  { accountCode: "3000", accountName: "Share Capital", debit: 0, credit: 100000 },
-  { accountCode: "3100", accountName: "Retained Earnings", debit: 0, credit: 165500 },
-  { accountCode: "4000", accountName: "Membership Revenue", debit: 0, credit: 125000 },
-  { accountCode: "4100", accountName: "Training Revenue", debit: 0, credit: 35000 },
-  { accountCode: "5000", accountName: "Staff Salaries", debit: 45000, credit: 0 },
-  { accountCode: "5100", accountName: "Rent Expense", debit: 25000, credit: 0 },
+  {
+    id: "payroll-reports",
+    title: "Payroll Reports",
+    description: "Detailed payroll register for staff and trainers",
+    group: "Payroll",
+    type: "table",
+    tags: ["payroll", "salary"],
+    external: { route: "/payroll-reports" },
+  },
+  {
+    id: "asset-reports",
+    title: "Asset Reports",
+    description: "Asset, maintenance and compliance report catalogue",
+    group: "Assets",
+    type: "table",
+    tags: ["assets", "maintenance"],
+    external: { route: "/asset-reports" },
+  },
+  {
+    id: "member-connect-reports",
+    title: "Member Connect Reports",
+    description: "Promotions, referrals, follow-ups and campaign ROI",
+    group: "Member Connect",
+    type: "chart",
+    tags: ["marketing", "referrals", "follow-ups"],
+    external: { route: "/member-connect-reports" },
+  },
+  {
+    id: "reports-analytics",
+    title: "Reports & Analytics",
+    description: "General BI dashboard — revenue, attendance and member trends",
+    group: "Analytics & Custom",
+    type: "chart",
+    tags: ["analytics", "dashboard"],
+    external: { route: "/reports" },
+  },
+  {
+    id: "custom-reports",
+    title: "Custom Reports",
+    description: "Build ad-hoc reports, including a printable membership report template",
+    group: "Analytics & Custom",
+    type: "table",
+    tags: ["custom", "ad-hoc"],
+    external: { route: "/custom-reports" },
+  },
 ];
 
 export function FinancialReports() {
   const { currencyCode } = useCurrency();
-  const { activeBranchId } = useBranch();
+  const { activeBranchName } = useBranch();
+  const navigate = useNavigate();
+
   const [selectedReport, setSelectedReport] = useState<string>("");
-  const [selectedBranch, setSelectedBranch] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(GROUP_ORDER));
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState("current-month");
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: subMonths(new Date(), 1),
+    from: startOfMonth(new Date()),
     to: new Date(),
   });
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [reportCategory, setReportCategory] = useState("all");
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [sortOrder, setSortOrder] = useState<"fifo" | "lifo">("fifo");
+
   const [incomeStatement, setIncomeStatement] = useState<IncomeStatementData | null>(null);
+  const [incomeStatementPrior, setIncomeStatementPrior] = useState<IncomeStatementData | null>(null);
   const [balanceSheet, setBalanceSheet] = useState<BalanceSheetData | null>(null);
   const [trialBalance, setTrialBalance] = useState<TrialBalanceData | null>(null);
   const [cashFlow, setCashFlow] = useState<CashFlowData | null>(null);
@@ -341,6 +320,7 @@ export function FinancialReports() {
   const [memberAging, setMemberAging] = useState<AgingData | null>(null);
   const [supplierAging, setSupplierAging] = useState<AgingData | null>(null);
   const [deferredRevenue, setDeferredRevenue] = useState<DeferredRevenueData | null>(null);
+  const [taxSummary, setTaxSummary] = useState<TaxSummaryData | null>(null);
 
   useEffect(() => {
     const now = new Date();
@@ -348,41 +328,62 @@ export function FinancialReports() {
       case "current-month":
         setDateRange({ from: startOfMonth(now), to: endOfMonth(now) });
         break;
-      case "last-month":
+      case "last-month": {
         const lastMo = subMonths(now, 1);
         setDateRange({ from: startOfMonth(lastMo), to: endOfMonth(lastMo) });
         break;
+      }
       case "current-quarter":
         setDateRange({ from: startOfQuarter(now), to: endOfQuarter(now) });
         break;
-      case "last-quarter":
+      case "last-quarter": {
         const lastQ = subQuarters(now, 1);
         setDateRange({ from: startOfQuarter(lastQ), to: endOfQuarter(lastQ) });
         break;
+      }
       case "current-year":
         setDateRange({ from: startOfYear(now), to: endOfYear(now) });
         break;
-      case "last-year":
+      case "last-year": {
         const lastYr = subYears(now, 1);
         setDateRange({ from: startOfYear(lastYr), to: endOfYear(lastYr) });
+        break;
+      }
+      default:
         break;
     }
   }, [selectedPeriod]);
 
-  // Re-generate report if branch changes
-  useEffect(() => {
-    if (selectedReport) {
-      handleGenerateReport(selectedReport);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBranchId]);
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  };
 
-  // Filter reports based on category
-  const filteredReports = reportDefinitions.filter(report =>
-    reportCategory === "all" || report.category === reportCategory
+  const filteredReports = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return reportDefinitions;
+    return reportDefinitions.filter(
+      (r) =>
+        r.title.toLowerCase().includes(q) ||
+        r.description.toLowerCase().includes(q) ||
+        r.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  }, [searchQuery]);
+
+  const groupedReports = useMemo(
+    () =>
+      GROUP_ORDER.map((group) => ({
+        group,
+        reports: filteredReports.filter((r) => r.group === group),
+      })).filter((g) => g.reports.length > 0),
+    [filteredReports]
   );
 
-  const branches = ["All Branches", "Downtown", "Mall Branch", "Marina Branch"];
+  const selectedReportDef = reportDefinitions.find((r) => r.id === selectedReport);
 
   const getDateParams = () => {
     const from = format(dateRange.from, "yyyy-MM-dd");
@@ -393,7 +394,9 @@ export function FinancialReports() {
   const handleGenerateReport = async (reportId: string) => {
     setIsGeneratingReport(true);
     setSelectedReport(reportId);
+    setSortOrder("fifo");
     setIncomeStatement(null);
+    setIncomeStatementPrior(null);
     setBalanceSheet(null);
     setTrialBalance(null);
     setCashFlow(null);
@@ -403,11 +406,19 @@ export function FinancialReports() {
     setMemberAging(null);
     setSupplierAging(null);
     setDeferredRevenue(null);
+    setTaxSummary(null);
     const { from, to } = getDateParams();
     try {
       if (reportId === "profit-loss") {
-        const data = await financialReportsService.getIncomeStatement(from, to);
-        setIncomeStatement(data);
+        const rangeDays = differenceInCalendarDays(dateRange.to, dateRange.from);
+        const priorTo = subDays(dateRange.from, 1);
+        const priorFrom = subDays(priorTo, rangeDays);
+        const [current, prior] = await Promise.all([
+          financialReportsService.getIncomeStatement(from, to),
+          financialReportsService.getIncomeStatement(format(priorFrom, "yyyy-MM-dd"), format(priorTo, "yyyy-MM-dd")),
+        ]);
+        setIncomeStatement(current);
+        setIncomeStatementPrior(prior);
       } else if (reportId === "balance-sheet") {
         const data = await financialReportsService.getBalanceSheet(to);
         setBalanceSheet(data);
@@ -435,13 +446,20 @@ export function FinancialReports() {
       } else if (reportId === "deferred-revenue") {
         const data = await financialReportsService.getDeferredRevenue();
         setDeferredRevenue(data);
+      } else if (reportId === "tax-summary") {
+        const data = await financialReportsService.getTaxSummary(from, to);
+        setTaxSummary(data);
       }
-      toast.success("Report generated successfully");
+      toast.success("Report generated");
     } catch (e: any) {
       toast.error(e.message || "Failed to generate report");
     } finally {
       setIsGeneratingReport(false);
     }
+  };
+
+  const handleRegenerate = () => {
+    if (selectedReport) handleGenerateReport(selectedReport);
   };
 
   const downloadBlob = (filename: string, blob: Blob) => {
@@ -484,24 +502,10 @@ export function FinancialReports() {
 
   const handleExportReport = (exportFormat: "csv" | "excel" | "pdf") => {
     if (!selectedReport) return;
-
     const dateLabel = `${format(dateRange.from, "yyyy-MM-dd")}_to_${format(dateRange.to, "yyyy-MM-dd")}`;
 
-    // Build a flat table depending on report type.
-    if (selectedReport === "profit-loss") {
-      const src = incomeStatement;
-      const rows = src
-        ? [
-            ...src.revenueLines.map((l) => ["Revenue", l.accountName, l.amount]),
-            ...src.expenseLines.map((l) => ["Expense", l.accountName, l.amount]),
-            ["", "Total Revenue", src.totalRevenue],
-            ["", "Total Expenses", src.totalExpenses],
-            ["", "Net Income", src.netIncome],
-          ]
-        : profitLossData.flatMap((s) => s.accounts.map((a) => [s.category, a.accountName, a.currentPeriod]));
-
-      const header = ["Section", "Account", `Amount (${currencyCode})`];
-      const filename = `profit-loss_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
+    const emit = (name: string, header: string[], rows: Array<Array<unknown>>) => {
+      const filename = `${name}_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
       if (exportFormat === "pdf") {
         window.print();
         return;
@@ -509,121 +513,196 @@ export function FinancialReports() {
       if (exportFormat === "excel") exportAsExcel(filename, header, rows);
       else exportAsCsv(filename, header, rows);
       toast.success("Export started");
+    };
+
+    if (selectedReport === "profit-loss") {
+      if (!incomeStatement) { toast.error("Generate the report first"); return; }
+      const rows = [
+        ...incomeStatement.revenueLines.map((l) => ["Revenue", l.accountName, l.amount]),
+        ...incomeStatement.expenseLines.map((l) => ["Expense", l.accountName, l.amount]),
+        ["", "Total Revenue", incomeStatement.totalRevenue],
+        ["", "Total Expenses", incomeStatement.totalExpenses],
+        ["", "Net Income", incomeStatement.netIncome],
+      ];
+      emit("profit-loss", ["Section", "Account", `Amount (${currencyCode})`], rows);
       return;
     }
 
     if (selectedReport === "trial-balance") {
-      const src = trialBalance;
-      const header = ["Code", "Account", `Debit (${currencyCode})`, `Credit (${currencyCode})`, `Net Balance (${currencyCode})`];
-      const rows = src
-        ? src.lines.map((l) => [l.code, l.name, l.debit, l.credit, l.netBalance])
-        : trialBalanceData.map((l) => [l.accountCode, l.accountName, l.debit, l.credit, (l.debit || 0) - (l.credit || 0)]);
-      const filename = `trial-balance_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
-      if (exportFormat === "pdf") {
-        window.print();
-        return;
-      }
-      if (exportFormat === "excel") exportAsExcel(filename, header, rows);
-      else exportAsCsv(filename, header, rows);
-      toast.success("Export started");
+      if (!trialBalance) { toast.error("Generate the report first"); return; }
+      const rows = trialBalance.lines.map((l) => [l.code, l.name, l.debit, l.credit, l.netBalance]);
+      emit("trial-balance", ["Code", "Account", `Debit (${currencyCode})`, `Credit (${currencyCode})`, `Net Balance (${currencyCode})`], rows);
       return;
     }
 
     if (selectedReport === "balance-sheet") {
-      const src = balanceSheet;
-      const header = ["Group", "Code", "Account", `Balance (${currencyCode})`];
-      const rows = src
-        ? Object.entries(src.accounts || {}).flatMap(([group, lines]) =>
-            (lines || []).map((l) => [group, l.code, l.name, l.balance])
-          )
-        : balanceSheetData.flatMap((s) => s.accounts.map((a) => [s.category, "", a.accountName, a.amount]));
-      const filename = `balance-sheet_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
-      if (exportFormat === "pdf") {
-        window.print();
-        return;
-      }
-      if (exportFormat === "excel") exportAsExcel(filename, header, rows);
-      else exportAsCsv(filename, header, rows);
-      toast.success("Export started");
+      if (!balanceSheet) { toast.error("Generate the report first"); return; }
+      const rows = Object.entries(balanceSheet.accounts || {}).flatMap(([group, lines]) =>
+        (lines || []).map((l) => [group, l.code, l.name, l.balance])
+      );
+      emit("balance-sheet", ["Group", "Code", "Account", `Balance (${currencyCode})`], rows);
       return;
     }
 
     if (selectedReport === "cash-flow") {
-      const src = cashFlow;
-      if (!src) {
-        toast.error("Generate the cash flow report first");
-        return;
-      }
-      const header = ["Metric", "Value"];
+      if (!cashFlow) { toast.error("Generate the report first"); return; }
       const rows = [
-        [`Total Inflows (${currencyCode})`, src.totalInflows],
-        [`Total Outflows (${currencyCode})`, src.totalOutflows],
-        [`Net Cash Flow (${currencyCode})`, src.netCashFlow],
-        ["Inflow Count", src.inflowCount],
-        ["Outflow Count", src.outflowCount],
+        [`Total Inflows (${currencyCode})`, cashFlow.totalInflows],
+        [`Total Outflows (${currencyCode})`, cashFlow.totalOutflows],
+        [`Net Cash Flow (${currencyCode})`, cashFlow.netCashFlow],
+        ["Inflow Count", cashFlow.inflowCount],
+        ["Outflow Count", cashFlow.outflowCount],
       ];
-      const filename = `cash-flow_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
-      if (exportFormat === "pdf") {
-        window.print();
-        return;
-      }
-      if (exportFormat === "excel") exportAsExcel(filename, header, rows);
-      else exportAsCsv(filename, header, rows);
-      toast.success("Export started");
+      emit("cash-flow", ["Metric", "Value"], rows);
       return;
     }
 
-    toast.info("Export for this report type is not available yet.");
+    if (selectedReport === "cash-book") {
+      if (!cashBook) { toast.error("Generate the report first"); return; }
+      const rows = cashBook.entries.map((e) => [e.date, e.voucherNo, e.accountName, e.debit, e.credit, e.runningBalance ?? 0]);
+      emit("cash-book", ["Date", "Voucher", "Account", "Debit", "Credit", "Balance"], rows);
+      return;
+    }
+
+    if (selectedReport === "day-book") {
+      if (!dayBook) { toast.error("Generate the report first"); return; }
+      const rows = dayBook.entries.map((e) => [e.voucherNo, e.accountName, e.narration ?? "", e.debit, e.credit]);
+      emit("day-book", ["Voucher", "Account", "Narration", "Debit", "Credit"], rows);
+      return;
+    }
+
+    if (selectedReport === "general-ledger") {
+      if (!generalLedger) { toast.error("Generate the report first"); return; }
+      const rows = generalLedger.accounts.flatMap((acc) =>
+        acc.entries.map((e) => [acc.accountCode, acc.accountName, e.date, e.voucherNo, e.debit, e.credit, e.runningBalance ?? 0])
+      );
+      emit("general-ledger", ["Account Code", "Account Name", "Date", "Voucher", "Debit", "Credit", "Balance"], rows);
+      return;
+    }
+
+    if (selectedReport === "member-aging" || selectedReport === "supplier-aging") {
+      const data = selectedReport === "member-aging" ? memberAging : supplierAging;
+      if (!data) { toast.error("Generate the report first"); return; }
+      const rows = data.rows.map((r) => [r.name, r.reference ?? "", r.dueDate ?? "", r.outstanding, r.daysOverdue, r.bucket]);
+      emit(selectedReport, ["Name", "Reference", "Due Date", "Outstanding", "Days Overdue", "Bucket"], rows);
+      return;
+    }
+
+    if (selectedReport === "deferred-revenue") {
+      if (!deferredRevenue) { toast.error("Generate the report first"); return; }
+      const rows = deferredRevenue.schedules.map((s) => [s.memberName ?? "", s.planName ?? "", s.startDate, s.endDate, s.totalAmount, s.recognizedAmount, s.remainingAmount]);
+      emit("deferred-revenue", ["Member", "Plan", "Start", "End", "Total", "Recognized", "Remaining"], rows);
+      return;
+    }
+
+    if (selectedReport === "tax-summary") {
+      if (!taxSummary) { toast.error("Generate the report first"); return; }
+      const rows = taxSummary.taxByCode.map((t) => [t.taxCode, t.name, t.taxType, t.outputAmount, t.inputAmount]);
+      emit("tax-summary", ["Tax Code", "Name", "Type", "Output Amount", "Input Amount"], rows);
+      return;
+    }
   };
 
-  const calculateTotals = (data: any[], field: string) => {
-    return data.reduce((sum, item) => sum + (item[field] || 0), 0);
-  };
+  // Merge current + prior income statement lines by account name for an accurate variance column.
+  const profitLossSections = useMemo(() => {
+    if (!incomeStatement) return null;
+    const priorRevenueMap = new Map((incomeStatementPrior?.revenueLines ?? []).map((l) => [l.accountName, l.amount]));
+    const priorExpenseMap = new Map((incomeStatementPrior?.expenseLines ?? []).map((l) => [l.accountName, l.amount]));
+    return [
+      {
+        category: "Revenue",
+        accounts: incomeStatement.revenueLines.map((l) => ({
+          accountName: l.accountName,
+          currentPeriod: l.amount,
+          priorPeriod: priorRevenueMap.get(l.accountName) ?? 0,
+        })),
+        totalCurrent: incomeStatement.totalRevenue,
+        totalPrior: incomeStatementPrior?.totalRevenue ?? 0,
+      },
+      {
+        category: "Expenses",
+        accounts: incomeStatement.expenseLines.map((l) => ({
+          accountName: l.accountName,
+          currentPeriod: l.amount,
+          priorPeriod: priorExpenseMap.get(l.accountName) ?? 0,
+        })),
+        totalCurrent: incomeStatement.totalExpenses,
+        totalPrior: incomeStatementPrior?.totalExpenses ?? 0,
+      },
+    ];
+  }, [incomeStatement, incomeStatementPrior]);
 
-  const StatusBadge = ({ status }: { status: Report["status"] }) => {
-    const statusConfig = {
-      ready: { color: "bg-green-100 text-green-800", label: "Ready" },
-      generating: { color: "bg-yellow-100 text-yellow-800", label: "Generating" },
-      outdated: { color: "bg-red-100 text-red-800", label: "Outdated" },
+  const EmptyState = ({ icon: Icon, label }: { icon: React.ElementType; label: string }) => (
+    <div className="text-center py-12 text-muted-foreground">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+        <Icon className="h-7 w-7 text-muted-foreground" />
+      </div>
+      <p>{label}</p>
+    </div>
+  );
+
+  const SummaryBar = ({ label, value, max, tone }: { label: string; value: number; max: number; tone: "green" | "red" | "primary" }) => {
+    const toneClasses: Record<string, { bar: string; text: string }> = {
+      green: { bar: "bg-green-500", text: "text-green-700" },
+      red: { bar: "bg-red-500", text: "text-red-700" },
+      primary: { bar: "bg-primary", text: "text-primary" },
     };
-
-    const config = statusConfig[status];
+    const c = toneClasses[tone];
+    const pct = max > 0 ? Math.min(100, Math.max(4, (Math.abs(value) / max) * 100)) : 0;
     return (
-      <Badge variant="secondary" className={config.color}>
-        {config.label}
-      </Badge>
+      <div>
+        <div className={cn("h-3 rounded-full overflow-hidden bg-muted")}>
+          <div className={cn("h-full rounded-full", c.bar)} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="mt-2">
+          <div className={cn("text-xl font-bold", c.text)}>
+            <CurrencyGlyph /> {Math.abs(Math.round(value)).toLocaleString()}
+          </div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+        </div>
+      </div>
     );
   };
 
-  const profitLossSections = incomeStatement
-    ? ([
-        {
-          category: "Revenue",
-          accounts: incomeStatement.revenueLines.map((l) => ({
-            accountName: l.accountName,
-            currentPeriod: l.amount,
-            priorPeriod: 0,
-          })),
-        },
-        {
-          category: "Expenses",
-          accounts: incomeStatement.expenseLines.map((l) => ({
-            accountName: l.accountName,
-            currentPeriod: l.amount,
-            priorPeriod: 0,
-          })),
-        },
-        {
-          category: "Net Income",
-          accounts: [
-            { accountName: "Net Income", currentPeriod: incomeStatement.netIncome, priorPeriod: 0 },
-          ],
-        },
-      ] as typeof profitLossData)
-    : profitLossData;
+  const SortToggle = () => (
+    <div className="flex items-center gap-1">
+      <Button type="button" size="sm" variant={sortOrder === "fifo" ? "default" : "outline"} onClick={() => setSortOrder("fifo")}>
+        FIFO (oldest first)
+      </Button>
+      <Button type="button" size="sm" variant={sortOrder === "lifo" ? "default" : "outline"} onClick={() => setSortOrder("lifo")}>
+        LIFO (newest first)
+      </Button>
+    </div>
+  );
+
+  const MiniBarChart = ({ data, dataKey = "value", nameKey = "name", height = 240, colorful = false }: { data: any[]; dataKey?: string; nameKey?: string; height?: number; colorful?: boolean }) => (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey={nameKey} tick={{ fontSize: 11 }} interval={0} angle={data.length > 5 ? -20 : 0} textAnchor={data.length > 5 ? "end" : "middle"} height={data.length > 5 ? 50 : 30} />
+        <YAxis tick={{ fontSize: 11 }} />
+        <Tooltip formatter={(v: number) => `${currencyCode} ${Number(v).toLocaleString()}`} />
+        <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} fill={CHART_COLORS[0]}>
+          {colorful && data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
+  const MiniLineChart = ({ data, dataKey = "value", nameKey = "name", height = 240 }: { data: any[]; dataKey?: string; nameKey?: string; height?: number }) => (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey={nameKey} tick={{ fontSize: 11 }} />
+        <YAxis tick={{ fontSize: 11 }} />
+        <Tooltip formatter={(v: number) => `${currencyCode} ${Number(v).toLocaleString()}`} />
+        <Line type="monotone" dataKey={dataKey} stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 2 }} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-3">
@@ -631,296 +710,362 @@ export function FinancialReports() {
             <FileText className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Financial Reports</h1>
-            <p className="text-sm text-gray-600">
+            <h1 className="text-2xl font-semibold">Financial Reports</h1>
+            <p className="text-sm text-muted-foreground">
               IFRS-compliant financial reports and statements
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh All
+          <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={!selectedReport || isGeneratingReport}>
+            <RefreshCw className={cn("h-4 w-4 mr-2", isGeneratingReport && "animate-spin")} />
+            Refresh
           </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export Package
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={!selectedReport}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExportReport("csv")}>CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportReport("excel")}>Excel</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportReport("pdf")}>PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="bg-white border-0 shadow-sm rounded-2xl overflow-hidden">
-        <CardHeader className="bg-gradient-light border-b border-slate-100">
-          <CardTitle className="text-lg">Report Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="branch">Branch/Entity</Label>
-              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch} value={branch.toLowerCase().replace(/\s+/g, '-')}>
-                      {branch}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left: report catalogue */}
+        <Card className="lg:col-span-4 border-primary/10 shadow-md">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Financial Reports</CardTitle>
+            <p className="text-xs text-muted-foreground">Every report across Financials, Membership, Sales, Payroll, Assets and Member Connect.</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search reports..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 text-sm"
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="period">Period</Label>
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="current-month">Current Month</SelectItem>
-                  <SelectItem value="last-month">Last Month</SelectItem>
-                  <SelectItem value="current-quarter">Current Quarter</SelectItem>
-                  <SelectItem value="last-quarter">Last Quarter</SelectItem>
-                  <SelectItem value="current-year">Current Year</SelectItem>
-                  <SelectItem value="last-year">Last Year</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="category">Report Category</Label>
-              <Select value={reportCategory} onValueChange={setReportCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="primary">Primary Statements</SelectItem>
-                  <SelectItem value="secondary">Secondary Reports</SelectItem>
-                  <SelectItem value="supporting">Supporting Reports</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Custom Date Range</Label>
-              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dateRange && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange?.from ? (
-                      dateRange.to ? (
-                        <>
-                          {format(dateRange.from, "LLL dd, y")} -{" "}
-                          {format(dateRange.to, "LLL dd, y")}
-                        </>
-                      ) : (
-                        format(dateRange.from, "LLL dd, y")
-                      )
-                    ) : (
-                      <span>Pick a date range</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={(range) => {
-                      if (range) {
-                        setDateRange(range as DateRange);
-                        if (range.from && range.to) {
-                          setSelectedPeriod("custom");
-                        }
-                      }
-                    }}
-                    numberOfMonths={2}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Report Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredReports.map((report) => (
-          <Card
-            key={report.id}
-            className="bg-white border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none cursor-pointer overflow-hidden rounded-2xl"
-          >
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-primary/10 rounded-lg p-2">
-                    <report.icon className="h-5 w-5 text-primary" />
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+              {groupedReports.map(({ group, reports }) => {
+                const GroupIcon = GROUP_META[group]?.icon ?? FileText;
+                // Auto-expand groups with matches while searching, without losing the user's manual collapse state once the search is cleared.
+                const collapsed = collapsedGroups.has(group) && !searchQuery.trim();
+                return (
+                  <div key={group} className="border rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group)}
+                      className="w-full flex items-center justify-between px-2 py-1.5 bg-muted/30 hover:bg-muted/50 transition-colors"
+                    >
+                      <span className="flex items-center gap-1.5 text-xs font-semibold">
+                        <GroupIcon className="h-3.5 w-3.5 text-primary" />
+                        {group}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        {reports.length} report{reports.length !== 1 ? "s" : ""}
+                        <ChevronRight
+                          className="h-3.5 w-3.5"
+                          style={{ transform: collapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform 0.25s ease" }}
+                        />
+                      </span>
+                    </button>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateRows: collapsed ? "0fr" : "1fr",
+                        transition: "grid-template-rows 0.25s ease",
+                      }}
+                    >
+                      <div className="min-h-0 overflow-hidden">
+                      <div className="p-1 space-y-1">
+                        {reports.map((r) => (
+                          <button
+                            type="button"
+                            key={r.id}
+                            onClick={() => (r.external ? navigate(r.external.route, { state: r.external.state }) : handleGenerateReport(r.id))}
+                            className={cn(
+                              "w-full text-left rounded-lg border p-2 transition-all",
+                              selectedReport === r.id
+                                ? "border-primary bg-primary/5"
+                                : "border-transparent hover:border-primary/20 hover:bg-muted/30"
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-xs font-semibold leading-tight">{r.title}</span>
+                              {r.external ? (
+                                <Badge variant="outline" className="text-xs shrink-0">
+                                  <ExternalLink /> Opens page
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs shrink-0">
+                                  {r.type === "chart" ? "Chart" : "Table"}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {r.tags.map((tag) => (
+                                <Badge key={tag} variant="secondary" className="text-xs font-normal">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm leading-tight">{report.title}</h3>
-                  </div>
+                );
+              })}
+              {groupedReports.length === 0 && (
+                <div className="text-sm text-muted-foreground text-center py-6">
+                  No reports match "{searchQuery}"
                 </div>
-                <StatusBadge status={report.status} />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Right: filters + generated report */}
+        <div className="lg:col-span-8 space-y-6">
+          <Card className="border-primary/10 shadow-md">
+            <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
+              <div>
+                <CardTitle>Filters</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Applied to: <span className="font-medium text-foreground">{selectedReportDef?.title ?? "No report selected"}</span>
+                </p>
               </div>
+              <Button variant="outline" size="sm" onClick={() => setShowAdvanced((v) => !v)}>
+                <SlidersHorizontal className="h-4 w-4 mr-2" />
+                Advanced
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {report.description}
-              </p>
-              
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span className="flex items-center">
-                  <CheckSquare className="h-3 w-3 mr-1" />
-                  IFRS Compliant
-                </span>
-                {report.lastGenerated && (
-                  <span className="flex items-center">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {format(new Date(report.lastGenerated), "MMM dd, HH:mm")}
-                  </span>
-                )}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Date From</Label>
+                  <Input
+                    type="date"
+                    value={format(dateRange.from, "yyyy-MM-dd")}
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      setDateRange((r) => ({ ...r, from: new Date(e.target.value) }));
+                      setSelectedPeriod("custom");
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Date To</Label>
+                  <Input
+                    type="date"
+                    value={format(dateRange.to, "yyyy-MM-dd")}
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      setDateRange((r) => ({ ...r, to: new Date(e.target.value) }));
+                      setSelectedPeriod("custom");
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Scope</Label>
+                  <div className="h-9 flex items-center px-3 rounded-md border bg-muted/30 text-sm text-muted-foreground truncate">
+                    {activeBranchName} (consolidated)
+                  </div>
+                </div>
               </div>
 
-              <div className="flex space-x-2">
-                <Button 
-                  size="sm" 
-                  className="flex-1 bg-primary hover:bg-primary/90"
-                  onClick={() => handleGenerateReport(report.id)}
-                  disabled={isGeneratingReport}
+              {showAdvanced && (
+                <div className="space-y-2">
+                  <Label>Quick Period</Label>
+                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="current-month">Current Month</SelectItem>
+                      <SelectItem value="last-month">Last Month</SelectItem>
+                      <SelectItem value="current-quarter">Current Quarter</SelectItem>
+                      <SelectItem value="last-quarter">Last Quarter</SelectItem>
+                      <SelectItem value="current-year">Current Year</SelectItem>
+                      <SelectItem value="last-year">Last Year</SelectItem>
+                      <SelectItem value="custom">Custom Range</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="font-normal">Date From: {format(dateRange.from, "yyyy-MM-dd")}</Badge>
+                  <Badge variant="outline" className="font-normal">Date To: {format(dateRange.to, "yyyy-MM-dd")}</Badge>
+                  <Badge variant="outline" className="font-normal">Scope: {activeBranchName}</Badge>
+                </div>
+                <Button
+                  onClick={handleRegenerate}
+                  disabled={!selectedReport || isGeneratingReport}
+                  className="shrink-0"
                 >
-                  <Eye className="h-4 w-4 mr-1" />
-                  View
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4" />
+                  {isGeneratingReport ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                  )}
+                  Generate
                 </Button>
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      {/* Report Viewer Dialog */}
-      {selectedReport && (
-        <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport("")}>
-          <DialogContent className="sm:max-w-6xl max-w-[95vw] max-h-[90vh] overflow-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {reportDefinitions.find(r => r.id === selectedReport)?.title}
-              </DialogTitle>
-              <DialogDescription>
-                Period: {format(dateRange.from, "MMM dd, yyyy")} - {format(dateRange.to, "MMM dd, yyyy")} | 
-                Branch: {selectedBranch === "all" ? "All Branches" : selectedBranch}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              {/* Export Actions */}
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" size="sm" onClick={() => handleExportReport("csv")}>
-                  <Download className="h-4 w-4 mr-2" />
-                  CSV
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleExportReport("excel")}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Excel
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleExportReport("pdf")}>
-                  <Download className="h-4 w-4 mr-2" />
-                  PDF
-                </Button>
-              </div>
-
-              {/* Report Content */}
-              {isGeneratingReport ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-gray-600">Generating report...</p>
+          <Card className="border-primary/10 shadow-md">
+            <CardHeader>
+              <CardTitle>{selectedReportDef?.title ?? "Select a report"}</CardTitle>
+              {selectedReport && (
+                <p className="text-sm text-muted-foreground">
+                  Period: {format(dateRange.from, "MMM dd, yyyy")} – {format(dateRange.to, "MMM dd, yyyy")} · Scope: {activeBranchName}
+                </p>
+              )}
+            </CardHeader>
+            <CardContent>
+              {!selectedReport ? (
+                <EmptyState icon={FileText} label="Pick a report from the left to get started." />
+              ) : isGeneratingReport ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+                  <p className="text-muted-foreground">Generating report...</p>
                 </div>
               ) : (
                 <div className="space-y-6">
                   {selectedReport === "profit-loss" && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Statement of Profit or Loss</h3>
-                      <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="font-semibold text-primary">Account</TableHead>
-                              <TableHead className="font-semibold text-primary text-right">Current Period ({currencyCode})</TableHead>
-                              <TableHead className="font-semibold text-primary text-right">Prior Period ({currencyCode})</TableHead>
-                              <TableHead className="font-semibold text-primary text-right">Variance (%)</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {profitLossSections.map((section, sectionIndex) => (
-                              <React.Fragment key={sectionIndex}>
-                                <TableRow className="bg-gray-50">
-                                  <TableCell colSpan={4} className="font-semibold text-primary">
-                                    {section.category}
-                                  </TableCell>
-                                </TableRow>
-                                {section.accounts.map((account, accountIndex) => {
-                                  const variance = account.priorPeriod !== 0 
-                                    ? ((account.currentPeriod - account.priorPeriod) / Math.abs(account.priorPeriod) * 100).toFixed(1)
-                                    : "N/A";
-                                  
-                                  return (
-                                    <TableRow key={accountIndex}>
-                                      <TableCell className="pl-6">{account.accountName}</TableCell>
-                                      <TableCell className="text-right">
-                                        {account.currentPeriod.toLocaleString()}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        {account.priorPeriod.toLocaleString()}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        <span className={variance !== "N/A" && parseFloat(variance) > 0 ? "text-green-600" : "text-red-600"}>
-                                          {variance !== "N/A" ? `${variance}%` : "N/A"}
-                                        </span>
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                                {sectionIndex === 0 && (
-                                  <TableRow className="bg-blue-50 font-semibold">
-                                    <TableCell>Total Revenue</TableCell>
-                                    <TableCell className="text-right">
-                                      {section.accounts.reduce((sum, acc) => sum + acc.currentPeriod, 0).toLocaleString()}
+                    !profitLossSections ? (
+                      <EmptyState icon={TrendingUp} label="Generate the report to view revenue, expenses and net profit." />
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <SummaryBar label="Revenue" value={incomeStatement!.totalRevenue} max={Math.max(Math.abs(incomeStatement!.totalRevenue), Math.abs(incomeStatement!.totalExpenses), Math.abs(incomeStatement!.netIncome)) || 1} tone="green" />
+                          <SummaryBar label="Total Expenses" value={incomeStatement!.totalExpenses} max={Math.max(Math.abs(incomeStatement!.totalRevenue), Math.abs(incomeStatement!.totalExpenses), Math.abs(incomeStatement!.netIncome)) || 1} tone="red" />
+                          <SummaryBar label="Net Income" value={incomeStatement!.netIncome} max={Math.max(Math.abs(incomeStatement!.totalRevenue), Math.abs(incomeStatement!.totalExpenses), Math.abs(incomeStatement!.netIncome)) || 1} tone={incomeStatement!.netIncome >= 0 ? "primary" : "red"} />
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <Card className="border-0 shadow-sm bg-muted/30">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Revenue by Account</CardTitle></CardHeader>
+                            <CardContent>
+                              {incomeStatement!.revenueLines.length === 0 ? (
+                                <p className="text-sm text-muted-foreground py-8 text-center">No revenue recorded.</p>
+                              ) : (
+                                <MiniBarChart data={incomeStatement!.revenueLines.map((l) => ({ name: l.accountName, value: l.amount }))} colorful />
+                              )}
+                            </CardContent>
+                          </Card>
+                          <Card className="border-0 shadow-sm bg-muted/30">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Expenses by Account</CardTitle></CardHeader>
+                            <CardContent>
+                              {incomeStatement!.expenseLines.length === 0 ? (
+                                <p className="text-sm text-muted-foreground py-8 text-center">No expenses recorded.</p>
+                              ) : (
+                                <MiniBarChart data={incomeStatement!.expenseLines.map((l) => ({ name: l.accountName, value: Math.abs(l.amount) }))} colorful />
+                              )}
+                            </CardContent>
+                          </Card>
+                        </div>
+                        <div className="rounded-2xl overflow-hidden border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="font-semibold text-primary">Account</TableHead>
+                                <TableHead className="font-semibold text-primary text-right">Current Period ({currencyCode})</TableHead>
+                                <TableHead className="font-semibold text-primary text-right">Prior Period ({currencyCode})</TableHead>
+                                <TableHead className="font-semibold text-primary text-right">Variance (%)</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {profitLossSections.map((section, sectionIndex) => (
+                                <React.Fragment key={sectionIndex}>
+                                  <TableRow className="bg-muted/30">
+                                    <TableCell colSpan={4} className="font-semibold text-primary">
+                                      {section.category}
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                      {section.accounts.reduce((sum, acc) => sum + acc.priorPeriod, 0).toLocaleString()}
-                                    </TableCell>
-                                    <TableCell className="text-right">-</TableCell>
                                   </TableRow>
-                                )}
-                              </React.Fragment>
-                            ))}
-                          </TableBody>
-                        </Table>
+                                  {section.accounts.length === 0 ? (
+                                    <TableRow>
+                                      <TableCell colSpan={4} className="pl-6 text-muted-foreground">No {section.category.toLowerCase()} recorded for this period.</TableCell>
+                                    </TableRow>
+                                  ) : section.accounts.map((account, accountIndex) => {
+                                    const variance = account.priorPeriod !== 0
+                                      ? (((account.currentPeriod - account.priorPeriod) / Math.abs(account.priorPeriod)) * 100).toFixed(1)
+                                      : null;
+                                    return (
+                                      <TableRow key={accountIndex}>
+                                        <TableCell className="pl-6">{account.accountName}</TableCell>
+                                        <TableCell className="text-right">{account.currentPeriod.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right">{account.priorPeriod.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right">
+                                          {variance === null ? (
+                                            <span className="text-muted-foreground">—</span>
+                                          ) : (
+                                            <span className={parseFloat(variance) >= 0 ? "text-green-600" : "text-red-600"}>
+                                              {parseFloat(variance) > 0 ? "+" : ""}{variance}%
+                                            </span>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                  <TableRow className="bg-primary/5 font-semibold">
+                                    <TableCell>Total {section.category}</TableCell>
+                                    <TableCell className="text-right">{section.totalCurrent.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{section.totalPrior.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">—</TableCell>
+                                  </TableRow>
+                                </React.Fragment>
+                              ))}
+                              <TableRow className="bg-primary/10 font-bold">
+                                <TableCell>Net Income</TableCell>
+                                <TableCell className="text-right">{incomeStatement!.netIncome.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{((incomeStatementPrior?.netIncome) ?? 0).toLocaleString()}</TableCell>
+                                <TableCell className="text-right">—</TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
-                    </div>
+                    )
                   )}
 
                   {selectedReport === "balance-sheet" && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Statement of Financial Position</h3>
+                    !balanceSheet ? (
+                      <EmptyState icon={Building2} label="Generate the report to view assets, liabilities and equity." />
+                    ) : (
+                      <div className="space-y-6">
+                        <Card className="border-0 shadow-sm bg-muted/30">
+                          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Assets vs Liabilities & Equity</CardTitle></CardHeader>
+                          <CardContent>
+                            <MiniBarChart
+                              colorful
+                              data={[
+                                { name: "Assets", value: balanceSheet.totalAssets },
+                                { name: "Liabilities", value: balanceSheet.totalLiabilities },
+                                { name: "Equity", value: balanceSheet.totalEquity },
+                              ]}
+                            />
+                          </CardContent>
+                        </Card>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           <h4 className="font-semibold text-primary">Assets</h4>
-                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                          <div className="rounded-2xl overflow-hidden border">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -929,66 +1074,33 @@ export function FinancialReports() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {balanceSheet ? (
-                                  Object.entries(balanceSheet.accounts ?? {})
-                                    .filter(([group]) => group.toLowerCase().includes("asset"))
-                                    .map(([group, lines]) => (
-                                      <React.Fragment key={group}>
-                                        <TableRow className="bg-gray-50">
-                                          <TableCell colSpan={2} className="font-semibold text-primary">
-                                            {group}
-                                          </TableCell>
-                                        </TableRow>
-                                        {(lines ?? []).map((l) => (
-                                          <TableRow key={`${group}-${l.code}-${l.name}`}>
-                                            <TableCell className="pl-6">{l.name}</TableCell>
-                                            <TableCell className="text-right">{Number(l.balance || 0).toLocaleString()}</TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </React.Fragment>
-                                    ))
-                                ) : (
-                                  balanceSheetData.filter(section =>
-                                    section.category.includes("Assets")
-                                  ).map((section, sectionIndex) => (
-                                    <React.Fragment key={sectionIndex}>
-                                      <TableRow className="bg-gray-50">
-                                        <TableCell colSpan={2} className="font-semibold text-primary">
-                                          {section.category}
-                                        </TableCell>
+                                {Object.entries(balanceSheet.accounts ?? {})
+                                  .filter(([group]) => group.toLowerCase().includes("asset"))
+                                  .map(([group, lines]) => (
+                                    <React.Fragment key={group}>
+                                      <TableRow className="bg-muted/30">
+                                        <TableCell colSpan={2} className="font-semibold text-primary">{group}</TableCell>
                                       </TableRow>
-                                      {section.accounts.map((account, accountIndex) => (
-                                        <TableRow key={accountIndex}>
-                                          <TableCell className="pl-6">{account.accountName}</TableCell>
-                                          <TableCell className="text-right">
-                                            {account.amount.toLocaleString()}
-                                          </TableCell>
+                                      {(lines ?? []).map((l) => (
+                                        <TableRow key={`${group}-${l.code}-${l.name}`}>
+                                          <TableCell className="pl-6">{l.name}</TableCell>
+                                          <TableCell className="text-right">{Number(l.balance || 0).toLocaleString()}</TableCell>
                                         </TableRow>
                                       ))}
                                     </React.Fragment>
-                                  ))
-                                )}
-                                <TableRow className="bg-blue-50 font-semibold">
+                                  ))}
+                                <TableRow className="bg-primary/5 font-semibold">
                                   <TableCell>Total Assets</TableCell>
-                                  <TableCell className="text-right">
-                                    {(balanceSheet
-                                      ? balanceSheet.totalAssets
-                                      : balanceSheetData
-                                          .filter(section => section.category.includes("Assets"))
-                                          .reduce((total, section) =>
-                                            total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
-                                          )
-                                    ).toLocaleString()}
-                                  </TableCell>
+                                  <TableCell className="text-right">{balanceSheet.totalAssets.toLocaleString()}</TableCell>
                                 </TableRow>
                               </TableBody>
                             </Table>
                           </div>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           <h4 className="font-semibold text-primary">Equity & Liabilities</h4>
-                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                          <div className="rounded-2xl overflow-hidden border">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -997,255 +1109,259 @@ export function FinancialReports() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {balanceSheet ? (
-                                  Object.entries(balanceSheet.accounts ?? {})
-                                    .filter(([group]) => !group.toLowerCase().includes("asset"))
-                                    .map(([group, lines]) => (
-                                      <React.Fragment key={group}>
-                                        <TableRow className="bg-gray-50">
-                                          <TableCell colSpan={2} className="font-semibold text-primary">
-                                            {group}
-                                          </TableCell>
-                                        </TableRow>
-                                        {(lines ?? []).map((l) => (
-                                          <TableRow key={`${group}-${l.code}-${l.name}`}>
-                                            <TableCell className="pl-6">{l.name}</TableCell>
-                                            <TableCell className="text-right">{Number(l.balance || 0).toLocaleString()}</TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </React.Fragment>
-                                    ))
-                                ) : (
-                                  balanceSheetData.filter(section =>
-                                    !section.category.includes("Assets")
-                                  ).map((section, sectionIndex) => (
-                                    <React.Fragment key={sectionIndex}>
-                                      <TableRow className="bg-gray-50">
-                                        <TableCell colSpan={2} className="font-semibold text-primary">
-                                          {section.category}
-                                        </TableCell>
+                                {Object.entries(balanceSheet.accounts ?? {})
+                                  .filter(([group]) => !group.toLowerCase().includes("asset"))
+                                  .map(([group, lines]) => (
+                                    <React.Fragment key={group}>
+                                      <TableRow className="bg-muted/30">
+                                        <TableCell colSpan={2} className="font-semibold text-primary">{group}</TableCell>
                                       </TableRow>
-                                      {section.accounts.map((account, accountIndex) => (
-                                        <TableRow key={accountIndex}>
-                                          <TableCell className="pl-6">{account.accountName}</TableCell>
-                                          <TableCell className="text-right">
-                                            {account.amount.toLocaleString()}
-                                          </TableCell>
+                                      {(lines ?? []).map((l) => (
+                                        <TableRow key={`${group}-${l.code}-${l.name}`}>
+                                          <TableCell className="pl-6">{l.name}</TableCell>
+                                          <TableCell className="text-right">{Number(l.balance || 0).toLocaleString()}</TableCell>
                                         </TableRow>
                                       ))}
                                     </React.Fragment>
-                                  ))
-                                )}
-                                <TableRow className="bg-blue-50 font-semibold">
+                                  ))}
+                                <TableRow className="bg-primary/5 font-semibold">
                                   <TableCell>Total Equity & Liabilities</TableCell>
-                                  <TableCell className="text-right">
-                                    {(balanceSheet
-                                      ? (balanceSheet.totalLiabilities + balanceSheet.totalEquity)
-                                      : balanceSheetData
-                                          .filter(section => !section.category.includes("Assets"))
-                                          .reduce((total, section) =>
-                                            total + section.accounts.reduce((sum, acc) => sum + acc.amount, 0), 0
-                                          )
-                                    ).toLocaleString()}
-                                  </TableCell>
+                                  <TableCell className="text-right">{(balanceSheet.totalLiabilities + balanceSheet.totalEquity).toLocaleString()}</TableCell>
                                 </TableRow>
                               </TableBody>
                             </Table>
                           </div>
                         </div>
                       </div>
-                    </div>
+                      </div>
+                    )
                   )}
 
                   {selectedReport === "trial-balance" && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Trial Balance</h3>
-                      <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                    !trialBalance ? (
+                      <EmptyState icon={Calculator} label="Generate the report to view every account balance." />
+                    ) : (
+                      <div className="space-y-6">
+                      <Card className="border-0 shadow-sm bg-muted/30">
+                        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Debit vs Total Credit</CardTitle></CardHeader>
+                        <CardContent>
+                          <MiniBarChart
+                            colorful
+                            data={[
+                              { name: "Total Debit", value: trialBalance.totalDebit },
+                              { name: "Total Credit", value: trialBalance.totalCredit },
+                            ]}
+                          />
+                        </CardContent>
+                      </Card>
+                      <div className="rounded-2xl overflow-hidden border">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="font-semibold text-primary">Account Code</TableHead>
-                              <TableHead className="font-semibold text-primary">Account Name</TableHead>
+                              <TableHead className="font-semibold text-primary">Code</TableHead>
+                              <TableHead className="font-semibold text-primary">Account</TableHead>
                               <TableHead className="font-semibold text-primary text-right">Debit ({currencyCode})</TableHead>
                               <TableHead className="font-semibold text-primary text-right">Credit ({currencyCode})</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {(trialBalance?.lines ?? trialBalanceData).map((account: any, index: number) => (
-                              <TableRow key={account.code ?? account.accountCode ?? index}>
-                                <TableCell>{account.code ?? account.accountCode}</TableCell>
-                                <TableCell>{account.name ?? account.accountName}</TableCell>
-                                <TableCell className="text-right">
-                                  {(account.debit ?? 0) > 0 ? Number(account.debit).toLocaleString() : "-"}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {(account.credit ?? 0) > 0 ? Number(account.credit).toLocaleString() : "-"}
-                                </TableCell>
+                            {trialBalance.lines.map((account, index) => (
+                              <TableRow key={account.code ?? index}>
+                                <TableCell>{account.code}</TableCell>
+                                <TableCell>{account.name}</TableCell>
+                                <TableCell className="text-right">{account.debit > 0 ? Number(account.debit).toLocaleString() : "-"}</TableCell>
+                                <TableCell className="text-right">{account.credit > 0 ? Number(account.credit).toLocaleString() : "-"}</TableCell>
                               </TableRow>
                             ))}
-                            <TableRow className="bg-blue-50 font-semibold">
+                            <TableRow className="bg-primary/5 font-semibold">
                               <TableCell colSpan={2}>Total</TableCell>
-                              <TableCell className="text-right">
-                                {(trialBalance?.totalDebit ?? trialBalanceData.reduce((sum, acc) => sum + acc.debit, 0)).toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {(trialBalance?.totalCredit ?? trialBalanceData.reduce((sum, acc) => sum + acc.credit, 0)).toLocaleString()}
-                              </TableCell>
+                              <TableCell className="text-right">{trialBalance.totalDebit.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{trialBalance.totalCredit.toLocaleString()}</TableCell>
                             </TableRow>
                           </TableBody>
                         </Table>
                       </div>
-                    </div>
+                      </div>
+                    )
                   )}
 
-                  {/* Other reports would follow similar patterns */}
                   {selectedReport === "cash-flow" && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Statement of Cash Flows</h3>
-                      {!cashFlow ? (
-                        <div className="text-center py-14 text-gray-500">
-                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
-                            <BarChart3 className="h-7 w-7 text-gray-400" />
-                          </div>
-                          <p>Generate the report to view cash flow totals.</p>
-                          <p className="text-sm">Uses your real transactions for the selected range.</p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <Card className="border-0 shadow-sm">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm text-muted-foreground">Total Inflows</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-2xl font-semibold text-green-700"><CurrencyGlyph /> {cashFlow.totalInflows.toLocaleString()}</div>
-                              <p className="text-xs text-muted-foreground mt-1">{cashFlow.inflowCount} inflow transactions</p>
-                            </CardContent>
-                          </Card>
-                          <Card className="border-0 shadow-sm">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm text-muted-foreground">Total Outflows</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-2xl font-semibold text-red-700"><CurrencyGlyph /> {cashFlow.totalOutflows.toLocaleString()}</div>
-                              <p className="text-xs text-muted-foreground mt-1">{cashFlow.outflowCount} outflow transactions</p>
-                            </CardContent>
-                          </Card>
-                          <Card className="border-0 shadow-sm">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm text-muted-foreground">Net Cash Flow</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-2xl font-semibold text-primary"><CurrencyGlyph /> {cashFlow.netCashFlow.toLocaleString()}</div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {cashFlow.periodFrom} → {cashFlow.periodTo}
-                              </p>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      )}
-                    </div>
+                    !cashFlow ? (
+                      <EmptyState icon={DollarSign} label="Generate the report to view cash flow totals." />
+                    ) : (
+                      <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card className="border-0 shadow-sm bg-muted/30">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm text-muted-foreground">Total Inflows</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-semibold text-green-700"><CurrencyGlyph /> {cashFlow.totalInflows.toLocaleString()}</div>
+                            <p className="text-xs text-muted-foreground mt-1">{cashFlow.inflowCount} inflow transactions</p>
+                          </CardContent>
+                        </Card>
+                        <Card className="border-0 shadow-sm bg-muted/30">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm text-muted-foreground">Total Outflows</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-semibold text-red-700"><CurrencyGlyph /> {cashFlow.totalOutflows.toLocaleString()}</div>
+                            <p className="text-xs text-muted-foreground mt-1">{cashFlow.outflowCount} outflow transactions</p>
+                          </CardContent>
+                        </Card>
+                        <Card className="border-0 shadow-sm bg-muted/30">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm text-muted-foreground">Net Cash Flow</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-semibold text-primary"><CurrencyGlyph /> {cashFlow.netCashFlow.toLocaleString()}</div>
+                            <p className="text-xs text-muted-foreground mt-1">{cashFlow.periodFrom} → {cashFlow.periodTo}</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                      <Card className="border-0 shadow-sm bg-muted/30">
+                        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Inflows vs Outflows</CardTitle></CardHeader>
+                        <CardContent>
+                          <MiniBarChart
+                            colorful
+                            data={[
+                              { name: "Inflows", value: cashFlow.totalInflows },
+                              { name: "Outflows", value: cashFlow.totalOutflows },
+                              { name: "Net", value: cashFlow.netCashFlow },
+                            ]}
+                          />
+                        </CardContent>
+                      </Card>
+                      </div>
+                    )
                   )}
 
                   {selectedReport === "cash-book" && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Cash Book</h3>
-                      {!cashBook ? (
-                        <div className="text-center py-14 text-gray-500">
-                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
-                            <Wallet className="h-7 w-7 text-gray-400" />
-                          </div>
-                          <p>Generate the report to view cash/bank ledger entries.</p>
-                        </div>
-                      ) : (
-                        <>
+                    !cashBook ? (
+                      <EmptyState icon={Wallet} label="Generate the report to view cash/bank ledger entries." />
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
                           <div className="flex gap-6 text-sm">
                             <span>Opening: <strong>{cashBook.openingBalance.toLocaleString()}</strong></span>
                             <span>Closing: <strong>{cashBook.closingBalance.toLocaleString()}</strong></span>
                           </div>
-                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
-                            <Table>
-                              <TableHeader><TableRow>
-                                <TableHead>Date</TableHead><TableHead>Voucher</TableHead><TableHead>Account</TableHead>
-                                <TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
-                                <TableHead className="text-right">Balance</TableHead>
-                              </TableRow></TableHeader>
-                              <TableBody>
-                                {cashBook.entries.map((e, i) => (
-                                  <TableRow key={i}>
-                                    <TableCell>{e.date}</TableCell>
-                                    <TableCell className="font-mono text-xs">{e.voucherNo}</TableCell>
-                                    <TableCell>{e.accountName}</TableCell>
-                                    <TableCell className="text-right">{e.debit > 0 ? e.debit.toLocaleString() : "-"}</TableCell>
-                                    <TableCell className="text-right">{e.credit > 0 ? e.credit.toLocaleString() : "-"}</TableCell>
-                                    <TableCell className="text-right">{(e.runningBalance ?? 0).toLocaleString()}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                          <SortToggle />
+                        </div>
+                        {cashBook.entries.length > 0 && (
+                          <Card className="border-0 shadow-sm bg-muted/30">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Running Balance</CardTitle></CardHeader>
+                            <CardContent>
+                              <MiniLineChart data={sortByDate(cashBook.entries, (e) => e.date, sortOrder).map((e) => ({ name: e.date, value: e.runningBalance ?? 0 }))} />
+                            </CardContent>
+                          </Card>
+                        )}
+                        <div className="rounded-2xl overflow-hidden border">
+                          <Table>
+                            <TableHeader><TableRow>
+                              <TableHead>Date</TableHead><TableHead>Voucher</TableHead><TableHead>Account</TableHead>
+                              <TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
+                              <TableHead className="text-right">Balance</TableHead>
+                            </TableRow></TableHeader>
+                            <TableBody>
+                              {cashBook.entries.length === 0 ? (
+                                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No entries in this period.</TableCell></TableRow>
+                              ) : sortByDate(cashBook.entries, (e) => e.date, sortOrder).map((e, i) => (
+                                <TableRow key={i}>
+                                  <TableCell>{e.date}</TableCell>
+                                  <TableCell className="font-mono text-xs">{e.voucherNo}</TableCell>
+                                  <TableCell>{e.accountName}</TableCell>
+                                  <TableCell className="text-right">{e.debit > 0 ? e.debit.toLocaleString() : "-"}</TableCell>
+                                  <TableCell className="text-right">{e.credit > 0 ? e.credit.toLocaleString() : "-"}</TableCell>
+                                  <TableCell className="text-right">{(e.runningBalance ?? 0).toLocaleString()}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )
                   )}
 
                   {selectedReport === "day-book" && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Day Book</h3>
-                      {!dayBook ? (
-                        <div className="text-center py-14 text-gray-500">
-                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
-                            <BookOpen className="h-7 w-7 text-gray-400" />
-                          </div>
-                          <p>Generate the report to view today's postings (uses the "to" date above).</p>
-                        </div>
-                      ) : (
-                        <>
+                    !dayBook ? (
+                      <EmptyState icon={BookOpen} label={`Generate the report to view postings for ${format(dateRange.to, "MMM dd, yyyy")}.`} />
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
                           <div className="flex gap-6 text-sm">
                             <span>Total Debit: <strong>{dayBook.totalDebit.toLocaleString()}</strong></span>
                             <span>Total Credit: <strong>{dayBook.totalCredit.toLocaleString()}</strong></span>
                           </div>
-                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
-                            <Table>
-                              <TableHeader><TableRow>
-                                <TableHead>Voucher</TableHead><TableHead>Account</TableHead><TableHead>Narration</TableHead>
-                                <TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
-                              </TableRow></TableHeader>
-                              <TableBody>
-                                {dayBook.entries.map((e, i) => (
-                                  <TableRow key={i}>
-                                    <TableCell className="font-mono text-xs">{e.voucherNo}</TableCell>
-                                    <TableCell>{e.accountName}</TableCell>
-                                    <TableCell className="max-w-[240px] truncate" title={e.narration}>{e.narration || "—"}</TableCell>
-                                    <TableCell className="text-right">{e.debit > 0 ? e.debit.toLocaleString() : "-"}</TableCell>
-                                    <TableCell className="text-right">{e.credit > 0 ? e.credit.toLocaleString() : "-"}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                          <SortToggle />
+                        </div>
+                        {dayBook.entries.length > 0 && (
+                          <Card className="border-0 shadow-sm bg-muted/30">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Debit vs Credit by Account</CardTitle></CardHeader>
+                            <CardContent>
+                              <MiniBarChart
+                                colorful
+                                data={Object.values(
+                                  dayBook.entries.reduce((acc: Record<string, { name: string; value: number }>, e) => {
+                                    const key = e.accountName;
+                                    if (!acc[key]) acc[key] = { name: key, value: 0 };
+                                    acc[key].value += e.debit - e.credit;
+                                    return acc;
+                                  }, {})
+                                )}
+                              />
+                            </CardContent>
+                          </Card>
+                        )}
+                        <div className="rounded-2xl overflow-hidden border">
+                          <Table>
+                            <TableHeader><TableRow>
+                              <TableHead>Voucher</TableHead><TableHead>Account</TableHead><TableHead>Narration</TableHead>
+                              <TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
+                            </TableRow></TableHeader>
+                            <TableBody>
+                              {dayBook.entries.length === 0 ? (
+                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No postings on this date.</TableCell></TableRow>
+                              ) : (sortOrder === "lifo" ? [...dayBook.entries].reverse() : dayBook.entries).map((e, i) => (
+                                <TableRow key={i}>
+                                  <TableCell className="font-mono text-xs">{e.voucherNo}</TableCell>
+                                  <TableCell>{e.accountName}</TableCell>
+                                  <TableCell className="max-w-xs truncate" title={e.narration}>{e.narration || "—"}</TableCell>
+                                  <TableCell className="text-right">{e.debit > 0 ? e.debit.toLocaleString() : "-"}</TableCell>
+                                  <TableCell className="text-right">{e.credit > 0 ? e.credit.toLocaleString() : "-"}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )
                   )}
 
                   {selectedReport === "general-ledger" && (
-                    <div className="space-y-6">
-                      <h3 className="text-lg font-semibold">General Ledger</h3>
-                      {!generalLedger || generalLedger.accounts.length === 0 ? (
-                        <div className="text-center py-14 text-gray-500">
-                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
-                            <ScrollText className="h-7 w-7 text-gray-400" />
-                          </div>
-                          <p>Generate the report to view every account's postings.</p>
+                    !generalLedger || generalLedger.accounts.length === 0 ? (
+                      <EmptyState icon={ScrollText} label="Generate the report to view every account's postings." />
+                    ) : (
+                      <div className="space-y-6">
+                        <Card className="border-0 shadow-sm bg-muted/30">
+                          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Closing Balance by Account</CardTitle></CardHeader>
+                          <CardContent>
+                            <MiniBarChart
+                              colorful
+                              data={generalLedger.accounts.map((acc) => ({ name: acc.accountName, value: acc.closingBalance }))}
+                            />
+                          </CardContent>
+                        </Card>
+                        <div className="flex justify-end">
+                          <SortToggle />
                         </div>
-                      ) : (
-                        generalLedger.accounts.map((acc) => (
+                        {generalLedger.accounts.map((acc) => (
                           <div key={acc.accountCode} className="space-y-2">
                             <div className="flex items-center justify-between">
                               <h4 className="font-semibold text-primary">{acc.accountCode} — {acc.accountName}</h4>
-                              <span className="text-sm text-gray-500">Opening {acc.openingBalance.toLocaleString()} → Closing {acc.closingBalance.toLocaleString()}</span>
+                              <span className="text-sm text-muted-foreground">Opening {acc.openingBalance.toLocaleString()} → Closing {acc.closingBalance.toLocaleString()}</span>
                             </div>
-                            <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                            <div className="rounded-2xl overflow-hidden border">
                               <Table>
                                 <TableHeader><TableRow>
                                   <TableHead>Date</TableHead><TableHead>Voucher</TableHead>
@@ -1253,7 +1369,7 @@ export function FinancialReports() {
                                   <TableHead className="text-right">Balance</TableHead>
                                 </TableRow></TableHeader>
                                 <TableBody>
-                                  {acc.entries.map((e, i) => (
+                                  {sortByDate(acc.entries, (e) => e.date, sortOrder).map((e, i) => (
                                     <TableRow key={i}>
                                       <TableCell>{e.date}</TableCell>
                                       <TableCell className="font-mono text-xs">{e.voucherNo}</TableCell>
@@ -1266,125 +1382,169 @@ export function FinancialReports() {
                               </Table>
                             </div>
                           </div>
-                        ))
-                      )}
-                    </div>
+                        ))}
+                      </div>
+                    )
                   )}
 
-                  {(selectedReport === "member-aging" || selectedReport === "supplier-aging") && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">{selectedReport === "member-aging" ? "Member Aging" : "Supplier Aging"}</h3>
-                      {(() => {
-                        const data = selectedReport === "member-aging" ? memberAging : supplierAging;
-                        if (!data) {
-                          return (
-                            <div className="text-center py-14 text-gray-500">
-                              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
-                                {selectedReport === "member-aging" ? <Users className="h-7 w-7 text-gray-400" /> : <Truck className="h-7 w-7 text-gray-400" />}
-                              </div>
-                              <p>Generate the report to view outstanding balances.</p>
-                            </div>
-                          );
-                        }
-                        return (
-                          <>
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                              <Card className="border-0 shadow-sm"><CardContent className="pt-4"><div className="text-xs text-gray-500">Total Outstanding</div><div className="text-lg font-semibold">{data.totalOutstanding.toLocaleString()}</div></CardContent></Card>
-                              {Object.entries(data.buckets).map(([bucket, amount]) => (
-                                <Card key={bucket} className="border-0 shadow-sm"><CardContent className="pt-4"><div className="text-xs text-gray-500">{bucket} days</div><div className="text-lg font-semibold">{Number(amount).toLocaleString()}</div></CardContent></Card>
+                  {(selectedReport === "member-aging" || selectedReport === "supplier-aging") && (() => {
+                    const data = selectedReport === "member-aging" ? memberAging : supplierAging;
+                    if (!data) {
+                      return <EmptyState icon={selectedReport === "member-aging" ? Users : Truck} label="Generate the report to view outstanding balances." />;
+                    }
+                    return (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                          <Card className="border-0 shadow-sm bg-muted/30"><CardContent className="pt-4"><div className="text-xs text-muted-foreground">Total Outstanding</div><div className="text-lg font-semibold">{data.totalOutstanding.toLocaleString()}</div></CardContent></Card>
+                          {Object.entries(data.buckets).map(([bucket, amount]) => (
+                            <Card key={bucket} className="border-0 shadow-sm bg-muted/30"><CardContent className="pt-4"><div className="text-xs text-muted-foreground">{bucket} days</div><div className="text-lg font-semibold">{Number(amount).toLocaleString()}</div></CardContent></Card>
+                          ))}
+                        </div>
+                        {Object.keys(data.buckets).length > 0 && (
+                          <Card className="border-0 shadow-sm bg-muted/30">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Outstanding by Aging Bucket</CardTitle></CardHeader>
+                            <CardContent>
+                              <MiniBarChart colorful data={Object.entries(data.buckets).map(([bucket, amount]) => ({ name: `${bucket} days`, value: Number(amount) }))} />
+                            </CardContent>
+                          </Card>
+                        )}
+                        <div className="flex justify-end">
+                          <SortToggle />
+                        </div>
+                        <div className="rounded-2xl overflow-hidden border">
+                          <Table>
+                            <TableHeader><TableRow>
+                              <TableHead>{selectedReport === "member-aging" ? "Member" : "Supplier"}</TableHead>
+                              <TableHead>Reference</TableHead><TableHead>Due Date</TableHead>
+                              <TableHead className="text-right">Outstanding</TableHead>
+                              <TableHead className="text-right">Days Overdue</TableHead><TableHead>Bucket</TableHead>
+                            </TableRow></TableHeader>
+                            <TableBody>
+                              {data.rows.length === 0 ? (
+                                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No outstanding balances.</TableCell></TableRow>
+                              ) : sortByDate(data.rows, (r) => r.dueDate, sortOrder).map((r, i) => (
+                                <TableRow key={i}>
+                                  <TableCell>{r.name || "—"}</TableCell>
+                                  <TableCell className="font-mono text-xs">{r.reference || "—"}</TableCell>
+                                  <TableCell>{r.dueDate || "—"}</TableCell>
+                                  <TableCell className="text-right">{r.outstanding.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{r.daysOverdue}</TableCell>
+                                  <TableCell><Badge variant="secondary">{r.bucket}</Badge></TableCell>
+                                </TableRow>
                               ))}
-                            </div>
-                            <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
-                              <Table>
-                                <TableHeader><TableRow>
-                                  <TableHead>{selectedReport === "member-aging" ? "Member" : "Supplier"}</TableHead>
-                                  <TableHead>Reference</TableHead><TableHead>Due Date</TableHead>
-                                  <TableHead className="text-right">Outstanding</TableHead>
-                                  <TableHead className="text-right">Days Overdue</TableHead><TableHead>Bucket</TableHead>
-                                </TableRow></TableHeader>
-                                <TableBody>
-                                  {data.rows.map((r, i) => (
-                                    <TableRow key={i}>
-                                      <TableCell>{r.name || "—"}</TableCell>
-                                      <TableCell className="font-mono text-xs">{r.reference || "—"}</TableCell>
-                                      <TableCell>{r.dueDate || "—"}</TableCell>
-                                      <TableCell className="text-right">{r.outstanding.toLocaleString()}</TableCell>
-                                      <TableCell className="text-right">{r.daysOverdue}</TableCell>
-                                      <TableCell><Badge variant="secondary">{r.bucket}</Badge></TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {selectedReport === "deferred-revenue" && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Deferred Revenue</h3>
-                      {!deferredRevenue ? (
-                        <div className="text-center py-14 text-gray-500">
-                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
-                            <Hourglass className="h-7 w-7 text-gray-400" />
-                          </div>
-                          <p>Generate the report to view unrecognized membership revenue.</p>
+                    !deferredRevenue ? (
+                      <EmptyState icon={Hourglass} label="Generate the report to view unrecognized membership revenue." />
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <Card className="border-0 shadow-sm bg-muted/30"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Ledger Balance</CardTitle></CardHeader><CardContent><div className="text-2xl font-semibold"><CurrencyGlyph /> {deferredRevenue.ledgerBalance.toLocaleString()}</div></CardContent></Card>
+                          <Card className="border-0 shadow-sm bg-muted/30"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Scheduled Remaining</CardTitle></CardHeader><CardContent><div className="text-2xl font-semibold"><CurrencyGlyph /> {deferredRevenue.scheduledRemaining.toLocaleString()}</div></CardContent></Card>
+                          <Card className="border-0 shadow-sm bg-muted/30"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Active Schedules</CardTitle></CardHeader><CardContent><div className="text-2xl font-semibold">{deferredRevenue.activeScheduleCount}</div></CardContent></Card>
                         </div>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Card className="border-0 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Ledger Balance</CardTitle></CardHeader><CardContent><div className="text-2xl font-semibold"><CurrencyGlyph /> {deferredRevenue.ledgerBalance.toLocaleString()}</div></CardContent></Card>
-                            <Card className="border-0 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Scheduled Remaining</CardTitle></CardHeader><CardContent><div className="text-2xl font-semibold"><CurrencyGlyph /> {deferredRevenue.scheduledRemaining.toLocaleString()}</div></CardContent></Card>
-                            <Card className="border-0 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Active Schedules</CardTitle></CardHeader><CardContent><div className="text-2xl font-semibold">{deferredRevenue.activeScheduleCount}</div></CardContent></Card>
-                          </div>
-                          <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
-                            <Table>
-                              <TableHeader><TableRow>
-                                <TableHead>Member</TableHead><TableHead>Plan</TableHead><TableHead>Period</TableHead>
-                                <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Recognized</TableHead><TableHead className="text-right">Remaining</TableHead>
-                              </TableRow></TableHeader>
-                              <TableBody>
-                                {deferredRevenue.schedules.map((s) => (
-                                  <TableRow key={s.scheduleId}>
-                                    <TableCell>{s.memberName || "—"}</TableCell>
-                                    <TableCell>{s.planName || "—"}</TableCell>
-                                    <TableCell>{s.startDate} → {s.endDate}</TableCell>
-                                    <TableCell className="text-right">{s.totalAmount.toLocaleString()}</TableCell>
-                                    <TableCell className="text-right">{s.recognizedAmount.toLocaleString()}</TableCell>
-                                    <TableCell className="text-right">{s.remainingAmount.toLocaleString()}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                        {deferredRevenue.schedules.length > 0 && (
+                          <Card className="border-0 shadow-sm bg-muted/30">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Recognized vs Remaining</CardTitle></CardHeader>
+                            <CardContent>
+                              <MiniBarChart
+                                colorful
+                                data={[
+                                  { name: "Recognized", value: deferredRevenue.schedules.reduce((s, x) => s + x.recognizedAmount, 0) },
+                                  { name: "Remaining", value: deferredRevenue.schedules.reduce((s, x) => s + x.remainingAmount, 0) },
+                                ]}
+                              />
+                            </CardContent>
+                          </Card>
+                        )}
+                        <div className="flex justify-end">
+                          <SortToggle />
+                        </div>
+                        <div className="rounded-2xl overflow-hidden border">
+                          <Table>
+                            <TableHeader><TableRow>
+                              <TableHead>Member</TableHead><TableHead>Plan</TableHead><TableHead>Period</TableHead>
+                              <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Recognized</TableHead><TableHead className="text-right">Remaining</TableHead>
+                            </TableRow></TableHeader>
+                            <TableBody>
+                              {deferredRevenue.schedules.length === 0 ? (
+                                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No active deferred revenue schedules.</TableCell></TableRow>
+                              ) : sortByDate(deferredRevenue.schedules, (s) => s.startDate, sortOrder).map((s) => (
+                                <TableRow key={s.scheduleId}>
+                                  <TableCell>{s.memberName || "—"}</TableCell>
+                                  <TableCell>{s.planName || "—"}</TableCell>
+                                  <TableCell>{s.startDate} → {s.endDate}</TableCell>
+                                  <TableCell className="text-right">{s.totalAmount.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{s.recognizedAmount.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{s.remainingAmount.toLocaleString()}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )
                   )}
 
-                  {["bank-book", "fund-flow", "pdc-report"].includes(selectedReport) && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">
-                        {reportDefinitions.find(r => r.id === selectedReport)?.title}
-                      </h3>
-                      <div className="text-center py-14 text-gray-500">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-5">
-                          <FileText className="h-7 w-7 text-gray-400" />
+                  {selectedReport === "tax-summary" && (
+                    !taxSummary ? (
+                      <EmptyState icon={Landmark} label="Generate the report to view VAT and corporate tax computation." />
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <SummaryBar label="Output VAT" value={taxSummary.outputVat} max={Math.max(Math.abs(taxSummary.outputVat), Math.abs(taxSummary.inputVat), Math.abs(taxSummary.netVatPayable)) || 1} tone="green" />
+                          <SummaryBar label="Input VAT" value={taxSummary.inputVat} max={Math.max(Math.abs(taxSummary.outputVat), Math.abs(taxSummary.inputVat), Math.abs(taxSummary.netVatPayable)) || 1} tone="red" />
+                          <SummaryBar label="Net VAT Payable" value={taxSummary.netVatPayable} max={Math.max(Math.abs(taxSummary.outputVat), Math.abs(taxSummary.inputVat), Math.abs(taxSummary.netVatPayable)) || 1} tone={taxSummary.netVatPayable >= 0 ? "primary" : "green"} />
                         </div>
-                        <p>Report implementation in progress</p>
-                        <p className="text-sm">IFRS-compliant data structure ready</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <Card className="border-0 shadow-sm bg-muted/30"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Taxable Profit</CardTitle></CardHeader><CardContent><div className="text-xl font-semibold"><CurrencyGlyph /> {taxSummary.taxableProfit.toLocaleString()}</div></CardContent></Card>
+                          <Card className="border-0 shadow-sm bg-muted/30"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Corporate Tax Rate</CardTitle></CardHeader><CardContent><div className="text-xl font-semibold">{taxSummary.corporateTaxRate}%</div></CardContent></Card>
+                          <Card className="border-0 shadow-sm bg-muted/30"><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Corporate Tax Payable</CardTitle></CardHeader><CardContent><div className="text-xl font-semibold"><CurrencyGlyph /> {taxSummary.corporateTaxPayable.toLocaleString()}</div></CardContent></Card>
+                        </div>
+                        {taxSummary.taxByCode.length > 0 && (
+                          <Card className="border-0 shadow-sm bg-muted/30">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Output vs Input by Tax Code</CardTitle></CardHeader>
+                            <CardContent>
+                              <MiniBarChart colorful data={taxSummary.taxByCode.map((t) => ({ name: t.taxCode, value: t.outputAmount - t.inputAmount }))} />
+                            </CardContent>
+                          </Card>
+                        )}
+                        <div className="rounded-2xl overflow-hidden border">
+                          <Table>
+                            <TableHeader><TableRow>
+                              <TableHead>Tax Code</TableHead><TableHead>Name</TableHead><TableHead>Type</TableHead>
+                              <TableHead className="text-right">Output</TableHead><TableHead className="text-right">Input</TableHead>
+                            </TableRow></TableHeader>
+                            <TableBody>
+                              {taxSummary.taxByCode.length === 0 ? (
+                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No tax-coded transactions in this period.</TableCell></TableRow>
+                              ) : taxSummary.taxByCode.map((t, i) => (
+                                <TableRow key={i}>
+                                  <TableCell className="font-mono text-xs">{t.taxCode}</TableCell>
+                                  <TableCell>{t.name}</TableCell>
+                                  <TableCell>{t.taxType}</TableCell>
+                                  <TableCell className="text-right">{t.outputAmount.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{t.inputAmount.toLocaleString()}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
-                    </div>
+                    )
                   )}
                 </div>
               )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
-

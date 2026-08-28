@@ -52,6 +52,9 @@ export interface CreateAddonRequest {
   // How much of `amount` is covered by the member's reward wallet balance, if
   // any — debited server-side in the same transaction as the add-on itself.
   wallet_amount_applied?: number;
+  // Which staff member actually handled this sale — credited toward their
+  // revenue target regardless of which account is logged in.
+  processed_by_staff_id?: number;
 }
 
 class AddonsService {

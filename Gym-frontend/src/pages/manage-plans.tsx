@@ -1264,6 +1264,7 @@ export function ManagePlans() {
                 <Input
                   id="durationValue"
                   type="number"
+                  min="1"
                   placeholder="e.g., 1, 6, 12"
                   value={formData.durationValue}
                   onChange={(e) => setFormData({...formData, durationValue: e.target.value})}

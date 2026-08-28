@@ -13,11 +13,20 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Reads the {@code X-Active-Branch-Id} header from every authenticated request,
  * validates the user has access to that branch, and populates
  * {@link BranchContextHolder} so services can scope their queries.
+ *
+ * "All Branches" mode (a {@code null} active branch, which disables the
+ * Hibernate branch filter) is only ever granted to ROLE_ADMIN/ROLE_SUPER_ADMIN.
+ * Every other authenticated user must resolve to one concrete branch — either
+ * the one named by the header (if they're assigned to it) or, when no header
+ * is sent, their single assigned branch. A non-admin who is assigned to zero
+ * or multiple branches without specifying one is rejected rather than silently
+ * falling back to an unfiltered view.
  *
  * Runs after the JWT authentication filter.
  */
@@ -43,29 +52,46 @@ public class BranchContextFilter extends OncePerRequestFilter {
 
             if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof UserDetailsImpl) {
                 UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
+                boolean isAdmin = userDetails.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .anyMatch(a -> a.equals("ROLE_ADMIN") || a.equals("ROLE_SUPER_ADMIN"));
                 String branchHeader = request.getHeader(BRANCH_HEADER);
 
                 if (branchHeader != null && !branchHeader.isBlank()) {
+                    Long branchId;
                     try {
-                        Long branchId = Long.parseLong(branchHeader.trim());
-                        // Admin/Super Admin users can access any branch
-                        boolean isAdmin = userDetails.getAuthorities().stream()
-                                .map(GrantedAuthority::getAuthority)
-                                .anyMatch(a -> a.equals("ROLE_ADMIN") || a.equals("ROLE_SUPER_ADMIN"));
-
-                        if (isAdmin || userBranchRepository.existsByUserIdAndBranchId(userDetails.getId(), branchId)) {
-                            BranchContextHolder.setActiveBranchId(branchId);
-                        } else {
-                            // User doesn't have access to this branch — treat as null (will be caught by service layer)
-                            BranchContextHolder.setActiveBranchId(null);
-                        }
+                        branchId = Long.parseLong(branchHeader.trim());
                     } catch (NumberFormatException e) {
-                        // Invalid header value — treat as "All Branches"
-                        BranchContextHolder.setActiveBranchId(null);
+                        response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                                "Invalid " + BRANCH_HEADER + " header");
+                        return;
                     }
-                } else {
-                    // No header = "All Branches" mode
+
+                    if (isAdmin || userBranchRepository.existsByUserIdAndBranchId(userDetails.getId(), branchId)) {
+                        BranchContextHolder.setActiveBranchId(branchId);
+                    } else {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                                "You do not have access to the requested branch");
+                        return;
+                    }
+                } else if (isAdmin) {
+                    // No header, admin — consolidated "All Branches" view.
                     BranchContextHolder.setActiveBranchId(null);
+                } else {
+                    // No header, non-admin — never fall back to "All Branches".
+                    // Resolve unambiguously to the user's own assigned branch.
+                    List<Long> accessibleBranchIds = userBranchRepository.findBranchIdsByUserId(userDetails.getId());
+                    if (accessibleBranchIds.size() == 1) {
+                        BranchContextHolder.setActiveBranchId(accessibleBranchIds.get(0));
+                    } else if (accessibleBranchIds.isEmpty()) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                                "No branch is assigned to this user");
+                        return;
+                    } else {
+                        response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                                BRANCH_HEADER + " header is required when a user has access to multiple branches");
+                        return;
+                    }
                 }
             }
 

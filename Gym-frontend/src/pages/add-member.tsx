@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { plansService, Plan as MembershipPlanData } from '../utils/supabase/plans-service';
 import { membersService } from '../utils/supabase/members-service';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
+import { staffService, Staff } from '../utils/supabase/staff-service';
 import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
 import { referralService, ReferralResponse } from '../utils/supabase/referral-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
@@ -230,6 +231,16 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     accountHeadsService.getBankAccounts()
       .then(setBankAccounts)
       .catch(err => console.error('Failed to load bank accounts:', err));
+  }, []);
+
+  // Staff list for "processed by" credit — which staff member should have this
+  // sale count toward their revenue target, regardless of which account is logged in.
+  const [staffOptions, setStaffOptions] = useState<Staff[]>([]);
+  const [processedByStaffId, setProcessedByStaffId] = useState('');
+  useEffect(() => {
+    staffService.getStaff({}, 1, 500)
+      .then(res => setStaffOptions(res.items))
+      .catch(err => console.error('Failed to load staff list:', err));
   }, []);
   
   // Discount management state
@@ -1785,6 +1796,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       bank_account_code: selectedBankAccount?.code,
       bank_account_name: selectedBankAccount?.name,
       payment_breakdown: paymentBreakdownForPayload,
+      processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
       discount_applied: discountAmount || 0,
       reg_doc_number: formData.regDocNumber,
       reg_doc_date: toIso(formData.regDocDate),
@@ -1828,6 +1840,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   : undefined,
                 minor_bank_account_code: minorAccount?.code,
                 minor_bank_account_name: minorAccount?.name,
+                processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
               };
             }
             // Fall back to the primary member's plan when the family member didn't pick one
@@ -1867,6 +1880,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 : undefined,
               bank_account_code: account?.code,
               bank_account_name: account?.name,
+              processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
             };
           })
         : undefined,
@@ -5268,12 +5282,25 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 </div>
               </div>
             )}
+
+            {/* Processed By (Staff) — credits this sale toward that staff member's revenue target */}
+            <div className="space-y-1">
+              <Label className="text-sm text-gray-600">Processed By (Staff)</Label>
+              <Select value={processedByStaffId || undefined} onValueChange={setProcessedByStaffId}>
+                <SelectTrigger><SelectValue placeholder="Select staff member (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {staffOptions.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          
+
           {/* Action Buttons */}
           <div className="flex space-x-3 pt-4 border-t">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="flex-1"
               onClick={handlePaymentCancel}
             >

@@ -3,6 +3,7 @@ package com.company.project.services;
 import com.company.project.dto.MembershipPlanRequestDTO;
 import com.company.project.dto.MembershipPlanResponseDTO;
 import com.company.project.entities.MembershipPlan;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.MembershipPlanRepository;
 import org.springframework.stereotype.Service;
@@ -115,7 +116,10 @@ public class MembershipPlanService {
         if (req.getType()                != null) plan.setType(req.getType());
         if (req.getPlanType()            != null) plan.setPlanType(req.getPlanType());
         if (req.getDurationType()        != null) plan.setDurationType(req.getDurationType());
-        if (req.getDurationValue()       != null) plan.setDurationValue(req.getDurationValue());
+        if (req.getDurationValue()       != null) {
+            validateDurationValue(req.getDurationValue());
+            plan.setDurationValue(req.getDurationValue());
+        }
         if (req.getPrice()               != null) plan.setPrice(req.getPrice());
         if (req.getDiscount()            != null) plan.setDiscount(req.getDiscount());
         if (req.getStatus()              != null) plan.setStatus(req.getStatus());
@@ -147,6 +151,19 @@ public class MembershipPlanService {
 
         // Compute human-readable duration string
         plan.setDuration(computeDuration(req.getDurationValue(), req.getDurationType()));
+    }
+
+    // Guards computeExpiry() (MemberService) against silently backdating a
+    // member's expiry — plusMonths/plusYears/... on a negative or zero value
+    // lands the expiry before the start date instead of after it.
+    private void validateDurationValue(String durationValue) {
+        try {
+            if (Long.parseLong(durationValue) <= 0) {
+                throw new BusinessRuleViolationException("Duration value must be a positive number");
+            }
+        } catch (NumberFormatException e) {
+            throw new BusinessRuleViolationException("Duration value must be a whole number");
+        }
     }
 
     private String computeDuration(String durationValue, String durationType) {

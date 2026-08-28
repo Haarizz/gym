@@ -38,6 +38,7 @@ public class CommissionRuleService {
         CommissionRule rule = new CommissionRule();
         rule.setRole(req.getRole());
         rule.setBaseCommission(req.getBaseCommission());
+        rule.setAdmissionCommission(req.getAdmissionCommission());
         if (req.getTargetBonusesJson() != null) rule.setTargetBonusesJson(req.getTargetBonusesJson());
         return CommissionRuleResponseDTO.fromEntity(ruleRepository.save(rule));
     }
@@ -47,6 +48,7 @@ public class CommissionRuleService {
                 .orElseThrow(() -> new RuntimeException("Commission rule not found: " + id));
         if (req.getRole() != null) rule.setRole(req.getRole());
         if (req.getBaseCommission() != null) rule.setBaseCommission(req.getBaseCommission());
+        if (req.getAdmissionCommission() != null) rule.setAdmissionCommission(req.getAdmissionCommission());
         if (req.getTargetBonusesJson() != null) rule.setTargetBonusesJson(req.getTargetBonusesJson());
         return CommissionRuleResponseDTO.fromEntity(ruleRepository.save(rule));
     }

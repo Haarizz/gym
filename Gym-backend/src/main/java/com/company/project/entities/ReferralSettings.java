@@ -1,17 +1,28 @@
 package com.company.project.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 
-// Singleton row (always id=1) holding the Referrals page's Settings tab
-// configuration. There is exactly one referral program per gym, so this
-// doesn't need a lookup key beyond "the one row".
+// One row per branch holding the Referrals page's Settings tab configuration
+// — each branch can run its own referral program/rules. Was a single global
+// singleton (fixed id=1) before branch-scoping.
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "referral_settings")
-public class ReferralSettings extends BaseEntity {
+public class ReferralSettings extends BaseEntity implements BranchAware {
 
     @Id
-    private Long id = 1L;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    @Override
+    public Long getBranchId() { return branchId; }
+    @Override
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 
     @Column(name = "program_enabled")
     private Boolean programEnabled = true;

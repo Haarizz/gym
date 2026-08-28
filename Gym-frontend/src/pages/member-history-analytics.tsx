@@ -474,7 +474,8 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     setSavingFreeze(true);
     try {
       const freezeUntil = freezeEndDate.toISOString().split('T')[0] + 'T00:00:00Z';
-      await membersService.freezeMember(String(memberId), { freezeUntil, reason: freezeReason || undefined });
+      const freezeStart = freezeStartDate ? freezeStartDate.toISOString().split('T')[0] + 'T00:00:00Z' : undefined;
+      await membersService.freezeMember(String(memberId), { freezeUntil, freezeStartDate: freezeStart, reason: freezeReason || undefined });
       toast.success('Membership frozen successfully');
       setIsFreezeDialogOpen(false);
       setFreezeStartDate(undefined);
@@ -632,6 +633,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
   const isFrozen = member.membership_status === 'frozen';
   const isActive = member.membership_status === 'active';
+  // The membership_status column is only ever set explicitly (create/freeze/
+  // deactivate) — nothing flips it to "expired" when the expiry date passes,
+  // so derive that here from expiry_date rather than trusting the stored value.
+  const isExpiredByDate = !isFrozen && daysRemaining !== null && daysRemaining < 0;
+  const displayStatus = isExpiredByDate ? 'expired' : member.membership_status;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
@@ -702,7 +708,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <div>
                   <div className="flex items-center gap-3 mb-1">
                     <h3 className="font-semibold text-lg">{member.name}</h3>
-                    <Badge className="bg-gradient-primary text-white capitalize">{member.membership_status}</Badge>
+                    <Badge className={isExpiredByDate ? "bg-red-600 text-white capitalize" : "bg-gradient-primary text-white capitalize"}>{displayStatus}</Badge>
                   </div>
                   <p className="text-sm text-gray-600">Member ID: {member.member_id || member.id}</p>
                 </div>
@@ -804,12 +810,16 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             <div>
               <p className="text-sm text-gray-600 mb-1">Status</p>
               <Badge className={
-                isActive ? 'bg-green-100 text-green-700 flex items-center gap-1 w-fit'
+                (isActive && !isExpiredByDate) ? 'bg-green-100 text-green-700 flex items-center gap-1 w-fit'
                   : isFrozen ? 'bg-blue-100 text-blue-700 flex items-center gap-1 w-fit'
-                    : 'bg-gray-100 text-gray-700 flex items-center gap-1 w-fit'
+                    : isExpiredByDate ? 'bg-red-100 text-red-700 flex items-center gap-1 w-fit'
+                      : 'bg-gray-100 text-gray-700 flex items-center gap-1 w-fit'
               }>
-                {isActive ? <CheckCircle className="h-3.5 w-3.5" /> : <Snowflake className="h-3.5 w-3.5" />}
-                <span className="capitalize">{member.membership_status}</span>
+                {(isActive && !isExpiredByDate) ? <CheckCircle className="h-3.5 w-3.5" />
+                  : isFrozen ? <Snowflake className="h-3.5 w-3.5" />
+                    : isExpiredByDate ? <XCircle className="h-3.5 w-3.5" />
+                      : <Snowflake className="h-3.5 w-3.5" />}
+                <span className="capitalize">{displayStatus}</span>
               </Badge>
             </div>
             <div>
@@ -2245,7 +2255,19 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent mode="single" selected={freezeStartDate} onSelect={setFreezeStartDate} />
+                      <CalendarComponent
+                        mode="single"
+                        selected={freezeStartDate}
+                        onSelect={setFreezeStartDate}
+                        disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const mStartStr = member.membership_start_date || member.join_date;
+                          const mStart = mStartStr ? new Date(mStartStr) : null;
+                          if (mStart) mStart.setHours(0, 0, 0, 0);
+                          return date < today || (mStart != null && date < mStart);
+                        }}
+                      />
                     </PopoverContent>
                   </Popover>
                 </div>

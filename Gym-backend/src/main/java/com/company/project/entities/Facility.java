@@ -71,13 +71,4 @@ public class Facility extends BaseEntity implements BranchAware {
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
 
-    @jakarta.persistence.PrePersist
-    public void prePersistBranchId() {
-        if (this.branchId == null) {
-            Long activeBranch = com.company.project.security.BranchContextHolder.getActiveBranchId();
-            if (activeBranch != null) {
-                this.branchId = activeBranch;
-            }
-        }
-    }
 }
