@@ -4,10 +4,11 @@ import type { TrainerDashboardData, TrainerTodaySession } from '../domain/Traine
 interface BackendTrainerSession {
   id: string | number;
   start_time: string; // e.g. "2026-08-20T09:00:00"
-  member_name: string;
+  member_name: string | null;
+  class_name: string | null;
   type: string;
   focus: string;
-  status: 'completed' | 'upcoming';
+  status: string;
 }
 
 interface BackendTrainerDashboardData {
@@ -63,17 +64,38 @@ export class ApiTrainerDashboardRepository {
           formattedTime = session.start_time;
         }
 
+        let mappedStatus: TrainerTodaySession['status'] = 'upcoming';
+        if (session.status === 'completed') mappedStatus = 'completed';
+        else if (session.status === 'in_progress') mappedStatus = 'in_progress';
+
         return {
           id: session.id,
           time: formattedTime,
           member: session.member_name,
+          className: session.class_name,
           type: session.type,
           focus: session.focus,
-          status: session.status,
+          status: mappedStatus,
         };
       }),
       pendingTasks: [], // Explicitly deferred as per backend instructions
     };
+  }
+
+  /**
+   * PATCH /api/mobile/trainer/dashboard/sessions/{sessionId}/start
+   * Transitions a session to in_progress state.
+   */
+  async startSession(sessionId: string | number): Promise<void> {
+    await apiClient.patch(`/mobile/trainer/dashboard/sessions/${sessionId}/start`);
+  }
+
+  /**
+   * PATCH /api/mobile/trainer/dashboard/sessions/{sessionId}/finish
+   * Transitions an in-progress session to completed state.
+   */
+  async finishSession(sessionId: string | number): Promise<void> {
+    await apiClient.patch(`/mobile/trainer/dashboard/sessions/${sessionId}/finish`);
   }
 }
 

@@ -26,6 +26,7 @@ export const ADMIN_TABS: TabConfig[] = [
 export const MEMBER_TABS: TabConfig[] = [
   { name: 'index', title: 'Home', icon: 'home' },
   { name: 'bookings', title: 'Bookings', icon: 'calendar' },
+  { name: 'community', title: 'Community', icon: 'users' },
   { name: 'centers', title: 'Centers', icon: 'map-pin' },
   { name: 'membership', title: 'Membership', icon: 'credit-card' },
 ];
@@ -33,15 +34,19 @@ export const MEMBER_TABS: TabConfig[] = [
 export const TRAINER_TABS: TabConfig[] = [
   { name: 'index', title: 'Home', icon: 'home' },
   { name: 'schedule', title: 'Schedule', icon: 'calendar' },
+  { name: 'community', title: 'Community', icon: 'users' },
   { name: 'performance', title: 'Performance', icon: 'trending-up' },
   { name: 'ledger', title: 'Ledger', icon: 'book-open' },
+  { name: 'messaging', title: 'Messages', icon: 'message-square' },
 ];
 
 export const STAFF_TABS: TabConfig[] = [
   { name: 'index', title: 'Home', icon: 'home' },
   { name: 'performance', title: 'Performance', icon: 'trending-up' },
+  { name: 'community', title: 'Community', icon: 'users' },
   { name: 'schedule', title: 'Schedule', icon: 'calendar' },
   { name: 'ledger', title: 'Ledger', icon: 'book-open' },
+  { name: 'messaging', title: 'Messages', icon: 'message-square' },
 ];
 
 export const ADMIN_HEADER: HeaderConfig = {

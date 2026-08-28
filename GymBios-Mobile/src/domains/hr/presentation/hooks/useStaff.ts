@@ -26,8 +26,9 @@ export const staffKeys = {
 export function useStaff(initialFilters?: StaffFilters) {
   const queryClient = useQueryClient();
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+  const [page, setPage] = useState(initialFilters?.page ?? 1);
 
-  const filters = useMemo(() => initialFilters, [initialFilters]);
+  const filters = useMemo(() => ({ ...initialFilters, page }), [initialFilters, page]);
 
   const staffQuery = useQuery({
     queryKey: staffKeys.list(filters),
@@ -35,6 +36,7 @@ export function useStaff(initialFilters?: StaffFilters) {
   });
 
   const staff = staffQuery.data?.content ?? [];
+  const totalPages = staffQuery.data?.totalPages ?? 1;
   const loading = staffQuery.isFetching;
   const error = staffQuery.error as Error | null;
 
@@ -85,6 +87,9 @@ export function useStaff(initialFilters?: StaffFilters) {
   return {
     staff,
     selectedStaff,
+    page,
+    totalPages,
+    setPage,
 
     loading,
     submitting:

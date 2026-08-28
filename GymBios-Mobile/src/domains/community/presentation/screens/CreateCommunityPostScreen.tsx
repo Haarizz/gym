@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Pressable } from 'react-native';
@@ -17,6 +18,7 @@ import { CommunityPostComposer } from '../components/CommunityPostComposer';
  * Closed via router.back() on success or cancel.
  */
 export function CreateCommunityPostScreen() {
+  const { primaryColor, headerColors } = useCommunityTheme();
   const router = useRouter();
   const theme = useTheme();
   const composer = useCommunityPostComposer();
@@ -34,7 +36,7 @@ export function CreateCommunityPostScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+      <View style={styles.header}>
         <Pressable
           style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.6 }]}
           onPress={handleCancel}
@@ -42,7 +44,7 @@ export function CreateCommunityPostScreen() {
           accessibilityLabel="Cancel"
           hitSlop={8}
         >
-          <Typography variant="bodySmall" style={{ color: BrandColors.teal }}>
+          <Typography variant="bodySmallBold" style={{ color: '#7A7E8C', fontSize: 14 }}>
             Cancel
           </Typography>
         </Pressable>
@@ -83,9 +85,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 14,
   },
   cancelBtn: {
     minWidth: 60,
@@ -94,8 +96,9 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 16,
+    marginRight: 38,
   },
   headerSpacer: {
-    minWidth: 60,
+    width: 0,
   },
 });

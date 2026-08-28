@@ -1,6 +1,5 @@
 import { View, StyleSheet } from 'react-native';
 import { SearchBar } from '@/shared/components/SearchBar';
-import { Spacing } from '@/core/theme';
 
 interface MemberSearchBarProps {
   value: string;
@@ -23,7 +22,6 @@ export function MemberSearchBar({ value, onChangeText, isLoading }: MemberSearch
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    marginBottom: Spacing.three,
+    flex: 1,
   },
 });

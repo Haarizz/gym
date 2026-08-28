@@ -34,4 +34,4 @@ export {
   type ConfirmationModalVariant,
 } from './ConfirmationModal';
 export { Pagination, type PaginationProps } from './Pagination';
-
+export { TrafficLightSelector } from './TrafficLightSelector';

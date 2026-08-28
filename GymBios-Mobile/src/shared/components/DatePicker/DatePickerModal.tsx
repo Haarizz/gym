@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   safeArea: {
-    flex: 1,
+    flexShrink: 1,
   },
   handle: {
     alignSelf: 'center',

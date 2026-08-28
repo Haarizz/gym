@@ -3,5 +3,6 @@ export const checkInKeys = {
   today: () => [...checkInKeys.all, 'today'] as const,
   status: (identifier: { qr?: string; faceId?: string; memberId?: number }) =>
     [...checkInKeys.all, 'status', identifier] as const,
+  memberStatus: () => [...checkInKeys.all, 'memberStatus'] as const,
   deviceKeys: () => [...checkInKeys.all, 'deviceKeys'] as const,
 };

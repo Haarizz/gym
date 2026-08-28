@@ -38,17 +38,46 @@ export function useStaffDashboard() {
     queryFn: async (): Promise<StaffDashboardData> => {
       try {
         const data = await staffDashboardRepository.getStaffDashboard();
+        const rawData = data as any;
+        
+        const staffInfo = rawData.staffInfo || rawData.staff_info || {};
+        const todaysStats = rawData.todaysStats || rawData.todays_stats || {};
+        const urgentFollowUps = rawData.urgentFollowUps || rawData.urgent_follow_ups || [];
+        const recentConversions = rawData.recentConversions || rawData.recent_conversions || [];
+        const monthlySummary = rawData.monthlySummary || rawData.monthly_summary || {};
+
         return {
-          ...data,
           staffInfo: {
-            name: data.staffInfo?.name || profile?.name || DEFAULT_STAFF_DASHBOARD.staffInfo.name,
-            role: data.staffInfo?.role || profile?.role || DEFAULT_STAFF_DASHBOARD.staffInfo.role,
-            branch: data.staffInfo?.branch || profile?.branch || DEFAULT_STAFF_DASHBOARD.staffInfo.branch,
+            name: staffInfo.name || profile?.name || DEFAULT_STAFF_DASHBOARD.staffInfo.name,
+            role: staffInfo.role || profile?.role || DEFAULT_STAFF_DASHBOARD.staffInfo.role,
+            branch: staffInfo.branch || profile?.branch || DEFAULT_STAFF_DASHBOARD.staffInfo.branch,
           },
-          todaysStats: data.todaysStats ?? DEFAULT_STAFF_DASHBOARD.todaysStats,
-          urgentFollowUps: Array.isArray(data.urgentFollowUps) ? data.urgentFollowUps : [],
-          recentConversions: Array.isArray(data.recentConversions) ? data.recentConversions : [],
-          monthlySummary: data.monthlySummary ?? DEFAULT_STAFF_DASHBOARD.monthlySummary,
+          todaysStats: {
+            leadsAdded: todaysStats.leadsAdded ?? todaysStats.leads_added ?? DEFAULT_STAFF_DASHBOARD.todaysStats.leadsAdded,
+            followUpsCompleted: todaysStats.followUpsCompleted ?? todaysStats.follow_ups_completed ?? DEFAULT_STAFF_DASHBOARD.todaysStats.followUpsCompleted,
+            conversions: todaysStats.conversions ?? DEFAULT_STAFF_DASHBOARD.todaysStats.conversions,
+            checkins: todaysStats.checkins ?? DEFAULT_STAFF_DASHBOARD.todaysStats.checkins,
+          },
+          urgentFollowUps: Array.isArray(urgentFollowUps) ? urgentFollowUps.map(item => ({
+            id: item.id,
+            name: item.name || '',
+            phone: item.phone || '',
+            inquiry: item.inquiry || '',
+            lastContact: item.lastContact || item.last_contact || 'Never',
+            priority: item.priority || 'medium'
+          })) : [],
+          recentConversions: Array.isArray(recentConversions) ? recentConversions.map(item => ({
+            id: item.id,
+            name: item.name || '',
+            plan: item.plan || '',
+            amount: item.amount || '₹0'
+          })) : [],
+          monthlySummary: {
+            targetAchievement: monthlySummary.targetAchievement ?? monthlySummary.target_achievement ?? DEFAULT_STAFF_DASHBOARD.monthlySummary.targetAchievement,
+            totalConversions: monthlySummary.totalConversions ?? monthlySummary.total_conversions ?? DEFAULT_STAFF_DASHBOARD.monthlySummary.totalConversions,
+            revenueGenerated: monthlySummary.revenueGenerated ?? monthlySummary.revenue_generated ?? DEFAULT_STAFF_DASHBOARD.monthlySummary.revenueGenerated,
+            conversionRate: monthlySummary.conversionRate ?? monthlySummary.conversion_rate ?? DEFAULT_STAFF_DASHBOARD.monthlySummary.conversionRate,
+          },
         };
       } catch {
         return {

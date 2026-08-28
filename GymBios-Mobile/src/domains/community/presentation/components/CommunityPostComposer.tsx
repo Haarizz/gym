@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import {
   ActivityIndicator,
   Alert,
@@ -77,6 +78,7 @@ export function CommunityPostComposer({
   setCropZoom,
   onSuccess,
 }: CommunityPostComposerProps) {
+  const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
   const createPost = useCreateCommunityPost();
 
@@ -168,14 +170,18 @@ export function CommunityPostComposer({
           <View style={styles.typeRow}>
             {POST_TYPES.map((pt) => {
               const isActive = type === pt.value;
+              const typeClass = pt.value === 'achievement' ? { bg: '#FCF0D9', fg: '#C7861A', ic: '🏆' } :
+                                pt.value === 'question' ? { bg: '#FCE7ED', fg: '#C93B5C', ic: '❓' } :
+                                { bg: '#E4F5EC', fg: '#2E9463', ic: '💡' };
+              
               return (
                 <Pressable
                   key={pt.value}
                   style={({ pressed }) => [
-                    styles.typePill,
+                    styles.typeBtn,
                     {
-                      backgroundColor: isActive ? BrandColors.teal : theme.muted,
-                      borderColor: isActive ? BrandColors.teal : 'transparent',
+                      backgroundColor: isActive ? typeClass.bg : theme.backgroundElement,
+                      borderColor: isActive ? typeClass.fg : theme.border,
                     },
                     pressed && { opacity: 0.75 },
                   ]}
@@ -183,11 +189,12 @@ export function CommunityPostComposer({
                   accessibilityRole="radio"
                   accessibilityState={{ checked: isActive }}
                 >
+                  <Typography style={{ fontSize: 18 }}>{typeClass.ic}</Typography>
                   <Typography
                     variant="caption"
-                    style={[styles.typePillLabel, { color: isActive ? '#fff' : theme.text }]}
+                    style={[styles.typeBtnLabel, { color: isActive ? typeClass.fg : theme.textSecondary }]}
                   >
-                    {pt.label}
+                    {pt.label.split(' ')[1]}
                   </Typography>
                 </Pressable>
               );
@@ -247,15 +254,20 @@ export function CommunityPostComposer({
             <Pressable
               style={({ pressed }) => [
                 styles.photoPlaceholder,
-                { borderColor: theme.border, backgroundColor: theme.muted },
+                { borderColor: '#D3D2DC', backgroundColor: '#FBFBFD' },
                 pressed && { opacity: 0.75 },
               ]}
               onPress={handlePickImage}
               accessibilityLabel="Add photo"
             >
-              <Feather name="image" size={22} color={BrandColors.teal} />
-              <Typography variant="bodySmall" style={{ color: BrandColors.teal, fontWeight: '600' }}>
+              <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: theme.backgroundElement, alignItems: 'center', justifyContent: 'center' }}>
+                <Feather name="camera" size={16} color={primaryColor} />
+              </View>
+              <Typography variant="bodySmall" style={{ color: primaryColor, fontWeight: '700', fontSize: 12.5 }}>
                 Add Photo
+              </Typography>
+              <Typography variant="caption" style={{ color: '#A7AAB6', fontSize: 11 }}>
+                JPG or PNG, up to 10MB
               </Typography>
             </Pressable>
           ) : (
@@ -299,7 +311,7 @@ export function CommunityPostComposer({
                         style={({ pressed }) => [
                           styles.ratioPill,
                           {
-                            backgroundColor: isActive ? BrandColors.teal : theme.muted,
+                            backgroundColor: isActive ? primaryColor : theme.muted,
                           },
                           pressed && { opacity: 0.75 },
                         ]}
@@ -330,7 +342,7 @@ export function CommunityPostComposer({
                 {/* Native slider using a manual drag control — expo doesn't ship a Slider, use a simple range indicator */}
                 <View style={[styles.sliderTrack, { backgroundColor: theme.muted }]}>
                   <Pressable
-                    style={[styles.sliderFill, { width: `${cropPosition}%`, backgroundColor: BrandColors.teal }]}
+                    style={[styles.sliderFill, { width: `${cropPosition}%`, backgroundColor: primaryColor }]}
                     onStartShouldSetResponder={() => true}
                   />
                   {/* Accessible slider via quick decrement/increment buttons */}
@@ -369,7 +381,7 @@ export function CommunityPostComposer({
                       styles.sliderFill,
                       {
                         width: `${((cropZoom - 100) / 40) * 100}%`,
-                        backgroundColor: BrandColors.teal,
+                        backgroundColor: primaryColor,
                       },
                     ]}
                   />
@@ -397,7 +409,7 @@ export function CommunityPostComposer({
       </ScrollView>
 
       {/* Submit */}
-      <View style={[styles.footer, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
+      <View style={[styles.footer, { backgroundColor: theme.background }]}>
         <Button
           label={isSubmitting ? 'Posting…' : 'Post to Community'}
           variant="primary"
@@ -405,7 +417,11 @@ export function CommunityPostComposer({
           disabled={!canSubmit}
           loading={isSubmitting}
           onPress={handleSubmit}
+          style={{ borderRadius: 16 }}
         />
+        <Typography variant="caption" style={styles.helperText}>
+          Visible to everyone in your branch
+        </Typography>
       </View>
     </KeyboardAvoidingView>
   );
@@ -416,64 +432,72 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: Spacing.three,
-    gap: Spacing.one,
-    paddingBottom: Spacing.four,
+    padding: 18,
+    gap: 4,
+    paddingBottom: 24,
   },
   section: {
     gap: Spacing.two,
     marginBottom: Spacing.three,
   },
   label: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    color: '#64748b',
+    color: '#A7AAB6',
+    marginBottom: Spacing.half,
   },
   typeRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
-    flexWrap: 'wrap',
+    gap: 9,
   },
-  typePill: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Radius.full,
+  typeBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 14,
     borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
   },
-  typePillLabel: {
-    fontWeight: '600',
-    fontSize: 13,
+  typeBtnLabel: {
+    fontWeight: '700',
+    fontSize: 12,
   },
   input: {
     minHeight: 48,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three,
-    fontSize: 15,
-    paddingVertical: Spacing.md,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    paddingVertical: 13,
   },
   textArea: {
-    minHeight: 100,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.md,
-    fontSize: 15,
+    minHeight: 110,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingTop: 13,
+    fontSize: 14,
   },
   charCount: {
     textAlign: 'right',
-    marginTop: -Spacing.one,
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
   },
   photoPlaceholder: {
-    minHeight: 64,
-    borderWidth: 1.5,
+    paddingVertical: 26,
+    paddingHorizontal: 10,
+    borderWidth: 1.6,
     borderStyle: 'dashed',
-    borderRadius: Radius.md,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.two,
-    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#FBFBFD',
   },
   imageSection: {
     gap: Spacing.two,
@@ -544,7 +568,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   footer: {
-    padding: Spacing.three,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 26,
+  },
+  helperText: {
+    textAlign: 'center',
+    fontSize: 11.5,
+    color: '#A7AAB6',
+    marginTop: 10,
+    fontWeight: '500',
   },
 });

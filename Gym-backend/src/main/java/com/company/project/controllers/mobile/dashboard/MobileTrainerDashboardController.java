@@ -6,8 +6,11 @@ import com.company.project.services.mobile.dashboard.MobileTrainerDashboardServi
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.company.project.dto.mobile.dashboard.trainer.TrainerDashboardSessionDTO;
 
 @RestController
 @RequestMapping("/api/mobile/trainer/dashboard")
@@ -32,4 +35,25 @@ public class MobileTrainerDashboardController {
         }
         return ResponseEntity.ok(dashboardService.getTrainerDashboard(principal));
     }
+
+    @PatchMapping("/sessions/{sessionId}/start")
+    public ResponseEntity<TrainerDashboardSessionDTO> startSession(
+            @PathVariable Long sessionId,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(dashboardService.startSession(sessionId, principal));
+    }
+
+    @PatchMapping("/sessions/{sessionId}/finish")
+    public ResponseEntity<TrainerDashboardSessionDTO> finishSession(
+            @PathVariable Long sessionId,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(dashboardService.finishSession(sessionId, principal));
+    }
 }
+

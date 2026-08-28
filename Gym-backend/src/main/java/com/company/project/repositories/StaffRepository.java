@@ -13,4 +13,5 @@ public interface StaffRepository extends JpaRepository<Staff, Long>, JpaSpecific
     boolean existsByEmail(String email);
     long countByStatus(String status);
     List<Staff> findTop5ByOrderByCreatedAtDesc();
+    long countByRole(String role);
 }

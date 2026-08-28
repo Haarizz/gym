@@ -25,6 +25,8 @@ export function useCheckout() {
       queryClient.invalidateQueries({ queryKey: attendanceKeys.detail(id) });
       // Stats and reports may have changed after a checkout.
       queryClient.invalidateQueries({ queryKey: attendanceKeys.stats });
+      // Also invalidate check-in today list because checkout modifies recent check-ins
+      queryClient.invalidateQueries({ queryKey: ['checkIns', 'today'] });
     },
   });
 }

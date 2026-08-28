@@ -177,4 +177,23 @@ public class DashboardDTOs {
         public String getSubject() { return subject; }
         public void setSubject(String subject) { this.subject = subject; }
     }
+
+    public static class MemberChurnData {
+        private String month;
+        private int newMembers;
+        private int churned;
+
+        public MemberChurnData(String month, int newMembers, int churned) {
+            this.month = month;
+            this.newMembers = newMembers;
+            this.churned = churned;
+        }
+
+        public String getMonth() { return month; }
+        public void setMonth(String month) { this.month = month; }
+        public int getNewMembers() { return newMembers; }
+        public void setNewMembers(int newMembers) { this.newMembers = newMembers; }
+        public int getChurned() { return churned; }
+        public void setChurned(int churned) { this.churned = churned; }
+    }
 }

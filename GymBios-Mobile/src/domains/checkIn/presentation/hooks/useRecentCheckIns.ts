@@ -19,7 +19,8 @@ export function useRecentCheckIns() {
   const summary = useMemo(() => {
     if (!data) return { total: 0, active: 0, walkIns: 0 };
     const total = data.length;
-    const active = data.filter(r => r.status === 'In Gym' || r.checkOutTime == null).length;
+    // @ts-ignore - Handle both API response formats (raw snake_case and mapped camelCase)
+    const active = data.filter(r => r.status === 'In Gym' || r.status === 'active' || r.checkOutTime === null || r.check_out_time === null).length;
     const walkIns = data.filter(r => r.type === 'Walk-In' || r.walkInName).length;
     return { total, active, walkIns };
   }, [data]);

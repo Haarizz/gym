@@ -9,7 +9,7 @@ import { TrainerTodayScheduleCard } from '../components/TrainerTodayScheduleCard
 import { TrainerQuickActions } from '../components/TrainerQuickActions';
 
 export function TrainerDashboardScreen() {
-  const { data, isLoading, refetch, isRefetching, togglePendingTask } = useTrainerDashboard();
+  const { data, isLoading, refetch, isRefetching, togglePendingTask, startSession, finishSession } = useTrainerDashboard();
 
   if (isLoading && !data) {
     return (
@@ -39,7 +39,11 @@ export function TrainerDashboardScreen() {
         tasks={data.pendingTasks}
         onToggleTask={togglePendingTask}
       />
-      <TrainerTodayScheduleCard sessions={data.todaySessions} />
+      <TrainerTodayScheduleCard 
+        sessions={data.todaySessions} 
+        onStartSession={(session) => startSession(session.id)}
+        onFinishSession={(session) => finishSession(session.id)}
+      />
       <TrainerQuickActions />
     </ScrollView>
   );

@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
@@ -8,10 +9,11 @@ import { Avatar } from '@/shared/components/Avatar';
 
 import type { LeaderboardEntry } from '../../domain/community.types';
 
-const RANK_COLORS = ['#F59E0B', '#94A3B8', '#CD7F32'];
+/* const RANK_COLORS = ['#F59E0B', '#94A3B8', '#CD7F32']; */
 
-function getRankColor(index: number): string {
-  return RANK_COLORS[index] ?? BrandColors.teal;
+function getRankColor(index: number, primaryColor: string): string {
+  const RANK_COLORS = ['#eab308', '#94a3b8', '#b45309'];
+  return RANK_COLORS[index] ?? primaryColor;
 }
 
 interface CommunityLeaderboardProps {
@@ -19,12 +21,13 @@ interface CommunityLeaderboardProps {
 }
 
 export function CommunityLeaderboard({ entries }: CommunityLeaderboardProps) {
+  const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
 
   return (
     <View style={styles.container}>
       {entries.map((entry, index) => {
-        const rankColor = getRankColor(index);
+        const rankColor = getRankColor(index, primaryColor);
         const initials = entry.username?.slice(0, 2).toUpperCase() ?? '??';
 
         return (
@@ -55,8 +58,8 @@ export function CommunityLeaderboard({ entries }: CommunityLeaderboardProps) {
             </View>
 
             {/* Score */}
-            <View style={[styles.scoreBadge, { backgroundColor: BrandColors.teal + '18' }]}>
-              <Typography variant="caption" style={styles.scoreText}>
+            <View style={[styles.scoreBadge, { backgroundColor: primaryColor + '18' }]}>
+              <Typography variant="caption" style={[styles.scoreText, { color: primaryColor }]}>
                 {(entry.engagementScore ?? 0).toLocaleString()} pts
               </Typography>
             </View>
@@ -104,7 +107,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
   },
   scoreText: {
-    color: BrandColors.teal,
     fontWeight: '700',
     fontSize: 11,
   },

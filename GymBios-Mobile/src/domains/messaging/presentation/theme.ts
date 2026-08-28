@@ -1,0 +1,17 @@
+export const MessagingColors = {
+  bg: '#F5F4F9',
+  card: '#FFFFFF',
+  ink: '#1E2130',
+  muted: '#767A88',
+  faint: '#A7AAB6',
+  line: '#EAEAF1',
+  accent: '#2F8A73',
+  accent2: '#5CB69F',
+  dark: '#1F6857',
+  tint: '#E1F3EE',
+  inkA: '#0F3D32',
+  sms: '#7C6CE0',
+  smsTint: '#EEEBFB',
+  push: '#D9822B',
+  pushTint: '#FBEBD8',
+};

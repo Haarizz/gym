@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +34,7 @@ interface CommunityCommentsSheetProps {
  * so comments are NOT prefetched for every post in the feed.
  */
 export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCommentsSheetProps) {
+  const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
   const user = useAuthStore((s) => s.user);
   const [commentText, setCommentText] = useState('');
@@ -162,7 +164,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
         <Pressable
           style={({ pressed }) => [
             styles.sendBtn,
-            { backgroundColor: BrandColors.teal },
+            { backgroundColor: primaryColor },
             (!commentText.trim() || addMutation.isPending) && styles.sendBtnDisabled,
             pressed && { opacity: 0.8 },
           ]}

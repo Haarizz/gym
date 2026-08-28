@@ -1,14 +1,12 @@
 import { useCallback, useEffect } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
-import { Radius, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Avatar } from '@/shared/components/Avatar';
-import { Button } from '@/shared/components/Button';
-import { Card } from '@/shared/components/Card';
-import { FormSection } from '@/shared/components/FormSection';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { AppHeader } from '@/shared/components/AppHeader';
 import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import { useStaff } from '../hooks/useStaff';
@@ -18,25 +16,6 @@ interface StaffDetailScreenProps {
   onBack: () => void;
   onDeleted: () => void;
   onUpdated: () => void;
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Typography variant="caption" color="textSecondary" style={styles.detailLabel}>
-        {label}
-      </Typography>
-      <Typography variant="bodySmall">{value}</Typography>
-    </View>
-  );
-}
-
-function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <FormSection title={title}>
-      {children}
-    </FormSection>
-  );
 }
 
 export function StaffDetailScreen({
@@ -82,6 +61,11 @@ export function StaffDetailScreen({
   if (!selectedStaff) {
     return (
       <ScreenLayout>
+        <AppHeader
+          title="Staff Details"
+          colors={[theme.primary, theme.primary]}
+          onBack={onBack}
+        />
         <View style={styles.loadingContainer}>
           <Typography variant="body" color="textSecondary">
             Loading...
@@ -100,104 +84,133 @@ export function StaffDetailScreen({
 
   return (
     <ScreenLayout>
+      <AppHeader
+        title="Staff Details"
+        colors={[theme.primary, theme.primary]}
+        onBack={onBack}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Header */}
-        <Card style={styles.profileCard}>
+        {/* Profile Card */}
+        <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
           <View style={styles.profileHeader}>
-            <Avatar
-              initials={initials}
-              imageUrl={selectedStaff.photoUrl}
-              size={72}
-            />
-            <View style={styles.profileInfo}>
-              <Typography variant="subtitle">{selectedStaff.name}</Typography>
-              <Typography variant="bodySmall" color="textSecondary">
-                {selectedStaff.role}
-              </Typography>
-              <View style={styles.statusRow}>
-                <StatusBadge status={selectedStaff.status} />
+            <View style={styles.profileRow}>
+              <Avatar
+                initials={initials}
+                imageUrl={selectedStaff.photoUrl}
+                size={48}
+              />
+              <View style={styles.profileInfo}>
+                <Typography variant="subtitle">{selectedStaff.name}</Typography>
+                <Typography variant="caption" color="textSecondary">
+                  {selectedStaff.role} · {selectedStaff.department}
+                </Typography>
               </View>
             </View>
           </View>
-        </Card>
+          <View style={styles.actionButtonsRow}>
+            <Pressable style={styles.actionButton} onPress={handleEdit}>
+              <Feather name="edit" size={15} color={theme.text} />
+              <Typography variant="caption">Edit details</Typography>
+            </Pressable>
+            <Pressable style={styles.actionButton}>
+              <Feather name="sliders" size={15} color={theme.text} />
+              <Typography variant="caption">Change status</Typography>
+            </Pressable>
+            <Pressable style={styles.actionButton}>
+              <Feather name="target" size={15} color={theme.text} />
+              <Typography variant="caption">Set target</Typography>
+            </Pressable>
+            <Pressable style={styles.actionButton}>
+              <Feather name="calendar" size={15} color={theme.text} />
+              <Typography variant="caption">View schedule</Typography>
+            </Pressable>
+            <Pressable style={styles.actionButton} onPress={handleDelete}>
+              <Feather name="trash-2" size={15} color={BrandColors.danger} />
+              <Typography variant="caption" style={{ color: BrandColors.danger }}>Delete</Typography>
+            </Pressable>
+          </View>
+        </View>
 
-        {/* Personal Information */}
-        <DetailSection title="Personal Information">
-          <DetailRow label="Email" value={selectedStaff.email} />
-          <DetailRow label="Phone" value={selectedStaff.phone} />
-          <DetailRow label="Address" value={selectedStaff.address} />
-        </DetailSection>
+        {/* Contact Information Card */}
+        <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+          <Typography variant="bodySmallBold" style={styles.cardTitle}>Contact information</Typography>
+          <View style={styles.gridContainer}>
+            <View style={styles.gridItem}>
+              <Typography variant="caption" color="textSecondary">Employee ID</Typography>
+              <Typography variant="bodySmall">{selectedStaff.id || `EMP-${staffId.slice(0, 5)}`}</Typography>
+            </View>
+            <View style={styles.gridItem}>
+              <Typography variant="caption" color="textSecondary">Join date</Typography>
+              <Typography variant="bodySmall">{selectedStaff.joinDate}</Typography>
+            </View>
+            <View style={styles.gridItem}>
+              <Typography variant="caption" color="textSecondary">Phone</Typography>
+              <Typography variant="bodySmall">{selectedStaff.phone}</Typography>
+            </View>
+            <View style={styles.gridItem}>
+              <Typography variant="caption" color="textSecondary">Email</Typography>
+              <Typography variant="bodySmall">{selectedStaff.email}</Typography>
+            </View>
+            <View style={styles.gridItemFull}>
+              <Typography variant="caption" color="textSecondary">Address</Typography>
+              <Typography variant="bodySmall">{selectedStaff.address}</Typography>
+            </View>
+          </View>
+        </View>
 
-        {/* Employment */}
-        <DetailSection title="Employment">
-          <DetailRow label="Department" value={selectedStaff.department} />
-          <DetailRow label="Branch" value={selectedStaff.branch} />
-          <DetailRow label="Join Date" value={selectedStaff.joinDate} />
-        </DetailSection>
-
-        {/* Compensation */}
-        <DetailSection title="Compensation">
-          <DetailRow
-            label="Base Salary"
-            value={`$${selectedStaff.baseSalary.toLocaleString()}`}
-          />
-          <DetailRow
-            label="Monthly Target"
-            value={`$${selectedStaff.monthlyTarget.toLocaleString()}`}
-          />
-        </DetailSection>
-
-        {/* Certifications */}
-        {selectedStaff.certifications.length > 0 && (
-          <DetailSection title="Certifications">
-            {selectedStaff.certifications.map((cert, index) => (
-              <View key={index} style={[styles.certItem, { backgroundColor: theme.backgroundElement }]}>
-                <Typography variant="bodySmallBold">{cert.certName}</Typography>
+        {/* Certifications Card */}
+        <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+          <Typography variant="bodySmallBold" style={styles.cardTitle}>Certifications</Typography>
+          {selectedStaff.certifications.length === 0 ? (
+            <Typography variant="bodySmall" color="textSecondary">No certifications on file.</Typography>
+          ) : (
+            selectedStaff.certifications.map((cert, idx) => (
+              <View key={idx} style={{ marginBottom: idx < selectedStaff.certifications.length - 1 ? Spacing.two : 0 }}>
+                <Typography variant="bodySmall">{cert.certName}</Typography>
                 <Typography variant="caption" color="textSecondary">
                   {cert.issuer} · {cert.issueDate} to {cert.expiryDate}
                 </Typography>
               </View>
-            ))}
-          </DetailSection>
-        )}
-
-        {/* Schedule */}
-        {Object.keys(selectedStaff.schedule).length > 0 && (
-          <DetailSection title="Weekly Schedule">
-            {Object.entries(selectedStaff.schedule).map(([day, ranges]) => (
-              <View key={day} style={styles.scheduleDay}>
-                <Typography variant="bodySmallBold" style={styles.scheduleDayLabel}>
-                  {day}
-                </Typography>
-                <Typography variant="bodySmall" color="textSecondary">
-                  {ranges.join(', ')}
-                </Typography>
-              </View>
-            ))}
-          </DetailSection>
-        )}
-
-        {/* App Access */}
-        <DetailSection title="App Access">
-          <DetailRow
-            label="Access Enabled"
-            value={selectedStaff.appAccessEnabled ? 'Yes' : 'No'}
-          />
-          {selectedStaff.appAccessEnabled && selectedStaff.appUsername && (
-            <DetailRow label="Username" value={selectedStaff.appUsername} />
+            ))
           )}
-        </DetailSection>
+        </View>
 
-        {/* Actions */}
-        <View style={styles.actions}>
-          <Button label="Edit Staff" onPress={handleEdit} size="lg" />
-          <Button
-            label="Delete Staff"
-            variant="secondary"
-            onPress={handleDelete}
-            loading={submitting}
-            size="lg"
-          />
+        {/* Schedule Card */}
+        <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+          <Typography variant="bodySmallBold" style={styles.cardTitle}>Schedule</Typography>
+          {Object.keys(selectedStaff.schedule).length === 0 ? (
+            <Typography variant="bodySmall" color="textSecondary">No shifts scheduled this week.</Typography>
+          ) : (
+            Object.entries(selectedStaff.schedule).map(([day, ranges]) => (
+              <View key={day} style={styles.scheduleRow}>
+                <Typography variant="bodySmall" style={{ width: 100 }}>{day}</Typography>
+                <Typography variant="bodySmall" color="textSecondary">{ranges.join(', ')}</Typography>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* Performance Card */}
+        <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+          <Typography variant="bodySmallBold" style={styles.cardTitle}>Performance</Typography>
+          <View style={styles.performanceGrid}>
+            <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
+              <Typography variant="caption" color="textSecondary">Sessions completed</Typography>
+              <Typography variant="subtitle">0</Typography>
+            </View>
+            <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
+              <Typography variant="caption" color="textSecondary">New clients</Typography>
+              <Typography variant="subtitle">0</Typography>
+            </View>
+            <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
+              <Typography variant="caption" color="textSecondary">Revenue generated</Typography>
+              <Typography variant="subtitle">$0</Typography>
+            </View>
+            <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
+              <Typography variant="caption" color="textSecondary">Commission earned</Typography>
+              <Typography variant="subtitle">$0</Typography>
+            </View>
+          </View>
         </View>
       </ScrollView>
     </ScreenLayout>
@@ -207,7 +220,7 @@ export function StaffDetailScreen({
 const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing.four,
-    gap: Spacing.four,
+    gap: Spacing.md,
     paddingBottom: Spacing.six,
   },
   loadingContainer: {
@@ -215,44 +228,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  profileCard: {
-    alignItems: 'center',
+  card: {
+    borderRadius: Radius.md,
+    borderWidth: 0.5,
+    padding: Spacing.four,
   },
   profileHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  profileRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Spacing.md,
   },
   profileInfo: {
-    alignItems: 'center',
-    gap: Spacing.one,
+    justifyContent: 'center',
   },
-  statusRow: {
-    marginTop: Spacing.one,
-  },
-  detailRow: {
+  actionButtonsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  actionButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.two,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    gap: 6,
   },
-  detailLabel: {
-    flex: 1,
+  cardTitle: {
+    marginBottom: Spacing.md,
   },
-  certItem: {
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+  },
+  gridItem: {
+    width: '48%',
+  },
+  gridItemFull: {
+    width: '100%',
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    paddingVertical: Spacing.one,
+  },
+  performanceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+  },
+  performanceBox: {
+    width: '48%',
     borderRadius: Radius.md,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
-  scheduleDay: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.two,
-  },
-  scheduleDayLabel: {
-    flex: 1,
-  },
-  actions: {
-    gap: Spacing.three,
+    padding: Spacing.md,
   },
 });

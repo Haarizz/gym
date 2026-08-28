@@ -23,6 +23,7 @@ interface MemberResponse {
   membership_type: string;
   membership_plan_id?: number | null;
   membership_plan_name?: string | null;
+  membership_plan?: string | null;
   membership_plan_price?: number | null;
   status: string;
   start_date: string;
@@ -148,7 +149,7 @@ export class ApiMemberDirectoryRepository
 
       membershipType: response.membership_type,
       membershipPlanId: response.membership_plan_id ?? undefined,
-      membershipPlanName: response.membership_plan_name ?? undefined,
+      membershipPlanName: response.membership_plan_name ?? response.membership_plan ?? undefined,
       membershipPlanPrice: response.membership_plan_price ?? undefined,
       status: response.status,
       startDate: response.start_date,
