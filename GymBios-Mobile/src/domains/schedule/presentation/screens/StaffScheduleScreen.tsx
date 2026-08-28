@@ -20,6 +20,14 @@ export function StaffScheduleScreen() {
     );
   }
 
+  if (!data) {
+    return (
+      <View style={styles.loaderContainer}>
+        <Text style={{ color: '#64748B' }}>Failed to load schedule.</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.container}

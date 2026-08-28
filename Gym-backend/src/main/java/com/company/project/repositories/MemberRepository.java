@@ -97,4 +97,10 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
     List<Object[]> countActiveMembersByType();
 
     List<Member> findTop5ByOrderByJoinDateDesc();
+
+    long countByJoinDateBetween(LocalDateTime startDate, LocalDateTime endDate);
+
+    long countByMembershipStatusAndExpiryDateBetween(String status, LocalDateTime startDate, LocalDateTime endDate);
+
+    long countByJoinDateBeforeAndMembershipStatusNot(LocalDateTime joinDate, String membershipStatus);
 }

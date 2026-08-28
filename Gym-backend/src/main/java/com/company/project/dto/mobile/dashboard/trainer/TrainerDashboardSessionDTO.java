@@ -6,16 +6,18 @@ public class TrainerDashboardSessionDTO {
     private Long id;
     private LocalDateTime startTime;
     private String memberName;
+    private String className;
     private String type;
     private String focus;
     private String status;
 
     public TrainerDashboardSessionDTO() {}
 
-    public TrainerDashboardSessionDTO(Long id, LocalDateTime startTime, String memberName, String type, String focus, String status) {
+    public TrainerDashboardSessionDTO(Long id, LocalDateTime startTime, String memberName, String className, String type, String focus, String status) {
         this.id = id;
         this.startTime = startTime;
         this.memberName = memberName;
+        this.className = className;
         this.type = type;
         this.focus = focus;
         this.status = status;
@@ -43,6 +45,14 @@ public class TrainerDashboardSessionDTO {
 
     public void setMemberName(String memberName) {
         this.memberName = memberName;
+    }
+
+    public String getClassName() {
+        return className;
+    }
+
+    public void setClassName(String className) {
+        this.className = className;
     }
 
     public String getType() {

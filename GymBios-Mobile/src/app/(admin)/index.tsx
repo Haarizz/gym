@@ -1,5 +1,3 @@
-import { createAdminDashboardScreen } from '@/domains/reports/presentation/screens/AdminDashboardScreen';
-import { useRestoreSession } from '@/domains/auth';
+import { AdminDashboardScreen } from '@/domains/dashboard';
 
-const AdminDashboardScreen = createAdminDashboardScreen(useRestoreSession);
 export default AdminDashboardScreen;

@@ -6,3 +6,4 @@ export type { StaffAttendanceRecord } from './useStaffAttendance';
 
 export { useReportDateRange } from './useReportDateRange';
 export type { ReportPeriod, UseReportDateRangeReturn } from './useReportDateRange';
+export * from './useStaffAttendanceActions';

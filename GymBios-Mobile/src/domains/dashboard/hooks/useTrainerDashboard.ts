@@ -76,9 +76,25 @@ export function useTrainerDashboard() {
     },
   });
 
+  const startSessionMutation = useMutation({
+    mutationFn: (sessionId: string | number) => trainerDashboardRepository.startSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: trainerDashboardKeys.all });
+    },
+  });
+
+  const finishSessionMutation = useMutation({
+    mutationFn: (sessionId: string | number) => trainerDashboardRepository.finishSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: trainerDashboardKeys.all });
+    },
+  });
+
   return {
     ...query,
     data: query.data ?? DEFAULT_TRAINER_DASHBOARD,
     togglePendingTask: (id: string | number) => togglePendingTaskMutation.mutate(id),
+    startSession: (id: string | number) => startSessionMutation.mutate(id),
+    finishSession: (id: string | number) => finishSessionMutation.mutate(id),
   };
 }

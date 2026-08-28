@@ -30,8 +30,8 @@ interface StaffResponse {
   address: string;
   photo_url?: string | null;
 
-  certifications: Staff['certifications'];
-  schedule: Staff['schedule'];
+  certifications: any[];
+  schedule: any;
 
   created_at?: string;
   updated_at?: string;
@@ -105,7 +105,12 @@ export class ApiStaffRepository implements StaffRepository {
   }
 
   async createStaff(request: CreateStaffRequest): Promise<Staff> {
-    const response = await apiClient.post<StaffResponse>('/staff', request);
+    const payload = this.toStaffRequest(request);
+    // Ensure status defaults to ACTIVE if empty
+    if (!payload.status) {
+      payload.status = 'ACTIVE';
+    }
+    const response = await apiClient.post<StaffResponse>('/staff', payload);
 
     return this.toDomain(response.data);
   }
@@ -114,9 +119,14 @@ export class ApiStaffRepository implements StaffRepository {
     id: string,
     request: UpdateStaffRequest,
   ): Promise<Staff> {
+    const payload = this.toStaffRequest(request);
+    // Ensure status defaults to ACTIVE if empty
+    if (!payload.status) {
+      payload.status = 'ACTIVE';
+    }
     const response = await apiClient.put<StaffResponse>(
       `/staff/${id}`,
-      request,
+      payload,
     );
 
     return this.toDomain(response.data);
@@ -163,8 +173,15 @@ export class ApiStaffRepository implements StaffRepository {
       address: response.address,
       photoUrl: response.photo_url ?? undefined,
 
-      certifications: response.certifications,
-      schedule: response.schedule,
+      certifications: (response.certifications || []).map((c: any) => ({
+        id: c.id,
+        certName: c.cert_name || c.certName || '',
+        issuer: c.issuer || '',
+        issueDate: c.issue_date || c.issueDate || '',
+        expiryDate: c.expiry_date || c.expiryDate || '',
+        documentUrl: c.document_url || c.documentUrl || '',
+      })),
+      schedule: response.schedule || {},
 
       createdAt: response.created_at,
       updatedAt: response.updated_at,
@@ -200,6 +217,33 @@ export class ApiStaffRepository implements StaffRepository {
       commissionEarned: response.commission_earned,
       trend: response.trend,
       forecast: response.forecast,
+    };
+  }
+
+  private toStaffRequest(request: CreateStaffRequest | UpdateStaffRequest): any {
+    return {
+      name: request.name,
+      email: request.email,
+      phone: request.phone,
+      role: request.role,
+      department: request.department,
+      branch: request.branch,
+      monthly_target: request.monthlyTarget,
+      base_salary: request.baseSalary,
+      status: request.status,
+      join_date: request.joinDate,
+      address: request.address,
+      photo_url: request.photoUrl,
+      certifications: (request.certifications || []).map(c => ({
+        cert_name: c.certName,
+        issuer: c.issuer,
+        issue_date: c.issueDate,
+        expiry_date: c.expiryDate,
+        document_url: c.documentUrl,
+      })),
+      schedule: request.schedule,
+      app_username: request.appUsername,
+      app_password: request.appPassword,
     };
   }
 }

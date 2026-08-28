@@ -15,6 +15,7 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet, Typography } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
 import { useAuthStore } from '@/domains/auth';
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import {
   useToggleCommunityLike,
   useDeleteCommunityPost,
@@ -27,9 +28,9 @@ import type { CommunityPost } from '../../domain/community.types';
 const MODERATOR_ROLES = ['admin', 'staff'] as const;
 
 /** Returns a display colour for a given post type. */
-function getTypeColor(type: string): string {
+function getTypeColor(type: string, primaryColor: string): string {
   switch (type) {
-    case 'achievement': return BrandColors.teal;
+    case 'achievement': return primaryColor;
     case 'question': return '#3b82f6';
     case 'tip': return '#8b5cf6';
     default: return '#94a3b8';
@@ -62,6 +63,7 @@ interface CommunityPostCardProps {
 
 export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardProps) {
   const theme = useTheme();
+  const { primaryColor } = useCommunityTheme();
   const user = useAuthStore((s) => s.user);
   const appRole = useAuthStore((s) => s.appRole);
 
@@ -85,7 +87,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
     ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })
     : '';
 
-  const typeColor = getTypeColor(post.type);
+  const typeColor = getTypeColor(post.type, primaryColor);
 
   const handleLike = useCallback(() => {
     if (isPendingLike) return;
@@ -241,7 +243,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
           hitSlop={12}
         >
           {isPendingLike ? (
-            <ActivityIndicator size={14} color={BrandColors.teal} />
+            <ActivityIndicator size={14} color={primaryColor} />
           ) : (
             <Feather
               name="heart"
@@ -278,27 +280,29 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
-    marginHorizontal: Spacing.three,
-    marginVertical: Spacing.two,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderRadius: 20,
+    padding: 16,
+    marginHorizontal: 18,
+    marginVertical: 6,
+    shadowColor: '#141428',
+    shadowOpacity: 0.15,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#ECEBF2',
   },
   archived: {
     opacity: 0.7,
   },
   authorRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    marginBottom: Spacing.two,
+    alignItems: 'flex-start',
+    gap: 11,
   },
   authorMeta: {
     flex: 1,
+    paddingTop: 2,
     gap: 2,
   },
   authorNameRow: {
@@ -309,6 +313,9 @@ const styles = StyleSheet.create({
   },
   authorName: {
     flexShrink: 1,
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#1E2130',
   },
   roleBadge: {
     paddingHorizontal: 6,
@@ -324,25 +331,36 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   typeBadge: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   typeBadgeText: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '700',
   },
   menuButton: {
     padding: Spacing.half,
+    marginLeft: 4,
   },
   menuButtonPressed: {
     opacity: 0.6,
   },
   topic: {
-    marginBottom: Spacing.one,
+    marginBottom: 4,
+    marginTop: 11,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 19.5,
+    color: '#1E2130',
   },
   content: {
     lineHeight: 20,
+    fontSize: 13.5,
+    color: '#7A7E8C',
     marginBottom: Spacing.two,
   },
   imageWrap: {
@@ -363,26 +381,26 @@ const styles = StyleSheet.create({
   },
   interactions: {
     flexDirection: 'row',
-    gap: Spacing.three,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(0,0,0,0.06)',
-    paddingTop: Spacing.two,
-    marginTop: Spacing.one,
+    alignItems: 'center',
+    gap: 18,
+    borderTopWidth: 1,
+    borderTopColor: '#ECEBF2',
+    paddingTop: 12,
+    marginTop: 13,
   },
   interactionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: Spacing.two,
-    minHeight: 44,
+    paddingVertical: 4,
+    minHeight: 32,
   },
   interactionPressed: {
     opacity: 0.65,
   },
   interactionCount: {
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 12.5,
   },
   actionsList: {
     paddingBottom: Spacing.four,

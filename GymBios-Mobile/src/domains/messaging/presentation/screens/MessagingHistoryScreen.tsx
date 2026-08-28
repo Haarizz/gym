@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, FlatList, Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -9,6 +9,15 @@ import { useMessagingHistory } from '../../hooks/useMessagingHooks';
 
 export function MessagingHistoryScreen() {
   const router = useRouter();
+  const segments = useSegments();
+  const roleGroup = segments[0] || '(admin)';
+  
+  let headerColors: [string, string] = [BrandColors.teal, BrandColors.tealDark];
+  if (roleGroup === '(trainer)') {
+    headerColors = [BrandColors.trainerAmber, '#ea580c'];
+  } else if (roleGroup === '(member)') {
+    headerColors = [BrandColors.memberGold, BrandColors.trainerAmber];
+  }
   const { data: history = [], isLoading } = useMessagingHistory();
 
   return (
@@ -16,7 +25,7 @@ export function MessagingHistoryScreen() {
       <AppHeader
         title="Message History"
         subtitle="View sent & scheduled messages"
-        colors={[BrandColors.teal, BrandColors.tealDark]}
+        colors={headerColors}
         onBack={() => router.back()}
       />
       

@@ -74,8 +74,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchWrap: {
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.one,
+    paddingHorizontal: 18,
+    marginTop: -18,
+    paddingBottom: 4,
+    zIndex: 1,
   },
 });

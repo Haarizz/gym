@@ -1,4 +1,5 @@
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import Feather from '@expo/vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,8 +22,8 @@ const TABS: TabConfig[] = [
   { key: 'stats', label: 'Stats', icon: 'activity' },
 ];
 
-const ACTIVE_COLOR = BrandColors.teal;
-const INACTIVE_COLOR = '#94A3B8';
+
+const INprimaryColor = '#94A3B8';
 
 interface CommunityBottomNavProps {
   activeTab: CommunityTab;
@@ -30,6 +31,7 @@ interface CommunityBottomNavProps {
 }
 
 export function CommunityBottomNav({ activeTab, onTabPress }: CommunityBottomNavProps) {
+  const { primaryColor, headerColors } = useCommunityTheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -41,7 +43,7 @@ export function CommunityBottomNav({ activeTab, onTabPress }: CommunityBottomNav
     >
       {TABS.map((tab) => {
         const isActive = activeTab === tab.key;
-        const color = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
+        const color = isActive ? primaryColor : INprimaryColor;
 
         return (
           <Pressable
@@ -71,15 +73,13 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#ECEBF2',
     paddingTop: 8,
     shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: -6 },
     elevation: 14,
   },
   tab: {

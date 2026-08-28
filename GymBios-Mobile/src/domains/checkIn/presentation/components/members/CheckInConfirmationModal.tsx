@@ -8,6 +8,7 @@ import { MemberStatusBadge } from './MemberStatusBadge';
 interface CheckInConfirmationModalProps {
   visible: boolean;
   member: any;
+  actionType?: 'checkIn' | 'checkOut';
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
@@ -16,6 +17,7 @@ interface CheckInConfirmationModalProps {
 export function CheckInConfirmationModal({
   visible,
   member,
+  actionType = 'checkIn',
   onConfirm,
   onCancel,
   isLoading,
@@ -29,15 +31,19 @@ export function CheckInConfirmationModal({
   const currentDate = new Date().toLocaleDateString();
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  const isCheckIn = actionType === 'checkIn';
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <TouchableWithoutFeedback onPress={onCancel}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={styles.content}>
-              <Typography variant="subtitle" style={styles.title}>Confirm Check-in</Typography>
+              <Typography variant="subtitle" style={styles.title}>
+                {isCheckIn ? 'Confirm Check-in' : 'Confirm Check-out'}
+              </Typography>
               <Typography variant="bodySmall" color="textSecondary" style={styles.subtitle}>
-                Checking in {name}
+                {isCheckIn ? 'Checking in' : 'Checking out'} {name}
               </Typography>
               
               <View style={styles.memberInfoRow}>
@@ -51,7 +57,9 @@ export function CheckInConfirmationModal({
 
               <View style={styles.timeRow}>
                 <View style={styles.timeCol}>
-                  <Typography variant="caption" color="textSecondary">Check-In Time</Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    {isCheckIn ? 'Check-In Time' : 'Check-Out Time'}
+                  </Typography>
                   <Typography variant="body">{currentTime}</Typography>
                 </View>
                 <View style={styles.timeCol}>
@@ -62,7 +70,13 @@ export function CheckInConfirmationModal({
 
               <View style={styles.actions}>
                 <Button label="Cancel" variant="ghost" onPress={onCancel} style={styles.cancelBtn} disabled={isLoading} />
-                <Button label="Confirm Check-In" variant="primary" onPress={onConfirm} style={styles.confirmBtn} loading={isLoading} />
+                <Button 
+                  label={isCheckIn ? "Confirm Check-In" : "Confirm Check-Out"} 
+                  variant="primary" 
+                  onPress={onConfirm} 
+                  style={[styles.confirmBtn, !isCheckIn && { backgroundColor: BrandColors.danger }]} 
+                  loading={isLoading} 
+                />
               </View>
             </View>
           </TouchableWithoutFeedback>

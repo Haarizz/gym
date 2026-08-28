@@ -1,11 +1,10 @@
+import { Feather } from '@expo/vector-icons';
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
-import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { Spacing } from '@/core/theme';
 import { Avatar } from '@/shared/components/Avatar';
-import { Button } from '@/shared/components/Button';
-import { Card } from '@/shared/components/Card';
 import { Typography } from '@/shared/components/Typography';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { Staff } from '../../domain/Staff';
@@ -27,60 +26,71 @@ export const StaffCard = memo(function StaffCard({ staff, onPress }: StaffCardPr
 
   return (
     <Pressable onPress={() => onPress?.(staff)}>
-      <Card style={styles.container}>
-        <View style={styles.header}>
-          <Avatar
-            initials={initials}
-            imageUrl={staff.photoUrl}
-            size={48}
-          />
-          <View style={styles.info}>
-            <Typography variant="bodySmallBold" style={styles.name}>
-              {staff.name}
-            </Typography>
-            <Typography variant="caption" color="textSecondary">
-              {staff.role}
-            </Typography>
+      <View style={[styles.container, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <View style={styles.topSection}>
+          <View style={styles.userRow}>
+            <Avatar
+              initials={initials}
+              imageUrl={staff.photoUrl}
+              size={38}
+            />
+            <View style={styles.info}>
+              <Typography variant="bodySmallBold" style={styles.name}>
+                {staff.name}
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                {staff.role}{staff.branch ? ` · ${staff.branch}` : ''}
+              </Typography>
+            </View>
           </View>
           <StatusBadge status={staff.status} />
         </View>
 
-        <View style={styles.metrics}>
-          <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
-            <Typography variant="caption" color="textSecondary">
-              Monthly Target
+        <View style={[styles.bottomSection, { borderTopColor: theme.border }]}>
+          <View style={styles.metricItem}>
+            <Typography variant="caption" color="textSecondary" style={styles.metricLabel}>
+              Target
             </Typography>
             <Typography variant="bodySmallBold">
               ${staff.monthlyTarget.toLocaleString()}
             </Typography>
           </View>
-          <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
-            <Typography variant="caption" color="textSecondary">
+          <View style={styles.metricItem}>
+            <Typography variant="caption" color="textSecondary" style={styles.metricLabel}>
               Base Salary
             </Typography>
             <Typography variant="bodySmallBold">
               ${staff.baseSalary.toLocaleString()}
             </Typography>
           </View>
+          <Pressable hitSlop={8} style={styles.dotsButton}>
+            <Feather name="more-vertical" size={18} color={theme.textSecondary} />
+          </Pressable>
         </View>
-
-        <Button
-          label="View Details"
-          onPress={() => onPress?.(staff)}
-        />
-      </Card>
+      </View>
     </Pressable>
   );
 });
 
 const styles = StyleSheet.create({
   container: {
-    gap: Spacing.three,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    paddingTop: 12,
+    paddingBottom: 10,
+    paddingHorizontal: 14,
   },
-  header: {
+  topSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  userRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+    flex: 1,
+    paddingRight: Spacing.two,
   },
   info: {
     flex: 1,
@@ -88,14 +98,20 @@ const styles = StyleSheet.create({
   name: {
     marginBottom: 2,
   },
-  metrics: {
+  bottomSection: {
     flexDirection: 'row',
-    gap: Spacing.three,
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
   },
-  metricBox: {
+  metricItem: {
     flex: 1,
-    borderRadius: Radius.sm,
-    padding: Spacing.two,
-    gap: Spacing.half,
+  },
+  metricLabel: {
+    marginBottom: 2,
+  },
+  dotsButton: {
+    alignSelf: 'center',
   },
 });

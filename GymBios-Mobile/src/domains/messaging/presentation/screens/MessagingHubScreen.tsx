@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -14,16 +14,33 @@ type MessagingModule = {
   description?: string;
 };
 
-const messagingModules: MessagingModule[] = [
-  { id: 'compose', title: 'Compose Message', icon: 'edit', route: '/(admin)/messaging/compose', description: 'Send new messages & campaigns' },
-  { id: 'history', title: 'Message History', icon: 'clock', route: '/(admin)/messaging/history', description: 'View sent & scheduled messages' },
-  { id: 'templates', title: 'Templates', icon: 'layout', route: '/(admin)/messaging/templates', description: 'Manage reusable message templates' },
-  { id: 'analytics', title: 'Analytics', icon: 'bar-chart-2', route: '/(admin)/messaging/analytics', description: 'Messaging performance & insights' },
-];
-
 export function MessagingHubScreen() {
   const router = useRouter();
+  const segments = useSegments();
   const { data: analytics } = useMessagingAnalytics();
+  
+  const roleGroup = segments[0] || '(admin)';
+
+  let brandColor: string = BrandColors.teal;
+  let bgOverlay: string = 'rgba(50, 127, 116, 0.1)';
+  
+  if (roleGroup === '(trainer)') {
+    brandColor = BrandColors.trainerAmber;
+    bgOverlay = 'rgba(245, 158, 11, 0.1)';
+  } else if (roleGroup === '(member)') {
+    brandColor = BrandColors.memberGold;
+    bgOverlay = 'rgba(245, 199, 66, 0.1)';
+  } else if (roleGroup === '(staff)') {
+    brandColor = BrandColors.tealDark;
+    bgOverlay = 'rgba(42, 107, 98, 0.1)';
+  }
+
+  const messagingModules: MessagingModule[] = useMemo(() => [
+    { id: 'compose', title: 'Compose Message', icon: 'edit', route: `/${roleGroup}/messaging/compose`, description: 'Send new messages & campaigns' },
+    { id: 'history', title: 'Message History', icon: 'clock', route: `/${roleGroup}/messaging/history`, description: 'View sent & scheduled messages' },
+    { id: 'templates', title: 'Templates', icon: 'layout', route: `/${roleGroup}/messaging/templates`, description: 'Manage reusable message templates' },
+    { id: 'analytics', title: 'Analytics', icon: 'bar-chart-2', route: `/${roleGroup}/messaging/analytics`, description: 'Messaging performance & insights' },
+  ], [roleGroup]);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -56,8 +73,8 @@ export function MessagingHubScreen() {
                 android_ripple={{ color: '#F3F4F6' }}
               >
                 <View style={styles.listItemContent}>
-                  <View style={styles.iconContainer}>
-                    <Feather name={item.icon} size={20} color={BrandColors.teal} />
+                  <View style={[styles.iconContainer, { backgroundColor: bgOverlay }]}>
+                    <Feather name={item.icon} size={20} color={brandColor} />
                   </View>
                   <View style={styles.textContainer}>
                     <Text style={styles.itemTitle}>{item.title}</Text>
@@ -157,7 +174,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(50, 127, 116, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -175,3 +191,4 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
+

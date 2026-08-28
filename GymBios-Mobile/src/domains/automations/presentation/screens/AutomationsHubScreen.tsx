@@ -6,9 +6,8 @@ import { Spacing, BrandColors, BottomTabInset } from '@/core/theme';
 import { HubActionButton } from '../components/HubActionButton';
 import { AutomationsOverviewScreen } from './AutomationsOverviewScreen';
 import { AutomationWorkflowsScreen } from './AutomationWorkflowsScreen';
-import { AutomationAnalyticsScreen } from '@/domains/analytics/automations/presentation/screens/AutomationAnalyticsScreen';
 
-type AutomationsTab = 'overview' | 'workflows' | 'analytics';
+type AutomationsTab = 'overview' | 'workflows';
 
 export const AutomationsHubScreen = () => {
   const [activeTab, setActiveTab] = useState<AutomationsTab>('overview');
@@ -19,8 +18,6 @@ export const AutomationsHubScreen = () => {
         return <AutomationsOverviewScreen />;
       case 'workflows':
         return <AutomationWorkflowsScreen />;
-      case 'analytics':
-        return <AutomationAnalyticsScreen />;
       default:
         return null;
     }
@@ -47,12 +44,6 @@ export const AutomationsHubScreen = () => {
               iconName="git-branch"
               onPress={() => setActiveTab('workflows')}
               style={[styles.tabCard, activeTab === 'workflows' && styles.tabCardActive]}
-            />
-            <HubActionButton
-              title="Analytics"
-              iconName="bar-chart-2"
-              onPress={() => setActiveTab('analytics')}
-              style={[styles.tabCard, activeTab === 'analytics' && styles.tabCardActive]}
             />
           </ScrollView>
         </View>

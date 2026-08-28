@@ -1,4 +1,5 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import { RefreshControl } from 'react-native';
 
 import { BrandColors, Spacing } from '@/core/theme';
@@ -8,6 +9,7 @@ import { useCommunityLeaderboard } from '../../hooks/useCommunity';
 import { CommunityLeaderboard } from '../components/CommunityLeaderboard';
 
 export function CommunityLeaderboardScreen() {
+  const { primaryColor, headerColors } = useCommunityTheme();
   const { data, isLoading, isError, refetch, isRefetching } = useCommunityLeaderboard();
 
   if (isLoading) {
@@ -51,8 +53,8 @@ export function CommunityLeaderboardScreen() {
         <RefreshControl
           refreshing={isRefetching}
           onRefresh={() => refetch()}
-          tintColor={BrandColors.teal}
-          colors={[BrandColors.teal]}
+          tintColor={primaryColor}
+          colors={[primaryColor]}
         />
       }
       showsVerticalScrollIndicator={false}

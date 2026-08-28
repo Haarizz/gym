@@ -15,10 +15,11 @@ export interface TrainerTodayStats {
 export interface TrainerTodaySession {
   id: string | number;
   time: string;
-  member: string;
+  member: string | null;
+  className?: string | null;
   type: string;
   focus: string;
-  status: 'completed' | 'upcoming';
+  status: 'completed' | 'in_progress' | 'upcoming';
   phone?: string;
 }
 

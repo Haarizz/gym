@@ -1,5 +1,6 @@
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Spacing } from '@/core/theme';
 import { EmptyState, Loader } from '@/shared/components';
@@ -30,6 +31,7 @@ export function CommunityFeed({
   onRefresh,
   onCommentsPress,
 }: CommunityFeedProps) {
+  const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
 
   if (isLoading && posts.length === 0) {
@@ -75,7 +77,7 @@ export function CommunityFeed({
       ListFooterComponent={
         isFetchingNextPage ? (
           <View style={styles.footer}>
-            <ActivityIndicator size="small" color={BrandColors.teal} />
+            <ActivityIndicator size="small" color={primaryColor} />
           </View>
         ) : null
       }
@@ -83,8 +85,8 @@ export function CommunityFeed({
         <RefreshControl
           refreshing={isRefreshing}
           onRefresh={onRefresh}
-          tintColor={BrandColors.teal}
-          colors={[BrandColors.teal]}
+          tintColor={primaryColor}
+          colors={[primaryColor]}
         />
       }
       onEndReached={hasNextPage ? onEndReached : undefined}
@@ -102,8 +104,9 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
   },
   list: {
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.six,
+    paddingTop: 14,
+    paddingBottom: 100,
+    gap: 12,
   },
   emptyList: {
     flex: 1,

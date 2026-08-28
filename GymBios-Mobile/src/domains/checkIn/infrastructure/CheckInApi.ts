@@ -37,6 +37,7 @@ export interface CheckInStatusApiResponse {
 
 export interface AttendanceRecordApiResponse {
   id: number;
+  member_id?: number;
   member_db_id?: number;
   member_biz_id?: string;
   member_name?: string;

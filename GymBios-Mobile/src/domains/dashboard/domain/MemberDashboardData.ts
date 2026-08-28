@@ -24,8 +24,15 @@ export interface MemberQuickStatItem {
   color: string;
 }
 
+export interface MemberDashboardCheckInStatus {
+  checkedIn: boolean;
+  activeAttendanceId?: number | null;
+  checkInTime?: string | null;
+}
+
 export interface MemberDashboardData {
   memberInfo: MemberInfo;
   todaysSchedule: MemberTodayScheduleItem[];
   quickStats: MemberQuickStatItem[];
+  checkInStatus?: MemberDashboardCheckInStatus;
 }
