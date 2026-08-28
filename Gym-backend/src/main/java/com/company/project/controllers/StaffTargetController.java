@@ -2,9 +2,11 @@ package com.company.project.controllers;
 
 import com.company.project.dto.StaffTargetRequestDTO;
 import com.company.project.dto.StaffTargetResponseDTO;
+import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.StaffTargetService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -27,6 +29,26 @@ public class StaffTargetController {
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) String scope) {
         return ResponseEntity.ok(targetService.getTargets(year, month, scope));
+    }
+
+    /**
+     * GET /api/staff-targets/me
+     * Returns the current-month (or requested year/month) targets for the staff record
+     * linked to the authenticated account, with achieved figures reflecting real progress.
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> getMyTargets(
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body("Not authenticated");
+        }
+        try {
+            return ResponseEntity.ok(targetService.getMyTargets(principal.getId(), year, month));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body("No staff record linked to this account.");
+        }
     }
 
     @GetMapping("/{id}")

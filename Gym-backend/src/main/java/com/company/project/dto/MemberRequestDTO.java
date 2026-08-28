@@ -70,6 +70,11 @@ public class MemberRequestDTO {
     private String appUsername;
     private String appPassword;
 
+    // Which staff member actually handled this sale — credited toward their
+    // revenue target regardless of which account is logged in. Null falls back
+    // to "Admin" (see ReceiptService.resolveProcessedByName).
+    private Long processedByStaffId;
+
     // ── Getters & Setters ───────────────────────────────────────────────────
 
     public String getName() { return name; }
@@ -212,4 +217,7 @@ public class MemberRequestDTO {
 
     public String getAppPassword() { return appPassword; }
     public void setAppPassword(String appPassword) { this.appPassword = appPassword; }
+
+    public Long getProcessedByStaffId() { return processedByStaffId; }
+    public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
 }

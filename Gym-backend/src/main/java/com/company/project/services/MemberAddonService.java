@@ -158,7 +158,7 @@ public class MemberAddonService {
             Receipt receipt = receiptService.createMinorChargeReceipt(
                     savedGuardian, targetMember, fee, paidNow, "Add-on",
                     "Add-on: " + (saved.getAddonName() != null ? saved.getAddonName() : "Add-on"),
-                    saved.getPaymentBreakdown(), null, null);
+                    saved.getPaymentBreakdown(), null, null, request.getProcessedByStaffId());
 
             // Cash-basis: only post/voucher whatever was actually collected now,
             // never the full add-on fee if part of it is left as a due.
@@ -223,7 +223,7 @@ public class MemberAddonService {
                 receipt.setValidFrom(saved.getStartDate());
                 receipt.setValidTill(saved.getExpiryDate());
                 receipt.setMembershipType(targetMember.getMembershipType());
-                receipt.setProcessedBy("Admin");
+                receipt.setProcessedBy(receiptService.resolveProcessedByName(request.getProcessedByStaffId()));
                 receiptService.createReceipt(receipt);
             }
         }

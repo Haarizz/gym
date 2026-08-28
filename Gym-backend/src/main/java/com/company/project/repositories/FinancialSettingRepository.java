@@ -10,7 +10,11 @@ public interface FinancialSettingRepository extends JpaRepository<FinancialSetti
 
     List<FinancialSetting> findByCategoryOrderBySettingKeyAsc(String category);
 
+    List<FinancialSetting> findByCategoryAndBranchIdOrderBySettingKeyAsc(String category, Long branchId);
+
     Optional<FinancialSetting> findBySettingKey(String settingKey);
+
+    Optional<FinancialSetting> findBySettingKeyAndBranchId(String settingKey, Long branchId);
 
     List<FinancialSetting> findAllByOrderByCategoryAscSettingKeyAsc();
 }

@@ -50,6 +50,7 @@ public class ReferralService {
     private final ReferralRewardRepository rewardRepository;
     private final RewardAuditLogRepository auditLogRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final BranchSettingsResolver branchSettingsResolver;
 
     public ReferralService(ReferralRepository referralRepository,
                            ReferralRewardRuleRepository ruleRepository,
@@ -57,7 +58,8 @@ public class ReferralService {
                            RewardEngineService rewardEngineService,
                            ReferralRewardRepository rewardRepository,
                            RewardAuditLogRepository auditLogRepository,
-                           JdbcTemplate jdbcTemplate) {
+                           JdbcTemplate jdbcTemplate,
+                           BranchSettingsResolver branchSettingsResolver) {
         this.referralRepository = referralRepository;
         this.ruleRepository = ruleRepository;
         this.settingsRepository = settingsRepository;
@@ -65,13 +67,19 @@ public class ReferralService {
         this.rewardRepository = rewardRepository;
         this.auditLogRepository = auditLogRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.branchSettingsResolver = branchSettingsResolver;
     }
 
-    // ── Settings ───────────────────────────────────────────────────────────────
+    // ── Settings (one row per branch — each branch can run its own referral ────
+    //    program/rules) ──────────────────────────────────────────────────────
 
-    @Transactional(readOnly = true)
+    // Not readOnly: loadOrCreateSettings() below saves a fresh row on first access
+    // for a branch, which Postgres rejects inside a read-only transaction.
+    @Transactional
     public ReferralSettingsDTO getSettings() {
-        return ReferralSettingsDTO.fromEntity(loadOrCreateSettings());
+        Long branchId = branchSettingsResolver.resolveForRead();
+        ReferralSettings settings = branchId != null ? loadOrCreateSettings(branchId) : new ReferralSettings();
+        return ReferralSettingsDTO.fromEntity(settings);
     }
 
     // The frontend always PUTs the complete settings object (not a partial patch),
@@ -79,7 +87,8 @@ public class ReferralService {
     // and minPurchaseAmount represent "unlimited"/"no minimum". Null-guarding those
     // two used to make it impossible to clear them back to unlimited once set.
     public ReferralSettingsDTO updateSettings(ReferralSettingsDTO req) {
-        ReferralSettings s = loadOrCreateSettings();
+        Long branchId = branchSettingsResolver.resolveForWrite();
+        ReferralSettings s = loadOrCreateSettings(branchId);
         s.setProgramEnabled(req.getProgramEnabled());
         s.setAutoGenerateCodes(req.getAutoGenerateCodes());
         s.setEmailNotifications(req.getEmailNotifications());
@@ -92,8 +101,22 @@ public class ReferralService {
         return ReferralSettingsDTO.fromEntity(settingsRepository.save(s));
     }
 
+    /** Read-only lookup used mid-business-logic (e.g. createReferral) — falls back to the default branch in "All Branches" mode. */
     private ReferralSettings loadOrCreateSettings() {
-        return settingsRepository.findById(1L).orElseGet(() -> settingsRepository.save(new ReferralSettings()));
+        Long branchId = branchSettingsResolver.resolveForRead();
+        return branchId != null ? loadOrCreateSettings(branchId) : new ReferralSettings();
+    }
+
+    private ReferralSettings loadOrCreateSettings(Long branchId) {
+        return settingsRepository.findByBranchId(branchId).orElseGet(() -> {
+            // branchId is set explicitly before save (rather than left for BranchSecurityListener
+            // to fill in from BranchContextHolder) because this path also runs for the "All
+            // Branches" read-only fallback, where BranchContextHolder's active branch is null but
+            // branchId here is already resolved to the default branch.
+            ReferralSettings fresh = new ReferralSettings();
+            fresh.setBranchId(branchId);
+            return settingsRepository.save(fresh);
+        });
     }
 
     // ── Referrals ─────────────────────────────────────────────────────────────

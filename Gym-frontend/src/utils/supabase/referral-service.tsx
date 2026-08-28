@@ -108,16 +108,6 @@ export interface ReferralSettings {
   minPurchaseAmount?: number | null;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-async function getHeaders(): Promise<HeadersInit> {
-  const token = authService.getAccessToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 // ── API Methods ────────────────────────────────────────────────────────────────
 
 export const referralService = {
@@ -133,7 +123,7 @@ export const referralService = {
     if (params?.size)   p.set('size', String(params.size));
     if (params?.status) p.set('status', params.status);
     if (params?.search) p.set('search', params.search);
-    const res = await fetch(`${BASE_URL}/referrals?${p}`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals?${p}`);
     if (!res.ok) throw new Error('Failed to fetch referrals');
     const raw = await res.json();
     return {
@@ -169,11 +159,11 @@ export const referralService = {
   },
 
   async fixRewards(): Promise<void> {
-    await fetch(`${BASE_URL}/referrals/fix-rewards`, { headers: await getHeaders() });
+    await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/fix-rewards`);
   },
 
   async getStats(): Promise<ReferralStats> {
-    const res = await fetch(`${BASE_URL}/referrals/stats`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/stats`);
     if (!res.ok) throw new Error('Failed to fetch referral stats');
     const raw = await res.json();
     return {
@@ -188,7 +178,7 @@ export const referralService = {
   },
 
   async getById(id: number): Promise<ReferralResponse> {
-    const res = await fetch(`${BASE_URL}/referrals/${id}`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/${id}`);
     if (!res.ok) throw new Error('Failed to fetch referral');
     const r = await res.json();
     return {
@@ -230,9 +220,8 @@ export const referralService = {
       rule_id: request.ruleId,
       referral_code: request.referralCode
     };
-    const res = await fetch(`${BASE_URL}/referrals`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals`, {
       method: 'POST',
-      headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -278,9 +267,8 @@ export const referralService = {
       notes: request.notes,
       rule_id: request.ruleId
     };
-    const res = await fetch(`${BASE_URL}/referrals/${id}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/${id}`, {
       method: 'PUT',
-      headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to update referral');
@@ -307,9 +295,8 @@ export const referralService = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${BASE_URL}/referrals/${id}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/${id}`, {
       method: 'DELETE',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to delete referral');
   },
@@ -319,9 +306,8 @@ export const referralService = {
     membershipPlanId?: number;
     refereeMemberId?: string;
   }): Promise<ReferralResponse> {
-    const res = await fetch(`${BASE_URL}/referrals/${id}/mark-successful`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/${id}/mark-successful`, {
       method: 'POST',
-      headers: await getHeaders(),
       body: opts ? JSON.stringify({
         purchase_amount: opts.purchaseAmount,
         membership_plan_id: opts.membershipPlanId,
@@ -352,9 +338,8 @@ export const referralService = {
   },
 
   async markExpired(id: number): Promise<ReferralResponse> {
-    const res = await fetch(`${BASE_URL}/referrals/${id}/mark-expired`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/${id}/mark-expired`, {
       method: 'POST',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to mark referral as expired');
     const r = await res.json();
@@ -385,9 +370,7 @@ export const referralService = {
    * when there's nothing to redeem.
    */
   async getUnredeemedReward(memberId: string): Promise<ReferralResponse | null> {
-    const res = await fetch(`${BASE_URL}/referrals/unredeemed-reward?memberId=${encodeURIComponent(memberId)}`, {
-      headers: await getHeaders(),
-    });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/unredeemed-reward?memberId=${encodeURIComponent(memberId)}`);
     if (res.status === 204) return null;
     if (!res.ok) throw new Error('Failed to fetch unredeemed reward');
     const r = await res.json();
@@ -414,9 +397,8 @@ export const referralService = {
   },
 
   async redeemReward(id: number): Promise<ReferralResponse> {
-    const res = await fetch(`${BASE_URL}/referrals/${id}/redeem-reward`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/${id}/redeem-reward`, {
       method: 'POST',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to redeem reward');
     const r = await res.json();
@@ -447,9 +429,7 @@ export const referralService = {
    * Returns the referral details plus applicable reward rules for the referee (new member).
    */
   async validateCode(code: string): Promise<ReferralValidationResponse> {
-    const res = await fetch(`${BASE_URL}/referrals/validate-code?code=${encodeURIComponent(code)}`, {
-      headers: await getHeaders(),
-    });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/validate-code?code=${encodeURIComponent(code)}`);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.message || 'Invalid referral code');
@@ -486,7 +466,7 @@ export const referralService = {
 
   // Reward Rules
   async getRules(): Promise<RewardRuleResponse[]> {
-    const res = await fetch(`${BASE_URL}/referrals/rules`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/rules`);
     if (!res.ok) throw new Error('Failed to fetch reward rules');
     const raw = await res.json();
     return raw.map((r: any) => ({
@@ -509,9 +489,8 @@ export const referralService = {
       is_active: request.isActive,
       expiry_days: request.expiryDays
     };
-    const res = await fetch(`${BASE_URL}/referrals/rules`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/rules`, {
       method: 'POST',
-      headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to create reward rule');
@@ -529,9 +508,8 @@ export const referralService = {
       is_active: request.isActive,
       expiry_days: request.expiryDays
     };
-    const res = await fetch(`${BASE_URL}/referrals/rules/${id}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/rules/${id}`, {
       method: 'PUT',
-      headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to update reward rule');
@@ -539,18 +517,16 @@ export const referralService = {
   },
 
   async toggleRule(id: number): Promise<RewardRuleResponse> {
-    const res = await fetch(`${BASE_URL}/referrals/rules/${id}/toggle`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/rules/${id}/toggle`, {
       method: 'POST',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to toggle reward rule');
     return res.json();
   },
 
   async deleteRule(id: number): Promise<void> {
-    const res = await fetch(`${BASE_URL}/referrals/rules/${id}`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/rules/${id}`, {
       method: 'DELETE',
-      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to delete reward rule');
   },
@@ -558,7 +534,7 @@ export const referralService = {
   // ── Settings ─────────────────────────────────────────────────────────────
 
   async getSettings(): Promise<ReferralSettings> {
-    const res = await fetch(`${BASE_URL}/referrals/settings`, { headers: await getHeaders() });
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/settings`);
     if (!res.ok) throw new Error('Failed to fetch referral settings');
     const s = await res.json();
     return {
@@ -586,9 +562,8 @@ export const referralService = {
       expiry_days: settings.expiryDays,
       min_purchase_amount: settings.minPurchaseAmount,
     };
-    const res = await fetch(`${BASE_URL}/referrals/settings`, {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/settings`, {
       method: 'PUT',
-      headers: await getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to update referral settings');
@@ -606,4 +581,3 @@ export const referralService = {
     };
   },
 };
-

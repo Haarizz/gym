@@ -6,6 +6,7 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Separator } from "../components/ui/separator";
 import {
   Search,
@@ -40,7 +41,6 @@ import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Checkbox } from "../components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { format } from "date-fns";
 import { membersService } from '../utils/supabase/members-service';
 import type { Member } from '../utils/supabase/members-service';
@@ -52,6 +52,7 @@ import {
 } from '../components/shared/split-payment-fields';
 import type { SplitPaymentValue, SplitPaymentDetails } from '../components/shared/split-payment-fields';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
+import { staffService, Staff } from '../utils/supabase/staff-service';
 
 // Maps the Payment Mode radio value to the SplitPaymentValue key so a single
 // (non-Mixed) method's details can be validated/built by reusing the same
@@ -96,6 +97,13 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
   // Type, Cheque Number, Bank Transfer reference/account, Online Payment type.
   const [methodDetails, setMethodDetails]     = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
   const [bankAccounts, setBankAccounts]       = useState<AccountHead[]>([]);
+  // Which staff member actually collected this payment — credited toward their
+  // revenue target regardless of which account is logged in.
+  const [staffOptions, setStaffOptions]       = useState<Staff[]>([]);
+  const [processedByStaffId, setProcessedByStaffId] = useState("");
+  useEffect(() => {
+    staffService.getStaff({}, 1, 500).then(res => setStaffOptions(res.items)).catch(() => {});
+  }, []);
   useEffect(() => {
     accountHeadsService.getBankAccounts()
       .then(setBankAccounts)
@@ -288,6 +296,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
         transaction_ref: transactionReference || undefined,
         bill_payments:   billPayments,
         payment_breakdown: buildBreakdownForSubmit(),
+        processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
       });
 
       setGeneratedReceiptNo(result.receipt_no ?? "");
@@ -900,6 +909,19 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                         className="pl-10"
                       />
                     </div>
+                  </div>
+
+                  {/* Processed By (Staff) — credits this payment toward that staff member's revenue target */}
+                  <div>
+                    <Label htmlFor="processedByStaff">Processed By (Staff) <span className="text-muted-foreground font-normal">(Optional)</span></Label>
+                    <Select value={processedByStaffId || undefined} onValueChange={setProcessedByStaffId}>
+                      <SelectTrigger id="processedByStaff" className="mt-2"><SelectValue placeholder="Select staff member" /></SelectTrigger>
+                      <SelectContent>
+                        {staffOptions.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>

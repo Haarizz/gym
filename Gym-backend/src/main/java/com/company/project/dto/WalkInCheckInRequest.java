@@ -21,6 +21,8 @@ public class WalkInCheckInRequest {
     private List<PaymentSplitDTO> paymentBreakdown;
     private String deviceId;
     private String notes;
+    // Which staff member actually handled this walk-in — see MemberRequestDTO.processedByStaffId.
+    private Long processedByStaffId;
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -51,4 +53,7 @@ public class WalkInCheckInRequest {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public Long getProcessedByStaffId() { return processedByStaffId; }
+    public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
 }

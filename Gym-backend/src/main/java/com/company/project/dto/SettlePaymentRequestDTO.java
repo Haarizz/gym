@@ -16,6 +16,8 @@ public class SettlePaymentRequestDTO {
     private String remarks;
     private List<BillPayment> billPayments;
     private List<PaymentSplitDTO> paymentBreakdown; // legs when paymentMethod == "Mixed"
+    // Which staff member actually collected this payment — see MemberRequestDTO.processedByStaffId.
+    private Long processedByStaffId;
 
     public static class BillPayment {
         private Long receiptId;
@@ -49,4 +51,7 @@ public class SettlePaymentRequestDTO {
 
     public List<PaymentSplitDTO> getPaymentBreakdown()   { return paymentBreakdown; }
     public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
+
+    public Long getProcessedByStaffId()                  { return processedByStaffId; }
+    public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
 }

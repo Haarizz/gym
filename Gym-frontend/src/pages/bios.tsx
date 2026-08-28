@@ -5,6 +5,11 @@ import { Badge } from "../components/ui/badge";
 import { Progress } from "../components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Switch } from "../components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { 
   Brain,
@@ -29,7 +34,6 @@ import {
   CheckCircle,
   Clock,
   Zap,
-  Globe,
   Building2,
   UserCheck,
   CreditCard,
@@ -57,6 +61,8 @@ import { attendanceService } from '../utils/supabase/attendance-service';
 import { expensesService } from '../utils/supabase/expenses-service';
 import { financialAnalyticsService } from '../utils/supabase/financial-analytics-service';
 import { membersService } from '../utils/supabase/members-service';
+import { biosService, type BiosSettings, type BiosActivityLogEntry, type BiosBranchComparisonRow } from '../utils/supabase/bios-service';
+import { staffService, type StaffTarget } from '../utils/supabase/staff-service';
 import { useBranch } from '../utils/branch-context';
 import { useCurrency, CurrencyValue, CurrencyGlyph } from '../utils/currency';
 
@@ -193,64 +199,12 @@ const benchmarkData: BenchmarkPoint[] = [
   { metric: 'Operating Margin', value: 23.8, industry: 26.4, performance: 'below' }
 ];
 
-const recentReports = [
-  {
-    report: 'Monthly Financial Summary',
-    type: 'Financial',
-    generated: '2024-09-25',
-    downloads: 12,
-    status: 'Available'
-  },
-  {
-    report: 'Member Engagement Analysis',
-    type: 'Analytics',
-    generated: '2024-09-24',
-    downloads: 8,
-    status: 'Available'
-  },
-  {
-    report: 'Equipment Utilization Report',
-    type: 'Operational',
-    generated: '2024-09-23',
-    downloads: 15,
-    status: 'Available'
-  },
-  {
-    report: 'Staff Performance Review',
-    type: 'HR',
-    generated: '2024-09-22',
-    downloads: 6,
-    status: 'Available'
-  }
-];
-
-const recentExports = [
-  {
-    dataset: 'Member Data Export',
-    format: 'CSV',
-    exported: '2024-09-25 14:30',
-    size: '2.3 MB',
-    records: 847
-  },
-  {
-    dataset: 'Revenue Analytics',
-    format: 'Excel',
-    exported: '2024-09-24 16:45',
-    size: '1.8 MB',
-    records: 1250
-  },
-  {
-    dataset: 'Class Schedule Data',
-    format: 'JSON',
-    exported: '2024-09-23 10:15',
-    size: '0.9 MB',
-    records: 320
-  }
-];
-
 const REVENUE_SOURCE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-const INDUSTRY_BENCHMARKS = {
+// Fallback values shown only until the admin sets their own comparison targets
+// in BiOS Configuration — these are NOT sourced from any real industry data
+// feed (there is no such integration in this app).
+const DEFAULT_BENCHMARKS = {
   revenuePerMember: 135.2,
   memberRetention: 82.1,
   classUtilization: 74.8,
@@ -330,9 +284,67 @@ const formatSegmentLabel = (value: string) =>
     .trim()
     .replace(/\b\w/g, (match) => match.toUpperCase())} Segment`;
 
+const downloadBlob = (filename: string, blob: Blob) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+const toCsvCell = (value: unknown) => {
+  const s = value == null ? '' : String(value);
+  return `"${s.replaceAll('"', '""')}"`;
+};
+
+const exportAsCsv = (filename: string, header: string[], rows: Array<Array<unknown>>) => {
+  const csv = [
+    header.map(toCsvCell).join(','),
+    ...rows.map((r) => r.map(toCsvCell).join(',')),
+  ].join('\n');
+  downloadBlob(filename, new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+};
+
+const DetailRows = ({ rows }: { rows: Array<{ label: string; value: React.ReactNode }> }) => (
+  <div className="divide-y">
+    {rows.map((row, index) => (
+      <div key={index} className="flex justify-between items-center text-sm py-2">
+        <span className="text-gray-600">{row.label}</span>
+        <span className="font-medium text-gray-900">{row.value}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const DetailTable = ({ columns, rows }: { columns: string[]; rows: Array<Array<React.ReactNode>> }) => (
+  <div className="overflow-x-auto">
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b">
+          {columns.map((column, index) => (
+            <th key={index} className="text-left py-2 pr-4 text-gray-500 font-medium">{column}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, rowIndex) => (
+          <tr key={rowIndex} className="border-b last:border-0">
+            {row.map((cell, cellIndex) => (
+              <td key={cellIndex} className="py-2 pr-4">{cell}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
 export function BiOS() {
   const { formatCurrency, currencyCode } = useCurrency();
-  const { activeBranchId } = useBranch();
+  const { activeBranchId, isAllBranches, accessibleBranches } = useBranch();
   const [gymData, setGymData] = useState<GymDataContext | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
   const [revenueChartData, setRevenueChartData] = useState<RevenueChartPoint[]>(revenueData);
@@ -341,7 +353,41 @@ export function BiOS() {
   const [predictionsLoading, setPredictionsLoading] = useState(false);
   const [revenueSourceData, setRevenueSourceData] = useState<RevenueSourcePoint[]>(revenueBySource);
 
-  const loadRealData = useCallback(async () => {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [monthlyRevenueTarget, setMonthlyRevenueTarget] = useState('');
+  const [dailyCheckInTargetPercent, setDailyCheckInTargetPercent] = useState('33');
+  const [alertEnabled, setAlertEnabled] = useState(false);
+  const [alertEmail, setAlertEmail] = useState('');
+  const [alertRetentionThreshold, setAlertRetentionThreshold] = useState('80');
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleEmail, setScheduleEmail] = useState('');
+  const [scheduleFrequency, setScheduleFrequency] = useState('WEEKLY');
+  const [revenueAlertEnabled, setRevenueAlertEnabled] = useState(false);
+  const [revenueAlertThresholdPercent, setRevenueAlertThresholdPercent] = useState('90');
+  const [benchmarkRevenuePerMember, setBenchmarkRevenuePerMember] = useState('');
+  const [benchmarkRetentionPercent, setBenchmarkRetentionPercent] = useState('');
+  const [benchmarkClassUtilizationPercent, setBenchmarkClassUtilizationPercent] = useState('');
+  const [benchmarkStaffEfficiencyPercent, setBenchmarkStaffEfficiencyPercent] = useState('');
+  const [benchmarkOperatingMarginPercent, setBenchmarkOperatingMarginPercent] = useState('');
+
+  const [trendMonths, setTrendMonths] = useState(6);
+  const [detailsDialog, setDetailsDialog] = useState<{ title: string; description?: string; content: React.ReactNode } | null>(null);
+
+  // Real "Recent Reports" / "Recent Exports" activity log — replaces the
+  // previously hardcoded sample rows.
+  const [recentReportsLog, setRecentReportsLog] = useState<BiosActivityLogEntry[]>([]);
+  const [recentExportsLog, setRecentExportsLog] = useState<BiosActivityLogEntry[]>([]);
+  const [reportsThisMonth, setReportsThisMonth] = useState(0);
+  const [exportsThisWeek, setExportsThisWeek] = useState(0);
+
+  // Per-branch snapshot — only fetched/shown in "All Branches" mode.
+  const [branchComparison, setBranchComparison] = useState<BiosBranchComparisonRow[]>([]);
+
+  // Top staff by revenue achieved this month, for the Executive Dashboard detail view.
+  const [topStaffTargets, setTopStaffTargets] = useState<StaffTarget[]>([]);
+
+  const loadRealData = useCallback(async (months: number = 6) => {
     setDataLoading(true);
 
     try {
@@ -352,7 +398,7 @@ export function BiOS() {
         })),
         attendanceService.getAttendanceStats().catch(() => null),
         financialAnalyticsService.getDashboard().catch(() => null),
-        financialAnalyticsService.getMonthlyTrend(6).catch(() => []),
+        financialAnalyticsService.getMonthlyTrend(months).catch(() => []),
         financialAnalyticsService.getRevenueBySource().catch(() => []),
         expensesService.getStats().catch(() => null)
       ]);
@@ -402,7 +448,15 @@ export function BiOS() {
 
       setGymData(context);
 
-      const rollingMonths = getRollingMonths(6);
+      aiService.generatePredictiveInsights(context)
+        .then((insights) => {
+          if (insights.length > 0) {
+            setAiPredictions(insights);
+          }
+        })
+        .catch(() => {});
+
+      const rollingMonths = getRollingMonths(months);
       const liveRevenueChart = monthlyTrend.length > 0
         ? monthlyTrend.map((point) => ({
             month: point.month,
@@ -459,9 +513,123 @@ export function BiOS() {
   }, []);
 
   useEffect(() => {
-    loadRealData();
+    loadRealData(trendMonths);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBranchId]);
+  }, [activeBranchId, trendMonths]);
+
+  useEffect(() => {
+    biosService.getSettings()
+      .then((settings) => {
+        setMonthlyRevenueTarget(settings.monthly_revenue_target != null ? String(settings.monthly_revenue_target) : '');
+        setDailyCheckInTargetPercent(settings.daily_checkin_target_percent != null ? String(settings.daily_checkin_target_percent) : '33');
+        setAlertEnabled(settings.alert_enabled);
+        setAlertEmail(settings.alert_email || '');
+        setAlertRetentionThreshold(settings.alert_retention_threshold != null ? String(settings.alert_retention_threshold) : '80');
+        setScheduleEnabled(settings.schedule_enabled);
+        setScheduleEmail(settings.schedule_email || '');
+        setScheduleFrequency(settings.schedule_frequency || 'WEEKLY');
+        setRevenueAlertEnabled(!!settings.revenue_alert_enabled);
+        setRevenueAlertThresholdPercent(settings.revenue_alert_threshold_percent != null ? String(settings.revenue_alert_threshold_percent) : '90');
+        setBenchmarkRevenuePerMember(settings.benchmark_revenue_per_member != null ? String(settings.benchmark_revenue_per_member) : '');
+        setBenchmarkRetentionPercent(settings.benchmark_retention_percent != null ? String(settings.benchmark_retention_percent) : '');
+        setBenchmarkClassUtilizationPercent(settings.benchmark_class_utilization_percent != null ? String(settings.benchmark_class_utilization_percent) : '');
+        setBenchmarkStaffEfficiencyPercent(settings.benchmark_staff_efficiency_percent != null ? String(settings.benchmark_staff_efficiency_percent) : '');
+        setBenchmarkOperatingMarginPercent(settings.benchmark_operating_margin_percent != null ? String(settings.benchmark_operating_margin_percent) : '');
+      })
+      .catch(() => {});
+  }, []);
+
+  const loadActivityLogs = useCallback(() => {
+    biosService.getRecentActivity('REPORT', 20)
+      .then((entries) => {
+        setRecentReportsLog(entries.slice(0, 4));
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        setReportsThisMonth(entries.filter((e) => e.created_at && new Date(e.created_at) >= monthStart).length);
+      })
+      .catch(() => {});
+    biosService.getRecentActivity('EXPORT', 20)
+      .then((entries) => {
+        setRecentExportsLog(entries.slice(0, 4));
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - 7);
+        setExportsThisWeek(entries.filter((e) => e.created_at && new Date(e.created_at) >= weekStart).length);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadActivityLogs();
+  }, [loadActivityLogs]);
+
+  // Branch comparison only makes sense — and only returns cross-branch data —
+  // while viewing "All Branches" (see BiosController.getBranchComparison).
+  useEffect(() => {
+    if (!isAllBranches || accessibleBranches.length < 2) {
+      setBranchComparison([]);
+      return;
+    }
+    biosService.getBranchComparison().then(setBranchComparison).catch(() => setBranchComparison([]));
+  }, [isAllBranches, accessibleBranches.length]);
+
+  useEffect(() => {
+    const now = new Date();
+    staffService.getTargets(now.getFullYear(), now.getMonth() + 1, 'individual')
+      .then((targets) => {
+        const sorted = [...targets].sort((a, b) => (b.revenue_achieved || 0) - (a.revenue_achieved || 0));
+        setTopStaffTargets(sorted.slice(0, 5));
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveSettings = async () => {
+    if (alertEnabled && !alertEmail.trim()) {
+      toast.error('Enter an alert email first');
+      return;
+    }
+    if (scheduleEnabled && !scheduleEmail.trim()) {
+      toast.error('Enter a recipient email first');
+      return;
+    }
+    if (revenueAlertEnabled && !alertEmail.trim()) {
+      toast.error('Enter an alert email first (shared with retention alerts)');
+      return;
+    }
+    if (revenueAlertEnabled && !monthlyRevenueTarget.trim()) {
+      toast.error('Set a monthly revenue target first');
+      return;
+    }
+
+    setSavingSettings(true);
+    try {
+      const payload: Partial<BiosSettings> = {
+        monthly_revenue_target: monthlyRevenueTarget.trim() ? Number(monthlyRevenueTarget) : undefined,
+        daily_checkin_target_percent: dailyCheckInTargetPercent.trim() ? Number(dailyCheckInTargetPercent) : undefined,
+        alert_enabled: alertEnabled,
+        alert_email: alertEmail.trim() || undefined,
+        alert_retention_threshold: alertRetentionThreshold.trim() ? Number(alertRetentionThreshold) : undefined,
+        schedule_enabled: scheduleEnabled,
+        schedule_email: scheduleEmail.trim() || undefined,
+        schedule_frequency: scheduleFrequency,
+        revenue_alert_enabled: revenueAlertEnabled,
+        revenue_alert_threshold_percent: revenueAlertThresholdPercent.trim() ? Number(revenueAlertThresholdPercent) : undefined,
+        benchmark_revenue_per_member: benchmarkRevenuePerMember.trim() ? Number(benchmarkRevenuePerMember) : undefined,
+        benchmark_retention_percent: benchmarkRetentionPercent.trim() ? Number(benchmarkRetentionPercent) : undefined,
+        benchmark_class_utilization_percent: benchmarkClassUtilizationPercent.trim() ? Number(benchmarkClassUtilizationPercent) : undefined,
+        benchmark_staff_efficiency_percent: benchmarkStaffEfficiencyPercent.trim() ? Number(benchmarkStaffEfficiencyPercent) : undefined,
+        benchmark_operating_margin_percent: benchmarkOperatingMarginPercent.trim() ? Number(benchmarkOperatingMarginPercent) : undefined,
+      };
+      await biosService.updateSettings(payload);
+      toast.success('BiOS settings saved');
+      setSettingsOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save settings';
+      toast.error(message);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const handlePredict = async () => {
     if (!gymData) {
@@ -513,6 +681,8 @@ export function BiOS() {
   };
 
   const hasGymData = gymData !== null;
+  const monthlyRevenueTargetValue = monthlyRevenueTarget.trim() ? Number(monthlyRevenueTarget) : null;
+  const dailyCheckInTargetPercentValue = dailyCheckInTargetPercent.trim() ? Number(dailyCheckInTargetPercent) : 33;
   const totalRevenue = gymData?.totalRevenue ?? topKPIs.totalRevenue;
   const activeMembers = gymData?.activeMembers ?? topKPIs.activeMembers;
   const totalMembers = hasGymData ? gymData.totalMembers : topKPIs.activeMembers;
@@ -567,8 +737,12 @@ export function BiOS() {
     ? Number(clamp((avgSessionMinutes / 60) * 100, 0, 100).toFixed(1))
     : 0;
   const todayCheckInTarget = hasGymData
-    ? Math.max(1, Math.round((gymData.activeMembers || 1) * 0.33))
+    ? Math.max(1, Math.round((gymData.activeMembers || 1) * (dailyCheckInTargetPercentValue / 100)))
     : performanceMetrics[0].target;
+
+  const displayedRevenueChartData = monthlyRevenueTargetValue != null
+    ? revenueChartData.map((point) => ({ ...point, target: monthlyRevenueTargetValue }))
+    : revenueChartData;
 
   const livePerformanceMetrics: PerformanceMetricPoint[] = hasGymData
     ? [
@@ -640,37 +814,47 @@ export function BiOS() {
     ? (gymData.activeMembers > 0 ? Number((gymData.totalRevenue / gymData.activeMembers).toFixed(1)) : 0)
     : benchmarkData[0].value;
 
+  // The admin's own comparison targets (BiOS Configuration), falling back to
+  // DEFAULT_BENCHMARKS only until they've been set.
+  const currentBenchmarks = {
+    revenuePerMember: benchmarkRevenuePerMember.trim() ? Number(benchmarkRevenuePerMember) : DEFAULT_BENCHMARKS.revenuePerMember,
+    memberRetention: benchmarkRetentionPercent.trim() ? Number(benchmarkRetentionPercent) : DEFAULT_BENCHMARKS.memberRetention,
+    classUtilization: benchmarkClassUtilizationPercent.trim() ? Number(benchmarkClassUtilizationPercent) : DEFAULT_BENCHMARKS.classUtilization,
+    staffEfficiency: benchmarkStaffEfficiencyPercent.trim() ? Number(benchmarkStaffEfficiencyPercent) : DEFAULT_BENCHMARKS.staffEfficiency,
+    operatingMargin: benchmarkOperatingMarginPercent.trim() ? Number(benchmarkOperatingMarginPercent) : DEFAULT_BENCHMARKS.operatingMargin,
+  };
+
   const liveBenchmarks: BenchmarkPoint[] = hasGymData
     ? [
         {
           metric: 'Revenue per Member',
           value: revenuePerMember,
-          industry: INDUSTRY_BENCHMARKS.revenuePerMember,
-          performance: getBenchmarkPerformance(revenuePerMember, INDUSTRY_BENCHMARKS.revenuePerMember)
+          industry: currentBenchmarks.revenuePerMember,
+          performance: getBenchmarkPerformance(revenuePerMember, currentBenchmarks.revenuePerMember)
         },
         {
           metric: 'Member Retention',
           value: retentionRate,
-          industry: INDUSTRY_BENCHMARKS.memberRetention,
-          performance: getBenchmarkPerformance(retentionRate, INDUSTRY_BENCHMARKS.memberRetention)
+          industry: currentBenchmarks.memberRetention,
+          performance: getBenchmarkPerformance(retentionRate, currentBenchmarks.memberRetention)
         },
         {
           metric: 'Class Utilization',
           value: classOccupancy,
-          industry: INDUSTRY_BENCHMARKS.classUtilization,
-          performance: getBenchmarkPerformance(classOccupancy, INDUSTRY_BENCHMARKS.classUtilization)
+          industry: currentBenchmarks.classUtilization,
+          performance: getBenchmarkPerformance(classOccupancy, currentBenchmarks.classUtilization)
         },
         {
           metric: 'Staff Efficiency',
           value: sessionEfficiency,
-          industry: INDUSTRY_BENCHMARKS.staffEfficiency,
-          performance: getBenchmarkPerformance(sessionEfficiency, INDUSTRY_BENCHMARKS.staffEfficiency)
+          industry: currentBenchmarks.staffEfficiency,
+          performance: getBenchmarkPerformance(sessionEfficiency, currentBenchmarks.staffEfficiency)
         },
         {
           metric: 'Operating Margin',
           value: Number((gymData.profitMargin ?? 0).toFixed(1)),
-          industry: INDUSTRY_BENCHMARKS.operatingMargin,
-          performance: getBenchmarkPerformance(gymData.profitMargin ?? 0, INDUSTRY_BENCHMARKS.operatingMargin)
+          industry: currentBenchmarks.operatingMargin,
+          performance: getBenchmarkPerformance(gymData.profitMargin ?? 0, currentBenchmarks.operatingMargin)
         }
       ]
     : benchmarkData;
@@ -707,11 +891,280 @@ export function BiOS() {
       ? 'Good'
       : 'Needs Attention';
 
-  const displayExports = hasGymData
-    ? recentExports.map((exportItem, index) => (
-        index === 0 ? { ...exportItem, records: gymData.totalMembers } : exportItem
-      ))
-    : recentExports;
+  const formatRelativeTime = (iso?: string | null) => {
+    if (!iso) return 'Never';
+    const then = new Date(iso).getTime();
+    const diffMinutes = Math.max(0, Math.round((Date.now() - then) / 60000));
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    const diffDays = Math.round(diffHours / 24);
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  };
+
+  const handleGenerateReport = () => {
+    const dateLabel = new Date().toISOString().slice(0, 10);
+    const header = ['Metric', 'Value'];
+    const rows: Array<[string, string | number]> = [
+      ['Report Period', getCurrentPeriod()],
+      ['Total Revenue', totalRevenue],
+      ['Active Members', activeMembers],
+      ['Total Members', totalMembers],
+      ['Retention Rate (%)', retentionRate],
+      ['Monthly Revenue Growth (%)', revenueGrowthRate],
+      ['Member Growth (%)', memberGrowthRate],
+      ['Overall Health Score', overallHealthScore],
+      ...livePerformanceMetrics.map((metric) => [`${metric.metric} (current)`, metric.current] as [string, number]),
+      ...liveBenchmarks.map((benchmark) => [`${benchmark.metric} vs your target`, `${benchmark.value} vs ${benchmark.industry}`] as [string, string]),
+    ];
+    exportAsCsv(`bios-report_${dateLabel}.csv`, header, rows);
+    const title = `Business Summary — ${getCurrentPeriod()}`;
+    biosService.logActivity('REPORT', title, 'CSV', rows.length)
+      .then(loadActivityLogs)
+      .catch(() => {});
+    toast.success('Report generated');
+  };
+
+  const handleExportData = () => {
+    const dateLabel = new Date().toISOString().slice(0, 10);
+    const header = ['Category', 'Item', 'Value'];
+    const rows: Array<[string, string, string | number]> = [
+      ...revenueSourceData.map((source) => ['Revenue by Source', source.source, source.amount] as [string, string, number]),
+      ...revenueChartData.map((point) => ['Monthly Revenue', point.month, point.revenue] as [string, string, number]),
+      ...memberChartData.map((point) => ['Monthly Members', point.month, point.members] as [string, string, number]),
+      ...displayMemberSegments.map((segment) => ['Member Segment', segment.segment, segment.count] as [string, string, number]),
+    ];
+    exportAsCsv(`bios-data-export_${dateLabel}.csv`, header, rows);
+    biosService.logActivity('EXPORT', 'Full Data Export', 'CSV', rows.length)
+      .then(loadActivityLogs)
+      .catch(() => {});
+    toast.success('Data export started');
+  };
+
+  const showExecutiveDetails = () => {
+    setDetailsDialog({
+      title: 'Executive Dashboard',
+      description: `Business health summary for ${getCurrentPeriod()}`,
+      content: (
+        <div className="space-y-4">
+          <DetailRows
+            rows={[
+              { label: 'Revenue Growth', value: formatSignedPercent(revenueGrowthRate) },
+              { label: 'Member Growth', value: formatSignedPercent(memberGrowthRate) },
+              { label: 'Profit Margin', value: `${hasGymData ? gymData.profitMargin.toFixed(1) : '23.8'}%` },
+              { label: 'Overall Health Score', value: `${overallHealthScore}% (${overallHealthLabel})` }
+            ]}
+          />
+          <DetailTable
+            columns={['Month', 'Revenue', 'Target']}
+            rows={displayedRevenueChartData.map((point) => [point.month, formatCurrency(point.revenue), formatCurrency(point.target)])}
+          />
+          {topStaffTargets.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-2">Top Staff by Revenue This Month</h4>
+              <DetailTable
+                columns={['Staff', 'Revenue Achieved', 'Target', 'Progress']}
+                rows={topStaffTargets.map((t) => [
+                  t.staff_name || 'Unknown',
+                  formatCurrency(t.revenue_achieved || 0),
+                  formatCurrency(t.revenue_target || 0),
+                  `${t.percentage || 0}%`
+                ])}
+              />
+            </div>
+          )}
+        </div>
+      )
+    });
+  };
+
+  const showBiDetails = () => {
+    setDetailsDialog({
+      title: 'Business Intelligence',
+      description: hasGymData ? 'Live insights from connected data sources' : 'Sample insights — connect data to see live figures',
+      content: (
+        <div className="space-y-4">
+          <DetailRows
+            rows={[
+              { label: 'Data Sources', value: `${dataSourceCount} Active` },
+              { label: 'Peak Hour', value: hasGymData ? topPeakHour : 'N/A' },
+              { label: 'Check-ins Today', value: todayCheckIns },
+              { label: 'Net Income', value: hasGymData ? formatCurrency(gymData.netIncome) : '-' },
+              { label: 'Profit Margin', value: `${hasGymData ? gymData.profitMargin.toFixed(1) : '23.8'}%` }
+            ]}
+          />
+          {hasGymData && sortedPeakHours.length > 0 && (
+            <DetailTable
+              columns={['Hour', 'Check-ins']}
+              rows={sortedPeakHours.map(([hour, count]) => [hour, count])}
+            />
+          )}
+        </div>
+      )
+    });
+  };
+
+  const showPerformanceDetails = () => {
+    setDetailsDialog({
+      title: 'Performance Metrics',
+      description: `Overall performance score: ${performanceScore}%`,
+      content: (
+        <DetailTable
+          columns={['Metric', 'Current', 'Target', 'Change']}
+          rows={livePerformanceMetrics.map((metric) => [
+            metric.metric,
+            metric.current,
+            metric.target,
+            <span className={metric.trend === 'up' ? 'text-green-600' : metric.trend === 'down' ? 'text-red-600' : 'text-gray-600'}>
+              {formatSignedPercent(metric.change)}
+            </span>
+          ])}
+        />
+      )
+    });
+  };
+
+  const showPredictionsAllDetails = () => {
+    setDetailsDialog({
+      title: 'AI Predictions',
+      description: `Confidence average: ${confidenceAverage}%`,
+      content: (
+        <DetailTable
+          columns={['Insight', 'Prediction', 'Confidence', 'Timeframe', 'Priority']}
+          rows={aiPredictions.map((insight) => [
+            insight.insight,
+            insight.prediction,
+            `${insight.confidence}%`,
+            insight.timeframe,
+            insight.priority
+          ])}
+        />
+      )
+    });
+  };
+
+  const showRevenueBreakdownDetails = () => {
+    setDetailsDialog({
+      title: 'Revenue Breakdown',
+      description: `Total revenue: ${formatCurrency(totalRevenue)}`,
+      content: (
+        <DetailTable
+          columns={['Source', 'Amount', 'Share']}
+          rows={revenueSourceData.map((source) => [source.source, formatCurrency(source.amount), `${source.percentage}%`])}
+        />
+      )
+    });
+  };
+
+  const showRevenueTrendsDetails = () => {
+    setDetailsDialog({
+      title: 'Revenue vs Target Trends',
+      description: `Growth rate: ${formatSignedPercent(revenueGrowthRate)}`,
+      content: (
+        <DetailTable
+          columns={['Month', 'Revenue', 'Target']}
+          rows={displayedRevenueChartData.map((point) => [point.month, formatCurrency(point.revenue), formatCurrency(point.target)])}
+        />
+      )
+    });
+  };
+
+  const showMemberSegmentDetails = () => {
+    const fullSegments = hasGymData
+      ? Object.entries(gymData.membershipTypes)
+          .sort((first, second) => second[1] - first[1])
+          .map(([type, count]) => ({
+            segment: formatSegmentLabel(type),
+            count,
+            percentage: gymData.totalMembers > 0 ? Math.round((count / gymData.totalMembers) * 100) : 0
+          }))
+      : memberAnalytics.map((segment) => ({
+          segment: segment.segment,
+          count: segment.count,
+          percentage: Math.round((segment.count / topKPIs.activeMembers) * 100)
+        }));
+
+    setDetailsDialog({
+      title: 'Member Segments',
+      description: `${totalMembers.toLocaleString()} total members`,
+      content: (
+        <DetailTable
+          columns={['Segment', 'Members', 'Share']}
+          rows={fullSegments.map((segment) => [segment.segment, segment.count, `${segment.percentage}%`])}
+        />
+      )
+    });
+  };
+
+  const showMemberRetentionDetails = () => {
+    setDetailsDialog({
+      title: 'Member Growth & Retention',
+      description: `Retention rate: ${retentionRate}% (${formatSignedPercent(retentionDelta)} vs last month)`,
+      content: (
+        <DetailTable
+          columns={['Month', 'Members', 'Retention', 'Churn']}
+          rows={memberChartData.map((point) => [point.month, point.members, `${point.retention}%`, `${point.churn}%`])}
+        />
+      )
+    });
+  };
+
+  const showReportsAllDetails = () => {
+    setDetailsDialog({
+      title: 'Operational Reports',
+      description: recentReportsLog.length > 0 ? 'Recently generated reports' : 'No reports generated yet',
+      content: recentReportsLog.length > 0 ? (
+        <DetailTable
+          columns={['Report', 'Format', 'Generated By', 'Generated At']}
+          rows={recentReportsLog.map((report) => [report.title, report.format, report.generated_by || 'Unknown', formatRelativeTime(report.created_at)])}
+        />
+      ) : (
+        <p className="text-sm text-gray-500">Click "Generate" to create your first report.</p>
+      )
+    });
+  };
+
+  const showBenchmarkDetails = () => {
+    setDetailsDialog({
+      title: 'Your Benchmarks',
+      description: `${benchmarkBadgeText} — compared against the targets you set in BiOS Configuration, not external industry data`,
+      content: (
+        <DetailTable
+          columns={['Metric', 'Your Value', 'Your Target', 'Performance']}
+          rows={liveBenchmarks.map((benchmark) => [
+            benchmark.metric,
+            benchmark.metric.includes('Revenue') ? formatCurrency(benchmark.value) : `${benchmark.value}%`,
+            benchmark.metric.includes('Revenue') ? formatCurrency(benchmark.industry) : `${benchmark.industry}%`,
+            <span className={getPerformanceColor(benchmark.performance)}>{benchmark.performance}</span>
+          ])}
+        />
+      )
+    });
+  };
+
+  const showFilterOptions = () => {
+    setDetailsDialog({
+      title: 'Filter Trend Period',
+      description: 'Choose how many months of trend data to display',
+      content: (
+        <div className="flex gap-3">
+          {[3, 6, 12].map((months) => (
+            <Button
+              key={months}
+              variant={trendMonths === months ? 'default' : 'outline'}
+              onClick={() => {
+                setTrendMonths(months);
+                setDetailsDialog(null);
+              }}
+            >
+              {months} Months
+            </Button>
+          ))}
+        </div>
+      )
+    });
+  };
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -724,20 +1177,31 @@ export function BiOS() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={showFilterOptions}>
             <Filter className="h-4 w-4 mr-2" />
             Filter
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleGenerateReport}>
             <Download className="h-4 w-4 mr-2" />
             Export Dashboard
           </Button>
-          <Button variant="outline" size="sm" onClick={loadRealData} disabled={dataLoading}>
+          <Button variant="outline" size="sm" onClick={() => loadRealData(trendMonths)} disabled={dataLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${dataLoading ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
         </div>
       </div>
+
+      {/* Executive Summary — a short rule-based narrative from real numbers (no
+          external AI API required; works the same with or without VITE_CLAUDE_API_KEY). */}
+      {hasGymData && (
+        <Card className="bg-white border-0 shadow-sm border-l-4 border-l-purple-500">
+          <CardContent className="p-4 flex items-start space-x-3">
+            <Brain className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-gray-700">{aiService.generateExecutiveSummary(gymData)}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top-Level KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -840,7 +1304,7 @@ export function BiOS() {
                 <Monitor className="h-5 w-5 text-blue-600" />
                 <CardTitle>Executive Dashboard</CardTitle>
               </div>
-              <Button variant="outline" size="sm">View Details</Button>
+              <Button variant="outline" size="sm" onClick={showExecutiveDetails}>View Details</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -864,11 +1328,11 @@ export function BiOS() {
               <Progress value={overallHealthScore} className="h-2" />
               <p className="text-xs text-gray-500">Overall business health: {overallHealthLabel}</p>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={handleGenerateReport}>
                   <BarChart3 className="h-4 w-4 mr-1" />
                   KPI Report
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={handleGenerateReport}>
                   <Download className="h-4 w-4 mr-1" />
                   Export
                 </Button>
@@ -885,7 +1349,7 @@ export function BiOS() {
                 <Brain className="h-5 w-5 text-purple-600" />
                 <CardTitle>Business Intelligence</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Analyze</Button>
+              <Button variant="outline" size="sm" onClick={showBiDetails}>Analyze</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -917,11 +1381,11 @@ export function BiOS() {
                 </div>
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={showBiDetails}>
                   <Eye className="h-4 w-4 mr-1" />
                   View Insights
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
                   <Settings className="h-4 w-4 mr-1" />
                   Configure
                 </Button>
@@ -938,7 +1402,7 @@ export function BiOS() {
                 <Gauge className="h-5 w-5 text-green-600" />
                 <CardTitle>Performance Metrics</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Monitor</Button>
+              <Button variant="outline" size="sm" onClick={showPerformanceDetails}>Monitor</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -960,11 +1424,11 @@ export function BiOS() {
                 <Progress value={performanceScore} className="h-2" />
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={showPerformanceDetails}>
                   <Activity className="h-4 w-4 mr-1" />
                   Live View
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
                   <Calendar className="h-4 w-4 mr-1" />
                   Schedule
                 </Button>
@@ -1006,11 +1470,11 @@ export function BiOS() {
               </div>
               <Progress value={confidenceAverage} className="h-2" />
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
                   <Zap className="h-4 w-4 mr-1" />
                   Auto-Alert
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={showPredictionsAllDetails}>
                   <Eye className="h-4 w-4 mr-1" />
                   View All
                 </Button>
@@ -1027,7 +1491,7 @@ export function BiOS() {
                 <DollarSign className="h-5 w-5 text-green-600" />
                 <CardTitle>Revenue Analytics</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Analyze</Button>
+              <Button variant="outline" size="sm" onClick={showRevenueBreakdownDetails}>Analyze</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1058,11 +1522,11 @@ export function BiOS() {
                 </div>
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={showRevenueBreakdownDetails}>
                   <PieChartIcon className="h-4 w-4 mr-1" />
                   Breakdown
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={showRevenueTrendsDetails}>
                   <TrendingUp className="h-4 w-4 mr-1" />
                   Trends
                 </Button>
@@ -1079,7 +1543,7 @@ export function BiOS() {
                 <Users className="h-5 w-5 text-blue-600" />
                 <CardTitle>Member Analytics</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Segment</Button>
+              <Button variant="outline" size="sm" onClick={showMemberSegmentDetails}>Segment</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1101,11 +1565,11 @@ export function BiOS() {
                 ))}
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={showMemberSegmentDetails}>
                   <UsersIcon className="h-4 w-4 mr-1" />
                   Segments
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={showMemberRetentionDetails}>
                   <Target className="h-4 w-4 mr-1" />
                   Retention
                 </Button>
@@ -1122,33 +1586,35 @@ export function BiOS() {
                 <Activity className="h-5 w-5 text-cyan-600" />
                 <CardTitle>Operational Reports</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Generate</Button>
+              <Button variant="outline" size="sm" onClick={handleGenerateReport}>Generate</Button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Reports Generated</span>
-                <span className="font-semibold">24 this month</span>
+                <span className="font-semibold">{reportsThisMonth} this month</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Last Generated</span>
-                <span className="text-sm">2 hours ago</span>
+                <span className="text-sm">{formatRelativeTime(recentReportsLog[0]?.created_at)}</span>
               </div>
               <div className="space-y-2">
-                {recentReports.slice(0, 2).map((report, index) => (
+                {recentReportsLog.length === 0 ? (
+                  <p className="text-xs text-gray-500">No reports generated yet.</p>
+                ) : recentReportsLog.slice(0, 2).map((report, index) => (
                   <div key={index} className="text-sm p-2 bg-cyan-50 rounded">
-                    <div className="font-medium text-cyan-800">{report.report}</div>
-                    <div className="text-cyan-600 text-xs">{report.type} • {report.downloads} downloads</div>
+                    <div className="font-medium text-cyan-800">{report.title}</div>
+                    <div className="text-cyan-600 text-xs">{report.format} • {formatRelativeTime(report.created_at)}</div>
                   </div>
                 ))}
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={showReportsAllDetails}>
                   <FileText className="h-4 w-4 mr-1" />
                   View All
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={handleGenerateReport}>
                   <Download className="h-4 w-4 mr-1" />
                   Download
                 </Button>
@@ -1165,13 +1631,13 @@ export function BiOS() {
                 <Target className="h-5 w-5 text-red-600" />
                 <CardTitle>Benchmarking</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Compare</Button>
+              <Button variant="outline" size="sm" onClick={showBenchmarkDetails}>Compare</Button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Industry Comparison</span>
+                <span className="text-sm text-gray-600">vs Your Targets</span>
                 <Badge className={benchmarkBadgeClass}>{benchmarkBadgeText}</Badge>
               </div>
               <div className="space-y-2">
@@ -1198,13 +1664,13 @@ export function BiOS() {
                 ))}
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={showBenchmarkDetails}>
                   <BarChart3 className="h-4 w-4 mr-1" />
                   Full Report
                 </Button>
-                <Button variant="ghost" size="sm">
-                  <Globe className="h-4 w-4 mr-1" />
-                  Industry
+                <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
+                  <Settings className="h-4 w-4 mr-1" />
+                  Set Targets
                 </Button>
               </div>
             </div>
@@ -1219,33 +1685,35 @@ export function BiOS() {
                 <Download className="h-5 w-5 text-gray-600" />
                 <CardTitle>Data Export</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Export</Button>
+              <Button variant="outline" size="sm" onClick={handleExportData}>Export</Button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Recent Exports</span>
-                <span className="font-semibold">3 this week</span>
+                <span className="font-semibold">{exportsThisWeek} this week</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Total Records</span>
                 <span className="font-semibold">{hasGymData ? gymData.totalMembers.toLocaleString() : '2,417'}</span>
               </div>
               <div className="space-y-2">
-                {displayExports.slice(0, 2).map((export_, index) => (
+                {recentExportsLog.length === 0 ? (
+                  <p className="text-xs text-gray-500">No exports yet.</p>
+                ) : recentExportsLog.slice(0, 2).map((export_, index) => (
                   <div key={index} className="text-sm p-2 bg-gray-50 rounded">
-                    <div className="font-medium text-gray-800">{export_.dataset}</div>
-                    <div className="text-gray-600 text-xs">{export_.format} • {export_.size} • {export_.records} records</div>
+                    <div className="font-medium text-gray-800">{export_.title}</div>
+                    <div className="text-gray-600 text-xs">{export_.format} • {export_.row_count ?? 0} records • {formatRelativeTime(export_.created_at)}</div>
                   </div>
                 ))}
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={handleExportData}>
                   <FileSpreadsheet className="h-4 w-4 mr-1" />
                   Quick Export
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
                   <Settings className="h-4 w-4 mr-1" />
                   Configure
                 </Button>
@@ -1268,7 +1736,7 @@ export function BiOS() {
                 </CardTitle>
                 <CardDescription>Monthly performance against targets</CardDescription>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={showRevenueTrendsDetails}>
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </Button>
@@ -1276,7 +1744,7 @@ export function BiOS() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={revenueChartData}>
+              <LineChart data={displayedRevenueChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -1298,9 +1766,9 @@ export function BiOS() {
                   <Users className="h-5 w-5 text-blue-600" />
                   <span>Member Growth & Retention</span>
                 </CardTitle>
-                <CardDescription>Member metrics over the last 6 months</CardDescription>
+                <CardDescription>Member metrics over the last {trendMonths} months</CardDescription>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={showMemberRetentionDetails}>
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </Button>
@@ -1322,6 +1790,43 @@ export function BiOS() {
         </Card>
       </div>
 
+      {/* Branch Comparison — only fetched/shown while viewing "All Branches" */}
+      {branchComparison.length > 0 && (
+        <Card className="bg-white border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Building2 className="h-5 w-5 text-indigo-600" />
+              <span>Branch Comparison</span>
+            </CardTitle>
+            <CardDescription>Current-month snapshot across all branches</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Branch</TableHead>
+                  <TableHead>Total Members</TableHead>
+                  <TableHead>Active Members</TableHead>
+                  <TableHead>Retention</TableHead>
+                  <TableHead>Revenue (Month)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {branchComparison.map((row) => (
+                  <TableRow key={row.branch_id}>
+                    <TableCell className="font-medium">{row.branch_name} <span className="text-gray-400 text-xs">({row.branch_code})</span></TableCell>
+                    <TableCell>{row.total_members.toLocaleString()}</TableCell>
+                    <TableCell>{row.active_members.toLocaleString()}</TableCell>
+                    <TableCell>{row.retention_percent}%</TableCell>
+                    <TableCell>{formatCurrency(row.month_revenue)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick Actions Section */}
       <Card className="bg-white border-0 shadow-sm">
         <CardHeader>
@@ -1332,33 +1837,254 @@ export function BiOS() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <Button variant="outline" className="h-16 flex-col space-y-1">
+            <Button variant="outline" className="h-16 flex-col space-y-1" onClick={handleGenerateReport}>
               <FileBarChart className="h-6 w-6" />
               <span className="text-xs">Generate Report</span>
             </Button>
-            <Button variant="outline" className="h-16 flex-col space-y-1">
+            <Button variant="outline" className="h-16 flex-col space-y-1" onClick={handleExportData}>
               <Download className="h-6 w-6" />
               <span className="text-xs">Export Data</span>
             </Button>
-            <Button variant="outline" className="h-16 flex-col space-y-1">
+            <Button variant="outline" className="h-16 flex-col space-y-1" onClick={() => setSettingsOpen(true)}>
               <Target className="h-6 w-6" />
               <span className="text-xs">Set Targets</span>
             </Button>
-            <Button variant="outline" className="h-16 flex-col space-y-1">
+            <Button variant="outline" className="h-16 flex-col space-y-1" onClick={() => setSettingsOpen(true)}>
               <CalendarIcon className="h-6 w-6" />
               <span className="text-xs">Schedule Report</span>
             </Button>
-            <Button variant="outline" className="h-16 flex-col space-y-1">
+            <Button variant="outline" className="h-16 flex-col space-y-1" onClick={() => setSettingsOpen(true)}>
               <Bell className="h-6 w-6" />
               <span className="text-xs">Set Alerts</span>
             </Button>
-            <Button variant="outline" className="h-16 flex-col space-y-1">
+            <Button variant="outline" className="h-16 flex-col space-y-1" onClick={() => setSettingsOpen(true)}>
               <Settings className="h-6 w-6" />
               <span className="text-xs">Configure</span>
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* BiOS Configuration Dialog — backs Set Targets / Schedule Report / Set Alerts / Configure */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Settings className="h-5 w-5 text-purple-600" />
+              <span>BiOS Configuration</span>
+            </DialogTitle>
+            <DialogDescription>
+              Set performance targets, alerts, scheduled report delivery, and your comparison benchmarks.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs defaultValue="targets" className="py-2">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="targets">Targets</TabsTrigger>
+              <TabsTrigger value="alerts">Alerts</TabsTrigger>
+              <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="benchmarks">Benchmarks</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="targets" className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="bios-revenue-target">Monthly Revenue Target</Label>
+                <Input
+                  id="bios-revenue-target"
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 120000"
+                  value={monthlyRevenueTarget}
+                  onChange={(e) => setMonthlyRevenueTarget(e.target.value)}
+                  disabled={savingSettings}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bios-checkin-target">Daily Check-in Target (% of active members)</Label>
+                <Input
+                  id="bios-checkin-target"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={dailyCheckInTargetPercent}
+                  onChange={(e) => setDailyCheckInTargetPercent(e.target.value)}
+                  disabled={savingSettings}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="alerts" className="space-y-6 pt-4">
+              <div className="space-y-3 p-4 rounded-lg border bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900">Retention Alerts</h4>
+                  <Switch checked={alertEnabled} onCheckedChange={setAlertEnabled} disabled={savingSettings} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bios-alert-email">Alert Email</Label>
+                  <Input
+                    id="bios-alert-email"
+                    type="email"
+                    placeholder="manager@example.com"
+                    value={alertEmail}
+                    onChange={(e) => setAlertEmail(e.target.value)}
+                    disabled={savingSettings}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bios-alert-threshold">Alert if retention falls below (%)</Label>
+                  <Input
+                    id="bios-alert-threshold"
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={alertRetentionThreshold}
+                    onChange={(e) => setAlertRetentionThreshold(e.target.value)}
+                    disabled={savingSettings}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3 p-4 rounded-lg border bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900">Revenue Shortfall Alert</h4>
+                  <Switch checked={revenueAlertEnabled} onCheckedChange={setRevenueAlertEnabled} disabled={savingSettings} />
+                </div>
+                <p className="text-xs text-gray-500">Uses the alert email above. Requires a monthly revenue target (set under the Targets tab).</p>
+                <div className="space-y-2">
+                  <Label htmlFor="bios-revenue-alert-threshold">Alert if projected month-end revenue falls below (% of target)</Label>
+                  <Input
+                    id="bios-revenue-alert-threshold"
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={revenueAlertThresholdPercent}
+                    onChange={(e) => setRevenueAlertThresholdPercent(e.target.value)}
+                    disabled={savingSettings}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="reports" className="space-y-4 pt-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-gray-900">Scheduled Reports</h4>
+                <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} disabled={savingSettings} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bios-schedule-email">Recipient Email</Label>
+                <Input
+                  id="bios-schedule-email"
+                  type="email"
+                  placeholder="manager@example.com"
+                  value={scheduleEmail}
+                  onChange={(e) => setScheduleEmail(e.target.value)}
+                  disabled={savingSettings}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Frequency</Label>
+                <Select value={scheduleFrequency} onValueChange={setScheduleFrequency} disabled={savingSettings}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="WEEKLY">Weekly (every Monday)</SelectItem>
+                    <SelectItem value="MONTHLY">Monthly (1st of month)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="benchmarks" className="space-y-4 pt-4">
+              <p className="text-xs text-gray-500">
+                Your own comparison targets for the Benchmarking card — not sourced from any external industry data.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bios-bm-revenue">Revenue / Member ({currencyCode})</Label>
+                  <Input
+                    id="bios-bm-revenue"
+                    type="number"
+                    min="0"
+                    value={benchmarkRevenuePerMember}
+                    onChange={(e) => setBenchmarkRevenuePerMember(e.target.value)}
+                    disabled={savingSettings}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bios-bm-retention">Retention (%)</Label>
+                  <Input
+                    id="bios-bm-retention"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={benchmarkRetentionPercent}
+                    onChange={(e) => setBenchmarkRetentionPercent(e.target.value)}
+                    disabled={savingSettings}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bios-bm-class">Class Utilization (%)</Label>
+                  <Input
+                    id="bios-bm-class"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={benchmarkClassUtilizationPercent}
+                    onChange={(e) => setBenchmarkClassUtilizationPercent(e.target.value)}
+                    disabled={savingSettings}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bios-bm-staff">Staff Efficiency (%)</Label>
+                  <Input
+                    id="bios-bm-staff"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={benchmarkStaffEfficiencyPercent}
+                    onChange={(e) => setBenchmarkStaffEfficiencyPercent(e.target.value)}
+                    disabled={savingSettings}
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="bios-bm-margin">Operating Margin (%)</Label>
+                  <Input
+                    id="bios-bm-margin"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={benchmarkOperatingMarginPercent}
+                    onChange={(e) => setBenchmarkOperatingMarginPercent(e.target.value)}
+                    disabled={savingSettings}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSettingsOpen(false)} disabled={savingSettings}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSettings} disabled={savingSettings}>
+              {savingSettings ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Save Settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generic detail viewer — backs the View Details / Analyze / Monitor / Compare / etc. buttons */}
+      <Dialog open={detailsDialog !== null} onOpenChange={(open) => { if (!open) setDetailsDialog(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{detailsDialog?.title}</DialogTitle>
+            {detailsDialog?.description && <DialogDescription>{detailsDialog.description}</DialogDescription>}
+          </DialogHeader>
+          <div className="py-2">{detailsDialog?.content}</div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

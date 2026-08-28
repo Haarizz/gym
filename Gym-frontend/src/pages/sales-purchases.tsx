@@ -6,7 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { ShoppingCart, Package, CreditCard, TrendingUp, Filter, Download, RefreshCw } from 'lucide-react';
+import { ShoppingCart, Package, TrendingUp, TrendingDown, CreditCard, Filter, Download, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { receiptsService, Receipt } from '../utils/supabase/receipts-service';
 import { purchaseService, PurchaseOrder } from '../utils/supabase/purchase-service';
@@ -60,17 +60,42 @@ export function SalesPurchases() {
     });
   }, [receipts, purchaseOrders]);
 
-  // KPIs for current month
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthKey = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+  const pctChange = (curr: number, prev: number) => {
+    if (prev === 0) return curr > 0 ? 100 : 0;
+    return Math.round(((curr - prev) / Math.abs(prev)) * 100);
+  };
+
+  // KPIs for current month (with month-over-month change)
   const kpis = useMemo(() => {
     const monthReceipts = receipts.filter(r => (r.transaction_date || '').split('T')[0].startsWith(currentMonthKey));
+    const prevMonthReceipts = receipts.filter(r => (r.transaction_date || '').split('T')[0].startsWith(prevMonthKey));
     const monthlySales = monthReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const prevMonthlySales = prevMonthReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+
     const monthlyPurchases = purchaseOrders
       .filter(po => (po.orderDate || '').split('T')[0].startsWith(currentMonthKey))
       .reduce((s, po) => s + (Number(po.totalAmount) || 0), 0);
+    const prevMonthlyPurchases = purchaseOrders
+      .filter(po => (po.orderDate || '').split('T')[0].startsWith(prevMonthKey))
+      .reduce((s, po) => s + (Number(po.totalAmount) || 0), 0);
+
     const grossProfit = monthlySales - monthlyPurchases;
+    const prevGrossProfit = prevMonthlySales - prevMonthlyPurchases;
+
     const avgTransaction = monthReceipts.length > 0 ? monthlySales / monthReceipts.length : 0;
-    return { monthlySales, monthlyPurchases, grossProfit, avgTransaction };
-  }, [receipts, purchaseOrders, currentMonthKey]);
+    const prevAvgTransaction = prevMonthReceipts.length > 0 ? prevMonthlySales / prevMonthReceipts.length : 0;
+
+    return {
+      monthlySales, monthlyPurchases, grossProfit, avgTransaction,
+      salesChange: pctChange(monthlySales, prevMonthlySales),
+      purchasesChange: pctChange(monthlyPurchases, prevMonthlyPurchases),
+      profitChange: pctChange(grossProfit, prevGrossProfit),
+      avgChange: pctChange(avgTransaction, prevAvgTransaction),
+    };
+  }, [receipts, purchaseOrders, currentMonthKey, prevMonthKey]);
 
   // Recent sales (latest 20 receipts sorted by date)
   const recentSales = useMemo(() => {
@@ -95,6 +120,20 @@ export function SalesPurchases() {
     return 'bg-gray-100 text-gray-800';
   };
 
+  const renderTrend = (change: number) => (
+    <div className="flex items-center mt-1">
+      {change >= 0 ? (
+        <TrendingUp className="h-3.5 w-3.5 text-green-500 mr-1" />
+      ) : (
+        <TrendingDown className="h-3.5 w-3.5 text-red-500 mr-1" />
+      )}
+      <span className={`text-xs font-medium ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        {change >= 0 ? '+' : ''}{change}%
+      </span>
+      <span className="text-xs text-muted-foreground ml-1">vs last month</span>
+    </div>
+  );
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -103,76 +142,94 @@ export function SalesPurchases() {
           <p className="text-muted-foreground">Real-time sales transactions and purchase orders.</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={loadData} disabled={loading}>
+          <Button variant="outline" size="sm" className="h-9" onClick={loadData} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" size="sm" className="h-9">
             <Filter className="mr-2 h-4 w-4" />
             Filter
           </Button>
         </div>
       </div>
 
+      <style>{`
+        @keyframes salesPurchasesFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .sales-purchases-panel {
+          animation: salesPurchasesFadeIn 0.22s ease-out;
+        }
+      `}</style>
+
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sales-purchases-panel">
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Sales</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Monthly Sales</CardTitle>
+            <div className="bg-green-50 p-2 rounded-lg">
+              <ShoppingCart className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold"><CurrencyGlyph /> {Math.round(kpis.monthlySales).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">This month</p>
+            <div className="text-2xl font-bold text-green-700"><CurrencyGlyph /> {Math.round(kpis.monthlySales).toLocaleString()}</div>
+            {loading ? <p className="text-xs text-muted-foreground mt-1">This month</p> : renderTrend(kpis.salesChange)}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Total Purchases</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Package className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold"><CurrencyGlyph /> {Math.round(kpis.monthlyPurchases).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Purchase orders this month</p>
+            <div className="text-2xl font-bold text-blue-700"><CurrencyGlyph /> {Math.round(kpis.monthlyPurchases).toLocaleString()}</div>
+            {loading ? <p className="text-xs text-muted-foreground mt-1">Purchase orders this month</p> : renderTrend(kpis.purchasesChange)}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gross Profit</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Gross Profit</CardTitle>
+            <div className={`p-2 rounded-lg ${kpis.grossProfit >= 0 ? 'bg-purple-50' : 'bg-red-50'}`}>
+              <TrendingUp className={`h-4 w-4 ${kpis.grossProfit >= 0 ? 'text-purple-600' : 'text-red-600'}`} />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${kpis.grossProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+            <div className={`text-2xl font-bold ${kpis.grossProfit >= 0 ? 'text-purple-700' : 'text-red-700'}`}>
               <CurrencyGlyph /> {Math.round(kpis.grossProfit).toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">Sales minus purchases</p>
+            {loading ? <p className="text-xs text-muted-foreground mt-1">Sales minus purchases</p> : renderTrend(kpis.profitChange)}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Transaction</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-primary">Avg. Transaction</CardTitle>
+            <div className="bg-amber-50 p-2 rounded-lg">
+              <CreditCard className="h-4 w-4 text-amber-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold"><CurrencyGlyph /> {Math.round(kpis.avgTransaction).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Per receipt this month</p>
+            <div className="text-2xl font-bold text-amber-700"><CurrencyGlyph /> {Math.round(kpis.avgTransaction).toLocaleString()}</div>
+            {loading ? <p className="text-xs text-muted-foreground mt-1">Per receipt this month</p> : renderTrend(kpis.avgChange)}
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="sales">Sales</TabsTrigger>
-          <TabsTrigger value="purchases">Purchases</TabsTrigger>
+      <Tabs defaultValue="overview" className="space-y-6 sales-purchases-panel">
+        <TabsList className="w-full flex">
+          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+          <TabsTrigger value="sales" className="flex-1">Sales</TabsTrigger>
+          <TabsTrigger value="purchases" className="flex-1">Purchases</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-6 sales-purchases-panel">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Sales vs Purchases</CardTitle>
                 <CardDescription>Monthly comparison over the last 6 months</CardDescription>
@@ -192,7 +249,7 @@ export function SalesPurchases() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle>Profit Trend</CardTitle>
                 <CardDescription>Net profit over the last 6 months</CardDescription>
@@ -212,8 +269,8 @@ export function SalesPurchases() {
           </div>
         </TabsContent>
 
-        <TabsContent value="sales" className="space-y-6">
-          <Card>
+        <TabsContent value="sales" className="space-y-6 sales-purchases-panel">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -265,8 +322,8 @@ export function SalesPurchases() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="purchases" className="space-y-6">
-          <Card>
+        <TabsContent value="purchases" className="space-y-6 sales-purchases-panel">
+          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>

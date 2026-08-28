@@ -284,7 +284,7 @@ public class MobileStaffLedgerService {
         // Fetch configured commission rule for staff role
         BigDecimal commissionRate = new BigDecimal("0.05"); // Default 5%
         if (staff.getRole() != null) {
-            Optional<CommissionRule> ruleOpt = commissionRuleRepository.findByRole(staff.getRole());
+            Optional<CommissionRule> ruleOpt = commissionRuleRepository.findByRoleIgnoreCase(staff.getRole());
             if (ruleOpt.isPresent() && ruleOpt.get().getBaseCommission() != null && ruleOpt.get().getBaseCommission().compareTo(BigDecimal.ZERO) > 0) {
                 commissionRate = ruleOpt.get().getBaseCommission().divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
             }
@@ -368,7 +368,7 @@ public class MobileStaffLedgerService {
     private List<CommissionStructureItemDTO> computeCommissionStructure(Staff staff) {
         List<CommissionStructureItemDTO> items = new ArrayList<>();
         Optional<CommissionRule> ruleOpt = staff.getRole() != null
-                ? commissionRuleRepository.findByRole(staff.getRole())
+                ? commissionRuleRepository.findByRoleIgnoreCase(staff.getRole())
                 : Optional.empty();
 
         if (ruleOpt.isPresent() && ruleOpt.get().getBaseCommission() != null) {

@@ -70,6 +70,9 @@ export interface WalkInCheckInRequest {
   payment_breakdown?: PaymentSplitLeg[];
   device_id?: string;
   notes?: string;
+  // Which staff member actually handled this walk-in — credited toward their
+  // revenue target regardless of which account is logged in.
+  processed_by_staff_id?: number;
 }
 
 // ── Service ──────────────────────────────────────────────────────────────────

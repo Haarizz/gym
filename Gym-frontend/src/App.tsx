@@ -1238,37 +1238,48 @@ export default function App() {
                     {item.title}
                     {item.subItems && (
                       <div className="ml-auto">
-                        {expandedItems.includes(item.id) ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
+                        <ChevronRight
+                          className="h-4 w-4"
+                          style={{
+                            transform: expandedItems.includes(item.id) ? 'rotate(90deg)' : 'rotate(0deg)',
+                            transition: 'transform 0.25s ease',
+                          }}
+                        />
                       </div>
                     )}
                   </SidebarMenuButton>
 
-                  {item.subItems &&
-                    expandedItems.includes(item.id) && (
-                      <div className="ml-6 mt-1 space-y-1">
-                        {item.subItems.map((subItem) => (
-                          <SidebarMenuButton
-                            key={subItem.id}
-                            onClick={() =>
-                              handleNavClick(subItem.path || subItem.id)
-                            }
-                            isActive={
-                              activeSectionPathId === subItem.id
-                            }
-                            className={`w-full justify-start text-sm py-2 sidebar-item text-white/90 hover:bg-white/10 transition-all duration-300 ${
-                              activeSectionPathId === subItem.id ? 'sidebar-item-active' : ''
-                            }`}
-                          >
-                            <subItem.icon className="mr-3 h-4 w-4 sidebar-icon" />
-                            {subItem.title}
-                          </SidebarMenuButton>
-                        ))}
+                  {item.subItems && (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateRows: expandedItems.includes(item.id) ? '1fr' : '0fr',
+                        transition: 'grid-template-rows 0.25s ease',
+                      }}
+                    >
+                      <div style={{ overflow: 'hidden', minHeight: 0 }}>
+                        <div className="ml-6 mt-1 space-y-1">
+                          {item.subItems.map((subItem) => (
+                            <SidebarMenuButton
+                              key={subItem.id}
+                              onClick={() =>
+                                handleNavClick(subItem.path || subItem.id)
+                              }
+                              isActive={
+                                activeSectionPathId === subItem.id
+                              }
+                              className={`w-full justify-start text-sm py-2 sidebar-item text-white/90 hover:bg-white/10 transition-all duration-300 ${
+                                activeSectionPathId === subItem.id ? 'sidebar-item-active' : ''
+                              }`}
+                            >
+                              <subItem.icon className="mr-3 h-4 w-4 sidebar-icon" />
+                              {subItem.title}
+                            </SidebarMenuButton>
+                          ))}
+                        </div>
                       </div>
-                    )}
+                    </div>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
