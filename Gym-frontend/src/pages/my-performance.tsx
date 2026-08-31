@@ -48,6 +48,9 @@ function targetPeriodLabel(t: StaffTarget): string {
 }
 
 export function MyPerformance({ onNavigate }: MyPerformanceProps) {
+  const statCardShell = "border-0 shadow-md hover:shadow-lg transition-shadow duration-300";
+  const panelCardShell = "border-0 shadow-sm";
+
   const [activeTab, setActiveTab] = useState("activity");
 
   const [performance, setPerformance] = useState<StaffPerformance | null>(null);
@@ -158,7 +161,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
-          <Card className="border-primary/10 hover:shadow-lg transition-shadow duration-300">
+          <Card className={statCardShell}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="bg-gradient-light p-3 rounded-lg">
@@ -184,7 +187,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <Card className="border-primary/10 hover:shadow-lg transition-shadow duration-300">
+          <Card className={statCardShell}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="bg-gradient-light p-3 rounded-lg">
@@ -213,7 +216,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
-          <Card className="border-primary/10 hover:shadow-lg transition-shadow duration-300">
+          <Card className={statCardShell}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="bg-gradient-light p-3 rounded-lg">
@@ -234,7 +237,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
-          <Card className="border-primary/10 hover:shadow-lg transition-shadow duration-300">
+          <Card className={statCardShell}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="bg-gradient-light p-3 rounded-lg">
@@ -258,9 +261,9 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.5 }}
       >
-        <Card className="border-primary/10">
+        <Card className={panelCardShell}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <CardHeader className="border-b border-primary/10">
+            <CardHeader className="border-b border-border">
               <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full">
                 <TabsTrigger value="activity">
                   <Activity className="h-4 w-4 mr-2" />
@@ -330,14 +333,14 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                 <Separator />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="border-primary/20 bg-gradient-light">
+                  <Card className="border-0 shadow-sm bg-gradient-light">
                     <CardContent className="p-6 text-center">
                       <ShoppingBag className="h-8 w-8 text-primary mx-auto mb-2" />
                       <h4 className="font-semibold text-2xl text-primary"><CurrencyGlyph /> {revenueAchieved.toLocaleString()}</h4>
                       <p className="text-sm text-gray-600">Revenue This Month</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-primary/20 bg-gradient-light">
+                  <Card className="border-0 shadow-sm bg-gradient-light">
                     <CardContent className="p-6 text-center">
                       <Zap className="h-8 w-8 text-primary mx-auto mb-2" />
                       <h4 className="font-semibold text-2xl text-primary">{performance.breakdown.conversion_rate}%</h4>
@@ -350,7 +353,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
               {/* Engagement Tab */}
               <TabsContent value="engagement" className="space-y-6 mt-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="border-primary/20">
+                  <Card className="border-0 shadow-sm">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="font-semibold text-primary">Follow-up Completion</h4>
@@ -360,7 +363,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                       <p className="text-sm text-gray-600">Of assigned follow-ups completed</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-primary/20">
+                  <Card className="border-0 shadow-sm">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="font-semibold text-primary">Customer Satisfaction</h4>
@@ -428,7 +431,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.6 }}
         >
-          <Card className="border-primary/10">
+          <Card className="border-0 shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-start space-x-3">
                 <Target className="h-5 w-5 mt-0.5 text-primary" />
@@ -449,7 +452,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.7 }}
         >
-          <Card className="border-primary/10">
+          <Card className="border-0 shadow-sm">
             <CardHeader>
               <CardTitle className="text-primary flex items-center space-x-2">
                 <BarChart3 className="h-5 w-5" />
