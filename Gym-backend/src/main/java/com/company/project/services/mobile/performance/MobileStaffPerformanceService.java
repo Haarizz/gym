@@ -51,8 +51,10 @@ public class MobileStaffPerformanceService {
             throw new EntityNotFoundException("User not authenticated");
         }
 
-        Staff staff = staffRepository.findByUserId(principal.getId())
-                .orElseThrow(() -> new EntityNotFoundException("No staff record linked to this account"));
+        // Accounts without a linked Staff record (e.g. Admin) still get their own
+        // performance computed off activity recorded under their username —
+        // just without staff-only fields like a branch, monthly target, or leaderboard.
+        Staff staff = staffRepository.findByUserId(principal.getId()).orElse(null);
 
         LocalDate today = LocalDate.now();
         int year = today.getYear();
@@ -65,8 +67,10 @@ public class MobileStaffPerformanceService {
         // 1. Period
         PeriodDTO period = new PeriodDTO(year, month, monthLabel);
 
-        // Fetch optional StaffTarget for current month
-        Optional<StaffTarget> targetOpt = staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), year, month);
+        // Fetch optional StaffTarget for current month (only meaningful when linked to a Staff record)
+        Optional<StaffTarget> targetOpt = staff != null
+                ? staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), year, month)
+                : Optional.empty();
 
         // 2. Revenue Target & Achieved
         BigDecimal revenueAchieved = computeStaffRevenue(staff, principal.getUsername(), startOfMonth, startOfNextMonth);
@@ -76,7 +80,7 @@ public class MobileStaffPerformanceService {
             if (targetOpt.get().getRevenueAchieved() != null && targetOpt.get().getRevenueAchieved().compareTo(revenueAchieved) > 0) {
                 revenueAchieved = targetOpt.get().getRevenueAchieved();
             }
-        } else if (staff.getMonthlyTarget() != null && staff.getMonthlyTarget().compareTo(BigDecimal.ZERO) > 0) {
+        } else if (staff != null && staff.getMonthlyTarget() != null && staff.getMonthlyTarget().compareTo(BigDecimal.ZERO) > 0) {
             revenueTarget = staff.getMonthlyTarget();
         }
 
@@ -115,8 +119,10 @@ public class MobileStaffPerformanceService {
         // 5. Six-Month Trend
         List<TrendItemDTO> trend = computeSixMonthTrend(staff, principal.getUsername(), today);
 
-        // 6. Branch Leaderboard
-        List<LeaderboardItemDTO> leaderboard = computeBranchLeaderboard(staff, startOfMonth, startOfNextMonth);
+        // 6. Branch Leaderboard — only meaningful for an account linked to a Staff record
+        List<LeaderboardItemDTO> leaderboard = staff != null
+                ? computeBranchLeaderboard(staff, startOfMonth, startOfNextMonth)
+                : new ArrayList<>();
 
         // 7. Performance Breakdown
         int conversionRate = computeConversionRate(staff, principal.getUsername(), startOfMonth, startOfNextMonth);
@@ -152,7 +158,7 @@ public class MobileStaffPerformanceService {
                             cb.greaterThanOrEqualTo(root.get("createdAt"), start),
                             cb.lessThan(root.get("createdAt"), end))
             ));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
                         cb.equal(root.get("createdBy"), username)
@@ -179,7 +185,7 @@ public class MobileStaffPerformanceService {
                             cb.greaterThanOrEqualTo(root.get("updatedAt"), start),
                             cb.lessThan(root.get("updatedAt"), end))
             ));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
                         cb.equal(root.get("createdBy"), username)
@@ -200,7 +206,7 @@ public class MobileStaffPerformanceService {
                             cb.greaterThanOrEqualTo(root.get("createdAt"), start),
                             cb.lessThan(root.get("createdAt"), end))
             ));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
                         cb.equal(root.get("createdBy"), username)
@@ -266,7 +272,7 @@ public class MobileStaffPerformanceService {
     private int computeStaffLeadCount(Staff staff, String username) {
         Specification<Lead> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (staff.getName() != null && !staff.getName().isBlank()) {
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
                         cb.equal(root.get("createdBy"), username)
@@ -344,7 +350,7 @@ public class MobileStaffPerformanceService {
     private int computeConversionRate(Staff staff, String username, LocalDateTime startOfMonth, LocalDateTime startOfNextMonth) {
         Specification<Lead> staffLeadsSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (staff.getName() != null && !staff.getName().isBlank()) {
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
                         cb.equal(root.get("createdBy"), username)
@@ -359,7 +365,7 @@ public class MobileStaffPerformanceService {
         Specification<Lead> staffConvertedSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("status"), "converted"));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
                         cb.equal(root.get("createdBy"), username)
@@ -375,7 +381,7 @@ public class MobileStaffPerformanceService {
     private int computeFollowUpCompletion(Staff staff) {
         Specification<FollowUp> staffFUSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (staff.getName() != null && !staff.getName().isBlank()) {
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -387,7 +393,7 @@ public class MobileStaffPerformanceService {
         Specification<FollowUp> completedSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("status"), "completed"));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
