@@ -50,6 +50,7 @@ function targetPeriodLabel(t: StaffTarget): string {
 export function MyPerformance({ onNavigate }: MyPerformanceProps) {
   const statCardShell = "border-0 shadow-md hover:shadow-lg transition-shadow duration-300";
   const panelCardShell = "border-0 shadow-sm";
+  const tabContentShell = "space-y-6 mt-0 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out";
 
   const [activeTab, setActiveTab] = useState("activity");
 
@@ -264,20 +265,20 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
         <Card className={panelCardShell}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <CardHeader className="border-b border-border">
-              <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full">
-                <TabsTrigger value="activity">
+              <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full h-11 bg-muted/60">
+                <TabsTrigger value="activity" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">
                   <Activity className="h-4 w-4 mr-2" />
                   Activity
                 </TabsTrigger>
-                <TabsTrigger value="sales">
+                <TabsTrigger value="sales" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">
                   <ShoppingBag className="h-4 w-4 mr-2" />
                   Sales
                 </TabsTrigger>
-                <TabsTrigger value="engagement">
+                <TabsTrigger value="engagement" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">
                   <Heart className="h-4 w-4 mr-2" />
                   Engagement
                 </TabsTrigger>
-                <TabsTrigger value="targets">
+                <TabsTrigger value="targets" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">
                   <Target className="h-4 w-4 mr-2" />
                   Targets
                 </TabsTrigger>
@@ -286,7 +287,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
 
             <CardContent className="p-6">
               {/* Activity / Trend Tab */}
-              <TabsContent value="activity" className="space-y-6 mt-0">
+              <TabsContent value="activity" className={tabContentShell}>
                 <div>
                   <h3 className="text-lg font-semibold text-primary mb-4">Revenue & Conversions — Last 6 Months</h3>
                   {performance.trend.length === 0 ? (
@@ -314,7 +315,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
               </TabsContent>
 
               {/* Sales & Conversions Tab */}
-              <TabsContent value="sales" className="space-y-6 mt-0">
+              <TabsContent value="sales" className={tabContentShell}>
                 <div>
                   <h3 className="text-lg font-semibold text-primary mb-4">Conversion Progress</h3>
                   <div className="space-y-2">
@@ -351,7 +352,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
               </TabsContent>
 
               {/* Engagement Tab */}
-              <TabsContent value="engagement" className="space-y-6 mt-0">
+              <TabsContent value="engagement" className={tabContentShell}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card className="border-0 shadow-sm">
                     <CardContent className="p-6">
@@ -377,7 +378,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
               </TabsContent>
 
               {/* Targets & Achievements Tab */}
-              <TabsContent value="targets" className="space-y-6 mt-0">
+              <TabsContent value="targets" className={tabContentShell}>
                 <div>
                   <h3 className="text-lg font-semibold text-primary mb-4">Target Progress</h3>
                   <div className="space-y-4">
