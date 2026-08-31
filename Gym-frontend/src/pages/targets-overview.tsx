@@ -194,37 +194,58 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
   const totalRevenue = filteredStaffData.reduce((sum, t) => sum + (t.revenue_achieved || 0), 0);
   const commissionROI = totalRevenue > 0 ? ((totalRevenue - totalCommission) / totalRevenue * 100) : 0;
 
-  // Predictive alerts
-  const alerts = [
-    {
-      type: "warning",
-      title: "Sara needs attention",
-      message: "Sara is at 72% of target with 8 days left. Intervention recommended.",
-      priority: "high",
-      action: "Contact Sara"
-    },
-    {
-      type: "error", 
-      title: "Arshi underperforming",
-      message: "Arshi is only at 68% progress vs target. Immediate support needed.",
-      priority: "urgent",
-      action: "Schedule Meeting"
-    },
-    {
-      type: "success",
-      title: "Looka exceeded unit targets", 
-      message: "Looka already exceeded both yoga and swimming unit targets!",
-      priority: "low",
-      action: "Congratulate"
-    },
-    {
-      type: "info",
-      title: "Month-end forecast",
-      message: "At current pace, institution will reach 94% of monthly target.",
-      priority: "medium",
-      action: "View Forecast"
+  // Alerts derived from real target data — staff behind pace or already exceeding targets
+  const alerts = useMemo(() => {
+    const now = new Date();
+    const generated: Array<{ type: string; title: string; message: string; priority: string; staffName?: string }> = [];
+
+    filteredStaffData.forEach(t => {
+      const pct = t.percentage || 0;
+      let daysLeft = 0;
+      if (t.end_date) {
+        daysLeft = Math.max(0, Math.ceil((new Date(t.end_date).getTime() - now.getTime()) / 86400000));
+      } else if (t.timeframe === "monthly" && t.year && t.month) {
+        daysLeft = Math.max(0, Math.ceil((new Date(t.year, t.month, 0).getTime() - now.getTime()) / 86400000));
+      }
+
+      if (pct >= 100) {
+        generated.push({
+          type: "success",
+          title: `${t.staff_name} exceeded target`,
+          message: `${t.staff_name} has reached ${pct.toFixed(0)}% of their target.`,
+          priority: "low",
+          staffName: t.staff_name
+        });
+      } else if (pct < 70 && daysLeft > 0 && daysLeft <= 7) {
+        generated.push({
+          type: "error",
+          title: `${t.staff_name} needs attention`,
+          message: `${t.staff_name} is at ${pct.toFixed(0)}% of target with ${daysLeft} days left. Intervention recommended.`,
+          priority: "urgent",
+          staffName: t.staff_name
+        });
+      } else if (pct < 70) {
+        generated.push({
+          type: "warning",
+          title: `${t.staff_name} is behind`,
+          message: `${t.staff_name} is at ${pct.toFixed(0)}% progress vs target.`,
+          priority: "medium",
+          staffName: t.staff_name
+        });
+      }
+    });
+
+    if (instTarget.percentage > 0) {
+      generated.push({
+        type: "info",
+        title: "Institution progress",
+        message: `Institution is currently at ${instTarget.percentage.toFixed(0)}% of its monthly target.`,
+        priority: "medium"
+      });
     }
-  ];
+
+    return generated;
+  }, [filteredStaffData, instTarget.percentage]);
 
   return (
     <div className="p-6 space-y-6 bg-background">
@@ -848,44 +869,43 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
           <CardDescription>Proactive insights and recommended actions</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {alerts.map((alert, index) => (
-              <div key={index} className={cn(
-                "p-4 rounded-lg border",
-                alert.type === "error" && "bg-red-50 border-red-200",
-                alert.type === "warning" && "bg-yellow-50 border-yellow-200",
-                alert.type === "success" && "bg-green-50 border-green-200",
-                alert.type === "info" && "bg-blue-50 border-blue-200"
-              )}>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    {alert.type === "error" && <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />}
-                    {alert.type === "warning" && <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />}
-                    {alert.type === "success" && <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />}
-                    {alert.type === "info" && <Zap className="h-5 w-5 text-blue-600 mt-0.5" />}
-                    <div>
-                      <h4 className="font-medium text-foreground">{alert.title}</h4>
-                      <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
+          {alerts.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No alerts right now — everyone's tracking fine.</p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {alerts.map((alert, index) => (
+                <div key={index} className={cn(
+                  "p-4 rounded-lg border",
+                  alert.type === "error" && "bg-red-50 border-red-200",
+                  alert.type === "warning" && "bg-yellow-50 border-yellow-200",
+                  alert.type === "success" && "bg-green-50 border-green-200",
+                  alert.type === "info" && "bg-blue-50 border-blue-200"
+                )}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3">
+                      {alert.type === "error" && <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />}
+                      {alert.type === "warning" && <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />}
+                      {alert.type === "success" && <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />}
+                      {alert.type === "info" && <Zap className="h-5 w-5 text-blue-600 mt-0.5" />}
+                      <div>
+                        <h4 className="font-medium text-foreground">{alert.title}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
+                      </div>
                     </div>
+                    <Badge variant="outline" className={cn(
+                      "text-xs",
+                      alert.priority === "urgent" && "border-red-300 text-red-700",
+                      alert.priority === "high" && "border-yellow-300 text-yellow-700",
+                      alert.priority === "medium" && "border-blue-300 text-blue-700",
+                      alert.priority === "low" && "border-green-300 text-green-700"
+                    )}>
+                      {alert.priority}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className={cn(
-                    "text-xs",
-                    alert.priority === "urgent" && "border-red-300 text-red-700",
-                    alert.priority === "high" && "border-yellow-300 text-yellow-700",
-                    alert.priority === "medium" && "border-blue-300 text-blue-700",
-                    alert.priority === "low" && "border-green-300 text-green-700"
-                  )}>
-                    {alert.priority}
-                  </Badge>
                 </div>
-                <div className="mt-3 flex justify-end">
-                  <Button size="sm" variant="outline" className="text-xs">
-                    {alert.action}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
