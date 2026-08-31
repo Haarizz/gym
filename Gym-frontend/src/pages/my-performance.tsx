@@ -10,9 +10,8 @@ import { Separator } from "../components/ui/separator";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { motion } from "motion/react";
 import {
-  LineChart,
+  ComposedChart,
   Line,
-  BarChart,
   Bar,
   XAxis,
   YAxis,
@@ -50,7 +49,6 @@ function targetPeriodLabel(t: StaffTarget): string {
 export function MyPerformance({ onNavigate }: MyPerformanceProps) {
   const statCardShell = "border-0 shadow-md hover:shadow-lg transition-shadow duration-300";
   const panelCardShell = "border-0 shadow-sm";
-  const tabContentShell = "space-y-6 mt-0 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out";
 
   const [activeTab, setActiveTab] = useState("activity");
 
@@ -100,6 +98,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
   const rating = performance?.summary?.rating ?? 0;
   const growthPercentage = performance?.summary?.growth_percentage ?? 0;
   const leadCount = performance?.summary?.lead_count ?? 0;
+  const periodLabel = performance?.period.label ?? '';
 
   return (
     <div className="min-h-screen bg-gymbios-main-bg p-6 space-y-6">
@@ -265,20 +264,20 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
         <Card className={panelCardShell}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <CardHeader className="border-b border-border">
-              <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full h-11 bg-muted/60">
-                <TabsTrigger value="activity" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">
+              <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full">
+                <TabsTrigger value="activity">
                   <Activity className="h-4 w-4 mr-2" />
                   Activity
                 </TabsTrigger>
-                <TabsTrigger value="sales" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">
+                <TabsTrigger value="sales">
                   <ShoppingBag className="h-4 w-4 mr-2" />
                   Sales
                 </TabsTrigger>
-                <TabsTrigger value="engagement" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">
+                <TabsTrigger value="engagement">
                   <Heart className="h-4 w-4 mr-2" />
                   Engagement
                 </TabsTrigger>
-                <TabsTrigger value="targets" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">
+                <TabsTrigger value="targets">
                   <Target className="h-4 w-4 mr-2" />
                   Targets
                 </TabsTrigger>
@@ -287,17 +286,30 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
 
             <CardContent className="p-6">
               {/* Activity / Trend Tab */}
-              <TabsContent value="activity" className={tabContentShell}>
+              <TabsContent value="activity" className="space-y-6 mt-0">
+                <div>
+                  <h3 className="text-lg font-semibold text-primary mb-2">Revenue Target Progress</h3>
+                  <p className="text-sm text-gray-600 mb-3">
+                    {periodLabel} — <CurrencyGlyph /> {revenueAchieved.toLocaleString()}
+                    {performance.revenue_target.target > 0 ? ` / ${performance.revenue_target.target.toLocaleString()}` : ''}
+                    {' '}({performance.revenue_target.percentage}%)
+                  </p>
+                  <Progress value={Math.min(100, performance.revenue_target.percentage)} className="h-3" />
+                </div>
+
+                <Separator />
+
                 <div>
                   <h3 className="text-lg font-semibold text-primary mb-4">Revenue & Conversions — Last 6 Months</h3>
                   {performance.trend.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-8 text-center">No trend data available yet.</p>
                   ) : (
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={performance.trend}>
+                      <ComposedChart data={performance.trend}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                         <XAxis dataKey="label" stroke="#555555" />
-                        <YAxis stroke="#555555" />
+                        <YAxis yAxisId="revenue" stroke="#0047AB" />
+                        <YAxis yAxisId="conversions" orientation="right" stroke="#00c5cb" allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
                             background: "white",
@@ -305,17 +317,50 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                             borderRadius: "8px",
                             boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
                           }}
+                          formatter={(value: number, name: string) =>
+                            name === "Revenue" ? [`${value.toLocaleString()}`, name] : [value, name]
+                          }
                         />
                         <Legend />
-                        <Bar dataKey="conversions" fill="#0047AB" name="Conversions" radius={[8, 8, 0, 0]} />
-                      </BarChart>
+                        <Bar yAxisId="revenue" dataKey="revenue" fill="#0047AB" name="Revenue" radius={[8, 8, 0, 0]} />
+                        <Line yAxisId="conversions" type="monotone" dataKey="conversions" stroke="#00c5cb" strokeWidth={2.5} name="Conversions" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      </ComposedChart>
                     </ResponsiveContainer>
                   )}
                 </div>
+
+                {performance.trend.length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h3 className="text-lg font-semibold text-primary mb-4">Monthly Breakdown</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border text-left text-gray-500">
+                              <th className="py-2 font-medium">Month</th>
+                              <th className="py-2 font-medium text-right">Revenue</th>
+                              <th className="py-2 font-medium text-right">Conversions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {performance.trend.map((row) => (
+                              <tr key={row.period} className="border-b border-border/60 last:border-0">
+                                <td className="py-2">{row.label}</td>
+                                <td className="py-2 text-right"><CurrencyGlyph /> {row.revenue.toLocaleString()}</td>
+                                <td className="py-2 text-right">{row.conversions}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
               </TabsContent>
 
               {/* Sales & Conversions Tab */}
-              <TabsContent value="sales" className={tabContentShell}>
+              <TabsContent value="sales" className="space-y-6 mt-0">
                 <div>
                   <h3 className="text-lg font-semibold text-primary mb-4">Conversion Progress</h3>
                   <div className="space-y-2">
@@ -333,7 +378,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
 
                 <Separator />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <Card className="border-0 shadow-sm bg-gradient-light">
                     <CardContent className="p-6 text-center">
                       <ShoppingBag className="h-8 w-8 text-primary mx-auto mb-2" />
@@ -348,12 +393,31 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                       <p className="text-sm text-gray-600">Lead Conversion Rate</p>
                     </CardContent>
                   </Card>
+                  <Card className="border-0 shadow-sm bg-gradient-light">
+                    <CardContent className="p-6 text-center">
+                      <Users className="h-8 w-8 text-primary mx-auto mb-2" />
+                      <h4 className="font-semibold text-2xl text-primary">{leadCount}</h4>
+                      <p className="text-sm text-gray-600">Leads Assigned</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Separator />
+
+                <div className="flex items-center justify-between p-4 rounded-lg bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    {React.createElement(getChangeIcon(growthPercentage), { className: `h-5 w-5 ${getChangeColor(growthPercentage)}` })}
+                    <span className="text-sm text-gray-700">Revenue/conversions vs. last month</span>
+                  </div>
+                  <span className={`text-sm font-semibold ${getChangeColor(growthPercentage)}`}>
+                    {growthPercentage >= 0 ? '+' : ''}{growthPercentage}%
+                  </span>
                 </div>
               </TabsContent>
 
               {/* Engagement Tab */}
-              <TabsContent value="engagement" className={tabContentShell}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <TabsContent value="engagement" className="space-y-6 mt-0">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <Card className="border-0 shadow-sm">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
@@ -374,11 +438,35 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                       <p className="text-sm text-gray-600">Based on member feedback ratings</p>
                     </CardContent>
                   </Card>
+                  <Card className="border-0 shadow-sm">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-semibold text-primary">Member Rating</h4>
+                        <Star className="h-5 w-5 text-yellow-500" />
+                      </div>
+                      <div className="text-3xl font-bold text-primary mb-2">
+                        {rating > 0 ? `${rating} / 5` : "—"}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {rating > 0 ? "Average across your session feedback" : "No ratings received yet"}
+                      </p>
+                    </CardContent>
+                  </Card>
                 </div>
+
+                {rating > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Satisfaction level</span>
+                      <span className="font-medium text-primary">{performance.breakdown.customer_satisfaction}%</span>
+                    </div>
+                    <Progress value={performance.breakdown.customer_satisfaction} className="h-2" />
+                  </div>
+                )}
               </TabsContent>
 
               {/* Targets & Achievements Tab */}
-              <TabsContent value="targets" className={tabContentShell}>
+              <TabsContent value="targets" className="space-y-6 mt-0">
                 <div>
                   <h3 className="text-lg font-semibold text-primary mb-4">Target Progress</h3>
                   <div className="space-y-4">
