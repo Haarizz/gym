@@ -111,6 +111,17 @@ export interface CommissionRule {
   target_bonuses_json: string;
 }
 
+export interface StaffPerformance {
+  period: { year: number; month: number; label: string };
+  revenueTarget: { achieved: number; target: number; percentage: number };
+  conversionTarget: { achieved: number; target: number; percentage: number };
+  summary: { rating: number; growthPercentage: number; leadCount: number };
+  trend: Array<{ period: string; label: string; conversions: number; revenue: number }>;
+  leaderboard: Array<{ rank: number; staffId: number; staffName: string; conversionCount: number; revenue: number; currentUser: boolean }>;
+  breakdown: { conversionRate: number; followUpCompletion: number; customerSatisfaction: number };
+  motivation: { remainingConversions: number; message: string; status: string };
+}
+
 class StaffService {
 
   // ── Staff CRUD ──────────────────────────────────────────────────────────
@@ -147,6 +158,16 @@ class StaffService {
     );
     if (response.status === 404 || response.status === 401) return null;
     if (!response.ok) throw new Error(`Failed to fetch my profile: ${response.status}`);
+    return response.json();
+  }
+
+  /** Returns the aggregated performance dataset (revenue, conversions, trend, leaderboard) for the logged-in staff member, or null if no staff record is linked. */
+  async getMyPerformance(): Promise<StaffPerformance | null> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/mobile/staff/performance`
+    );
+    if (response.status === 404 || response.status === 401) return null;
+    if (!response.ok) throw new Error(`Failed to fetch performance: ${response.status}`);
     return response.json();
   }
 

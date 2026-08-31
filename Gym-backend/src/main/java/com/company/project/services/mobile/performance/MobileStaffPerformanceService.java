@@ -78,8 +78,6 @@ public class MobileStaffPerformanceService {
             }
         } else if (staff.getMonthlyTarget() != null && staff.getMonthlyTarget().compareTo(BigDecimal.ZERO) > 0) {
             revenueTarget = staff.getMonthlyTarget();
-        } else {
-            revenueTarget = new BigDecimal("150000"); // default baseline target
         }
 
         int revenuePercentage = 0;
@@ -90,7 +88,7 @@ public class MobileStaffPerformanceService {
 
         // 3. Conversion Target & Achieved
         int conversionsAchieved = computeStaffConversions(staff, principal.getUsername(), startOfMonth, startOfNextMonth);
-        int conversionTarget = 30; // default baseline target
+        int conversionTarget = 0;
         if (targetOpt.isPresent()) {
             StaffTarget target = targetOpt.get();
             if (target.getNewClientsTarget() != null && target.getNewClientsTarget() > 0) {
@@ -221,10 +219,6 @@ public class MobileStaffPerformanceService {
                 .filter(f -> f.getTrainerRating() != null || f.getOverallSatisfaction() != null)
                 .collect(Collectors.toList());
 
-        if (ratedFeedbacks.isEmpty()) {
-            return 4.6; // Baseline rating
-        }
-
         double sum = 0.0;
         int count = 0;
         for (WorkoutFeedback fb : ratedFeedbacks) {
@@ -237,7 +231,7 @@ public class MobileStaffPerformanceService {
             }
         }
 
-        if (count == 0) return 4.6;
+        if (count == 0) return 0.0;
         double avg = sum / count;
         return BigDecimal.valueOf(avg).setScale(1, RoundingMode.HALF_UP).doubleValue();
     }
@@ -266,7 +260,7 @@ public class MobileStaffPerformanceService {
             return targetOpt.get().getForecast();
         }
 
-        return 8; // Default initial positive trajectory
+        return 0;
     }
 
     private int computeStaffLeadCount(Staff staff, String username) {
@@ -280,12 +274,7 @@ public class MobileStaffPerformanceService {
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
-        long count = leadRepository.count(spec);
-        if (count == 0) {
-            long total = leadRepository.count();
-            return total > 0 ? (int) total : 152;
-        }
-        return (int) count;
+        return (int) leadRepository.count(spec);
     }
 
     private List<TrendItemDTO> computeSixMonthTrend(Staff staff, String username, LocalDate today) {
@@ -365,7 +354,7 @@ public class MobileStaffPerformanceService {
         };
 
         long totalLeads = leadRepository.count(staffLeadsSpec);
-        if (totalLeads == 0) return 62; // Fallback percentage
+        if (totalLeads == 0) return 0;
 
         Specification<Lead> staffConvertedSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -393,12 +382,7 @@ public class MobileStaffPerformanceService {
         };
 
         long total = followUpRepository.count(staffFUSpec);
-        if (total == 0) {
-            long globalTotal = followUpRepository.count();
-            if (globalTotal == 0) return 85; // Baseline completion percentage
-            long globalCompleted = followUpRepository.countByStatus("completed");
-            return (int) Math.round(((double) globalCompleted / globalTotal) * 100);
-        }
+        if (total == 0) return 0;
 
         Specification<FollowUp> completedSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -414,7 +398,7 @@ public class MobileStaffPerformanceService {
     }
 
     private int computeCustomerSatisfaction(double rating) {
-        if (rating <= 0.0) return 92;
+        if (rating <= 0.0) return 0;
         int satisfaction = (int) Math.round((rating / 5.0) * 100);
         return Math.min(100, Math.max(0, satisfaction));
     }
