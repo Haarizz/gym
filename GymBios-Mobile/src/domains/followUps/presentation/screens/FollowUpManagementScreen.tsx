@@ -33,6 +33,8 @@ import { FollowUpFilters } from '../components/FollowUpFilters';
 import { FollowUpList } from '../components/FollowUpList';
 import { RescheduleFollowUpSheet } from '../components/RescheduleFollowUpSheet';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 export function FollowUpManagementScreen() {
   const theme = useTheme();
 
@@ -79,21 +81,29 @@ export function FollowUpManagementScreen() {
   // Quick Action Handlers
   const handleCall = useCallback((followUp: FollowUp) => {
     if (!followUp.leadPhone) {
-      Alert.alert('No Phone Number', 'This lead does not have a phone number recorded.');
+      toast.info('This lead does not have a phone number recorded.', {
+        title: 'No Phone Number'
+      });
       return;
     }
     Linking.openURL(`tel:${followUp.leadPhone.replace(/\s+/g, '')}`).catch(() => {
-      Alert.alert('Error', 'Unable to launch phone dialer on this device.');
+      toast.error('Unable to launch phone dialer on this device.', {
+        title: 'Error'
+      });
     });
   }, []);
 
   const handleEmail = useCallback((followUp: FollowUp) => {
     if (!followUp.leadEmail) {
-      Alert.alert('No Email Address', 'This lead does not have an email address recorded.');
+      toast.info('This lead does not have an email address recorded.', {
+        title: 'No Email Address'
+      });
       return;
     }
     Linking.openURL(`mailto:${followUp.leadEmail}`).catch(() => {
-      Alert.alert('Error', 'Unable to launch mail client on this device.');
+      toast.error('Unable to launch mail client on this device.', {
+        title: 'Error'
+      });
     });
   }, []);
 
@@ -120,7 +130,9 @@ export function FollowUpManagementScreen() {
             onPress: () => {
               deleteMutation.mutate(followUp.id, {
                 onError: err => {
-                  Alert.alert('Error', err.message || 'Failed to delete follow-up.');
+                  toast.error(err.message || 'Failed to delete follow-up.', {
+                    title: 'Error'
+                  });
                 },
               });
             },
@@ -144,7 +156,9 @@ export function FollowUpManagementScreen() {
             onPress: () => {
               cancelMutation.mutate(followUp.id, {
                 onError: err => {
-                  Alert.alert('Error', err.message || 'Failed to cancel follow-up.');
+                  toast.error(err.message || 'Failed to cancel follow-up.', {
+                    title: 'Error'
+                  });
                 },
               });
             },
@@ -176,7 +190,9 @@ export function FollowUpManagementScreen() {
             setEditingFollowUp(null);
           },
           onError: err => {
-            Alert.alert('Error', err.message || 'Failed to update follow-up.');
+            toast.error(err.message || 'Failed to update follow-up.', {
+              title: 'Error'
+            });
           },
         },
       );
@@ -186,7 +202,9 @@ export function FollowUpManagementScreen() {
           setAddSheetVisible(false);
         },
         onError: err => {
-          Alert.alert('Error', err.message || 'Failed to create follow-up.');
+          toast.error(err.message || 'Failed to create follow-up.', {
+            title: 'Error'
+          });
         },
       });
     }
@@ -205,7 +223,9 @@ export function FollowUpManagementScreen() {
           setCompletingFollowUp(null);
         },
         onError: err => {
-          Alert.alert('Error', err.message || 'Failed to complete follow-up.');
+          toast.error(err.message || 'Failed to complete follow-up.', {
+            title: 'Error'
+          });
         },
       },
     );
@@ -224,7 +244,9 @@ export function FollowUpManagementScreen() {
           setReschedulingFollowUp(null);
         },
         onError: err => {
-          Alert.alert('Error', err.message || 'Failed to reschedule follow-up.');
+          toast.error(err.message || 'Failed to reschedule follow-up.', {
+            title: 'Error'
+          });
         },
       },
     );

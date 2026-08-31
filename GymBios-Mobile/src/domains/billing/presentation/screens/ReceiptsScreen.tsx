@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -15,6 +15,8 @@ import {
   ErrorState,
   ReceiptCard,
 } from '../components';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface ReceiptsScreenProps {
   onBack: () => void;
@@ -51,10 +53,11 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
 
   const handleExportCSV = useCallback(() => {
     const totalCount = pagination?.total ?? receipts.length;
-    Alert.alert(
-      'Export Receipts CSV',
+    toast.info(
       `Exporting entire receipt list (${totalCount} record${totalCount !== 1 ? 's' : ''}) to CSV file.`,
-      [{ text: 'OK' }],
+      {
+        title: 'Export Receipts CSV'
+      }
     );
   }, [pagination?.total, receipts.length]);
 

@@ -18,6 +18,7 @@ import {
   useProfile,
   useUnreadNotificationCount,
 } from '@/domains/profile';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 import {
   isCommunityRoute,
   isFullScreenRoute,
@@ -66,8 +67,10 @@ export function RoleTabsLayout({
   const segments = useSegments();
   const [isModulesOpen, setIsModulesOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false);
   const { profile, initials } = useProfile();
   const { count: unreadCount } = useUnreadNotificationCount();
+  const { selectedBranchId, availableBranches, setSelectedBranchId } = useBranchContext();
 
   const roleGroup = segments[0] || '(admin)';
 
@@ -111,9 +114,15 @@ export function RoleTabsLayout({
 
               <View style={styles.headerTextContainer}>
                 <Text style={styles.greeting}>{greeting}</Text>
-                <Text style={styles.titleText}>
-                  {profile?.name || title} · {profile?.branch || 'All branches'}
-                </Text>
+                <Pressable 
+                  onPress={() => isAdmin && setIsBranchSelectorOpen(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                >
+                  <Text style={styles.titleText}>
+                    {profile?.name || title} · {selectedBranchId === 'ALL' ? 'All branches' : availableBranches.find(b => b.id === selectedBranchId)?.branch_name || 'All branches'}
+                  </Text>
+                  {isAdmin && <Feather name="chevron-down" size={16} color="#FFF" style={{ marginLeft: 4 }} />}
+                </Pressable>
               </View>
             </View>
 
@@ -221,6 +230,37 @@ export function RoleTabsLayout({
           onClose={() => setIsModulesOpen(false)}
         >
           <ModuleSheet onNavigate={() => setIsModulesOpen(false)} />
+        </AppBottomSheet>
+
+        <AppBottomSheet
+          visible={isBranchSelectorOpen}
+          title="Select Branch"
+          subtitle="Choose a branch context"
+          onClose={() => setIsBranchSelectorOpen(false)}
+        >
+          <View style={{ padding: 16 }}>
+            <Pressable
+              style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}
+              onPress={() => {
+                setSelectedBranchId('ALL');
+                setIsBranchSelectorOpen(false);
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: selectedBranchId === 'ALL' ? '700' : '400', color: selectedBranchId === 'ALL' ? BrandColors.teal : '#000' }}>All Branches</Text>
+            </Pressable>
+            {availableBranches.map((branch) => (
+              <Pressable
+                key={branch.id}
+                style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}
+                onPress={() => {
+                  setSelectedBranchId(branch.id);
+                  setIsBranchSelectorOpen(false);
+                }}
+              >
+                <Text style={{ fontSize: 16, fontWeight: selectedBranchId === branch.id ? '700' : '400', color: selectedBranchId === branch.id ? BrandColors.teal : '#000' }}>{branch.branch_name}</Text>
+              </Pressable>
+            ))}
+          </View>
         </AppBottomSheet>
 
         <NotificationPanel

@@ -22,6 +22,8 @@ import {
   useDeleteCommunityComment,
 } from '../../hooks/useCommunityActions';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 interface CommunityCommentsSheetProps {
   postId: number | null;
   visible: boolean;
@@ -55,7 +57,9 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
       { postId, request: { content: commentText.trim() } },
       {
         onSuccess: () => setCommentText(''),
-        onError: () => Alert.alert('Error', 'Could not post comment.'),
+        onError: () => toast.error('Could not post comment.', {
+          title: 'Error'
+        }),
       },
     );
   }, [addMutation, commentText, postId]);
@@ -71,7 +75,9 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
           onPress: () => {
             deleteMutation.mutate(
               { postId, commentId },
-              { onError: () => Alert.alert('Error', 'Could not delete comment.') },
+              { onError: () => toast.error('Could not delete comment.', {
+                title: 'Error'
+              }) },
             );
           },
         },

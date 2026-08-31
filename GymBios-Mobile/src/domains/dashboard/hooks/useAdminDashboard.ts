@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { BrandColors } from '@/core/theme';
 import type { AdminDashboardData, AdminReportType } from '../domain/AdminDashboardData';
+import { useBranchContext } from "@/shared/providers/BranchProvider";
 
 const DEFAULT_ADMIN_DASHBOARD: AdminDashboardData = {
   branch: 'All Branches',
@@ -131,8 +132,9 @@ export function getAdminReportData(reportType: AdminReportType): Array<Record<st
 }
 
 export function useAdminDashboard() {
+    const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: adminDashboardKeys.all,
+    queryKey: [...(Array.isArray(adminDashboardKeys.all) ? adminDashboardKeys.all : [adminDashboardKeys.all]), selectedBranchId],
     queryFn: async (): Promise<AdminDashboardData> => {
       return DEFAULT_ADMIN_DASHBOARD;
     },

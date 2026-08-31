@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, Linking, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Linking } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Avatar } from '@/shared/components/Avatar';
 import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 export interface MemberReferralData {
   id: string;
@@ -57,7 +59,9 @@ export function ReferralMemberCard({
       if (supported) {
         Linking.openURL(url);
       } else {
-        Alert.alert('Sharing', `WhatsApp message prepared:\n${msg}`);
+        toast.info(`WhatsApp message prepared:\n${msg}`, {
+          title: 'Sharing'
+        });
       }
     });
   };
@@ -67,7 +71,9 @@ export function ReferralMemberCard({
     const body = `Hi!\n\nJoin our gym using my referral code "${member.referralCode}" or link: https://${member.referralLink}\n\nBest regards,\n${member.memberName}`;
     const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     Linking.openURL(url).catch(() => {
-      Alert.alert('Sharing', `Email invitation:\n${body}`);
+      toast.info(`Email invitation:\n${body}`, {
+        title: 'Sharing'
+      });
     });
   };
 

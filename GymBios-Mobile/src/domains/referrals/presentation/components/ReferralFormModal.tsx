@@ -7,7 +7,6 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -18,6 +17,8 @@ import { useReferralRules } from '../../hooks/useReferrals';
 import { useCreateReferral, useUpdateReferral } from '../../hooks/useReferralActions';
 import type { Referral } from '../../domain/Referral';
 import type { NewReferralFormState } from '../hooks/useReferralForm';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface ReferralFormModalProps {
   visible: boolean;
@@ -82,7 +83,9 @@ export function ReferralFormModal({
 
   const handleSubmit = () => {
     if (!referrerName.trim() || !refereeName.trim()) {
-      Alert.alert('Required Fields', 'Please enter both Referrer Name and Referred Person Name.');
+      toast.info('Please enter both Referrer Name and Referred Person Name.', {
+        title: 'Required Fields'
+      });
       return;
     }
 
@@ -103,12 +106,16 @@ export function ReferralFormModal({
         },
         {
           onSuccess: () => {
-            Alert.alert('Success', 'Referral updated successfully.');
+            toast.success('Referral updated successfully.', {
+              title: 'Success'
+            });
             onClose();
             onSuccess?.();
           },
           onError: (err) => {
-            Alert.alert('Error', err.message || 'Failed to update referral.');
+            toast.error(err.message || 'Failed to update referral.', {
+              title: 'Error'
+            });
           },
         }
       );
@@ -128,12 +135,16 @@ export function ReferralFormModal({
         },
         {
           onSuccess: () => {
-            Alert.alert('Success', 'Referral registered successfully.');
+            toast.success('Referral registered successfully.', {
+              title: 'Success'
+            });
             onClose();
             onSuccess?.();
           },
           onError: (err) => {
-            Alert.alert('Error', err.message || 'Failed to create referral.');
+            toast.error(err.message || 'Failed to create referral.', {
+              title: 'Error'
+            });
           },
         }
       );

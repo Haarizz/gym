@@ -1,13 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  View,
-  Pressable,
-  RefreshControl,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { ScrollView, StyleSheet, View, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -16,6 +8,8 @@ import { Button } from '@/shared/components/Button';
 import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
 import { ReferralHeader } from '../components/ReferralHeader';
 import { useRewardStats } from '@/domains/rewards';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function RewardQueueScreen() {
   const router = useRouter();
@@ -75,7 +69,7 @@ export function RewardQueueScreen() {
   });
 
   const handleAction = (code: string, action: string) => {
-    Alert.alert(action, `Reward ${code} ${action.toLowerCase()} successfully.`);
+    toast.info(`Reward ${code} ${action.toLowerCase()} successfully.`);
   };
 
   return (

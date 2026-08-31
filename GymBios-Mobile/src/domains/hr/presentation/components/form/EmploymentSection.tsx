@@ -1,5 +1,7 @@
 import { Input } from '@/shared/components/Input';
+import { Dropdown } from '@/shared/components/Dropdown';
 import { FormSection } from '@/shared/components/FormSection';
+import { useAllBranches } from '@/domains/branch';
 
 interface EmploymentSectionProps {
   role: string;
@@ -26,11 +28,20 @@ export function EmploymentSection({
   onChangeJoinDate,
   onChangeStatus,
 }: EmploymentSectionProps) {
+  const { data: branchData } = useAllBranches();
+  const branchOptions = branchData ? branchData.map((b) => ({ label: b.branch_name, value: b.branch_name })) : [];
+
   return (
     <FormSection title="Employment">
       <Input label="Role" value={role} onChangeText={onChangeRole} placeholder="e.g. Sales Manager" />
       <Input label="Department" value={department} onChangeText={onChangeDepartment} placeholder="e.g. Sales" />
-      <Input label="Branch" value={branch} onChangeText={onChangeBranch} placeholder="e.g. Main Branch" />
+      <Dropdown
+        label="Branch"
+        value={branch}
+        options={branchOptions}
+        onChange={(v) => onChangeBranch(v)}
+        placeholder="Select Branch"
+      />
       <Input label="Join Date" value={joinDate} onChangeText={onChangeJoinDate} placeholder="YYYY-MM-DD" />
       <Input label="Status" value={status} onChangeText={onChangeStatus} placeholder="e.g. ACTIVE" />
     </FormSection>

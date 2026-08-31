@@ -1,13 +1,13 @@
 import { useRouter } from 'expo-router';
-import { Alert } from 'react-native';
-
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+
 import { AppHeader } from '@/shared/components/AppHeader';
 import { BrandColors } from '@/core/theme';
-
 import { TrainingStreamForm } from '../components/TrainingStreamForm';
+
 import { useCreateTrainingStream } from '../../hooks/useTrainingStreamActions';
 import type { CreateTrainingStreamRequest } from '../../application/TrainingStreamRepository';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function UploadTrainingRecordingScreen() {
   const router = useRouter();
@@ -18,7 +18,9 @@ export function UploadTrainingRecordingScreen() {
       await mutation.mutateAsync(values);
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to upload recording');
+      toast.error(e.message || 'Failed to upload recording', {
+        title: 'Error'
+      });
     }
   };
 

@@ -17,6 +17,7 @@ import { BillingService } from '../application/BillingService';
 import { ApiBillingRepository } from '../infrastructure/ApiBillingRepository';
 
 import { billingKeys } from './billingKeys';
+import { useBranchContext } from "@/shared/providers/BranchProvider";
 
 const repository = new ApiBillingRepository();
 const billingService = new BillingService(repository);
@@ -25,8 +26,9 @@ const billingService = new BillingService(repository);
  * Billing dashboard summary stats.
  */
 export function useBillingStats() {
+    const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: billingKeys.stats,
+    queryKey: [...(Array.isArray(billingKeys.stats) ? billingKeys.stats : [billingKeys.stats]), selectedBranchId],
     queryFn: () => billingService.getBillingStats(),
   });
 
@@ -43,8 +45,9 @@ export function useBillingStats() {
  * Paginated member receipts list.
  */
 export function useReceipts(filters?: ReceiptFilters) {
+    const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: [...billingKeys.receipts, filters],
+    queryKey: [...billingKeys.receipts, filters, selectedBranchId],
     queryFn: () => billingService.getMemberReceipts(filters),
   });
 
@@ -66,10 +69,11 @@ export function useReceipts(filters?: ReceiptFilters) {
  * when the ID has not yet been resolved from navigation params.
  */
 export function useReceipt(id: number | undefined) {
+    const { selectedBranchId } = useBranchContext();
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: billingKeys.receipt(id),
+    queryKey: [...(Array.isArray(billingKeys.receipt(id)) ? billingKeys.receipt(id) : [billingKeys.receipt(id)]), selectedBranchId],
     queryFn: () => billingService.getReceipt(id!),
     enabled: id != null && id > 0,
     initialData: () => {
@@ -93,8 +97,9 @@ export function useReceipt(id: number | undefined) {
  * List of members with overdue or upcoming payments.
  */
 export function useMemberDues() {
+    const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: billingKeys.dues,
+    queryKey: [...(Array.isArray(billingKeys.dues) ? billingKeys.dues : [billingKeys.dues]), selectedBranchId],
     queryFn: () => billingService.getMemberDues(),
   });
 
@@ -120,8 +125,9 @@ export function useMemberStatement(
   memberId: number | undefined,
   range?: StatementRange,
 ) {
+    const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: [...billingKeys.statement(memberId), range],
+    queryKey: [...billingKeys.statement(memberId), range, selectedBranchId],
     queryFn: () => billingService.getMemberStatement(memberId!, range),
     enabled: memberId != null && memberId > 0,
   });
@@ -144,8 +150,9 @@ export function useMemberStatement(
  * dormant and prevents requests to `/billing/member/0/pending-bills`.
  */
 export function usePendingBills(memberId: number | undefined) {
+    const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: billingKeys.pendingBills(memberId),
+    queryKey: [...(Array.isArray(billingKeys.pendingBills(memberId)) ? billingKeys.pendingBills(memberId) : [billingKeys.pendingBills(memberId)]), selectedBranchId],
     queryFn: () => billingService.getPendingBills(memberId!),
     enabled: memberId != null && memberId > 0,
   });

@@ -5,6 +5,7 @@ import { Dropdown } from '@/shared/components/Dropdown';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { FormSection } from '@/shared/components/FormSection';
 import { useRoles } from '@/domains/roles/hooks/useRoles';
+import { useAllBranches } from '@/domains/branch';
 import type { StaffWizardData } from '../../hooks/useStaffWizard';
 
 interface EmploymentStepProps {
@@ -22,15 +23,12 @@ const DEPARTMENTS = [
   { label: 'HR', value: 'HR' },
 ];
 
-const BRANCHES = [
-  { label: 'Main Branch', value: 'Main Branch' },
-  { label: 'Downtown', value: 'Downtown' },
-  { label: 'Westside', value: 'Westside' },
-];
-
 export function EmploymentStep({ data, updateField }: EmploymentStepProps) {
   const { roles } = useRoles();
+  const { data: branchData } = useAllBranches();
+
   const roleOptions = roles.map((r) => ({ label: r.roleName, value: r.roleName }));
+  const branchOptions = branchData ? branchData.map((b) => ({ label: b.branch_name, value: b.branch_name })) : [];
 
   return (
     <View style={styles.container}>
@@ -52,7 +50,7 @@ export function EmploymentStep({ data, updateField }: EmploymentStepProps) {
         <Dropdown
           label="Branch *"
           value={data.branch}
-          options={BRANCHES}
+          options={branchOptions}
           onChange={(v) => updateField('branch', v)}
           placeholder="Select Branch"
         />

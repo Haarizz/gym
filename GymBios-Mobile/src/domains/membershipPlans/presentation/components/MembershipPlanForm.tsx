@@ -1,13 +1,5 @@
 import { useCallback, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing } from '@/core/theme';
@@ -26,6 +18,8 @@ import { SessionsCapacityStep } from './steps/SessionsCapacityStep';
 import { FamilyOptionsStep } from './steps/FamilyOptionsStep';
 import { FreezePolicyStep } from './steps/FreezePolicyStep';
 import { AssignmentsStep } from './steps/AssignmentsStep';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface MembershipPlanFormProps {
   mode: 'create' | 'edit';
@@ -46,7 +40,9 @@ export function MembershipPlanForm({
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   const handleError = useCallback((_error: Error) => {
-    Alert.alert('Error', 'Something went wrong. Please try again.');
+    toast.error('Something went wrong. Please try again.', {
+      title: 'Error'
+    });
   }, []);
 
   const {

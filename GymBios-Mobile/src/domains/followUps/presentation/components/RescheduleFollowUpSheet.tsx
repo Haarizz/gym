@@ -1,20 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
 import type { FollowUp } from '../../domain/FollowUp';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface RescheduleFollowUpSheetProps {
   visible: boolean;
@@ -42,7 +35,9 @@ export function RescheduleFollowUpSheet({
 
   const handleSubmit = () => {
     if (!dueDate) {
-      Alert.alert('Validation Error', 'New due date is required.');
+      toast.error('New due date is required.', {
+        title: 'Validation Error'
+      });
       return;
     }
     // Format to ISO date string (YYYY-MM-DD)

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { BookingStatsHeader } from '../components/BookingStatsHeader';
@@ -52,8 +52,8 @@ export function MemberBookingsScreen() {
 
   const handleCancelBooking = (id: string | number) => {
     cancelMutation.mutate(Number(id), {
-      onSuccess: () => Alert.alert('Success', 'Your reservation has been cancelled.'),
-      onError: () => Alert.alert('Error', 'Failed to cancel the booking.'),
+      onSuccess: () => toast.success('Your reservation has been cancelled.'),
+      onError: () => toast.error('Failed to cancel the booking.'),
     });
   };
 

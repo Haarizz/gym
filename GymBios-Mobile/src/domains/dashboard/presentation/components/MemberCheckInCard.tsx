@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useQueryClient } from '@tanstack/react-query';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -13,6 +13,8 @@ import {
 import { useMemberDashboard, dashboardKeys } from '@/domains/dashboard';
 import { PostWorkoutFeedbackSheet } from '@/domains/checkIn/presentation/components/members/PostWorkoutFeedbackSheet';
 import type { MemberFeedbackPayload } from '@/domains/checkIn/domain/MemberFeedback';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function MemberCheckInCard() {
   const queryClient = useQueryClient();
@@ -61,7 +63,9 @@ export function MemberCheckInCard() {
           if (attId) {
             setCompletedAttendanceId(attId);
           }
-          Alert.alert('Check-In Successful', 'Welcome to the gym! Access unlocked.');
+          toast.success('Welcome to the gym! Access unlocked.', {
+            title: 'Check-In Successful'
+          });
         },
         onError: (err: any) => {
           const status = err?.status || err?.response?.status;
@@ -76,12 +80,16 @@ export function MemberCheckInCard() {
             setOverrideCheckedIn(true);
             queryClient.invalidateQueries({ queryKey: checkInKeys.all });
             queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
-            Alert.alert(
-              'Already Checked In',
-              'You have an active workout session in progress. Tap Check Out when finished.'
+            toast.info(
+              'You have an active workout session in progress. Tap Check Out when finished.',
+              {
+                title: 'Already Checked In'
+              }
             );
           } else {
-            Alert.alert('Check-In Notice', msg);
+            toast.info(msg, {
+              title: 'Check-In Notice'
+            });
           }
         },
       });
@@ -115,7 +123,9 @@ export function MemberCheckInCard() {
             queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
           }
 
-          Alert.alert('Check-Out Notice', msg);
+          toast.info(msg, {
+            title: 'Check-Out Notice'
+          });
         },
       });
     }
@@ -141,7 +151,9 @@ export function MemberCheckInCard() {
           err?.response?.data?.message ||
           err?.message ||
           'Feedback could not be submitted.';
-        Alert.alert('Feedback Error', msg);
+        toast.error(msg, {
+          title: 'Feedback Error'
+        });
       },
     });
   };

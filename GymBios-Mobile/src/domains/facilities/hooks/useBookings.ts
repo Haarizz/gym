@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ApiFacilityRepository } from '../infrastructure/ApiFacilityRepository';
 import type { BookingFilters } from '../domain/Booking';
+import { useBranchContext } from "@/shared/providers/BranchProvider";
 
 const repository = new ApiFacilityRepository();
 
@@ -11,8 +12,9 @@ export const bookingKeys = {
 };
 
 export function useBookings(filters?: BookingFilters) {
+    const { selectedBranchId } = useBranchContext();
   return useQuery({
-    queryKey: bookingKeys.list(filters),
+    queryKey: [...(Array.isArray(bookingKeys.list(filters)) ? bookingKeys.list(filters) : [bookingKeys.list(filters)]), selectedBranchId],
     queryFn: () => repository.getBookings(filters),
   });
 }

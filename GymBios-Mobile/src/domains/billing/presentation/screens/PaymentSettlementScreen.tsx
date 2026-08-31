@@ -1,12 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -27,6 +20,8 @@ import {
   PaymentMethodBadge,
   PaymentSummaryCard,
 } from '../components';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface PaymentSettlementScreenProps {
   memberId: number;
@@ -109,7 +104,9 @@ export function PaymentSettlementScreen({
       onSuccess(response.id);
     } catch (err: any) {
       form.hideReview();
-      Alert.alert('Payment Failed', err?.message ?? 'Something went wrong. Please try again.');
+      toast.error(err?.message ?? 'Something went wrong. Please try again.', {
+        title: 'Payment Failed'
+      });
     }
   }, [memberId, form, settlePayment, onSuccess]);
 

@@ -27,4 +27,7 @@ export interface DropdownProps {
 
   /** Validation error message shown below the field. */
   error?: string;
+
+  /** Custom trigger element that completely replaces the default input trigger */
+  customTrigger?: (openSheet: () => void) => React.ReactNode;
 }

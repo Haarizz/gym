@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useProfile } from '@/domains/profile';
 import type { TrainerDashboardData } from '../domain/TrainerDashboardData';
 import { trainerDashboardRepository } from '../infrastructure/ApiTrainerDashboardRepository';
+import { useBranchContext } from "@/shared/providers/BranchProvider";
 
 const DEFAULT_TRAINER_DASHBOARD: TrainerDashboardData = {
   trainerInfo: {
@@ -25,11 +26,12 @@ export const trainerDashboardKeys = {
 };
 
 export function useTrainerDashboard() {
+    const { selectedBranchId } = useBranchContext();
   const { profile } = useProfile();
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: trainerDashboardKeys.all,
+    queryKey: [...(Array.isArray(trainerDashboardKeys.all) ? trainerDashboardKeys.all : [trainerDashboardKeys.all]), selectedBranchId],
     queryFn: async (): Promise<TrainerDashboardData> => {
       try {
         const data = await trainerDashboardRepository.getTrainerDashboard();

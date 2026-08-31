@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import type { MembershipPlanItem } from './PlanCard';
@@ -40,19 +42,12 @@ export function PlanPurchaseModal({
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
-      Alert.alert(
-        'Purchase Successful! 🎉',
-        `You have successfully subscribed to ${plan.name} at ${center.name}. Your membership is now active!`,
-        [
-          {
-            text: 'Great!',
-            onPress: () => {
-              onSuccess();
-              onClose();
-            },
-          },
-        ]
-      );
+      toast.success(`You have successfully subscribed to ${plan.name} at ${center.name}. Your membership is now active!`, {
+        title: 'Purchase Successful! 🎉',
+        duration: 4000,
+      });
+      onSuccess();
+      onClose();
     }, 800);
   };
 

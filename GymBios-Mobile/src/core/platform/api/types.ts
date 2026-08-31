@@ -1,3 +1,11 @@
+import 'axios';
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipGlobalErrorToast?: boolean;
+  }
+}
+
 export interface ApiErrorBody {
   message?: string;
   code?: string;

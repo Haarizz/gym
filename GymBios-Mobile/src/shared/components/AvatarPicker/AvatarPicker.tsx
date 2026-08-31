@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
@@ -39,10 +40,7 @@ export function AvatarPicker({
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
-          'Permission Required',
-          'Camera access is needed to take a profile photo.',
-        );
+        toast.warning('Camera access is needed to take a profile photo.', { title: 'Permission Required' });
         return;
       }
 
@@ -57,7 +55,7 @@ export function AvatarPicker({
         onChangePhoto(result.assets[0].uri);
       }
     } catch (_err) {
-      Alert.alert('Error', 'Camera is unavailable or an error occurred.');
+      toast.error('Camera is unavailable or an error occurred.');
     }
   }, [onChangePhoto]);
 
@@ -66,10 +64,7 @@ export function AvatarPicker({
       const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
-          'Permission Required',
-          'Gallery access is needed to select a photo.',
-        );
+        toast.warning('Gallery access is needed to select a photo.', { title: 'Permission Required' });
         return;
       }
 
@@ -84,7 +79,7 @@ export function AvatarPicker({
         onChangePhoto(result.assets[0].uri);
       }
     } catch (_err) {
-      Alert.alert('Error', 'Unable to open image gallery.');
+      toast.error('Unable to open image gallery.');
     }
   }, [onChangePhoto]);
 

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -16,6 +16,8 @@ import { EmploymentStep } from './steps/EmploymentStep';
 import { CompensationStep } from './steps/CompensationStep';
 import { ScheduleStep } from './steps/ScheduleStep';
 import { AppAccessStep } from './steps/AppAccessStep';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface StaffWizardScreenProps {
   mode: 'create' | 'edit';
@@ -43,7 +45,9 @@ export function StaffWizardScreen({
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   const handleError = useCallback((_error: Error) => {
-    Alert.alert('Error', 'An error occurred. Please try again.');
+    toast.error('An error occurred. Please try again.', {
+      title: 'Error'
+    });
   }, []);
 
   const handleCancel = useCallback(() => {
