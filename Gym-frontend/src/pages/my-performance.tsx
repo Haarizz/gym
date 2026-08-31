@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { CurrencyGlyph } from "../utils/currency";
+import { staffService, StaffTarget } from "../utils/supabase/staff-service";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -106,14 +107,11 @@ const monthlyHistoricalData = [
   { month: "Jul", revenue: 7320, sessions: 54, feedback: 4.7, attendance: 93 },
 ];
 
-// Target progress data
-const targetProgressData = [
-  { name: "Membership Plan Sales", current: 16, target: 20, percentage: 80, category: "Sales" },
-  { name: "POS Products Sold", current: 45, target: 75, percentage: 60, category: "Sales" },
-  { name: "Session Completion Rate", current: 95, target: 100, percentage: 95, category: "Performance" },
-  { name: "Member Retention", current: 34, target: 38, percentage: 89, category: "Engagement" },
-  { name: "New Client Acquisition", current: 12, target: 15, percentage: 80, category: "Growth" },
-];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function targetPeriodLabel(t: StaffTarget): string {
+  return t.month ? `${MONTH_NAMES[t.month - 1]} ${t.year}` : `${t.year || ""}`;
+}
 
 // Achievement badges
 const achievementBadges = [
@@ -153,6 +151,27 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
   const [compareWithPrevious, setCompareWithPrevious] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState("revenue");
   const [activeTab, setActiveTab] = useState("activity");
+
+  const [myTargets, setMyTargets] = useState<StaffTarget[]>([]);
+  const [loadingTargets, setLoadingTargets] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingTargets(true);
+      try {
+        const profile = await staffService.getMyProfile();
+        if (!profile) { if (!cancelled) setMyTargets([]); return; }
+        const targets = await staffService.getTargets(undefined, undefined, undefined, Number(profile.id));
+        if (!cancelled) setMyTargets(targets);
+      } catch (error) {
+        console.error("Failed to load my targets:", error);
+      } finally {
+        if (!cancelled) setLoadingTargets(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Calculate KPI changes
   const kpiData = useMemo(() => ({
@@ -629,27 +648,43 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
               {/* Targets & Achievements Tab */}
               <TabsContent value="targets" className="space-y-6 mt-0">
                 <div>
-                  <h3 className="text-lg font-semibold text-primary mb-4">Monthly Target Progress</h3>
+                  <h3 className="text-lg font-semibold text-primary mb-4">Target Progress</h3>
                   <div className="space-y-4">
-                    {targetProgressData.map((target, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium">{target.name}</span>
-                            <Badge className="ml-2 bg-gradient-light text-primary border-primary/20 text-xs">
-                              {target.category}
-                            </Badge>
+                    {loadingTargets ? (
+                      <p className="text-sm text-gray-500">Loading targets...</p>
+                    ) : myTargets.length === 0 ? (
+                      <p className="text-sm text-gray-500">No targets assigned yet. Your admin hasn't set any targets for you.</p>
+                    ) : (
+                      myTargets.map((target) => {
+                        const pct = target.percentage ?? 0;
+                        return (
+                          <div key={target.id} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="font-medium">Revenue — {targetPeriodLabel(target)}</span>
+                                <Badge className="ml-2 bg-gradient-light text-primary border-primary/20 text-xs">
+                                  {target.scope === 'institution' ? 'Institution' : 'Individual'}
+                                </Badge>
+                              </div>
+                              <span className="text-sm text-gray-600">
+                                <CurrencyGlyph /> {Number(target.revenue_achieved || 0).toLocaleString()} / <CurrencyGlyph /> {Number(target.revenue_target || 0).toLocaleString()} ({pct}%)
+                              </span>
+                            </div>
+                            <Progress
+                              value={Math.min(pct, 100)}
+                              className={`h-3 ${pct >= 90 ? 'bg-green-100' : pct >= 70 ? 'bg-yellow-100' : 'bg-red-100'}`}
+                            />
+                            {(target.sessions_target || target.new_clients_target) && (
+                              <div className="text-xs text-gray-600">
+                                {target.sessions_target ? `${target.sessions_achieved || 0}/${target.sessions_target} sessions` : ''}
+                                {target.sessions_target && target.new_clients_target ? ' · ' : ''}
+                                {target.new_clients_target ? `${target.new_clients_achieved || 0}/${target.new_clients_target} new clients` : ''}
+                              </div>
+                            )}
                           </div>
-                          <span className="text-sm text-gray-600">
-                            {target.current} / {target.target} ({target.percentage}%)
-                          </span>
-                        </div>
-                        <Progress 
-                          value={target.percentage} 
-                          className={`h-3 ${target.percentage >= 90 ? 'bg-green-100' : target.percentage >= 70 ? 'bg-yellow-100' : 'bg-red-100'}`}
-                        />
-                      </div>
-                    ))}
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 

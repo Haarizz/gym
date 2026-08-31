@@ -61,7 +61,7 @@ import {
 import { toast } from "sonner";
 import { format, subDays, subMonths } from "date-fns";
 import { authService } from "../utils/supabase/auth-service";
-import { staffService, Staff } from "../utils/supabase/staff-service";
+import { staffService, Staff, StaffTarget } from "../utils/supabase/staff-service";
 
 interface MyProfileProps {
   onNavigate?: (section: string) => void;
@@ -72,17 +72,6 @@ interface EditableProfileFields {
   email: string;
   phone: string;
   address: string;
-}
-
-interface UserStats {
-  currentTargets: number;
-  completedTargets: number;
-  totalTargets: number;
-  performanceScore: number;
-  attendanceRate: number;
-  classesCompleted: number;
-  hoursWorked: number;
-  clientsSatisfaction: number;
 }
 
 interface Achievement {
@@ -103,31 +92,9 @@ interface Transaction {
   status: 'completed' | 'pending' | 'failed';
 }
 
-interface Target {
-  id: string;
-  title: string;
-  description: string;
-  progress: number;
-  target: number;
-  unit: string;
-  deadline: Date;
-  status: 'active' | 'completed' | 'overdue';
-  category: string;
-}
-
-// Trial Data — performance/targets/transactions are not yet backed by real
+// Trial Data — achievements/transactions are not yet backed by real
 // endpoints, so these stay illustrative until those modules are wired up.
-const userStats: UserStats = {
-  currentTargets: 8,
-  completedTargets: 24,
-  totalTargets: 32,
-  performanceScore: 94,
-  attendanceRate: 98,
-  classesCompleted: 156,
-  hoursWorked: 340,
-  clientsSatisfaction: 96
-};
-
+// Targets/performance are now driven by the real /api/staff-targets data (see myTargets below).
 const achievements: Achievement[] = [
   {
     id: "A001",
@@ -197,41 +164,20 @@ const recentTransactions: Transaction[] = [
   }
 ];
 
-const currentTargets: Target[] = [
-  {
-    id: "TG001",
-    title: "Monthly Client Sessions",
-    description: "Complete 80 personal training sessions",
-    progress: 72,
-    target: 80,
-    unit: "sessions",
-    deadline: new Date(2024, 10, 30),
-    status: 'active',
-    category: 'Performance'
-  },
-  {
-    id: "TG002",
-    title: "Client Satisfaction",
-    description: "Maintain 95%+ satisfaction rating",
-    progress: 96,
-    target: 95,
-    unit: "%",
-    deadline: new Date(2024, 10, 30),
-    status: 'completed',
-    category: 'Quality'
-  },
-  {
-    id: "TG003",
-    title: "New Client Acquisition",
-    description: "Onboard 5 new premium clients",
-    progress: 3,
-    target: 5,
-    unit: "clients",
-    deadline: new Date(2024, 10, 30),
-    status: 'active',
-    category: 'Growth'
-  }
-];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function targetLabel(t: StaffTarget): string {
+  const timeframeLabel = t.timeframe ? t.timeframe.charAt(0).toUpperCase() + t.timeframe.slice(1) : "Revenue";
+  const period = t.month ? `${MONTH_NAMES[t.month - 1]} ${t.year}` : `${t.year || ""}`;
+  const prefix = t.scope === 'institution' ? 'Institution-wide' : timeframeLabel;
+  return `${prefix} Target${period ? ` — ${period}` : ''}`;
+}
+
+function targetStatus(t: StaffTarget): 'active' | 'completed' | 'overdue' {
+  if ((t.percentage ?? 0) >= 100) return 'completed';
+  if (t.end_date && new Date(t.end_date) < new Date()) return 'overdue';
+  return 'active';
+}
 
 export function MyProfile({ onNavigate }: MyProfileProps) {
   const { currencyCode } = useCurrency();
@@ -290,6 +236,40 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
     return () => { cancelled = true; };
   }, []);
 
+  const [myTargets, setMyTargets] = useState<StaffTarget[]>([]);
+  const [loadingTargets, setLoadingTargets] = useState(false);
+
+  useEffect(() => {
+    if (!staffProfile?.id) { setMyTargets([]); return; }
+    let cancelled = false;
+    (async () => {
+      setLoadingTargets(true);
+      try {
+        const targets = await staffService.getTargets(undefined, undefined, undefined, Number(staffProfile.id));
+        if (!cancelled) setMyTargets(targets);
+      } catch (error) {
+        console.error("Failed to load targets:", error);
+      } finally {
+        if (!cancelled) setLoadingTargets(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [staffProfile?.id]);
+
+  const targetsSummary = useMemo(() => {
+    const total = myTargets.length;
+    const completed = myTargets.filter(t => (t.percentage ?? 0) >= 100).length;
+    const active = total - completed;
+    const avgPerformance = total > 0
+      ? Math.round(myTargets.reduce((sum, t) => sum + (t.percentage ?? 0), 0) / total)
+      : 0;
+    const revenueAchieved = myTargets.reduce((sum, t) => sum + (Number(t.revenue_achieved) || 0), 0);
+    const revenueTarget = myTargets.reduce((sum, t) => sum + (Number(t.revenue_target) || 0), 0);
+    const sessionsAchieved = myTargets.reduce((sum, t) => sum + (Number(t.sessions_achieved) || 0), 0);
+    const newClientsAchieved = myTargets.reduce((sum, t) => sum + (Number(t.new_clients_achieved) || 0), 0);
+    return { total, completed, active, avgPerformance, revenueAchieved, revenueTarget, sessionsAchieved, newClientsAchieved };
+  }, [myTargets]);
+
   // Real identity fields — staff record wins when linked, falls back to the account.
   const displayName = staffProfile?.name || authUser?.name || "User";
   const displayEmail = staffProfile?.email || authUser?.email || "";
@@ -303,9 +283,11 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
   const displayInitials = displayName.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
   // Calculate progress percentages
-  const targetsProgress = (userStats.completedTargets / userStats.totalTargets) * 100;
-  const performanceColor = userStats.performanceScore >= 90 ? 'text-green-600' :
-                          userStats.performanceScore >= 75 ? 'text-yellow-600' : 'text-red-600';
+  const targetsProgress = targetsSummary.total > 0 ? (targetsSummary.completed / targetsSummary.total) * 100 : 0;
+  const performanceColor = targetsSummary.avgPerformance >= 90 ? 'text-green-600' :
+                          targetsSummary.avgPerformance >= 75 ? 'text-yellow-600' : 'text-red-600';
+  // Attendance isn't backed by a real endpoint yet — stays illustrative until that module is wired up.
+  const attendanceRate = 98;
 
   const startEditing = () => {
     setEditedProfile({
@@ -604,10 +586,10 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Performance Score</span>
                   <span className={`text-sm font-bold ${performanceColor}`}>
-                    {userStats.performanceScore}%
+                    {targetsSummary.avgPerformance}%
                   </span>
                 </div>
-                <Progress value={userStats.performanceScore} className="h-2" />
+                <Progress value={targetsSummary.avgPerformance} className="h-2" />
               </div>
 
               {/* Targets Progress */}
@@ -615,7 +597,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Targets Progress</span>
                   <span className="text-sm font-bold text-primary">
-                    {userStats.completedTargets}/{userStats.totalTargets}
+                    {targetsSummary.completed}/{targetsSummary.total}
                   </span>
                 </div>
                 <Progress value={targetsProgress} className="h-2" />
@@ -626,22 +608,22 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Attendance Rate</span>
                   <span className="text-sm font-bold text-green-600">
-                    {userStats.attendanceRate}%
+                    {attendanceRate}%
                   </span>
                 </div>
-                <Progress value={userStats.attendanceRate} className="h-2" />
+                <Progress value={attendanceRate} className="h-2" />
               </div>
 
               <Separator />
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{userStats.classesCompleted}</div>
-                  <div className="text-xs text-gray-600">Classes</div>
+                  <div className="text-2xl font-bold text-primary">{targetsSummary.sessionsAchieved}</div>
+                  <div className="text-xs text-gray-600">Sessions</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{userStats.hoursWorked}</div>
-                  <div className="text-xs text-gray-600">Hours</div>
+                  <div className="text-2xl font-bold text-primary">{targetsSummary.newClientsAchieved}</div>
+                  <div className="text-xs text-gray-600">New Clients</div>
                 </div>
               </div>
             </CardContent>
@@ -784,7 +766,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                       {isEditing ? (
                         <Input
                           value={editedProfile.phone}
-                          onChange={(e) => setEditedProfile({...editedProfile, phone: e.target.value})}
+                          onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setEditedProfile({...editedProfile, phone: v}); }}
                           className="input-focus"
                         />
                       ) : (
@@ -918,7 +900,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   <CardContent className="p-6 relative z-10">
                     <div className="flex items-center justify-between text-white">
                       <div>
-                        <div className="text-3xl font-bold mb-1">{userStats.performanceScore}%</div>
+                        <div className="text-3xl font-bold mb-1">{targetsSummary.avgPerformance}%</div>
                         <div className="text-white/90 font-medium">Performance Score</div>
                       </div>
                       <TrendingUp className="h-8 w-8 text-white/80" />
@@ -931,8 +913,21 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   <CardContent className="p-6 relative z-10">
                     <div className="flex items-center justify-between text-white">
                       <div>
-                        <div className="text-3xl font-bold mb-1">{userStats.classesCompleted}</div>
-                        <div className="text-white/90 font-medium">Classes Completed</div>
+                        <div className="text-3xl font-bold mb-1"><CurrencyGlyph /> {targetsSummary.revenueAchieved.toLocaleString()}</div>
+                        <div className="text-white/90 font-medium">Revenue Achieved</div>
+                      </div>
+                      <CircleDollarSign className="h-8 w-8 text-white/80" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm overflow-hidden relative">
+                  <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
+                  <CardContent className="p-6 relative z-10">
+                    <div className="flex items-center justify-between text-white">
+                      <div>
+                        <div className="text-3xl font-bold mb-1">{targetsSummary.sessionsAchieved}</div>
+                        <div className="text-white/90 font-medium">Sessions Completed</div>
                       </div>
                       <Dumbbell className="h-8 w-8 text-white/80" />
                     </div>
@@ -944,23 +939,10 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   <CardContent className="p-6 relative z-10">
                     <div className="flex items-center justify-between text-white">
                       <div>
-                        <div className="text-3xl font-bold mb-1">{userStats.hoursWorked}</div>
-                        <div className="text-white/90 font-medium">Hours Worked</div>
+                        <div className="text-3xl font-bold mb-1">{targetsSummary.newClientsAchieved}</div>
+                        <div className="text-white/90 font-medium">New Clients Acquired</div>
                       </div>
-                      <Timer className="h-8 w-8 text-white/80" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-0 shadow-sm overflow-hidden relative">
-                  <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
-                  <CardContent className="p-6 relative z-10">
-                    <div className="flex items-center justify-between text-white">
-                      <div>
-                        <div className="text-3xl font-bold mb-1">{userStats.clientsSatisfaction}%</div>
-                        <div className="text-white/90 font-medium">Client Satisfaction</div>
-                      </div>
-                      <Heart className="h-8 w-8 text-white/80" />
+                      <Users className="h-8 w-8 text-white/80" />
                     </div>
                   </CardContent>
                 </Card>
@@ -982,38 +964,35 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                 </CardContent>
               </Card>
 
-              {/* KPIs */}
+              {/* Target Achievement Breakdown */}
               <Card className={panelCardShell}>
                 <CardHeader>
-                  <CardTitle className="text-primary">Key Performance Indicators</CardTitle>
+                  <CardTitle className="text-primary">Target Achievement Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="text-center p-4 bg-gradient-light rounded-lg">
-                      <div className="text-2xl font-bold text-green-600 mb-2">
-                        <ArrowUpRight className="h-6 w-6 inline mr-1" />
-                        +12%
+                      <div className="text-2xl font-bold text-primary mb-2">
+                        {targetsSummary.revenueTarget > 0 ? Math.round((targetsSummary.revenueAchieved / targetsSummary.revenueTarget) * 100) : 0}%
                       </div>
-                      <div className="text-sm font-medium">Performance Growth</div>
-                      <div className="text-xs text-gray-600">vs last month</div>
+                      <div className="text-sm font-medium">Revenue Target Achieved</div>
+                      <div className="text-xs text-gray-600">
+                        <CurrencyGlyph /> {targetsSummary.revenueAchieved.toLocaleString()} of <CurrencyGlyph /> {targetsSummary.revenueTarget.toLocaleString()}
+                      </div>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-gradient-light rounded-lg">
-                      <div className="text-2xl font-bold text-green-600 mb-2">
-                        <ArrowUpRight className="h-6 w-6 inline mr-1" />
-                        +8%
+                      <div className="text-2xl font-bold text-primary mb-2">
+                        {targetsSummary.completed}/{targetsSummary.total}
                       </div>
-                      <div className="text-sm font-medium">Client Retention</div>
-                      <div className="text-xs text-gray-600">vs last quarter</div>
+                      <div className="text-sm font-medium">Targets Completed</div>
+                      <div className="text-xs text-gray-600">across all assigned periods</div>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-gradient-light rounded-lg">
-                      <div className="text-2xl font-bold text-green-600 mb-2">
-                        <ArrowUpRight className="h-6 w-6 inline mr-1" />
-                        +15%
-                      </div>
-                      <div className="text-sm font-medium">Session Quality</div>
-                      <div className="text-xs text-gray-600">avg rating improvement</div>
+                      <div className="text-2xl font-bold text-primary mb-2">{targetsSummary.sessionsAchieved}</div>
+                      <div className="text-sm font-medium">Sessions Logged</div>
+                      <div className="text-xs text-gray-600">against target sessions</div>
                     </div>
                   </div>
                 </CardContent>
@@ -1038,41 +1017,60 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {currentTargets.map((target) => (
-                    <div key={target.id} className="p-4 bg-gradient-light rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="bg-gradient-primary text-white rounded-full p-2">
-                            <Target className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <div className="font-medium">{target.title}</div>
-                            <div className="text-sm text-gray-600">{target.description}</div>
-                          </div>
-                        </div>
-                        <Badge className={`${
-                          target.status === 'completed' ? 'bg-green-100 text-green-800' :
-                          target.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                          'bg-blue-100 text-blue-800'
-                        }`}>
-                          {target.status}
-                        </Badge>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Progress: {target.progress} / {target.target} {target.unit}</span>
-                          <span className="font-medium">
-                            {Math.round((target.progress / target.target) * 100)}%
-                          </span>
-                        </div>
-                        <Progress value={(target.progress / target.target) * 100} className="h-2" />
-                        <div className="text-xs text-gray-600">
-                          Deadline: {format(target.deadline, 'MMM dd, yyyy')}
-                        </div>
-                      </div>
+                  {loadingTargets ? (
+                    <div className="flex items-center justify-center py-10 text-gray-500">
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Loading targets...
                     </div>
-                  ))}
+                  ) : myTargets.length === 0 ? (
+                    <div className="text-center py-10 text-gray-500">
+                      <Target className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                      No targets assigned yet. Your admin hasn't set any targets for you.
+                    </div>
+                  ) : (
+                    myTargets.map((target) => {
+                      const status = targetStatus(target);
+                      return (
+                        <div key={target.id} className="p-4 bg-gradient-light rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="bg-gradient-primary text-white rounded-full p-2">
+                                <Target className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <div className="font-medium">{targetLabel(target)}</div>
+                                <div className="text-sm text-gray-600">
+                                  <CurrencyGlyph /> {Number(target.revenue_achieved || 0).toLocaleString()} of <CurrencyGlyph /> {Number(target.revenue_target || 0).toLocaleString()} revenue
+                                  {target.sessions_target ? ` · ${target.sessions_achieved || 0}/${target.sessions_target} sessions` : ''}
+                                  {target.new_clients_target ? ` · ${target.new_clients_achieved || 0}/${target.new_clients_target} new clients` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            <Badge className={`${
+                              status === 'completed' ? 'bg-green-100 text-green-800' :
+                              status === 'overdue' ? 'bg-red-100 text-red-800' :
+                              'bg-blue-100 text-blue-800'
+                            }`}>
+                              {status}
+                            </Badge>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Revenue progress</span>
+                              <span className="font-medium">{target.percentage ?? 0}%</span>
+                            </div>
+                            <Progress value={Math.min(target.percentage ?? 0, 100)} className="h-2" />
+                            <div className="text-xs text-gray-600">
+                              {target.end_date
+                                ? `Deadline: ${format(new Date(target.end_date), 'MMM dd, yyyy')}`
+                                : `Period: ${target.month ? `${MONTH_NAMES[target.month - 1]} ${target.year}` : target.year}`}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </CardContent>
               </Card>
 
@@ -1080,18 +1078,18 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className={panelCardShell}>
                   <CardContent className="p-6 text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">{userStats.currentTargets}</div>
+                    <div className="text-3xl font-bold text-primary mb-2">{targetsSummary.active}</div>
                     <div className="text-sm text-gray-600">Active Targets</div>
                   </CardContent>
                 </Card>
-                
+
                 <Card className={panelCardShell}>
                   <CardContent className="p-6 text-center">
-                    <div className="text-3xl font-bold text-green-600 mb-2">{userStats.completedTargets}</div>
+                    <div className="text-3xl font-bold text-green-600 mb-2">{targetsSummary.completed}</div>
                     <div className="text-sm text-gray-600">Completed</div>
                   </CardContent>
                 </Card>
-                
+
                 <Card className={panelCardShell}>
                   <CardContent className="p-6 text-center">
                     <div className="text-3xl font-bold text-primary mb-2">{Math.round(targetsProgress)}%</div>

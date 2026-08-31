@@ -25,8 +25,9 @@ public class StaffTargetController {
     public ResponseEntity<List<StaffTargetResponseDTO>> getTargets(
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) String scope) {
-        return ResponseEntity.ok(targetService.getTargets(year, month, scope));
+            @RequestParam(required = false) String scope,
+            @RequestParam(value = "staff_db_id", required = false) Long staffDbId) {
+        return ResponseEntity.ok(targetService.getTargets(year, month, scope, staffDbId));
     }
 
     @GetMapping("/{id}")

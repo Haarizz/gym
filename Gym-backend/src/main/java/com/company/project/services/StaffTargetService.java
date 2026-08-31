@@ -27,9 +27,15 @@ public class StaffTargetService {
     }
 
     @Transactional(readOnly = true)
-    public List<StaffTargetResponseDTO> getTargets(Integer year, Integer month, String scope) {
+    public List<StaffTargetResponseDTO> getTargets(Integer year, Integer month, String scope, Long staffDbId) {
         List<StaffTarget> targets;
-        if (year != null && month != null) {
+        if (staffDbId != null && year != null && month != null) {
+            targets = targetRepository.findByStaffIdAndYearAndMonth(staffDbId, year, month);
+        } else if (staffDbId != null && scope != null) {
+            targets = targetRepository.findByStaff_IdAndScope(staffDbId, scope);
+        } else if (staffDbId != null) {
+            targets = targetRepository.findByStaff_Id(staffDbId);
+        } else if (year != null && month != null) {
             targets = targetRepository.findByYearAndMonth(year, month);
         } else if (scope != null) {
             targets = targetRepository.findByScope(scope);
