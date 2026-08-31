@@ -64,7 +64,9 @@ public class MobileTrainerPerformanceService {
         LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime startOfNextMonth = startOfMonth.plusMonths(1);
 
-        Optional<StaffTarget> targetOpt = staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), year, month);
+        Optional<StaffTarget> targetOpt = staffTargetRepository
+                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), year, month)
+                .stream().findFirst();
 
         // 1. Monthly Performance - Revenue
         BigDecimal revenueAchieved = computeStaffRevenue(staff, principal.getUsername(), startOfMonth, startOfNextMonth);

@@ -70,7 +70,9 @@ public class MobileTrainerLedgerService {
         LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime startOfNextMonth = startOfMonth.plusMonths(1);
 
-        Optional<StaffTarget> currentTargetOpt = staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), year, month);
+        Optional<StaffTarget> currentTargetOpt = staffTargetRepository
+                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), year, month)
+                .stream().findFirst();
         Optional<SalaryPaymentEmployee> paymentEmployeeOpt = staff.getStaffId() != null
                 ? salaryPaymentEmployeeRepository.findByEmployeeId(staff.getStaffId())
                 : Optional.empty();
@@ -220,7 +222,9 @@ public class MobileTrainerLedgerService {
 
         LocalDateTime startOfPrevMonth = prevMonthDate.withDayOfMonth(1).atStartOfDay();
         LocalDateTime endOfPrevMonth = startOfPrevMonth.plusMonths(1);
-        Optional<StaffTarget> prevTargetOpt = staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), prevYear, prevMonth);
+        Optional<StaffTarget> prevTargetOpt = staffTargetRepository
+                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), prevYear, prevMonth)
+                .stream().findFirst();
         BigDecimal prevCommission = computeStaffCommission(staff, username, startOfPrevMonth, endOfPrevMonth, prevTargetOpt);
 
         return baseSalary.add(prevCommission);

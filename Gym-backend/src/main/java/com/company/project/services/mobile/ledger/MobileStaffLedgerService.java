@@ -77,7 +77,9 @@ public class MobileStaffLedgerService {
         PeriodDTO period = new PeriodDTO(year, month, monthLabel);
 
         // Fetch optional StaffTarget & SalaryPaymentEmployee
-        Optional<StaffTarget> currentTargetOpt = staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), year, month);
+        Optional<StaffTarget> currentTargetOpt = staffTargetRepository
+                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), year, month)
+                .stream().findFirst();
         Optional<SalaryPaymentEmployee> paymentEmployeeOpt = staff.getStaffId() != null
                 ? salaryPaymentEmployeeRepository.findByEmployeeId(staff.getStaffId())
                 : Optional.empty();
@@ -169,7 +171,9 @@ public class MobileStaffLedgerService {
         LocalDateTime startOfMonth = LocalDate.of(year, month, 1).atStartOfDay();
         LocalDateTime startOfNextMonth = startOfMonth.plusMonths(1);
 
-        Optional<StaffTarget> targetOpt = staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), year, month);
+        Optional<StaffTarget> targetOpt = staffTargetRepository
+                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), year, month)
+                .stream().findFirst();
         Optional<SalaryPaymentEmployee> paymentEmployeeOpt = staff.getStaffId() != null
                 ? salaryPaymentEmployeeRepository.findByEmployeeId(staff.getStaffId())
                 : Optional.empty();
@@ -341,7 +345,9 @@ public class MobileStaffLedgerService {
         // Fallback: estimate from previous month target / receipts
         LocalDateTime startOfPrevMonth = prevMonthDate.withDayOfMonth(1).atStartOfDay();
         LocalDateTime endOfPrevMonth = startOfPrevMonth.plusMonths(1);
-        Optional<StaffTarget> prevTargetOpt = staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), prevYear, prevMonth);
+        Optional<StaffTarget> prevTargetOpt = staffTargetRepository
+                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), prevYear, prevMonth)
+                .stream().findFirst();
         BigDecimal prevCommission = computeStaffCommission(staff, username, startOfPrevMonth, endOfPrevMonth, prevTargetOpt);
 
         return baseSalary.add(prevCommission).compareTo(BigDecimal.ZERO) > 0

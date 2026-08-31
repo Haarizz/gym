@@ -67,9 +67,12 @@ public class MobileStaffPerformanceService {
         // 1. Period
         PeriodDTO period = new PeriodDTO(year, month, monthLabel);
 
-        // Fetch optional StaffTarget for current month (only meaningful when linked to a Staff record)
+        // Fetch optional StaffTarget for current month (only meaningful when linked to a Staff record).
+        // Multiple rows can exist for the same staff/period (no DB uniqueness enforced), so take
+        // the most recently created one rather than letting a non-unique lookup blow up.
         Optional<StaffTarget> targetOpt = staff != null
-                ? staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), year, month)
+                ? staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), year, month)
+                        .stream().findFirst()
                 : Optional.empty();
 
         // 2. Revenue Target & Achieved

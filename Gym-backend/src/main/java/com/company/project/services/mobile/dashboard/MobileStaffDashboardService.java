@@ -316,7 +316,9 @@ public class MobileStaffDashboardService {
             Staff staff, String username, int year, int month,
             LocalDateTime startOfMonth, LocalDateTime startOfNextMonth) {
 
-        Optional<StaffTarget> targetOpt = staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), year, month);
+        Optional<StaffTarget> targetOpt = staffTargetRepository
+                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), year, month)
+                .stream().findFirst();
 
         if (targetOpt.isPresent()) {
             StaffTarget target = targetOpt.get();

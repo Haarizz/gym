@@ -137,7 +137,9 @@ public class MobileTrainerDashboardService {
 
         // Monthly Target Percentage
         int monthlyTargetPercentage = 0;
-        Optional<StaffTarget> targetOpt = staffTargetRepository.findByStaff_IdAndYearAndMonth(staff.getId(), today.getYear(), today.getMonthValue());
+        Optional<StaffTarget> targetOpt = staffTargetRepository
+                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), today.getYear(), today.getMonthValue())
+                .stream().findFirst();
         
         if (targetOpt.isPresent()) {
             StaffTarget target = targetOpt.get();
