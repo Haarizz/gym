@@ -91,11 +91,11 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
   const getChangeColor = (change: number) => (change >= 0 ? "text-green-600" : "text-red-600");
   const getChangeIcon = (change: number) => (change >= 0 ? TrendingUp : TrendingDown);
 
-  const revenueAchieved = performance?.revenueTarget.achieved ?? 0;
-  const conversionsAchieved = performance?.conversionTarget.achieved ?? 0;
-  const rating = performance?.summary.rating ?? 0;
-  const growthPercentage = performance?.summary.growthPercentage ?? 0;
-  const leadCount = performance?.summary.leadCount ?? 0;
+  const revenueAchieved = performance?.revenue_target?.achieved ?? 0;
+  const conversionsAchieved = performance?.conversion_target?.achieved ?? 0;
+  const rating = performance?.summary?.rating ?? 0;
+  const growthPercentage = performance?.summary?.growth_percentage ?? 0;
+  const leadCount = performance?.summary?.lead_count ?? 0;
 
   return (
     <div className="min-h-screen bg-gymbios-main-bg p-6 space-y-6">
@@ -191,15 +191,15 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                   <Dumbbell className="h-6 w-6 text-primary" />
                 </div>
                 <Badge className="text-primary bg-transparent border-0">
-                  {performance.conversionTarget.percentage}%
+                  {performance.conversion_target.percentage}%
                 </Badge>
               </div>
               <div className="space-y-2">
                 <h3 className="text-2xl font-bold text-primary">{conversionsAchieved}</h3>
                 <p className="text-sm text-gray-600">Conversions</p>
                 <p className="text-xs text-gray-500">
-                  {performance.conversionTarget.target > 0
-                    ? `Target: ${performance.conversionTarget.target}`
+                  {performance.conversion_target.target > 0
+                    ? `Target: ${performance.conversion_target.target}`
                     : "No target set"}
                 </p>
               </div>
@@ -319,11 +319,11 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                       <span className="font-medium">Leads → Conversions</span>
                       <span className="text-sm text-gray-600">
                         {conversionsAchieved}
-                        {performance.conversionTarget.target > 0 ? ` / ${performance.conversionTarget.target}` : ''}
-                        {' '}({performance.conversionTarget.percentage}%)
+                        {performance.conversion_target.target > 0 ? ` / ${performance.conversion_target.target}` : ''}
+                        {' '}({performance.conversion_target.percentage}%)
                       </span>
                     </div>
-                    <Progress value={Math.min(100, performance.conversionTarget.percentage)} className="h-3" />
+                    <Progress value={Math.min(100, performance.conversion_target.percentage)} className="h-3" />
                   </div>
                 </div>
 
@@ -340,7 +340,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                   <Card className="border-primary/20 bg-gradient-light">
                     <CardContent className="p-6 text-center">
                       <Zap className="h-8 w-8 text-primary mx-auto mb-2" />
-                      <h4 className="font-semibold text-2xl text-primary">{performance.breakdown.conversionRate}%</h4>
+                      <h4 className="font-semibold text-2xl text-primary">{performance.breakdown.conversion_rate}%</h4>
                       <p className="text-sm text-gray-600">Lead Conversion Rate</p>
                     </CardContent>
                   </Card>
@@ -356,7 +356,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                         <h4 className="font-semibold text-primary">Follow-up Completion</h4>
                         <TrendingUp className="h-5 w-5 text-green-600" />
                       </div>
-                      <div className="text-3xl font-bold text-primary mb-2">{performance.breakdown.followUpCompletion}%</div>
+                      <div className="text-3xl font-bold text-primary mb-2">{performance.breakdown.follow_up_completion}%</div>
                       <p className="text-sm text-gray-600">Of assigned follow-ups completed</p>
                     </CardContent>
                   </Card>
@@ -366,7 +366,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                         <h4 className="font-semibold text-primary">Customer Satisfaction</h4>
                         <Heart className="h-5 w-5 text-primary" />
                       </div>
-                      <div className="text-3xl font-bold text-primary mb-2">{performance.breakdown.customerSatisfaction}%</div>
+                      <div className="text-3xl font-bold text-primary mb-2">{performance.breakdown.customer_satisfaction}%</div>
                       <p className="text-sm text-gray-600">Based on member feedback ratings</p>
                     </CardContent>
                   </Card>
@@ -460,17 +460,17 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
               <div className="space-y-2">
                 {performance.leaderboard.map((entry) => (
                   <div
-                    key={entry.staffId}
-                    className={`flex items-center justify-between p-3 rounded-lg ${entry.currentUser ? 'bg-primary/5 border border-primary/20' : 'bg-gray-50'}`}
+                    key={entry.staff_id}
+                    className={`flex items-center justify-between p-3 rounded-lg ${entry.current_user ? 'bg-primary/5 border border-primary/20' : 'bg-gray-50'}`}
                   >
                     <div className="flex items-center space-x-3">
                       <span className="w-6 text-center font-semibold text-gray-600">{entry.rank}</span>
-                      <span className={`font-medium ${entry.currentUser ? 'text-primary' : ''}`}>
-                        {entry.currentUser ? 'You' : entry.staffName}
+                      <span className={`font-medium ${entry.current_user ? 'text-primary' : ''}`}>
+                        {entry.current_user ? 'You' : entry.staff_name}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span>{entry.conversionCount} conversions</span>
+                      <span>{entry.conversion_count} conversions</span>
                       <span className="font-medium text-primary"><CurrencyGlyph /> {entry.revenue.toLocaleString()}</span>
                     </div>
                   </div>

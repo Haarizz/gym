@@ -113,13 +113,13 @@ export interface CommissionRule {
 
 export interface StaffPerformance {
   period: { year: number; month: number; label: string };
-  revenueTarget: { achieved: number; target: number; percentage: number };
-  conversionTarget: { achieved: number; target: number; percentage: number };
-  summary: { rating: number; growthPercentage: number; leadCount: number };
+  revenue_target: { achieved: number; target: number; percentage: number };
+  conversion_target: { achieved: number; target: number; percentage: number };
+  summary: { rating: number; growth_percentage: number; lead_count: number };
   trend: Array<{ period: string; label: string; conversions: number; revenue: number }>;
-  leaderboard: Array<{ rank: number; staffId: number; staffName: string; conversionCount: number; revenue: number; currentUser: boolean }>;
-  breakdown: { conversionRate: number; followUpCompletion: number; customerSatisfaction: number };
-  motivation: { remainingConversions: number; message: string; status: string };
+  leaderboard: Array<{ rank: number; staff_id: number; staff_name: string; conversion_count: number; revenue: number; current_user: boolean }>;
+  breakdown: { conversion_rate: number; follow_up_completion: number; customer_satisfaction: number };
+  motivation: { remaining_conversions: number; message: string; status: string };
 }
 
 class StaffService {
