@@ -156,7 +156,7 @@ export function StaffClassForm({
           <DatePicker
             label="Date"
             value={date}
-            onChange={(d) => { setDate(d); setErrors(prev => ({ ...prev, date: '' })); }}
+            onChange={(d) => { setDate(d ?? undefined); setErrors(prev => ({ ...prev, date: '' })); }}
             error={errors.date}
             style={styles.field}
           />
@@ -204,7 +204,7 @@ export function StaffClassForm({
               <Input
                 label="Price"
                 keyboardType="numeric"
-                leftIcon={<Typography variant="bodyMedium" style={{ color: theme.textSecondary }}>₹</Typography>}
+                leftIcon={<Typography variant="body" style={{ color: theme.textSecondary }}>₹</Typography>}
                 value={price}
                 onChangeText={setPrice}
               />

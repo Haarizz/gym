@@ -25,6 +25,15 @@ export function useStaffClassesTrainers() {
   });
 }
 
+export function useStaffAllClasses(startDate: string, endDate: string) {
+  const { selectedBranchId } = useBranchContext();
+  return useQuery({
+    queryKey: [...staffClassesKeys.all, startDate, endDate, selectedBranchId],
+    queryFn: () => staffClassRepository.getSessions(startDate, endDate),
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
 export function useCreateStaffClass() {
   const queryClient = useQueryClient();
   

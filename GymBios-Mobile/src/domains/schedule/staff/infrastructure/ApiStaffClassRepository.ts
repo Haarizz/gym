@@ -3,6 +3,34 @@ import type { MobileStaffSessionRequestDTO, MobileStaffSessionResponseDTO } from
 
 export class ApiStaffClassRepository {
   /**
+   * GET /api/sessions
+   */
+  async getSessions(startDate: string, endDate: string): Promise<MobileStaffSessionResponseDTO[]> {
+    const response = await apiClient.get<any[]>('/sessions', {
+      params: { startDate, endDate }
+    });
+    
+    // Map backend response safely
+    return response.data.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      trainerId: item.trainer_id || item.trainerId,
+      trainerName: item.trainer_name || item.trainerName,
+      date: item.date,
+      startTime: item.start_time || item.startTime,
+      endTime: item.end_time || item.endTime,
+      durationMinutes: item.duration_minutes || item.durationMinutes,
+      location: item.location,
+      capacity: item.capacity,
+      booked: item.booked,
+      price: item.price,
+      status: item.status,
+      description: item.description,
+    }));
+  }
+
+  /**
    * POST /api/sessions
    * Creates a new class session using the Staff UI workflow.
    */

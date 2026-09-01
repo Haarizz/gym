@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Loader } from '@/shared/components';
 import { useRouter } from 'expo-router';
 import { Dropdown } from '@/shared/components/Dropdown/Dropdown';
 import { useStaffSchedule } from '../../hooks/useStaffSchedule';
-import { useTrainerSchedule } from '../../hooks/useTrainerSchedule';
+import { useStaffAllClasses } from '../../staff/presentation/hooks/useStaffClasses';
 import { StaffScheduleHeaderCard } from '../components/StaffScheduleHeaderCard';
 import { StaffScheduleStatsGrid } from '../components/StaffScheduleStatsGrid';
 import { StaffAddTaskButton } from '../components/StaffAddTaskButton';
@@ -21,33 +21,46 @@ export function StaffScheduleScreen() {
   const { data, isLoading, refetch, isRefetching, toggleTask } = useStaffSchedule();
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const { data: trainerData, isLoading: isTrainerLoading, refetch: refetchTrainer } = useTrainerSchedule(todayStr, todayStr);
+  const { data: allClasses, isLoading: isClassesLoading, refetch: refetchClasses } = useStaffAllClasses(todayStr, todayStr);
 
   const combinedTasks = useMemo(() => {
     if (!data) return [];
     
     const staffTasks = data.tasks || [];
     
-    const classes = trainerData?.weekSchedule?.[0]?.sessions || [];
-    const classTasks = classes.map((cls: any) => ({
-      id: `class-${cls.id}`,
-      time: cls.time,
-      type: 'Class',
-      name: cls.member || 'Class',
-      action: cls.type || 'Scheduled Class',
-      priority: 'medium' as const,
-      completed: cls.status === 'completed',
-    }));
+    const classes = allClasses || [];
+    const classTasks = classes.map((cls) => {
+      // Parse HH:mm:ss or HH:mm into a Date object and format it as hh:mm a
+      let formattedTime = 'TBD';
+      if (cls.startTime) {
+        try {
+          const timeParsed = parse(cls.startTime, cls.startTime.split(':').length === 3 ? 'HH:mm:ss' : 'HH:mm', new Date());
+          formattedTime = format(timeParsed, 'hh:mm a');
+        } catch (e) {
+          formattedTime = cls.startTime;
+        }
+      }
+
+      return {
+        id: `class-${cls.id}`,
+        time: formattedTime,
+        type: 'Class',
+        name: cls.name || 'Class',
+        action: cls.trainerName || cls.type || 'Scheduled Class',
+        priority: 'medium' as const,
+        completed: cls.status === 'completed',
+      };
+    });
 
     return [...staffTasks, ...classTasks];
-  }, [data, trainerData]);
+  }, [data, allClasses]);
 
   const handleRefresh = () => {
     refetch();
-    refetchTrainer();
+    refetchClasses();
   };
 
-  if ((isLoading && !data) || (isTrainerLoading && !trainerData)) {
+  if ((isLoading && !data) || (isClassesLoading && !allClasses)) {
     return (
       <View style={styles.loaderContainer}>
         <Loader message="Loading schedule..." />
@@ -105,7 +118,7 @@ export function StaffScheduleScreen() {
           customTrigger={(openSheet) => (
             <StaffAddTaskButton onPress={openSheet} />
           )}
-        />can you 
+        />
       </View>
 
       {/* Today's Tasks Section */}

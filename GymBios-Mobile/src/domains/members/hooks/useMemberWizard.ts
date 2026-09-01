@@ -8,6 +8,7 @@ import type {
   UpdateMemberRequest,
 } from '../application/directory/MemberDirectoryRepository';
 import { useMemberActions } from './useMemberActions';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 
 export interface DraftFamilyMember {
   name: string;
@@ -148,17 +149,17 @@ function mapMemberToWizardData(member?: Member): MemberWizardData {
     paymentStatus: member?.paymentStatus ?? 'PAID',
     discount: '',
 
-    bloodGroup: '',
-    height: '',
-    weight: '',
-    medicalConditions: '',
-    chronicIllnesses: '',
-    allergies: '',
-    currentMedications: '',
-    healthNotes: '',
+    bloodGroup: member?.bloodGroup ?? '',
+    height: member?.height ?? '',
+    weight: member?.weight ?? '',
+    medicalConditions: member?.medicalConditions ?? '',
+    chronicIllnesses: member?.chronicIllnesses ?? '',
+    allergies: member?.allergies ?? '',
+    currentMedications: member?.currentMedications ?? '',
+    healthNotes: member?.healthNotes ?? '',
 
-    isFamilyHead: true,
-    relationshipToHead: 'SPOUSE',
+    isFamilyHead: member?.familyHeadId === undefined,
+    relationshipToHead: member?.familyRole ?? 'SPOUSE',
     familyMembers: [],
 
     appAccessEnabled: member?.appAccessEnabled ?? false,
@@ -203,6 +204,23 @@ function buildCreateRequest(
     outstandingBalance: paymentResult?.outstandingBalance,
     bankAccountCode: paymentResult?.bankAccountCode,
     bankAccountName: paymentResult?.bankAccountName,
+
+    bloodGroup: data.bloodGroup || undefined,
+    height: data.height || undefined,
+    weight: data.weight || undefined,
+    medicalConditions: data.medicalConditions || undefined,
+    chronicIllnesses: data.chronicIllnesses || undefined,
+    allergies: data.allergies || undefined,
+    currentMedications: data.currentMedications || undefined,
+    healthNotes: data.healthNotes || undefined,
+
+    appAccessEnabled: data.appAccessEnabled,
+    appUsername: data.appAccessEnabled ? data.username : undefined,
+    appPassword: data.appAccessEnabled ? data.password : undefined,
+
+    isFamilyHead: data.isFamilyHead,
+    relationshipToHead: data.isFamilyHead ? undefined : data.relationshipToHead,
+    familyMembers: data.isFamilyHead ? data.familyMembers : undefined,
   };
 }
 
@@ -254,6 +272,7 @@ export function useMemberWizard({
     mapMemberToWizardData(initialData),
   );
   const { createMember, updateMember, submitting } = useMemberActions();
+  const { selectedBranchId } = useBranchContext();
 
   const currentStep = STEPS[step - 1];
   const totalSteps = STEPS.length;
@@ -305,16 +324,24 @@ export function useMemberWizard({
     async (paymentResult?: PaymentResult) => {
       try {
         if (mode === 'create') {
-          await createMember(buildCreateRequest(data, paymentResult));
+          const request = buildCreateRequest(data, paymentResult);
+          if (selectedBranchId && selectedBranchId !== 'ALL') {
+            request.branchId = selectedBranchId;
+          }
+          await createMember(request);
         } else if (mode === 'edit' && memberId) {
-          await updateMember(memberId, buildUpdateRequest(data));
+          const request = buildUpdateRequest(data);
+          if (selectedBranchId && selectedBranchId !== 'ALL') {
+            request.branchId = selectedBranchId;
+          }
+          await updateMember(memberId, request);
         }
         onSuccess?.();
       } catch (err) {
         onError?.(err as Error);
       }
     },
-    [mode, data, memberId, createMember, updateMember, onSuccess, onError],
+    [mode, data, memberId, createMember, updateMember, onSuccess, onError, selectedBranchId],
   );
 
   return {
