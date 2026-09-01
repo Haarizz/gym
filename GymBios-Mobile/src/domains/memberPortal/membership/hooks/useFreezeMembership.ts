@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { membershipApi } from '../infrastructure/membership.api';
 import { memberMembershipKeys } from './useMemberMembership';
-import { Alert } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface FreezeMembershipParams {
   durationDays: number;
@@ -19,7 +19,7 @@ export function useFreezeMembership() {
     },
     onError: (error: any) => {
       const message = error?.response?.data?.message || 'Failed to freeze membership.';
-      Alert.alert('Freeze Failed', message);
+      toast.error(message, { title: 'Freeze Failed' });
     },
   });
 }

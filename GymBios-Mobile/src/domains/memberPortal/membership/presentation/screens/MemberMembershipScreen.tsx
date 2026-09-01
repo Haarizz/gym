@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,6 +8,7 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { MembershipStatusCard, type MembershipDetails } from '../components/MembershipStatusCard';
@@ -59,7 +59,7 @@ export function MemberMembershipScreen() {
   };
 
   const handleRenewSuccess = () => {
-    Alert.alert('Coming Soon', 'Renew mutation will be implemented soon.');
+    toast.info('Renew mutation will be implemented soon.', { title: 'Coming Soon' });
   };
 
   const onRefresh = () => {

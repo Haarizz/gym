@@ -7,8 +7,8 @@ import type { MembershipPlan } from '../domain/MembershipPlan';
 export class MembershipPlanService {
   constructor(private readonly repository: MembershipPlanRepository) {}
 
-  getPlans(status?: string): Promise<MembershipPlan[]> {
-    return this.repository.getPlans(status);
+  getPlans(status?: string, branchId?: number | 'ALL'): Promise<MembershipPlan[]> {
+    return this.repository.getPlans(status, branchId);
   }
 
   getPlanById(id: number): Promise<MembershipPlan> {

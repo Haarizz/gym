@@ -19,6 +19,7 @@ interface MemberResponse {
   gender?: string | null;
   photo_url?: string | null;
   address?: string | null;
+  branch_id?: number | null;
 
   membership_type: string;
   membership_plan_id?: number | null;
@@ -43,6 +44,15 @@ interface MemberResponse {
   user_id?: number | null;
   app_username?: string | null;
   app_access_enabled: boolean;
+
+  blood_group?: string | null;
+  height?: string | null;
+  weight?: string | null;
+  medical_conditions?: string | null;
+  chronic_illnesses?: string | null;
+  allergies?: string | null;
+  current_medications?: string | null;
+  health_notes?: string | null;
 
   created_at?: string;
   updated_at?: string;
@@ -146,6 +156,7 @@ export class ApiMemberDirectoryRepository
       gender: response.gender ?? undefined,
       photoUrl: response.photo_url ?? undefined,
       address: response.address ?? undefined,
+      branchId: response.branch_id ?? undefined,
 
       membershipType: response.membership_type,
       membershipPlanId: response.membership_plan_id ?? undefined,
@@ -170,6 +181,15 @@ export class ApiMemberDirectoryRepository
       appUsername: response.app_username ?? undefined,
       appAccessEnabled: response.app_access_enabled,
 
+      bloodGroup: response.blood_group ?? undefined,
+      height: response.height ?? undefined,
+      weight: response.weight ?? undefined,
+      medicalConditions: response.medical_conditions ?? undefined,
+      chronicIllnesses: response.chronic_illnesses ?? undefined,
+      allergies: response.allergies ?? undefined,
+      currentMedications: response.current_medications ?? undefined,
+      healthNotes: response.health_notes ?? undefined,
+
       createdAt: response.created_at,
       updatedAt: response.updated_at,
     };
@@ -186,6 +206,7 @@ export class ApiMemberDirectoryRepository
       gender: request.gender,
       photo_url: request.photoUrl,
       address: request.address,
+      branch_id: request.branchId,
       membership_type: request.membershipType,
       membership_plan_id: request.membershipPlanId,
       status: request.status,
@@ -216,6 +237,30 @@ export class ApiMemberDirectoryRepository
             bank_account_name: request.bankAccountName,
           }
         : {}),
+      
+      blood_group: request.bloodGroup,
+      height: request.height,
+      weight: request.weight,
+      medical_conditions: request.medicalConditions,
+      chronic_illnesses: request.chronicIllnesses,
+      allergies: request.allergies,
+      current_medications: request.currentMedications,
+      health_notes: request.healthNotes,
+
+      app_access_enabled: request.appAccessEnabled,
+      app_username: request.appUsername,
+      app_password: request.appPassword,
+
+      is_family_head: request.isFamilyHead,
+      relationship_to_head: request.relationshipToHead,
+      family_members: request.familyMembers?.map(member => ({
+        name: member.name,
+        email: member.email,
+        phone: member.phone,
+        date_of_birth: member.dateOfBirth,
+        gender: member.gender,
+        relationship: member.relationship,
+      })),
     };
   }
 }

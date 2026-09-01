@@ -10,6 +10,7 @@ export interface Member {
   gender?: string;
   photoUrl?: string;
   address?: string;
+  branchId?: number;
 
   // Membership
   membershipType: string;
@@ -37,6 +38,16 @@ export interface Member {
   userId?: number;
   appUsername?: string;
   appAccessEnabled: boolean;
+
+  // Medical
+  bloodGroup?: string;
+  height?: string;
+  weight?: string;
+  medicalConditions?: string;
+  chronicIllnesses?: string;
+  allergies?: string;
+  currentMedications?: string;
+  healthNotes?: string;
 
   // Audit
   createdAt?: string;

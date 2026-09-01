@@ -9,6 +9,7 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { MembershipPlanCard } from './MembershipPlanCard';
@@ -72,7 +73,7 @@ export function RenewMembershipModal({
         ]
       );
     } catch (error) {
-      Alert.alert('Error', 'Failed to update membership plan. Please try again.');
+      toast.error('Failed to update membership plan. Please try again.');
     }
   };
 

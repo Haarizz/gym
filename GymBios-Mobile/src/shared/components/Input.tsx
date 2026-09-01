@@ -18,6 +18,8 @@ export interface InputProps extends TextInputProps {
   error?: string;
   /** 'default' uses the standard themed style; 'auth' uses a white card-style input for login screens */
   variant?: 'default' | 'auth';
+  containerStyle?: any;
+  leftIcon?: React.ReactNode;
 }
 
 export function Input({
@@ -27,6 +29,8 @@ export function Input({
   variant = 'default',
   onFocus,
   onBlur,
+  containerStyle,
+  leftIcon,
   ...rest
 }: InputProps) {
   const theme = useTheme();
@@ -55,7 +59,7 @@ export function Input({
       ];
 
   return (
-    <View>
+    <View style={containerStyle}>
       {label ? (
         <Typography
           variant="bodySmallBold"
@@ -66,6 +70,7 @@ export function Input({
       ) : null}
 
       <View style={styles.inputContainer}>
+        {leftIcon && <View style={styles.leftIconContainer}>{leftIcon}</View>}
         <TextInput
           {...rest}
           secureTextEntry={
@@ -132,7 +137,14 @@ const styles = StyleSheet.create({
 
   inputContainer: {
     position: 'relative',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  leftIconContainer: {
+    position: 'absolute',
+    left: Spacing.three,
+    zIndex: 1,
   },
 
   input: {

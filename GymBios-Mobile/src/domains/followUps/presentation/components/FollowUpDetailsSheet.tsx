@@ -24,6 +24,8 @@ import {
 } from '../../hooks/useFollowUpMutations';
 import { useFollowUp } from '../../hooks/useFollowUps';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 interface FollowUpDetailsSheetProps {
   visible: boolean;
   followUpId: number | null;
@@ -85,7 +87,9 @@ export function FollowUpDetailsSheet({
 
   const handleCall = () => {
     if (!followUp?.leadPhone) {
-      Alert.alert('No Phone', 'No phone number available.');
+      toast.info('No phone number available.', {
+        title: 'No Phone'
+      });
       return;
     }
     Linking.openURL(`tel:${followUp.leadPhone.replace(/\s+/g, '')}`);
@@ -93,7 +97,9 @@ export function FollowUpDetailsSheet({
 
   const handleEmail = () => {
     if (!followUp?.leadEmail) {
-      Alert.alert('No Email', 'No email address available.');
+      toast.info('No email address available.', {
+        title: 'No Email'
+      });
       return;
     }
     Linking.openURL(`mailto:${followUp.leadEmail}`);
@@ -101,7 +107,9 @@ export function FollowUpDetailsSheet({
 
   const handleAddRecordSubmit = () => {
     if (!recordNotes.trim()) {
-      Alert.alert('Validation Error', 'Notes are required for communication record.');
+      toast.error('Notes are required for communication record.', {
+        title: 'Validation Error'
+      });
       return;
     }
 
@@ -125,7 +133,9 @@ export function FollowUpDetailsSheet({
           setRecordNextAction('');
         },
         onError: err => {
-          Alert.alert('Error', err.message || 'Failed to add communication record.');
+          toast.error(err.message || 'Failed to add communication record.', {
+            title: 'Error'
+          });
         },
       },
     );

@@ -1,4 +1,5 @@
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
@@ -24,16 +25,16 @@ export function TrainerProfileCard({ trainer }: TrainerProfileCardProps) {
     .toUpperCase();
 
   const handleMessage = () => {
-    Alert.alert('Message Coach', `Starting chat with ${trainer.name}...`);
+    toast.info(`Starting chat with ${trainer.name}...`, { title: 'Message Coach' });
   };
 
   const handleCall = () => {
     if (trainer.phone) {
       Linking.openURL(`tel:${trainer.phone}`).catch(() => {
-        Alert.alert('Call Coach', `Calling ${trainer.name} at ${trainer.phone}`);
+        toast.info(`Calling ${trainer.name} at ${trainer.phone}`, { title: 'Call Coach' });
       });
     } else {
-      Alert.alert('Call Coach', `Calling ${trainer.name}...`);
+      toast.info(`Calling ${trainer.name}...`, { title: 'Call Coach' });
     }
   };
 

@@ -52,12 +52,13 @@ interface MembershipPlanResponse {
 }
 
 export class ApiMembershipPlanRepository implements MembershipPlanRepository {
-  async getPlans(status?: string): Promise<MembershipPlan[]> {
+  async getPlans(status?: string, branchId?: number | 'ALL'): Promise<MembershipPlan[]> {
+    const params: any = {};
+    if (status) params.status = status;
+
     const response = await apiClient.get<MembershipPlanResponse[]>(
       '/plans',
-      {
-        params: status ? { status } : undefined,
-      },
+      { params },
     );
 
     return response.data.map(item => this.toDomain(item));

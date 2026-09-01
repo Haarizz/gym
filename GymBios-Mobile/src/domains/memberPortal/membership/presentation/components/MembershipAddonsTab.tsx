@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View, ActivityIndicator, Alert } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { Pagination } from '@/shared/components';
@@ -37,11 +38,11 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
       { addonId: paymentAddOn.id, paymentResult: result },
       {
         onSuccess: () => {
-          Alert.alert('Success', `${paymentAddOn.name} purchased successfully.`);
+          toast.success(`${paymentAddOn.name} purchased successfully.`);
           setPaymentAddOn(null);
         },
         onError: (err: any) => {
-          Alert.alert('Purchase Failed', err?.message || 'Could not process the purchase.');
+          toast.error(err?.message || 'Could not process the purchase.', { title: 'Purchase Failed' });
         },
       }
     );

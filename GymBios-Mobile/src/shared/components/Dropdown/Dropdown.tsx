@@ -18,6 +18,7 @@ export function Dropdown({
   required = false,
   disabled = false,
   error,
+  customTrigger,
 }: DropdownProps) {
   const theme = useTheme();
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -43,60 +44,66 @@ export function Dropdown({
 
   return (
     <View>
-      {/* ── Label ── */}
-      {label ? (
-        <Typography variant="bodySmallBold" style={styles.label}>
-          {label}
-          {required ? (
-            <Typography variant="bodySmallBold" style={{ color: theme.error }}>
-              {' *'}
+      {customTrigger ? (
+        customTrigger(openSheet)
+      ) : (
+        <>
+          {/* ── Label ── */}
+          {label ? (
+            <Typography variant="bodySmallBold" style={styles.label}>
+              {label}
+              {required ? (
+                <Typography variant="bodySmallBold" style={{ color: theme.error }}>
+                  {' *'}
+                </Typography>
+              ) : null}
             </Typography>
           ) : null}
-        </Typography>
-      ) : null}
 
-      {/* ── Trigger field — styled identically to DatePicker ── */}
-      <Pressable
-        onPress={openSheet}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={label ?? 'Dropdown'}
-        accessibilityState={{ disabled }}
-        style={({ pressed }) => [
-          styles.field,
-          {
-            backgroundColor: theme.backgroundElement,
-            borderColor: error
-              ? theme.error
-              : pressed && !disabled
-                ? theme.primary
-                : theme.border,
-            opacity: disabled ? 0.5 : 1,
-          },
-        ]}
-      >
-        <Typography
-          variant="bodySmall"
-          numberOfLines={1}
-          style={[
-            styles.valueText,
-            { color: hasValue ? theme.text : theme.textSecondary },
-          ]}
-        >
-          {hasValue ? selectedOption!.label : placeholder}
-        </Typography>
-        <Feather name="chevron-down" size={18} color={theme.textSecondary} />
-      </Pressable>
+          {/* ── Trigger field — styled identically to DatePicker ── */}
+          <Pressable
+            onPress={openSheet}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityLabel={label ?? 'Dropdown'}
+            accessibilityState={{ disabled }}
+            style={({ pressed }) => [
+              styles.field,
+              {
+                backgroundColor: theme.backgroundElement,
+                borderColor: error
+                  ? theme.error
+                  : pressed && !disabled
+                    ? theme.primary
+                    : theme.border,
+                opacity: disabled ? 0.5 : 1,
+              },
+            ]}
+          >
+            <Typography
+              variant="bodySmall"
+              numberOfLines={1}
+              style={[
+                styles.valueText,
+                { color: hasValue ? theme.text : theme.textSecondary },
+              ]}
+            >
+              {hasValue ? selectedOption!.label : placeholder}
+            </Typography>
+            <Feather name="chevron-down" size={18} color={theme.textSecondary} />
+          </Pressable>
 
-      {/* ── Validation error ── */}
-      {error ? (
-        <Typography
-          variant="caption"
-          style={[styles.error, { color: theme.error }]}
-        >
-          {error}
-        </Typography>
-      ) : null}
+          {/* ── Validation error ── */}
+          {error ? (
+            <Typography
+              variant="caption"
+              style={[styles.error, { color: theme.error }]}
+            >
+              {error}
+            </Typography>
+          ) : null}
+        </>
+      )}
 
       {/* ── Options bottom sheet ── */}
       <AppBottomSheet

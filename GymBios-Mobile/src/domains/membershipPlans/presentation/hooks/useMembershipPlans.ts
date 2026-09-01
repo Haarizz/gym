@@ -5,6 +5,7 @@ import type { MembershipPlan } from '../../domain/MembershipPlan';
 import type { MembershipPlanRequest } from '../../application/MembershipPlanRepository';
 import { MembershipPlanService } from '../../application/MembershipPlanService';
 import { ApiMembershipPlanRepository } from '../../infrastructure/ApiMembershipPlanRepository';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 
 const repository = new ApiMembershipPlanRepository();
 const planService = new MembershipPlanService(repository);
@@ -12,17 +13,18 @@ const planService = new MembershipPlanService(repository);
 export const membershipPlanKeys = {
   all: ['membershipPlans'] as const,
   lists: () => [...membershipPlanKeys.all, 'list'] as const,
-  list: (status?: string) => [...membershipPlanKeys.lists(), status] as const,
+  list: (status?: string, branchId?: number | 'ALL') => [...membershipPlanKeys.lists(), status, branchId] as const,
   details: () => [...membershipPlanKeys.all, 'detail'] as const,
   detail: (id: number) => [...membershipPlanKeys.details(), id] as const,
 };
 
 export function useMembershipPlans(statusFilter?: string) {
   const queryClient = useQueryClient();
+  const { selectedBranchId } = useBranchContext();
 
   const plansQuery = useQuery({
-    queryKey: membershipPlanKeys.list(statusFilter),
-    queryFn: () => planService.getPlans(statusFilter),
+    queryKey: membershipPlanKeys.list(statusFilter, selectedBranchId),
+    queryFn: () => planService.getPlans(statusFilter, selectedBranchId),
   });
 
   const plans = plansQuery.data ?? [];

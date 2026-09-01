@@ -1,13 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -24,6 +16,8 @@ import { ScheduleStep } from './steps/ScheduleStep';
 import { DiscountStep } from './steps/DiscountStep';
 import { TargetingStep } from './steps/TargetingStep';
 import { PolicyStep } from './steps/PolicyStep';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface PromotionFormProps {
   mode: 'create' | 'edit';
@@ -44,7 +38,9 @@ export function PromotionForm({
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   const handleError = useCallback((_error: Error) => {
-    Alert.alert('Error', 'Failed to save promotion. Please check input data and try again.');
+    toast.error('Failed to save promotion. Please check input data and try again.', {
+      title: 'Error'
+    });
   }, []);
 
   const {

@@ -42,7 +42,7 @@ export interface MembershipPlanRequest {
 }
 
 export interface MembershipPlanRepository {
-  getPlans(status?: string): Promise<MembershipPlan[]>;
+  getPlans(status?: string, branchId?: number | 'ALL'): Promise<MembershipPlan[]>;
 
   getPlanById(id: number): Promise<MembershipPlan>;
 

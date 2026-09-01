@@ -18,6 +18,7 @@ export interface CreateMemberRequest {
   gender?: string;
   photoUrl?: string;
   address?: string;
+  branchId?: number;
 
   membershipType: string;
   membershipPlanId?: number;
@@ -31,6 +32,33 @@ export interface CreateMemberRequest {
   outstandingBalance?: number;
   bankAccountCode?: string;
   bankAccountName?: string;
+
+  // Medical
+  bloodGroup?: string;
+  height?: string;
+  weight?: string;
+  medicalConditions?: string;
+  chronicIllnesses?: string;
+  allergies?: string;
+  currentMedications?: string;
+  healthNotes?: string;
+
+  // App Access
+  appAccessEnabled?: boolean;
+  appUsername?: string;
+  appPassword?: string;
+
+  // Family
+  isFamilyHead?: boolean;
+  relationshipToHead?: string;
+  familyMembers?: Array<{
+    name: string;
+    email?: string;
+    phone?: string;
+    dateOfBirth?: string;
+    gender?: string;
+    relationship: string;
+  }>;
 }
 
 export interface UpdateMemberRequest {
@@ -41,6 +69,7 @@ export interface UpdateMemberRequest {
   gender?: string;
   photoUrl?: string;
   address?: string;
+  branchId?: number;
 
   membershipType: string;
   membershipPlanId?: number;
@@ -48,6 +77,33 @@ export interface UpdateMemberRequest {
   startDate: string;
   endDate?: string;
   paymentStatus: string;
+
+  // Medical
+  bloodGroup?: string;
+  height?: string;
+  weight?: string;
+  medicalConditions?: string;
+  chronicIllnesses?: string;
+  allergies?: string;
+  currentMedications?: string;
+  healthNotes?: string;
+
+  // App Access
+  appAccessEnabled?: boolean;
+  appUsername?: string;
+  appPassword?: string;
+
+  // Family
+  isFamilyHead?: boolean;
+  relationshipToHead?: string;
+  familyMembers?: Array<{
+    name: string;
+    email?: string;
+    phone?: string;
+    dateOfBirth?: string;
+    gender?: string;
+    relationship: string;
+  }>;
 }
 
 export interface MemberDirectoryRepository {

@@ -18,6 +18,8 @@ import {
 } from '../../hooks/usePromotions';
 import { formatDiscountDisplay } from '../utils/promotionStatistics';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 interface PromotionDetailsSheetProps {
   visible: boolean;
   promotion: PromotionCampaignResponse | null;
@@ -67,10 +69,14 @@ export function PromotionDetailsSheet({
   const handleDuplicate = async () => {
     try {
       await duplicateMutation.mutateAsync(promotion.id);
-      Alert.alert('Success', `Created duplicate of "${promotion.name}".`);
+      toast.success(`Created duplicate of "${promotion.name}".`, {
+        title: 'Success'
+      });
       onClose();
     } catch {
-      Alert.alert('Error', 'Failed to duplicate promotion.');
+      toast.error('Failed to duplicate promotion.', {
+        title: 'Error'
+      });
     }
   };
 
@@ -86,10 +92,14 @@ export function PromotionDetailsSheet({
           onPress: async () => {
             try {
               await deleteMutation.mutateAsync(promotion.id);
-              Alert.alert('Success', `Deleted "${promotion.name}".`);
+              toast.success(`Deleted "${promotion.name}".`, {
+                title: 'Success'
+              });
               onClose();
             } catch {
-              Alert.alert('Error', 'Failed to delete promotion.');
+              toast.error('Failed to delete promotion.', {
+                title: 'Error'
+              });
             }
           },
         },

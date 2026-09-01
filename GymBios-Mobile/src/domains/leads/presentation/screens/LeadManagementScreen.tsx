@@ -34,6 +34,9 @@ import { LeadList } from '../components/LeadList';
 import { LeadSelectionToolbar } from '../components/LeadSelectionToolbar';
 import { useLeadSelection } from '../hooks/useLeadSelection';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
+
 interface LeadManagementScreenProps {
   onNavigateToDetail?: (lead: Lead) => void;
   onNavigateToCreate?: () => void;
@@ -76,6 +79,7 @@ export function LeadManagementScreen({
   onNavigateToCreate,
 }: LeadManagementScreenProps) {
   const theme = useTheme();
+  const { selectedBranchId } = useBranchContext();
 
   // State
   const [filters, setFilters] = useState<LeadFiltersType>({ page: 1, size: 50 });
@@ -145,31 +149,43 @@ export function LeadManagementScreen({
   // Direct Lead Action Handlers
   const handleCall = useCallback((lead: Lead) => {
     if (!lead.phone) {
-      Alert.alert('No Phone Number', 'This lead does not have a phone number recorded.');
+      toast.info('This lead does not have a phone number recorded.', {
+        title: 'No Phone Number'
+      });
       return;
     }
     Linking.openURL(`tel:${lead.phone.replace(/\s+/g, '')}`).catch(() => {
-      Alert.alert('Error', 'Unable to launch phone dialer on this device.');
+      toast.error('Unable to launch phone dialer on this device.', {
+        title: 'Error'
+      });
     });
   }, []);
 
   const handleEmail = useCallback((lead: Lead) => {
     if (!lead.email) {
-      Alert.alert('No Email Address', 'This lead does not have an email address recorded.');
+      toast.info('This lead does not have an email address recorded.', {
+        title: 'No Email Address'
+      });
       return;
     }
     Linking.openURL(`mailto:${lead.email}`).catch(() => {
-      Alert.alert('Error', 'Unable to launch mail client on this device.');
+      toast.error('Unable to launch mail client on this device.', {
+        title: 'Error'
+      });
     });
   }, []);
 
   const handleMessage = useCallback((lead: Lead) => {
     if (!lead.phone) {
-      Alert.alert('No Phone Number', 'This lead does not have a phone number recorded.');
+      toast.info('This lead does not have a phone number recorded.', {
+        title: 'No Phone Number'
+      });
       return;
     }
     Linking.openURL(`sms:${lead.phone.replace(/\s+/g, '')}`).catch(() => {
-      Alert.alert('Error', 'Unable to launch SMS messaging on this device.');
+      toast.error('Unable to launch SMS messaging on this device.', {
+        title: 'Error'
+      });
     });
   }, []);
 
@@ -215,7 +231,9 @@ export function LeadManagementScreen({
                   if (isSelected(lead.id)) toggleSelection(lead.id);
                 },
                 onError: err => {
-                  Alert.alert('Error', err.message || 'Failed to delete lead.');
+                  toast.error(err.message || 'Failed to delete lead.', {
+                    title: 'Error'
+                  });
                 },
               });
             },
@@ -229,7 +247,9 @@ export function LeadManagementScreen({
   // Modal Submit Handlers
   const handleCreateSubmit = () => {
     if (!formFirstName.trim()) {
-      Alert.alert('Validation Error', 'First name is required.');
+      toast.error('First name is required.', {
+        title: 'Validation Error'
+      });
       return;
     }
 
@@ -251,7 +271,9 @@ export function LeadManagementScreen({
           resetForm();
         },
         onError: err => {
-          Alert.alert('Error', err.message || 'Failed to create lead.');
+          toast.error(err.message || 'Failed to create lead.', {
+            title: 'Error'
+          });
         },
       },
     );
@@ -260,7 +282,9 @@ export function LeadManagementScreen({
   const handleEditSubmit = () => {
     if (!selectedLead) return;
     if (!formFirstName.trim()) {
-      Alert.alert('Validation Error', 'First name is required.');
+      toast.error('First name is required.', {
+        title: 'Validation Error'
+      });
       return;
     }
 
@@ -286,7 +310,9 @@ export function LeadManagementScreen({
           resetForm();
         },
         onError: err => {
-          Alert.alert('Error', err.message || 'Failed to update lead.');
+          toast.error(err.message || 'Failed to update lead.', {
+            title: 'Error'
+          });
         },
       },
     );
@@ -303,13 +329,17 @@ export function LeadManagementScreen({
       );
       clearSelection();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update lead statuses.');
+      toast.error(err.message || 'Failed to update lead statuses.', {
+        title: 'Error'
+      });
     }
   };
 
   const handleBulkAssignApply = async () => {
     if (!bulkStaffName.trim()) {
-      Alert.alert('Validation Error', 'Staff member selection is required.');
+      toast.error('Staff member selection is required.', {
+        title: 'Validation Error'
+      });
       return;
     }
     setBulkAssignModalVisible(false);
@@ -336,7 +366,9 @@ export function LeadManagementScreen({
       setBulkStaffName('');
       clearSelection();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to assign staff to leads.');
+      toast.error(err.message || 'Failed to assign staff to leads.', {
+        title: 'Error'
+      });
     }
   };
 
@@ -354,7 +386,9 @@ export function LeadManagementScreen({
               await Promise.all(selectedLeadIds.map(id => deleteMutation.mutateAsync(id)));
               clearSelection();
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete some leads.');
+              toast.error(err.message || 'Failed to delete some leads.', {
+                title: 'Error'
+              });
             }
           },
         },
@@ -375,6 +409,10 @@ export function LeadManagementScreen({
   };
 
   const openCreateModal = () => {
+    if (selectedBranchId === 'ALL') {
+      toast.error('Please select a specific branch from the header menu before creating a new lead.', { title: 'Branch Required' });
+      return;
+    }
     if (onNavigateToCreate) {
       onNavigateToCreate();
     } else {

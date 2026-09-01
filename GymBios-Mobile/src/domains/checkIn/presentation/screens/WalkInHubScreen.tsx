@@ -1,6 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { useBranchContext } from '@/shared/providers/BranchProvider';
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import { BrandColors, BottomTabInset, Spacing } from '@/core/theme';
@@ -19,6 +22,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
 export function WalkInHubScreen() {
   const router = useRouter();
   const { recentVisitors } = useRecentCheckIns();
+  const { selectedBranchId } = useBranchContext();
 
   return (
     <ScreenLayout>
@@ -36,7 +40,13 @@ export function WalkInHubScreen() {
           iconName="user-plus"
           iconBg="#dcfce7"
           iconColor="#16a34a"
-          onPress={() => router.push('/(admin)/check-in/walk-in/register')}
+          onPress={() => {
+            if (selectedBranchId === 'ALL') {
+              toast.error('Please select a specific branch from the header menu before registering a visitor.', { title: 'Branch Required' });
+              return;
+            }
+            router.push('/(admin)/check-in/walk-in/register');
+          }}
         />
 
         <HubFeatureCard

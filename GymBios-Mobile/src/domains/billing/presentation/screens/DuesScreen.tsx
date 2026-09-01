@@ -18,6 +18,8 @@ import {
   MoneyText,
 } from '../components';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 interface DuesScreenProps {
   onBack: () => void;
   onNavigateToMemberStatement: (memberId: number, memberName?: string) => void;
@@ -60,7 +62,9 @@ export function DuesScreen({
         {
           text: 'Send Reminders',
           onPress: () => {
-            Alert.alert('Success', `Reminders dispatched via SMS & Email to ${overdueCount} members.`);
+            toast.success(`Reminders dispatched via SMS & Email to ${overdueCount} members.`, {
+              title: 'Success'
+            });
           },
         },
       ],
@@ -69,7 +73,9 @@ export function DuesScreen({
 
   const handleExport = useCallback(() => {
     const overdueList = dues.filter((d) => d.status === DueStatus.Overdue || d.daysOverdue > 0);
-    Alert.alert('Export Overdue Report', `Exported ${overdueList.length} overdue member record(s) to CSV.`);
+    toast.info(`Exported ${overdueList.length} overdue member record(s) to CSV.`, {
+      title: 'Export Overdue Report'
+    });
   }, [dues]);
 
   const overdueCount = stats?.overdueCount ?? dues.filter((d) => d.status === DueStatus.Overdue || d.daysOverdue > 0).length;

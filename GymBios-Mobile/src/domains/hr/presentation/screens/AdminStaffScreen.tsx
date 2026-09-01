@@ -12,6 +12,8 @@ import { Pagination } from '@/shared/components/Pagination';
 import { SearchBar } from '@/shared/components/SearchBar';
 import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { toast } from '@/shared/components/Toasts/toastStore';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { StaffCard } from '../components/StaffCard';
 import { useStaff } from '../hooks/useStaff';
 import type { Staff } from '../../domain/Staff';
@@ -28,6 +30,16 @@ export function AdminStaffScreen({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { staff, loading, refresh, page, totalPages, setPage } = useStaff();
+  const { selectedBranchId } = useBranchContext();
+
+  const handleCreate = useCallback(() => {
+    if (selectedBranchId === 'ALL') {
+      toast.error('Please select a specific branch from the header menu before creating a new staff.', { title: 'Branch Required' });
+      return;
+    }
+    onNavigateToCreate();
+  }, [selectedBranchId, onNavigateToCreate]);
+
   const [search, setSearch] = useState('');
 
   const filteredStaff = useMemo(() => {
@@ -65,7 +77,7 @@ export function AdminStaffScreen({
           </View>
           <Pressable
             style={[styles.addButton, { backgroundColor: theme.primary }]}
-            onPress={onNavigateToCreate}
+            onPress={handleCreate}
             accessibilityLabel="Add staff"
           >
             <Feather name="plus" size={20} color={theme.background} />
@@ -95,7 +107,7 @@ export function AdminStaffScreen({
         </ScrollView>
       </View>
     ),
-    [search, totalStaff, activeStaff, inactiveStaff, theme, onNavigateToCreate],
+    [search, totalStaff, activeStaff, inactiveStaff, theme, handleCreate],
   );
 
   const renderEmpty = useCallback(
@@ -110,10 +122,10 @@ export function AdminStaffScreen({
           }
           icon="users"
           buttonLabel={!search ? 'Add Staff' : undefined}
-          onPress={!search ? onNavigateToCreate : undefined}
+          onPress={!search ? handleCreate : undefined}
         />
       ) : null,
-    [loading, search, onNavigateToCreate],
+    [loading, search, handleCreate],
   );
 
   const renderFooter = useCallback(() => {

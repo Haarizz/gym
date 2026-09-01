@@ -10,6 +10,9 @@ import type { MembershipPlan } from '../../domain/MembershipPlan';
 import { useMembershipPlans } from '../hooks/useMembershipPlans';
 import { MembershipPlanList } from '../components/MembershipPlanList';
 import { MembershipPlanFilter, type StatusFilter } from '../components/MembershipPlanFilter';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface MembershipPlansScreenProps {
   onNavigateToCreate: () => void;
@@ -50,6 +53,18 @@ export function MembershipPlansScreen({
     return result;
   }, [plans, statusFilter, search]);
 
+  const { selectedBranchId } = useBranchContext();
+
+  const handleCreatePress = useCallback(() => {
+    if (selectedBranchId === 'ALL') {
+      toast.error('Please select a specific branch from the header menu before creating a new membership plan.', {
+        title: 'Branch Required'
+      });
+      return;
+    }
+    onNavigateToCreate();
+  }, [selectedBranchId, onNavigateToCreate]);
+
   const handleEdit = useCallback(
     (plan: MembershipPlan) => {
       onNavigateToEdit(plan);
@@ -62,7 +77,9 @@ export function MembershipPlansScreen({
       try {
         await duplicatePlan(plan.id);
       } catch {
-        Alert.alert('Error', 'Failed to duplicate plan. Please try again.');
+        toast.error('Failed to duplicate plan. Please try again.', {
+          title: 'Error'
+        });
       }
     },
     [duplicatePlan],
@@ -82,7 +99,9 @@ export function MembershipPlansScreen({
               try {
                 await deletePlan(plan.id);
               } catch {
-                Alert.alert('Error', 'Failed to delete plan.');
+                toast.error('Failed to delete plan.', {
+                  title: 'Error'
+                });
               }
             },
           },
@@ -102,7 +121,7 @@ export function MembershipPlansScreen({
           </Typography>
           <Button
             label="+ New Plan"
-            onPress={onNavigateToCreate}
+            onPress={handleCreatePress}
             size="md"
           />
         </View>
@@ -118,7 +137,7 @@ export function MembershipPlansScreen({
         <MembershipPlanFilter selected={statusFilter} onSelect={setStatusFilter} />
       </View>
     ),
-    [search, statusFilter, onNavigateToCreate],
+    [search, statusFilter, handleCreatePress],
   );
 
   return (

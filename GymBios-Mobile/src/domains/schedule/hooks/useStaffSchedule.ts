@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { StaffScheduleData } from '../domain/StaffScheduleData';
 import { staffScheduleRepository } from '../infrastructure/ApiStaffScheduleRepository';
+import { useBranchContext } from "@/shared/providers/BranchProvider";
 
 export const scheduleKeys = {
   all: ['schedule'] as const,
@@ -8,10 +9,11 @@ export const scheduleKeys = {
 };
 
 export function useStaffSchedule() {
+    const { selectedBranchId } = useBranchContext();
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: scheduleKeys.staff(),
+    queryKey: [...(Array.isArray(scheduleKeys.staff()) ? scheduleKeys.staff() : [scheduleKeys.staff()]), selectedBranchId],
     queryFn: async (): Promise<StaffScheduleData> => {
       return staffScheduleRepository.getStaffSchedule();
     },

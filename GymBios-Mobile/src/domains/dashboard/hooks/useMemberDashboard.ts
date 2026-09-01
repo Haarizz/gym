@@ -3,6 +3,7 @@ import { useProfile } from '@/domains/profile';
 import type { MemberDashboardData } from '../domain/MemberDashboardData';
 import { memberDashboardRepository } from '../infrastructure/ApiMemberDashboardRepository';
 import { dashboardKeys } from './useStaffDashboard';
+import { useBranchContext } from "@/shared/providers/BranchProvider";
 
 export const DEFAULT_MEMBER_DASHBOARD: MemberDashboardData = {
   memberInfo: {
@@ -24,10 +25,11 @@ export const DEFAULT_MEMBER_DASHBOARD: MemberDashboardData = {
 };
 
 export function useMemberDashboard() {
+    const { selectedBranchId } = useBranchContext();
   const { profile } = useProfile();
 
   const query = useQuery({
-    queryKey: [...dashboardKeys.all, 'member'],
+    queryKey: [...dashboardKeys.all, 'member', selectedBranchId],
     queryFn: async (): Promise<MemberDashboardData> => {
       try {
         const data = await memberDashboardRepository.getMemberDashboard();

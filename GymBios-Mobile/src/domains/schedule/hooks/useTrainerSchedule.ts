@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { TrainerScheduleData, MobileSessionRequestDTO, MobileAvailabilityDTO } from '../domain/TrainerScheduleData';
 import { ApiTrainerScheduleRepository } from '../infrastructure/ApiTrainerScheduleRepository';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
+import { useBranchContext } from "@/shared/providers/BranchProvider";
 
 export const trainerScheduleKeys = {
   all: ['schedule', 'trainer'] as const,
@@ -10,8 +11,9 @@ export const trainerScheduleKeys = {
 };
 
 export function useTrainerSchedule(startDate: string, endDate: string) {
+    const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: trainerScheduleKeys.dateRange(startDate, endDate),
+    queryKey: [...(Array.isArray(trainerScheduleKeys.dateRange(startDate, endDate)) ? trainerScheduleKeys.dateRange(startDate, endDate) : [trainerScheduleKeys.dateRange(startDate, endDate)]), selectedBranchId],
     queryFn: () => ApiTrainerScheduleRepository.getSchedule(startDate, endDate),
     staleTime: 1000 * 60 * 2,
   });
@@ -56,8 +58,9 @@ export function useDeleteTrainerSession() {
 }
 
 export function useTrainerAvailability() {
+    const { selectedBranchId } = useBranchContext();
   return useQuery({
-    queryKey: trainerScheduleKeys.availability,
+    queryKey: [...(Array.isArray(trainerScheduleKeys.availability) ? trainerScheduleKeys.availability : [trainerScheduleKeys.availability]), selectedBranchId],
     queryFn: () => ApiTrainerScheduleRepository.getAvailability(),
     staleTime: 1000 * 60 * 5,
   });

@@ -21,6 +21,8 @@ import {
   PendingBillCard,
 } from '../components';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 interface CreateReceiptScreenProps {
   onBack: () => void;
   onReceiptCreated?: (receiptId: string) => void;
@@ -116,7 +118,9 @@ export function CreateReceiptScreen({
 
   const handleProceedToPayment = useCallback(() => {
     if (selectedBillIds.size === 0) {
-      Alert.alert('Bill Required', 'Please select at least one pending bill to proceed.');
+      toast.info('Please select at least one pending bill to proceed.', {
+        title: 'Bill Required'
+      });
       return;
     }
     setPaymentSheetVisible(true);
@@ -152,7 +156,9 @@ export function CreateReceiptScreen({
       },
       onError: () => {
         setPaymentSheetVisible(false);
-        Alert.alert('Payment Error', 'Could not record payment. Please try again.');
+        toast.error('Could not record payment. Please try again.', {
+          title: 'Payment Error'
+        });
       },
     });
   }, [

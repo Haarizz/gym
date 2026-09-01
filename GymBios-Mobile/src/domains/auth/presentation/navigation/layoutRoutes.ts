@@ -42,6 +42,9 @@ export const FULL_SCREEN_ROUTES: readonly RoutePattern[] = [
   ['leads', 'add'],
   // Check-In
   ['check-in'],
+
+  // Schedule
+  ['schedule', 'add-class'],
 ] as const;
 
 /**

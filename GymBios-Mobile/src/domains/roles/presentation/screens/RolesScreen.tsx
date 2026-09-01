@@ -15,6 +15,8 @@ import { RoleCard } from '../components/RoleCard';
 import { RoleEmptyState } from '../components/RoleEmptyState';
 import { RoleActionsMenu } from '../components/RoleActionsMenu';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 export function RolesScreen() {
   const router = useRouter();
   const { roles, loading, search, setSearch } = useRoleSearch();
@@ -38,7 +40,9 @@ export function RolesScreen() {
 
   const handleDuplicateRole = (role: Role) => {
     duplicateRole(role.id).catch(err => {
-      Alert.alert('Error', 'Failed to duplicate role.');
+      toast.error('Failed to duplicate role.', {
+        title: 'Error'
+      });
     });
   };
 
@@ -53,7 +57,9 @@ export function RolesScreen() {
           style: 'destructive',
           onPress: () => {
             deleteRole(role.id).catch(err => {
-              Alert.alert('Error', 'Unable to delete role.');
+              toast.error('Unable to delete role.', {
+                title: 'Error'
+              });
             });
           }
         },

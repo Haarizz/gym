@@ -7,7 +7,6 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
@@ -18,6 +17,8 @@ import { ReferralMemberCard, type MemberReferralData } from '../components/Refer
 import { ReferralQrCodeModal } from '../components/ReferralQrCodeModal';
 import { useReferrals } from '../../hooks/useReferrals';
 import { useReferralFilters, type TierFilter } from '../hooks/useReferralFilters';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function ReferralMembersScreen() {
   const router = useRouter();
@@ -98,11 +99,15 @@ export function ReferralMembersScreen() {
   }, [refetch]);
 
   const handleCopyCode = (code: string) => {
-    Alert.alert('Referral Code', `Referral code "${code}" copied.`);
+    toast.info(`Referral code "${code}" copied.`, {
+      title: 'Referral Code'
+    });
   };
 
   const handleCopyLink = (link: string) => {
-    Alert.alert('Referral Link', `Referral link "${link}" copied.`);
+    toast.info(`Referral link "${link}" copied.`, {
+      title: 'Referral Link'
+    });
   };
 
   return (

@@ -1,14 +1,6 @@
 import { useState } from 'react';
-import {
-  Alert,
-  Linking,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import type { CenterItem } from './CenterCard';
@@ -29,12 +21,12 @@ export function CenterDetailModal({ visible, center, onClose }: CenterDetailModa
 
   const handleCall = () => {
     Linking.openURL(`tel:${center.phone}`).catch(() => {
-      Alert.alert('Phone Call', `Call center at ${center.phone}`);
+      toast.info(`Call center at ${center.phone}`, { title: 'Phone Call' });
     });
   };
 
   const handleNavigate = () => {
-    Alert.alert('Directions', `Navigating to ${center.name}, ${center.address}`);
+    toast.info(`Navigating to ${center.name}, ${center.address}`, { title: 'Directions' });
   };
 
   const handleSelectPlan = (plan: MembershipPlanItem) => {

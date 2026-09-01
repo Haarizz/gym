@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Loader } from '@/shared/components';
 import { useStaffLedger } from '../../hooks/useStaffLedger';
@@ -11,6 +11,8 @@ import { StaffLedgerBreakdownSection } from '../components/StaffLedgerBreakdownS
 import { StaffLedgerEarningsSection } from '../components/StaffLedgerEarningsSection';
 import { StaffLedgerTaxSection } from '../components/StaffLedgerTaxSection';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 type LedgerTab = 'breakdown' | 'earnings' | 'tax';
 
 export function StaffLedgerScreen() {
@@ -20,18 +22,26 @@ export function StaffLedgerScreen() {
   const handleDownloadSalarySlip = async () => {
     try {
       await staffLedgerRepository.downloadSalarySlip();
-      Alert.alert('Salary Slip Ready', 'Your salary slip advice has been generated successfully.');
+      toast.info('Your salary slip advice has been generated successfully.', {
+        title: 'Salary Slip Ready'
+      });
     } catch (err) {
-      Alert.alert('Download Notice', 'Your salary slip advice is being prepared by HR.');
+      toast.info('Your salary slip advice is being prepared by HR.', {
+        title: 'Download Notice'
+      });
     }
   };
 
   const handleDocumentPress = async (doc: TaxDocument) => {
     try {
       await staffLedgerRepository.downloadTaxDocument(doc.id);
-      Alert.alert('Tax Document Ready', `${doc.title} is ready for viewing.`);
+      toast.info(`${doc.title} is ready for viewing.`, {
+        title: 'Tax Document Ready'
+      });
     } catch (err) {
-      Alert.alert('Document Notice', `${doc.title} will be provided once filed by the compliance team.`);
+      toast.info(`${doc.title} will be provided once filed by the compliance team.`, {
+        title: 'Document Notice'
+      });
     }
   };
 
