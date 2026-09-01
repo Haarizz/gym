@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface TrainingSessionRepository extends JpaRepository<TrainingSession, Long> {
     List<TrainingSession> findTop5ByStatusOrderByDateDescStartTimeDesc(String status);
+    long countByDateBetween(java.time.LocalDate startDate, java.time.LocalDate endDate);
 }

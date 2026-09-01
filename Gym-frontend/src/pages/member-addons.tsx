@@ -73,6 +73,7 @@ import { addonsService, MemberAddon } from "../utils/supabase/addons-service";
 import { addonPlansService, AddonPlan as ApiAddonPlan } from "../utils/supabase/addon-plans-service";
 import { facilitiesService, FacilityApi } from "../utils/supabase/facilities-service";
 import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
+import { staffService, Staff } from "../utils/supabase/staff-service";
 import {
   EMPTY_SPLIT_DETAILS, EMPTY_SPLIT_PAYMENT, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
   CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
@@ -215,6 +216,13 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       .catch(err => console.error('Failed to load bank accounts:', err));
   }, []);
   const [notes, setNotes] = useState("");
+  // Which staff member actually handled this sale — credited toward their
+  // revenue target regardless of which account is logged in.
+  const [staffOptions, setStaffOptions] = useState<Staff[]>([]);
+  const [processedByStaffId, setProcessedByStaffId] = useState("");
+  useEffect(() => {
+    staffService.getStaff({}, 1, 500).then(res => setStaffOptions(res.items)).catch(() => {});
+  }, []);
   const [customValidity, setCustomValidity] = useState<number>(30);
   const [customAmount, setCustomAmount] = useState<number>(0);
   // Only used when the selected member is billed to a family head — how much
@@ -562,6 +570,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
         // so the wallet balance and its ledger liability account can't drift
         // apart the way a separate follow-up debit call could.
         wallet_amount_applied: walletAmountApplied > 0 ? walletAmountApplied : undefined,
+        processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
       });
       if (rewardApplied && availableReward) {
         // Best-effort: the add-on purchase already succeeded, so a failure here
@@ -578,6 +587,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       setPaymentMethod("Cash");
       setMethodDetails(EMPTY_SPLIT_DETAILS);
       setMinorPaidNow("");
+      setProcessedByStaffId("");
     } catch (err: any) {
       toast.error(err?.message || "Failed to save add-on purchase. Please try again.");
     } finally {
@@ -1257,6 +1267,19 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                   placeholder="Add any additional notes here..."
                   rows={2}
                 />
+              </div>
+
+              {/* Processed By (Staff) — credits this sale toward that staff member's revenue target */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Processed By (Staff) <span className="text-muted-foreground font-normal">(Optional)</span></Label>
+                <Select value={processedByStaffId || undefined} onValueChange={setProcessedByStaffId}>
+                  <SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger>
+                  <SelectContent>
+                    {staffOptions.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Membership update */}

@@ -59,4 +59,7 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
 
     // Fallback: find full history by member name (handles receipts with stale/null memberDbId)
     List<Receipt> findByMemberNameOrderByTransactionDateAsc(String memberName);
+
+    @Query("SELECT COALESCE(SUM(r.paidAmount), 0) FROM Receipt r WHERE r.planName LIKE %:category% AND r.transactionDate >= :start AND r.transactionDate < :end")
+    BigDecimal sumPaidInPeriodByCategory(@Param("category") String category, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

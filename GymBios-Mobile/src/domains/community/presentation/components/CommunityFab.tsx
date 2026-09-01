@@ -1,9 +1,9 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import Feather from '@expo/vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Platform } from 'react-native';
-
-import { BrandColors } from '@/core/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Height of the CommunityBottomNav bar so the FAB sits above it.
 const BOTTOM_NAV_HEIGHT = 74;
@@ -17,6 +17,7 @@ interface CommunityFabProps {
  * Positioned above the Community bottom navigation bar.
  */
 export function CommunityFab({ onPress }: CommunityFabProps) {
+  const { primaryColor, headerColors } = useCommunityTheme();
   const insets = useSafeAreaInsets();
   const bottomOffset =
     BOTTOM_NAV_HEIGHT +
@@ -34,9 +35,12 @@ export function CommunityFab({ onPress }: CommunityFabProps) {
       accessibilityRole="button"
       accessibilityLabel="Create community post"
     >
-      <View style={styles.fab}>
+      <LinearGradient
+        colors={headerColors as unknown as readonly [string, string, ...string[]]}
+        style={[styles.fab, { shadowColor: '#000' }]}
+      >
         <Feather name="plus" size={26} color="#fff" />
-      </View>
+      </LinearGradient>
     </Pressable>
   );
 }
@@ -51,8 +55,7 @@ const styles = StyleSheet.create({
   fab: {
     width: 56,
     height: 56,
-    borderRadius: 28,
-    backgroundColor: BrandColors.teal,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
 
@@ -60,7 +63,6 @@ const styles = StyleSheet.create({
     elevation: 8,
 
     // iOS
-    shadowColor: BrandColors.teal,
     shadowOpacity: 0.35,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },

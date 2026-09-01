@@ -468,6 +468,16 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
     }
   };
 
+  // membershipStatus is only ever set explicitly (create/freeze/deactivate) —
+  // nothing flips it to "expired" when membershipEndDate passes, so derive
+  // that here rather than trusting the stored value (mirrors the Member
+  // Directory's getComputedStatus / member-history-analytics' isExpiredByDate).
+  const isFrozenStatus = (memberInfo?.membershipStatus ?? "").toLowerCase() === "frozen";
+  const membershipEndDateStr = memberInfo?.membershipEndDate ?? null;
+  const isExpiredByDate = !isFrozenStatus
+    && membershipEndDateStr != null
+    && new Date(membershipEndDateStr) < new Date();
+
   // Member display data — falls back to placeholders until API responds
   const memberData = {
     name: memberInfo?.name ?? (isAdminUser ? (adminUsername ? adminUsername.charAt(0).toUpperCase() + adminUsername.slice(1) : "Admin") : "Member"),
@@ -475,7 +485,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
     joinDate: "—",
     nextBilling: fmtDate(memberInfo?.nextPaymentDate ?? memberInfo?.membershipEndDate),
     credits: 8,
-    status: memberInfo?.membershipStatus ?? "—",
+    status: isExpiredByDate ? "expired" : (memberInfo?.membershipStatus ?? "—"),
     streak: 12,
     profileImage: undefined as string | undefined,
     nextClass: "—",

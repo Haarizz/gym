@@ -94,7 +94,13 @@ public class MobileTrainerDashboardService {
             }
 
             // Find members for this session via Booking
-            String memberName = resolveMemberNameForSession(session);
+            String memberName = null;
+            String className = null;
+            if ("class".equalsIgnoreCase(session.getType())) {
+                className = session.getName();
+            } else {
+                memberName = resolveMemberNameForSession(session);
+            }
             
             LocalDateTime sessionStartTime = session.getDate().atTime(session.getStartTime());
 
@@ -102,6 +108,7 @@ public class MobileTrainerDashboardService {
                     session.getId(),
                     sessionStartTime,
                     memberName,
+                    className,
                     session.getType() != null ? session.getType() : "Session",
                     session.getName() != null ? session.getName() : session.getDescription(),
                     session.getStatus()
@@ -197,6 +204,92 @@ public class MobileTrainerDashboardService {
         );
 
         return new TrainerDashboardResponseDTO(trainerInfo, stats, todaySessions);
+    }
+    
+    @Transactional
+    public TrainerDashboardSessionDTO startSession(Long sessionId, UserDetailsImpl principal) {
+        if (principal == null || principal.getId() == null) {
+            throw new EntityNotFoundException("User not authenticated");
+        }
+        
+        Staff staff = staffRepository.findByUserId(principal.getId())
+                .orElseThrow(() -> new EntityNotFoundException("No staff record linked to this account"));
+                
+        TrainingSession session = entityManager.find(TrainingSession.class, sessionId);
+        if (session == null || session.getTrainer() == null || !session.getTrainer().getId().equals(staff.getId())) {
+            throw new EntityNotFoundException("Session not found");
+        }
+        
+        if (!"active".equalsIgnoreCase(session.getStatus())) {
+            throw new IllegalArgumentException("Only scheduled sessions can be started. Current status: " + session.getStatus());
+        }
+        
+        session.setStatus("in_progress");
+        entityManager.merge(session);
+        entityManager.flush();
+        
+        String memberName = null;
+        String className = null;
+        if ("class".equalsIgnoreCase(session.getType())) {
+            className = session.getName();
+        } else {
+            memberName = resolveMemberNameForSession(session);
+        }
+        
+        LocalDateTime sessionStartTime = session.getDate().atTime(session.getStartTime());
+        
+        return new TrainerDashboardSessionDTO(
+                session.getId(),
+                sessionStartTime,
+                memberName,
+                className,
+                session.getType() != null ? session.getType() : "Session",
+                session.getName() != null ? session.getName() : session.getDescription(),
+                session.getStatus()
+        );
+    }
+    
+    @Transactional
+    public TrainerDashboardSessionDTO finishSession(Long sessionId, UserDetailsImpl principal) {
+        if (principal == null || principal.getId() == null) {
+            throw new EntityNotFoundException("User not authenticated");
+        }
+        
+        Staff staff = staffRepository.findByUserId(principal.getId())
+                .orElseThrow(() -> new EntityNotFoundException("No staff record linked to this account"));
+                
+        TrainingSession session = entityManager.find(TrainingSession.class, sessionId);
+        if (session == null || session.getTrainer() == null || !session.getTrainer().getId().equals(staff.getId())) {
+            throw new EntityNotFoundException("Session not found");
+        }
+        
+        if (!"in_progress".equalsIgnoreCase(session.getStatus())) {
+            throw new IllegalArgumentException("Only in-progress sessions can be completed. Current status: " + session.getStatus());
+        }
+        
+        session.setStatus("completed");
+        entityManager.merge(session);
+        entityManager.flush();
+        
+        String memberName = null;
+        String className = null;
+        if ("class".equalsIgnoreCase(session.getType())) {
+            className = session.getName();
+        } else {
+            memberName = resolveMemberNameForSession(session);
+        }
+        
+        LocalDateTime sessionStartTime = session.getDate().atTime(session.getStartTime());
+        
+        return new TrainerDashboardSessionDTO(
+                session.getId(),
+                sessionStartTime,
+                memberName,
+                className,
+                session.getType() != null ? session.getType() : "Session",
+                session.getName() != null ? session.getName() : session.getDescription(),
+                session.getStatus()
+        );
     }
     
     private String resolveMemberNameForSession(TrainingSession session) {

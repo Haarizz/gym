@@ -25,6 +25,7 @@ import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.repositories.RoleRepository;
 import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -355,7 +356,8 @@ public class MemberService {
         combinedBreakdown.addAll(minorPaidLegs);
         com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
                 saved, "New", saved.getPaymentStatus(), combinedBreakdown.isEmpty() ? null : combinedBreakdown,
-                request.getBankAccountCode(), request.getBankAccountName(), combinedFee, minorCharges);
+                request.getBankAccountCode(), request.getBankAccountName(), combinedFee, minorCharges,
+                request.getProcessedByStaffId());
 
         // Post to General Ledger for whatever amount was actually received — a partial/
         // credit payment (e.g. AED 5 received against a AED 45 invoice) must still post
@@ -580,7 +582,7 @@ public class MemberService {
 
         com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
                 savedDep, "New", savedDep.getPaymentStatus(), fm.getPaymentBreakdown(),
-                fm.getBankAccountCode(), fm.getBankAccountName());
+                fm.getBankAccountCode(), fm.getBankAccountName(), fm.getProcessedByStaffId());
 
         if (receipt.getPaidAmount() != null && receipt.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
             financialEventService.onMemberPaymentReceived(receipt);
@@ -723,7 +725,7 @@ public class MemberService {
         // received now (paidAmount is derived from fee − outstandingBalance).
         com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
                 saved, "Renewal", saved.getPaymentStatus(), request.getPaymentBreakdown(),
-                request.getBankAccountCode(), request.getBankAccountName());
+                request.getBankAccountCode(), request.getBankAccountName(), request.getProcessedByStaffId());
 
         // Post to General Ledger for whatever amount was actually received — a partial/
         // credit renewal must still post the real amount through the real method; it
@@ -804,7 +806,8 @@ public class MemberService {
 
         com.company.project.entities.Receipt receipt = receiptService.createMinorChargeReceipt(
                 savedGuardian, savedMinor, feeAmount, paidAmount, "Renewal", null,
-                request.getPaymentBreakdown(), request.getBankAccountCode(), request.getBankAccountName());
+                request.getPaymentBreakdown(), request.getBankAccountCode(), request.getBankAccountName(),
+                request.getProcessedByStaffId());
 
         if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
             financialEventService.onMemberPaymentReceived(receipt);
@@ -894,7 +897,7 @@ public class MemberService {
         com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
                 savedHead, "Renewal", savedHead.getPaymentStatus(), request.getPaymentBreakdown(),
                 request.getBankAccountCode(), request.getBankAccountName(), totalFee,
-                memberCharges.isEmpty() ? null : memberCharges);
+                memberCharges.isEmpty() ? null : memberCharges, request.getProcessedByStaffId());
 
         if (renewalPaid) {
             financialEventService.onMemberPaymentReceived(receipt);
@@ -1008,12 +1011,17 @@ public class MemberService {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
         LocalDateTime freezeUntil = parseDateTime(request.getFreezeUntil());
+        LocalDateTime freezeStart = request.getFreezeStartDate() != null
+                ? parseDateTime(request.getFreezeStartDate())
+                : null;
+        if (freezeStart == null) freezeStart = LocalDateTime.now();
+        validateFreezeStartDate(freezeStart, member.getMembershipStartDate());
         member.setMembershipStatus("frozen");
-        member.setFreezeStartDate(LocalDateTime.now());
+        member.setFreezeStartDate(freezeStart);
         member.setFreezeEndDate(freezeUntil);
         if (request.getReason() != null) member.setFreezeReason(request.getReason());
         Member saved = memberRepository.save(member);
-        cascadeFreezeStateToBilledToHeadDependents(saved, "frozen", freezeUntil, request.getReason(), 0);
+        cascadeFreezeStateToBilledToHeadDependents(saved, "frozen", freezeStart, freezeUntil, request.getReason(), 0);
 
         notificationService.notifyRoles(
                 List.of("ADMIN", "MANAGER"),
@@ -1035,6 +1043,18 @@ public class MemberService {
             );
         }
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    // Mirrors the client-side checks in the Freeze Membership dialogs so a
+    // caller bypassing the UI (or a stale frontend) can't backdate a freeze.
+    private void validateFreezeStartDate(LocalDateTime freezeStart, LocalDateTime membershipStartDate) {
+        LocalDate startDay = freezeStart.toLocalDate();
+        if (startDay.isBefore(LocalDate.now())) {
+            throw new BusinessRuleViolationException("Freeze start date cannot be in the past");
+        }
+        if (membershipStartDate != null && startDay.isBefore(membershipStartDate.toLocalDate())) {
+            throw new BusinessRuleViolationException("Freeze start date cannot be before the membership start date");
+        }
     }
 
     public MemberResponseDTO unfreezeMember(Long id) {
@@ -1062,7 +1082,7 @@ public class MemberService {
         member.setFreezeEndDate(null);
         member.setFreezeReason(null);
         Member saved = memberRepository.save(member);
-        cascadeFreezeStateToBilledToHeadDependents(saved, "active", null, null, daysFrozen);
+        cascadeFreezeStateToBilledToHeadDependents(saved, "active", null, null, null, daysFrozen);
 
         notificationService.notifyRoles(
                 List.of("ADMIN", "MANAGER"),
@@ -1096,7 +1116,7 @@ public class MemberService {
      * Independently-billed adult dependents (individual-mode Family/Couple) are
      * deliberately NOT touched — they manage their own membership/freeze status.
      */
-    private void cascadeFreezeStateToBilledToHeadDependents(Member head, String status,
+    private void cascadeFreezeStateToBilledToHeadDependents(Member head, String status, LocalDateTime freezeStart,
                                                              LocalDateTime freezeUntil, String reason, long daysFrozen) {
         if (!Boolean.TRUE.equals(head.getIsFamilyHead()) || head.getMemberId() == null) return;
         List<Member> dependents = memberRepository.findByFamilyHeadId(head.getMemberId());
@@ -1104,7 +1124,7 @@ public class MemberService {
             if (!dep.isEffectivelyBilledToHead()) continue;
             dep.setMembershipStatus(status);
             if ("frozen".equals(status)) {
-                dep.setFreezeStartDate(LocalDateTime.now());
+                dep.setFreezeStartDate(freezeStart);
                 dep.setFreezeEndDate(freezeUntil);
                 if (reason != null) dep.setFreezeReason(reason);
             } else {
@@ -1201,7 +1221,23 @@ public class MemberService {
                 ));
             }
             if (status != null && !status.isBlank()) {
-                predicates.add(cb.equal(root.get("membershipStatus"), status));
+                // membershipStatus is only ever set explicitly (create/freeze/deactivate)
+                // — nothing flips it to "expired" when membershipEndDate/expiryDate
+                // passes, so a literal equality filter would never match those members.
+                // This mirrors the frontend's getComputedStatus(), which treats any
+                // member past its end date as "Expired" regardless of the stored value.
+                Expression<LocalDateTime> effectiveEndDate =
+                        cb.coalesce(root.get("membershipEndDate"), root.get("expiryDate"));
+                Predicate expiredByDate = cb.and(
+                        cb.notEqual(root.get("membershipStatus"), "pending_approval"),
+                        cb.isNotNull(effectiveEndDate),
+                        cb.lessThan(effectiveEndDate, LocalDateTime.now())
+                );
+                if ("expired".equalsIgnoreCase(status)) {
+                    predicates.add(cb.or(cb.equal(root.get("membershipStatus"), status), expiredByDate));
+                } else {
+                    predicates.add(cb.and(cb.equal(root.get("membershipStatus"), status), cb.not(expiredByDate)));
+                }
             }
             if (membershipType != null && !membershipType.isBlank()) {
                 predicates.add(cb.equal(root.get("membershipType"), membershipType));

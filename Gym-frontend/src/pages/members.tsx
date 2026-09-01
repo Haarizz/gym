@@ -67,6 +67,7 @@ import { addonsService } from '../utils/supabase/addons-service';
 import { authService } from '../utils/supabase/auth-service';
 import { receiptsService, Receipt as ApiReceipt } from '../utils/supabase/receipts-service';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
+import { staffService, Staff } from '../utils/supabase/staff-service';
 import {
   SplitPaymentFields, isSplitPaymentValid, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
   EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
@@ -237,6 +238,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       await membersService.renewFamily(familyRenewalHead.id, {
         payment_status: familyRenewalPaymentStatus,
         payment_method: familyRenewalPaymentMethod,
+        processed_by_staff_id: familyRenewalProcessedByStaffId ? Number(familyRenewalProcessedByStaffId) : undefined,
       });
       toast.success('Family renewed', {
         description: `${familyRenewalHead.name}'s family membership has been renewed.`,
@@ -267,6 +269,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [splitLegs, setSplitLegs] = useState<SplitPaymentValue>(EMPTY_SPLIT_PAYMENT);
   const [splitLegDetails, setSplitLegDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
   const [renewalBankAccounts, setRenewalBankAccounts] = useState<AccountHead[]>([]);
+  // Which staff member actually processed this renewal — credited toward their
+  // revenue target regardless of which account is logged in.
+  const [staffOptions, setStaffOptions] = useState<Staff[]>([]);
+  const [renewalProcessedByStaffId, setRenewalProcessedByStaffId] = useState('');
+  const [familyRenewalProcessedByStaffId, setFamilyRenewalProcessedByStaffId] = useState('');
   // "Credit" — renews the membership now but defers some/all of the fee as an
   // outstanding due, mirroring the Add Member credit flow: an optional amount
   // received now (via a real method), with the remainder left as Member.outstandingBalance.
@@ -356,13 +363,17 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         : membersService.getMembers({}, { limit: 10000 });
       const res = await fetcher;
       const all = res.members;
+      // Use the same date-derived status the Member Directory table shows
+      // (getComputedStatus) rather than the raw membership_status column —
+      // that column is never auto-flipped to "expired" when the expiry date
+      // passes, so counting it directly undercounts the Expired KPI.
       setStatusCounts({
         total: all.length,
-        active: all.filter((m: Member) => m.membership_status === 'active').length,
-        inactive: all.filter((m: Member) => m.membership_status === 'inactive').length,
-        expired: all.filter((m: Member) => m.membership_status === 'expired').length,
-        frozen: all.filter((m: Member) => (m.membership_status || '').toLowerCase() === 'frozen').length,
-        suspended: all.filter((m: Member) => m.membership_status === 'suspended').length,
+        active: all.filter((m: Member) => getComputedStatus(m) === 'Active').length,
+        inactive: all.filter((m: Member) => getComputedStatus(m) === 'Inactive').length,
+        expired: all.filter((m: Member) => getComputedStatus(m) === 'Expired').length,
+        frozen: all.filter((m: Member) => getComputedStatus(m) === 'Frozen').length,
+        suspended: all.filter((m: Member) => getComputedStatus(m) === 'Suspended').length,
       });
     } catch (e) {
       console.error('Failed to load status counts:', e);
@@ -404,6 +415,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // Bank accounts for the Renewals & Upgrades payment panel's Bank Transfer leg
   useEffect(() => {
     accountHeadsService.getBankAccounts().then(setRenewalBankAccounts).catch(() => { });
+  }, []);
+
+  // Staff list for the "processed by" selector on renewals
+  useEffect(() => {
+    staffService.getStaff({}, 1, 500).then(res => setStaffOptions(res.items)).catch(() => { });
   }, []);
 
   // Load pending members from sessionStorage
@@ -987,6 +1003,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           payment_breakdown: paymentBreakdown,
           bank_account_code: bankAccountCode,
           bank_account_name: bankAccountName,
+          processed_by_staff_id: renewalProcessedByStaffId ? Number(renewalProcessedByStaffId) : undefined,
         });
       } else {
         await membersService.renewMember(String(memberId), {
@@ -1001,6 +1018,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           payment_breakdown: paymentBreakdown,
           bank_account_code: bankAccountCode,
           bank_account_name: bankAccountName,
+          processed_by_staff_id: renewalProcessedByStaffId ? Number(renewalProcessedByStaffId) : undefined,
         });
       }
       // Refresh member list
@@ -1594,6 +1612,17 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           </Select>
                         </div>
                       )}
+                      <div className="space-y-2">
+                        <Label>Processed By (Staff)</Label>
+                        <Select value={familyRenewalProcessedByStaffId || undefined} onValueChange={setFamilyRenewalProcessedByStaffId}>
+                          <SelectTrigger><SelectValue placeholder="Select staff member (optional)" /></SelectTrigger>
+                          <SelectContent>
+                            {staffOptions.map(s => (
+                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="flex justify-end gap-2 pt-2">
                         <Button variant="outline" onClick={() => setFamilyRenewalHead(null)}>Cancel</Button>
                         <Button onClick={handleRenewFamily} disabled={isRenewingFamily}>
@@ -2521,6 +2550,18 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Processed By (Staff)</Label>
+                    <Select value={renewalProcessedByStaffId || undefined} onValueChange={setRenewalProcessedByStaffId}>
+                      <SelectTrigger><SelectValue placeholder="Select staff member (optional)" /></SelectTrigger>
+                      <SelectContent>
+                        {staffOptions.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <Button

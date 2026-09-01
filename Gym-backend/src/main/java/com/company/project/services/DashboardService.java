@@ -270,4 +270,23 @@ public class DashboardService {
         BigDecimal diff = current.subtract(previous);
         return diff.divide(previous, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).doubleValue();
     }
+
+    public List<MemberChurnData> getMemberChurnData() {
+        List<MemberChurnData> churnDataList = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM");
+        
+        for (int i = 5; i >= 0; i--) {
+            LocalDateTime startOfMonth = now.minusMonths(i).withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+            LocalDateTime endOfMonth = startOfMonth.plusMonths(1).minusNanos(1);
+            
+            // Note: Since we don't have explicit churn tracking, we use expired or cancelled statuses in that month
+            long newMembers = memberRepository.countByJoinDateBetween(startOfMonth, endOfMonth);
+            long churnedMembers = memberRepository.countByMembershipStatusAndExpiryDateBetween("expired", startOfMonth, endOfMonth) +
+                                  memberRepository.countByMembershipStatusAndExpiryDateBetween("cancelled", startOfMonth, endOfMonth);
+            
+            churnDataList.add(new MemberChurnData(startOfMonth.format(formatter), (int)newMembers, (int)churnedMembers));
+        }
+        return churnDataList;
+    }
 }

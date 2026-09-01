@@ -1,4 +1,5 @@
-import { Stack } from 'expo-router';
+import { Stack, Redirect } from 'expo-router';
+import { useAuthStore } from '@/domains/auth/store/authStore';
 
 /**
  * Check-In module stack navigator.
@@ -13,6 +14,12 @@ import { Stack } from 'expo-router';
  *     walk-in/visitors  → DailyVisitorsScreen
  */
 export default function CheckInStack() {
+  const role = useAuthStore((s) => s.appRole);
+
+  if (role === 'staff') {
+    return <Redirect href="/(staff)/check-in" />;
+  }
+
   return (
     <Stack
       screenOptions={{

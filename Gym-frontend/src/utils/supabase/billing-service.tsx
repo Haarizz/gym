@@ -52,6 +52,9 @@ export interface SettlePaymentRequest {
   remarks?: string;
   bill_payments: { receipt_id: number; pay_amount: number }[];
   payment_breakdown?: PaymentSplitLeg[];
+  // Which staff member actually collected this payment — credited toward their
+  // revenue target regardless of which account is logged in.
+  processed_by_staff_id?: number;
 }
 
 // One line item within a guardian's receipt representing a minor family
@@ -153,6 +156,7 @@ class BillingService {
         pay_amount: bp.pay_amount,
       })),
       payment_breakdown: request.payment_breakdown,
+      processed_by_staff_id: request.processed_by_staff_id,
     };
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/billing/settle`,

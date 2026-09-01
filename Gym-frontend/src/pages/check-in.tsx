@@ -128,6 +128,8 @@ export function CheckIn() {
   const [dailyCheckIns, setDailyCheckIns] = useState<any[]>([]);
   const [walkInsLoaded, setWalkInsLoaded] = useState(false);
   const [bankAccounts, setBankAccounts]   = useState<AccountHead[]>([]);
+  const [staffOptions, setStaffOptions]   = useState<Staff[]>([]);
+  const [processedByStaffId, setProcessedByStaffId] = useState('');
 
   // Payment-method-specific detail fields — matches Add Member's capture for
   // Card/Cheque/Bank Transfer/Online Payment so a walk-in's payment record has
@@ -174,6 +176,7 @@ export function CheckIn() {
         ...staffRes.items.map(staffToPerson),
       ];
       setPeople(combined);
+      setStaffOptions(staffRes.items);
     } catch (err) {
       toast.error('Failed to load people list');
     }
@@ -407,6 +410,7 @@ export function CheckIn() {
         payment_breakdown: isCredit ? undefined : [buildWalkInPaymentLeg(amount)],
         device_id: 'WEB',
         notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${methodLabel}, Amount: ${currencyCode} ${amount}`,
+        processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
       };
       const resp = await checkInService.walkInCheckIn(req);
 
@@ -437,7 +441,7 @@ export function CheckIn() {
   const resetDailyForm = () => {
     setVisitorName(''); setVisitorMobile(''); setVisitorPhoto(null);
     setSelectedPlan(''); setPaymentMethod(''); setPaymentDone(false);
-    setProcessingPayment(false);
+    setProcessingPayment(false); setProcessedByStaffId('');
     setPaymentDetails({ cardType: '', chequeNumber: '', chequeDate: '', bankName: '', bankAccountId: '', onlinePaymentType: '', providerName: '' });
     if (isCameraActive && videoRef.current) {
       (videoRef.current.srcObject as MediaStream)?.getTracks().forEach(t => t.stop());
@@ -800,6 +804,19 @@ export function CheckIn() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-primary">Processed By (Staff)</Label>
+                    <Select value={processedByStaffId || undefined} onValueChange={setProcessedByStaffId}>
+                      <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select staff member (optional)" /></SelectTrigger>
+                      <SelectContent>
+                        {staffOptions.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Credits this sale toward that staff member's revenue target.</p>
                   </div>
 
                   {/* Method-specific detail fields — mirrors add-member.tsx's renderPaymentMethodDetails */}

@@ -66,4 +66,9 @@ public class DashboardController {
     public ResponseEntity<GenericResponse<?>> getPendingTasks() {
         return ResponseEntity.ok(new GenericResponse<>(true, dashboardService.getPendingTasks()));
     }
+
+    @GetMapping("/member-churn")
+    public ResponseEntity<GenericResponse<?>> getMemberChurn() {
+        return ResponseEntity.ok(new GenericResponse<>(true, dashboardService.getMemberChurnData()));
+    }
 }

@@ -25,7 +25,7 @@ export const styles = StyleSheet.create({
     elevation: 16,
   },
   safeArea: {
-    flex: 1, // <-- key line, lets ScrollView claim remaining space
+    flexShrink: 1, // lets ScrollView claim remaining space up to maxHeight without collapsing
   },
   handle: {
     alignSelf: 'center',
@@ -68,7 +68,7 @@ export const styles = StyleSheet.create({
     backgroundColor: BrandColors.screenBackgroundAlt,
   },
   body: {
-    flex: 1, // <-- and this one
+    flexShrink: 1, 
   },
   contentContainer: {
     paddingHorizontal: Spacing.four,

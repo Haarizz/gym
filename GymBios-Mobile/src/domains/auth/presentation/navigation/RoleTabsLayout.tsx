@@ -85,8 +85,8 @@ export function RoleTabsLayout({
 
   return (
     <SafeAreaView
-      edges={['top']}
-      style={[styles.safeArea, { backgroundColor: resolvedColors[0] }]}>
+      edges={isFullScreen ? [] : ['top']}
+      style={[styles.safeArea, { backgroundColor: isFullScreen ? BrandColors.screenBackground : resolvedColors[0] }]}>
       <View style={styles.container}>
         {!isFullScreen && showRoleHeader && (
           <View style={[styles.header, { backgroundColor: resolvedColors[0] }]}>

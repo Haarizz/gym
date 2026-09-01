@@ -1,17 +1,30 @@
 package com.company.project.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 
-// Singleton row (always id=1) holding the Attendance Reports page's
-// "Schedule Automated Reports" toggle — previously that toggle was pure
-// client-side React state with no backend, so it silently reset on every
-// page reload and no report was ever actually sent (see AttendanceReportScheduler).
+// One row per branch holding the Attendance Reports page's "Schedule
+// Automated Reports" toggle and gym floor capacity — previously that toggle
+// was pure client-side React state with no backend, so it silently reset on
+// every page reload and no report was ever actually sent (see
+// AttendanceReportScheduler). Was a single global singleton (fixed id=1)
+// until gym_capacity (different per branch) forced branch-scoping.
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "attendance_report_settings")
-public class AttendanceReportSettings extends BaseEntity {
+public class AttendanceReportSettings extends BaseEntity implements BranchAware {
 
     @Id
-    private Long id = 1L;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    @Override
+    public Long getBranchId() { return branchId; }
+    @Override
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 
     @Column(name = "enabled")
     private Boolean enabled = false;

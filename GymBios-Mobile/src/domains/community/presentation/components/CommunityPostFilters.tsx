@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components';
@@ -17,6 +18,7 @@ interface CommunityPostFiltersProps {
 }
 
 export function CommunityPostFilters({ selectedType, onSelectType }: CommunityPostFiltersProps) {
+  const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
 
   return (
@@ -35,8 +37,8 @@ export function CommunityPostFilters({ selectedType, onSelectType }: CommunityPo
             style={({ pressed }) => [
               styles.pill,
               isSelected
-                ? { backgroundColor: BrandColors.teal }
-                : { backgroundColor: theme.muted },
+                ? { backgroundColor: primaryColor, borderColor: primaryColor }
+                : { backgroundColor: theme.backgroundElement },
               pressed && styles.pillPressed,
             ]}
             onPress={() => onSelectType(pt.value)}
@@ -49,7 +51,7 @@ export function CommunityPostFilters({ selectedType, onSelectType }: CommunityPo
               variant="caption"
               style={[
                 styles.pillLabel,
-                { color: isSelected ? '#fff' : theme.text },
+                { color: isSelected ? '#fff' : '#7A7E8C' },
               ]}
             >
               {pt.label}
@@ -65,17 +67,21 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
 
   pill: {
-    minHeight: 36,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Radius.md,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#ECEBF2', // var(--line)
+    backgroundColor: '#FFFFFF',
   },
 
   pillPressed: {
@@ -84,6 +90,6 @@ const styles = StyleSheet.create({
 
   pillLabel: {
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 13,
   },
 });

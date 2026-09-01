@@ -8,9 +8,11 @@ import com.company.project.dto.ReceiptsPageResponseDTO;
 import com.company.project.dto.SettlePaymentRequestDTO;
 import com.company.project.entities.Member;
 import com.company.project.entities.Receipt;
+import com.company.project.entities.Staff;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.ReceiptRepository;
+import com.company.project.repositories.StaffRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,17 +40,31 @@ public class ReceiptService {
     private final FinancialEventService financialEventService;
     private final ReceiptVoucherService receiptVoucherService;
     private final VoucherNumberService voucherNumberService;
+    private final StaffRepository staffRepository;
 
     public ReceiptService(ReceiptRepository receiptRepository,
                           MemberRepository memberRepository,
                           FinancialEventService financialEventService,
                           @Lazy ReceiptVoucherService receiptVoucherService,
-                          VoucherNumberService voucherNumberService) {
+                          VoucherNumberService voucherNumberService,
+                          StaffRepository staffRepository) {
         this.receiptRepository     = receiptRepository;
         this.memberRepository      = memberRepository;
         this.financialEventService = financialEventService;
         this.receiptVoucherService = receiptVoucherService;
         this.voucherNumberService  = voucherNumberService;
+        this.staffRepository      = staffRepository;
+    }
+
+    /**
+     * Resolves which staff member should be credited with a sale for revenue-target
+     * purposes. Lets a shared/admin login attribute a transaction to whoever actually
+     * handled it (via an explicit staff picker), instead of always crediting whichever
+     * account happened to be authenticated when the receipt was created.
+     */
+    public String resolveProcessedByName(Long processedByStaffId) {
+        if (processedByStaffId == null) return "Admin";
+        return staffRepository.findById(processedByStaffId).map(Staff::getName).orElse("Admin");
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -80,7 +96,9 @@ public class ReceiptService {
         return ReceiptResponseDTO.fromEntity(receipt);
     }
 
-    @Transactional(readOnly = true)
+    // Not readOnly: the stale member_db_id self-heal below writes corrected
+    // receipts back, which Postgres rejects inside a read-only transaction.
+    @Transactional
     public List<ReceiptResponseDTO> getPendingBillsForMember(Long memberDbId) {
         List<Receipt> bills = receiptRepository.findPendingByMember(memberDbId);
 
@@ -117,7 +135,9 @@ public class ReceiptService {
      * Receipt.minorCharges) — so their statement always comes back empty with
      * billedToHead=true and familyHeadName populated instead.
      */
-    @Transactional(readOnly = true)
+    // Not readOnly: the stale member_db_id self-heal below writes corrected
+    // receipts back, which Postgres rejects inside a read-only transaction.
+    @Transactional
     public com.company.project.dto.MemberStatementResponseDTO getMemberStatement(
             Long memberDbId, LocalDateTime from, LocalDateTime to) {
         Member member = memberRepository.findById(memberDbId)
@@ -363,12 +383,12 @@ public class ReceiptService {
      * Called from MemberService after creating or renewing a member.
      */
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus) {
-        return createReceiptForMember(member, transactionType, paymentStatus, null, null, null);
+        return createReceiptForMember(member, transactionType, paymentStatus, null, null, null, null);
     }
 
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,
                                           List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown) {
-        return createReceiptForMember(member, transactionType, paymentStatus, paymentBreakdown, null, null);
+        return createReceiptForMember(member, transactionType, paymentStatus, paymentBreakdown, null, null, null);
     }
 
     /**
@@ -382,9 +402,10 @@ public class ReceiptService {
      */
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,
                                           List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
-                                          String bankAccountCode, String bankAccountName) {
+                                          String bankAccountCode, String bankAccountName,
+                                          Long processedByStaffId) {
         return createReceiptForMember(member, transactionType, paymentStatus, paymentBreakdown,
-                bankAccountCode, bankAccountName, null, null);
+                bankAccountCode, bankAccountName, null, null, processedByStaffId);
     }
 
     /**
@@ -397,7 +418,8 @@ public class ReceiptService {
                                           List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
                                           String bankAccountCode, String bankAccountName,
                                           BigDecimal amountOverride,
-                                          List<com.company.project.dto.MinorChargeDTO> minorCharges) {
+                                          List<com.company.project.dto.MinorChargeDTO> minorCharges,
+                                          Long processedByStaffId) {
         Receipt r = new Receipt();
         r.setTransactionDate(LocalDateTime.now());
         r.setMemberDbId(member.getId());
@@ -442,7 +464,7 @@ public class ReceiptService {
         r.setValidFrom(member.getMembershipStartDate());
         r.setValidTill(member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate());
         r.setMembershipType(member.getMembershipType());
-        r.setProcessedBy("Admin");
+        r.setProcessedBy(resolveProcessedByName(processedByStaffId));
 
         Receipt saved = receiptRepository.save(r);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
@@ -463,7 +485,7 @@ public class ReceiptService {
     public Receipt createWalkInReceipt(String visitorName, String visitorPhone, String planName,
                                        BigDecimal amount, BigDecimal paidAmount, String paymentMethod,
                                        List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
-                                       String remarks) {
+                                       String remarks, Long processedByStaffId) {
         BigDecimal totalAmount = amount != null ? amount : BigDecimal.ZERO;
         BigDecimal paid = paidAmount != null ? paidAmount.max(BigDecimal.ZERO).min(totalAmount) : BigDecimal.ZERO;
 
@@ -482,7 +504,7 @@ public class ReceiptService {
         r.setPlanName(planName);
         r.setValidFrom(LocalDateTime.now());
         r.setMembershipType("Walk-In");
-        r.setProcessedBy("Admin");
+        r.setProcessedBy(resolveProcessedByName(processedByStaffId));
         r.setRemarks(remarks);
 
         Receipt saved = receiptRepository.save(r);
@@ -505,9 +527,10 @@ public class ReceiptService {
     public Receipt createMinorChargeReceipt(Member guardian, Member minor, BigDecimal fee, boolean paid,
                                             String transactionType,
                                             List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
-                                            String bankAccountCode, String bankAccountName) {
+                                            String bankAccountCode, String bankAccountName,
+                                            Long processedByStaffId) {
         return createMinorChargeReceipt(guardian, minor, fee, paid ? fee : BigDecimal.ZERO,
-                transactionType, null, paymentBreakdown, bankAccountCode, bankAccountName);
+                transactionType, null, paymentBreakdown, bankAccountCode, bankAccountName, processedByStaffId);
     }
 
     /**
@@ -520,7 +543,8 @@ public class ReceiptService {
     public Receipt createMinorChargeReceipt(Member guardian, Member minor, BigDecimal fee, BigDecimal paidAmount,
                                             String transactionType, String description,
                                             List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
-                                            String bankAccountCode, String bankAccountName) {
+                                            String bankAccountCode, String bankAccountName,
+                                            Long processedByStaffId) {
         Receipt r = new Receipt();
         r.setTransactionDate(LocalDateTime.now());
         r.setMemberDbId(guardian.getId());
@@ -547,7 +571,7 @@ public class ReceiptService {
         r.setValidFrom(minor.getMembershipStartDate());
         r.setValidTill(minor.getMembershipEndDate() != null ? minor.getMembershipEndDate() : minor.getExpiryDate());
         r.setMembershipType(guardian.getMembershipType());
-        r.setProcessedBy("Admin");
+        r.setProcessedBy(resolveProcessedByName(processedByStaffId));
         r.setRemarks("Charge for family member: " + minor.getName()
                 + (minor.getRelationshipToHead() != null ? " (" + minor.getRelationshipToHead() + ")" : ""));
         r.setMinorCharges(List.of(new com.company.project.dto.MinorChargeDTO(
@@ -632,7 +656,7 @@ public class ReceiptService {
         settlement.setValidFrom(member.getMembershipStartDate());
         settlement.setValidTill(member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate());
         settlement.setMembershipType(member.getMembershipType());
-        settlement.setProcessedBy("Admin");
+        settlement.setProcessedBy(resolveProcessedByName(req.getProcessedByStaffId()));
         settlement.setRemarks(req.getRemarks());
         settlement.setLinkedBillId(soleBillId);
         // member.outstandingBalance was just finalized above (post-settlement), so this

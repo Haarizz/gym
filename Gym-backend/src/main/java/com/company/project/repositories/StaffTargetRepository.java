@@ -16,4 +16,5 @@ public interface StaffTargetRepository extends JpaRepository<StaffTarget, Long>,
 
     List<StaffTarget> findByStaff_Id(Long staffId);
     List<StaffTarget> findByStaff_IdAndScope(Long staffId, String scope);
+    List<StaffTarget> findByScopeAndYearAndMonthAndStaffIsNull(String scope, Integer year, Integer month);
 }

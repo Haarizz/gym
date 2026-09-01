@@ -1,2 +1,1 @@
-export * from './presentation/screens/AnalyticsHubScreen';
-export * from './community';
+export * from './presentation/screens/AdminAnalyticsScreen';

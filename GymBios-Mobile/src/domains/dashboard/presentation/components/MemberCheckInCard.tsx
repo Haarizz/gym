@@ -1,71 +1,203 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useQueryClient } from '@tanstack/react-query';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
-import { useCheckIn } from '@/domains/checkIn';
+import {
+  checkInKeys,
+  useMemberCheckIn,
+  useMemberCheckInStatus,
+  useMemberCheckOut,
+  useSubmitWorkoutFeedback,
+} from '@/domains/checkIn';
+import { useMemberDashboard, dashboardKeys } from '@/domains/dashboard';
+import { PostWorkoutFeedbackSheet } from '@/domains/checkIn/presentation/components/members/PostWorkoutFeedbackSheet';
+import type { MemberFeedbackPayload } from '@/domains/checkIn/domain/MemberFeedback';
 
 export function MemberCheckInCard() {
-  const [checkedIn, setCheckedIn] = useState(false);
-  const checkInMutation = useCheckIn();
+  const queryClient = useQueryClient();
+  const { data: dashboardData } = useMemberDashboard();
+  const { data: statusData } = useMemberCheckInStatus();
 
-  const handleCheckIn = () => {
-    if (checkedIn) {
-      Alert.alert('Already Checked In', 'You have already checked in for today!');
-      return;
+  const checkInMutation = useMemberCheckIn();
+  const checkOutMutation = useMemberCheckOut();
+  const feedbackMutation = useSubmitWorkoutFeedback();
+
+  const [overrideCheckedIn, setOverrideCheckedIn] = useState<boolean | null>(null);
+  const [feedbackSheetVisible, setFeedbackSheetVisible] = useState(false);
+  const [completedAttendanceId, setCompletedAttendanceId] = useState<number | null>(null);
+
+  // Sync override when server query status updates
+  useEffect(() => {
+    if (statusData?.checkedIn !== undefined) {
+      setOverrideCheckedIn(null);
     }
+  }, [statusData?.checkedIn]);
 
-    checkInMutation.mutate(
-      {
-        name: 'Sarah Johnson',
-        sessionType: 'gym',
+  const isCheckedIn =
+    overrideCheckedIn !== null
+      ? overrideCheckedIn
+      : Boolean(statusData?.checkedIn ?? dashboardData?.checkInStatus?.checkedIn);
+
+  const activeAttendanceId =
+    statusData?.attendanceId ??
+    statusData?.attendance_id ??
+    dashboardData?.checkInStatus?.activeAttendanceId ??
+    completedAttendanceId ??
+    null;
+
+  const isActionPending =
+    checkInMutation.isPending || checkOutMutation.isPending;
+
+  const handleAction = () => {
+    if (isActionPending) return;
+
+    if (!isCheckedIn) {
+      // Perform Check-In
+      checkInMutation.mutate(undefined, {
+        onSuccess: (resp) => {
+          setOverrideCheckedIn(true);
+          const attId = resp?.attendanceId ?? resp?.attendance_id;
+          if (attId) {
+            setCompletedAttendanceId(attId);
+          }
+          Alert.alert('Check-In Successful', 'Welcome to the gym! Access unlocked.');
+        },
+        onError: (err: any) => {
+          const status = err?.status || err?.response?.status;
+          const msg =
+            err?.response?.data?.message || err?.message || 'Check-in could not be completed.';
+
+          // If member is already checked in (409 Conflict / Business rule violation)
+          if (
+            status === 409 ||
+            (typeof msg === 'string' && msg.toLowerCase().includes('already checked in'))
+          ) {
+            setOverrideCheckedIn(true);
+            queryClient.invalidateQueries({ queryKey: checkInKeys.all });
+            queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+            Alert.alert(
+              'Already Checked In',
+              'You have an active workout session in progress. Tap Check Out when finished.'
+            );
+          } else {
+            Alert.alert('Check-In Notice', msg);
+          }
+        },
+      });
+    } else {
+      // Perform Check-Out
+      checkOutMutation.mutate(undefined, {
+        onSuccess: (resp) => {
+          setOverrideCheckedIn(false);
+          const attId =
+            resp?.attendanceId ??
+            resp?.attendance_id ??
+            activeAttendanceId ??
+            completedAttendanceId;
+
+          if (attId) {
+            setCompletedAttendanceId(attId);
+          }
+          setFeedbackSheetVisible(true);
+        },
+        onError: (err: any) => {
+          const status = err?.status || err?.response?.status;
+          const msg =
+            err?.response?.data?.message || err?.message || 'Check-out could not be completed.';
+
+          if (
+            status === 409 ||
+            (typeof msg === 'string' && msg.toLowerCase().includes('no active check-in'))
+          ) {
+            setOverrideCheckedIn(false);
+            queryClient.invalidateQueries({ queryKey: checkInKeys.all });
+            queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+          }
+
+          Alert.alert('Check-Out Notice', msg);
+        },
+      });
+    }
+  };
+
+  const handleFeedbackSubmit = (payload: MemberFeedbackPayload) => {
+    const finalPayload: MemberFeedbackPayload = {
+      ...payload,
+      attendanceId: payload.attendanceId || completedAttendanceId || activeAttendanceId || 0,
+      attendance_id: payload.attendanceId || completedAttendanceId || activeAttendanceId || 0,
+    };
+
+    feedbackMutation.mutate(finalPayload, {
+      onSuccess: () => {
+        setFeedbackSheetVisible(false);
+        setCompletedAttendanceId(null);
+        setOverrideCheckedIn(false);
+        queryClient.invalidateQueries({ queryKey: checkInKeys.all });
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       },
-      {
-        onSuccess: () => {
-          setCheckedIn(true);
-          Alert.alert('Check-In Successful', 'Welcome to the gym! Gate access unlocked.');
-        },
-        onError: () => {
-          // Graceful fallback simulation
-          setCheckedIn(true);
-          Alert.alert('Check-In Successful', 'Welcome to FitZone! Gate access unlocked.');
-        },
-      }
-    );
+      onError: (err: any) => {
+        const msg =
+          err?.response?.data?.message ||
+          err?.message ||
+          'Feedback could not be submitted.';
+        Alert.alert('Feedback Error', msg);
+      },
+    });
   };
 
   return (
-    <Pressable
-      onPress={handleCheckIn}
-      disabled={checkInMutation.isPending}
-      style={({ pressed }) => [
-        styles.container,
-        checkedIn && styles.containerCheckedIn,
-        pressed && styles.pressed,
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel="Check In Now"
-    >
-      <View style={styles.content}>
-        <View style={styles.iconBox}>
-          {checkInMutation.isPending ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Feather name={checkedIn ? 'check' : 'maximize'} size={24} color="#FFFFFF" />
-          )}
+    <>
+      <Pressable
+        onPress={handleAction}
+        disabled={isActionPending}
+        style={({ pressed }) => [
+          styles.container,
+          isCheckedIn && styles.containerCheckedIn,
+          pressed && styles.pressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={isCheckedIn ? 'Check Out of Gym' : 'Check In Now'}
+      >
+        <View style={styles.content}>
+          <View style={[styles.iconBox, isCheckedIn && styles.iconBoxCheckedIn]}>
+            {isActionPending ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Feather
+                name={isCheckedIn ? 'log-out' : 'maximize'}
+                size={24}
+                color="#FFFFFF"
+              />
+            )}
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={styles.title}>
+              {isCheckedIn ? 'Tap to Check Out' : 'Check In Now'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isCheckedIn ? 'Workout in progress · Tap when finished' : 'Gate access ready'}
+            </Text>
+          </View>
+          <Feather
+            name="chevron-right"
+            size={20}
+            color="rgba(255,255,255,0.8)"
+          />
         </View>
-        <View style={styles.textContainer}>
-          <Text style={styles.title}>{checkedIn ? 'Checked In' : 'Check In Now'}</Text>
-          <Text style={styles.subtitle}>
-            {checkedIn ? 'Access granted for today' : 'Gate access ready'}
-          </Text>
-        </View>
-        <Feather
-          name={checkedIn ? 'check-circle' : 'chevron-right'}
-          size={20}
-          color="rgba(255,255,255,0.8)"
+      </Pressable>
+
+      {/* Post-Workout Feedback Sheet */}
+      {feedbackSheetVisible && (
+        <PostWorkoutFeedbackSheet
+          visible={feedbackSheetVisible}
+          attendanceId={completedAttendanceId || activeAttendanceId || 0}
+          isSubmitting={feedbackMutation.isPending}
+          onSubmit={handleFeedbackSubmit}
+          onClose={() => setFeedbackSheetVisible(false)}
         />
-      </View>
-    </Pressable>
+      )}
+    </>
   );
 }
 
@@ -81,7 +213,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   containerCheckedIn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#C9821E',
   },
   pressed: {
     opacity: 0.92,
@@ -100,6 +232,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.three,
+  },
+  iconBoxCheckedIn: {
+    backgroundColor: 'rgba(0,0,0,0.15)',
   },
   textContainer: {
     flex: 1,

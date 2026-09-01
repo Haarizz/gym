@@ -108,6 +108,10 @@ export interface CommissionRule {
   id: string;
   role: string;
   base_commission: number;
+  // Rate applied to new-member admission revenue instead of base_commission,
+  // which still applies to everything else (renewals, add-ons, walk-ins).
+  // Falls back to base_commission when not set.
+  admission_commission?: number;
   target_bonuses_json: string;
 }
 
@@ -272,6 +276,20 @@ class StaffService {
     if (!response.ok) throw new Error(`Failed to delete target: ${response.status}`);
   }
 
+  /** Targets for the staff member linked to the logged-in account, defaulting to the current month. */
+  async getMyTargets(year?: number, month?: number): Promise<StaffTarget[]> {
+    const params = new URLSearchParams();
+    if (year)  params.append('year',  String(year));
+    if (month) params.append('month', String(month));
+
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff-targets/me?${params.toString()}`
+    );
+    if (response.status === 404 || response.status === 401) return [];
+    if (!response.ok) throw new Error(`Failed to fetch my targets: ${response.status}`);
+    return response.json();
+  }
+
   // ── Commission Rules ─────────────────────────────────────────────────────
 
   async getCommissionRules(): Promise<CommissionRule[]> {
@@ -285,6 +303,7 @@ class StaffService {
   async updateCommissionRule(id: string, data: {
     role?: string;
     base_commission?: number;
+    admission_commission?: number;
     target_bonuses_json?: string;
   }): Promise<CommissionRule> {
     const response = await authService.makeAuthenticatedRequest(
@@ -298,6 +317,7 @@ class StaffService {
   async createCommissionRule(data: {
     role: string;
     base_commission: number;
+    admission_commission?: number;
     target_bonuses_json: string;
   }): Promise<CommissionRule> {
     const response = await authService.makeAuthenticatedRequest(

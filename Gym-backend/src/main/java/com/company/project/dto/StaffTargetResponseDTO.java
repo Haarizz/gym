@@ -72,6 +72,35 @@ public class StaffTargetResponseDTO {
         return dto;
     }
 
+    /**
+     * Builds the DTO with "achieved" figures floored at live-computed progress (actual paid
+     * receipts / converted leads for the period), so the reported percentage never understates
+     * real performance even when nobody has manually pushed a PATCH .../achievement update.
+     */
+    public static StaffTargetResponseDTO fromEntity(StaffTarget t, BigDecimal liveRevenueAchieved, Integer liveConversions) {
+        return fromEntity(t, liveRevenueAchieved, liveConversions, null);
+    }
+
+    public static StaffTargetResponseDTO fromEntity(StaffTarget t, BigDecimal liveRevenueAchieved, Integer liveConversions, BigDecimal liveCommission) {
+        StaffTargetResponseDTO dto = fromEntity(t);
+        if (liveRevenueAchieved != null && liveRevenueAchieved.compareTo(dto.revenueAchieved) > 0) {
+            dto.revenueAchieved = liveRevenueAchieved;
+        }
+        if (liveConversions != null && liveConversions > dto.newClientsAchieved) {
+            dto.newClientsAchieved = liveConversions;
+        }
+        if (liveCommission != null && liveCommission.compareTo(dto.commissionEarned) > 0) {
+            dto.commissionEarned = liveCommission;
+        }
+        if (t.getRevenueTarget() != null && t.getRevenueTarget().compareTo(BigDecimal.ZERO) > 0) {
+            dto.percentage = dto.revenueAchieved
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(t.getRevenueTarget(), 0, java.math.RoundingMode.HALF_UP)
+                    .intValue();
+        }
+        return dto;
+    }
+
     // All getters/setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }

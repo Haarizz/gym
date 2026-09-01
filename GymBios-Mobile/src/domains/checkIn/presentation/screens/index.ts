@@ -5,3 +5,4 @@ export * from './WalkInHubScreen';
 export * from './WalkInRegistrationScreen';
 export * from './DailyVisitorsScreen';
 
+export * from './staff/StaffCheckInScreen';

@@ -10,22 +10,25 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class CompanyTaxDetailsService {
 
-    private static final Long SINGLETON_ID = 1L;
-
     private final CompanyTaxDetailsRepository repository;
+    private final BranchSettingsResolver branchSettingsResolver;
 
-    public CompanyTaxDetailsService(CompanyTaxDetailsRepository repository) {
+    public CompanyTaxDetailsService(CompanyTaxDetailsRepository repository, BranchSettingsResolver branchSettingsResolver) {
         this.repository = repository;
+        this.branchSettingsResolver = branchSettingsResolver;
     }
 
     public CompanyTaxDetailsDTO get() {
-        CompanyTaxDetails d = repository.findById(SINGLETON_ID).orElseGet(CompanyTaxDetails::new);
+        Long branchId = branchSettingsResolver.resolveForRead();
+        CompanyTaxDetails d = branchId != null
+                ? repository.findByBranchId(branchId).orElseGet(CompanyTaxDetails::new)
+                : new CompanyTaxDetails();
         return CompanyTaxDetailsDTO.fromEntity(d);
     }
 
     public CompanyTaxDetailsDTO update(CompanyTaxDetailsDTO req) {
-        CompanyTaxDetails d = repository.findById(SINGLETON_ID).orElseGet(CompanyTaxDetails::new);
-        d.setId(SINGLETON_ID);
+        Long branchId = branchSettingsResolver.resolveForWrite();
+        CompanyTaxDetails d = repository.findByBranchId(branchId).orElseGet(CompanyTaxDetails::new);
         d.setLegalName(req.getLegalName());
         d.setGstNumber(req.getGstNumber());
         d.setVatNumber(req.getVatNumber());

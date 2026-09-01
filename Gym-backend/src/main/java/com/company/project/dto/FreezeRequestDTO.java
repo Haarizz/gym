@@ -6,10 +6,14 @@ package com.company.project.dto;
 public class FreezeRequestDTO {
 
     private String freezeUntil;   // ISO date string "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm:ssZ"
+    private String freezeStartDate; // Same formats; optional — defaults to now when omitted
     private String reason;
 
     public String getFreezeUntil() { return freezeUntil; }
     public void setFreezeUntil(String freezeUntil) { this.freezeUntil = freezeUntil; }
+
+    public String getFreezeStartDate() { return freezeStartDate; }
+    public void setFreezeStartDate(String freezeStartDate) { this.freezeStartDate = freezeStartDate; }
 
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }

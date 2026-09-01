@@ -4,8 +4,9 @@ import { invalidateCompanyDetailsCache } from "../utils/company-details";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Settings as SettingsIcon, Coins, Check, Building, MapPin, Mail, Phone, UploadCloud, Building2, Image as ImageIcon, Hash } from "lucide-react";
+import { Settings as SettingsIcon, Coins, Check, Building, MapPin, Mail, Phone, UploadCloud, Building2, Image as ImageIcon, Hash, MapPinned } from "lucide-react";
 import { useCurrency, CURRENCIES, CurrencyCode, CurrencyGlyph } from "../utils/currency";
+import { useBranch } from "../utils/branch-context";
 import { toast } from "sonner";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -13,7 +14,16 @@ import { Textarea } from "../components/ui/textarea";
 
 export function AppSettings() {
   const { currencyCode, currency, setCurrencyCode, saving } = useCurrency();
+  const { activeBranchId, activeBranchName, isAllBranches, accessibleBranches } = useBranch();
+  const defaultBranchName = accessibleBranches.find((b) => b.isDefault)?.branchName ?? accessibleBranches[0]?.branchName ?? "the default branch";
   const [pendingCode, setPendingCode] = useState<CurrencyCode>(currencyCode);
+
+  // Currency + Company Details are branch-scoped — keep the pending currency
+  // selector in sync whenever the underlying (branch-resolved) value changes,
+  // e.g. after switching branches.
+  useEffect(() => {
+    setPendingCode(currencyCode);
+  }, [currencyCode]);
 
   const isDirty = pendingCode !== currencyCode;
 
@@ -64,14 +74,22 @@ export function AppSettings() {
         setIsCompanyLoading(false);
       }
     };
+    setIsCompanyLoading(true);
     loadSettings();
-  }, []);
+    // Company Details is branch-scoped — re-fetch whenever the active branch changes.
+  }, [activeBranchId]);
 
   const [isCompanyDirty, setIsCompanyDirty] = useState(false);
 
   const handleCompanyChange = (field: string, value: string) => {
     setCompanyDetails(prev => ({ ...prev, [field]: value }));
     setIsCompanyDirty(true);
+  };
+
+  // Phone Number accepts digits and common separators (+, -, spaces,
+  // parentheses) only — strips letters/symbols as they're typed or pasted.
+  const handlePhoneChange = (value: string) => {
+    handleCompanyChange("phone", value.replace(/[^0-9+\-\s()]/g, ""));
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,6 +153,19 @@ export function AppSettings() {
             <p className="text-gray-600 mt-1">Application-wide preferences for GymBios</p>
           </div>
         </div>
+      </div>
+
+      <div className="max-w-2xl rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 flex items-center gap-2 text-sm">
+        <MapPinned className="h-4 w-4 text-primary flex-shrink-0" />
+        {isAllBranches ? (
+          <span className="text-gray-700">
+            Currency and Company Details are per-branch. Viewing <strong>{defaultBranchName}</strong>'s settings as a read-only reference — select a specific branch to edit.
+          </span>
+        ) : (
+          <span className="text-gray-700">
+            Currency and Company Details below apply to <strong>{activeBranchName}</strong> only — other branches configure their own.
+          </span>
+        )}
       </div>
 
       <Card className="bg-white border-0 shadow-sm max-w-2xl">
@@ -242,11 +273,11 @@ export function AppSettings() {
                     Phone Number
                   </Label>
                   <Input 
-                    id="phone" 
-                    type="tel" 
-                    placeholder="+1 234 567 890" 
+                    id="phone"
+                    type="tel"
+                    placeholder="+1 234 567 890"
                     value={companyDetails.phone}
-                    onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) handleCompanyChange("phone", v); }}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
                   />
                 </div>
               </div>

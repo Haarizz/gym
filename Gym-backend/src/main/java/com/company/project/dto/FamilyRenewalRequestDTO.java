@@ -16,6 +16,8 @@ public class FamilyRenewalRequestDTO {
     private List<PaymentSplitDTO> paymentBreakdown;
     private String bankAccountCode;
     private String bankAccountName;
+    // Which staff member actually handled this renewal — see MemberRequestDTO.processedByStaffId.
+    private Long processedByStaffId;
 
     public String getPlanName() { return planName; }
     public void setPlanName(String planName) { this.planName = planName; }
@@ -34,4 +36,7 @@ public class FamilyRenewalRequestDTO {
 
     public String getBankAccountName() { return bankAccountName; }
     public void setBankAccountName(String bankAccountName) { this.bankAccountName = bankAccountName; }
+
+    public Long getProcessedByStaffId() { return processedByStaffId; }
+    public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
 }

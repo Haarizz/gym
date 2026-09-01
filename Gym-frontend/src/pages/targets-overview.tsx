@@ -82,7 +82,7 @@ const COLORS = {
 };
 
 interface TargetsOverviewProps {
-  onNavigate: (section: string) => void;
+  onNavigate: (section: string, params?: Record<string, any>) => void;
 }
 
 export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
@@ -114,14 +114,25 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
   const individualTargets = targets.filter(t => t.scope === 'individual');
   const institutionTargetData = targets.find(t => t.scope === 'institution');
 
-  const instTarget = {
-    monthly: institutionTargetData?.revenue_target || 0,
-    achieved: institutionTargetData?.revenue_achieved || 0,
-    percentage: institutionTargetData?.percentage || 0,
-    remaining: Math.max(0, (institutionTargetData?.revenue_target || 0) - (institutionTargetData?.revenue_achieved || 0)),
-    daysLeft: 0,
-    dailyRequired: 0
-  };
+  const monthDaysLeft = useMemo(() => {
+    const today = new Date();
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    return Math.max(0, endOfMonth.getDate() - today.getDate());
+  }, []);
+
+  const instTarget = useMemo(() => {
+    const monthly = institutionTargetData?.revenue_target || 0;
+    const achieved = institutionTargetData?.revenue_achieved || 0;
+    const remaining = Math.max(0, monthly - achieved);
+    return {
+      monthly,
+      achieved,
+      percentage: institutionTargetData?.percentage || 0,
+      remaining,
+      daysLeft: monthDaysLeft,
+      dailyRequired: monthDaysLeft > 0 ? Math.ceil(remaining / monthDaysLeft) : remaining
+    };
+  }, [institutionTargetData, monthDaysLeft]);
 
   // Compute department performance from individual targets
   const departmentPerformance = useMemo(() => {
@@ -138,6 +149,32 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
 
   // Trend data is not available week-by-week from the API; use empty array
   const trendData: Array<{date: string; target: number; actual: number; forecast: number}> = [];
+
+  const exportToCsv = () => {
+    const header = ["Staff", "Role", "Department", "Target", "Achieved", "Progress %", "Commission", "Forecast %"];
+    const rows = filteredStaffData.map(t => [
+      t.staff_name || "",
+      t.staff_role || "",
+      t.staff_department || "",
+      t.revenue_target || 0,
+      t.revenue_achieved || 0,
+      t.percentage || 0,
+      t.commission_earned || 0,
+      t.forecast || 0,
+    ]);
+    const csv = [header, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `staff-targets-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const toggleRowExpansion = (staffId: string) => {
     setExpandedRows(prev =>
@@ -194,58 +231,52 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
   const totalRevenue = filteredStaffData.reduce((sum, t) => sum + (t.revenue_achieved || 0), 0);
   const commissionROI = totalRevenue > 0 ? ((totalRevenue - totalCommission) / totalRevenue * 100) : 0;
 
-  // Alerts derived from real target data — staff behind pace or already exceeding targets
+  // Alerts derived from real target/progress data for this period
   const alerts = useMemo(() => {
-    const now = new Date();
-    const generated: Array<{ type: string; title: string; message: string; priority: string; staffName?: string }> = [];
+    const generated: Array<{ type: string; title: string; message: string; priority: string; action: string }> = [];
 
     filteredStaffData.forEach(t => {
       const pct = t.percentage || 0;
-      let daysLeft = 0;
-      if (t.end_date) {
-        daysLeft = Math.max(0, Math.ceil((new Date(t.end_date).getTime() - now.getTime()) / 86400000));
-      } else if (t.timeframe === "monthly" && t.year && t.month) {
-        daysLeft = Math.max(0, Math.ceil((new Date(t.year, t.month, 0).getTime() - now.getTime()) / 86400000));
-      }
-
-      if (pct >= 100) {
-        generated.push({
-          type: "success",
-          title: `${t.staff_name} exceeded target`,
-          message: `${t.staff_name} has reached ${pct.toFixed(0)}% of their target.`,
-          priority: "low",
-          staffName: t.staff_name
-        });
-      } else if (pct < 70 && daysLeft > 0 && daysLeft <= 7) {
+      const name = t.staff_name || "This staff member";
+      if (pct < 60 && monthDaysLeft <= 10) {
         generated.push({
           type: "error",
-          title: `${t.staff_name} needs attention`,
-          message: `${t.staff_name} is at ${pct.toFixed(0)}% of target with ${daysLeft} days left. Intervention recommended.`,
+          title: `${name} underperforming`,
+          message: `${name} is only at ${pct.toFixed(0)}% of target with ${monthDaysLeft} day${monthDaysLeft === 1 ? "" : "s"} left. Immediate support needed.`,
           priority: "urgent",
-          staffName: t.staff_name
+          action: `Contact ${name.split(" ")[0]}`
         });
-      } else if (pct < 70) {
+      } else if (pct < 75 && monthDaysLeft <= 10) {
         generated.push({
           type: "warning",
-          title: `${t.staff_name} is behind`,
-          message: `${t.staff_name} is at ${pct.toFixed(0)}% progress vs target.`,
-          priority: "medium",
-          staffName: t.staff_name
+          title: `${name} needs attention`,
+          message: `${name} is at ${pct.toFixed(0)}% of target with ${monthDaysLeft} day${monthDaysLeft === 1 ? "" : "s"} left. Intervention recommended.`,
+          priority: "high",
+          action: `Contact ${name.split(" ")[0]}`
+        });
+      } else if (pct >= 100) {
+        generated.push({
+          type: "success",
+          title: `${name} hit their target`,
+          message: `${name} has reached ${pct.toFixed(0)}% of their target for this period.`,
+          priority: "low",
+          action: "Congratulate"
         });
       }
     });
 
-    if (instTarget.percentage > 0) {
+    if (instTarget.monthly > 0) {
       generated.push({
-        type: "info",
-        title: "Institution progress",
-        message: `Institution is currently at ${instTarget.percentage.toFixed(0)}% of its monthly target.`,
-        priority: "medium"
+        type: instTarget.percentage >= 85 ? "success" : "info",
+        title: "Month-end forecast",
+        message: `At current pace, the institution is at ${instTarget.percentage.toFixed(0)}% of its monthly target with ${monthDaysLeft} day${monthDaysLeft === 1 ? "" : "s"} left.`,
+        priority: "medium",
+        action: "View Forecast"
       });
     }
 
-    return generated;
-  }, [filteredStaffData, instTarget.percentage]);
+    return generated.slice(0, 8);
+  }, [filteredStaffData, instTarget, monthDaysLeft]);
 
   return (
     <div className="p-6 space-y-6 bg-background">
@@ -279,12 +310,20 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
               </SelectContent>
             </Select>
 
-            <Button variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoading}
+              onClick={() => {
+                const now = new Date();
+                loadTargets(now.getFullYear(), now.getMonth() + 1);
+              }}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
               Refresh
             </Button>
 
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={exportToCsv} disabled={filteredStaffData.length === 0}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -609,10 +648,20 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-1">
-                            <Button variant="ghost" size="sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="View details"
+                              onClick={() => toggleRowExpansion(t.id)}
+                            >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Manage target"
+                              onClick={() => onNavigate("set-targets", { staffId: t.staff_db_id })}
+                            >
                               <Award className="h-4 w-4" />
                             </Button>
                           </div>
@@ -870,27 +919,26 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
         </CardHeader>
         <CardContent>
           {alerts.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No alerts right now — everyone's tracking fine.</p>
+            <p className="text-sm text-muted-foreground">No alerts for this period.</p>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {alerts.map((alert, index) => (
-                <div key={index} className={cn(
-                  "p-4 rounded-lg border",
-                  alert.type === "error" && "bg-red-50 border-red-200",
-                  alert.type === "warning" && "bg-yellow-50 border-yellow-200",
-                  alert.type === "success" && "bg-green-50 border-green-200",
-                  alert.type === "info" && "bg-blue-50 border-blue-200"
-                )}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3">
-                      {alert.type === "error" && <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />}
-                      {alert.type === "warning" && <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />}
-                      {alert.type === "success" && <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />}
-                      {alert.type === "info" && <Zap className="h-5 w-5 text-blue-600 mt-0.5" />}
-                      <div>
-                        <h4 className="font-medium text-foreground">{alert.title}</h4>
-                        <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
-                      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {alerts.map((alert, index) => (
+              <div key={index} className={cn(
+                "p-4 rounded-lg border",
+                alert.type === "error" && "bg-red-50 border-red-200",
+                alert.type === "warning" && "bg-yellow-50 border-yellow-200",
+                alert.type === "success" && "bg-green-50 border-green-200",
+                alert.type === "info" && "bg-blue-50 border-blue-200"
+              )}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-3">
+                    {alert.type === "error" && <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />}
+                    {alert.type === "warning" && <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />}
+                    {alert.type === "success" && <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />}
+                    {alert.type === "info" && <Zap className="h-5 w-5 text-blue-600 mt-0.5" />}
+                    <div>
+                      <h4 className="font-medium text-foreground">{alert.title}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
                     </div>
                     <Badge variant="outline" className={cn(
                       "text-xs",
@@ -903,8 +951,14 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                     </Badge>
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="mt-3 flex justify-end">
+                  <Button size="sm" variant="outline" className="text-xs">
+                    {alert.action}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
           )}
         </CardContent>
       </Card>

@@ -16,7 +16,7 @@ export function StaffQuickActions({ onAddLead, onCheckIn }: StaffQuickActionsPro
     if (onAddLead) {
       onAddLead();
     } else {
-      router.push('/(staff)/leads' as any);
+      router.push('/(staff)/leads/add' as any);
     }
   };
 
@@ -24,7 +24,7 @@ export function StaffQuickActions({ onAddLead, onCheckIn }: StaffQuickActionsPro
     if (onCheckIn) {
       onCheckIn();
     } else {
-      router.push('/(staff)/checkIn' as any);
+      router.push('/(staff)/check-in' as any);
     }
   };
 

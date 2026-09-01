@@ -1,13 +1,14 @@
 import { StyleSheet, View } from 'react-native';
 
+import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import { BrandColors, Spacing } from '@/core/theme';
 import { StatCard, Typography } from '@/shared/components';
 
 import type { CommunityStats } from '../../domain/community.types';
 
-function getTypeColor(type: string): string {
+function getTypeColor(type: string, primaryColor: string): string {
   switch (type) {
-    case 'achievement': return BrandColors.teal;
+    case 'achievement': return primaryColor;
     case 'question': return '#3b82f6';
     case 'tip': return '#8b5cf6';
     default: return '#94a3b8';
@@ -19,6 +20,7 @@ interface CommunityStatsOverviewProps {
 }
 
 export function CommunityStatsOverview({ stats }: CommunityStatsOverviewProps) {
+  const { primaryColor, headerColors } = useCommunityTheme();
   return (
     <View>
       {/* Overview row */}
@@ -27,7 +29,7 @@ export function CommunityStatsOverview({ stats }: CommunityStatsOverviewProps) {
           label="Total Posts"
           value={String(stats.totalPosts ?? 0)}
           iconName="file-text"
-          color={BrandColors.teal}
+          color={primaryColor}
         />
         <StatCard
           label="Total Likes"
@@ -51,7 +53,7 @@ export function CommunityStatsOverview({ stats }: CommunityStatsOverviewProps) {
           </Typography>
           {stats.byType.map((t) => (
             <View key={t.type} style={styles.typeRow}>
-              <View style={[styles.typeDot, { backgroundColor: getTypeColor(t.type) }]} />
+              <View style={[styles.typeDot, { backgroundColor: getTypeColor(t.type, primaryColor) }]} />
               <Typography variant="bodySmall" style={styles.typeLabel}>
                 {t.type.charAt(0).toUpperCase() + t.type.slice(1)}
               </Typography>

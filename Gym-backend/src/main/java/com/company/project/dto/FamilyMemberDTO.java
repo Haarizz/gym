@@ -43,6 +43,9 @@ public class FamilyMemberDTO {
     private String minorBankAccountCode;
     private String minorBankAccountName;
 
+    // Which staff member actually handled this sale — see MemberRequestDTO.processedByStaffId.
+    private Long processedByStaffId;
+
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
@@ -102,4 +105,7 @@ public class FamilyMemberDTO {
 
     public String getMinorBankAccountName() { return minorBankAccountName; }
     public void setMinorBankAccountName(String minorBankAccountName) { this.minorBankAccountName = minorBankAccountName; }
+
+    public Long getProcessedByStaffId() { return processedByStaffId; }
+    public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
 }

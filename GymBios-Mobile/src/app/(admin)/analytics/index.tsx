@@ -1,5 +1,3 @@
-import { AnalyticsHubScreen } from '@/domains/analytics';
+import { AdminAnalyticsScreen } from '@/domains/analytics';
 
-export default function AnalyticsHubRoute() {
-  return <AnalyticsHubScreen />;
-}
+export default AdminAnalyticsScreen;

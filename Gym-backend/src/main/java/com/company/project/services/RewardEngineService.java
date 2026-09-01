@@ -58,6 +58,7 @@ public class RewardEngineService {
     private final RewardRedemptionService redemptionService;
     private final NotificationService notificationService;
     private final EmailService emailService;
+    private final BranchSettingsResolver branchSettingsResolver;
 
     public RewardEngineService(ReferralRewardRuleRepository ruleRepository,
                                 ReferralRewardRepository rewardRepository,
@@ -68,7 +69,8 @@ public class RewardEngineService {
                                 RewardAuditLogRepository auditLogRepository,
                                 RewardRedemptionService redemptionService,
                                 NotificationService notificationService,
-                                EmailService emailService) {
+                                EmailService emailService,
+                                BranchSettingsResolver branchSettingsResolver) {
         this.ruleRepository = ruleRepository;
         this.rewardRepository = rewardRepository;
         this.referralRepository = referralRepository;
@@ -79,12 +81,14 @@ public class RewardEngineService {
         this.redemptionService = redemptionService;
         this.notificationService = notificationService;
         this.emailService = emailService;
+        this.branchSettingsResolver = branchSettingsResolver;
     }
 
     public void generateRewardsForReferral(Referral referral) {
         if (referral == null || !"successful".equals(referral.getStatus())) return;
 
-        ReferralSettings settings = settingsRepository.findById(1L).orElse(null);
+        Long branchId = branchSettingsResolver.resolveForRead();
+        ReferralSettings settings = branchId != null ? settingsRepository.findByBranchId(branchId).orElse(null) : null;
         if (settings != null && Boolean.FALSE.equals(settings.getProgramEnabled())) return;
 
         List<ReferralRewardRule> rules;

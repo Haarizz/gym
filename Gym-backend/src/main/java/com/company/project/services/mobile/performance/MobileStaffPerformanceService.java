@@ -6,6 +6,7 @@ import com.company.project.entities.*;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.StaffProgressCalculator;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class MobileStaffPerformanceService {
     private final FollowUpRepository followUpRepository;
     private final ReceiptRepository receiptRepository;
     private final WorkoutFeedbackRepository workoutFeedbackRepository;
+    private final StaffProgressCalculator progressCalculator;
 
     public MobileStaffPerformanceService(
             StaffRepository staffRepository,
@@ -37,13 +39,15 @@ public class MobileStaffPerformanceService {
             LeadRepository leadRepository,
             FollowUpRepository followUpRepository,
             ReceiptRepository receiptRepository,
-            WorkoutFeedbackRepository workoutFeedbackRepository) {
+            WorkoutFeedbackRepository workoutFeedbackRepository,
+            StaffProgressCalculator progressCalculator) {
         this.staffRepository = staffRepository;
         this.staffTargetRepository = staffTargetRepository;
         this.leadRepository = leadRepository;
         this.followUpRepository = followUpRepository;
         this.receiptRepository = receiptRepository;
         this.workoutFeedbackRepository = workoutFeedbackRepository;
+        this.progressCalculator = progressCalculator;
     }
 
     public StaffPerformanceResponseDTO getStaffPerformance(UserDetailsImpl principal) {
@@ -150,76 +154,11 @@ public class MobileStaffPerformanceService {
     }
 
     private BigDecimal computeStaffRevenue(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        Specification<Receipt> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "Paid"));
-            predicates.add(cb.or(
-                    cb.and(cb.isNotNull(root.get("transactionDate")),
-                            cb.greaterThanOrEqualTo(root.get("transactionDate"), start),
-                            cb.lessThan(root.get("transactionDate"), end)),
-                    cb.and(cb.isNull(root.get("transactionDate")),
-                            cb.greaterThanOrEqualTo(root.get("createdAt"), start),
-                            cb.lessThan(root.get("createdAt"), end))
-            ));
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-
-        List<Receipt> receipts = receiptRepository.findAll(spec);
-        return receipts.stream()
-                .map(r -> r.getPaidAmount() != null ? r.getPaidAmount() : (r.getAmount() != null ? r.getAmount() : BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return progressCalculator.computeRevenue(staff, username, start, end);
     }
 
     private int computeStaffConversions(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        Specification<Lead> leadConvertedSpec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "converted"));
-            predicates.add(cb.or(
-                    cb.and(cb.isNotNull(root.get("lastContactDate")),
-                            cb.greaterThanOrEqualTo(root.get("lastContactDate"), start),
-                            cb.lessThan(root.get("lastContactDate"), end)),
-                    cb.and(cb.isNull(root.get("lastContactDate")),
-                            cb.greaterThanOrEqualTo(root.get("updatedAt"), start),
-                            cb.lessThan(root.get("updatedAt"), end))
-            ));
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-        int leadConversions = (int) leadRepository.count(leadConvertedSpec);
-
-        Specification<Receipt> receiptSpec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "Paid"));
-            predicates.add(cb.or(
-                    cb.and(cb.isNotNull(root.get("transactionDate")),
-                            cb.greaterThanOrEqualTo(root.get("transactionDate"), start),
-                            cb.lessThan(root.get("transactionDate"), end)),
-                    cb.and(cb.isNull(root.get("transactionDate")),
-                            cb.greaterThanOrEqualTo(root.get("createdAt"), start),
-                            cb.lessThan(root.get("createdAt"), end))
-            ));
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-        int paidReceipts = (int) receiptRepository.count(receiptSpec);
-
-        return Math.max(leadConversions, paidReceipts);
+        return progressCalculator.computeConversions(staff, username, start, end);
     }
 
     private double computeStaffRating() {

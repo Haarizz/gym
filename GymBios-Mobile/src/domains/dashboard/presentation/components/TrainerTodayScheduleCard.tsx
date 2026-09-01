@@ -8,6 +8,7 @@ interface TrainerTodayScheduleCardProps {
   sessions: TrainerTodaySession[];
   onViewAll?: () => void;
   onStartSession?: (session: TrainerTodaySession) => void;
+  onFinishSession?: (session: TrainerTodaySession) => void;
   onMessageMember?: (session: TrainerTodaySession) => void;
 }
 
@@ -15,6 +16,7 @@ export function TrainerTodayScheduleCard({
   sessions,
   onViewAll,
   onStartSession,
+  onFinishSession,
   onMessageMember,
 }: TrainerTodayScheduleCardProps) {
   const router = useRouter();
@@ -39,6 +41,7 @@ export function TrainerTodayScheduleCard({
       <View style={styles.list}>
         {sessions.map((session, index) => {
           const isCompleted = session.status === 'completed';
+          const isInProgress = session.status === 'in_progress';
 
           return (
             <View
@@ -61,7 +64,7 @@ export function TrainerTodayScheduleCard({
 
                 {/* Session Details */}
                 <View style={styles.sessionDetails}>
-                  <Text style={styles.memberName}>{session.member}</Text>
+                  <Text style={styles.memberName}>{session.className || session.member || 'No Member'}</Text>
                   <Text style={styles.sessionSubtext}>
                     {session.type} • {session.focus}
                   </Text>
@@ -73,15 +76,27 @@ export function TrainerTodayScheduleCard({
                     </View>
                   ) : (
                     <View style={styles.actionsRow}>
-                      <Pressable
-                        style={styles.startButton}
-                        onPress={() => onStartSession?.(session)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Start session with ${session.member}`}
-                      >
-                        <Feather name="play" size={12} color="#FFFFFF" />
-                        <Text style={styles.startButtonText}>Start Session</Text>
-                      </Pressable>
+                      {isInProgress ? (
+                        <Pressable
+                          style={[styles.startButton, styles.finishButton]}
+                          onPress={() => onFinishSession?.(session)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Finish session with ${session.className || session.member}`}
+                        >
+                          <Feather name="square" size={12} color="#FFFFFF" />
+                          <Text style={styles.startButtonText}>Finish Session</Text>
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          style={styles.startButton}
+                          onPress={() => onStartSession?.(session)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Start session with ${session.className || session.member}`}
+                        >
+                          <Feather name="play" size={12} color="#FFFFFF" />
+                          <Text style={styles.startButtonText}>Start Session</Text>
+                        </Pressable>
+                      )}
 
                       <Pressable
                         style={styles.messageButton}
@@ -209,6 +224,9 @@ const styles = StyleSheet.create({
     backgroundColor: BrandColors.trainerAmber,
     paddingVertical: 6,
     borderRadius: Radius.sm,
+  },
+  finishButton: {
+    backgroundColor: '#3B82F6', // Blue color for Finish Session
   },
   startButtonText: {
     fontSize: 12,

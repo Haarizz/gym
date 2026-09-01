@@ -84,7 +84,7 @@ export class CheckInApiRepository implements CheckInRepository {
   private toAttendanceRecord(response: AttendanceRecordApiResponse): AttendanceRecord {
     return {
       id: response.id,
-      memberDbId: response.member_db_id,
+      memberDbId: response.member_id ?? response.member_db_id,
       memberBizId: response.member_biz_id,
       memberName: response.member_name,
       photoUrl: response.photo_url,

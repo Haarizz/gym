@@ -134,8 +134,10 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
     setIsSubmitting(true);
     try {
       const freezeUntil = freezeEndDate.toISOString().split('T')[0] + 'T00:00:00Z';
+      const freezeStart = freezeStartDate.toISOString().split('T')[0] + 'T00:00:00Z';
       await membersService.freezeMember(String(selectedMember.id), {
         freezeUntil,
+        freezeStartDate: freezeStart,
         reason: freezeNotes || undefined,
       });
       toast.success(`Membership frozen for ${selectedMember.name}`, {

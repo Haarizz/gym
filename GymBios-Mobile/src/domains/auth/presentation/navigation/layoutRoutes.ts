@@ -37,6 +37,11 @@ export const FULL_SCREEN_ROUTES: readonly RoutePattern[] = [
 
   // Profile Hub & Sub-screens
   ['profile'],
+
+  // Leads
+  ['leads', 'add'],
+  // Check-In
+  ['check-in'],
 ] as const;
 
 /**

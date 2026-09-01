@@ -65,7 +65,10 @@ public class SecurityConfig {
                     .hasAnyRole("ADMIN", "HR")
 
                 // Financial endpoints — Accountant, Manager, Admin
-                .requestMatchers("/api/billing/**", "/api/expenses/**", "/api/ledgers/**", "/api/financials/**")
+                // (bios/settings holds org-wide revenue targets and alert/report
+                // recipient emails — the same sensitivity as the other financial
+                // config here, so it gets the same role gate)
+                .requestMatchers("/api/billing/**", "/api/expenses/**", "/api/ledgers/**", "/api/financials/**", "/api/bios/**")
                     .hasAnyRole("ADMIN", "MANAGER", "ACCOUNTANT")
 
                 // Core gym operations — any authenticated user

@@ -25,23 +25,29 @@ public class AttendanceService {
     private final MemberRepository memberRepository;
     private final ReceiptService receiptService;
     private final com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository;
+    private final BranchSettingsResolver branchSettingsResolver;
 
     public AttendanceService(AttendanceRepository attendanceRepository,
                              MemberRepository memberRepository,
                              @org.springframework.context.annotation.Lazy ReceiptService receiptService,
-                             com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository) {
+                             com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository,
+                             BranchSettingsResolver branchSettingsResolver) {
         this.attendanceRepository = attendanceRepository;
         this.memberRepository     = memberRepository;
         this.receiptService       = receiptService;
         this.reportSettingsRepository = reportSettingsRepository;
+        this.branchSettingsResolver = branchSettingsResolver;
     }
 
-    // ── Automated report settings ────────────────────────────────────────────
+    // ── Automated report settings (one row per branch — gym floor capacity ─────
+    //    and the scheduled-report toggle both vary by branch) ──────────────────
 
     @Transactional(readOnly = true)
     public com.company.project.dto.AttendanceReportSettingsDTO getReportSettings() {
-        var settings = reportSettingsRepository.findById(1L)
-                .orElseGet(com.company.project.entities.AttendanceReportSettings::new);
+        Long branchId = branchSettingsResolver.resolveForRead();
+        var settings = branchId != null
+                ? reportSettingsRepository.findByBranchId(branchId).orElseGet(com.company.project.entities.AttendanceReportSettings::new)
+                : new com.company.project.entities.AttendanceReportSettings();
         return new com.company.project.dto.AttendanceReportSettingsDTO(
                 Boolean.TRUE.equals(settings.getEnabled()), settings.getRecipientEmail(), settings.getGymCapacity());
     }
@@ -49,7 +55,8 @@ public class AttendanceService {
     @Transactional
     public com.company.project.dto.AttendanceReportSettingsDTO updateReportSettings(
             com.company.project.dto.AttendanceReportSettingsDTO request) {
-        var settings = reportSettingsRepository.findById(1L)
+        Long branchId = branchSettingsResolver.resolveForWrite();
+        var settings = reportSettingsRepository.findByBranchId(branchId)
                 .orElseGet(com.company.project.entities.AttendanceReportSettings::new);
         if (request.getEnabled() != null) settings.setEnabled(request.getEnabled());
         if (request.getRecipientEmail() != null) settings.setRecipientEmail(request.getRecipientEmail());
@@ -210,7 +217,7 @@ public class AttendanceService {
                     req.getName(), req.getPhone(), req.getSessionType(),
                     req.getAmount(), paid ? req.getAmount() : java.math.BigDecimal.ZERO,
                     req.getPaymentMethod(), req.getPaymentBreakdown(),
-                    req.getNotes());
+                    req.getNotes(), req.getProcessedByStaffId());
         }
 
         CheckInResponse resp = new CheckInResponse();

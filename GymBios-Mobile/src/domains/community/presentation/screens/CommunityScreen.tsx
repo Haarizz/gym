@@ -44,9 +44,8 @@ export function CommunityScreen() {
         {renderDestination()}
       </View>
 
-      {/* FAB sits above bottom nav */}
       <CommunityFab onPress={() => {
-        const roleSegment = segments[0] === '(admin)' ? '(admin)' : '(member)';
+        const roleSegment = segments[0] || '(member)';
         router.push(`/${roleSegment}/community/create-post` as never);
       }} />
 

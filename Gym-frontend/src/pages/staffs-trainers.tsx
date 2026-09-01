@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { toast } from 'sonner';
 import { staffService, Staff, CommissionRule, StaffCertification } from '../utils/supabase/staff-service';
+import { rolesService, Role } from '../utils/supabase/roles-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -378,10 +379,13 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
 
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [commissionRulesList, setCommissionRulesList] = useState<CommissionRule[]>([]);
+  // All roles from Roles & Permissions (system + user-created) — the source of truth
+  // for which roles a commission rule can target.
+  const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingRules, setIsSavingRules] = useState(false);
-  const [commissionRulesEdits, setCommissionRulesEdits] = useState<Record<string, {baseCommission: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>({});
-  const [pendingNewRules, setPendingNewRules] = useState<Array<{tempId: string; role: string; baseCommission: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>([]);
+  const [commissionRulesEdits, setCommissionRulesEdits] = useState<Record<string, {baseCommission: number; admissionCommission: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>({});
+  const [pendingNewRules, setPendingNewRules] = useState<Array<{tempId: string; role: string; baseCommission: number; admissionCommission: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>([]);
   const [roleTargets, setRoleTargets] = useState<Record<string, { revenue: number; sessions: number; newClients: number }>>({});
   const [newEmployeeBasicInfo, setNewEmployeeBasicInfo] = useState<{
     name: string; email: string; phone: string; role: string; department: string;
@@ -448,6 +452,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   useEffect(() => {
     if (!showTargetSettings) return;
     loadCommissionRules();
+    rolesService.getRoles('', 1, 200).then(res => setAllRoles(res.data)).catch(e => console.error('Failed to load roles', e));
     // Build role targets from current staff list
     const roles: Record<string, { revenue: number; sessions: number; newClients: number }> = {};
     const seen = new Set<string>();
@@ -730,6 +735,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         if (edits) {
           await staffService.updateCommissionRule(rule.id, {
             base_commission: edits.baseCommission,
+            admission_commission: edits.admissionCommission,
             target_bonuses_json: JSON.stringify(edits.targetBonuses)
           });
         }
@@ -740,6 +746,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           await staffService.createCommissionRule({
             role: nr.role.trim(),
             base_commission: nr.baseCommission,
+            admission_commission: nr.admissionCommission,
             target_bonuses_json: JSON.stringify(nr.targetBonuses)
           });
         }
@@ -2206,7 +2213,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
 
               {/* Existing rules */}
               {commissionRulesList.map((rule) => {
-                const edits = commissionRulesEdits[rule.id] || { baseCommission: rule.base_commission, targetBonuses: [] };
+                const edits = commissionRulesEdits[rule.id] || { baseCommission: rule.base_commission, admissionCommission: rule.admission_commission ?? rule.base_commission, targetBonuses: [] };
                 return (
                   <Card key={rule.id} className="border-primary/10 shadow-sm">
                     <CardHeader className="pb-2 pt-4 px-4">
@@ -2216,12 +2223,21 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 space-y-4">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Base Commission (%)</Label>
-                        <Input type="number" value={edits.baseCommission} step="0.1" className="h-8 text-sm"
-                          onChange={e => setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, baseCommission: Number(e.target.value) } }))}
-                        />
-                        <p className="text-xs text-muted-foreground">Base percentage of revenue generated</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Base Commission (%)</Label>
+                          <Input type="number" value={edits.baseCommission} step="0.1" className="h-8 text-sm"
+                            onChange={e => setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, baseCommission: Number(e.target.value) } }))}
+                          />
+                          <p className="text-xs text-muted-foreground">Renewals, add-ons, walk-ins</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Admission Commission (%)</Label>
+                          <Input type="number" value={edits.admissionCommission} step="0.1" className="h-8 text-sm"
+                            onChange={e => setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, admissionCommission: Number(e.target.value) } }))}
+                          />
+                          <p className="text-xs text-muted-foreground">New member signups</p>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground">Target Achievement Bonuses</Label>
@@ -2258,17 +2274,38 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               })}
 
               {/* Pending new rules */}
-              {pendingNewRules.map((nr) => (
+              {pendingNewRules.map((nr) => {
+                // Offer every role from Roles & Permissions (system + user-created), not
+                // just roles among currently-hired staff — otherwise you couldn't set up a
+                // commission rule for a role before anyone's been hired into it. Excludes
+                // roles that already have a rule, since the backend enforces one per role.
+                // (Matching against Staff.role at commission-computation time is
+                // case-insensitive, so "RECEPTIONIST" here still matches a staff member's
+                // "Receptionist" job title.)
+                const usedRoles = new Set([
+                  ...commissionRulesList.map(r => r.role),
+                  ...pendingNewRules.filter(r => r.tempId !== nr.tempId).map(r => r.role).filter(Boolean),
+                ]);
+                const availableRoles = allRoles.map(r => r.role_name).filter(role => !usedRoles.has(role));
+                return (
                 <Card key={nr.tempId} className="border-primary/20 shadow-sm border-dashed">
                   <CardHeader className="pb-2 pt-4 px-4">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 space-y-1">
-                        <Label className="text-xs text-muted-foreground">Role Name</Label>
-                        <Input placeholder="e.g. Senior Trainer"
-                          value={nr.role}
-                          className="h-8 text-sm font-medium"
-                          onChange={e => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, role: e.target.value } : r))}
-                        />
+                        <Label className="text-xs text-muted-foreground">Role</Label>
+                        <Select
+                          value={nr.role || undefined}
+                          onValueChange={v => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, role: v } : r))}
+                        >
+                          <SelectTrigger className="h-8 text-sm font-medium">
+                            <SelectValue placeholder={availableRoles.length ? "Select a role" : "No roles without a rule"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableRoles.map(role => (
+                              <SelectItem key={role} value={role}>{role}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 mt-5 flex-shrink-0"
                         onClick={() => setPendingNewRules(prev => prev.filter(r => r.tempId !== nr.tempId))}>
@@ -2277,11 +2314,21 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     </div>
                   </CardHeader>
                   <CardContent className="px-4 pb-4 space-y-4">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Base Commission (%)</Label>
-                      <Input type="number" value={nr.baseCommission} step="0.1" className="h-8 text-sm"
-                        onChange={e => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, baseCommission: Number(e.target.value) } : r))}
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Base Commission (%)</Label>
+                        <Input type="number" value={nr.baseCommission} step="0.1" className="h-8 text-sm"
+                          onChange={e => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, baseCommission: Number(e.target.value) } : r))}
+                        />
+                        <p className="text-xs text-muted-foreground">Renewals, add-ons, walk-ins</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Admission Commission (%)</Label>
+                        <Input type="number" value={nr.admissionCommission} step="0.1" className="h-8 text-sm"
+                          onChange={e => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, admissionCommission: Number(e.target.value) } : r))}
+                        />
+                        <p className="text-xs text-muted-foreground">New member signups</p>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Target Achievement Bonuses</Label>
@@ -2314,13 +2361,20 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
 
-              {/* Add Rule button */}
-              <Button variant="outline" className="w-full border-dashed text-primary border-primary/30 hover:bg-primary/5"
-                onClick={() => setPendingNewRules(prev => [...prev, { tempId: Date.now().toString(), role: '', baseCommission: 5, targetBonuses: [] }])}>
-                <Plus className="h-4 w-4 mr-2" /> Add Commission Rule
-              </Button>
+              {/* Add Rule button — only when a role still lacks a commission rule */}
+              {allRoles.map(r => r.role_name).some(role =>
+                !commissionRulesList.some(r => r.role === role) && !pendingNewRules.some(r => r.role === role)
+              ) ? (
+                <Button variant="outline" className="w-full border-dashed text-primary border-primary/30 hover:bg-primary/5"
+                  onClick={() => setPendingNewRules(prev => [...prev, { tempId: Date.now().toString(), role: '', baseCommission: 5, admissionCommission: 5, targetBonuses: [] }])}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Commission Rule
+                </Button>
+              ) : (
+                <p className="text-center text-xs text-muted-foreground py-2">Every role already has a commission rule.</p>
+              )}
             </TabsContent>
           </Tabs>
 
