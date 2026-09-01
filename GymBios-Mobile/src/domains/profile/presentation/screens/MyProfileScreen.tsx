@@ -1,12 +1,5 @@
 import { useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors, Spacing } from '@/core/theme';
@@ -19,6 +12,8 @@ import { Typography } from '@/shared/components/Typography';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface MyProfileScreenProps {
   onBack: () => void;
@@ -64,7 +59,9 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
 
   const handleSaveProfile = async () => {
     if (!editedName.trim() || !editedEmail.trim()) {
-      Alert.alert('Validation Error', 'Name and email are required.');
+      toast.error('Name and email are required.', {
+        title: 'Validation Error'
+      });
       return;
     }
 
@@ -76,23 +73,33 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
         address: editedAddress.trim(),
       });
       setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully.');
+      toast.success('Profile updated successfully.', {
+        title: 'Success'
+      });
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to update profile.');
+      toast.error(err?.message || 'Failed to update profile.', {
+        title: 'Error'
+      });
     }
   };
 
   const handleChangePassword = async () => {
     if (!currentPassword) {
-      Alert.alert('Validation Error', 'Please enter your current password.');
+      toast.error('Please enter your current password.', {
+        title: 'Validation Error'
+      });
       return;
     }
     if (!newPassword || newPassword.length < 8) {
-      Alert.alert('Validation Error', 'New password must be at least 8 characters long.');
+      toast.error('New password must be at least 8 characters long.', {
+        title: 'Validation Error'
+      });
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Validation Error', 'New password and confirm password do not match.');
+      toast.error('New password and confirm password do not match.', {
+        title: 'Validation Error'
+      });
       return;
     }
 
@@ -104,9 +111,13 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      Alert.alert('Success', 'Password changed successfully.');
+      toast.success('Password changed successfully.', {
+        title: 'Success'
+      });
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to change password.');
+      toast.error(err?.message || 'Failed to change password.', {
+        title: 'Error'
+      });
     }
   };
 

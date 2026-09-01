@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +19,8 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Button, Typography } from '@/shared/components';
 import { useCreateCommunityPost } from '../../hooks/useCommunityActions';
 import type { CropRatio } from '../hooks/useCommunityPostComposer';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 const POST_TYPES = [
   { value: 'achievement', label: '🏆 Achievement' },
@@ -86,7 +87,9 @@ export function CommunityPostComposer({
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Permission Required', 'Gallery access is needed to attach a photo.');
+        toast.warning('Gallery access is needed to attach a photo.', {
+          title: 'Permission Required'
+        });
         return;
       }
 
@@ -100,7 +103,9 @@ export function CommunityPostComposer({
       if (!result.canceled && result.assets.length > 0) {
         const asset = result.assets[0];
         if (!asset.base64) {
-          Alert.alert('Error', 'Could not read image data.');
+          toast.error('Could not read image data.', {
+            title: 'Error'
+          });
           return;
         }
         const mimeType = asset.mimeType ?? 'image/jpeg';
@@ -110,7 +115,9 @@ export function CommunityPostComposer({
         setCropZoom(100);
       }
     } catch {
-      Alert.alert('Error', 'Unable to open image gallery.');
+      toast.error('Unable to open image gallery.', {
+        title: 'Error'
+      });
     }
   }, [setImage, setCropPosition, setCropZoom]);
 
@@ -120,11 +127,15 @@ export function CommunityPostComposer({
 
   const handleSubmit = useCallback(() => {
     if (!topic.trim()) {
-      Alert.alert('Validation', 'Topic is required.');
+      toast.info('Topic is required.', {
+        title: 'Validation'
+      });
       return;
     }
     if (!content.trim()) {
-      Alert.alert('Validation', 'Post content is required.');
+      toast.info('Post content is required.', {
+        title: 'Validation'
+      });
       return;
     }
 
@@ -143,7 +154,9 @@ export function CommunityPostComposer({
       {
         onSuccess,
         onError: (err) => {
-          Alert.alert('Error', (err as Error)?.message ?? 'Could not create post. Please try again.');
+          toast.error((err as Error)?.message ?? 'Could not create post. Please try again.', {
+            title: 'Error'
+          });
         },
       },
     );

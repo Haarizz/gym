@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -12,6 +12,8 @@ import { ReferralDetailsSheet } from '../components/ReferralDetailsSheet';
 import { useReferrals } from '../../hooks/useReferrals';
 import { useFixReferralRewards, useMarkReferralSuccessful } from '../../hooks/useReferralActions';
 import type { Referral } from '../../domain/Referral';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function ReferralsOverviewScreen() {
   const router = useRouter();
@@ -28,11 +30,15 @@ export function ReferralsOverviewScreen() {
   const handleRefreshData = () => {
     fixRewardsMutation.mutate(undefined, {
       onSuccess: () => {
-        Alert.alert('Refreshed', 'Data refreshed and rewards fixed.');
+        toast.info('Data refreshed and rewards fixed.', {
+          title: 'Refreshed'
+        });
         refetch();
       },
       onError: (err) => {
-        Alert.alert('Refresh Failed', err.message || 'Failed to refresh data.');
+        toast.error(err.message || 'Failed to refresh data.', {
+          title: 'Refresh Failed'
+        });
       },
     });
   };
@@ -45,13 +51,17 @@ export function ReferralsOverviewScreen() {
           `"${r.referrerName}","${r.refereeName}","${r.refereeEmail || ''}","${r.status}","${r.rewardAmount || 0}","${r.date || r.createdAt}"`
       ),
     ];
-    Alert.alert('CSV Export', `Generated CSV report with ${referrals.length} records.`);
+    toast.info(`Generated CSV report with ${referrals.length} records.`, {
+      title: 'CSV Export'
+    });
   };
 
   const handleMarkSuccessful = (referral: Referral) => {
     markSuccessfulMutation.mutate({ id: Number(referral.id) }, {
       onSuccess: () => {
-        Alert.alert('Success', 'Referral marked as successful.');
+        toast.success('Referral marked as successful.', {
+          title: 'Success'
+        });
         refetch();
       },
     });

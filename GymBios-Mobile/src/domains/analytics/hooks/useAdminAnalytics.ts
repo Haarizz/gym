@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/core/network/apiClient';
+import { useBranchContext } from "@/shared/providers/BranchProvider";
 
 export interface AdminAnalyticsData {
   aiInsights: string[];
@@ -27,8 +28,9 @@ export interface AdminAnalyticsData {
 }
 
 export function useAdminAnalytics() {
+    const { selectedBranchId } = useBranchContext();
   const query = useQuery<AdminAnalyticsData>({
-    queryKey: ['admin-analytics'],
+    queryKey: ['admin-analytics', selectedBranchId],
     queryFn: async () => {
       // API returns snake_case due to backend Jackson configuration
       const res = await apiClient.get<any>('/mobile/admin/analytics');

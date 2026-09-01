@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { membershipApi } from '../infrastructure/membership.api';
 import { memberMembershipKeys } from './useMemberMembership';
-import { Alert } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function useUnfreezeMembership() {
   const queryClient = useQueryClient();
@@ -13,7 +13,9 @@ export function useUnfreezeMembership() {
     },
     onError: (error: any) => {
       const message = error?.response?.data?.message || 'Failed to unfreeze membership.';
-      Alert.alert('Unfreeze Failed', message);
+      toast.error(message, {
+        title: 'Unfreeze Failed'
+      });
     },
   });
 }

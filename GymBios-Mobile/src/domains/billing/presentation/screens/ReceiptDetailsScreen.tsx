@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -20,6 +20,8 @@ import {
   PaymentSummaryCard,
   ReceiptActionBar,
 } from '../components';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface ReceiptDetailsScreenProps {
   receiptId: number;
@@ -71,10 +73,11 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
 
   const handleDownload = useCallback(() => {
-    Alert.alert(
-      'Download Receipt',
+    toast.info(
       `Receipt ${receipt?.receiptNo ?? `#${receiptId}`} has been saved to your downloads.`,
-      [{ text: 'OK' }],
+      {
+        title: 'Download Receipt'
+      }
     );
   }, [receipt?.receiptNo, receiptId]);
 
@@ -85,10 +88,8 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
   const handleShareChannel = useCallback((channel: string) => {
     setShareSheetVisible(false);
     setTimeout(() => {
-      Alert.alert(
-        `Share via ${channel}`,
-        `Receipt ${receipt?.receiptNo ?? `#${receiptId}`} sent via ${channel} to ${receipt?.memberName ?? 'Member'}.`,
-        [{ text: 'OK' }],
+      toast.info(
+        `Receipt ${receipt?.receiptNo ?? `#${receiptId}`} sent via ${channel} to ${receipt?.memberName ?? 'Member'}.`
       );
     }, 200);
   }, [receipt?.receiptNo, receipt?.memberName, receiptId]);

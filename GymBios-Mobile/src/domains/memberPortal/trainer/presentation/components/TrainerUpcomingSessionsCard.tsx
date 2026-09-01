@@ -1,4 +1,5 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
@@ -17,7 +18,7 @@ const SESSIONS: UpcomingSessionData[] = [
 
 export function TrainerUpcomingSessionsCard() {
   const handleBookSession = () => {
-    Alert.alert('Book Session', 'Opening Coach calendar to pick your next session slot.');
+    toast.info('Opening Coach calendar to pick your next session slot.', { title: 'Book Session' });
   };
 
   return (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, StyleSheet, Pressable, Alert } from 'react-native';
+import { Modal, View, StyleSheet, Pressable } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
@@ -11,6 +11,8 @@ import {
   useMarkReferralExpired,
 } from '../../hooks/useReferralActions';
 import type { Referral } from '../../domain/Referral';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface ReferralDetailsSheetProps {
   visible: boolean;
@@ -40,12 +42,16 @@ export function ReferralDetailsSheet({
       { id: Number(referral.id) },
       {
         onSuccess: () => {
-          Alert.alert('Success', 'Referral marked as successful!');
+          toast.success('Referral marked as successful!', {
+            title: 'Success'
+          });
           onClose();
           onSuccess?.();
         },
         onError: (err) => {
-          Alert.alert('Error', err.message || 'Failed to update referral status.');
+          toast.error(err.message || 'Failed to update referral status.', {
+            title: 'Error'
+          });
         },
       }
     );
@@ -54,12 +60,16 @@ export function ReferralDetailsSheet({
   const handleMarkExpired = () => {
     markExpiredMutation.mutate(Number(referral.id), {
       onSuccess: () => {
-        Alert.alert('Success', 'Referral marked as expired.');
+        toast.success('Referral marked as expired.', {
+          title: 'Success'
+        });
         onClose();
         onSuccess?.();
       },
       onError: (err) => {
-        Alert.alert('Error', err.message || 'Failed to update referral status.');
+        toast.error(err.message || 'Failed to update referral status.', {
+          title: 'Error'
+        });
       },
     });
   };

@@ -1,18 +1,15 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 export function TrainerWorkoutPlanCard() {
   const handleViewPlan = () => {
-    Alert.alert('Workout Program', 'Opening 4-Week Muscle Building full routine schedule.');
+    toast.info('Opening 4-Week Muscle Building full routine schedule.', { title: 'Workout Program' });
   };
 
   const handleRequestUpdate = () => {
-    Alert.alert(
-      'Request Plan Update',
-      'Your request for a program review has been sent to Coach Rahul Mehta.',
-      [{ text: 'OK' }]
-    );
+    toast.success('Your request for a program review has been sent to Coach Rahul Mehta.', { title: 'Request Plan Update' });
   };
 
   return (

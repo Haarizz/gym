@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -16,6 +16,8 @@ import {
   MoneyText,
   StatementRow,
 } from '../components';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface MemberStatementsScreenProps {
   onBack: () => void;
@@ -66,7 +68,9 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
 
   const handleGenerateStatement = useCallback(() => {
     if (!selectedMember) {
-      Alert.alert('Selection Required', 'Please select a member first to generate a statement.');
+      toast.info('Please select a member first to generate a statement.', {
+        title: 'Selection Required'
+      });
       return;
     }
     setActiveMemberId(selectedMember.id);
@@ -78,13 +82,16 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
 
   const handleExportCSV = useCallback(() => {
     if (!statement || !statement.lines.length) {
-      Alert.alert('Export CSV', 'No statement lines available to export.');
+      toast.info('No statement lines available to export.', {
+        title: 'Export CSV'
+      });
       return;
     }
-    Alert.alert(
-      'Export Statement CSV',
+    toast.info(
       `Exported statement of account for ${statement.memberName ?? 'Member'} to CSV.`,
-      [{ text: 'OK' }],
+      {
+        title: 'Export Statement CSV'
+      }
     );
   }, [statement]);
 

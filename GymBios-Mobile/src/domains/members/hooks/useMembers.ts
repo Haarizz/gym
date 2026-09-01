@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 
 import type { Member } from '../domain/Member';
 import type { MemberFilters } from '../application/directory/MemberDirectoryRepository';
@@ -22,6 +23,7 @@ export const memberKeys = {
 };
 
 export function useMembers(initialFilters?: MemberFilters) {
+  const { selectedBranchId } = useBranchContext();
   const queryClient = useQueryClient();
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
@@ -30,7 +32,7 @@ export function useMembers(initialFilters?: MemberFilters) {
   const filters = useMemo(() => initialFilters, [initialFilters]);
 
   const membersQuery = useQuery({
-    queryKey: memberKeys.list({ ...filters, page }),
+    queryKey: [...memberKeys.list({ ...filters, page }), selectedBranchId],
     queryFn: () => directoryService.getMembers({ ...filters, page }),
   });
 
@@ -102,8 +104,9 @@ export function useMembers(initialFilters?: MemberFilters) {
 }
 
 export function useMembersList(filters?: MemberFilters) {
+  const { selectedBranchId } = useBranchContext();
   return useQuery({
-    queryKey: memberKeys.list(filters),
+    queryKey: [...memberKeys.list(filters), selectedBranchId],
     queryFn: () => directoryService.getMembers(filters),
   });
 }

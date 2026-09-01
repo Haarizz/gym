@@ -10,6 +10,7 @@ import { AttendanceService } from '../application/AttendanceService';
 import { AttendanceApiRepository } from '../infrastructure/AttendanceApiRepository';
 
 import { attendanceKeys } from './attendanceKeys';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 
 const repository = new AttendanceApiRepository();
 const attendanceService = new AttendanceService(repository);
@@ -18,8 +19,9 @@ const attendanceService = new AttendanceService(repository);
  * Paginated attendance list.
  */
 export function useAttendance(filters?: AttendanceFilters) {
+  const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: attendanceKeys.list(filters),
+    queryKey: [...attendanceKeys.list(filters), selectedBranchId],
     queryFn: () => attendanceService.getAttendance(filters),
   });
 
@@ -37,8 +39,9 @@ export function useAttendance(filters?: AttendanceFilters) {
  * Aggregate attendance statistics for the dashboard.
  */
 export function useAttendanceStats() {
+  const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: attendanceKeys.stats,
+    queryKey: [...attendanceKeys.stats, selectedBranchId],
     queryFn: () => attendanceService.getAttendanceStats(),
   });
 
@@ -55,8 +58,9 @@ export function useAttendanceStats() {
  * Attendance analytics report for the reports page.
  */
 export function useAttendanceReport(range?: ReportRange) {
+  const { selectedBranchId } = useBranchContext();
   const query = useQuery({
-    queryKey: attendanceKeys.reports(range),
+    queryKey: [...attendanceKeys.reports(range), selectedBranchId],
     queryFn: () => attendanceService.getAttendanceReport(range),
   });
 

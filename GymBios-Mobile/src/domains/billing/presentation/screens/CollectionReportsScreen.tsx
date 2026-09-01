@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -9,6 +9,8 @@ import { Typography } from '@/shared/components/Typography';
 
 import { useBillingStats } from '../../hooks/useBills';
 import { BillingSkeleton, ErrorState, MoneyText } from '../components';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface CollectionReportsScreenProps {
   onBack: () => void;
@@ -25,11 +27,15 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
   const { stats, loading, error, refresh } = useBillingStats();
 
   const handleExportCSV = useCallback(() => {
-    Alert.alert('Export CSV', `Exported ${period} Collection Report to CSV.`);
+    toast.info(`Exported ${period} Collection Report to CSV.`, {
+      title: 'Export CSV'
+    });
   }, [period]);
 
   const handleExportPDF = useCallback(() => {
-    Alert.alert('Export PDF', `Exported ${period} Collection Report to PDF.`);
+    toast.info(`Exported ${period} Collection Report to PDF.`, {
+      title: 'Export PDF'
+    });
   }, [period]);
 
   const monthlyCollection = stats?.monthlyCollection ?? 0;

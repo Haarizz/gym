@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useProfile } from '@/domains/profile';
 import type { StaffDashboardData } from '../domain/StaffDashboardData';
 import { staffDashboardRepository } from '../infrastructure/ApiStaffDashboardRepository';
+import { useBranchContext } from "@/shared/providers/BranchProvider";
 
 export const DEFAULT_STAFF_DASHBOARD: StaffDashboardData = {
   staffInfo: {
@@ -31,10 +32,11 @@ export const dashboardKeys = {
 };
 
 export function useStaffDashboard() {
+    const { selectedBranchId } = useBranchContext();
   const { profile } = useProfile();
 
   const query = useQuery({
-    queryKey: dashboardKeys.staff(),
+    queryKey: [...(Array.isArray(dashboardKeys.staff()) ? dashboardKeys.staff() : [dashboardKeys.staff()]), selectedBranchId],
     queryFn: async (): Promise<StaffDashboardData> => {
       try {
         const data = await staffDashboardRepository.getStaffDashboard();

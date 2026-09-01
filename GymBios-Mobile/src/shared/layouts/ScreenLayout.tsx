@@ -11,7 +11,7 @@ interface ScreenLayoutProps {
 
 // Keep these in sync with the floating tab bar defined in RoleTabsLayout,
 // so scrollable content is never hidden behind it.
-const TAB_BAR_HEIGHT = 74;
+export const TAB_BAR_HEIGHT = 74;
 
 export function ScreenLayout({ children, scrollable = false }: ScreenLayoutProps) {
   const insets = useSafeAreaInsets();

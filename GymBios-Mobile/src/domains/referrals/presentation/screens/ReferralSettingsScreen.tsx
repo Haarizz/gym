@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  View,
-  TextInput,
-  Switch,
-  Alert,
-} from 'react-native';
+import { ScrollView, StyleSheet, View, TextInput, Switch } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -17,6 +10,8 @@ import { ReferralHeader } from '../components/ReferralHeader';
 import { useReferralSettings } from '../../hooks/useReferrals';
 import { useUpdateReferralSettings } from '../../hooks/useReferralActions';
 import type { ReferralSettings } from '../../domain/ReferralSettings';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function ReferralSettingsScreen() {
   const router = useRouter();
@@ -45,10 +40,14 @@ export function ReferralSettingsScreen() {
   const handleSave = () => {
     updateSettingsMutation.mutate(settings, {
       onSuccess: () => {
-        Alert.alert('Success', 'Program settings saved successfully.');
+        toast.success('Program settings saved successfully.', {
+          title: 'Success'
+        });
       },
       onError: (err) => {
-        Alert.alert('Error', err.message || 'Failed to save settings.');
+        toast.error(err.message || 'Failed to save settings.', {
+          title: 'Error'
+        });
       },
     });
   };

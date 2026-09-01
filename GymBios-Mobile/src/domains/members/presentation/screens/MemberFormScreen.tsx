@@ -1,13 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -28,6 +20,8 @@ import { MembershipStep } from '../components/form/MembershipStep';
 import { MedicalStep } from '../components/form/MedicalStep';
 import { FamilyStep } from '../components/form/FamilyStep';
 import { AppAccessStep } from '../components/form/AppAccessStep';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface MemberFormScreenProps {
   mode: 'create' | 'edit';
@@ -56,7 +50,9 @@ export function MemberFormScreen({
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
 
   const handleError = useCallback((_error: Error) => {
-    Alert.alert('Error', 'An error occurred. Please try again.');
+    toast.error('An error occurred. Please try again.', {
+      title: 'Error'
+    });
   }, []);
 
   const handleCancel = useCallback(() => {

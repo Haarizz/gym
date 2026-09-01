@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 
 import type { Staff } from '../../domain/Staff';
 import type {
@@ -24,6 +25,7 @@ export const staffKeys = {
 };
 
 export function useStaff(initialFilters?: StaffFilters) {
+  const { selectedBranchId } = useBranchContext();
   const queryClient = useQueryClient();
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [page, setPage] = useState(initialFilters?.page ?? 1);
@@ -31,7 +33,7 @@ export function useStaff(initialFilters?: StaffFilters) {
   const filters = useMemo(() => ({ ...initialFilters, page }), [initialFilters, page]);
 
   const staffQuery = useQuery({
-    queryKey: staffKeys.list(filters),
+    queryKey: [...staffKeys.list(filters), selectedBranchId],
     queryFn: () => staffService.getStaff(filters),
   });
 

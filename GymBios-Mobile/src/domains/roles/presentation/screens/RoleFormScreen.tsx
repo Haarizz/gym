@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppHeader } from '@/shared/components/AppHeader';
@@ -17,6 +17,8 @@ import { ROLE_MODULES } from '../constants/modules';
 import { RolePermissionSummary } from '../components/RolePermissionSummary';
 import { RolePermissionModule } from '../components/RolePermissionModule';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 export function RoleFormScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,7 +32,9 @@ export function RoleFormScreen() {
   useEffect(() => {
     if (isEditing && roleId) {
       loadRole(roleId).catch(() => {
-        Alert.alert('Error', 'Failed to load role data.');
+        toast.error('Failed to load role data.', {
+          title: 'Error'
+        });
         router.back();
       });
     }
@@ -89,7 +93,9 @@ function RoleFormContent({ initialData, isEditing, roleId, submitting, onSubmitA
     onSubmitAction(roleId || 0, request)
       .then(() => onSuccess())
       .catch((err) => {
-        Alert.alert('Error', isEditing ? 'Failed to update role.' : 'Failed to create role.');
+        toast.error(isEditing ? 'Failed to update role.' : 'Failed to create role.', {
+          title: 'Error'
+        });
       });
   };
 

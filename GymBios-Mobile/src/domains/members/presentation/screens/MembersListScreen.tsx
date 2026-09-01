@@ -9,6 +9,8 @@ import { Input } from '@/shared/components/Input';
 import { SearchBar } from '@/shared/components/SearchBar';
 import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { toast } from '@/shared/components/Toasts/toastStore';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { MemberCard } from '../components/MemberCard';
 import { useMembers } from '../../hooks/useMembers';
@@ -25,6 +27,15 @@ export function MembersListScreen({
 }: MembersListScreenProps) {
   const theme = useTheme();
   const { members, loading, error, totalElements, refresh } = useMembers();
+  const { selectedBranchId } = useBranchContext();
+
+  const handleCreate = useCallback(() => {
+    if (selectedBranchId === 'ALL') {
+      toast.error('Please select a specific branch from the header menu before creating a new member.', { title: 'Branch Required' });
+      return;
+    }
+    onNavigateToCreate();
+  }, [selectedBranchId, onNavigateToCreate]);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -122,7 +133,7 @@ export function MembersListScreen({
 
         <Button
           label="+ Add Member"
-          onPress={onNavigateToCreate}
+          onPress={handleCreate}
           size="lg"
         />
       </View>
@@ -135,7 +146,7 @@ export function MembersListScreen({
       totalElements,
       filteredMembers.length,
       theme,
-      onNavigateToCreate,
+      handleCreate,
     ],
   );
 
@@ -160,10 +171,10 @@ export function MembersListScreen({
         }
         icon="users"
         buttonLabel={!search ? 'Add Member' : undefined}
-        onPress={!search ? onNavigateToCreate : undefined}
+        onPress={!search ? handleCreate : undefined}
       />
     );
-  }, [loading, error, search, onNavigateToCreate]);
+  }, [loading, error, search, handleCreate]);
 
   if (loading && members.length === 0) {
     return (

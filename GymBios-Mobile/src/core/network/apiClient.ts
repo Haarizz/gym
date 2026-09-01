@@ -5,6 +5,7 @@ import { secureStorage } from '@/core/platform/storage';
 import { StorageKeys } from '@/core/platform/storage/storageKeys';
 
 import { ApiError, type ApiErrorBody } from '@/core/platform/api/types';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 /**
  * Shared API client for the mobile app.
@@ -31,6 +32,14 @@ export function setApiClientToken(token: string | null) {
   }
 }
 
+export function setApiClientBranch(branchId: number | 'ALL') {
+  if (branchId !== 'ALL') {
+    apiClient.defaults.headers.common['X-Active-Branch-Id'] = String(branchId);
+  } else {
+    delete apiClient.defaults.headers.common['X-Active-Branch-Id'];
+  }
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiErrorBody>) => {
@@ -38,6 +47,10 @@ apiClient.interceptors.response.use(
     const body = error.response?.data;
     const message =
       body?.message ?? error.message ?? 'An unexpected error occurred';
+
+    if (!error.config?.skipGlobalErrorToast) {
+      toast.error(message);
+    }
 
     return Promise.reject(new ApiError(message, status, body));
   },

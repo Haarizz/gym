@@ -23,6 +23,8 @@ import {
 } from '../../hooks/useReferralActions';
 import type { Referral } from '../../domain/Referral';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 export function ReferralActivityScreen() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'successful' | 'expired'>(
@@ -64,11 +66,15 @@ export function ReferralActivityScreen() {
           onPress: () => {
             deleteMutation.mutate(Number(referral.id), {
               onSuccess: () => {
-                Alert.alert('Deleted', 'Referral deleted.');
+                toast.info('Referral deleted.', {
+                  title: 'Deleted'
+                });
                 refetch();
               },
               onError: (err) => {
-                Alert.alert('Error', err.message || 'Failed to delete referral.');
+                toast.error(err.message || 'Failed to delete referral.', {
+                  title: 'Error'
+                });
               },
             });
           },
@@ -82,11 +88,15 @@ export function ReferralActivityScreen() {
       { id: Number(referral.id) },
       {
         onSuccess: () => {
-          Alert.alert('Success', 'Referral marked as successful.');
+          toast.success('Referral marked as successful.', {
+            title: 'Success'
+          });
           refetch();
         },
         onError: (err) => {
-          Alert.alert('Error', err.message || 'Failed to update referral.');
+          toast.error(err.message || 'Failed to update referral.', {
+            title: 'Error'
+          });
         },
       }
     );

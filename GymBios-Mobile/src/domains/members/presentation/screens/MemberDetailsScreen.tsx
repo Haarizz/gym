@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
@@ -30,6 +30,8 @@ import type {
 } from '../../application/membership/MemberMembershipRepository';
 import type { FreezeRequest } from '../../application/freeze/MemberFreezeRepository';
 import type { SetCredentialsRequest } from '../../application/access/MemberAccessRepository';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface MemberDetailsScreenProps {
   memberId: number;
@@ -81,7 +83,9 @@ export function MemberDetailsScreen({
           await deleteMember(selectedMember.id);
           onDeleted();
         } catch {
-          Alert.alert('Error', 'Failed to delete member.');
+          toast.error('Failed to delete member.', {
+            title: 'Error'
+          });
         }
       },
     });

@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Linking,
   Pressable,
   ScrollView,
@@ -20,6 +19,8 @@ import { Dropdown } from '@/shared/components/Dropdown';
 import type { Lead, LeadInteractionType } from '../../domain/Lead';
 import { useAddLeadInteraction } from '../../hooks/useLeadMutations';
 import { useLead } from '../../hooks/useLeads';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface LeadDetailsSheetProps {
   visible: boolean;
@@ -71,38 +72,52 @@ export function LeadDetailsSheet({
 
   const handleCall = () => {
     if (!lead?.phone) {
-      Alert.alert('No Phone', 'No phone number available for this lead.');
+      toast.info('No phone number available for this lead.', {
+        title: 'No Phone'
+      });
       return;
     }
     Linking.openURL(`tel:${lead.phone.replace(/\s+/g, '')}`).catch(() => {
-      Alert.alert('Error', 'Unable to open phone dialer.');
+      toast.error('Unable to open phone dialer.', {
+        title: 'Error'
+      });
     });
   };
 
   const handleEmail = () => {
     if (!lead?.email) {
-      Alert.alert('No Email', 'No email address available for this lead.');
+      toast.info('No email address available for this lead.', {
+        title: 'No Email'
+      });
       return;
     }
     Linking.openURL(`mailto:${lead.email}`).catch(() => {
-      Alert.alert('Error', 'Unable to open mail client.');
+      toast.error('Unable to open mail client.', {
+        title: 'Error'
+      });
     });
   };
 
   const handleMessage = () => {
     if (!lead?.phone) {
-      Alert.alert('No Phone', 'No phone number available for this lead.');
+      toast.info('No phone number available for this lead.', {
+        title: 'No Phone'
+      });
       return;
     }
     Linking.openURL(`sms:${lead.phone.replace(/\s+/g, '')}`).catch(() => {
-      Alert.alert('Error', 'Unable to open SMS messaging.');
+      toast.error('Unable to open SMS messaging.', {
+        title: 'Error'
+      });
     });
   };
 
   const handleAddInteractionSubmit = () => {
     if (!leadId) return;
     if (!interactionNotes.trim()) {
-      Alert.alert('Validation Error', 'Interaction notes are required.');
+      toast.error('Interaction notes are required.', {
+        title: 'Validation Error'
+      });
       return;
     }
 
@@ -124,7 +139,9 @@ export function LeadDetailsSheet({
           setStaffMemberName('');
         },
         onError: (err: any) => {
-          Alert.alert('Error', err.message || 'Failed to add interaction.');
+          toast.error(err.message || 'Failed to add interaction.', {
+            title: 'Error'
+          });
         },
       },
     );

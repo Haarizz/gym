@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  View,
-  TextInput,
-  Pressable,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { ScrollView, StyleSheet, View, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -18,6 +10,8 @@ import { ReferralHeader } from '../components/ReferralHeader';
 import { useMembers } from '@/domains/members';
 import { useRedeemReferralReward } from '../../hooks/useReferralActions';
 import type { Member } from '@/domains/members';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function MyRewardsScreen() {
   const router = useRouter();
@@ -40,10 +34,14 @@ export function MyRewardsScreen() {
   const handleRedeem = (rewardId: number, label: string) => {
     redeemMutation.mutate(rewardId, {
       onSuccess: () => {
-        Alert.alert('Success', `${label} redeemed successfully.`);
+        toast.success(`${label} redeemed successfully.`, {
+          title: 'Success'
+        });
       },
       onError: (err) => {
-        Alert.alert('Error', err.message || 'Failed to redeem reward.');
+        toast.error(err.message || 'Failed to redeem reward.', {
+          title: 'Error'
+        });
       },
     });
   };

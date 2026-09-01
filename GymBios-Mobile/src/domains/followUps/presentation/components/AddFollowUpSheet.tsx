@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -20,6 +19,8 @@ import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
 import type { FollowUp } from '../../domain/FollowUp';
 import type { FollowUpRequest } from '../../domain/FollowUpRequest';
+
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface AddFollowUpSheetProps {
   visible: boolean;
@@ -113,15 +114,21 @@ export function AddFollowUpSheet({
 
   const handleSubmit = () => {
     if (!leadId) {
-      Alert.alert('Validation Error', 'Please select a member or lead.');
+      toast.error('Please select a member or lead.', {
+        title: 'Validation Error'
+      });
       return;
     }
     if (!subject.trim()) {
-      Alert.alert('Validation Error', 'Follow-up subject is required.');
+      toast.error('Follow-up subject is required.', {
+        title: 'Validation Error'
+      });
       return;
     }
     if (!dueDate) {
-      Alert.alert('Validation Error', 'Due date is required.');
+      toast.error('Due date is required.', {
+        title: 'Validation Error'
+      });
       return;
     }
 

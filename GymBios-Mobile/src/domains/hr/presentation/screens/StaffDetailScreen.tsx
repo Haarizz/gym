@@ -11,6 +11,8 @@ import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import { useStaff } from '../hooks/useStaff';
 
+import { toast } from '@/shared/components/Toasts/toastStore';
+
 interface StaffDetailScreenProps {
   staffId: string;
   onBack: () => void;
@@ -46,7 +48,9 @@ export function StaffDetailScreen({
               await deleteStaff(staffId);
               onDeleted();
             } catch {
-              Alert.alert('Error', 'Failed to delete staff member.');
+              toast.error('Failed to delete staff member.', {
+                title: 'Error'
+              });
             }
           },
         },
