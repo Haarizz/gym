@@ -432,7 +432,7 @@ export function RenewUpgrade({ onNavigate }: RenewUpgradeProps) {
                           </div>
                           <div className="flex items-center space-x-1 text-sm">
                             <Mail className="h-3 w-3 text-gray-400" />
-                            <span>{member.email}</span>
+                            <span>{member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}</span>
                           </div>
                         </div>
                       </TableCell>

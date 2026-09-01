@@ -246,7 +246,7 @@ export function AppSettings() {
                     type="tel" 
                     placeholder="+1 234 567 890" 
                     value={companyDetails.phone}
-                    onChange={(e) => handleCompanyChange("phone", e.target.value)}
+                    onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) handleCompanyChange("phone", v); }}
                   />
                 </div>
               </div>

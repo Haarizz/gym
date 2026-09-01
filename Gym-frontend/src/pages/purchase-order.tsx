@@ -2276,7 +2276,7 @@ export function PurchaseOrder() {
                 <Label>Phone</Label>
                 <Input
                   value={supplierForm.phone}
-                  onChange={e => setSupplierForm(f => ({ ...f, phone: e.target.value }))}
+                  onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setSupplierForm(f => ({ ...f, phone: v })); }}
                   placeholder="+971 XX XXX XXXX"
                 />
               </div>

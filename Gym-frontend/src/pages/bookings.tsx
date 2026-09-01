@@ -514,7 +514,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                               </div>
                               <div className="flex-1">
                                 <div className="font-medium">{member.name}</div>
-                                <div className="text-sm text-gray-500">{member.email}</div>
+                                <div className="text-sm text-gray-500">{member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}</div>
                                 <div className="text-xs text-gray-400">{member.phone} • {member.membershipType}</div>
                               </div>
                             </div>
@@ -550,7 +550,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                         <Input
                           id="guest-phone"
                           value={guestDetails.phone}
-                          onChange={(e) => setGuestDetails(prev => ({ ...prev, phone: e.target.value }))}
+                          onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setGuestDetails(prev => ({ ...prev, phone: v })); }}
                           placeholder="+971-50-123-4567"
                         />
                       </div>

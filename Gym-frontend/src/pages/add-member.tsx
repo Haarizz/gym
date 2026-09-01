@@ -6,6 +6,7 @@ import { accountHeadsService, AccountHead } from '../utils/supabase/account-head
 import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
 import { referralService, ReferralResponse } from '../utils/supabase/referral-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
+import { useBranch } from '../utils/branch-context';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -130,6 +131,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { currencyCode } = useCurrency();
+  const { isAllBranches } = useBranch();
   const isEditMode = Boolean(routeMemberId);
 
   // A lead converted on the Leads page hands its contact info off here via router state
@@ -987,7 +989,15 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (isAllBranches) {
+      toast.error('Please switch to a branch to create member', {
+        description: 'Member records must belong to a specific branch. Select one from the sidebar before continuing.',
+        duration: 5000,
+      });
+      return;
+    }
+
     // Validation
     const isMemberIdValid = isEditMode ? !!formData.memberId : true;
     if (!isMemberIdValid || !formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.membershipPlan) {
@@ -2014,6 +2024,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       </div>
 
       <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4">
+          {isAllBranches && !isEditMode && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <span className="font-medium">All Branches is selected.</span> Choose a specific branch from the sidebar before creating a member — records must belong to one branch.
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Top Section - Member Photo */}
             <Card className="border border-blue-100 bg-gradient-to-r from-blue-50/50 to-indigo-50/40 shadow-sm">
@@ -3260,7 +3275,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             )}
 
             <div className="flex items-center justify-between gap-3 py-4 border-t bg-slate-50/60 rounded-xl px-4">
-              <p className="text-sm text-muted-foreground">All required fields must be filled before submitting.</p>
+              <p className="text-sm text-muted-foreground">
+                {isAllBranches && !isEditMode
+                  ? 'Select a specific branch from the sidebar to create a member.'
+                  : 'All required fields must be filled before submitting.'}
+              </p>
               <div className="flex gap-3 shrink-0">
                 <Button
                   type="button"
@@ -3269,7 +3288,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-green-600 hover:bg-green-700 px-8">
+                <Button
+                  type="submit"
+                  className="bg-green-600 hover:bg-green-700 px-8"
+                  disabled={isAllBranches && !isEditMode}
+                >
                   {isEditMode ? 'Update Member' : 'Create Member'}
                 </Button>
               </div>
@@ -5284,7 +5307,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
               onClick={handlePaymentConfirm}
               disabled={
-                !selectedPaymentMethod
+                (isAllBranches && !isEditMode)
+                || !selectedPaymentMethod
                 || (selectedPaymentMethod === 'multi-pay' && (!validateSplitPayment() || !validateSplitPaymentFields()))
                 || (selectedPaymentMethod === 'credit' && parseFloat(paymentData.receivedAmount || '0') > 0 && (
                     !paymentData.receivedVia || !validateMethodDetails(paymentData.receivedVia).ok

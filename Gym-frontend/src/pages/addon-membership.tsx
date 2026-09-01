@@ -368,7 +368,7 @@ export function AddonMembership() {
                           {member.name}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {member.email}
+                          {member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}
                         </div>
                       </div>
                     </TableCell>

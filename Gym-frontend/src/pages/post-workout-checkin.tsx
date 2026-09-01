@@ -2078,7 +2078,7 @@ export function PostWorkoutCheckin() {
                         <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
                           <span>ID: {member.id}</span>
                           <span>Plan: {member.membershipType || 'N/A'}</span>
-                          <span>{member.email}</span>
+                          <span>{member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}</span>
                           <span>{member.phone}</span>
                         </div>
                       </div>

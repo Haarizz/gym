@@ -235,7 +235,7 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
                     type="tel"
                     placeholder="+971 50 123 4567"
                     value={formData.mobile}
-                    onChange={(e) => handleChange('mobile', e.target.value)}
+                    onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) handleChange('mobile', v); }}
                     className={`pl-10 ${errors.mobile ? 'border-red-500' : ''}`}
                   />
                 </div>
@@ -378,7 +378,7 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
                     type="tel"
                     placeholder="+971 50 123 4567"
                     value={formData.emergencyContactNumber}
-                    onChange={(e) => handleChange('emergencyContactNumber', e.target.value)}
+                    onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) handleChange('emergencyContactNumber', v); }}
                     className={`bg-white ${errors.emergencyContactNumber ? 'border-red-500' : ''}`}
                   />
                   {errors.emergencyContactNumber && (

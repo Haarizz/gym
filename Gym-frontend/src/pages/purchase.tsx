@@ -2008,7 +2008,7 @@ export function Purchase() {
                 <Input
                   placeholder="+971-4-xxx-xxxx"
                   value={supplierForm.phone ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, phone: e.target.value }))}
+                  onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setSupplierForm(p => ({ ...p, phone: v })); }}
                 />
               </div>
               <div>

@@ -69,11 +69,21 @@ class MobileStaffPerformanceServiceTest {
     }
 
     @Test
-    @DisplayName("Throws EntityNotFoundException when no staff record is linked to user")
-    void testMissingStaffThrows() {
+    @DisplayName("Computes performance from username-matched activity when no staff record is linked")
+    void testMissingStaffComputesFromUsernameActivity() {
         when(staffRepository.findByUserId(100L)).thenReturn(Optional.empty());
+        when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
+        when(leadRepository.count(any(Specification.class))).thenReturn(0L);
+        when(followUpRepository.count(any(Specification.class))).thenReturn(0L);
+        when(workoutFeedbackRepository.findAll()).thenReturn(Collections.emptyList());
 
-        assertThrows(EntityNotFoundException.class, () -> performanceService.getStaffPerformance(testPrincipal));
+        StaffPerformanceResponseDTO response = performanceService.getStaffPerformance(testPrincipal);
+
+        assertNotNull(response);
+        // Staff-only fields are skipped rather than guessed at when there's no linked Staff record.
+        assertTrue(response.getLeaderboard().isEmpty());
+        assertEquals(BigDecimal.ZERO, response.getRevenueTarget().getTarget());
+        assertEquals(0, response.getConversionTarget().getTarget());
     }
 
     @Test
@@ -89,12 +99,20 @@ class MobileStaffPerformanceServiceTest {
         target.setForecast(8);
 
         LocalDate today = LocalDate.now();
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonth(10L, today.getYear(), today.getMonthValue()))
-                .thenReturn(Optional.of(target));
+        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, today.getYear(), today.getMonthValue()))
+                .thenReturn(List.of(target));
 
         when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         when(leadRepository.count(any(Specification.class))).thenReturn(24L);
-        when(workoutFeedbackRepository.findAll()).thenReturn(Collections.emptyList());
+
+        // Ratings 5,5,5,4,4 average to 4.6, matching the rating asserted below.
+        List<WorkoutFeedback> feedbacks = new ArrayList<>();
+        for (int r : new int[]{5, 5, 5, 4, 4}) {
+            WorkoutFeedback fb = new WorkoutFeedback();
+            fb.setTrainerRating(r);
+            feedbacks.add(fb);
+        }
+        when(workoutFeedbackRepository.findAll()).thenReturn(feedbacks);
         when(staffRepository.findAll(any(Specification.class))).thenReturn(Collections.singletonList(testStaff));
 
         StaffPerformanceResponseDTO response = performanceService.getStaffPerformance(testPrincipal);
@@ -139,8 +157,8 @@ class MobileStaffPerformanceServiceTest {
         when(staffRepository.findByUserId(100L)).thenReturn(Optional.of(testStaff));
 
         LocalDate today = LocalDate.now();
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonth(10L, today.getYear(), today.getMonthValue()))
-                .thenReturn(Optional.empty());
+        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, today.getYear(), today.getMonthValue()))
+                .thenReturn(Collections.emptyList());
 
         when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         when(leadRepository.count(any(Specification.class))).thenReturn(0L);

@@ -857,7 +857,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <div className="space-y-3">
                 <div className="flex items-center space-x-3 text-sm">
                   <Mail className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">{member.email || '—'}</span>
+                  <span className="text-gray-600">
+                    {member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}
+                  </span>
                 </div>
                 <div className="flex items-center space-x-3 text-sm">
                   <Phone className="h-4 w-4 text-primary" />
@@ -2014,7 +2016,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 id="mobileNumber"
                 placeholder="+971 50 123 4567"
                 value={transferForm.mobileNumber}
-                onChange={(e) => setTransferForm({ ...transferForm, mobileNumber: e.target.value })}
+                onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setTransferForm({ ...transferForm, mobileNumber: v }); }}
               />
             </div>
 

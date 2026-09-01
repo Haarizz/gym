@@ -148,8 +148,8 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
       setSearchQuery('');
       setSearchResults([]);
       await loadFrozenMembers();
-    } catch {
-      toast.error('Failed to freeze membership. Please try again.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to freeze membership. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -236,12 +236,12 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                 <div className="space-y-2">
                   <Label>Search Member</Label>
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     <Input
                       placeholder="Name, ID, Phone or Email…"
                       value={searchQuery}
                       onChange={(e) => { setSearchQuery(e.target.value); setSelectedMember(null); }}
-                      className="pl-9"
+                      className="pl-10"
                     />
                   </div>
 
@@ -307,9 +307,11 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                         <p className="text-xs font-semibold">{selectedMember.phone || '—'}</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between px-4 py-2.5 border-t border-blue-100 bg-blue-50/60">
-                      <p className="text-xs text-muted-foreground">Email</p>
-                      <p className="text-xs font-bold text-primary">{selectedMember.email || '—'}</p>
+                    <div className="px-4 py-2.5 border-t border-blue-100 bg-blue-50/60">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Email</p>
+                      <p className="text-xs font-semibold text-primary break-all">
+                        {selectedMember.email && !selectedMember.email.includes('@family.local') ? selectedMember.email : 'Not added'}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -328,7 +330,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar mode="single" selected={freezeStartDate} onSelect={setFreezeStartDate} disabled={(date) => date < new Date()} />
+                            <Calendar mode="single" selected={freezeStartDate} onSelect={setFreezeStartDate} disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} />
                           </PopoverContent>
                         </Popover>
                       </div>
@@ -428,12 +430,12 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                   </Select>
                 </div>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
                     placeholder="Search frozen members…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
+                    className="pl-10"
                   />
                 </div>
               </CardHeader>

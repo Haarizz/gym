@@ -43,6 +43,7 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
     member.app_access_enabled ?? null
   );
   const [isTogglingAccess, setIsTogglingAccess] = useState(false);
+  const displayEmail = member.email && !member.email.includes('@family.local') ? member.email : 'Not added';
 
   const handleToggleAccess = async () => {
     if (!member.user_id) return;
@@ -152,7 +153,7 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
                   <div className="flex items-center space-x-4 mt-2">
                     <div className="flex items-center space-x-1 text-sm">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span>{member.email}</span>
+                      <span>{displayEmail}</span>
                     </div>
                     <div className="flex items-center space-x-1 text-sm">
                       <Phone className="h-4 w-4 text-muted-foreground" />
@@ -207,7 +208,7 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <InfoRow label="Full Name" value={member.name} icon={<User className="h-4 w-4" />} />
-                  <InfoRow label="Email Address" value={member.email} icon={<Mail className="h-4 w-4" />} />
+                  <InfoRow label="Email Address" value={displayEmail} icon={<Mail className="h-4 w-4" />} />
                   <InfoRow label="Phone Number" value={member.phone} icon={<Phone className="h-4 w-4" />} />
                   <InfoRow
                     label="Date of Birth"

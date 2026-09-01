@@ -504,7 +504,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                           </div>
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <Mail className="h-4 w-4" />
-                            <span className="truncate">{selectedMember.email}</span>
+                            <span className="truncate">{selectedMember.email && !selectedMember.email.includes('@family.local') ? selectedMember.email : 'Not added'}</span>
                           </div>
                           <div>
                             <Badge

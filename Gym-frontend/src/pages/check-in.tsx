@@ -712,7 +712,7 @@ export function CheckIn() {
                     </div>
                     <div className="space-y-2">
                       <Label className="text-primary">Mobile Number <span className="text-red-500">*</span></Label>
-                      <Input type="tel" placeholder="+971 XX XXX XXXX" value={visitorMobile} onChange={e => setVisitorMobile(e.target.value)} maxLength={15} className="border-primary/20 focus:border-primary" />
+                      <Input type="tel" placeholder="+971 XX XXX XXXX" value={visitorMobile} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setVisitorMobile(v); }} maxLength={15} className="border-primary/20 focus:border-primary" />
                     </div>
                   </div>
 

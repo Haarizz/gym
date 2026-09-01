@@ -3263,7 +3263,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   <div className="mt-2 space-y-2">
                     <div className="flex items-center text-sm">
                       <Mail className="mr-2 h-4 w-4" />
-                      {selectedMember.email}
+                      {selectedMember.email && !selectedMember.email.includes('@family.local') ? selectedMember.email : 'Not added'}
                     </div>
                     <div className="flex items-center text-sm">
                       <Phone className="mr-2 h-4 w-4" />

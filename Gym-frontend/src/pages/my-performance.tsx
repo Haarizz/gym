@@ -164,8 +164,8 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           <Card className={statCardShell}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="bg-gradient-light p-3 rounded-lg">
-                  <DollarSign className="h-6 w-6 text-primary" />
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <DollarSign className="h-6 w-6 text-blue-600" />
                 </div>
                 <Badge className={`${getChangeColor(growthPercentage)} bg-transparent border-0`}>
                   {React.createElement(getChangeIcon(growthPercentage), { className: "h-3 w-3 mr-1" })}
@@ -173,7 +173,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                 </Badge>
               </div>
               <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-primary"><CurrencyGlyph /> {revenueAchieved.toLocaleString()}</h3>
+                <h3 className="text-2xl font-bold text-blue-700"><CurrencyGlyph /> {revenueAchieved.toLocaleString()}</h3>
                 <p className="text-sm text-gray-600">Revenue Generated</p>
                 <p className="text-xs text-gray-500">vs. last period</p>
               </div>
@@ -190,15 +190,15 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           <Card className={statCardShell}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="bg-gradient-light p-3 rounded-lg">
-                  <Dumbbell className="h-6 w-6 text-primary" />
+                <div className="bg-emerald-50 p-3 rounded-lg">
+                  <Dumbbell className="h-6 w-6 text-emerald-600" />
                 </div>
-                <Badge className="text-primary bg-transparent border-0">
+                <Badge className="text-emerald-700 bg-transparent border-0">
                   {performance.conversion_target.percentage}%
                 </Badge>
               </div>
               <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-primary">{conversionsAchieved}</h3>
+                <h3 className="text-2xl font-bold text-emerald-700">{conversionsAchieved}</h3>
                 <p className="text-sm text-gray-600">Conversions</p>
                 <p className="text-xs text-gray-500">
                   {performance.conversion_target.target > 0
@@ -219,12 +219,12 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           <Card className={statCardShell}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="bg-gradient-light p-3 rounded-lg">
-                  <Users className="h-6 w-6 text-primary" />
+                <div className="bg-indigo-50 p-3 rounded-lg">
+                  <Users className="h-6 w-6 text-indigo-600" />
                 </div>
               </div>
               <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-primary">{leadCount}</h3>
+                <h3 className="text-2xl font-bold text-indigo-700">{leadCount}</h3>
                 <p className="text-sm text-gray-600">Leads Assigned</p>
               </div>
             </CardContent>
@@ -240,12 +240,12 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
           <Card className={statCardShell}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="bg-gradient-light p-3 rounded-lg">
-                  <Star className="h-6 w-6 text-primary" />
+                <div className="bg-amber-50 p-3 rounded-lg">
+                  <Star className="h-6 w-6 text-amber-600" />
                 </div>
               </div>
               <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-primary">
+                <h3 className="text-2xl font-bold text-amber-700">
                   {rating > 0 ? `${rating} / 5` : "No ratings yet"}
                 </h3>
                 <p className="text-sm text-gray-600">Member Feedback Score</p>
@@ -379,24 +379,24 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                 <Separator />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Card className="border-0 shadow-sm bg-gradient-light">
+                  <Card className="border-0 shadow-sm bg-blue-50">
                     <CardContent className="p-6 text-center">
-                      <ShoppingBag className="h-8 w-8 text-primary mx-auto mb-2" />
-                      <h4 className="font-semibold text-2xl text-primary"><CurrencyGlyph /> {revenueAchieved.toLocaleString()}</h4>
+                      <ShoppingBag className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                      <h4 className="font-semibold text-2xl text-blue-700"><CurrencyGlyph /> {revenueAchieved.toLocaleString()}</h4>
                       <p className="text-sm text-gray-600">Revenue This Month</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm bg-gradient-light">
+                  <Card className="border-0 shadow-sm bg-amber-50">
                     <CardContent className="p-6 text-center">
-                      <Zap className="h-8 w-8 text-primary mx-auto mb-2" />
-                      <h4 className="font-semibold text-2xl text-primary">{performance.breakdown.conversion_rate}%</h4>
+                      <Zap className="h-8 w-8 text-amber-600 mx-auto mb-2" />
+                      <h4 className="font-semibold text-2xl text-amber-700">{performance.breakdown.conversion_rate}%</h4>
                       <p className="text-sm text-gray-600">Lead Conversion Rate</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm bg-gradient-light">
+                  <Card className="border-0 shadow-sm bg-indigo-50">
                     <CardContent className="p-6 text-center">
-                      <Users className="h-8 w-8 text-primary mx-auto mb-2" />
-                      <h4 className="font-semibold text-2xl text-primary">{leadCount}</h4>
+                      <Users className="h-8 w-8 text-indigo-600 mx-auto mb-2" />
+                      <h4 className="font-semibold text-2xl text-indigo-700">{leadCount}</h4>
                       <p className="text-sm text-gray-600">Leads Assigned</p>
                     </CardContent>
                   </Card>
@@ -418,33 +418,33 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
               {/* Engagement Tab */}
               <TabsContent value="engagement" className="space-y-6 mt-0">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Card className="border-0 shadow-sm">
+                  <Card className="border-0 shadow-sm bg-emerald-50">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-primary">Follow-up Completion</h4>
-                        <TrendingUp className="h-5 w-5 text-green-600" />
+                        <h4 className="font-semibold text-emerald-800">Follow-up Completion</h4>
+                        <TrendingUp className="h-5 w-5 text-emerald-600" />
                       </div>
-                      <div className="text-3xl font-bold text-primary mb-2">{performance.breakdown.follow_up_completion}%</div>
+                      <div className="text-3xl font-bold text-emerald-700 mb-2">{performance.breakdown.follow_up_completion}%</div>
                       <p className="text-sm text-gray-600">Of assigned follow-ups completed</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm">
+                  <Card className="border-0 shadow-sm bg-rose-50">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-primary">Customer Satisfaction</h4>
-                        <Heart className="h-5 w-5 text-primary" />
+                        <h4 className="font-semibold text-rose-800">Customer Satisfaction</h4>
+                        <Heart className="h-5 w-5 text-rose-600" />
                       </div>
-                      <div className="text-3xl font-bold text-primary mb-2">{performance.breakdown.customer_satisfaction}%</div>
+                      <div className="text-3xl font-bold text-rose-700 mb-2">{performance.breakdown.customer_satisfaction}%</div>
                       <p className="text-sm text-gray-600">Based on member feedback ratings</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm">
+                  <Card className="border-0 shadow-sm bg-amber-50">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-primary">Member Rating</h4>
-                        <Star className="h-5 w-5 text-yellow-500" />
+                        <h4 className="font-semibold text-amber-800">Member Rating</h4>
+                        <Star className="h-5 w-5 text-amber-500" />
                       </div>
-                      <div className="text-3xl font-bold text-primary mb-2">
+                      <div className="text-3xl font-bold text-amber-700 mb-2">
                         {rating > 0 ? `${rating} / 5` : "—"}
                       </div>
                       <p className="text-sm text-gray-600">
@@ -514,25 +514,37 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
       </motion.div>
 
       {/* Motivation */}
-      {performance.motivation && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-        >
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-3">
-                <Target className="h-5 w-5 mt-0.5 text-primary" />
-                <div>
-                  <h4 className="font-semibold mb-1">{performance.motivation.status.replace(/_/g, ' ')}</h4>
-                  <p className="text-sm text-gray-700">{performance.motivation.message}</p>
+      {performance.motivation && (() => {
+        const status = performance.motivation.status;
+        const motivationColors: Record<string, { border: string; iconBg: string; icon: string }> = {
+          ACHIEVED:  { border: "border-l-green-500",  iconBg: "bg-green-100",  icon: "text-green-600" },
+          ON_TRACK:  { border: "border-l-blue-500",   iconBg: "bg-blue-100",   icon: "text-blue-600" },
+          AHEAD:     { border: "border-l-amber-500",  iconBg: "bg-amber-100",  icon: "text-amber-600" },
+          AT_RISK:   { border: "border-l-rose-500",   iconBg: "bg-rose-100",   icon: "text-rose-600" },
+        };
+        const colors = motivationColors[status] || motivationColors.ON_TRACK;
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+          >
+            <Card className={`border-0 border-l-4 ${colors.border} shadow-sm`}>
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-3">
+                  <div className={`${colors.iconBg} p-2 rounded-full`}>
+                    <Target className={`h-5 w-5 ${colors.icon}`} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-1">{status.replace(/_/g, ' ')}</h4>
+                    <p className="text-sm text-gray-700">{performance.motivation.message}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        );
+      })()}
 
       {/* Branch Leaderboard */}
       {performance.leaderboard.length > 0 && (

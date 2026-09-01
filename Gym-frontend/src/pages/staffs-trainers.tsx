@@ -1568,7 +1568,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     placeholder="+971 50 123 4567"
                     className="mt-1"
                     value={newEmployeeBasicInfo.phone}
-                    onChange={e => setNewEmployeeBasicInfo(p => ({...p, phone: e.target.value}))}
+                    onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setNewEmployeeBasicInfo(p => ({...p, phone: v})); }}
                   />
                 </div>
                 <div>
@@ -1813,7 +1813,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   <div>
                     <Label>Phone Number</Label>
                     <Input className="mt-1" value={editEmployeeData.phone}
-                      onChange={e => setEditEmployeeData(p => p ? {...p, phone: e.target.value} : p)} />
+                      onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setEditEmployeeData(p => p ? {...p, phone: v} : p); }} />
                   </div>
                   <div>
                     <Label>Join Date</Label>

@@ -703,7 +703,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate group-hover:text-primary transition-colors">{member.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">{member.email}</p>
+                    <p className="text-sm text-muted-foreground truncate">{member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}</p>
                   </div>
                   <div className="text-right">
                     <Badge className={getMembershipBadgeColor(member.membershipType)}>
@@ -1216,7 +1216,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                         {membershipType}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">{member.email}</p>
+                    <p className="text-sm text-muted-foreground truncate">{member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}</p>
                     <div className="flex items-center space-x-4 mt-1">
                       <span className="text-xs text-muted-foreground">{member.phone}</span>
                       <span className="text-xs text-muted-foreground">

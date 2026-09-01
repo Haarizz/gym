@@ -102,8 +102,8 @@ class MobileStaffLedgerServiceTest {
         target.setCommissionEarned(new BigDecimal("6000"));
         target.setForecast(9);
 
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonth(10L, year, month))
-                .thenReturn(Optional.of(target));
+        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, year, month))
+                .thenReturn(List.of(target));
         when(salaryPaymentEmployeeRepository.findByEmployeeId("EMP-0010"))
                 .thenReturn(Optional.empty());
 
@@ -171,8 +171,8 @@ class MobileStaffLedgerServiceTest {
         when(staffRepository.findByUserId(100L)).thenReturn(Optional.of(testStaff));
 
         LocalDate today = LocalDate.now();
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonth(10L, today.getYear(), today.getMonthValue()))
-                .thenReturn(Optional.empty());
+        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, today.getYear(), today.getMonthValue()))
+                .thenReturn(Collections.emptyList());
         when(salaryPaymentEmployeeRepository.findByEmployeeId("EMP-0010"))
                 .thenReturn(Optional.empty());
         when(salaryPaymentRepository.findAll()).thenReturn(Collections.emptyList());

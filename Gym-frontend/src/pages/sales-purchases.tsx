@@ -95,84 +95,58 @@ export function SalesPurchases() {
     return 'bg-gray-100 text-gray-800';
   };
 
+  const statCards = [
+    { label: 'Monthly Sales', value: `${Math.round(kpis.monthlySales).toLocaleString()}`, sub: 'This month', icon: <ShoppingCart className="h-5 w-5 text-blue-600" />, bg: 'bg-blue-100' },
+    { label: 'Total Purchases', value: `${Math.round(kpis.monthlyPurchases).toLocaleString()}`, sub: 'Purchase orders this month', icon: <Package className="h-5 w-5 text-purple-600" />, bg: 'bg-purple-100' },
+    { label: 'Gross Profit', value: `${Math.round(kpis.grossProfit).toLocaleString()}`, sub: 'Sales minus purchases', icon: <TrendingUp className="h-5 w-5 text-green-600" />, bg: 'bg-green-100', tone: kpis.grossProfit >= 0 ? 'text-green-700' : 'text-red-700' },
+    { label: 'Avg. Transaction', value: `${Math.round(kpis.avgTransaction).toLocaleString()}`, sub: 'Per receipt this month', icon: <CreditCard className="h-5 w-5 text-orange-600" />, bg: 'bg-orange-100' },
+  ];
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Sales & Purchases</h1>
-          <p className="text-muted-foreground">Real-time sales transactions and purchase orders.</p>
+          <h1 className="text-2xl font-semibold text-foreground">Sales & Purchases</h1>
+          <p className="text-sm text-muted-foreground">Real-time sales transactions and purchase orders.</p>
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={loadData} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button variant="outline">
-            <Filter className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" className="gap-2">
+            <Filter className="h-4 w-4" />
             Filter
           </Button>
         </div>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Sales</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold"><CurrencyGlyph /> {Math.round(kpis.monthlySales).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">This month</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold"><CurrencyGlyph /> {Math.round(kpis.monthlyPurchases).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Purchase orders this month</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gross Profit</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${kpis.grossProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-              <CurrencyGlyph /> {Math.round(kpis.grossProfit).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">Sales minus purchases</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Transaction</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold"><CurrencyGlyph /> {Math.round(kpis.avgTransaction).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Per receipt this month</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map(({ label, value, sub, icon, bg, tone }) => (
+          <Card key={label} className="border-0 shadow-sm hover:shadow-md transition-shadow duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+              <div className={`p-2 rounded-lg ${bg}`}>{icon}</div>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold flex items-center gap-1 ${tone ?? ''}`}><CurrencyGlyph /> {value}</div>
+              <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="sales">Sales</TabsTrigger>
-          <TabsTrigger value="purchases">Purchases</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 lg:w-[420px] h-11 bg-muted/60">
+          <TabsTrigger value="overview" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">Overview</TabsTrigger>
+          <TabsTrigger value="sales" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">Sales</TabsTrigger>
+          <TabsTrigger value="purchases" className="text-sm transition-all duration-300 data-[state=active]:shadow-sm">Purchases</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle>Sales vs Purchases</CardTitle>
                 <CardDescription>Monthly comparison over the last 6 months</CardDescription>
@@ -180,19 +154,23 @@ export function SalesPurchases() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                    <YAxis tickLine={false} axisLine={false} />
+                    <Tooltip
+                      cursor={{ fill: 'var(--muted)' }}
+                      contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                      formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`}
+                    />
                     <Legend />
-                    <Bar dataKey="sales" fill="#8884d8" name="Sales" />
-                    <Bar dataKey="purchases" fill="#82ca9d" name="Purchases" />
+                    <Bar dataKey="sales" fill="#8884d8" name="Sales" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="purchases" fill="#82ca9d" name="Purchases" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle>Profit Trend</CardTitle>
                 <CardDescription>Net profit over the last 6 months</CardDescription>
@@ -200,11 +178,15 @@ export function SalesPurchases() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`} />
-                    <Line type="monotone" dataKey="profit" stroke="#8884d8" strokeWidth={2} name="Profit" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                    <YAxis tickLine={false} axisLine={false} />
+                    <Tooltip
+                      cursor={{ stroke: 'var(--border)' }}
+                      contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                      formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`}
+                    />
+                    <Line type="monotone" dataKey="profit" stroke="#8884d8" strokeWidth={2.5} name="Profit" dot={{ r: 3 }} activeDot={{ r: 5 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -212,8 +194,8 @@ export function SalesPurchases() {
           </div>
         </TabsContent>
 
-        <TabsContent value="sales" className="space-y-6">
-          <Card>
+        <TabsContent value="sales" className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out">
+          <Card className="border-0 shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -232,41 +214,43 @@ export function SalesPurchases() {
               ) : recentSales.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">No sales records found.</div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Receipt No.</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Plan / Item</TableHead>
-                      <TableHead>Payment Method</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentSales.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell>{r.transaction_date ? r.transaction_date.split('T')[0] : '—'}</TableCell>
-                        <TableCell className="font-medium">{r.receipt_no || r.id.slice(0, 8)}</TableCell>
-                        <TableCell>{r.member_name || '—'}</TableCell>
-                        <TableCell>{r.plan_name || r.transaction_type || '—'}</TableCell>
-                        <TableCell>{r.payment_method || '—'}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(r.status || '')}>{r.status || '—'}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium"><CurrencyGlyph /> {Number(r.amount).toLocaleString()}</TableCell>
+                <div className="rounded-xl border overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Receipt No.</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Plan / Item</TableHead>
+                        <TableHead>Payment Method</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {recentSales.map((r) => (
+                        <TableRow key={r.id} className="transition-colors">
+                          <TableCell>{r.transaction_date ? r.transaction_date.split('T')[0] : '—'}</TableCell>
+                          <TableCell className="font-medium">{r.receipt_no || r.id.slice(0, 8)}</TableCell>
+                          <TableCell>{r.member_name || '—'}</TableCell>
+                          <TableCell>{r.plan_name || r.transaction_type || '—'}</TableCell>
+                          <TableCell>{r.payment_method || '—'}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(r.status || '')}>{r.status || '—'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium"><CurrencyGlyph /> {Number(r.amount).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="purchases" className="space-y-6">
-          <Card>
+        <TabsContent value="purchases" className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out">
+          <Card className="border-0 shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -285,34 +269,36 @@ export function SalesPurchases() {
               ) : recentPOs.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">No purchase orders found.</div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>PO Number</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Total Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentPOs.map((po) => (
-                      <TableRow key={po.id}>
-                        <TableCell>{po.orderDate ? po.orderDate.split('T')[0] : '—'}</TableCell>
-                        <TableCell className="font-medium">{po.poNumber}</TableCell>
-                        <TableCell>{po.supplierName}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{po.priority}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(po.status)}>{po.status.replace(/_/g, ' ')}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium"><CurrencyGlyph /> {Number(po.totalAmount).toLocaleString()}</TableCell>
+                <div className="rounded-xl border overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>PO Number</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Priority</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Total Amount</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {recentPOs.map((po) => (
+                        <TableRow key={po.id} className="transition-colors">
+                          <TableCell>{po.orderDate ? po.orderDate.split('T')[0] : '—'}</TableCell>
+                          <TableCell className="font-medium">{po.poNumber}</TableCell>
+                          <TableCell>{po.supplierName}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{po.priority}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(po.status)}>{po.status.replace(/_/g, ' ')}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium"><CurrencyGlyph /> {Number(po.totalAmount).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>

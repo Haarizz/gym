@@ -1233,7 +1233,7 @@ export function Leads() {
             </div>
             <div>
               <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" placeholder="Enter phone number" value={newLead.phone} onChange={e => setNewLead(p => ({ ...p, phone: e.target.value }))} />
+              <Input id="phone" placeholder="Enter phone number" value={newLead.phone} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setNewLead(p => ({ ...p, phone: v })); }} />
             </div>
             <div>
               <Label htmlFor="source">Lead Source</Label>
@@ -1306,7 +1306,7 @@ export function Leads() {
             </div>
             <div>
               <Label>Phone</Label>
-              <Input value={editLead.phone} onChange={e => setEditLead(p => ({ ...p, phone: e.target.value }))} />
+              <Input value={editLead.phone} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setEditLead(p => ({ ...p, phone: v })); }} />
             </div>
             <div>
               <Label>Status</Label>

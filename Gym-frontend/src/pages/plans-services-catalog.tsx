@@ -442,7 +442,7 @@ export function PlansServicesCatalog() {
                     <Input
                       id="phone"
                       value={inquiryData.phone}
-                      onChange={(e) => setInquiryData({...inquiryData, phone: e.target.value})}
+                      onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setInquiryData({...inquiryData, phone: v}); }}
                       placeholder="+971 50 123 4567"
                     />
                   </div>

@@ -1259,7 +1259,7 @@ export function Referrals() {
             </div>
             <div>
               <Label>Referee Phone</Label>
-              <Input className="mt-1" value={editReferral.refereePhone} onChange={e => setEditReferral(p => ({ ...p, refereePhone: e.target.value }))} />
+              <Input className="mt-1" value={editReferral.refereePhone} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setEditReferral(p => ({ ...p, refereePhone: v })); }} />
             </div>
             <div>
               <Label>Status</Label>
@@ -1363,7 +1363,7 @@ export function Referrals() {
             </div>
             <div>
               <Label>Referred Member Phone</Label>
-              <Input placeholder="+971 XX XXX XXXX" type="tel" className="mt-1" value={newReferral.refereePhone} onChange={e => setNewReferral(p => ({ ...p, refereePhone: e.target.value }))} />
+              <Input placeholder="+971 XX XXX XXXX" type="tel" className="mt-1" value={newReferral.refereePhone} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setNewReferral(p => ({ ...p, refereePhone: v })); }} />
             </div>
             <div>
               <Label>Referral Person Photo (For Access)</Label>
