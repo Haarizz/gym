@@ -34,6 +34,7 @@ import {
 } from './presentation/screens/RoleShellScreens';
 import { createSplashRoute } from './presentation/screens/SplashRoute';
 import { createRoleSelectionRoute } from './presentation/screens/RoleSelectionRoute';
+import { createMemberAuthScreen } from './presentation/screens/MemberAuthScreen';
 
 const authApi = new AuthApi();
 const authRemoteDataSource = new AuthRemoteDataSource(authApi);
@@ -56,6 +57,7 @@ export const RoleLoginScreen = createRoleLoginScreen(useLogin);
 
 export const SplashRoute = createSplashRoute(useRestoreSession);
 export const RoleSelectionRoute = createRoleSelectionRoute(useSelectAppRole);
+export const MemberAuthScreen = createMemberAuthScreen(useLogin);
 
 export { SplashScreen } from './presentation/screens/SplashScreen';
 export { RoleSelectionScreen } from './presentation/screens/RoleSelectionScreen';

@@ -9,3 +9,4 @@ export function getRoleHomeHref(role: AppRole): Href {
 
 export const ROLE_SELECTION_HREF = '/role-selection' as Href;
 export const ROLE_LOGIN_HREF = '/(auth)/login' as Href;
+export const MEMBER_AUTH_HREF = '/(auth)/member' as Href;

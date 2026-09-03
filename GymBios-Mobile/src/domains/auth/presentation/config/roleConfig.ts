@@ -65,15 +65,6 @@ export const ROLE_MODE_CARDS: RoleModeCardConfig[] = [
     borderColor: BrandColors.teal,
   },
   {
-    role: 'member',
-    title: 'GymBios Member',
-    description:
-      'Your fitness journey. Check-in, book classes, manage membership, and connect with trainers.',
-    accentColor: BrandColors.memberGold,
-    iconName: 'activity',
-    borderColor: BrandColors.memberGold,
-  },
-  {
     role: 'trainer',
     title: 'GymBios Trainer',
     description:

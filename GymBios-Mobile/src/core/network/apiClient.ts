@@ -33,10 +33,10 @@ export function setApiClientToken(token: string | null) {
 }
 
 export function setApiClientBranch(branchId: number | 'ALL') {
-  if (branchId !== 'ALL') {
-    apiClient.defaults.headers.common['X-Active-Branch-Id'] = String(branchId);
-  } else {
+  if (branchId === 'ALL') {
     delete apiClient.defaults.headers.common['X-Active-Branch-Id'];
+  } else {
+    apiClient.defaults.headers.common['X-Active-Branch-Id'] = String(branchId);
   }
 }
 

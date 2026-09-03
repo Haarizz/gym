@@ -9,7 +9,7 @@ import type { RestoreSession } from '../../application/useCases/RestoreSession';
 import type { AppRole } from '../../domain/valueObjects/AppRole';
 import { useAuthStore } from '../../store/authStore';
 import type { LoginFormValues } from '../forms/LoginForm';
-import { getRoleHomeHref, ROLE_LOGIN_HREF, ROLE_SELECTION_HREF } from '../navigation/routes';
+import { getRoleHomeHref, MEMBER_AUTH_HREF, ROLE_LOGIN_HREF, ROLE_SELECTION_HREF } from '../navigation/routes';
 
 export function createUseSelectAppRole(authOrchestrator: AuthOrchestrator) {
   return function useSelectAppRole() {
@@ -114,7 +114,7 @@ export function createUseRestoreSession(
         queryClient.clear();
         reset();
         analytics.track({ name: 'auth_logout_success' });
-        router.replace(ROLE_SELECTION_HREF);
+        router.replace(MEMBER_AUTH_HREF);
       },
     });
 
