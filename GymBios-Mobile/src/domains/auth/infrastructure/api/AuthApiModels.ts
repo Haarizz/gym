@@ -13,6 +13,8 @@ export interface LoginResponseApiModel {
   enabled: boolean;
   staff_name?: string;
   permissions?: string[];
+  branchId?: number;
+  branch_id?: number;
 }
 
 export type MeResponseApiModel = LoginResponseApiModel;
@@ -24,6 +26,7 @@ export interface UserApiModel {
   full_name: string;
   role: AppRole;
   permissions: string[];
+  branchId?: number;
 }
 
 export interface StoredSessionApiModel {
@@ -33,4 +36,5 @@ export interface StoredSessionApiModel {
   appRole: AppRole;
   permissions: string[];
   user: UserApiModel;
+  branchId?: number;
 }

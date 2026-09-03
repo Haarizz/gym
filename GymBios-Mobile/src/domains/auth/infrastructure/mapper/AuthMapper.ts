@@ -105,6 +105,7 @@ export function mapLoginResponseToSession(
       fullName: ROLE_DISPLAY_NAMES[appRole] ?? response.username,
       appRole,
       permissions,
+      branchId: response.branchId ?? response.branch_id,
     }),
   });
 }
@@ -133,7 +134,9 @@ export function mapSessionToStored(session: Session): StoredSessionApiModel {
       full_name: session.user.fullName,
       role: session.user.appRole,
       permissions: [...session.user.permissions],
+      branchId: session.user.branchId,
     },
+    branchId: session.user.branchId,
   };
 }
 
@@ -153,6 +156,7 @@ export function mapStoredToSession(stored: StoredSessionApiModel): Session {
       fullName: stored.user.full_name,
       appRole,
       permissions: stored.user.permissions ?? stored.permissions ?? [],
+      branchId: stored.branchId ?? stored.user.branchId,
     }),
   });
 }

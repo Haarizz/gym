@@ -1,10 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
-import { BrandHeader, ComingSoonCard, RoleModeCard } from '@/shared/components';
+import { BrandHeader, ComingSoonCard, RoleModeCard, Button } from '@/shared/components';
 
 import { ROLE_MODE_CARDS } from '../config/roleConfig';
+import { MEMBER_AUTH_HREF } from '../navigation/routes';
 import type { AppRole } from '../../domain/valueObjects/AppRole';
 
 interface RoleSelectionScreenProps {
@@ -12,6 +14,7 @@ interface RoleSelectionScreenProps {
 }
 
 export function RoleSelectionScreen({ onRoleSelect }: RoleSelectionScreenProps) {
+  const router = useRouter();
   return (
     <LinearGradient
       colors={[BrandColors.screenBackground, BrandColors.screenBackgroundAlt]}
@@ -30,6 +33,12 @@ export function RoleSelectionScreen({ onRoleSelect }: RoleSelectionScreenProps) 
           />
         ))}
         <ComingSoonCard />
+        <Button 
+          variant="outline" 
+          label="Return to Member Login" 
+          onPress={() => router.replace(MEMBER_AUTH_HREF)} 
+          style={{ marginTop: Spacing.two }}
+        />
         <View style={styles.accentBar}>
           <LinearGradient
             colors={[BrandColors.teal, BrandColors.memberGold, BrandColors.trainerAmber]}

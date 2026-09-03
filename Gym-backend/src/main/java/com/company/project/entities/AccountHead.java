@@ -46,7 +46,7 @@ public class AccountHead extends BaseEntity implements BranchAware {
     private BigDecimal currentBalance;
 
     @Column(name = "currency_code", length = 3)
-    private String currencyCode; // e.g. USD, AED. Defaults to base currency if null.
+    private String currencyCode = "AED"; // e.g. USD, AED. Defaults to base currency if null.
 
     @Column(name = "is_active")
     private Boolean isActive;

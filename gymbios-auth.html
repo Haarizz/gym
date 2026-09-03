@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GymBios — Member Sign In / Sign Up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #EEF3F0;
+    --surface: #FFFFFF;
+    --ink: #14241F;
+    --muted: #6E7C77;
+    --muted-soft: #9AA6A1;
+    --teal-deep: #0A3F34;
+    --teal: #0E6653;
+    --teal-bright: #16815F;
+    --teal-pale: #E4F1EB;
+    --gold: #EFA80D;
+    --gold-soft: #FCEDC7;
+    --orange: #E2762B;
+    --line: #E3E9E5;
+    --danger: #D65454;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:'Inter', sans-serif;
+    background:
+      radial-gradient(900px 500px at 15% -10%, #DCEAE2 0%, transparent 60%),
+      radial-gradient(700px 500px at 100% 10%, #F7ECD6 0%, transparent 55%),
+      var(--bg);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:48px 20px;
+    color:var(--ink);
+  }
+
+  .stage{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:22px;
+  }
+
+  .stage-label{
+    font-size:13px;
+    color:var(--muted);
+    letter-spacing:.01em;
+  }
+  .stage-label strong{ color:var(--teal-deep); }
+
+  /* ---------- Phone frame ---------- */
+  .phone{
+    width:360px;
+    max-width:92vw;
+    background:var(--surface);
+    border-radius:38px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.6) inset,
+      0 30px 60px -20px rgba(10,63,52,.35),
+      0 10px 25px -10px rgba(10,63,52,.25);
+    overflow:hidden;
+    border:8px solid #0D1512;
+    position:relative;
+  }
+
+  .statusbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 22px 6px;
+    font-size:13px;
+    font-weight:600;
+    color:#fff;
+    position:relative;
+    z-index:3;
+  }
+  .statusbar .icons{ display:flex; gap:6px; align-items:center; }
+
+  /* ---------- Header / hero ---------- */
+  .header{
+    position:relative;
+    padding:8px 26px 46px;
+    background:
+      linear-gradient(160deg, var(--teal-bright) 0%, var(--teal) 55%, var(--teal-deep) 100%);
+    overflow:hidden;
+  }
+  .header::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(220px 140px at 90% 0%, rgba(255,255,255,.14), transparent 70%);
+  }
+  .pulse-wrap{
+    position:absolute;
+    left:0; right:0; bottom:14px;
+    height:34px;
+    opacity:.55;
+  }
+  .pulse-wrap svg{ width:100%; height:100%; display:block; }
+
+  .brand{
+    position:relative;
+    z-index:2;
+    margin-top:14px;
+  }
+  .brand-mark{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .brand-mark .mark{
+    width:34px; height:34px;
+    border-radius:10px;
+    background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.35);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .brand-mark .mark svg{ width:18px; height:18px; }
+  .brand-name{
+    font-family:'Poppins', sans-serif;
+    font-weight:800;
+    font-size:22px;
+    color:#fff;
+    letter-spacing:-.01em;
+  }
+  .brand-tag{
+    margin:8px 0 0;
+    font-size:12.5px;
+    color:rgba(255,255,255,.72);
+    font-weight:500;
+  }
+
+  /* ---------- Sheet ---------- */
+  .sheet{
+    position:relative;
+    margin-top:-26px;
+    background:var(--surface);
+    border-radius:26px 26px 0 0;
+    padding:26px 24px 20px;
+    z-index:3;
+  }
+
+  .tabs{
+    display:flex;
+    gap:26px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:22px;
+  }
+  .tab{
+    appearance:none;
+    background:none;
+    border:none;
+    font-family:'Inter', sans-serif;
+    font-size:14.5px;
+    font-weight:600;
+    color:var(--muted-soft);
+    padding:0 0 12px;
+    cursor:pointer;
+    position:relative;
+    transition:color .18s ease;
+  }
+  .tab.active{ color:var(--teal-deep); }
+  .tab::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:-1px;
+    height:2px;
+    background:var(--teal);
+    transform:scaleX(0);
+    transform-origin:left;
+    transition:transform .22s ease;
+    border-radius:2px;
+  }
+  .tab.active::after{ transform:scaleX(1); }
+
+  .panel{ display:none; }
+  .panel.active{ display:block; animation:rise .28s ease; }
+  @keyframes rise{
+    from{ opacity:0; transform:translateY(6px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .panel h1{
+    font-family:'Poppins', sans-serif;
+    font-size:21px;
+    font-weight:700;
+    color:var(--ink);
+    margin:0 0 4px;
+    letter-spacing:-.01em;
+  }
+  .panel p.sub{
+    margin:0 0 22px;
+    font-size:13.5px;
+    color:var(--muted);
+  }
+
+  .field{ margin-bottom:16px; }
+  .field label{
+    display:block;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--teal-deep);
+    margin-bottom:7px;
+  }
+  .input-wrap{
+    position:relative;
+    display:flex;
+    align-items:center;
+  }
+  .input-wrap input{
+    width:100%;
+    font-family:'Inter', sans-serif;
+    font-size:14.5px;
+    color:var(--ink);
+    background:#F8FAF9;
+    border:1.5px solid var(--line);
+    border-radius:12px;
+    padding:13px 14px;
+    outline:none;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .input-wrap input::placeholder{ color:var(--muted-soft); }
+  .input-wrap input:focus{
+    border-color:var(--teal-bright);
+    background:#fff;
+  }
+  .input-wrap.has-icon input{ padding-right:42px; }
+  .icon-btn{
+    position:absolute;
+    right:10px;
+    background:none;
+    border:none;
+    padding:6px;
+    cursor:pointer;
+    color:var(--muted-soft);
+    display:flex;
+  }
+  .icon-btn:hover{ color:var(--teal); }
+  .icon-btn svg{ width:18px; height:18px; }
+
+  .row-between{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin:2px 0 20px;
+  }
+  .remember{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:12.5px;
+    color:var(--muted);
+  }
+  .remember input{ accent-color:var(--teal); width:14px; height:14px; }
+  .link{
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--teal);
+    text-decoration:none;
+  }
+  .link:hover{ text-decoration:underline; }
+
+  .btn-primary{
+    width:100%;
+    border:none;
+    border-radius:13px;
+    padding:14.5px;
+    font-family:'Inter', sans-serif;
+    font-size:14.5px;
+    font-weight:700;
+    color:#fff;
+    cursor:pointer;
+    background:linear-gradient(135deg, var(--teal-bright), var(--teal-deep));
+    box-shadow:0 10px 22px -8px rgba(14,102,83,.55);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn-primary:hover{ transform:translateY(-1px); box-shadow:0 14px 26px -8px rgba(14,102,83,.6); }
+  .btn-primary:active{ transform:translateY(0); }
+
+  .divider{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin:20px 0 16px;
+    color:var(--muted-soft);
+    font-size:12px;
+  }
+  .divider::before, .divider::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--line);
+  }
+
+  .switch-line{
+    text-align:center;
+    font-size:13px;
+    color:var(--muted);
+  }
+  .switch-line button{
+    background:none;
+    border:none;
+    font:inherit;
+    font-weight:700;
+    color:var(--teal);
+    cursor:pointer;
+    padding:0;
+  }
+
+  /* strength meter */
+  .strength{
+    display:flex;
+    gap:5px;
+    margin-top:8px;
+  }
+  .strength i{
+    flex:1;
+    height:4px;
+    border-radius:3px;
+    background:var(--line);
+    transition:background .2s ease;
+  }
+  .strength-label{
+    font-size:11.5px;
+    color:var(--muted-soft);
+    margin-top:6px;
+    display:block;
+  }
+
+  .terms{
+    font-size:11.5px;
+    color:var(--muted-soft);
+    line-height:1.5;
+    margin:14px 0 18px;
+  }
+  .terms a{ color:var(--teal); text-decoration:none; font-weight:600; }
+
+  .admin-link{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:16px 0 4px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .admin-link svg{ width:16px; height:16px; color:var(--muted-soft); }
+  .admin-link span{
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--muted);
+  }
+  .admin-link:hover span{ color:var(--teal-deep); }
+  .admin-link{ cursor:pointer; text-decoration:none; }
+
+  .home-bar{
+    display:flex;
+    justify-content:center;
+    padding:10px 0 14px;
+  }
+  .home-bar i{
+    width:120px; height:4px;
+    background:#D9DFDC;
+    border-radius:3px;
+  }
+
+  @media (max-width:420px){
+    .phone{ width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="stage-label">GymBios <strong>Member Access</strong> — sign in / create account</div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons">●●●● 🛜 🔋</span>
+    </div>
+
+    <div class="header">
+      <div class="pulse-wrap">
+        <svg viewBox="0 0 360 34" preserveAspectRatio="none">
+          <polyline points="0,17 60,17 78,4 92,30 108,17 360,17" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="brand">
+        <div class="brand-mark">
+          <div class="mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12h4l2-6 4 12 2-6h8"/>
+            </svg>
+          </div>
+          <span class="brand-name">GymBios</span>
+        </div>
+        <p class="brand-tag">Track workouts, book classes, own your progress.</p>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="tabs">
+        <button class="tab active" data-target="signin">Sign In</button>
+        <button class="tab" data-target="signup">Create Account</button>
+      </div>
+
+      <!-- SIGN IN -->
+      <div class="panel active" id="signin">
+        <h1>Welcome back</h1>
+        <p class="sub">Sign in to pick up where you left off.</p>
+
+        <div class="field">
+          <label for="si-user">Username or email</label>
+          <div class="input-wrap">
+            <input id="si-user" type="text" placeholder="e.g. arjun.k">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="si-pass">Password</label>
+          <div class="input-wrap has-icon">
+            <input id="si-pass" type="password" placeholder="Enter your password">
+            <button class="icon-btn" type="button" data-toggle="si-pass" aria-label="Show password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="row-between">
+          <label class="remember"><input type="checkbox"> Remember me</label>
+          <a class="link" href="#">Forgot password?</a>
+        </div>
+
+        <button class="btn-primary" type="button">Sign in</button>
+
+        <div class="divider">or</div>
+        <p class="switch-line">New to GymBios? <button data-target="signup">Create an account</button></p>
+      </div>
+
+      <!-- SIGN UP -->
+      <div class="panel" id="signup">
+        <h1>Create your account</h1>
+        <p class="sub">Join your gym's member app in under a minute.</p>
+
+        <div class="field">
+          <label for="su-name">Full name</label>
+          <div class="input-wrap">
+            <input id="su-name" type="text" placeholder="Your full name">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="su-email">Email</label>
+          <div class="input-wrap">
+            <input id="su-email" type="email" placeholder="you@example.com">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="su-pass">Password</label>
+          <div class="input-wrap has-icon">
+            <input id="su-pass" type="password" placeholder="Create a password">
+            <button class="icon-btn" type="button" data-toggle="su-pass" aria-label="Show password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="strength" id="strength-meter">
+            <i></i><i></i><i></i><i></i>
+          </div>
+          <span class="strength-label" id="strength-label">Use 8+ characters</span>
+        </div>
+
+        <p class="terms">By creating an account, you agree to GymBios's <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</p>
+
+        <button class="btn-primary" type="button">Create account</button>
+
+        <div class="divider">or</div>
+        <p class="switch-line">Already a member? <button data-target="signin">Sign in</button></p>
+      </div>
+
+      <div class="admin-link" tabindex="0" role="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a5 5 0 0 0-5 5v2a5 5 0 0 0 2 4v2c0 3 1 5 1 5M12 2a5 5 0 0 1 5 5v2a5 5 0 0 1-2 4v2M8 11c0 3 1.5 5 4 5s4-2 4-5M6 9c0 4 2 8 6 9M18 9c0 4-2 8-6 9"/></svg>
+        <span>Administrator login</span>
+      </div>
+    </div>
+
+    <div class="home-bar"><i></i></div>
+  </div>
+</div>
+
+<script>
+  // Tab / panel switching
+  const tabs = document.querySelectorAll('[data-target]');
+  const panels = document.querySelectorAll('.panel');
+  const tabButtons = document.querySelectorAll('.tab');
+
+  tabs.forEach(el => {
+    el.addEventListener('click', () => {
+      const target = el.getAttribute('data-target');
+      panels.forEach(p => p.classList.toggle('active', p.id === target));
+      tabButtons.forEach(t => t.classList.toggle('active', t.getAttribute('data-target') === target));
+    });
+  });
+
+  // Password show/hide
+  document.querySelectorAll('.icon-btn[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.getAttribute('data-toggle'));
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+  });
+
+  // Simple password strength for sign-up
+  const suPass = document.getElementById('su-pass');
+  const bars = document.querySelectorAll('#strength-meter i');
+  const strengthLabel = document.getElementById('strength-label');
+  const colors = ['#D65454', '#E2762B', '#EFA80D', '#16815F'];
+  const labels = ['Weak', 'Fair', 'Good', 'Strong'];
+
+  suPass.addEventListener('input', () => {
+    const v = suPass.value;
+    let score = 0;
+    if (v.length >= 6) score++;
+    if (v.length >= 10) score++;
+    if (/[0-9]/.test(v)) score++;
+    if (/[^A-Za-z0-9]/.test(v) || /[A-Z]/.test(v)) score++;
+    score = Math.min(score, 4);
+
+    bars.forEach((b, i) => {
+      b.style.background = i < score ? colors[Math.max(score - 1, 0)] : '#E3E9E5';
+    });
+    strengthLabel.textContent = v.length === 0 ? 'Use 8+ characters' : labels[Math.max(score - 1, 0)];
+  });
+
+  // Administrator login → placeholder action
+  document.querySelector('.admin-link').addEventListener('click', () => {
+    alert('This would route to the GymBios Admin sign-in flow.');
+  });
+</script>
+
+</body>
+</html>
