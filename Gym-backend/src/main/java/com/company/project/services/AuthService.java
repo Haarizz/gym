@@ -37,6 +37,7 @@ public class AuthService {
     private final RoleService roleService;
     private final com.company.project.repositories.UserBranchRepository userBranchRepository;
     private final com.company.project.repositories.BranchRepository branchRepository;
+    private final com.company.project.repositories.UserProfileRepository userProfileRepository;
 
     public AuthService(
             UserRepository userRepository,
@@ -48,7 +49,8 @@ public class AuthService {
             StaffRepository staffRepository,
             RoleService roleService,
             com.company.project.repositories.UserBranchRepository userBranchRepository,
-            com.company.project.repositories.BranchRepository branchRepository
+            com.company.project.repositories.BranchRepository branchRepository,
+            com.company.project.repositories.UserProfileRepository userProfileRepository
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -60,6 +62,7 @@ public class AuthService {
         this.roleService = roleService;
         this.userBranchRepository = userBranchRepository;
         this.branchRepository = branchRepository;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @Transactional
@@ -130,6 +133,7 @@ public class AuthService {
                 .permissions(extractPermissions(userDetails))
                 .accessibleBranches(accessibleBranches)
                 .defaultBranchId(defaultBranchId)
+                .profileCompleted(deriveProfileCompleted(userDetails.getId()))
                 .build();
     }
 
@@ -164,7 +168,14 @@ public class AuthService {
                 .permissions(extractPermissions(userDetails))
                 .accessibleBranches(accessibleBranches)
                 .defaultBranchId(defaultBranchId)
+                .profileCompleted(deriveProfileCompleted(userDetails.getId()))
                 .build();
+    }
+
+    private Boolean deriveProfileCompleted(Long userId) {
+        return userProfileRepository.findByUserId(userId)
+                .map(com.company.project.entities.UserProfile::isProfileCompleted)
+                .orElse(false);
     }
 
     private List<com.company.project.dto.BranchResponseDTO> fetchAccessibleBranches(UserDetailsImpl userDetails) {

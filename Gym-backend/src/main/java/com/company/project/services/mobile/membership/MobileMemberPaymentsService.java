@@ -24,17 +24,18 @@ public class MobileMemberPaymentsService {
         this.memberRepository = memberRepository;
     }
 
-    private Member getAuthenticatedMember(UserDetailsImpl principal) {
+    private java.util.Optional<Member> getAuthenticatedMember(UserDetailsImpl principal) {
         if (principal == null || principal.getId() == null) {
             throw new EntityNotFoundException("User not authenticated");
         }
-        return memberRepository.findByUserId(principal.getId())
-                .orElseThrow(() -> new EntityNotFoundException("No member profile linked to this user account"));
+        return memberRepository.findByUserId(principal.getId());
     }
 
     public List<MobilePaymentHistoryDTO> getPaymentHistory(UserDetailsImpl principal) {
-        Member member = getAuthenticatedMember(principal);
-
+        java.util.Optional<Member> memberOpt = getAuthenticatedMember(principal);
+        if (memberOpt.isEmpty()) return java.util.Collections.emptyList();
+        
+        Member member = memberOpt.get();
 
         List<Receipt> receipts = receiptRepository.findByMemberDbIdOrderByTransactionDateAsc(member.getId());
 

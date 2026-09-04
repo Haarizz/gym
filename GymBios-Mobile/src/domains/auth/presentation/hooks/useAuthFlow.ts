@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { analytics } from '@/core/platform/analytics';
 
 import type { AuthOrchestrator } from '../../application/orchestrators/AuthOrchestrator';
+import type { RegisterUserDto } from '../../application/useCases/RegisterUser';
 import type { RestoreSession } from '../../application/useCases/RestoreSession';
 import type { AppRole } from '../../domain/valueObjects/AppRole';
 import { useAuthStore } from '../../store/authStore';
@@ -69,6 +70,42 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
 
     return {
       login: mutation.mutate,
+      isLoading: mutation.isPending,
+      errorMessage,
+    };
+  };
+}
+
+export function createUseRegister(authOrchestrator: AuthOrchestrator) {
+  return function useRegister() {
+    const router = useRouter();
+    const setSession = useAuthStore((state) => state.setSession);
+    const [errorMessage, setErrorMessage] = useState<string>();
+
+    const mutation = useMutation({
+      mutationFn: (values: RegisterUserDto) =>
+        authOrchestrator.register(values),
+      onSuccess: (result) => {
+        if (!result.success) {
+          setErrorMessage(result.error);
+          analytics.track({ name: 'auth_register_failed' });
+          return;
+        }
+
+        setErrorMessage(undefined);
+        setSession(result.value);
+        analytics.track({
+          name: 'auth_register_success',
+          properties: { userId: result.value.user.id },
+        });
+        analytics.identify(result.value.user.id);
+        
+        // Let the AuthBootstrap routing redirect them to profile-completion
+      },
+    });
+
+    return {
+      register: mutation.mutate,
       isLoading: mutation.isPending,
       errorMessage,
     };

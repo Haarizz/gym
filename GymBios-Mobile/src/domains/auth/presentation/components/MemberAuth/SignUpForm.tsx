@@ -8,9 +8,12 @@ import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 
 interface SignUpFormProps {
   onSwitchToSignin: () => void;
+  onRegister: (values: SignupValues) => void;
+  isLoading?: boolean;
+  errorMessage?: string | null;
 }
 
-export function SignUpForm({ onSwitchToSignin }: SignUpFormProps) {
+export function SignUpForm({ onSwitchToSignin, onRegister, isLoading, errorMessage }: SignUpFormProps) {
   const {
     control,
     handleSubmit,
@@ -20,6 +23,7 @@ export function SignUpForm({ onSwitchToSignin }: SignUpFormProps) {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       fullName: '',
+      username: '',
       email: '',
       password: '',
     },
@@ -28,7 +32,7 @@ export function SignUpForm({ onSwitchToSignin }: SignUpFormProps) {
   const signupPassword = watch('password', '');
 
   const onSignup = (values: SignupValues) => {
-    Alert.alert('Coming Soon', 'Account creation will be available soon.');
+    onRegister(values);
   };
 
   return (
@@ -54,6 +58,25 @@ export function SignUpForm({ onSwitchToSignin }: SignUpFormProps) {
               onChangeText={onChange}
               value={value}
               error={errors.fullName?.message}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="username"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <Input
+              variant="auth"
+              label="Username"
+              placeholder="Choose a username"
+              autoCapitalize="none"
+              autoComplete="username"
+              returnKeyType="next"
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              error={errors.username?.message}
             />
           )}
         />
@@ -101,6 +124,10 @@ export function SignUpForm({ onSwitchToSignin }: SignUpFormProps) {
         />
       </View>
 
+      {errorMessage && (
+        <Typography style={styles.errorText}>{errorMessage}</Typography>
+      )}
+
       <Typography style={styles.terms}>
         By creating an account, you agree to GymBios's{' '}
         <Typography style={styles.termsLink}>Terms</Typography> and{' '}
@@ -111,6 +138,7 @@ export function SignUpForm({ onSwitchToSignin }: SignUpFormProps) {
         label="Create account"
         size="lg"
         onPress={handleSubmit(onSignup)}
+        loading={isLoading}
         style={styles.btnPrimary}
       />
 
@@ -144,6 +172,12 @@ const styles = StyleSheet.create({
   },
   fields: {
     gap: 16,
+  },
+  errorText: {
+    color: '#D93B3B',
+    fontSize: 13,
+    marginTop: 12,
+    textAlign: 'center',
   },
   passwordField: {
     marginBottom: 8,

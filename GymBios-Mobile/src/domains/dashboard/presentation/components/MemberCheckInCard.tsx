@@ -48,6 +48,8 @@ export function MemberCheckInCard() {
     completedAttendanceId ??
     null;
 
+  const isActiveMembership = dashboardData?.memberInfo?.isActive ?? false;
+
   const isActionPending =
     checkInMutation.isPending || checkOutMutation.isPending;
 
@@ -162,39 +164,50 @@ export function MemberCheckInCard() {
     <>
       <Pressable
         onPress={handleAction}
-        disabled={isActionPending}
+        disabled={isActionPending || !isActiveMembership}
         style={({ pressed }) => [
           styles.container,
           isCheckedIn && styles.containerCheckedIn,
+          !isActiveMembership && styles.containerDisabled,
           pressed && styles.pressed,
         ]}
         accessibilityRole="button"
-        accessibilityLabel={isCheckedIn ? 'Check Out of Gym' : 'Check In Now'}
+        accessibilityLabel={
+          !isActiveMembership ? 'Membership Required' : isCheckedIn ? 'Check Out of Gym' : 'Check In Now'
+        }
       >
         <View style={styles.content}>
-          <View style={[styles.iconBox, isCheckedIn && styles.iconBoxCheckedIn]}>
+          <View style={[styles.iconBox, isCheckedIn && styles.iconBoxCheckedIn, !isActiveMembership && styles.iconBoxDisabled]}>
             {isActionPending ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator color={!isActiveMembership ? BrandColors.textSecondary : '#FFFFFF'} size="small" />
             ) : (
               <Feather
-                name={isCheckedIn ? 'log-out' : 'maximize'}
+                name={!isActiveMembership ? 'lock' : isCheckedIn ? 'log-out' : 'maximize'}
                 size={24}
-                color="#FFFFFF"
+                color={!isActiveMembership ? BrandColors.textSecondary : '#FFFFFF'}
               />
             )}
           </View>
           <View style={styles.textContainer}>
-            <Text style={styles.title}>
-              {isCheckedIn ? 'Tap to Check Out' : 'Check In Now'}
+            <Text style={[styles.title, !isActiveMembership && styles.textDisabled]}>
+              {!isActiveMembership
+                ? 'Check In Locked'
+                : isCheckedIn
+                ? 'Tap to Check Out'
+                : 'Check In Now'}
             </Text>
-            <Text style={styles.subtitle}>
-              {isCheckedIn ? 'Workout in progress · Tap when finished' : 'Gate access ready'}
+            <Text style={[styles.subtitle, !isActiveMembership && styles.textDisabled]}>
+              {!isActiveMembership
+                ? 'Requires an active gym membership'
+                : isCheckedIn
+                ? 'Workout in progress · Tap when finished'
+                : 'Gate access ready'}
             </Text>
           </View>
           <Feather
             name="chevron-right"
             size={20}
-            color="rgba(255,255,255,0.8)"
+            color={!isActiveMembership ? BrandColors.textSecondary : 'rgba(255,255,255,0.8)'}
           />
         </View>
       </Pressable>
@@ -227,6 +240,13 @@ const styles = StyleSheet.create({
   containerCheckedIn: {
     backgroundColor: '#C9821E',
   },
+  containerDisabled: {
+    backgroundColor: BrandColors.screenBackground,
+    borderWidth: 1,
+    borderColor: BrandColors.neutral[200],
+    shadowColor: 'transparent',
+    opacity: 0.8,
+  },
   pressed: {
     opacity: 0.92,
     transform: [{ scale: 0.99 }],
@@ -248,6 +268,9 @@ const styles = StyleSheet.create({
   iconBoxCheckedIn: {
     backgroundColor: 'rgba(0,0,0,0.15)',
   },
+  iconBoxDisabled: {
+    backgroundColor: 'transparent',
+  },
   textContainer: {
     flex: 1,
   },
@@ -260,5 +283,8 @@ const styles = StyleSheet.create({
     fontSize: TypographyScale.small,
     color: 'rgba(255,255,255,0.85)',
     marginTop: 2,
+  },
+  textDisabled: {
+    color: BrandColors.textSecondary,
   },
 });

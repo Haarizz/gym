@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import type { createUseLogin } from '../hooks/useAuthFlow';
+import type { createUseLogin, createUseRegister } from '../hooks/useAuthFlow';
 import { AuthHeader } from '../components/MemberAuth/AuthHeader';
 import { AuthTabs } from '../components/MemberAuth/AuthTabs';
 import { SignInForm } from '../components/MemberAuth/SignInForm';
@@ -11,11 +11,13 @@ import { AdminLoginLink } from '../components/MemberAuth/AdminLoginLink';
 
 interface MemberAuthScreenProps {
   useLogin: ReturnType<typeof createUseLogin>;
+  useRegister: ReturnType<typeof createUseRegister>;
 }
 
-export function MemberAuthScreen({ useLogin }: MemberAuthScreenProps) {
+export function MemberAuthScreen({ useLogin, useRegister }: MemberAuthScreenProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
-  const { login, isLoading, errorMessage } = useLogin('member');
+  const { login, isLoading: isLoginLoading, errorMessage: loginError } = useLogin('member');
+  const { register, isLoading: isRegisterLoading, errorMessage: registerError } = useRegister();
 
   return (
     <View style={styles.root}>
@@ -45,13 +47,16 @@ export function MemberAuthScreen({ useLogin }: MemberAuthScreenProps) {
 
             {activeTab === 'signin' ? (
               <SignInForm 
-                isLoading={isLoading} 
-                errorMessage={errorMessage} 
+                isLoading={isLoginLoading} 
+                errorMessage={loginError} 
                 onLogin={(values) => login({ username: values.username, password: values.password })} 
                 onSwitchToSignup={() => setActiveTab('signup')} 
               />
             ) : (
               <SignUpForm 
+                isLoading={isRegisterLoading}
+                errorMessage={registerError}
+                onRegister={register}
                 onSwitchToSignin={() => setActiveTab('signin')} 
               />
             )}
@@ -64,9 +69,9 @@ export function MemberAuthScreen({ useLogin }: MemberAuthScreenProps) {
   );
 }
 
-export function createMemberAuthScreen(useLogin: ReturnType<typeof createUseLogin>) {
+export function createMemberAuthScreen(useLogin: ReturnType<typeof createUseLogin>, useRegister: ReturnType<typeof createUseRegister>) {
   return function MemberAuthScreenContainer() {
-    return <MemberAuthScreen useLogin={useLogin} />;
+    return <MemberAuthScreen useLogin={useLogin} useRegister={useRegister} />;
   };
 }
 

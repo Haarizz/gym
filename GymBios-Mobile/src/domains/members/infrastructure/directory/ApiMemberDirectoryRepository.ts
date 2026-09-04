@@ -104,7 +104,9 @@ export class ApiMemberDirectoryRepository
   }
 
   async getCurrentMember(): Promise<Member> {
-    const response = await apiClient.get<MemberResponse>('/members/me');
+    const response = await apiClient.get<MemberResponse>('/members/me', {
+      skipGlobalErrorToast: true,
+    });
     return this.toDomain(response.data);
   }
 

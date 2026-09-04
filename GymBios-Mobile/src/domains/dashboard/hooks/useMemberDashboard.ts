@@ -8,12 +8,12 @@ import { useBranchContext } from "@/shared/providers/BranchProvider";
 export const DEFAULT_MEMBER_DASHBOARD: MemberDashboardData = {
   memberInfo: {
     name: 'Member',
-    role: 'Active Member',
-    gymName: 'FitZone Downtown',
-    membershipType: 'Standard Plan',
-    daysRemaining: 180,
-    validUntil: '2026-12-31',
-    isActive: true,
+    role: 'Member',
+    gymName: 'Unassigned',
+    membershipType: 'No Active Plan',
+    daysRemaining: 0,
+    validUntil: '',
+    isActive: false,
   },
   todaysSchedule: [],
   quickStats: [

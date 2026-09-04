@@ -76,6 +76,28 @@ export class AuthRemoteDataSource {
     }
   }
 
+  async registerMobileUser(payload: any): Promise<Result<Session, string>> {
+    if (env.useMockApi) {
+      return { success: false, error: 'Mock register is not supported' };
+    }
+
+    try {
+      const apiPayload = {
+        full_name: payload.fullName,
+        username: payload.username,
+        email: payload.email,
+        password: payload.password,
+      };
+      const response = await this.authApi.registerMobileUser(apiPayload);
+      return { success: true, value: mapLoginResponseToSession(response.data, 'member') };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Unable to register. Please try again.' };
+    }
+  }
+
   private mockLogin(
     username: Username,
     password: Password,
@@ -91,16 +113,18 @@ export class AuthRemoteDataSource {
     const session = Session.create({
       accessToken: `mock-access-token-${role}`,
       refreshToken: `mock-refresh-token-${role}`,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
       appRole: role,
-      permissions,
+      permissions: ['read', 'write'],
+      profileCompleted: true,
       user: User.create({
         id: `usr_mock_${role}`,
         username: username.value,
-        email: `${username.value}@gymbios.local`,
-        fullName: ROLE_DISPLAY_NAMES[role],
+        email: `mock_${role}@example.com`,
+        fullName: `Mock ${role}`,
         appRole: role,
         permissions,
+        profileCompleted: true,
       }),
     });
 

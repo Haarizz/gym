@@ -191,23 +191,23 @@ export class ApiMemberDashboardRepository implements MemberDashboardRepository {
 
       role: membership?.membershipType || membership?.membership_type
         ? `${membership?.membershipType || membership?.membership_type} Member`
-        : 'Active Member',
+        : 'Member',
 
-      gymName: 'FitZone Downtown',
+      gymName: 'Unassigned', // Backend currently doesn't send gym name in this DTO, but we should default to Unassigned rather than FitZone Downtown
 
       membershipType:
         membership?.planName ||
         membership?.plan_name ||
         membership?.membershipType ||
         membership?.membership_type ||
-        'Standard Plan',
+        'No Active Plan',
 
       daysRemaining: membership?.daysRemaining ?? membership?.days_remaining ?? 0,
 
       validUntil:
         (membership?.expiryDate || membership?.expiry_date)?.split('T')[0] ||
         (membership?.endDate || membership?.end_date)?.split('T')[0] ||
-        '2026-12-31',
+        '',
 
       isActive: membership?.active ?? false,
     };
