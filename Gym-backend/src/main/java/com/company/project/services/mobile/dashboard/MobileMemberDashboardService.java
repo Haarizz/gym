@@ -53,8 +53,41 @@ public class MobileMemberDashboardService {
             throw new EntityNotFoundException("User not authenticated");
         }
 
-        Member member = memberRepository.findByUserId(principal.getId())
-                .orElseThrow(() -> new EntityNotFoundException("No member profile linked to this user account"));
+        Optional<Member> memberOpt = memberRepository.findByUserId(principal.getId());
+
+        if (memberOpt.isEmpty()) {
+            String role = principal.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .filter(auth -> auth.startsWith("ROLE_"))
+                    .findFirst()
+                    .orElse("ROLE_MEMBER");
+
+            MemberIdentityDTO identity = new MemberIdentityDTO(
+                    null,
+                    principal.getUsername(),
+                    principal.getEmail(),
+                    null,
+                    role
+            );
+            
+            MembershipDetailsDTO membership = new MembershipDetailsDTO(
+                    null, null, null, false, null, null, null, 0, null, null
+            );
+
+            CheckInStatusDTO checkInStatus = new CheckInStatusDTO(false, null, null);
+            MemberActivityStatsDTO activityStats = new MemberActivityStatsDTO(0, 0, 0);
+
+            return new MemberDashboardResponseDTO(
+                    identity,
+                    membership,
+                    checkInStatus,
+                    Collections.emptyList(),
+                    activityStats,
+                    null
+            );
+        }
+
+        Member member = memberOpt.get();
 
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();

@@ -42,8 +42,7 @@ public class MobileMemberAddOnsService {
     }
 
     public MobileAddOnsResponseDTO getAddOns(UserDetailsImpl principal, int page, int limit) {
-        Member member = memberRepository.findByEmail(principal.getEmail())
-                .orElseThrow(() -> new RuntimeException("Member not found"));
+        java.util.Optional<Member> memberOpt = memberRepository.findByEmail(principal.getEmail());
 
         // 1. Available Add-ons (Paginated)
         Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.ASC, "name"));
@@ -72,21 +71,25 @@ public class MobileMemberAddOnsService {
         );
 
         // 2. Active Add-ons (For current member)
-        Specification<MemberAddon> activeSpec = (root, query, cb) -> cb.and(
-                cb.equal(root.get("memberDbId"), member.getId()),
-                cb.equal(root.get("status"), "Active")
-        );
-        List<MemberAddon> activeAddons = memberAddonRepository.findAll(activeSpec);
+        List<MobileActiveAddOnDTO> activeDtos = new java.util.ArrayList<>();
+        if (memberOpt.isPresent()) {
+            Member member = memberOpt.get();
+            Specification<MemberAddon> activeSpec = (root, query, cb) -> cb.and(
+                    cb.equal(root.get("memberDbId"), member.getId()),
+                    cb.equal(root.get("status"), "Active")
+            );
+            List<MemberAddon> activeAddons = memberAddonRepository.findAll(activeSpec);
 
-        List<MobileActiveAddOnDTO> activeDtos = activeAddons.stream().map(ma -> {
-            MobileActiveAddOnDTO dto = new MobileActiveAddOnDTO();
-            dto.setId(ma.getId());
-            dto.setAddonName(ma.getAddonName());
-            dto.setCategory(ma.getCategory());
-            dto.setExpiryDate(ma.getExpiryDate());
-            dto.setStatus(ma.getStatus());
-            return dto;
-        }).collect(Collectors.toList());
+            activeDtos = activeAddons.stream().map(ma -> {
+                MobileActiveAddOnDTO dto = new MobileActiveAddOnDTO();
+                dto.setId(ma.getId());
+                dto.setAddonName(ma.getAddonName());
+                dto.setCategory(ma.getCategory());
+                dto.setExpiryDate(ma.getExpiryDate());
+                dto.setStatus(ma.getStatus());
+                return dto;
+            }).collect(Collectors.toList());
+        }
 
         MobileAddOnsResponseDTO response = new MobileAddOnsResponseDTO();
         response.setAvailable(availableDtos);

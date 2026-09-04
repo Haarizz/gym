@@ -23,30 +23,54 @@ interface MembershipStatusCardProps {
 }
 
 export function MembershipStatusCard({ membership }: MembershipStatusCardProps) {
+  if (membership.status === 'No Active Plan') {
+    return (
+      <View style={[styles.card, styles.inactiveCard]}>
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>Current Plan</Text>
+            <Text style={[styles.planTitle, styles.inactiveTextDark]}>No Active Plan</Text>
+            <Text style={[styles.priceText, styles.inactiveTextLight]}>N/A</Text>
+          </View>
+          <View style={[styles.activeBadge, { backgroundColor: BrandColors.neutral[200] }]}>
+            <Text style={[styles.activeBadgeText, { color: BrandColors.neutral[500] }]}>INACTIVE</Text>
+          </View>
+        </View>
+        <Text style={styles.inactivePrompt}>
+          You don't have an active membership plan. Join a gym to unlock benefits and add-ons.
+        </Text>
+      </View>
+    );
+  }
+
   const percentRemaining = Math.max(
     5,
     Math.min(100, Math.round((membership.daysRemaining / (membership.totalDays || 365)) * 100))
   );
 
-  const formattedStart = new Date(membership.startDate).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const formattedStart = membership.startDate
+    ? new Date(membership.startDate).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : 'N/A';
 
-  const formattedEnd = new Date(membership.endDate).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const formattedEnd = membership.endDate
+    ? new Date(membership.endDate).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : 'N/A';
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <View>
           <Text style={styles.badgeLabel}>Current Plan</Text>
-          <Text style={styles.planTitle}>{membership.type}</Text>
-          <Text style={styles.priceText}>{membership.price}</Text>
+          <Text style={styles.planTitle}>{membership.type || 'Unknown Plan'}</Text>
+          <Text style={styles.priceText}>{membership.price || 'N/A'}</Text>
         </View>
         <View style={styles.activeBadge}>
           <Feather name="check-circle" size={12} color="#FFFFFF" />
@@ -58,7 +82,7 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
       <View style={styles.progressSection}>
         <View style={styles.progressLabelRow}>
           <Text style={styles.progressLabel}>Membership Progress</Text>
-          <Text style={styles.daysRemainingText}>{membership.daysRemaining} days left</Text>
+          <Text style={styles.daysRemainingText}>{membership.daysRemaining || 0} days left</Text>
         </View>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${percentRemaining}%` }]} />
@@ -187,5 +211,24 @@ const styles = StyleSheet.create({
   },
   rightCol: {
     alignItems: 'flex-end',
+  },
+  inactiveCard: {
+    backgroundColor: BrandColors.screenBackground,
+    borderWidth: 1,
+    borderColor: BrandColors.neutral[200],
+    shadowColor: 'transparent',
+    elevation: 0,
+  },
+  inactiveTextDark: {
+    color: '#111827',
+  },
+  inactiveTextLight: {
+    color: '#6B7280',
+  },
+  inactivePrompt: {
+    fontSize: TypographyScale.body,
+    color: '#4B5563',
+    lineHeight: 20,
+    marginTop: Spacing.two,
   },
 });

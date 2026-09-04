@@ -41,7 +41,16 @@ public class MobileMemberCheckInService {
 
     @Transactional(readOnly = true)
     public MemberCheckInStatusResponseDTO getCheckInStatus(UserDetailsImpl principal) {
-        Member member = getAuthenticatedMember(principal);
+        if (principal == null || principal.getId() == null) {
+            return new MemberCheckInStatusResponseDTO(false, null, null);
+        }
+
+        var memberOpt = memberRepository.findByUserId(principal.getId());
+        if (memberOpt.isEmpty()) {
+            return new MemberCheckInStatusResponseDTO(false, null, null);
+        }
+
+        Member member = memberOpt.get();
 
         List<Attendance> attendances = attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(member.getId());
         Attendance activeAttendance = (attendances != null)

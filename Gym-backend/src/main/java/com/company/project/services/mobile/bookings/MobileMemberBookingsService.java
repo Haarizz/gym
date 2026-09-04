@@ -54,16 +54,23 @@ public class MobileMemberBookingsService {
         this.trainingSessionService = trainingSessionService;
     }
 
-    private Member getAuthenticatedMember(UserDetailsImpl principal) {
+    private java.util.Optional<Member> getAuthenticatedMember(UserDetailsImpl principal) {
         if (principal == null || principal.getId() == null) {
             throw new EntityNotFoundException("User not authenticated");
         }
-        return memberRepository.findByUserId(principal.getId())
+        return memberRepository.findByUserId(principal.getId());
+    }
+
+    private Member requireAuthenticatedMember(UserDetailsImpl principal) {
+        return getAuthenticatedMember(principal)
                 .orElseThrow(() -> new EntityNotFoundException("No member profile linked to this user account"));
     }
 
     public List<MemberBookingDTO> getUpcomingBookings(UserDetailsImpl principal) {
-        Member member = getAuthenticatedMember(principal);
+        java.util.Optional<Member> memberOpt = getAuthenticatedMember(principal);
+        if (memberOpt.isEmpty()) return java.util.Collections.emptyList();
+        
+        Member member = memberOpt.get();
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
 
@@ -72,7 +79,10 @@ public class MobileMemberBookingsService {
     }
 
     public List<MemberBookingDTO> getPastBookings(UserDetailsImpl principal) {
-        Member member = getAuthenticatedMember(principal);
+        java.util.Optional<Member> memberOpt = getAuthenticatedMember(principal);
+        if (memberOpt.isEmpty()) return java.util.Collections.emptyList();
+        
+        Member member = memberOpt.get();
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
 
@@ -86,7 +96,10 @@ public class MobileMemberBookingsService {
     }
 
     public BookingStatsDTO getBookingStats(UserDetailsImpl principal) {
-        Member member = getAuthenticatedMember(principal);
+        java.util.Optional<Member> memberOpt = getAuthenticatedMember(principal);
+        if (memberOpt.isEmpty()) return new BookingStatsDTO(0, 0, 0);
+        
+        Member member = memberOpt.get();
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
         LocalDate startOfWeek = today.with(DayOfWeek.MONDAY);
@@ -103,7 +116,10 @@ public class MobileMemberBookingsService {
     }
 
     public List<AvailableClassDTO> getAvailableClasses(UserDetailsImpl principal, LocalDate date) {
-        Member member = getAuthenticatedMember(principal);
+        java.util.Optional<Member> memberOpt = getAuthenticatedMember(principal);
+        if (memberOpt.isEmpty()) return java.util.Collections.emptyList();
+        
+        Member member = memberOpt.get();
         final LocalDate targetDate = (date == null) ? LocalDate.now() : date;
 
         // Use existing TrainingSessionService to fetch all available sessions for the specific date
@@ -148,7 +164,7 @@ public class MobileMemberBookingsService {
     }
 
     public MemberBookingDTO getBookingDetails(UserDetailsImpl principal, Long bookingId) {
-        Member member = getAuthenticatedMember(principal);
+        Member member = requireAuthenticatedMember(principal);
         Booking booking = mobileBookingRepository.findByIdAndMemberId(bookingId, member.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found or access denied"));
 
@@ -160,7 +176,7 @@ public class MobileMemberBookingsService {
 
     @Transactional
     public MemberBookingDTO createBooking(UserDetailsImpl principal, CreateMemberBookingRequestDTO request) {
-        Member member = getAuthenticatedMember(principal);
+        Member member = requireAuthenticatedMember(principal);
         
         // Use existing BookingService which handles capacity checks, waitlists (if any), and notifications
         BookingRequestDTO webRequest = new BookingRequestDTO();
@@ -179,7 +195,7 @@ public class MobileMemberBookingsService {
 
     @Transactional
     public MemberBookingDTO cancelBooking(UserDetailsImpl principal, Long bookingId) {
-        Member member = getAuthenticatedMember(principal);
+        Member member = requireAuthenticatedMember(principal);
         Booking booking = mobileBookingRepository.findByIdAndMemberId(bookingId, member.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found or access denied"));
 

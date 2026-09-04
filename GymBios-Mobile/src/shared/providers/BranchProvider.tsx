@@ -27,6 +27,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     queryKey: ['current-member'],
     queryFn: () => memberRepository.getCurrentMember(),
     enabled: appRole === 'member' && !user?.branchId,
+    retry: false,
   });
 
   const { data: branches, isLoading: isBranchesLoading } = useMyBranches();

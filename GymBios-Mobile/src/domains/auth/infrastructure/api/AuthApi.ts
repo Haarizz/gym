@@ -11,4 +11,9 @@ export class AuthApi {
   getCurrentUser() {
     return httpClient.get<MeResponseApiModel>('/auth/me');
   }
+
+  async registerMobileUser(payload: any) {
+    const response = await httpClient.post<LoginResponseApiModel>('/mobile/auth/register', payload);
+    return response;
+  }
 }

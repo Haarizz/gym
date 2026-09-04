@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Complete Your Profile · FitZone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold-500:#eba715;
+    --gold-600:#d99310;
+    --gold-050:#fdf3dd;
+    --green-700:#1f5d4e;
+    --green-600:#256d5c;
+    --green-050:#e7f2ef;
+    --ink-900:#1a1d1e;
+    --ink-600:#5d6668;
+    --ink-400:#9aa3a5;
+    --line:#e9ebe9;
+    --paper:#ffffff;
+    --canvas:#f4f5f3;
+    --red-600:#c2483c;
+    --red-050:#fbeae7;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Manrope',-apple-system,BlinkMacSystemFont,sans-serif;
+    background:#e7e5e0;
+    color:var(--ink-900);
+    display:flex;
+    justify-content:center;
+    padding:32px 12px;
+    min-height:100vh;
+  }
+  .device{
+    width:412px;
+    max-width:100%;
+    background:var(--canvas);
+    border-radius:34px;
+    overflow:hidden;
+    box-shadow:0 30px 60px -20px rgba(20,30,25,0.35), 0 0 0 8px #17181a;
+    min-height:860px;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background:var(--paper);
+    padding:18px 20px 16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    border-bottom:1px solid var(--line);
+    position:sticky;
+    top:0;
+    z-index:5;
+  }
+  .back-btn{
+    width:34px;height:34px;border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--paper);
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ink-900);
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .back-btn svg{width:16px;height:16px;}
+  .topbar-titles{flex:1;min-width:0;}
+  .topbar-titles h1{
+    margin:0; font-size:16px; font-weight:800; letter-spacing:-0.01em;
+  }
+  .topbar-titles p{
+    margin:2px 0 0; font-size:12.5px; color:var(--ink-600); font-weight:500;
+  }
+  .step-pill{
+    font-size:11.5px;
+    font-weight:700;
+    color:var(--green-700);
+    background:var(--green-050);
+    padding:5px 10px;
+    border-radius:999px;
+    flex-shrink:0;
+  }
+
+  /* ---------- Progress ---------- */
+  .progress-wrap{
+    padding:14px 20px 0;
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+  }
+  .progress-track{
+    display:flex;
+    gap:6px;
+    padding-bottom:16px;
+  }
+  .progress-seg{
+    flex:1;
+    height:5px;
+    border-radius:999px;
+    background:var(--line);
+    overflow:hidden;
+  }
+  .progress-seg i{
+    display:block;
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg,var(--gold-600),var(--gold-500));
+    border-radius:999px;
+    transition:width .4s ease;
+  }
+  .progress-seg.done i{width:100%;}
+  .progress-seg.active i{width:100%;}
+  .progress-labels{
+    display:flex;
+    justify-content:space-between;
+    font-size:10.5px;
+    color:var(--ink-400);
+    font-weight:700;
+    letter-spacing:.02em;
+    padding-bottom:12px;
+    margin-top:-10px;
+  }
+  .progress-labels span.on{color:var(--green-700);}
+
+  /* ---------- Screens ---------- */
+  .screens{flex:1; position:relative; overflow:hidden;}
+  .screen{
+    display:none;
+    padding:22px 20px 110px;
+    animation:fadeIn .25s ease;
+  }
+  .screen.active{display:block;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+
+  .intro{margin-bottom:20px;}
+  .intro h2{
+    font-size:21px; margin:0 0 6px; font-weight:800; letter-spacing:-0.02em;
+  }
+  .intro p{margin:0; font-size:13.5px; color:var(--ink-600); line-height:1.5;}
+
+  /* card / section */
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .card-head{display:flex; align-items:flex-start; gap:12px; margin-bottom:18px;}
+  .icon-badge{
+    width:36px;height:36px;border-radius:11px;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .icon-badge svg{width:18px;height:18px;}
+  .icon-badge.gold{background:var(--gold-050); color:var(--gold-600);}
+  .icon-badge.green{background:var(--green-050); color:var(--green-700);}
+  .icon-badge.red{background:var(--red-050); color:var(--red-600);}
+  .card-head h3{margin:0; font-size:15px; font-weight:800;}
+  .card-head p{margin:2px 0 0; font-size:12px; color:var(--ink-600); font-weight:500;}
+
+  /* photo uploader */
+  .photo-row{
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:6px 0 4px;
+  }
+  .avatar{
+    width:84px;height:84px;border-radius:50%;
+    background:var(--canvas);
+    border:1.5px dashed #cfd3cf;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ink-400);
+    margin-bottom:12px;
+    position:relative;
+  }
+  .avatar svg{width:30px;height:30px;}
+  .avatar .cam-dot{
+    position:absolute; right:-2px; bottom:-2px;
+    width:26px;height:26px;border-radius:50%;
+    background:var(--gold-500);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff; border:3px solid var(--paper);
+  }
+  .avatar .cam-dot svg{width:12px;height:12px;}
+  .photo-row h4{margin:0 0 3px; font-size:13.5px; font-weight:700;}
+  .photo-row p{margin:0 0 14px; font-size:11.5px; color:var(--ink-600);}
+  .photo-actions{display:flex; gap:8px; width:100%;}
+  .btn-outline-sm{
+    flex:1;
+    padding:9px 10px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    font-size:12.5px; font-weight:700; color:var(--ink-900);
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    cursor:pointer;
+  }
+  .btn-outline-sm svg{width:14px;height:14px;}
+  .btn-outline-sm.primary{
+    background:var(--ink-900); color:#fff; border-color:var(--ink-900);
+  }
+
+  /* form fields */
+  .field{margin-bottom:16px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{
+    display:block; font-size:12.5px; font-weight:700; color:var(--ink-900);
+    margin-bottom:6px;
+  }
+  .field label .req{color:var(--red-600);}
+  .field label .opt{color:var(--ink-400); font-weight:600;}
+  .field .hint{font-size:11px; color:var(--ink-400); margin-top:5px; font-weight:500;}
+  .input, select, textarea{
+    width:100%;
+    padding:11px 13px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-sm);
+    font-size:13.5px;
+    font-family:inherit;
+    color:var(--ink-900);
+    background:var(--paper);
+    outline:none;
+  }
+  .input:focus, select:focus, textarea:focus{
+    border-color:var(--gold-500);
+    box-shadow:0 0 0 3px var(--gold-050);
+  }
+  ::placeholder{color:var(--ink-400);}
+  .row-2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  textarea{resize:none; min-height:56px;}
+  .char-count{
+    text-align:right; font-size:10.5px; color:var(--ink-400); margin-top:4px; font-weight:600;
+  }
+  select{
+    appearance:none;
+    -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%239aa3a5'><path d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%239aa3a5' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 12px center;
+    padding-right:34px;
+  }
+  .readonly-field{
+    background:var(--canvas);
+    color:var(--ink-600);
+  }
+
+  /* emergency banner card */
+  .emg-card{
+    background:var(--red-050);
+    border:1px solid #f3d3ce;
+    border-radius:var(--radius-lg);
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .emg-note{
+    background:var(--paper);
+    border-radius:var(--radius-md);
+    padding:13px 14px;
+    margin-top:16px;
+    display:flex;
+    gap:10px;
+  }
+  .emg-note svg{width:16px;height:16px; color:var(--red-600); flex-shrink:0; margin-top:1px;}
+  .emg-note p{margin:0; font-size:11.5px; color:var(--ink-600); line-height:1.55;}
+  .emg-note strong{color:var(--ink-900); display:block; font-size:12.5px; margin-bottom:2px;}
+
+  .skip-note{
+    display:flex; align-items:center; gap:8px;
+    font-size:11.5px; color:var(--ink-400); font-weight:600;
+    justify-content:center; margin-top:6px;
+  }
+
+  /* ---------- Success screen ---------- */
+  .success-screen{
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    padding:60px 28px 40px;
+    animation:fadeIn .3s ease;
+  }
+  .success-screen.active{display:flex;}
+  .success-badge{
+    width:76px;height:76px;border-radius:50%;
+    background:var(--green-700);
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:22px;
+    box-shadow:0 10px 24px -6px rgba(31,93,78,0.45);
+  }
+  .success-badge svg{width:34px;height:34px; color:#fff;}
+  .success-screen h2{font-size:21px; font-weight:800; margin:0 0 8px; letter-spacing:-0.02em;}
+  .success-screen p{font-size:13.5px; color:var(--ink-600); line-height:1.6; margin:0 0 30px; max-width:280px;}
+  .success-actions{width:100%; display:flex; flex-direction:column; gap:10px;}
+
+  /* ---------- Bottom nav (footer buttons) ---------- */
+  .footer-nav{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    background:var(--paper);
+    border-top:1px solid var(--line);
+    padding:14px 20px 18px;
+    display:flex;
+    gap:10px;
+    z-index:6;
+  }
+  .btn{
+    flex:1;
+    padding:13px 16px;
+    border-radius:13px;
+    font-size:14px;
+    font-weight:800;
+    border:none;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn svg{width:16px;height:16px;}
+  .btn-primary{
+    background:var(--green-700);
+    color:#fff;
+  }
+  .btn-primary.gold{
+    background:linear-gradient(180deg,var(--gold-500),var(--gold-600));
+    color:#3a2a05;
+  }
+  .btn-ghost{
+    background:var(--paper);
+    color:var(--ink-900);
+    border:1px solid var(--line);
+    flex:0 0 46px;
+  }
+  .btn-ghost svg{width:16px;height:16px; margin:0;}
+
+  /* reference note (not part of app UI) */
+  .devnote{
+    width:412px; max-width:100%;
+    margin-top:14px;
+    font-size:11.5px;
+    color:#8b8f89;
+    text-align:center;
+    font-weight:600;
+  }
+  .wrap{display:flex; flex-direction:column; align-items:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="device">
+
+  <!-- ================= TOP BAR ================= -->
+  <div class="topbar" id="topbar">
+    <button class="back-btn" onclick="prevStep()" id="backBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="topbar-titles">
+      <h1 id="screenTitle">Personal details</h1>
+      <p id="screenSub">Tell us a bit about yourself</p>
+    </div>
+    <div class="step-pill" id="stepPill">Step 1 of 3</div>
+  </div>
+
+  <!-- ================= PROGRESS ================= -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-track">
+      <div class="progress-seg" data-seg="1"><i></i></div>
+      <div class="progress-seg" data-seg="2"><i></i></div>
+      <div class="progress-seg" data-seg="3"><i></i></div>
+    </div>
+    <div class="progress-labels">
+      <span data-label="1">Personal</span>
+      <span data-label="2">Health</span>
+      <span data-label="3">Emergency</span>
+    </div>
+  </div>
+
+  <div class="screens">
+
+    <!-- ============================================================ -->
+    <!-- STEP 1 — PERSONAL DETAILS -->
+    <!-- ============================================================ -->
+    <div class="screen active" data-screen="1">
+      <div class="intro">
+        <h2>Let's set up your profile</h2>
+        <p>A complete profile helps gyms verify your identity and keep you safe during training. It only takes a few minutes.</p>
+      </div>
+
+      <div class="card">
+        <div class="photo-row">
+          <div class="avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+            <div class="cam-dot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            </div>
+          </div>
+          <h4>Profile photo</h4>
+          <p>Optional, but helps gym staff recognize you at check-in</p>
+          <div class="photo-actions">
+            <button class="btn-outline-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+              Capture
+            </button>
+            <button class="btn-outline-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12M6 10l6-6 6 6"/><path d="M4 20h16"/></svg>
+              Upload
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="icon-badge green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+          </div>
+          <div>
+            <h3>Basic information</h3>
+            <p>Your name and contact details</p>
+          </div>
+        </div>
+
+        <div class="row-2">
+          <div class="field">
+            <label>First name <span class="req">*</span></label>
+            <input class="input" placeholder="e.g. John" value="Vasim">
+          </div>
+          <div class="field">
+            <label>Last name <span class="req">*</span></label>
+            <input class="input" placeholder="e.g. Doe">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Email <span class="req">*</span></label>
+          <input class="input" type="email" placeholder="you@email.com">
+        </div>
+
+        <div class="field">
+          <label>Phone <span class="req">*</span></label>
+          <input class="input" placeholder="+971 XX XXX XXXX">
+        </div>
+
+        <div class="row-2">
+          <div class="field">
+            <label>Gender <span class="opt">(optional)</span></label>
+            <select>
+              <option>Select gender</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Nationality</label>
+            <select>
+              <option>Select country</option>
+              <option>UAE</option>
+              <option>India</option>
+              <option>UK</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Address</label>
+          <input class="input" placeholder="Street, city">
+        </div>
+
+        <div class="row-2">
+          <div class="field">
+            <label>Date of birth <span class="req">*</span></label>
+            <input class="input" type="date">
+          </div>
+          <div class="field">
+            <label>Age</label>
+            <input class="input readonly-field" placeholder="Auto-calculated" readonly>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- STEP 2 — HEALTH INFORMATION -->
+    <!-- ============================================================ -->
+    <div class="screen" data-screen="2">
+      <div class="intro">
+        <h2>Health information</h2>
+        <p>This helps trainers respond quickly and safely if something comes up during a session. All fields are optional but recommended.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="icon-badge gold">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-4.35-9.5-8.5C.9 9 2.5 5.5 6 5c2-.3 3.5.8 4.5 2C11.5 5.8 13 4.7 15 5c3.5.5 5.1 4 3.5 7.5C16 16.65 12 21 12 21z"/></svg>
+          </div>
+          <div>
+            <h3>Medical background</h3>
+            <p>Optional, helps in an emergency</p>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Medical conditions <span class="opt">(optional)</span></label>
+          <textarea placeholder="e.g. Asthma, Diabetes, High Blood Pressure"></textarea>
+          <div class="char-count">0/500</div>
+        </div>
+
+        <div class="field">
+          <label>Allergies <span class="opt">(optional)</span></label>
+          <textarea placeholder="e.g. Peanuts, Penicillin, Dust, Latex"></textarea>
+          <div class="char-count">0/500</div>
+        </div>
+
+        <div class="field">
+          <label>Current medications <span class="opt">(optional)</span></label>
+          <textarea placeholder="e.g. Metformin 500mg, Vitamin D 1000IU"></textarea>
+          <div class="char-count">0/500</div>
+        </div>
+
+        <div class="field">
+          <label>Chronic illnesses <span class="opt">(optional)</span></label>
+          <textarea placeholder="e.g. Heart Disease, Arthritis, COPD"></textarea>
+          <div class="char-count">0/500</div>
+        </div>
+
+        <div class="field">
+          <label>Blood type</label>
+          <select>
+            <option>Select blood type</option>
+            <option>O+</option><option>O-</option>
+            <option>A+</option><option>A-</option>
+            <option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option>
+          </select>
+        </div>
+
+        <div class="row-2">
+          <div class="field">
+            <label>Height (cm)</label>
+            <input class="input" type="number" placeholder="170">
+          </div>
+          <div class="field">
+            <label>Weight (kg)</label>
+            <input class="input" type="number" placeholder="70">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- STEP 3 — EMERGENCY CONTACT -->
+    <!-- ============================================================ -->
+    <div class="screen" data-screen="3">
+      <div class="intro">
+        <h2>Emergency contact</h2>
+        <p>Who should we reach out to if something happens while you're training?</p>
+      </div>
+
+      <div class="emg-card">
+        <div class="card-head" style="margin-bottom:16px;">
+          <div class="icon-badge red" style="background:#fff;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2C7 2 3 6 3 11c0 5.5 6.5 10 9 11.5 2.5-1.5 9-6 9-11.5 0-5-4-9-9-9z"/></svg>
+          </div>
+          <div>
+            <h3>Emergency contact information</h3>
+            <p>Person to contact in case of emergency</p>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Contact name <span class="req">*</span></label>
+          <input class="input" placeholder="Enter full name">
+        </div>
+
+        <div class="field">
+          <label>Contact number <span class="req">*</span></label>
+          <input class="input" placeholder="+971 XX XXX XXXX">
+        </div>
+
+        <div class="emg-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+          <p><strong>Why we ask</strong>This person will be contacted immediately in case of a medical emergency during training. Please make sure the details are accurate and up to date.</p>
+        </div>
+      </div>
+
+      <div class="skip-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        This is the last step before your profile is complete
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SUCCESS SCREEN -->
+  <!-- ============================================================ -->
+  <div class="success-screen" data-screen="success">
+    <div class="success-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <h2>Profile complete</h2>
+    <p>You're all set, Vasim. You can now apply for membership at any FitZone gym on the platform.</p>
+    <div class="success-actions">
+      <button class="btn btn-primary gold" style="width:100%;">
+        Browse gym memberships
+      </button>
+      <button class="btn" style="width:100%; background:transparent; color:var(--ink-600); font-weight:700;">
+        Go to home
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= FOOTER NAV ================= -->
+  <div class="footer-nav" id="footerNav">
+    <button class="btn btn-ghost" id="prevBtn" onclick="prevStep()" style="visibility:hidden;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">
+      Continue
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+  </div>
+
+</div>
+<p class="devnote">Reference UI · profile completion must finish before a member can apply for a gym membership</p>
+</div>
+
+<script>
+  const TOTAL_STEPS = 3;
+  let current = 1;
+
+  const titles = {
+    1: { title:"Personal details", sub:"Tell us a bit about yourself" },
+    2: { title:"Health information", sub:"For your safety during training" },
+    3: { title:"Emergency contact", sub:"In case we need to reach someone" }
+  };
+
+  function renderProgress(){
+    document.querySelectorAll('.progress-seg').forEach(seg=>{
+      const n = parseInt(seg.dataset.seg);
+      seg.classList.toggle('done', n < current);
+      seg.classList.toggle('active', n <= current);
+    });
+    document.querySelectorAll('.progress-labels span').forEach(label=>{
+      const n = parseInt(label.dataset.label);
+      label.classList.toggle('on', n <= current);
+    });
+  }
+
+  function renderScreen(){
+    document.querySelectorAll('.screen').forEach(s=>{
+      s.classList.toggle('active', parseInt(s.dataset.screen) === current);
+    });
+    document.getElementById('screenTitle').textContent = titles[current].title;
+    document.getElementById('screenSub').textContent = titles[current].sub;
+    document.getElementById('stepPill').textContent = `Step ${current} of ${TOTAL_STEPS}`;
+    document.getElementById('prevBtn').style.visibility = current === 1 ? 'hidden' : 'visible';
+
+    const nextBtn = document.getElementById('nextBtn');
+    if(current === TOTAL_STEPS){
+      nextBtn.innerHTML = 'Complete profile <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+      nextBtn.classList.add('gold');
+    } else {
+      nextBtn.innerHTML = 'Continue <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>';
+      nextBtn.classList.remove('gold');
+    }
+    renderProgress();
+  }
+
+  function nextStep(){
+    if(current < TOTAL_STEPS){
+      current++;
+      renderScreen();
+    } else {
+      // finished all steps -> show success
+      document.getElementById('topbar').style.display = 'none';
+      document.getElementById('progressWrap').style.display = 'none';
+      document.getElementById('footerNav').style.display = 'none';
+      document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+      document.querySelector('[data-screen="success"]').classList.add('active');
+    }
+  }
+
+  function prevStep(){
+    if(current > 1){
+      current--;
+      renderScreen();
+    }
+  }
+
+  renderScreen();
+</script>
+
+</body>
+</html>

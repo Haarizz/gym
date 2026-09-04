@@ -13,6 +13,7 @@ public class AuthResponseDTO {
     private List<String> permissions;
     private List<BranchResponseDTO> accessibleBranches;
     private Long defaultBranchId;
+    private Boolean profileCompleted;
 
     public AuthResponseDTO() {}
 
@@ -46,6 +47,9 @@ public class AuthResponseDTO {
     public Long getDefaultBranchId() { return defaultBranchId; }
     public void setDefaultBranchId(Long defaultBranchId) { this.defaultBranchId = defaultBranchId; }
 
+    public Boolean getProfileCompleted() { return profileCompleted; }
+    public void setProfileCompleted(Boolean profileCompleted) { this.profileCompleted = profileCompleted; }
+
     // Manual Builder
     public static AuthResponseDTOBuilder builder() {
         return new AuthResponseDTOBuilder();
@@ -62,6 +66,7 @@ public class AuthResponseDTO {
         private List<String> permissions;
         private List<BranchResponseDTO> accessibleBranches;
         private Long defaultBranchId;
+        private Boolean profileCompleted;
 
         public AuthResponseDTOBuilder token(String token) { this.token = token; return this; }
         public AuthResponseDTOBuilder username(String username) { this.username = username; return this; }
@@ -73,6 +78,7 @@ public class AuthResponseDTO {
         public AuthResponseDTOBuilder permissions(List<String> permissions) { this.permissions = permissions; return this; }
         public AuthResponseDTOBuilder accessibleBranches(List<BranchResponseDTO> accessibleBranches) { this.accessibleBranches = accessibleBranches; return this; }
         public AuthResponseDTOBuilder defaultBranchId(Long defaultBranchId) { this.defaultBranchId = defaultBranchId; return this; }
+        public AuthResponseDTOBuilder profileCompleted(Boolean profileCompleted) { this.profileCompleted = profileCompleted; return this; }
 
         public AuthResponseDTO build() {
             AuthResponseDTO dto = new AuthResponseDTO();
@@ -86,6 +92,7 @@ public class AuthResponseDTO {
             dto.permissions = this.permissions;
             dto.accessibleBranches = this.accessibleBranches;
             dto.defaultBranchId = this.defaultBranchId;
+            dto.profileCompleted = this.profileCompleted;
             return dto;
         }
     }

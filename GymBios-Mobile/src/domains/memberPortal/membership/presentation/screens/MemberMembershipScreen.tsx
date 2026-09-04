@@ -133,10 +133,12 @@ export function MemberMembershipScreen() {
       {/* Membership Card */}
       <MembershipStatusCard membership={membership} />
 
-      {/* Quick Action Buttons */}
-      <View style={styles.quickActionsRow}>
-        <Pressable
-          style={({ pressed }) => [styles.actionButtonGold, pressed && styles.pressed]}
+      {membership.status !== 'No Active Plan' && (
+        <>
+          {/* Quick Action Buttons */}
+          <View style={styles.quickActionsRow}>
+            <Pressable
+              style={({ pressed }) => [styles.actionButtonGold, pressed && styles.pressed]}
           onPress={() => setIsRenewModalOpen(true)}
           accessibilityRole="button"
           accessibilityLabel="Renew Membership"
@@ -223,6 +225,8 @@ export function MemberMembershipScreen() {
           page={addonsPage} 
           setPage={setAddonsPage} 
         />
+      )}
+        </>
       )}
 
       {/* Modals */}

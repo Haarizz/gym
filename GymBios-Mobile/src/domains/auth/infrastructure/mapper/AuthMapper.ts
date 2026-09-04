@@ -98,14 +98,16 @@ export function mapLoginResponseToSession(
     expiresAt,
     appRole,
     permissions,
+    profileCompleted: response.profileCompleted ?? response.profile_completed ?? true,
     user: User.create({
-      id: String(response.userId),
+      id: String(response.userId ?? response.user_id),
       username: response.username,
       email: `${response.username}@gymbios.local`,
       fullName: ROLE_DISPLAY_NAMES[appRole] ?? response.username,
       appRole,
       permissions,
       branchId: response.branchId ?? response.branch_id,
+      profileCompleted: response.profileCompleted ?? response.profile_completed ?? true,
     }),
   });
 }
@@ -135,8 +137,10 @@ export function mapSessionToStored(session: Session): StoredSessionApiModel {
       role: session.user.appRole,
       permissions: [...session.user.permissions],
       branchId: session.user.branchId,
+      profileCompleted: session.user.profileCompleted,
     },
     branchId: session.user.branchId,
+    profileCompleted: session.profileCompleted,
   };
 }
 
@@ -149,6 +153,7 @@ export function mapStoredToSession(stored: StoredSessionApiModel): Session {
     expiresAt: new Date(stored.expiresAt),
     appRole,
     permissions: stored.permissions ?? stored.user.permissions ?? [],
+    profileCompleted: stored.profileCompleted ?? stored.user.profileCompleted ?? true,
     user: User.create({
       id: stored.user.id,
       username: stored.user.username ?? stored.user.email,
@@ -157,6 +162,7 @@ export function mapStoredToSession(stored: StoredSessionApiModel): Session {
       appRole,
       permissions: stored.user.permissions ?? stored.permissions ?? [],
       branchId: stored.branchId ?? stored.user.branchId,
+      profileCompleted: stored.user.profileCompleted ?? stored.profileCompleted ?? true,
     }),
   });
 }

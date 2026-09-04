@@ -14,7 +14,30 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
         month: 'short',
         day: 'numeric',
       })
-    : '2026-12-31';
+    : '-';
+
+  if (!memberInfo.isActive || memberInfo.membershipType === 'No Active Plan') {
+    return (
+      <View style={[styles.card, styles.inactiveCard]}>
+        <View style={styles.topRow}>
+          <View style={styles.infoLeft}>
+            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>Membership Status</Text>
+            <Text style={[styles.membershipType, styles.inactiveTextDark]}>No Active Membership</Text>
+            <View style={styles.locationRow}>
+              <Feather name="info" size={12} color="#6B7280" />
+              <Text style={[styles.gymName, styles.inactiveTextLight]}>Action Required</Text>
+            </View>
+          </View>
+        </View>
+        <View style={[styles.divider, styles.inactiveDivider]} />
+        <View style={styles.bottomRow}>
+          <Text style={styles.inactivePrompt}>
+            Please join a gym and select a membership plan to unlock all features.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.card}>
@@ -131,5 +154,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     marginTop: 2,
+  },
+  inactiveCard: {
+    backgroundColor: BrandColors.screenBackground,
+    shadowColor: 'transparent',
+    borderWidth: 1,
+    borderColor: BrandColors.neutral[200],
+  },
+  inactiveTextDark: {
+    color: '#111827', // dark gray for main text
+  },
+  inactiveTextLight: {
+    color: '#6B7280', // lighter gray for labels
+  },
+  inactiveDivider: {
+    backgroundColor: BrandColors.neutral[200],
+  },
+  inactivePrompt: {
+    fontSize: TypographyScale.body,
+    color: '#4B5563', // gray-600
+    lineHeight: 20,
+    marginTop: Spacing.two,
   },
 });
