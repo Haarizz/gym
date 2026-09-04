@@ -19,4 +19,5 @@ export interface AuthRepository {
   getPendingRole(): Promise<Result<AppRoleValue | null, string>>;
   clearPendingRole(): Promise<Result<void, string>>;
   refreshSession(refreshToken: string): Promise<Result<Session, string>>;
+  registerMobileUser(payload: any): Promise<Result<Session, string>>;
 }

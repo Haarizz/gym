@@ -43,6 +43,7 @@ public class AuthService {
     private final com.company.project.repositories.BranchRepository branchRepository;
     private final GymRepository gymRepository;
     private final UserDirectoryRepository userDirectoryRepository;
+    private final com.company.project.repositories.UserProfileRepository userProfileRepository;
 
     @org.springframework.beans.factory.annotation.Value("${tenant.routing.enabled:false}")
     private boolean tenantRoutingEnabled;
@@ -59,7 +60,8 @@ public class AuthService {
             com.company.project.repositories.UserBranchRepository userBranchRepository,
             com.company.project.repositories.BranchRepository branchRepository,
             GymRepository gymRepository,
-            UserDirectoryRepository userDirectoryRepository
+            UserDirectoryRepository userDirectoryRepository,
+            com.company.project.repositories.UserProfileRepository userProfileRepository
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -73,6 +75,7 @@ public class AuthService {
         this.gymRepository = gymRepository;
         this.branchRepository = branchRepository;
         this.userDirectoryRepository = userDirectoryRepository;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @Transactional
@@ -184,6 +187,7 @@ public class AuthService {
                     .permissions(extractPermissions(userDetails))
                     .accessibleBranches(accessibleBranches)
                     .defaultBranchId(defaultBranchId)
+                    .profileCompleted(deriveProfileCompleted(userDetails.getId()))
                     .build();
         } finally {
             // Only ever set above when loginTenantSlug != null — always safe to clear
@@ -225,6 +229,7 @@ public class AuthService {
                 .permissions(extractPermissions(userDetails))
                 .accessibleBranches(accessibleBranches)
                 .defaultBranchId(defaultBranchId)
+                .profileCompleted(deriveProfileCompleted(userDetails.getId()))
                 .build();
     }
 
@@ -262,6 +267,12 @@ public class AuthService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private Boolean deriveProfileCompleted(Long userId) {
+        return userProfileRepository.findByUserId(userId)
+                .map(com.company.project.entities.UserProfile::isProfileCompleted)
+                .orElse(false);
     }
 
     private List<com.company.project.dto.BranchResponseDTO> fetchAccessibleBranches(UserDetailsImpl userDetails) {

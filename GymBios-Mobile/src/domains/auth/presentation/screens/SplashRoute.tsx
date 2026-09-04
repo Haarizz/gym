@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 
-import { getRoleHomeHref, ROLE_SELECTION_HREF } from '../navigation/routes';
+import { getRoleHomeHref, MEMBER_AUTH_HREF } from '../navigation/routes';
 import { SplashScreen } from './SplashScreen';
 import type { createUseRestoreSession } from '../hooks/useAuthFlow';
 
@@ -16,7 +16,7 @@ export function createSplashRoute(useRestoreSession: ReturnType<typeof createUse
         return;
       }
 
-      router.replace(ROLE_SELECTION_HREF);
+      router.replace(MEMBER_AUTH_HREF);
     }, [router, session]);
 
     return <SplashScreen onComplete={handleComplete} />;

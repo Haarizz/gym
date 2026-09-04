@@ -50,6 +50,23 @@ public class BranchContextFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
+        String path = request.getRequestURI();
+        if (path.startsWith("/api/auth/")
+                || path.startsWith("/api/mobile/auth/")
+                || path.startsWith("/api/mobile/profile/")
+                || path.startsWith("/api/mobile/")
+                || path.startsWith("/api/community")
+                || path.startsWith("/api/notifications")
+                || path.equals("/api/branches/my-branches")
+                || path.equals("/api/members/me")) {
+            // Mobile endpoints are scoped to the authenticated user via JWT (not branch).
+            // /api/branches/my-branches must also be reachable so members can discover gyms.
+            // /api/members/me is used to fetch the user's member profile on mount.
+            // Self-registered members with no gym assignment must not be blocked here.
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 

@@ -16,6 +16,7 @@ public class MemberRequestDTO {
     private String membershipType;
     private String membershipStatus;
     private String membershipPlan;
+    private Long membershipPlanId;
 
     // ISO date strings from frontend
     private String joinDate;
@@ -94,6 +95,9 @@ public class MemberRequestDTO {
 
     public String getMembershipPlan() { return membershipPlan; }
     public void setMembershipPlan(String membershipPlan) { this.membershipPlan = membershipPlan; }
+
+    public Long getMembershipPlanId() { return membershipPlanId; }
+    public void setMembershipPlanId(Long membershipPlanId) { this.membershipPlanId = membershipPlanId; }
 
     public String getJoinDate() { return joinDate; }
     public void setJoinDate(String joinDate) { this.joinDate = joinDate; }

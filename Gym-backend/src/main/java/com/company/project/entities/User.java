@@ -31,6 +31,9 @@ public class User extends BaseEntity {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private Set<UserRole> userRoles = new HashSet<>();
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private UserProfile userProfile;
+
     public User() {}
 
     public User(String username, String email, String passwordHash) {
@@ -57,4 +60,7 @@ public class User extends BaseEntity {
 
     public Set<UserRole> getUserRoles() { return userRoles; }
     public void setUserRoles(Set<UserRole> userRoles) { this.userRoles = userRoles; }
+
+    public UserProfile getUserProfile() { return userProfile; }
+    public void setUserProfile(UserProfile userProfile) { this.userProfile = userProfile; }
 }

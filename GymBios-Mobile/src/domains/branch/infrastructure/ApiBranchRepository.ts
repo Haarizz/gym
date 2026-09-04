@@ -4,8 +4,8 @@ import { IBranchRepository } from '../domain/repository';
 
 export class ApiBranchRepository implements IBranchRepository {
   async getMyBranches(): Promise<Branch[]> {
-    const { data } = await apiClient.get<Branch[]>('/branches/my-branches');
-    return data;
+    const response = await apiClient.get<Branch[]>('/branches/my-branches');
+    return response.data;
   }
 
   async getAllBranches(): Promise<Branch[]> {

@@ -7,6 +7,8 @@ export interface UserProps {
   readonly fullName: string;
   readonly appRole: AppRole;
   readonly permissions: readonly string[];
+  readonly branchId?: number;
+  readonly profileCompleted: boolean;
 }
 
 export class User {
@@ -16,6 +18,8 @@ export class User {
   readonly fullName: string;
   readonly appRole: AppRole;
   readonly permissions: readonly string[];
+  readonly branchId?: number;
+  readonly profileCompleted: boolean;
 
   private constructor(props: UserProps) {
     this.id = props.id;
@@ -24,6 +28,8 @@ export class User {
     this.fullName = props.fullName;
     this.appRole = props.appRole;
     this.permissions = props.permissions;
+    this.branchId = props.branchId;
+    this.profileCompleted = props.profileCompleted;
   }
 
   static create(props: UserProps): User {

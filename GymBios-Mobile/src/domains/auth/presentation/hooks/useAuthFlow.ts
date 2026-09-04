@@ -5,11 +5,12 @@ import { useCallback, useState } from 'react';
 import { analytics } from '@/core/platform/analytics';
 
 import type { AuthOrchestrator } from '../../application/orchestrators/AuthOrchestrator';
+import type { RegisterUserDto } from '../../application/useCases/RegisterUser';
 import type { RestoreSession } from '../../application/useCases/RestoreSession';
 import type { AppRole } from '../../domain/valueObjects/AppRole';
 import { useAuthStore } from '../../store/authStore';
 import type { LoginFormValues } from '../forms/LoginForm';
-import { getRoleHomeHref, ROLE_LOGIN_HREF, ROLE_SELECTION_HREF } from '../navigation/routes';
+import { getRoleHomeHref, MEMBER_AUTH_HREF, ROLE_LOGIN_HREF, ROLE_SELECTION_HREF } from '../navigation/routes';
 
 export function createUseSelectAppRole(authOrchestrator: AuthOrchestrator) {
   return function useSelectAppRole() {
@@ -75,6 +76,42 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
   };
 }
 
+export function createUseRegister(authOrchestrator: AuthOrchestrator) {
+  return function useRegister() {
+    const router = useRouter();
+    const setSession = useAuthStore((state) => state.setSession);
+    const [errorMessage, setErrorMessage] = useState<string>();
+
+    const mutation = useMutation({
+      mutationFn: (values: RegisterUserDto) =>
+        authOrchestrator.register(values),
+      onSuccess: (result) => {
+        if (!result.success) {
+          setErrorMessage(result.error);
+          analytics.track({ name: 'auth_register_failed' });
+          return;
+        }
+
+        setErrorMessage(undefined);
+        setSession(result.value);
+        analytics.track({
+          name: 'auth_register_success',
+          properties: { userId: result.value.user.id },
+        });
+        analytics.identify(result.value.user.id);
+        
+        // Let the AuthBootstrap routing redirect them to profile-completion
+      },
+    });
+
+    return {
+      register: mutation.mutate,
+      isLoading: mutation.isPending,
+      errorMessage,
+    };
+  };
+}
+
 export function createUseRestoreSession(
   restoreSession: RestoreSession,
   authOrchestrator: AuthOrchestrator,
@@ -114,7 +151,7 @@ export function createUseRestoreSession(
         queryClient.clear();
         reset();
         analytics.track({ name: 'auth_logout_success' });
-        router.replace(ROLE_SELECTION_HREF);
+        router.replace(MEMBER_AUTH_HREF);
       },
     });
 

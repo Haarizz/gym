@@ -54,8 +54,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // Public auth endpoints — no token required (register/login/username-check)
-                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/check-username").permitAll()
+                // Public auth endpoints — no token required (register/login/username-check/mobile-register)
+                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/check-username", "/api/mobile/auth/register", "/error").permitAll()
 
                 // Platform-owner-only endpoints. GYMBIOS_ADMIN is scoped to Gym Management
                 // only (see RoleService.getEffectivePermissionKeys) — it has no business on

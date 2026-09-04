@@ -15,7 +15,7 @@ interface AuthBootstrapProps {
 }
 
 export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProps) {
-  const { restore, isHydrated, isRestoring, isAuthenticated } = useRestoreSession();
+  const { restore, isHydrated, isRestoring, isAuthenticated, session } = useRestoreSession();
 
   const segments = useSegments();
   const router = useRouter();
@@ -34,11 +34,24 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
     if (!isHydrated || isRestoring) return;
 
     const inAuthGroup = segments[0] === '(auth)' || segments[0] === 'role-selection';
+    const isProfileCompletion = segments.join('/') === '(auth)/profile-completion';
+    // Check both session-level and user-level profileCompleted for consistency
+    const profileCompleted = session?.profileCompleted ?? session?.user.profileCompleted ?? false;
 
-    if (!isAuthenticated && !inAuthGroup && segments.length > 0) {
+    if (isAuthenticated) {
+      if (session?.appRole === 'member') {
+        if (!profileCompleted && !isProfileCompletion) {
+          // Profile incomplete → send to profile completion
+          router.replace('/(auth)/profile-completion');
+        } else if (profileCompleted && isProfileCompletion) {
+          // Profile just completed while still on profile-completion screen → go home
+          router.replace('/(member)');
+        }
+      }
+    } else if (!inAuthGroup && segments.length > 0) {
       router.replace(ROLE_SELECTION_HREF);
     }
-  }, [isHydrated, isRestoring, isAuthenticated, segments, router]);
+  }, [isHydrated, isRestoring, isAuthenticated, session, segments, router]);
 
   if (!isHydrated || isRestoring) {
     return <Loader message="Loading GymBios..." />;

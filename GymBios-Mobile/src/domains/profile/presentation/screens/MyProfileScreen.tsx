@@ -12,6 +12,7 @@ import { Typography } from '@/shared/components/Typography';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
+import { AddressAutocomplete } from '../components/AddressAutocomplete';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
@@ -205,13 +206,22 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
                 placeholder="Enter phone number"
               />
 
-              <Input
-                label="Address"
-                value={displayAddress}
-                onChangeText={setEditedAddress}
-                editable={isEditing}
-                placeholder="Enter address"
-              />
+              {isEditing ? (
+                <View style={{ zIndex: 10 }}>
+                  <AddressAutocomplete
+                    label="Address"
+                    value={editedAddress}
+                    onChange={setEditedAddress}
+                  />
+                </View>
+              ) : (
+                <Input
+                  label="Address"
+                  value={displayAddress}
+                  editable={false}
+                  placeholder="Enter address"
+                />
+              )}
 
               {profile?.staffId && (
                 <View style={styles.readOnlyRow}>

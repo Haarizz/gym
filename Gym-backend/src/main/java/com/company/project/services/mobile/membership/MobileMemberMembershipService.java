@@ -30,18 +30,37 @@ public class MobileMemberMembershipService {
         this.membershipPlanRepository = membershipPlanRepository;
     }
 
-    private Member getAuthenticatedMember(UserDetailsImpl principal) {
+    private java.util.Optional<Member> getAuthenticatedMember(UserDetailsImpl principal) {
         if (principal == null || principal.getId() == null) {
             throw new EntityNotFoundException("User not authenticated");
         }
-        return memberRepository.findByUserId(principal.getId())
-                .orElseThrow(() -> new EntityNotFoundException("No member profile linked to this user account"));
+        return memberRepository.findByUserId(principal.getId());
     }
 
     public MobileMemberMembershipResponseDTO getMembership(UserDetailsImpl principal) {
-        Member member = getAuthenticatedMember(principal);
-
+        java.util.Optional<Member> memberOpt = getAuthenticatedMember(principal);
         MobileMemberMembershipResponseDTO response = new MobileMemberMembershipResponseDTO();
+        
+        if (memberOpt.isEmpty()) {
+            MobileMemberMembershipResponseDTO.MembershipInfo inactiveInfo = new MobileMemberMembershipResponseDTO.MembershipInfo();
+            inactiveInfo.setStatus("No Active Plan");
+            inactiveInfo.setAutoRenew(false);
+            response.setMembership(inactiveInfo);
+            
+            MobileMemberMembershipResponseDTO.FreezeInfo noFreeze = new MobileMemberMembershipResponseDTO.FreezeInfo();
+            noFreeze.setAvailable(false);
+            noFreeze.setIsFrozen(false);
+            response.setFreeze(noFreeze);
+            
+            MobileMemberMembershipResponseDTO.RenewalOfferInfo noOffer = new MobileMemberMembershipResponseDTO.RenewalOfferInfo();
+            noOffer.setAvailable(false);
+            response.setRenewalOffer(noOffer);
+            
+            response.setBenefits(java.util.Collections.emptyList());
+            return response;
+        }
+
+        Member member = memberOpt.get();
         
         // 1. Membership Overview
         MobileMemberMembershipResponseDTO.MembershipInfo membershipInfo = new MobileMemberMembershipResponseDTO.MembershipInfo();

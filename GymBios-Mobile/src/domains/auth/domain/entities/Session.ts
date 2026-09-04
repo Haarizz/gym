@@ -8,6 +8,7 @@ export interface SessionProps {
   readonly appRole: AppRole;
   readonly permissions: readonly string[];
   readonly expiresAt: Date;
+  readonly profileCompleted: boolean;
 }
 
 export class Session {
@@ -17,6 +18,7 @@ export class Session {
   readonly appRole: AppRole;
   readonly permissions: readonly string[];
   readonly expiresAt: Date;
+  readonly profileCompleted: boolean;
 
   private constructor(props: SessionProps) {
     this.accessToken = props.accessToken;
@@ -25,6 +27,7 @@ export class Session {
     this.appRole = props.appRole;
     this.permissions = props.permissions;
     this.expiresAt = props.expiresAt;
+    this.profileCompleted = props.profileCompleted;
   }
 
   static create(props: SessionProps): Session {

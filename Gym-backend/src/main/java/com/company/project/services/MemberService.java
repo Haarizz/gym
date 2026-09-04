@@ -20,11 +20,13 @@ import com.company.project.entities.MembershipPlan;
 import com.company.project.entities.Role;
 import com.company.project.entities.User;
 import com.company.project.entities.UserRole;
+import com.company.project.entities.UserBranch;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.repositories.RoleRepository;
 import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
+import com.company.project.repositories.UserBranchRepository;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.context.annotation.Lazy;
@@ -64,6 +66,7 @@ public class MemberService {
     private final ReceiptVoucherService receiptVoucherService;
     private final FinancialEventService financialEventService;
     private final BranchService branchService;
+    private final UserBranchRepository userBranchRepository;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
@@ -76,7 +79,8 @@ public class MemberService {
                          AutomationExecutorService automationExecutorService,
                          ReceiptVoucherService receiptVoucherService,
                          FinancialEventService financialEventService,
-                         BranchService branchService) {
+                         BranchService branchService,
+                         UserBranchRepository userBranchRepository) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
         this.receiptService            = receiptService;
@@ -89,6 +93,7 @@ public class MemberService {
         this.receiptVoucherService     = receiptVoucherService;
         this.financialEventService     = financialEventService;
         this.branchService             = branchService;
+        this.userBranchRepository      = userBranchRepository;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -410,6 +415,10 @@ public class MemberService {
             Role memberRole = roleRepository.findByRoleName("MEMBER")
                     .orElseThrow(() -> new EntityNotFoundException("MEMBER role not found"));
             userRoleRepository.save(new UserRole(null, user, memberRole));
+            
+            if (saved.getBranchId() != null) {
+                userBranchRepository.save(new UserBranch(user.getId(), saved.getBranchId()));
+            }
 
             saved.setUserId(user.getId());
             saved.setAppUsername(request.getAppUsername());
@@ -459,6 +468,10 @@ public class MemberService {
                     .orElseThrow(() -> new EntityNotFoundException("MEMBER role not found"));
             userRoleRepository.save(new UserRole(null, user, memberRole));
 
+            if (member.getBranchId() != null) {
+                userBranchRepository.save(new UserBranch(user.getId(), member.getBranchId()));
+            }
+
             member.setUserId(user.getId());
             member.setAppUsername(appUsername);
             member.setAppAccessEnabled(true);
@@ -480,16 +493,6 @@ public class MemberService {
         userRepository.save(user);
         member.setAppAccessEnabled(enabled);
         return MemberResponseDTO.fromEntity(memberRepository.save(member));
-    }
-
-    /**
-     * Generates a unique placeholder email so the NOT NULL / UNIQUE constraint on
-     * Member.email is satisfied for a family member who wasn't given a real one.
-     */
-    private String syntheticFamilyEmail(String headMemberId, String name) {
-        return "family_" + headMemberId + "_"
-                + name.trim().toLowerCase().replaceAll("[^a-z0-9]", "_")
-                + "_" + System.currentTimeMillis() + "@family.local";
     }
 
     /**
@@ -538,7 +541,7 @@ public class MemberService {
         Member dep = new Member();
         dep.setName(fm.getName());
         dep.setEmail(fm.getEmail() != null && !fm.getEmail().isBlank()
-                ? fm.getEmail() : syntheticFamilyEmail(head.getMemberId(), fm.getName()));
+                ? fm.getEmail() : null);
         dep.setPhone(fm.getPhone());
         dep.setMembershipType(head.getMembershipType());
         dep.setMembershipStatus("active");
@@ -615,7 +618,7 @@ public class MemberService {
         Member dep = new Member();
         dep.setName(fm.getName());
         dep.setEmail(fm.getEmail() != null && !fm.getEmail().isBlank()
-                ? fm.getEmail() : syntheticFamilyEmail(head.getMemberId(), fm.getName()));
+                ? fm.getEmail() : null);
         dep.setPhone(fm.getPhone());
         dep.setMembershipType(head.getMembershipType());
         dep.setMembershipStatus(head.getMembershipStatus());
@@ -1155,11 +1158,17 @@ public class MemberService {
      */
     private void applyRequest(MemberRequestDTO r, Member m) {
         if (r.getName()                != null) m.setName(r.getName());
-        if (r.getEmail()               != null) m.setEmail(r.getEmail());
+        if (r.getEmail() != null) {
+            m.setEmail(r.getEmail().trim().isEmpty() ? null : r.getEmail().trim());
+        }
         if (r.getPhone()               != null) m.setPhone(r.getPhone());
         if (r.getMembershipType()      != null) m.setMembershipType(r.getMembershipType());
         if (r.getMembershipStatus()    != null) m.setMembershipStatus(r.getMembershipStatus());
-        if (r.getMembershipPlan()      != null) m.setMembershipPlan(r.getMembershipPlan());
+        if (r.getMembershipPlanId() != null) {
+            planRepository.findById(r.getMembershipPlanId()).ifPresent(p -> m.setMembershipPlan(p.getName()));
+        } else if (r.getMembershipPlan() != null) {
+            m.setMembershipPlan(r.getMembershipPlan());
+        }
         if (r.getJoinDate()            != null) m.setJoinDate(parseDateTime(r.getJoinDate()));
         if (r.getMembershipStartDate() != null) m.setMembershipStartDate(parseDateTime(r.getMembershipStartDate()));
         if (r.getMembershipEndDate()   != null) m.setMembershipEndDate(parseDateTime(r.getMembershipEndDate()));

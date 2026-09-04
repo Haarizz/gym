@@ -104,10 +104,9 @@ export class ApiMemberDirectoryRepository
   }
 
   async getCurrentMember(): Promise<Member> {
-    const response = await apiClient.get<MemberResponse>(
-      '/members/me',
-    );
-
+    const response = await apiClient.get<MemberResponse>('/members/me', {
+      skipGlobalErrorToast: true,
+    });
     return this.toDomain(response.data);
   }
 
@@ -209,7 +208,7 @@ export class ApiMemberDirectoryRepository
       branch_id: request.branchId,
       membership_type: request.membershipType,
       membership_plan_id: request.membershipPlanId,
-      status: request.status,
+      membership_status: request.status,
       start_date: request.startDate,
       ...('endDate' in request ? { end_date: request.endDate } : {}),
       payment_status: request.paymentStatus,

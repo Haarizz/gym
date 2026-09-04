@@ -26,8 +26,20 @@ export class AuthRepositoryImpl implements AuthRepository {
     return this.remoteDataSource.logout();
   }
 
-  refreshSession(refreshToken: string): Promise<Result<Session, string>> {
-    return this.remoteDataSource.refreshSession(refreshToken);
+  async refreshSession(refreshToken: string): Promise<Result<Session, string>> {
+    const result = await this.remoteDataSource.refreshSession(refreshToken);
+    if (result.success) {
+      await this.persistSession(result.value);
+    }
+    return result;
+  }
+
+  async registerMobileUser(payload: any): Promise<Result<Session, string>> {
+    const result = await this.remoteDataSource.registerMobileUser(payload);
+    if (result.success) {
+      await this.persistSession(result.value);
+    }
+    return result;
   }
 
   async getStoredSession(): Promise<Result<Session | null, string>> {

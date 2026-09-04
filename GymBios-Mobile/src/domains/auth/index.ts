@@ -2,6 +2,7 @@ import { AuthOrchestrator } from './application/orchestrators/AuthOrchestrator';
 import { LoginUser } from './application/useCases/LoginUser';
 import { LogoutUser } from './application/useCases/LogoutUser';
 import { RefreshSession } from './application/useCases/RefreshSession';
+import { RegisterUser } from './application/useCases/RegisterUser';
 import { RestoreSession } from './application/useCases/RestoreSession';
 import { SelectAppRole } from './application/useCases/SelectAppRole';
 import { AuthApi } from './infrastructure/api/AuthApi';
@@ -10,6 +11,7 @@ import { AuthRepositoryImpl } from './infrastructure/repository/AuthRepositoryIm
 import { createAuthBootstrap } from './presentation/components/AuthBootstrap';
 import {
   createUseLogin,
+  createUseRegister,
   createUseRestoreSession,
   createUseSelectAppRole,
 } from './presentation/hooks/useAuthFlow';
@@ -34,6 +36,7 @@ import {
 } from './presentation/screens/RoleShellScreens';
 import { createSplashRoute } from './presentation/screens/SplashRoute';
 import { createRoleSelectionRoute } from './presentation/screens/RoleSelectionRoute';
+import { createMemberAuthScreen } from './presentation/screens/MemberAuthScreen';
 
 const authApi = new AuthApi();
 const authRemoteDataSource = new AuthRemoteDataSource(authApi);
@@ -44,11 +47,13 @@ const loginUser = new LoginUser(authRepository);
 const logoutUser = new LogoutUser(authRepository);
 const restoreSession = new RestoreSession(authRepository);
 const refreshSession = new RefreshSession(authRepository);
+const registerUser = new RegisterUser(authRepository);
 
-export const authOrchestrator = new AuthOrchestrator(selectAppRole, loginUser, logoutUser);
+export const authOrchestrator = new AuthOrchestrator(selectAppRole, loginUser, logoutUser, registerUser);
 
 export const useSelectAppRole = createUseSelectAppRole(authOrchestrator);
 export const useLogin = createUseLogin(authOrchestrator);
+export const useRegister = createUseRegister(authOrchestrator);
 export const useRestoreSession = createUseRestoreSession(restoreSession, authOrchestrator);
 
 export const AuthBootstrap = createAuthBootstrap(useRestoreSession);
@@ -56,6 +61,7 @@ export const RoleLoginScreen = createRoleLoginScreen(useLogin);
 
 export const SplashRoute = createSplashRoute(useRestoreSession);
 export const RoleSelectionRoute = createRoleSelectionRoute(useSelectAppRole);
+export const MemberAuthScreen = createMemberAuthScreen(useLogin, useRegister);
 
 export { SplashScreen } from './presentation/screens/SplashScreen';
 export { RoleSelectionScreen } from './presentation/screens/RoleSelectionScreen';
@@ -98,3 +104,4 @@ export type { Session } from './domain/entities/Session';
 export type { AppRole } from './domain/valueObjects/AppRole';
 export { ROLE_HOME_ROUTES, APP_ROLES, isAppRole } from './domain/valueObjects/AppRole';
 export { refreshSession };
+export { authRepository };
