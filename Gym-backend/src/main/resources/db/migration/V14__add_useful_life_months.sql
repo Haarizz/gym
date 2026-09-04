@@ -1,5 +1,5 @@
 ALTER TABLE assets
-ADD COLUMN useful_life_months INTEGER;
+ADD COLUMN IF NOT EXISTS useful_life_months INTEGER;
 
 UPDATE assets
 SET useful_life_months = 0

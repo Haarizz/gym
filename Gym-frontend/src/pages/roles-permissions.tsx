@@ -110,7 +110,7 @@ export function RolesPermissions() {
       .catch((err) => toast.error(err.message || "Failed to load permission catalog"));
   }, [canView]);
 
-  const isAdmin = (role: Role | null) => role?.role_name?.toUpperCase() === "ADMIN";
+  const isAdmin = (role: Role | null) => role?.role_name?.toUpperCase() === "GYMBIOS_ADMIN";
 
   const openCreateDialog = () => {
     setEditingRole(null);
@@ -384,7 +384,7 @@ export function RolesPermissions() {
 
             {editingIsAdmin && (
               <p className="text-sm text-muted-foreground bg-muted rounded-md p-3">
-                ADMIN always has every permission and cannot be reduced. The matrix below is shown for reference only.
+                GYMBIOS_ADMIN is fixed to Gym Management only and cannot be edited here. The matrix below is shown for reference only.
               </p>
             )}
 

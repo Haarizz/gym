@@ -2,6 +2,8 @@ package com.company.project.config;
 
 import com.company.project.dto.ProductRequestDTO;
 import com.company.project.entities.AccountHead;
+import com.company.project.entities.Branch;
+import com.company.project.entities.Gym;
 import com.company.project.entities.Permission;
 import com.company.project.entities.ProductCategory;
 import com.company.project.entities.Role;
@@ -13,6 +15,8 @@ import com.company.project.repositories.AccountHeadRepository;
 import com.company.project.repositories.PermissionRepository;
 import com.company.project.repositories.ProductCategoryRepository;
 import com.company.project.repositories.ProductRepository;
+import com.company.project.repositories.BranchRepository;
+import com.company.project.repositories.GymRepository;
 import com.company.project.repositories.RolePermissionRepository;
 import com.company.project.repositories.RoleRepository;
 import com.company.project.repositories.UserRepository;
@@ -25,6 +29,7 @@ import com.company.project.services.SupplierBillService;
 import com.company.project.services.SupplierService;
 import com.company.project.services.WarehouseService;
 import com.company.project.services.ProductCategoryService;
+import com.company.project.security.BranchContextHolder;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -56,6 +61,8 @@ public class DataInitializer implements CommandLineRunner {
     private final FiscalYearService fiscalYearService;
     private final PermissionRepository permissionRepository;
     private final RolePermissionRepository rolePermissionRepository;
+    private final BranchRepository branchRepository;
+    private final GymRepository gymRepository;
 
     public DataInitializer(
             RoleRepository roleRepository,
@@ -74,7 +81,9 @@ public class DataInitializer implements CommandLineRunner {
             AddonPlanService addonPlanService,
             FiscalYearService fiscalYearService,
             PermissionRepository permissionRepository,
-            RolePermissionRepository rolePermissionRepository
+            RolePermissionRepository rolePermissionRepository,
+            BranchRepository branchRepository,
+            GymRepository gymRepository
     ) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
@@ -93,14 +102,19 @@ public class DataInitializer implements CommandLineRunner {
         this.fiscalYearService = fiscalYearService;
         this.permissionRepository = permissionRepository;
         this.rolePermissionRepository = rolePermissionRepository;
+        this.branchRepository = branchRepository;
+        this.gymRepository = gymRepository;
     }
 
     @Override
     @Transactional
     public void run(String... args) throws Exception {
         // Seed Roles
+        // GYMBIOS_ADMIN is the platform owner (us) — bypasses all permission checks,
+        // see RoleService.ADMIN_ROLE_NAME. ADMIN is a distinct, ordinary (non-system)
+        // role reserved for gym owners: scoped to their own gym only, no bypass powers.
         List<String> rolesToSeed = List.of(
-                "ADMIN", "MANAGER", "USER", "ACCOUNTANT", "HR", "MEMBER", "STAFF",
+                "GYMBIOS_ADMIN", "ADMIN", "MANAGER", "USER", "ACCOUNTANT", "HR", "MEMBER", "STAFF",
                 "RECEPTIONIST", "TRAINER");
         for (String roleName : rolesToSeed) {
             if (roleRepository.findByRoleName(roleName).isEmpty()) {
@@ -110,62 +124,108 @@ public class DataInitializer implements CommandLineRunner {
             }
         }
 
-        // Administration module: seed the module x action permission catalog and each
-        // role's default permission set (see PermissionCatalog / RoleService).
-        seedPermissionsAndRolePermissions();
-
-        // Seed Admin User
-        if (!userRepository.existsByEmail("admin@gymbios.com")) {
-            User admin = new User();
-            admin.setUsername("admin");
-            admin.setEmail("admin@gymbios.com");
-            admin.setPasswordHash(passwordEncoder.encode("admin123"));
-            admin.setEnabled(true);
-            admin.setUserRoles(new HashSet<>());
-            admin = userRepository.save(admin);
-
-            Role adminRole = roleRepository.findByRoleName("ADMIN")
-                    .orElseThrow(() -> new RuntimeException("Admin role not found"));
-            
-            UserRole userRole = new UserRole(null, admin, adminRole);
-            userRoleRepository.save(userRole);
+        // Seed a default Gym + Branch on a genuinely fresh database. This data used to
+        // come from Flyway migrations V18/V24 ("Main Branch"/"Main Gym", ON CONFLICT DO
+        // NOTHING) — but local dev deliberately runs with spring.flyway.enabled=false
+        // (see application-local.properties: Hibernate's ddl-auto=update owns schema
+        // creation locally, since the legacy migration chain assumes tables Hibernate
+        // itself originally created). That means those INSERT-only migrations never run
+        // locally at all, so a teammate's first-ever boot against a brand-new empty
+        // database got no branch/gym row — confirmed live: this crashed startup entirely
+        // the moment DataInitializer.seedSampleProducts tried to create a product with
+        // no branch context to resolve. Idempotent (skips if a default branch already
+        // exists), so this is a no-op on GYMBIOS's own already-seeded database.
+        Branch defaultBranch = branchRepository.findByIsDefaultTrue().orElse(null);
+        if (defaultBranch == null) {
+            defaultBranch = new Branch("Main Branch", "MAIN");
+            defaultBranch.setStatus("ACTIVE");
+            defaultBranch.setDefault(true);
+            defaultBranch = branchRepository.save(defaultBranch);
+        }
+        if (gymRepository.findByIsDefaultTrue().isEmpty() && !gymRepository.existsBySlug("main-gym")) {
+            Gym defaultGym = new Gym("Main Gym", "main-gym");
+            defaultGym.setStatus("ACTIVE");
+            defaultGym.setDefault(true);
+            gymRepository.save(defaultGym);
         }
 
-        // Seed default Warehouses
-        warehouseService.initDefaultWarehouses();
+        // Every seed step below creates BranchAware rows (categories, warehouses,
+        // account heads, products, ...) — BranchSecurityListener's @PrePersist hook
+        // auto-stamps branch_id from BranchContextHolder when it's set, which is how
+        // every other branch-scoped row in this app gets its branch_id. Set once, for
+        // the rest of this boot-time seeding, so everything lands on the real default
+        // branch consistently — rather than at NULL, which is invisible to Hibernate's
+        // branchFilter (a bare SQL "branch_id = :branchId" excludes NULL rows) the
+        // moment anything later in this same transaction enables that filter. Confirmed
+        // live: setting the context only inside seedSampleProducts (this fix's first
+        // draft) left the categories seeded earlier by initDefaultCategories() at
+        // branch_id=NULL, so resolveCategoryId's own lookup couldn't see them once the
+        // filter turned on, and tried to insert duplicates of every one.
+        BranchContextHolder.setActiveBranchId(defaultBranch.getId());
+        try {
+            // Administration module: seed the module x action permission catalog and each
+            // role's default permission set (see PermissionCatalog / RoleService).
+            seedPermissionsAndRolePermissions();
 
-        // Seed default Product Categories
-        productCategoryService.initDefaultCategories();
+            // Seed Gymbios (platform-owner) Admin User — the account every fresh clone/
+            // fresh database boots with, so a teammate can log in as super admin and
+            // create gyms immediately. Username/email deliberately match the account
+            // actually used in local dev (admin / admin@gymbios.com), not the older
+            // gymbios_admin@gymbios.com placeholder this used to seed.
+            if (!userRepository.existsByEmail("admin@gymbios.com")) {
+                User admin = new User();
+                admin.setUsername("admin");
+                admin.setEmail("admin@gymbios.com");
+                admin.setPasswordHash(passwordEncoder.encode("admin123"));
+                admin.setEnabled(true);
+                admin.setUserRoles(new HashSet<>());
+                admin = userRepository.save(admin);
 
-        // Seed default Suppliers
-        supplierService.initDefaultSuppliers();
+                Role adminRole = roleRepository.findByRoleName("GYMBIOS_ADMIN")
+                        .orElseThrow(() -> new RuntimeException("Gymbios admin role not found"));
 
-        // Seed the full Chart of Accounts (see FinancialEventService's account-code
-        // table) — previously only the codes some transaction had already touched
-        // existed (auto-bootstrapped lazily in FinancialEventService.updateAccountBalance),
-        // so e.g. Accounts Receivable/Fixed Assets/Salary Expense were invisible in
-        // the Chart of Accounts screen until their first posting.
-        seedDefaultAccountHeads();
+                UserRole userRole = new UserRole(null, admin, adminRole);
+                userRoleRepository.save(userRole);
+            }
 
-        // Seed the current calendar year as an OPEN FiscalYear with 12 OPEN monthly
-        // FiscalPeriods, so period-lock enforcement (FiscalPeriodService.assertPeriodOpen)
-        // has something to check against out of the box. Idempotent — skips if the
-        // year already exists.
-        fiscalYearService.ensureCalendarYearSeeded(LocalDate.now().getYear());
+            // Seed default Warehouses
+            warehouseService.initDefaultWarehouses();
 
-        // Seed the Add-on Plan catalog ("Purchase An Add-On" screen) — previously
-        // a hardcoded array in member-addons.tsx, now an editable Chart-of-Accounts-
-        // style catalog the admin can create/edit/delete from the UI.
-        addonPlanService.initDefaultAddonPlans();
+            // Seed default Product Categories
+            productCategoryService.initDefaultCategories();
 
-        // Salary Payments & Advances are now user-generated only (no seed data).
+            // Seed default Suppliers
+            supplierService.initDefaultSuppliers();
 
-        // Seed sample POS-ready products (idempotent: skips any name already present)
-        seedSampleProducts();
+            // Seed the full Chart of Accounts (see FinancialEventService's account-code
+            // table) — previously only the codes some transaction had already touched
+            // existed (auto-bootstrapped lazily in FinancialEventService.updateAccountBalance),
+            // so e.g. Accounts Receivable/Fixed Assets/Salary Expense were invisible in
+            // the Chart of Accounts screen until their first posting.
+            seedDefaultAccountHeads();
 
-        // Self-heal: apply stock-in for any CONFIRMED supplier bill that predates the purchase
-        // form's warehouse field (idempotent — only touches bills still missing a warehouseId).
-        supplierBillService.backfillMissingWarehouseStock();
+            // Seed the current calendar year as an OPEN FiscalYear with 12 OPEN monthly
+            // FiscalPeriods, so period-lock enforcement (FiscalPeriodService.assertPeriodOpen)
+            // has something to check against out of the box. Idempotent — skips if the
+            // year already exists.
+            fiscalYearService.ensureCalendarYearSeeded(LocalDate.now().getYear());
+
+            // Seed the Add-on Plan catalog ("Purchase An Add-On" screen) — previously
+            // a hardcoded array in member-addons.tsx, now an editable Chart-of-Accounts-
+            // style catalog the admin can create/edit/delete from the UI.
+            addonPlanService.initDefaultAddonPlans();
+
+            // Salary Payments & Advances are now user-generated only (no seed data).
+
+            // Seed sample POS-ready products (idempotent: skips any name already present)
+            seedSampleProducts();
+
+            // Self-heal: apply stock-in for any CONFIRMED supplier bill that predates the purchase
+            // form's warehouse field (idempotent — only touches bills still missing a warehouseId).
+            supplierBillService.backfillMissingWarehouseStock();
+        } finally {
+            BranchContextHolder.clear();
+        }
     }
 
     // ── Administration: permission catalog + default role permissions ─────────────
@@ -174,9 +234,11 @@ public class DataInitializer implements CommandLineRunner {
      * Idempotent: only inserts catalog rows that don't exist yet, and only seeds a
      * role's default permission set the first time (a role with any existing
      * role_permissions rows is left alone, so an admin's edits via the Roles &
-     * Permissions UI are never overwritten on the next app restart). ADMIN is
+     * Permissions UI are never overwritten on the next app restart). GYMBIOS_ADMIN is
      * deliberately not seeded here — it always evaluates to "all permissions" via
-     * RoleService.getEffectivePermissionKeys(), regardless of stored rows.
+     * RoleService.getEffectivePermissionKeys(), regardless of stored rows. ADMIN (the
+     * gym-owner role) is also left unseeded here — its permission set is configured
+     * explicitly per gym when a gym owner's login is provisioned, not defaulted globally.
      */
     private void seedPermissionsAndRolePermissions() {
         for (Map.Entry<String, List<String>> entry : PermissionCatalog.MODULES.entrySet()) {
@@ -191,8 +253,10 @@ public class DataInitializer implements CommandLineRunner {
 
         // These roles are wired into existing app logic (SecurityConfig role-based rules,
         // the staff-login flow's default role) — protect them from deletion regardless of
-        // whether their permission set has been customized.
-        for (String name : List.of("ADMIN", "MANAGER", "USER", "ACCOUNTANT", "HR", "MEMBER", "STAFF")) {
+        // whether their permission set has been customized. ADMIN (gym owners) is
+        // deliberately excluded — it must stay editable/deletable per gym, unlike the
+        // platform-owner GYMBIOS_ADMIN role.
+        for (String name : DefaultRolePermissions.SYSTEM_ROLE_NAMES) {
             roleRepository.findByRoleName(name).ifPresent(role -> {
                 if (!role.isSystem()) {
                     role.setSystem(true);
@@ -201,115 +265,9 @@ public class DataInitializer implements CommandLineRunner {
             });
         }
 
-        seedDefaultRolePermissions("MANAGER", List.of(
-                "DASHBOARD_VIEW",
-                "MEMBERS_VIEW", "MEMBERS_CREATE", "MEMBERS_EDIT", "MEMBERS_EXPORT",
-                "MEMBER_CONNECT_VIEW", "MEMBER_CONNECT_CREATE", "MEMBER_CONNECT_EDIT", "MEMBER_CONNECT_EXPORT",
-                "PROMOTIONS_CAMPAIGN_VIEW", "PROMOTIONS_CAMPAIGN_CREATE", "PROMOTIONS_CAMPAIGN_EDIT", "PROMOTIONS_CAMPAIGN_EXPORT",
-                "REFERRALS_VIEW", "REFERRALS_CREATE", "REFERRALS_EDIT", "REFERRALS_EXPORT",
-                "LEADS_VIEW", "LEADS_CREATE", "LEADS_EDIT", "LEADS_EXPORT",
-                "FOLLOW_UPS_VIEW", "FOLLOW_UPS_CREATE", "FOLLOW_UPS_EDIT", "FOLLOW_UPS_EXPORT",
-                "MESSAGING_VIEW", "MESSAGING_CREATE", "MESSAGING_EDIT", "MESSAGING_EXPORT",
-                "AUTOMATIONS_VIEW", "AUTOMATIONS_CREATE", "AUTOMATIONS_EDIT", "AUTOMATIONS_EXPORT",
-                "POST_WORKOUT_CHECKIN_VIEW", "POST_WORKOUT_CHECKIN_CREATE", "POST_WORKOUT_CHECKIN_EDIT", "POST_WORKOUT_CHECKIN_EXPORT",
-                "MEMBER_CONNECT_REPORTS_VIEW", "MEMBER_CONNECT_REPORTS_EXPORT",
-                "MEMBER_CONNECT_ANALYTICS_VIEW", "MEMBER_CONNECT_ANALYTICS_EXPORT",
-                "COMMUNITY_VIEW", "COMMUNITY_CREATE", "COMMUNITY_EDIT", "COMMUNITY_EXPORT",
-                "ATTENDANCE_VIEW", "ATTENDANCE_CREATE", "ATTENDANCE_EDIT", "ATTENDANCE_EXPORT",
-                "CHECK_IN_VIEW", "CHECK_IN_CREATE", "CHECK_IN_EDIT", "CHECK_IN_EXPORT",
-                "TRAINING_STREAMS_VIEW", "TRAINING_STREAMS_CREATE", "TRAINING_STREAMS_EDIT", "TRAINING_STREAMS_EXPORT",
-                "COMMUNITY_REPORTS_VIEW", "COMMUNITY_REPORTS_EXPORT",
-                "COMMUNITY_ANALYTICS_VIEW", "COMMUNITY_ANALYTICS_EXPORT",
-                "BILLING_VIEW", "BILLING_CREATE", "BILLING_EDIT", "BILLING_EXPORT",
-                "PAYMENTS_VIEW", "PAYMENTS_CREATE", "PAYMENTS_EDIT", "PAYMENTS_EXPORT", "PAYMENTS_APPROVE",
-                "MEMBERSHIP_PLANS_VIEW", "MEMBERSHIP_PLANS_CREATE", "MEMBERSHIP_PLANS_EDIT", "MEMBERSHIP_PLANS_EXPORT",
-                "TRAINERS_VIEW", "TRAINERS_CREATE", "TRAINERS_EDIT", "TRAINERS_EXPORT",
-                "STAFF_VIEW", "STAFF_CREATE", "STAFF_EDIT", "STAFF_DELETE", "STAFF_EXPORT",
-                "TRAININGS_CLASSES_VIEW", "TRAININGS_CLASSES_CREATE", "TRAININGS_CLASSES_EDIT", "TRAININGS_CLASSES_EXPORT",
-                "BOOKINGS_VIEW", "BOOKINGS_CREATE", "BOOKINGS_EDIT", "BOOKINGS_EXPORT",
-                "SALARY_PAYMENTS_VIEW", "SALARY_PAYMENTS_CREATE", "SALARY_PAYMENTS_EDIT", "SALARY_PAYMENTS_EXPORT", "SALARY_PAYMENTS_APPROVE",
-                "SALARY_ADVANCES_VIEW", "SALARY_ADVANCES_CREATE", "SALARY_ADVANCES_EDIT", "SALARY_ADVANCES_EXPORT", "SALARY_ADVANCES_APPROVE",
-                "PAYROLL_REPORTS_VIEW", "PAYROLL_REPORTS_EXPORT",
-                "PAYROLL_ANALYTICS_VIEW", "PAYROLL_ANALYTICS_EXPORT",
-                "PAYROLL_VIEW", "PAYROLL_CREATE", "PAYROLL_EDIT", "PAYROLL_EXPORT", "PAYROLL_APPROVE",
-                "REPORTS_VIEW", "REPORTS_EXPORT",
-                "ASSETS_VIEW", "ASSETS_CREATE", "ASSETS_EDIT", "ASSETS_EXPORT",
-                "SALES_PURCHASES_VIEW", "SALES_PURCHASES_CREATE", "SALES_PURCHASES_EDIT", "SALES_PURCHASES_EXPORT",
-                "POINT_OF_SALE_VIEW", "POINT_OF_SALE_CREATE", "POINT_OF_SALE_EDIT", "POINT_OF_SALE_EXPORT",
-                "PRODUCTS_VIEW", "PRODUCTS_CREATE", "PRODUCTS_EDIT", "PRODUCTS_EXPORT",
-                "CATEGORY_VIEW", "CATEGORY_CREATE", "CATEGORY_EDIT", "CATEGORY_EXPORT",
-                "PURCHASE_ORDER_VIEW", "PURCHASE_ORDER_CREATE", "PURCHASE_ORDER_EDIT", "PURCHASE_ORDER_EXPORT",
-                "PURCHASE_VIEW", "PURCHASE_CREATE", "PURCHASE_EDIT", "PURCHASE_EXPORT",
-                "WASTAGE_RETURNS_VIEW", "WASTAGE_RETURNS_CREATE", "WASTAGE_RETURNS_EDIT", "WASTAGE_RETURNS_EXPORT",
-                "PRODUCTION_RECIPE_VIEW", "PRODUCTION_RECIPE_CREATE", "PRODUCTION_RECIPE_EDIT", "PRODUCTION_RECIPE_EXPORT",
-                "SALES_REPORTS_VIEW", "SALES_REPORTS_EXPORT",
-                "SALES_ANALYTICS_VIEW", "SALES_ANALYTICS_EXPORT",
-                "FINANCIALS_VIEW", "FINANCIALS_CREATE", "FINANCIALS_EDIT", "FINANCIALS_EXPORT", "FINANCIALS_APPROVE",
-                "LEDGERS_VIEW", "LEDGERS_CREATE", "LEDGERS_EDIT", "LEDGERS_EXPORT",
-                "RECEIPT_VOUCHER_VIEW", "RECEIPT_VOUCHER_CREATE", "RECEIPT_VOUCHER_EDIT", "RECEIPT_VOUCHER_EXPORT",
-                "JOURNAL_VOUCHER_VIEW", "JOURNAL_VOUCHER_CREATE", "JOURNAL_VOUCHER_EDIT", "JOURNAL_VOUCHER_EXPORT",
-                "PAYMENT_VOUCHER_VIEW", "PAYMENT_VOUCHER_CREATE", "PAYMENT_VOUCHER_EDIT", "PAYMENT_VOUCHER_EXPORT", "PAYMENT_VOUCHER_APPROVE",
-                "BANK_RECONCILIATIONS_VIEW", "BANK_RECONCILIATIONS_CREATE", "BANK_RECONCILIATIONS_EDIT", "BANK_RECONCILIATIONS_EXPORT",
-                "EXPENSES_VIEW", "EXPENSES_CREATE", "EXPENSES_EDIT", "EXPENSES_EXPORT",
-                "TAX_COMPLIANCE_VIEW", "TAX_COMPLIANCE_CREATE", "TAX_COMPLIANCE_EDIT", "TAX_COMPLIANCE_EXPORT",
-                "FISCAL_PERIODS_VIEW", "FISCAL_PERIODS_CREATE", "FISCAL_PERIODS_EDIT", "FISCAL_PERIODS_EXPORT",
-                "FINANCIAL_REPORTS_VIEW", "FINANCIAL_REPORTS_EXPORT",
-                "FINANCIAL_ANALYTICS_VIEW", "FINANCIAL_ANALYTICS_EXPORT",
-                "GYMOS_VIEW", "BIOS_VIEW",
-                "SETTINGS_VIEW", "SETTINGS_EDIT",
-                "ADMINISTRATION_VIEW"
-        ));
-
-        seedDefaultRolePermissions("ACCOUNTANT", List.of(
-                "DASHBOARD_VIEW",
-                "BILLING_VIEW", "BILLING_CREATE", "BILLING_EDIT", "BILLING_EXPORT",
-                "PAYMENTS_VIEW", "PAYMENTS_CREATE", "PAYMENTS_EDIT", "PAYMENTS_EXPORT",
-                "FINANCIALS_VIEW", "FINANCIALS_CREATE", "FINANCIALS_EDIT", "FINANCIALS_EXPORT", "FINANCIALS_APPROVE",
-                "LEDGERS_VIEW", "LEDGERS_CREATE", "LEDGERS_EDIT", "LEDGERS_EXPORT",
-                "RECEIPT_VOUCHER_VIEW", "RECEIPT_VOUCHER_CREATE", "RECEIPT_VOUCHER_EDIT", "RECEIPT_VOUCHER_EXPORT",
-                "JOURNAL_VOUCHER_VIEW", "JOURNAL_VOUCHER_CREATE", "JOURNAL_VOUCHER_EDIT", "JOURNAL_VOUCHER_EXPORT",
-                "PAYMENT_VOUCHER_VIEW", "PAYMENT_VOUCHER_CREATE", "PAYMENT_VOUCHER_EDIT", "PAYMENT_VOUCHER_EXPORT", "PAYMENT_VOUCHER_APPROVE",
-                "BANK_RECONCILIATIONS_VIEW", "BANK_RECONCILIATIONS_CREATE", "BANK_RECONCILIATIONS_EDIT", "BANK_RECONCILIATIONS_EXPORT",
-                "EXPENSES_VIEW", "EXPENSES_CREATE", "EXPENSES_EDIT", "EXPENSES_EXPORT",
-                "TAX_COMPLIANCE_VIEW", "TAX_COMPLIANCE_CREATE", "TAX_COMPLIANCE_EDIT", "TAX_COMPLIANCE_EXPORT",
-                "FISCAL_PERIODS_VIEW", "FISCAL_PERIODS_CREATE", "FISCAL_PERIODS_EDIT", "FISCAL_PERIODS_EXPORT",
-                "FINANCIAL_REPORTS_VIEW", "FINANCIAL_REPORTS_EXPORT",
-                "FINANCIAL_ANALYTICS_VIEW", "FINANCIAL_ANALYTICS_EXPORT",
-                "SALES_PURCHASES_VIEW",
-                "SALES_REPORTS_VIEW", "SALES_REPORTS_EXPORT",
-                "REPORTS_VIEW", "REPORTS_EXPORT"
-        ));
-
-        seedDefaultRolePermissions("HR", List.of(
-                "DASHBOARD_VIEW",
-                "STAFF_VIEW", "STAFF_CREATE", "STAFF_EDIT", "STAFF_DELETE", "STAFF_EXPORT",
-                "TRAININGS_CLASSES_VIEW", "TRAININGS_CLASSES_CREATE", "TRAININGS_CLASSES_EDIT", "TRAININGS_CLASSES_EXPORT",
-                "PAYROLL_VIEW", "PAYROLL_CREATE", "PAYROLL_EDIT", "PAYROLL_EXPORT",
-                "SALARY_PAYMENTS_VIEW", "SALARY_PAYMENTS_CREATE", "SALARY_PAYMENTS_EDIT", "SALARY_PAYMENTS_EXPORT",
-                "SALARY_ADVANCES_VIEW", "SALARY_ADVANCES_CREATE", "SALARY_ADVANCES_EDIT", "SALARY_ADVANCES_EXPORT",
-                "PAYROLL_REPORTS_VIEW", "PAYROLL_REPORTS_EXPORT",
-                "PAYROLL_ANALYTICS_VIEW", "PAYROLL_ANALYTICS_EXPORT",
-                "REPORTS_VIEW"
-        ));
-
-        // Matches the spec's worked example exactly.
-        seedDefaultRolePermissions("RECEPTIONIST", List.of(
-                "DASHBOARD_VIEW",
-                "MEMBERS_VIEW", "MEMBERS_CREATE", "MEMBERS_EDIT",
-                "PAYMENTS_VIEW", "PAYMENTS_CREATE",
-                "REPORTS_VIEW"
-        ));
-
-        seedDefaultRolePermissions("TRAINER", List.of(
-                "DASHBOARD_VIEW",
-                "MEMBERS_VIEW",
-                "ATTENDANCE_VIEW", "ATTENDANCE_CREATE",
-                "CHECK_IN_VIEW", "CHECK_IN_CREATE"
-        ));
-
-        seedDefaultRolePermissions("USER", List.of("DASHBOARD_VIEW"));
-        seedDefaultRolePermissions("MEMBER", List.of("DASHBOARD_VIEW"));
-        seedDefaultRolePermissions("STAFF", List.of("DASHBOARD_VIEW"));
+        // Base grant sets — see DefaultRolePermissions for the actual data (shared with
+        // TenantProvisioningService's per-tenant seeding, Phase 3).
+        DefaultRolePermissions.GRANTS.forEach(this::seedDefaultRolePermissions);
 
         // Backfill new sub-module permissions for existing installs
         for (String key : List.of(
@@ -512,6 +470,10 @@ public class DataInitializer implements CommandLineRunner {
 
         Long defaultWarehouseId = resolveDefaultWarehouseId();
 
+        // ProductService.createProduct resolves its branch via
+        // BranchService.resolveBranchForCreate(null), which reads
+        // BranchContextHolder — already set by run() for the whole seeding pass (see
+        // its own comment for why this can't be scoped to just this one method).
         for (SampleProduct sample : samples) {
             if (existingNames.contains(sample.name().toLowerCase())) continue;
 

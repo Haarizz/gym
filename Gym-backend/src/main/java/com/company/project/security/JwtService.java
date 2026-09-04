@@ -23,8 +23,14 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private int jwtExpirationMs;
 
+    public static final String TENANT_CLAIM = "tenant";
+
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    public String extractTenant(String token) {
+        return extractClaim(token, claims -> claims.get(TENANT_CLAIM, String.class));
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {

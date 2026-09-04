@@ -1,9 +1,9 @@
 -- Add the new column
 ALTER TABLE account_heads
-ADD COLUMN currency_code VARCHAR(3);
+ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3);
 
 ALTER TABLE journal_vouchers
-ADD COLUMN currency_code VARCHAR(3);
+ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3);
 
 -- Populate existing records
 UPDATE account_heads

@@ -427,7 +427,7 @@ public class MemberService {
         }
 
         notificationService.notifyRoles(
-                List.of("ADMIN", "MANAGER"),
+                List.of("GYMBIOS_ADMIN", "MANAGER"),
                 "New Member Joined",
                 saved.getName() + " has joined as a new member.",
                 "SUCCESS", "MEDIUM", "MEMBERS",
@@ -1027,7 +1027,7 @@ public class MemberService {
         cascadeFreezeStateToBilledToHeadDependents(saved, "frozen", freezeStart, freezeUntil, request.getReason(), 0);
 
         notificationService.notifyRoles(
-                List.of("ADMIN", "MANAGER"),
+                List.of("GYMBIOS_ADMIN", "MANAGER"),
                 "Membership Frozen",
                 saved.getName() + "'s membership has been frozen.",
                 "WARNING", "MEDIUM", "MEMBERS",
@@ -1088,7 +1088,7 @@ public class MemberService {
         cascadeFreezeStateToBilledToHeadDependents(saved, "active", null, null, null, daysFrozen);
 
         notificationService.notifyRoles(
-                List.of("ADMIN", "MANAGER"),
+                List.of("GYMBIOS_ADMIN", "MANAGER"),
                 "Membership Unfrozen",
                 saved.getName() + "'s membership has been reactivated.",
                 "SUCCESS", "LOW", "MEMBERS",

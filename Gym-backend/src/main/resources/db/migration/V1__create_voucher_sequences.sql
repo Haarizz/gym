@@ -11,7 +11,7 @@
 -- One row per (voucher type + year) prefix, e.g. "JV-2026-", "PV-2026-", "RV-2026-".
 -- A new year automatically gets a fresh row starting from 1, matching the existing
 -- JV-YYYY-NNNNN / PV-YYYY-NNNNN / RV-YYYY-NNNNN numbering format exactly.
-CREATE TABLE voucher_sequences (
+CREATE TABLE IF NOT EXISTS voucher_sequences (
     prefix     VARCHAR(32) PRIMARY KEY,
     last_value BIGINT NOT NULL DEFAULT 0
 );

@@ -21,7 +21,10 @@ import java.util.List;
  * {@link BranchContextHolder} so services can scope their queries.
  *
  * "All Branches" mode (a {@code null} active branch, which disables the
- * Hibernate branch filter) is only ever granted to ROLE_ADMIN/ROLE_SUPER_ADMIN.
+ * Hibernate branch filter) is granted to ROLE_ADMIN (a gym owner, viewing all
+ * branches within their own gym — branches are already gym-scoped via gym_id)
+ * and ROLE_SUPER_ADMIN. GYMBIOS_ADMIN (the platform owner) is scoped to Gym
+ * Management only and has no reason to see branch-scoped operational data at all.
  * Every other authenticated user must resolve to one concrete branch — either
  * the one named by the header (if they're assigned to it) or, when no header
  * is sent, their single assigned branch. A non-admin who is assigned to zero
@@ -72,9 +75,18 @@ public class BranchContextFilter extends OncePerRequestFilter {
                 boolean isAdmin = userDetails.getAuthorities().stream()
                         .map(GrantedAuthority::getAuthority)
                         .anyMatch(a -> a.equals("ROLE_ADMIN") || a.equals("ROLE_SUPER_ADMIN"));
+                boolean isGymbiosAdmin = userDetails.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .anyMatch(a -> a.equals("ROLE_GYMBIOS_ADMIN"));
                 String branchHeader = request.getHeader(BRANCH_HEADER);
 
-                if (branchHeader != null && !branchHeader.isBlank()) {
+                if (isGymbiosAdmin) {
+                    // GYMBIOS_ADMIN (platform owner) is scoped to Gym Management only and
+                    // is never assigned to any branch by design — skip branch resolution
+                    // entirely rather than 403ing every request through the "no branch
+                    // assigned" path below. Its endpoints (GymController) don't read
+                    // BranchContextHolder at all.
+                } else if (branchHeader != null && !branchHeader.isBlank()) {
                     Long branchId;
                     try {
                         branchId = Long.parseLong(branchHeader.trim());

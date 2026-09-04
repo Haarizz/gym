@@ -74,7 +74,7 @@ public class SalaryAdvanceService {
         advance.setAttachment(req.getAttachment());
         SalaryAdvance saved = advanceRepository.save(advance);
         notificationService.notifyRoles(
-                List.of("ADMIN", "HR"),
+                List.of("GYMBIOS_ADMIN", "HR"),
                 "Salary Advance Requested",
                 (saved.getEmployeeName() != null ? saved.getEmployeeName() : "An employee") +
                 " requested a salary advance" +

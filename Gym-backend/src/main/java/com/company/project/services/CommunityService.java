@@ -373,13 +373,14 @@ public class CommunityService {
         communityPostRepository.save(post);
     }
 
+    /**
+     * GYMBIOS_ADMIN (platform owner) is scoped to Gym Management only — it doesn't
+     * moderate community content for any gym, so this override is permanently off.
+     * Left in place (rather than removed) as the hook for a future gym-scoped
+     * moderator role, if one is ever needed.
+     */
     private boolean isAdmin(User user) {
-        if (user == null || user.getUserRoles() == null) return false;
-        return user.getUserRoles().stream().anyMatch(userRole -> {
-            if (userRole == null || userRole.getRole() == null) return false;
-            String roleName = userRole.getRole().getRoleName();
-            return roleName != null && roleName.equalsIgnoreCase("ADMIN");
-        });
+        return false;
     }
 
     private User getCurrentUserOrThrow() {

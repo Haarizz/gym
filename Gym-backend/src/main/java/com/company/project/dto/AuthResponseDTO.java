@@ -10,6 +10,7 @@ public class AuthResponseDTO {
     private Boolean enabled;
     private String roleName;
     private String staffName;
+    private String gymName;
     private List<String> permissions;
     private List<BranchResponseDTO> accessibleBranches;
     private Long defaultBranchId;
@@ -38,6 +39,9 @@ public class AuthResponseDTO {
     public String getStaffName() { return staffName; }
     public void setStaffName(String staffName) { this.staffName = staffName; }
 
+    public String getGymName() { return gymName; }
+    public void setGymName(String gymName) { this.gymName = gymName; }
+
     public List<String> getPermissions() { return permissions; }
     public void setPermissions(List<String> permissions) { this.permissions = permissions; }
 
@@ -63,6 +67,7 @@ public class AuthResponseDTO {
         private Boolean enabled;
         private String roleName;
         private String staffName;
+        private String gymName;
         private List<String> permissions;
         private List<BranchResponseDTO> accessibleBranches;
         private Long defaultBranchId;
@@ -75,6 +80,7 @@ public class AuthResponseDTO {
         public AuthResponseDTOBuilder enabled(Boolean enabled) { this.enabled = enabled; return this; }
         public AuthResponseDTOBuilder roleName(String roleName) { this.roleName = roleName; return this; }
         public AuthResponseDTOBuilder staffName(String staffName) { this.staffName = staffName; return this; }
+        public AuthResponseDTOBuilder gymName(String gymName) { this.gymName = gymName; return this; }
         public AuthResponseDTOBuilder permissions(List<String> permissions) { this.permissions = permissions; return this; }
         public AuthResponseDTOBuilder accessibleBranches(List<BranchResponseDTO> accessibleBranches) { this.accessibleBranches = accessibleBranches; return this; }
         public AuthResponseDTOBuilder defaultBranchId(Long defaultBranchId) { this.defaultBranchId = defaultBranchId; return this; }
@@ -89,6 +95,7 @@ public class AuthResponseDTO {
             dto.enabled     = this.enabled;
             dto.roleName    = this.roleName;
             dto.staffName   = this.staffName;
+            dto.gymName     = this.gymName;
             dto.permissions = this.permissions;
             dto.accessibleBranches = this.accessibleBranches;
             dto.defaultBranchId = this.defaultBranchId;

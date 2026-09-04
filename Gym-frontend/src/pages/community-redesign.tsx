@@ -293,7 +293,7 @@ export function Community() {
   }, []);
   const isAdmin = currentRoles.some((role) => {
     const normalized = String(role).toUpperCase();
-    return normalized === "ADMIN" || normalized === "ROLE_ADMIN";
+    return normalized === "GYMBIOS_ADMIN" || normalized === "ROLE_GYMBIOS_ADMIN";
   });
   const canDeletePost = (post: CommunityPost) =>
     isAdmin || (Number.isFinite(currentUserId) && Number(post.authorUserId) === Number(currentUserId));

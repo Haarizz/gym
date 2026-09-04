@@ -1,5 +1,5 @@
 ALTER TABLE assets
-ADD COLUMN accumulated_depreciation NUMERIC(12,2);
+ADD COLUMN IF NOT EXISTS accumulated_depreciation NUMERIC(12,2);
 
 UPDATE assets
 SET accumulated_depreciation = 0.00

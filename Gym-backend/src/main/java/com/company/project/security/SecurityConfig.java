@@ -30,15 +30,18 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final DeviceAuthFilter deviceAuthFilter;
+    private final TenantContextFilter tenantContextFilter;
     private final BranchContextFilter branchContextFilter;
     private final UserDetailsService userDetailsService;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
                           DeviceAuthFilter deviceAuthFilter,
+                          TenantContextFilter tenantContextFilter,
                           BranchContextFilter branchContextFilter,
                           UserDetailsService userDetailsService) {
         this.jwtAuthFilter    = jwtAuthFilter;
         this.deviceAuthFilter = deviceAuthFilter;
+        this.tenantContextFilter = tenantContextFilter;
         this.branchContextFilter = branchContextFilter;
         this.userDetailsService = userDetailsService;
     }
@@ -54,22 +57,34 @@ public class SecurityConfig {
                 // Public auth endpoints — no token required (register/login/username-check/mobile-register)
                 .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/check-username", "/api/mobile/auth/register", "/error").permitAll()
 
-                // Admin-only endpoints
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // Platform-owner-only endpoints. GYMBIOS_ADMIN is scoped to Gym Management
+                // only (see RoleService.getEffectivePermissionKeys) — it has no business on
+                // any of these operational routes, so it is deliberately absent from all of
+                // them (unlike during the ADMIN->GYMBIOS_ADMIN rename, where it kept the old
+                // ADMIN's full access). No route currently lives under /api/admin/**, so that
+                // matcher is left unowned rather than granted to any role.
+                .requestMatchers("/api/admin/**").denyAll()
 
-                // Manager + Admin endpoints
-                .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
+                // Manager endpoints
+                .requestMatchers("/api/manager/**").hasRole("MANAGER")
 
-                // Payroll & HR — restricted to HR and Admin
+                // Payroll & HR — restricted to HR
                 .requestMatchers("/api/payroll/**", "/api/employees/**", "/api/recruitment/**")
-                    .hasAnyRole("ADMIN", "HR")
+                    .hasRole("HR")
 
-                // Financial endpoints — Accountant, Manager, Admin
+                // Financial endpoints — Accountant, Manager, and the gym owner (ADMIN).
+                // ADMIN was missing here despite the app's own fine-grained permission
+                // catalog already granting BILLING_VIEW/CREATE/EDIT (etc.) to that role
+                // by default (see DefaultRolePermissions.GRANTS) — this URL-level role
+                // gate ran BEFORE any controller/permission check, so a gym owner's own
+                // real, granted permissions never even got the chance to apply: every
+                // owner (confirmed on Test Gym and Power Gym alike) got a flat 403 on
+                // their own member's billing statement, cash-in-hand/ledger data, etc.
                 // (bios/settings holds org-wide revenue targets and alert/report
                 // recipient emails — the same sensitivity as the other financial
                 // config here, so it gets the same role gate)
                 .requestMatchers("/api/billing/**", "/api/expenses/**", "/api/ledgers/**", "/api/financials/**", "/api/bios/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "ACCOUNTANT")
+                    .hasAnyRole("MANAGER", "ACCOUNTANT", "ADMIN")
 
                 // Core gym operations — any authenticated user
                 .requestMatchers(
@@ -106,8 +121,10 @@ public class SecurityConfig {
             // Device key filter runs first so hardware devices are identified before JWT check
             .addFilterBefore(deviceAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthFilter, DeviceAuthFilter.class)
-            // Branch context filter runs after JWT to read active branch header and validate access
-            .addFilterAfter(branchContextFilter, JwtAuthenticationFilter.class);
+            // Tenant context filter runs after JWT to read the tenant claim (Phase 2 multi-tenant
+            // groundwork, no-op while tenant.routing.enabled=false); branch context runs after that.
+            .addFilterAfter(tenantContextFilter, JwtAuthenticationFilter.class)
+            .addFilterAfter(branchContextFilter, TenantContextFilter.class);
 
         return http.build();
     }

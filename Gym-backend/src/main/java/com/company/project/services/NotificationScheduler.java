@@ -115,7 +115,7 @@ public class NotificationScheduler {
         int count = expiring.size();
 
         notificationService.notifyRoleAggregated(
-                "ADMIN",
+                "GYMBIOS_ADMIN",
                 count + " Membership" + (count > 1 ? "s" : "") + " Expiring Soon",
                 count + " membership" + (count > 1 ? "s expire" : " expires") + " within 7 days.",
                 "WARNING", "MEDIUM", "MEMBERS",
@@ -163,7 +163,7 @@ public class NotificationScheduler {
         int count = expired.size();
 
         notificationService.notifyRoleAggregated(
-                "ADMIN",
+                "GYMBIOS_ADMIN",
                 count + " Membership" + (count > 1 ? "s" : "") + " Expired",
                 count + " membership" + (count > 1 ? "s have" : " has") + " expired today.",
                 "DANGER", "HIGH", "MEMBERS",
@@ -210,7 +210,7 @@ public class NotificationScheduler {
         int count = dueToday.size();
 
         notificationService.notifyRoleAggregated(
-                "ADMIN",
+                "GYMBIOS_ADMIN",
                 count + " Follow-Up" + (count > 1 ? "s" : "") + " Due Today",
                 count + " follow-up" + (count > 1 ? "s are" : " is") + " due today.",
                 "WARNING", "MEDIUM", "FOLLOW_UPS",
@@ -237,7 +237,7 @@ public class NotificationScheduler {
         int count = overdue.size();
 
         notificationService.notifyRoleAggregated(
-                "ADMIN",
+                "GYMBIOS_ADMIN",
                 count + " Overdue Follow-Up" + (count > 1 ? "s" : ""),
                 count + " follow-up" + (count > 1 ? "s are" : " is") + " overdue and need attention.",
                 "DANGER", "HIGH", "FOLLOW_UPS",
@@ -269,7 +269,7 @@ public class NotificationScheduler {
         int count = due.size();
 
         notificationService.notifyRoleAggregated(
-                "ADMIN",
+                "GYMBIOS_ADMIN",
                 count + " Asset" + (count > 1 ? "s" : "") + " Due for Maintenance",
                 count + " asset" + (count > 1 ? "s require" : " requires") + " maintenance within 7 days.",
                 "WARNING", "MEDIUM", "ASSETS",
@@ -307,7 +307,7 @@ public class NotificationScheduler {
         if (due.size() > 3) names += " and " + (due.size() - 3) + " more";
 
         notificationService.notifyRoles(
-                List.of("ADMIN", "ACCOUNTANT"),
+                List.of("GYMBIOS_ADMIN", "ACCOUNTANT"),
                 "Tax Compliance Due Soon",
                 count + " compliance item" + (count > 1 ? "s" : "") + " due within 7 days: " + names + ".",
                 "DANGER", "CRITICAL", "FINANCIALS",

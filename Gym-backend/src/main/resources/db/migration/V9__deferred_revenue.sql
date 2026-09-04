@@ -15,7 +15,7 @@
 --   - adds expenses.payment_status so onExpenseApproved() can credit Accounts
 --     Payable instead of always assuming immediate cash payment.
 
-CREATE TABLE deferred_revenue_schedules (
+CREATE TABLE IF NOT EXISTS deferred_revenue_schedules (
     id                         BIGSERIAL PRIMARY KEY,
     receipt_id                 BIGINT NOT NULL,
     member_db_id               BIGINT,
@@ -38,7 +38,7 @@ CREATE TABLE deferred_revenue_schedules (
 CREATE INDEX idx_deferred_revenue_schedules_status ON deferred_revenue_schedules (status);
 CREATE INDEX idx_deferred_revenue_schedules_receipt ON deferred_revenue_schedules (receipt_id);
 
-CREATE TABLE deferred_revenue_recognition_lines (
+CREATE TABLE IF NOT EXISTS deferred_revenue_recognition_lines (
     id                             BIGSERIAL PRIMARY KEY,
     schedule_id                    BIGINT NOT NULL REFERENCES deferred_revenue_schedules(id),
     period_number                  INTEGER NOT NULL,
@@ -58,8 +58,8 @@ CREATE TABLE deferred_revenue_recognition_lines (
 CREATE INDEX idx_deferred_revenue_lines_due ON deferred_revenue_recognition_lines (status, period_end);
 CREATE INDEX idx_deferred_revenue_lines_schedule ON deferred_revenue_recognition_lines (schedule_id);
 
-ALTER TABLE expenses ADD COLUMN payment_status VARCHAR(20) NOT NULL DEFAULT 'PAID';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) NOT NULL DEFAULT 'PAID';
 
 INSERT INTO account_heads (code, name, type, opening_balance, current_balance, is_active, created_at)
 VALUES ('5800', 'Depreciation Expense', 'EXPENSE', 0, 0, TRUE, NOW())
-ON CONFLICT (code) DO NOTHING;
+ON CONFLICT (branch_id, code) DO NOTHING;

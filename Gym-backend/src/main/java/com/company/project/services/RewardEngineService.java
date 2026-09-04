@@ -328,7 +328,7 @@ public class RewardEngineService {
         // caller transaction, but this try/catch is a second line of defense against anything
         // notification-related ever reaching generateRewardsForReferral()'s transaction.
         try {
-            notificationService.notifyRoles(List.of("ADMIN", "MANAGER"), title, message,
+            notificationService.notifyRoles(List.of("GYMBIOS_ADMIN", "MANAGER"), title, message,
                     "SUCCESS", priority, "REFERRALS", reward.getId(), "/reward-queue",
                     "REWARD_GENERATED_" + reward.getId());
         } catch (Exception ex) {

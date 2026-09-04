@@ -18,6 +18,18 @@ interface BranchContextType {
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
+// Only ADMIN (a gym owner, viewing all branches within their own gym) and
+// GYMBIOS_ADMIN (the platform owner — though it has no branches to view) are
+// ever allowed "All Branches" mode — see BranchContextFilter.java. A stale
+// sessionStorage value of 'null' left over from a previous session in either of
+// those roles must never be honored for any other role (staff/receptionist/etc.
+// logging in afterward), or they'd silently land in a read-only, branch-less
+// view despite having real branch access.
+const canUseAllBranches = () => {
+  const role = sessionStorage.getItem('gymbios_role_name')?.toLowerCase();
+  return role === 'gymbios_admin' || role === 'admin';
+};
+
 export function BranchProvider({ children }: { children: ReactNode }) {
   const [activeBranchId, setActiveBranchIdState] = useState<number | null>(null);
   const [accessibleBranches, setAccessibleBranches] = useState<Branch[]>([]);
@@ -37,7 +49,13 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       
       // Auto-update active branch if needed
       const storedActiveBranchId = sessionStorage.getItem('activeBranchId');
-      if (storedActiveBranchId === null || storedActiveBranchId === "undefined") {
+      const wantsAllBranches = storedActiveBranchId === "null" && canUseAllBranches();
+      if (wantsAllBranches) {
+          setActiveBranchIdState(null);
+      } else if (storedActiveBranchId !== null && storedActiveBranchId !== "undefined" && storedActiveBranchId !== "null") {
+          // Ensure state matches what was just set by authService.signIn
+          setActiveBranchIdState(Number(storedActiveBranchId));
+      } else {
           const defaultBranch = mappedBranches.find((b: any) => b.isDefault);
           if (defaultBranch) {
               setActiveBranchIdState(defaultBranch.id);
@@ -46,11 +64,6 @@ export function BranchProvider({ children }: { children: ReactNode }) {
               setActiveBranchIdState(mappedBranches[0].id);
               sessionStorage.setItem('activeBranchId', mappedBranches[0].id.toString());
           }
-      } else if (storedActiveBranchId !== "null") {
-          // Ensure state matches what was just set by authService.signIn
-          setActiveBranchIdState(Number(storedActiveBranchId));
-      } else {
-          setActiveBranchIdState(null);
       }
     } catch (e) {
       console.error("Failed to refresh branches", e);
@@ -71,10 +84,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     }
 
     const storedActiveBranchId = sessionStorage.getItem('activeBranchId');
-    if (storedActiveBranchId !== null && storedActiveBranchId !== "null" && storedActiveBranchId !== "undefined") {
-        setActiveBranchIdState(Number(storedActiveBranchId));
-    } else if (storedActiveBranchId === "null") {
+    if (storedActiveBranchId === "null" && canUseAllBranches()) {
         setActiveBranchIdState(null);
+    } else if (storedActiveBranchId !== null && storedActiveBranchId !== "null" && storedActiveBranchId !== "undefined") {
+        setActiveBranchIdState(Number(storedActiveBranchId));
     } else {
         // Auto-select default or first branch
         const defaultBranch = branches.find(b => b.isDefault);

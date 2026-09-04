@@ -212,7 +212,7 @@ public class RewardRedemptionService {
 
         if (!expiringSoon.isEmpty()) {
             int count = expiringSoon.size();
-            notificationService.notifyRoles(List.of("ADMIN", "MANAGER"),
+            notificationService.notifyRoles(List.of("GYMBIOS_ADMIN", "MANAGER"),
                     count + " Reward" + (count > 1 ? "s" : "") + " Expiring Soon",
                     count + " reward" + (count > 1 ? "s expire" : " expires") + " within 3 days.",
                     "WARNING", "MEDIUM", "REFERRALS", null, "/reward-queue",

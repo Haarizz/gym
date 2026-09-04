@@ -2,7 +2,6 @@ package com.company.project.services;
 
 import com.company.project.dto.BranchRequestDTO;
 import com.company.project.dto.BranchResponseDTO;
-import com.company.project.dto.StaffResponseDTO;
 import com.company.project.entities.Branch;
 import com.company.project.entities.StaffBranch;
 import com.company.project.entities.UserBranch;
@@ -113,12 +112,15 @@ public class BranchService {
 
     /**
      * Returns branches the current user can access.
-     * Admin/Super Admin users get all active branches.
-     * Other users get only their assigned branches.
+     * Super Admin and a gym-owner ADMIN both get all active branches — once each
+     * gym has its own dedicated database (Phase 5 cutover), every branch reachable
+     * from a request is definitionally already that one gym's own branch, so no
+     * further gym-based filtering is needed for either role. Other users get only
+     * their assigned branches.
      */
     public List<BranchResponseDTO> getMyBranches() {
         UserDetailsImpl userDetails = getCurrentUser();
-        if (isAdmin(userDetails)) {
+        if (isSuperAdmin(userDetails) || isGymOwnerAdmin(userDetails)) {
             return getActiveBranches();
         }
         List<Long> branchIds = userBranchRepository.findBranchIdsByUserId(userDetails.getId());
@@ -130,11 +132,13 @@ public class BranchService {
 
     /**
      * Validates whether the user has access to the given branch.
-     * Admin users always have access.
+     * Super Admin and a gym-owner ADMIN both always have access — see getMyBranches's
+     * doc comment for why gym-based filtering is no longer needed for either role.
+     * Everyone else needs an explicit user_branches row.
      */
     public boolean hasAccess(Long userId, Long branchId) {
         UserDetailsImpl userDetails = getCurrentUser();
-        if (isAdmin(userDetails)) return true;
+        if (isSuperAdmin(userDetails) || isGymOwnerAdmin(userDetails)) return true;
         return userBranchRepository.existsByUserIdAndBranchId(userId, branchId);
     }
 
@@ -154,7 +158,10 @@ public class BranchService {
         }
         // Validate the user has access to the requested branch
         UserDetailsImpl userDetails = getCurrentUser();
-        if (!isAdmin(userDetails) && !userBranchRepository.existsByUserIdAndBranchId(userDetails.getId(), requestBranchId)) {
+        boolean hasAccess = isSuperAdmin(userDetails)
+                || isGymOwnerAdmin(userDetails)
+                || userBranchRepository.existsByUserIdAndBranchId(userDetails.getId(), requestBranchId);
+        if (!hasAccess) {
             throw new RuntimeException("You do not have access to the specified branch");
         }
         return requestBranchId;
@@ -166,7 +173,7 @@ public class BranchService {
      */
     public List<Long> getAccessibleBranchIds() {
         UserDetailsImpl userDetails = getCurrentUser();
-        if (isAdmin(userDetails)) {
+        if (isSuperAdmin(userDetails) || isGymOwnerAdmin(userDetails)) {
             return branchRepository.findByStatus("ACTIVE").stream()
                     .map(Branch::getId)
                     .collect(Collectors.toList());
@@ -263,9 +270,15 @@ public class BranchService {
         return (UserDetailsImpl) auth.getPrincipal();
     }
 
-    private boolean isAdmin(UserDetailsImpl userDetails) {
+    private boolean isSuperAdmin(UserDetailsImpl userDetails) {
         return userDetails.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> a.equals("ROLE_ADMIN") || a.equals("ROLE_SUPER_ADMIN"));
+                .anyMatch(a -> a.equals("ROLE_SUPER_ADMIN"));
+    }
+
+    private boolean isGymOwnerAdmin(UserDetailsImpl userDetails) {
+        return userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals("ROLE_ADMIN"));
     }
 }

@@ -64,7 +64,7 @@ public class FollowUpService {
         saved = followUpRepository.save(saved);
 
         notificationService.notifyRoles(
-                List.of("ADMIN", "MANAGER"),
+                List.of("GYMBIOS_ADMIN", "MANAGER"),
                 "New Follow-Up Scheduled",
                 "Follow-up for " + (saved.getLead() != null ? saved.getLead().getFirstName() : "a contact") +
                 " is due on " + (saved.getDueDate() != null ? saved.getDueDate().toLocalDate().toString() : "N/A") + ".",

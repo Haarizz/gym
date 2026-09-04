@@ -13,7 +13,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     if (activeBranchId && activeBranchId !== 'null') {
       config.headers['X-Active-Branch-Id'] = activeBranchId;
     } else {
