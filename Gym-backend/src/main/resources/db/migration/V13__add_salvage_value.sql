@@ -1,5 +1,5 @@
 ALTER TABLE assets
-ADD COLUMN salvage_value NUMERIC(12,2);
+ADD COLUMN IF NOT EXISTS salvage_value NUMERIC(12,2);
 
 UPDATE assets
 SET salvage_value = 0.00

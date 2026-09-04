@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class RoleService {
 
-    public static final String ADMIN_ROLE_NAME = "ADMIN";
+    public static final String ADMIN_ROLE_NAME = "GYMBIOS_ADMIN";
 
     private final RoleRepository roleRepository;
     private final RolePermissionRepository rolePermissionRepository;
@@ -49,11 +49,18 @@ public class RoleService {
         this.userRoleRepository = userRoleRepository;
     }
 
-    /** ADMIN always has every permission in the catalog — never depends on stored rows. */
+    /**
+     * GYMBIOS_ADMIN (the platform owner) is scoped to Gym Management only — it creates
+     * and manages gym clients, nothing else. This is a fixed set, not stored role_permissions
+     * rows, so it can't drift from the catalog and can't be edited away via the UI (see
+     * updateRole's guard below).
+     */
     @Transactional(readOnly = true)
     public List<String> getEffectivePermissionKeys(Role role) {
         if (role.getRoleName() != null && role.getRoleName().equalsIgnoreCase(ADMIN_ROLE_NAME)) {
-            return PermissionCatalog.allKeys();
+            return PermissionCatalog.MODULES.get("GYM_MANAGEMENT").stream()
+                    .map(action -> PermissionCatalog.key("GYM_MANAGEMENT", action))
+                    .collect(Collectors.toList());
         }
         return rolePermissionRepository.findByRoleId(role.getId()).stream()
                 .map(rp -> rp.getPermission().getPermissionKey())
@@ -137,14 +144,11 @@ public class RoleService {
         role = roleRepository.save(role);
 
         if (isAdmin) {
-            // ADMIN's effective permissions are always "all" regardless of stored rows —
-            // block edits from ever appearing to strip them.
+            // GYMBIOS_ADMIN's permission set (Gym Management only, see
+            // getEffectivePermissionKeys) is fixed and code-defined — reject any attempt
+            // to change it here rather than letting it drift via the UI.
             if (req.getPermissionKeys() != null) {
-                List<String> allKeys = PermissionCatalog.allKeys();
-                boolean triedToRemoveSome = !new java.util.HashSet<>(req.getPermissionKeys()).containsAll(allKeys);
-                if (triedToRemoveSome) {
-                    throw new BusinessRuleViolationException("ADMIN permissions cannot be reduced");
-                }
+                throw new BusinessRuleViolationException("GYMBIOS_ADMIN's permissions are fixed and cannot be edited");
             }
         } else if (req.getPermissionKeys() != null) {
             applyPermissions(role, req.getPermissionKeys());

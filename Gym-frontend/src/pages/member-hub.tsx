@@ -193,7 +193,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
     try {
       const rolesRaw = sessionStorage.getItem("roles");
       const roles: string[] = rolesRaw ? JSON.parse(rolesRaw) : [];
-      setIsAdminUser(roles.some((r) => r.toUpperCase().includes("ADMIN")));
+      setIsAdminUser(roles.some((r) => r.toUpperCase() === "GYMBIOS_ADMIN"));
     } catch {}
   }, []);
 
@@ -1053,7 +1053,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                                 )}
                               </div>
 
-                              {/* 3-dot action menu — visible only to owner or ADMIN */}
+                              {/* 3-dot action menu — visible only to owner or GYMBIOS_ADMIN */}
                               {canManagePost(post) && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>

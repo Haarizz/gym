@@ -128,7 +128,7 @@ public class ReceiptVoucherService {
         ReceiptVoucher saved = receiptVoucherRepository.save(rv);
         postToLedgerIfNeeded(saved);
         notificationService.notifyRoles(
-                List.of("ADMIN", "MANAGER", "ACCOUNTANT"),
+                List.of("GYMBIOS_ADMIN", "MANAGER", "ACCOUNTANT"),
                 "Payment Received",
                 "Receipt " + saved.getVoucherNo() + " created" +
                 (saved.getAmount() != null ? " for AED " + saved.getAmount() : "") + ".",
@@ -204,7 +204,7 @@ public class ReceiptVoucherService {
         ReceiptVoucher saved = receiptVoucherRepository.save(rv);
 
         notificationService.notifyRoles(
-                List.of("ADMIN", "MANAGER", "ACCOUNTANT"),
+                List.of("GYMBIOS_ADMIN", "MANAGER", "ACCOUNTANT"),
                 "Payment Received – " + sourceCategory,
                 source + " | Voucher " + saved.getVoucherNo() + " | AED " + saved.getAmount(),
                 "SUCCESS", "MEDIUM", "BILLING",

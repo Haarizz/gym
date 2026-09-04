@@ -111,7 +111,7 @@ public class ExpenseService {
         expense.setStatus(req.getStatus() != null && !req.getStatus().isBlank() ? req.getStatus() : "pending");
         Expense saved = expenseRepository.save(expense);
         notificationService.notifyRoles(
-                List.of("ADMIN", "ACCOUNTANT"),
+                List.of("GYMBIOS_ADMIN", "ACCOUNTANT"),
                 "New Expense Submitted",
                 "Expense of " + (saved.getTotalAmount() != null ? "AED " + saved.getTotalAmount() : "") +
                 " from " + (saved.getVendorName() != null ? saved.getVendorName() : "vendor") + " is pending review.",

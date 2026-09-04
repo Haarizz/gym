@@ -180,7 +180,7 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const SLOTS = ['Morning (6am–12pm)', 'Afternoon (12pm–5pm)', 'Evening (5pm–10pm)'];
 // Single set of roles used both as the employee's job role and their app login/RBAC role,
 // so Add/Edit Employee only asks for one "Role" instead of two confusingly similar fields.
-const SECURITY_ROLES = ['Admin', 'Receptionist', 'Trainer', 'Accountant', 'Manager'];
+const SECURITY_ROLES = ['Gymbios_Admin', 'Receptionist', 'Trainer', 'Accountant', 'Manager'];
 
 function AddScheduleTab() {
   const [schedule, setSchedule] = React.useState<Record<string, string[]>>(() =>
@@ -978,7 +978,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="gymbios_admin">Gymbios_Admin</SelectItem>
                 <SelectItem value="trainer">Trainers</SelectItem>
                 <SelectItem value="reception">Reception</SelectItem>
                 <SelectItem value="accountant">Accountants</SelectItem>

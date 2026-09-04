@@ -5,7 +5,7 @@
 -- All three post through FinancialEventService like every other module
 -- (onContraVoucherPosted / onDebitNoteIssued / onCreditNoteIssued).
 
-CREATE TABLE contra_vouchers (
+CREATE TABLE IF NOT EXISTS contra_vouchers (
     id                BIGSERIAL PRIMARY KEY,
     voucher_no        VARCHAR(50) NOT NULL UNIQUE,
     date              DATE NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE contra_vouchers (
     updated_by        VARCHAR(255)
 );
 
-CREATE TABLE debit_notes (
+CREATE TABLE IF NOT EXISTS debit_notes (
     id             BIGSERIAL PRIMARY KEY,
     voucher_no     VARCHAR(50) NOT NULL UNIQUE,
     date           DATE NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE debit_notes (
     updated_by     VARCHAR(255)
 );
 
-CREATE TABLE credit_notes (
+CREATE TABLE IF NOT EXISTS credit_notes (
     id                BIGSERIAL PRIMARY KEY,
     voucher_no        VARCHAR(50) NOT NULL UNIQUE,
     date              DATE NOT NULL,

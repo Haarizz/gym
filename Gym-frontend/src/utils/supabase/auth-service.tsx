@@ -91,12 +91,18 @@ class AuthService {
         const permissions: string[] = Array.isArray(result.permissions) ? result.permissions : [];
         const roleName: string | undefined = result.roleName ?? result.role_name ?? roles[0];
         const staffName: string | undefined = result.staffName ?? result.staff_name;
+        // A gym owner has no Staff record, so staffName is always empty for them —
+        // gymName (their own gym's name, e.g. "Power Gym") is a far better sidebar
+        // label than falling all the way back to their raw login email, which is
+        // what happened before this field existed (confirmed live: "powergym@
+        // gmail.com" shown as the display name instead of any real name).
+        const gymName: string | undefined = result.gymName ?? result.gym_name;
         const username = result.username || email;
 
         this.user = {
           id:   `backend_${username}`,
           email,
-          name: staffName || username,
+          name: staffName || gymName || username,
           role: roles[0]?.toLowerCase() || "user",
           roleName,
           staffName,

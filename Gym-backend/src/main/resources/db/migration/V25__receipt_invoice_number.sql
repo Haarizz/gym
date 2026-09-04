@@ -9,4 +9,4 @@
 -- rather than replacing it, so nothing that already relies on receipt_no
 -- (search, "View Receipt" lookups, printed receipts) changes behavior.
 
-ALTER TABLE receipts ADD COLUMN invoice_no VARCHAR(50);
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS invoice_no VARCHAR(50);

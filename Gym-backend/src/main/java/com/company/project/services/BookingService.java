@@ -146,7 +146,7 @@ public class BookingService {
         String sessionName = session.getName() != null ? session.getName() : "session";
         String today = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         notificationService.notifyRoleAggregated(
-                "ADMIN",
+                "GYMBIOS_ADMIN",
                 "New Booking",
                 "A new booking was made for: " + sessionName,
                 "INFO", "LOW", "BOOKINGS",
@@ -183,7 +183,7 @@ public class BookingService {
             String sName = booking.getSession() != null && booking.getSession().getName() != null
                     ? booking.getSession().getName() : "session";
             notificationService.notifyRole(
-                    "ADMIN",
+                    "GYMBIOS_ADMIN",
                     "Booking Cancelled",
                     "Booking for " + sName + " was cancelled.",
                     "WARNING", "MEDIUM", "BOOKINGS",

@@ -198,7 +198,7 @@ public class SalaryPaymentService {
         financialEventService.onSalaryPaid(payment);
 
         notificationService.notifyRoles(
-                List.of("ADMIN", "HR"),
+                List.of("GYMBIOS_ADMIN", "HR"),
                 "Salary Payment Processed",
                 "Salary for " + payment.getEmployeeName() + " (" + payment.getMonth() + "/" + payment.getYear() +
                 ") of AED " + payment.getNetSalary() + " has been processed.",

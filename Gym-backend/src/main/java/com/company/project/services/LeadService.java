@@ -59,7 +59,7 @@ public class LeadService {
         saved = leadRepository.save(saved);
 
         notificationService.notifyRoles(
-                List.of("ADMIN", "MANAGER"),
+                List.of("GYMBIOS_ADMIN", "MANAGER"),
                 "New Lead",
                 saved.getFirstName() + " " + saved.getLastName() + " added as a new lead.",
                 "INFO", "MEDIUM", "LEADS",

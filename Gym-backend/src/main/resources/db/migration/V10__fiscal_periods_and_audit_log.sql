@@ -14,7 +14,7 @@
 -- called idempotently from DataInitializer on every boot (same pattern already
 -- used for warehouses, product categories, suppliers, etc. in that file).
 
-CREATE TABLE fiscal_years (
+CREATE TABLE IF NOT EXISTS fiscal_years (
     id          BIGSERIAL PRIMARY KEY,
     name        VARCHAR(50) NOT NULL UNIQUE,
     start_date  DATE NOT NULL,
@@ -26,7 +26,7 @@ CREATE TABLE fiscal_years (
     updated_by  VARCHAR(255)
 );
 
-CREATE TABLE fiscal_periods (
+CREATE TABLE IF NOT EXISTS fiscal_periods (
     id             BIGSERIAL PRIMARY KEY,
     fiscal_year_id BIGINT NOT NULL REFERENCES fiscal_years(id),
     name           VARCHAR(50) NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE fiscal_periods (
 CREATE INDEX idx_fiscal_periods_date_range ON fiscal_periods (start_date, end_date);
 CREATE INDEX idx_fiscal_periods_year ON fiscal_periods (fiscal_year_id);
 
-CREATE TABLE financial_audit_logs (
+CREATE TABLE IF NOT EXISTS financial_audit_logs (
     id           BIGSERIAL PRIMARY KEY,
     action       VARCHAR(20) NOT NULL,
     entity_type  VARCHAR(100) NOT NULL,

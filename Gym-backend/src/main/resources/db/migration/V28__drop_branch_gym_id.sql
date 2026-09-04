@@ -1,0 +1,15 @@
+-- Phase 5 cutover: branches.gym_id (added in V24) is retired. It was a bare FK
+-- convention column (no JPA relation), used only to let a gym-owner ADMIN see
+-- "all branches in my own gym" — a distinction that becomes structurally
+-- meaningless once each gym has its own dedicated database (there is nothing
+-- else in that database to distinguish by gym_id). See Branch.java/
+-- BranchRepository.java/BranchService.java/AuthService.java for the
+-- corresponding application-code removal.
+--
+-- Guarded with IF EXISTS: a fresh tenant database's bootstrap (Hibernate
+-- schema-export + this same Flyway chain, per Phase 3) never creates this
+-- column at all once Branch.java no longer declares it, so this migration is a
+-- no-op there — only the primary GYMBIOS database (and Test Gym's already-
+-- migrated gymbios_test_gym, which ran this same Flyway chain before the
+-- column was removed from Branch.java) actually has it to drop.
+ALTER TABLE branches DROP COLUMN IF EXISTS gym_id;

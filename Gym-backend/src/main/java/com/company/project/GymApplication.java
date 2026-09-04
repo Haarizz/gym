@@ -2,6 +2,7 @@ package com.company.project;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -12,6 +13,16 @@ import java.util.TimeZone;
 @EnableJpaAuditing
 @EnableScheduling
 @EnableAsync
+// Phase 1 (control-plane groundwork): a second persistence unit now exists
+// (see controlplane.config.ControlPlaneDataSourceConfig). Spring Boot's implicit
+// "scan everything under com.company.project" default can no longer be trusted to
+// keep control-plane entities out of the PRIMARY EntityManagerFactory, so this
+// pins the primary unit's entity scope explicitly (repository scanning and the
+// DataSource/EntityManagerFactory/TransactionManager beans themselves are now
+// explicit too, in config.PrimaryDataSourceConfig — see that class for why).
+// Every existing entity already lives flat under this package, so this is a
+// no-op for existing behavior — it only excludes the new controlplane subtree.
+@EntityScan("com.company.project.entities")
 public class GymApplication {
 
 	public static void main(String[] args) {

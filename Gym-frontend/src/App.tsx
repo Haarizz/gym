@@ -59,6 +59,7 @@ import { PlansServicesCatalog } from "./pages/plans-services-catalog";
 import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
 import { BranchManagement } from "./pages/branch-management";
+import { GymManagement } from "./pages/gym-management";
 import { AssetTransactions } from "./pages/asset-transactions";
 import { AssetHistoryPage } from "./pages/asset-history";
 import { AssetReports } from "./pages/asset-reports";
@@ -598,6 +599,13 @@ const menuItems = [
     permission: "BRANCH_MANAGEMENT_VIEW",
   },
   {
+    title: "Gym Management",
+    icon: Dumbbell,
+    id: "gym-management",
+    path: "/gym-management",
+    permission: "GYM_MANAGEMENT_VIEW",
+  },
+  {
     title: "Settings",
     icon: Settings,
     id: "settings",
@@ -734,9 +742,20 @@ export default function App() {
 
   // Re-filters whenever permissions change (login, logout, or a live role edit).
   const permissions = usePermissions();
+  // GYMBIOS_ADMIN (platform owner) is scoped to Gym Management only — it manages
+  // gym clients, not its own branch/profile, so both are hidden for this role
+  // specifically rather than gated by the normal per-module permission system.
+  const isGymbiosAdmin = sessionStorage.getItem('gymbios_role_name')?.toLowerCase() === 'gymbios_admin';
+  // ADMIN (a gym owner) can view "All Branches" — aggregated across their own
+  // gym's branches only, never other gyms'. See branch-context.tsx's matching
+  // canUseAllBranches() and BranchContextFilter.java on the backend.
+  const canViewAllBranches = isGymbiosAdmin
+    || sessionStorage.getItem('gymbios_role_name')?.toLowerCase() === 'admin';
   const visibleMenuItems = useMemo(
-    () => filterMenuByPermission(menuItems, hasPermission),
-    [permissions],
+    () => filterMenuByPermission(menuItems, hasPermission).filter(
+      (item) => !(isGymbiosAdmin && item.id === 'my-profile')
+    ),
+    [permissions, isGymbiosAdmin],
   );
 
   // Blocks direct URL navigation to a gated page too — sidebar hiding alone
@@ -986,7 +1005,7 @@ export default function App() {
 
   const renderContent = (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Navigate to={isGymbiosAdmin ? "/gym-management" : "/dashboard"} replace />} />
       <Route path="/dashboard" element={<Dashboard onNavigate={handleNavClick} />} />
       <Route path="/community" element={<Community />} />
       <Route path="/members" element={<Members onNavigate={handleNavClick} initialTab={navigationParams.tab} />} />
@@ -1090,6 +1109,7 @@ export default function App() {
       <Route path="/assets" element={<Assets />} />
       <Route path="/manage-assets" element={<ManageAssets />} />
       <Route path="/branch-management" element={<BranchManagement />} />
+      <Route path="/gym-management" element={<GymManagement />} />
       <Route path="/asset-history" element={<AssetHistoryPage />} />
       <Route path="/asset-transactions" element={<AssetTransactions />} />
       <Route path="/asset-reports" element={<AssetReports />} />
@@ -1182,38 +1202,41 @@ export default function App() {
               </div>
               <NotificationBell className="text-white/80 hover:text-white hover:bg-white/10" />
             </div>
-            {/* Branch Selector */}
-            <div className="mt-2">
-              <Select
-                value={activeBranchId === null ? "null" : activeBranchId.toString()}
-                onValueChange={(val) => {
-                  setActiveBranch(val === "null" ? null : Number(val));
-                }}
-              >
-                <SelectTrigger className="w-full bg-white/10 text-white border-white/20 hover:bg-white/20 focus:ring-white/50 focus:ring-offset-0 focus:ring-offset-transparent transition-colors">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Admin user with "All Branches" access will have "null" as an option */}
-                  {sessionStorage.getItem('gymbios_role_name')?.toLowerCase() === 'admin' && (
-                    <SelectItem value="null">
-                      <div className="flex items-center gap-2">
-                        <Globe className="h-4 w-4 text-blue-500" />
-                        <span>All Branches</span>
-                      </div>
-                    </SelectItem>
-                  )}
-                  {accessibleBranches.map(b => (
-                    <SelectItem key={b.id} value={b.id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-blue-500" />
-                        <span>{b.branchName.replace(/[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim()}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Branch Selector — GYMBIOS_ADMIN (platform owner) has no branch access
+                at all, since it's scoped to Gym Management only; hide entirely rather
+                than show an empty/meaningless dropdown for that role. */}
+            {!isGymbiosAdmin && (
+              <div className="mt-2">
+                <Select
+                  value={activeBranchId === null ? "null" : activeBranchId.toString()}
+                  onValueChange={(val) => {
+                    setActiveBranch(val === "null" ? null : Number(val));
+                  }}
+                >
+                  <SelectTrigger className="w-full bg-white/10 text-white border-white/20 hover:bg-white/20 focus:ring-white/50 focus:ring-offset-0 focus:ring-offset-transparent transition-colors">
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {canViewAllBranches && (
+                      <SelectItem value="null">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-blue-500" />
+                          <span>All Branches</span>
+                        </div>
+                      </SelectItem>
+                    )}
+                    {accessibleBranches.map(b => (
+                      <SelectItem key={b.id} value={b.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-blue-500" />
+                          <span>{b.branchName.replace(/[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim()}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </SidebarHeader>
 
           <SidebarContent className="p-4">
@@ -1305,7 +1328,7 @@ export default function App() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate text-white capitalize">
-                  {user?.name || "Gym Manager"}
+                  {isGymbiosAdmin ? "Super Admin" : (user?.name || "Gym Manager")}
                 </p>
                 <p className="text-xs text-white/70 truncate">
                   {user?.email || "user@example.com"}
@@ -1362,7 +1385,7 @@ export default function App() {
               <ProtectedRoute isAuthenticated={isAuthenticated}>
                 {routeAllowed ? (
                   <React.Fragment key={`branch-${activeBranchId || 'all'}`}>
-                    {isAllBranches && (
+                    {isAllBranches && currentPath !== '/gym-management' && (
                       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 m-4 rounded-r-md flex items-start shadow-sm">
                         <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
                         <div>
@@ -1375,6 +1398,10 @@ export default function App() {
                     )}
                     {renderContent}
                   </React.Fragment>
+                ) : isGymbiosAdmin ? (
+                  // GYMBIOS_ADMIN is scoped to Gym Management only — send it there
+                  // instead of showing a dead-end permission error.
+                  <Navigate to="/gym-management" replace />
                 ) : (
                   <div className="p-6">
                     <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">

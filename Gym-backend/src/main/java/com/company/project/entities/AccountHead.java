@@ -45,8 +45,17 @@ public class AccountHead extends BaseEntity implements BranchAware {
     @Column(name = "current_balance", precision = 12, scale = 2)
     private BigDecimal currentBalance;
 
+    // Defaults to "AED" so every construction site (FinancialEventService's
+    // auto-created "Cash in Hand"/etc., AccountHeadService's manual creation,
+    // DataInitializer's seed accounts — none of which ever called
+    // setCurrencyCode) gets a real value instead of explicit NULL. Explicit NULL
+    // from Hibernate bypasses the column's own DB-level DEFAULT 'AED' (V11), which
+    // only applies when a column is omitted from the INSERT entirely — confirmed
+    // live: this silently worked on GYMBIOS only because V11 was never actually
+    // applied there (a gap found in Phase 4), but broke immediately on a freshly
+    // provisioned tenant database, which correctly enforces NOT NULL.
     @Column(name = "currency_code", length = 3)
-    private String currencyCode; // e.g. USD, AED. Defaults to base currency if null.
+    private String currencyCode = "AED";
 
     @Column(name = "is_active")
     private Boolean isActive;

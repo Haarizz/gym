@@ -8,12 +8,12 @@
 -- company_tax_details holds the single-row GST No / VAT No / TRN registration
 -- record surfaced on receipts/invoices/reports.
 
-ALTER TABLE tax_codes ADD COLUMN tax_type VARCHAR(20) NOT NULL DEFAULT 'STANDARD';
-ALTER TABLE tax_codes ADD COLUMN secondary_tax_code VARCHAR(50);
+ALTER TABLE tax_codes ADD COLUMN IF NOT EXISTS tax_type VARCHAR(20) NOT NULL DEFAULT 'STANDARD';
+ALTER TABLE tax_codes ADD COLUMN IF NOT EXISTS secondary_tax_code VARCHAR(50);
 
-ALTER TABLE supplier_bills ADD COLUMN tax_code VARCHAR(50);
+ALTER TABLE supplier_bills ADD COLUMN IF NOT EXISTS tax_code VARCHAR(50);
 
-CREATE TABLE company_tax_details (
+CREATE TABLE IF NOT EXISTS company_tax_details (
     id         BIGINT PRIMARY KEY,
     legal_name VARCHAR(255),
     gst_number VARCHAR(50),

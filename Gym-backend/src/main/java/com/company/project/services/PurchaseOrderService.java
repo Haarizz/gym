@@ -166,7 +166,7 @@ public class PurchaseOrderService {
         if ("CONFIRMED".equalsIgnoreCase(newStatus) || "RECEIVED".equalsIgnoreCase(newStatus)) {
             String label = "CONFIRMED".equalsIgnoreCase(newStatus) ? "Confirmed" : "Received";
             notificationService.notifyRoles(
-                    List.of("ADMIN", "MANAGER"),
+                    List.of("GYMBIOS_ADMIN", "MANAGER"),
                     "Purchase Order " + label,
                     "PO " + po.getPoNumber() + " has been " + label.toLowerCase() + ".",
                     "SUCCESS", "MEDIUM", "INVENTORY",
