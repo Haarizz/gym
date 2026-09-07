@@ -1200,7 +1200,9 @@ export default function App() {
                   </p>
                 </div>
               </div>
-              <NotificationBell className="text-white/80 hover:text-white hover:bg-white/10" />
+              {!isGymbiosAdmin && (
+                <NotificationBell className="text-white/80 hover:text-white hover:bg-white/10" />
+              )}
             </div>
             {/* Branch Selector — GYMBIOS_ADMIN (platform owner) has no branch access
                 at all, since it's scoped to Gym Management only; hide entirely rather
@@ -1360,7 +1362,7 @@ export default function App() {
                 </div>
               </div>
               <div className="flex-1" />
-              <NotificationBell className="mr-2" />
+              {!isGymbiosAdmin && <NotificationBell className="mr-2" />}
               <div className="relative">
                 <Avatar className="h-8 w-8 border-2 border-primary/20">
                   <AvatarImage src={userPhoto || undefined} />

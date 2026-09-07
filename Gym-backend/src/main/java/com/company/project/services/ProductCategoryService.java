@@ -84,7 +84,19 @@ public class ProductCategoryService {
     // ── Init ────────────────────────────────────────────────────────────────
 
     public void initDefaultCategories() {
-        if (categoryRepository.count() > 0) return;
+        // Categories are branch-scoped (uk_product_categories_branch_name is a
+        // (branch_id, name) composite, not a global unique-on-name). A plain,
+        // unfiltered categoryRepository.count() looked like a safe "already
+        // seeded" guard, but BranchFilterAspect enables Hibernate's branchFilter
+        // for this @Transactional call whenever BranchContextHolder has an active
+        // branch, which makes count() (and findByName()) silently branch-scoped
+        // too — so a second branch (or a re-seed on a database where these rows
+        // already exist under a different/NULL branch_id) saw count() == 0 and
+        // tried to INSERT names that already existed elsewhere in the table,
+        // tripping what used to be a global unique constraint. Look up each
+        // default explicitly by (branchId, name) instead of trusting ambient
+        // filter state, so this stays correct however/whenever it's called.
+        Long branchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
 
         Object[][] defaults = {
             {"Supplements",      "SUPPLEMENTS", "bg-blue-500",   "Pill"},
@@ -96,9 +108,11 @@ public class ProductCategoryService {
         };
 
         for (Object[] row : defaults) {
-            if (categoryRepository.findByName((String) row[0]).isEmpty()) {
+            String name = (String) row[0];
+            if (categoryRepository.findByBranchIdAndName(branchId, name).isEmpty()) {
                 ProductCategory c = new ProductCategory();
-                c.setName((String) row[0]);
+                c.setBranchId(branchId);
+                c.setName(name);
                 c.setCategoryType((String) row[1]);
                 c.setColor((String) row[2]);
                 c.setIconName((String) row[3]);
