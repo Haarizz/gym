@@ -13,5 +13,12 @@ public interface ProductCategoryRepository extends JpaRepository<ProductCategory
 
     Optional<ProductCategory> findByName(String name);
 
+    // Explicit branch-scoped lookup, independent of whether Hibernate's
+    // "branchFilter" session filter happens to be enabled — used by seeding code
+    // that must check existence against the real (branch_id, name) unique
+    // constraint rather than whatever the ambient filter state is. branchId is
+    // nullable, matching rows created in "All Branches" (admin/global) mode.
+    Optional<ProductCategory> findByBranchIdAndName(Long branchId, String name);
+
     List<ProductCategory> findAllByOrderByNameAsc();
 }

@@ -504,10 +504,18 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private Long resolveCategoryId(String name) {
-        return productCategoryRepository.findByName(name)
+        // Branch-scoped lookup (see ProductCategoryService.initDefaultCategories's
+        // comment) — the unqualified findByName used to silently disagree with
+        // whatever branchFilter state was active, and the fallback insert below
+        // never stamped branchId at all, leaving orphaned NULL-branch categories
+        // that a real, branch-scoped uniqueness constraint would then collide
+        // with the next time this ran under an active branch filter.
+        Long branchId = BranchContextHolder.getActiveBranchId();
+        return productCategoryRepository.findByBranchIdAndName(branchId, name)
                 .map(ProductCategory::getId)
                 .orElseGet(() -> {
                     ProductCategory cat = new ProductCategory();
+                    cat.setBranchId(branchId);
                     cat.setName(name);
                     return productCategoryRepository.save(cat).getId();
                 });

@@ -5,14 +5,16 @@ import org.hibernate.annotations.Filter;
 
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
-@Table(name = "product_categories")
+@Table(name = "product_categories", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_product_categories_branch_name", columnNames = {"branch_id", "name"})
+})
 public class ProductCategory extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String name;
 
     // SUPPLEMENTS / EQUIPMENT / MERCHANDISE / CAFE / APPAREL / ACCESSORIES / FOOD_BEVERAGES / SERVICES
