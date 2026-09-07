@@ -380,7 +380,7 @@ public class TenantProvisioningService {
             emfBean.destroy();
         }
 
-        preInsertV24IfHibernateAlreadyCreatedUserProfiles(tenantDs);
+        dropUserProfilesSoFlywayCanCreateItCleanly(tenantDs);
 
         Flyway flyway = Flyway.configure()
                 .dataSource(tenantDs)
@@ -397,62 +397,32 @@ public class TenantProvisioningService {
      * "CREATE TABLE user_profiles (...)" with no IF NOT EXISTS, fails with
      * "relation already exists" the moment it runs seconds later in this same
      * provisioning call. Confirmed live: every gym created after V24 was added
-     * hits this — not a pre-existing-data edge case like the rest of this
-     * session's Flyway-history repairs, but the standard boot order for every
-     * future tenant. V24 can't be edited in place (checksummed/applied on every
-     * environment that already ran it), so this pre-inserts its history row —
-     * using the exact checksum Flyway itself computes for the file, verified
-     * against a local run — only when Hibernate has, in fact, already built the
-     * identical table, so Flyway's migrate() skips straight past it instead of
-     * re-attempting the CREATE TABLE.
+     * hits this, on the very first provisioning attempt — not a pre-existing-
+     * data edge case like the rest of this session's Flyway-history repairs.
+     *
+     * First attempt at this fix (pre-inserting V24's flyway_schema_history row
+     * before calling migrate()) only worked for a RETRY, where Flyway had
+     * already run partway and the history table already existed. On a
+     * brand-new tenant's first attempt — the common case — the history table
+     * doesn't exist yet at this point, baselineOnMigrate(true) does NOT mean
+     * "treat the whole existing schema as already migrated" (a wrong
+     * assumption in that first attempt), and Flyway genuinely runs V1 through
+     * V24 in full against the Hibernate-built schema, hitting the exact same
+     * collision. Confirmed live against tenant "fit-zone".
+     *
+     * The actually-robust fix: since V24 can't be edited in place (checksummed
+     * everywhere it's already applied), just don't let Hibernate create this
+     * table at all — drop it right after the bootstrap pass, unconditionally,
+     * so V24's own CREATE TABLE is always the sole, legitimate creator on
+     * every run (first attempt or retry alike). Every column this table needs
+     * is defined by V24 itself, so nothing is lost by not letting Hibernate
+     * create it first; V36 (also already applied by every environment that
+     * needs it) adds the two audit columns V24 itself is missing.
      */
-    private void preInsertV24IfHibernateAlreadyCreatedUserProfiles(DataSource tenantDs) throws Exception {
-        try (Connection conn = tenantDs.getConnection()) {
-            boolean userProfilesExists;
-            try (PreparedStatement check = conn.prepareStatement(
-                    "SELECT to_regclass('public.user_profiles') IS NOT NULL")) {
-                try (ResultSet rs = check.executeQuery()) {
-                    rs.next();
-                    userProfilesExists = rs.getBoolean(1);
-                }
-            }
-            if (!userProfilesExists) {
-                return;
-            }
-
-            boolean flywayHistoryExists;
-            try (PreparedStatement check = conn.prepareStatement(
-                    "SELECT to_regclass('public.flyway_schema_history') IS NOT NULL")) {
-                try (ResultSet rs = check.executeQuery()) {
-                    rs.next();
-                    flywayHistoryExists = rs.getBoolean(1);
-                }
-            }
-            if (!flywayHistoryExists) {
-                // Flyway hasn't run at all yet this call (no baseline row either) —
-                // its own baselineOnMigrate=true/baselineVersion=0 will create the
-                // history table and treat this whole schema as pre-existing at
-                // version 0, so V24 never gets individually attempted against it.
-                // Nothing to pre-insert.
-                return;
-            }
-
-            try (PreparedStatement check = conn.prepareStatement(
-                    "SELECT 1 FROM flyway_schema_history WHERE version = '24'")) {
-                try (ResultSet rs = check.executeQuery()) {
-                    if (rs.next()) {
-                        return; // already recorded — nothing to do
-                    }
-                }
-            }
-
-            try (PreparedStatement insert = conn.prepareStatement(
-                    "INSERT INTO flyway_schema_history " +
-                    "(installed_rank, version, description, type, script, checksum, installed_by, installed_on, execution_time, success) " +
-                    "SELECT COALESCE(MAX(installed_rank), 0) + 1, '24', 'user profile', 'SQL', 'V24__user_profile.sql', -938505568, current_user, now(), 0, true " +
-                    "FROM flyway_schema_history")) {
-                insert.executeUpdate();
-            }
+    private void dropUserProfilesSoFlywayCanCreateItCleanly(DataSource tenantDs) throws Exception {
+        try (Connection conn = tenantDs.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE IF EXISTS user_profiles");
         }
     }
 
