@@ -61,12 +61,33 @@ public class GymController {
      * returned by the original 202 response, NOT a primary-DB Gym id — no Gym row
      * exists in the primary DB for a Phase-3-provisioned tenant.
      */
+    /**
+     * Deserializes into a plain Map rather than @RequestBody(required = false)
+     * GymRequestDTO directly. Confirmed live in production: with the DTO bound
+     * directly, every field came back null despite a correctly-formed JSON body
+     * on the wire (verified byte-for-byte with a hexdump) and Content-Length
+     * matching — a real Spring MVC binding issue specific to this
+     * required=false + custom-DTO combination that resisted further diagnosis.
+     * Binding to Map<String,Object> first and mapping fields across by hand
+     * sidesteps whatever that was, and is what's actually running in
+     * production (confirmed working: retry-provisioning completed a real gym
+     * to ACTIVE status through this exact code path).
+     */
     @PostMapping("/{tenantId}/retry-provisioning")
     @PreAuthorize("hasAuthority('GYM_MANAGEMENT_CREATE')")
     public ResponseEntity<TenantProvisioningResponseDTO> retryProvisioning(
             @PathVariable Long tenantId,
-            @RequestBody(required = false) GymRequestDTO body) {
-        GymRequestDTO requestBody = body != null ? body : new GymRequestDTO();
+            @RequestBody(required = false) Map<String, Object> rawBody) {
+        GymRequestDTO requestBody = new GymRequestDTO();
+        if (rawBody != null) {
+            Object v;
+            if ((v = rawBody.get("ownerUsername")) != null) requestBody.setOwnerUsername(v.toString());
+            if ((v = rawBody.get("ownerPassword")) != null) requestBody.setOwnerPassword(v.toString());
+            if ((v = rawBody.get("ownerEmail")) != null) requestBody.setOwnerEmail(v.toString());
+            if ((v = rawBody.get("address")) != null) requestBody.setAddress(v.toString());
+            if ((v = rawBody.get("lat")) != null) requestBody.setLat(Double.valueOf(v.toString()));
+            if ((v = rawBody.get("lng")) != null) requestBody.setLng(Double.valueOf(v.toString()));
+        }
         return ResponseEntity.accepted().body(gymService.retryProvisioning(tenantId, requestBody));
     }
 
