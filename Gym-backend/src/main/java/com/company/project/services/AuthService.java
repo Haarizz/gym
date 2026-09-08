@@ -294,7 +294,7 @@ public class AuthService {
     private Boolean deriveProfileCompleted(Long userId) {
         return userProfileRepository.findByUserId(userId)
                 .map(com.company.project.entities.UserProfile::isProfileCompleted)
-                .orElse(false);
+                .orElse(true);
     }
 
     private List<com.company.project.dto.BranchResponseDTO> fetchAccessibleBranches(UserDetailsImpl userDetails) {

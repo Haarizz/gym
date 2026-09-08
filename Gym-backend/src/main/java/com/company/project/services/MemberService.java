@@ -27,6 +27,9 @@ import com.company.project.repositories.RoleRepository;
 import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
 import com.company.project.repositories.UserBranchRepository;
+import com.company.project.controlplane.repositories.UserDirectoryRepository;
+import com.company.project.controlplane.entities.UserDirectoryEntry;
+import com.company.project.security.TenantContextHolder;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.context.annotation.Lazy;
@@ -67,6 +70,7 @@ public class MemberService {
     private final FinancialEventService financialEventService;
     private final BranchService branchService;
     private final UserBranchRepository userBranchRepository;
+    private final UserDirectoryRepository userDirectoryRepository;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
@@ -80,7 +84,8 @@ public class MemberService {
                          ReceiptVoucherService receiptVoucherService,
                          FinancialEventService financialEventService,
                          BranchService branchService,
-                         UserBranchRepository userBranchRepository) {
+                         UserBranchRepository userBranchRepository,
+                         UserDirectoryRepository userDirectoryRepository) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
         this.receiptService            = receiptService;
@@ -94,6 +99,7 @@ public class MemberService {
         this.financialEventService     = financialEventService;
         this.branchService             = branchService;
         this.userBranchRepository      = userBranchRepository;
+        this.userDirectoryRepository   = userDirectoryRepository;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -427,6 +433,10 @@ public class MemberService {
                 userBranchRepository.save(new UserBranch(user.getId(), saved.getBranchId()));
             }
 
+            if (TenantContextHolder.getCurrentTenant() != null) {
+                userDirectoryRepository.save(new UserDirectoryEntry(user.getUsername(), user.getEmail(), TenantContextHolder.getCurrentTenant()));
+            }
+
             saved.setUserId(user.getId());
             saved.setAppUsername(request.getAppUsername());
             saved.setAppAccessEnabled(true);
@@ -487,6 +497,10 @@ public class MemberService {
 
             if (member.getBranchId() != null) {
                 userBranchRepository.save(new UserBranch(user.getId(), member.getBranchId()));
+            }
+
+            if (TenantContextHolder.getCurrentTenant() != null) {
+                userDirectoryRepository.save(new UserDirectoryEntry(user.getUsername(), user.getEmail(), TenantContextHolder.getCurrentTenant()));
             }
 
             member.setUserId(user.getId());
