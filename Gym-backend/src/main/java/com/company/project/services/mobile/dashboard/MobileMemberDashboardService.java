@@ -53,7 +53,15 @@ public class MobileMemberDashboardService {
             throw new EntityNotFoundException("User not authenticated");
         }
 
-        Optional<Member> memberOpt = memberRepository.findByUserId(principal.getId());
+        Optional<Member> memberOpt = principal.isGlobal()
+                ? memberRepository.findByGlobalUserId(principal.getId())
+                : memberRepository.findByUserId(principal.getId());
+
+        // Fallback: if a global-flagged user has no globalUserId record, try local userId
+        // (this handles stale tokens issued before IS_GLOBAL_CLAIM was corrected)
+        if (memberOpt.isEmpty() && principal.isGlobal()) {
+            memberOpt = memberRepository.findByUserId(principal.getId());
+        }
 
         if (memberOpt.isEmpty()) {
             String role = principal.getAuthorities().stream()

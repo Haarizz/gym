@@ -745,15 +745,18 @@ export default function App() {
   // GYMBIOS_ADMIN (platform owner) is scoped to Gym Management only — it manages
   // gym clients, not its own branch/profile, so both are hidden for this role
   // specifically rather than gated by the normal per-module permission system.
-  const isGymbiosAdmin = sessionStorage.getItem('gymbios_role_name')?.toLowerCase() === 'gymbios_admin';
+  const rolesRaw = sessionStorage.getItem('roles');
+  const roles = rolesRaw ? (JSON.parse(rolesRaw) as string[]) : [];
+  const isGymbiosAdmin = roles.some(r => r.toLowerCase().replace('role_', '') === 'gymbios_admin') || sessionStorage.getItem('gymbios_role_name')?.toLowerCase().replace('role_', '') === 'gymbios_admin';
   // ADMIN (a gym owner) can view "All Branches" — aggregated across their own
   // gym's branches only, never other gyms'. See branch-context.tsx's matching
   // canUseAllBranches() and BranchContextFilter.java on the backend.
   const canViewAllBranches = isGymbiosAdmin
-    || sessionStorage.getItem('gymbios_role_name')?.toLowerCase() === 'admin';
+    || roles.some(r => r.toLowerCase().replace('role_', '') === 'admin')
+    || sessionStorage.getItem('gymbios_role_name')?.toLowerCase().replace('role_', '') === 'admin';
   const visibleMenuItems = useMemo(
     () => filterMenuByPermission(menuItems, hasPermission).filter(
-      (item) => !(isGymbiosAdmin && item.id === 'my-profile')
+      (item) => isGymbiosAdmin ? item.id === 'gym-management' : true
     ),
     [permissions, isGymbiosAdmin],
   );
@@ -761,7 +764,9 @@ export default function App() {
   // Blocks direct URL navigation to a gated page too — sidebar hiding alone
   // doesn't stop typing e.g. /payroll-employees straight into the address bar.
   const requiredRoutePermission = routePermissionMap[location.pathname];
-  const routeAllowed = !requiredRoutePermission || permissions.includes(requiredRoutePermission);
+  const routeAllowed = isGymbiosAdmin 
+    ? (location.pathname === '/gym-management' || location.pathname === '/')
+    : (!requiredRoutePermission || permissions.includes(requiredRoutePermission));
 
   // Provide navigation params from location state if available
   const navigationParams = location.state || {};
@@ -816,7 +821,7 @@ export default function App() {
     async (email: string, password: string, rememberMe: boolean) => {
       try {
         console.log('Attempting login for:', email);
-        const result = await authService.signIn(email, password, rememberMe);
+        const result = await authService.signIn(email, password);
         
         if (result.success) {
           const currentUser = authService.getCurrentUser();

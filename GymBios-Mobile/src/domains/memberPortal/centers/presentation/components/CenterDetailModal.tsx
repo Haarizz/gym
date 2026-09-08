@@ -1,35 +1,48 @@
 import { useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
-import type { CenterItem } from './CenterCard';
-import { PlanCard, type MembershipPlanItem } from './PlanCard';
+import type { CenterSummary, CenterPlan } from '@/domains/discovery';
+import { useCenterDetails, useCenterPlans } from '@/domains/discovery';
+import { PlanCard } from './PlanCard';
 import { PlanPurchaseModal } from './PlanPurchaseModal';
 
 interface CenterDetailModalProps {
   visible: boolean;
-  center: CenterItem | null;
+  center: CenterSummary | null;
   onClose: () => void;
 }
 
 export function CenterDetailModal({ visible, center, onClose }: CenterDetailModalProps) {
-  const [selectedPlan, setSelectedPlan] = useState<MembershipPlanItem | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<CenterPlan | null>(null);
   const [isPurchaseModalVisible, setIsPurchaseModalVisible] = useState(false);
+
+  const { data: details, isLoading: isDetailsLoading } = useCenterDetails(
+    center?.tenantSlug || '',
+    center?.branchId || 0
+  );
+
+  const { data: plans, isLoading: isPlansLoading } = useCenterPlans(
+    center?.tenantSlug || '',
+    center?.branchId || 0
+  );
 
   if (!center) return null;
 
   const handleCall = () => {
-    Linking.openURL(`tel:${center.phone}`).catch(() => {
-      toast.info(`Call center at ${center.phone}`, { title: 'Phone Call' });
-    });
+    if (details?.phone) {
+      Linking.openURL(`tel:${details.phone}`).catch(() => {
+        toast.info(`Call center at ${details.phone}`, { title: 'Phone Call' });
+      });
+    }
   };
 
   const handleNavigate = () => {
-    toast.info(`Navigating to ${center.name}, ${center.address}`, { title: 'Directions' });
+    toast.info(`Navigating to ${center.centerName}, ${center.address}`, { title: 'Directions' });
   };
 
-  const handleSelectPlan = (plan: MembershipPlanItem) => {
+  const handleSelectPlan = (plan: CenterPlan) => {
     setSelectedPlan(plan);
     setIsPurchaseModalVisible(true);
   };
@@ -44,7 +57,7 @@ export function CenterDetailModal({ visible, center, onClose }: CenterDetailModa
               <Feather name="chevron-left" size={24} color={BrandColors.textPrimary} />
             </Pressable>
             <Text style={styles.headerTitle} numberOfLines={1}>
-              {center.name}
+              {center.centerName}
             </Text>
             <Pressable hitSlop={12} onPress={handleCall} style={styles.phoneButton}>
               <Feather name="phone" size={18} color={BrandColors.teal} />
@@ -55,109 +68,134 @@ export function CenterDetailModal({ visible, center, onClose }: CenterDetailModa
             {/* Hero Card */}
             <View style={styles.heroCard}>
               <View style={styles.heroHeader}>
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryText}>{center.category}</Text>
-                </View>
-                <View style={styles.ratingBadge}>
-                  <Feather name="star" size={13} color="#F59E0B" />
-                  <Text style={styles.ratingText}>{center.rating}</Text>
-                  <Text style={styles.reviewsText}>({center.reviews})</Text>
-                </View>
+                {center.centerType && (
+                  <View style={styles.categoryBadge}>
+                    <Text style={styles.categoryText}>{center.centerType}</Text>
+                  </View>
+                )}
+                {/* Rating badge removed as per requirements */}
               </View>
 
-              <Text style={styles.heroName}>{center.name}</Text>
-              <Text style={styles.heroAddress}>{center.address}</Text>
+              <Text style={styles.heroName}>{center.centerName}</Text>
+              {center.address && <Text style={styles.heroAddress}>{center.address}</Text>}
 
               <View style={styles.heroActions}>
                 <Pressable style={styles.directionButton} onPress={handleNavigate}>
                   <Feather name="navigation" size={14} color="#FFFFFF" />
-                  <Text style={styles.directionButtonText}>Directions ({center.distance})</Text>
+                  <Text style={styles.directionButtonText}>Directions</Text>
                 </Pressable>
-                <Pressable style={styles.callActionButton} onPress={handleCall}>
-                  <Feather name="phone-call" size={14} color={BrandColors.teal} />
-                  <Text style={styles.callActionText}>Call</Text>
-                </Pressable>
+                {details?.phone && (
+                  <Pressable style={styles.callActionButton} onPress={handleCall}>
+                    <Feather name="phone-call" size={14} color={BrandColors.teal} />
+                    <Text style={styles.callActionText}>Call</Text>
+                  </Pressable>
+                )}
               </View>
             </View>
 
-            {/* About Section */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionHeading}>About This Center</Text>
-              <Text style={styles.aboutText}>{center.about}</Text>
+            {isDetailsLoading ? (
+              <ActivityIndicator size="large" color={BrandColors.teal} style={{ marginTop: 20 }} />
+            ) : details ? (
+              <>
+                {/* About Section */}
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionHeading}>About This Center</Text>
+                  {details.about && <Text style={styles.aboutText}>{details.about}</Text>}
 
-              <View style={styles.timingBox}>
-                <Feather name="clock" size={16} color={BrandColors.trainerAmber} />
-                <View style={styles.timingInfo}>
-                  <Text style={styles.timingLabel}>Timings</Text>
-                  <Text style={styles.timingText}>{center.timings}</Text>
-                </View>
-              </View>
-
-              <View style={styles.genderBox}>
-                <Feather name="users" size={16} color={BrandColors.teal} />
-                <View style={styles.timingInfo}>
-                  <Text style={styles.timingLabel}>Access Type</Text>
-                  <Text style={styles.timingText}>{center.genderType}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Facilities Section */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionHeading}>Amenities & Facilities</Text>
-              <View style={styles.facilityGrid}>
-                {center.facilities.map((fac, idx) => (
-                  <View key={idx} style={styles.facilityCard}>
-                    <Feather name="check-circle" size={14} color={BrandColors.teal} />
-                    <Text style={styles.facilityName}>{fac}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Certified Trainers */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionHeading}>Certified Trainers</Text>
-              <View style={styles.trainerList}>
-                {center.trainers.map((trainer, idx) => (
-                  <View key={idx} style={styles.trainerItem}>
-                    <View style={styles.trainerAvatar}>
-                      <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
+                  {details.operatingHours && (
+                    <View style={styles.timingBox}>
+                      <Feather name="clock" size={16} color={BrandColors.trainerAmber} />
+                      <View style={styles.timingInfo}>
+                        <Text style={styles.timingLabel}>Timings</Text>
+                        <Text style={styles.timingText}>{details.operatingHours}</Text>
+                      </View>
                     </View>
-                    <View style={styles.trainerInfo}>
-                      <Text style={styles.trainerName}>{trainer.name}</Text>
-                      <Text style={styles.trainerSpecialty}>{trainer.specialty}</Text>
+                  )}
+
+                  {details.accessType && (
+                    <View style={styles.genderBox}>
+                      <Feather name="users" size={16} color={BrandColors.teal} />
+                      <View style={styles.timingInfo}>
+                        <Text style={styles.timingLabel}>Access Type</Text>
+                        <Text style={styles.timingText}>{details.accessType}</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Facilities / Amenities */}
+                {details.amenities && details.amenities.length > 0 && (
+                  <View style={styles.sectionCard}>
+                    <Text style={styles.sectionHeading}>Facilities & Amenities</Text>
+                    <View style={styles.facilityGrid}>
+                      {details.amenities.map((fac) => (
+                        <View key={fac.id || fac.facility_id} style={styles.facilityCard}>
+                          <Feather name="check-circle" size={14} color={BrandColors.teal} />
+                          <Text style={styles.facilityName}>{fac.name}</Text>
+                        </View>
+                      ))}
                     </View>
                   </View>
-                ))}
-              </View>
-            </View>
+                )}
+
+                {/* Certified Trainers */}
+                {details.trainers && details.trainers.length > 0 && (
+                  <View style={styles.sectionCard}>
+                    <Text style={styles.sectionHeading}>Certified Trainers</Text>
+                    <View style={styles.trainerList}>
+                      {details.trainers.map((trainer) => (
+                        <View key={trainer.staffId || trainer.id} style={styles.trainerItem}>
+                          <View style={styles.trainerAvatar}>
+                            <Text style={styles.trainerAvatarText}>
+                              {trainer.name.substring(0, 2).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={styles.trainerInfo}>
+                            <Text style={styles.trainerName}>{trainer.name}</Text>
+                            <Text style={styles.trainerSpecialty}>{trainer.role || 'Trainer'}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </>
+            ) : null}
 
             {/* Membership Plans */}
             <View style={styles.sectionCard}>
               <Text style={styles.sectionHeading}>Membership Plans</Text>
               <Text style={styles.plansSubtitle}>Select a plan to join this center</Text>
-              <View style={styles.plansList}>
-                {center.plans.map((plan) => (
-                  <PlanCard key={plan.id} plan={plan} onSelect={handleSelectPlan} />
-                ))}
-              </View>
+              
+              {isPlansLoading ? (
+                <ActivityIndicator size="small" color={BrandColors.teal} />
+              ) : plans && plans.length > 0 ? (
+                <View style={styles.plansList}>
+                  {plans.map((plan) => (
+                    <PlanCard key={plan.id} plan={plan} onSelect={handleSelectPlan} />
+                  ))}
+                </View>
+              ) : (
+                <Text style={{ color: BrandColors.textSecondary, marginTop: Spacing.two }}>No plans available at the moment.</Text>
+              )}
             </View>
           </ScrollView>
         </View>
       </View>
 
       {/* Plan Purchase Modal */}
-      <PlanPurchaseModal
-        visible={isPurchaseModalVisible}
-        plan={selectedPlan}
-        center={center}
-        onClose={() => setIsPurchaseModalVisible(false)}
-        onSuccess={() => {
-          setIsPurchaseModalVisible(false);
-          onClose();
-        }}
-      />
+      {selectedPlan && (
+        <PlanPurchaseModal
+          visible={isPurchaseModalVisible}
+          plan={selectedPlan as any} // Keeping as any to avoid modifying PlanPurchaseModal for now as requested
+          center={center as any} // Keeping as any to avoid modifying PlanPurchaseModal
+          onClose={() => setIsPurchaseModalVisible(false)}
+          onSuccess={() => {
+            setIsPurchaseModalVisible(false);
+            onClose();
+          }}
+        />
+      )}
     </Modal>
   );
 }
@@ -227,29 +265,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two + 2,
     paddingVertical: 3,
     borderRadius: Radius.full,
+    alignSelf: 'flex-start',
   },
   categoryText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingHorizontal: Spacing.two + 2,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  reviewsText: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.8)',
   },
   heroName: {
     fontSize: 22,

@@ -7,182 +7,14 @@ import {
   Text,
   TextInput,
   View,
+  ActivityIndicator,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
-import { CenterCard, type CenterItem } from '../components/CenterCard';
+import { CenterCard } from '../components/CenterCard';
 import { CenterDetailModal } from '../components/CenterDetailModal';
 import { CenterFiltersModal } from '../components/CenterFiltersModal';
-
-const CENTERS_DATA: CenterItem[] = [
-  {
-    id: '1',
-    name: 'FitZone Premium',
-    category: 'Gym',
-    address: '14, Hill Road, Bandra West, Mumbai',
-    area: 'Bandra West',
-    distance: '0.8 km',
-    rating: 4.8,
-    reviews: 312,
-    about:
-      'FitZone Premium is a premier fitness destination with 15,000 sq ft of state-of-the-art equipment. Our 24/7 facility offers world-class amenities, certified trainers, and a motivating community.',
-    facilities: [
-      'Cardio Zone',
-      'Free Weights',
-      'Group Classes',
-      'Steam Room',
-      'Locker Room',
-      'Juice Bar',
-      'Parking',
-      'Functional Training',
-    ],
-    trainers: [
-      { name: 'Rahul Sharma', specialty: 'Strength & Conditioning', avatar: 'RS' },
-      { name: 'Priya Mehta', specialty: 'HIIT & Cardio', avatar: 'PM' },
-      { name: 'Karan Bose', specialty: 'Powerlifting', avatar: 'KB' },
-    ],
-    timings: 'Mon–Sat: 5:00 AM – 11:00 PM\nSun: 7:00 AM – 9:00 PM',
-    genderType: 'Mixed',
-    phone: '+91 98200 12345',
-    established: '2018',
-    plans: [
-      {
-        id: 'p1',
-        name: 'Monthly',
-        duration: '1 Month',
-        durationMonths: 1,
-        price: 2499,
-        taxPct: 18,
-        features: ['Full gym access', 'Group classes (4/week)', 'Locker access'],
-      },
-      {
-        id: 'p2',
-        name: 'Quarterly',
-        duration: '3 Months',
-        durationMonths: 3,
-        price: 6499,
-        originalPrice: 7497,
-        taxPct: 18,
-        features: ['Full gym access', 'Unlimited group classes', 'Locker access', '2 PT sessions'],
-        popular: true,
-        offer: 'Save ₹998',
-      },
-      {
-        id: 'p3',
-        name: 'Annual',
-        duration: '12 Months',
-        durationMonths: 12,
-        price: 22999,
-        originalPrice: 29988,
-        taxPct: 18,
-        features: ['24/7 all-club access', 'Unlimited classes & PT assessment', 'Guest passes (5)', 'Dietician consultation'],
-        offer: 'Save ₹6,989',
-      },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Iron Temple Gym & Studio',
-    category: 'Studio',
-    address: '22, Linking Road, Khar West, Mumbai',
-    area: 'Khar West',
-    distance: '1.4 km',
-    rating: 4.6,
-    reviews: 198,
-    about:
-      'Hardcore training space built for serious lifters, strength athletes, and functional fitness enthusiasts with Olympic platforms and competition racks.',
-    facilities: [
-      'Olympic Platforms',
-      'Power Racks',
-      'Turf Track',
-      'Sauna',
-      'Protein Bar',
-      'Physio On-site',
-    ],
-    trainers: [
-      { name: 'Vikram Rao', specialty: 'Bodybuilding & Hypertrophy', avatar: 'VR' },
-      { name: 'Sneha Roy', specialty: 'Mobility & Calisthenics', avatar: 'SR' },
-    ],
-    timings: 'Mon–Sun: 6:00 AM – 10:30 PM',
-    genderType: 'Mixed',
-    phone: '+91 98200 67890',
-    established: '2020',
-    plans: [
-      {
-        id: 'p4',
-        name: 'Monthly Pro',
-        duration: '1 Month',
-        durationMonths: 1,
-        price: 2999,
-        taxPct: 18,
-        features: ['Full weightroom access', 'Open gym 7 days', 'Locker'],
-      },
-      {
-        id: 'p5',
-        name: 'Annual Elite',
-        duration: '12 Months',
-        durationMonths: 12,
-        price: 24999,
-        originalPrice: 35988,
-        taxPct: 18,
-        features: ['Full access + recovery suite', '12 PT sessions', 'Custom programming', 'Guest passes (10)'],
-        popular: true,
-        offer: 'Save ₹10,989',
-      },
-    ],
-  },
-  {
-    id: '3',
-    name: 'Aura Wellness & Pilates Studio',
-    category: 'Wellness Center',
-    address: '5th Floor, Trade Center, BKC, Mumbai',
-    area: 'BKC',
-    distance: '3.2 km',
-    rating: 4.9,
-    reviews: 420,
-    about:
-      'Holistic sanctuary offering Reformer Pilates, Aerial Yoga, sound baths, and recovery therapies in a serene, eco-conscious atmosphere.',
-    facilities: [
-      'Reformer Pilates',
-      'Yoga Shala',
-      'Ice Bath & Sauna',
-      'Meditation Lounge',
-      'Organic Cafe',
-      'Valet Parking',
-    ],
-    trainers: [
-      { name: 'Maya Singh', specialty: 'Master Pilates Instructor', avatar: 'MS' },
-      { name: 'Tara Deshmukh', specialty: 'Ashtanga Yoga & Breathwork', avatar: 'TD' },
-    ],
-    timings: 'Mon–Sat: 6:30 AM – 9:00 PM\nSun: 8:00 AM – 6:00 PM',
-    genderType: 'Ladies Only',
-    phone: '+91 98200 99887',
-    established: '2021',
-    plans: [
-      {
-        id: 'p6',
-        name: 'Reformer 10-Class Pack',
-        duration: '2 Months',
-        durationMonths: 2,
-        price: 8500,
-        taxPct: 18,
-        features: ['10 Reformer sessions', 'Ice bath access', 'Locker & towel service'],
-      },
-      {
-        id: 'p7',
-        name: 'Unlimited Wellness Annual',
-        duration: '12 Months',
-        durationMonths: 12,
-        price: 45000,
-        originalPrice: 60000,
-        taxPct: 18,
-        features: ['Unlimited Pilates & Yoga', 'Weekly recovery suite session', 'Nutrition coach'],
-        popular: true,
-        offer: 'Save ₹15,000',
-      },
-    ],
-  },
-];
+import { useCenters, type CenterSummary } from '@/domains/discovery';
 
 const CATEGORY_TABS = ['All', 'Gym', 'Fitness Center', 'Wellness Center', 'Studio'];
 
@@ -190,36 +22,27 @@ export function MemberCentersScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedGender, setSelectedGender] = useState('All');
-  const [sortBy, setSortBy] = useState('Rating');
+  const [sortBy, setSortBy] = useState('Rating'); // Kept for UI compatibility, even without rating
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [selectedCenter, setSelectedCenter] = useState<CenterItem | null>(null);
+  const [selectedCenter, setSelectedCenter] = useState<CenterSummary | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isRefetching, setIsRefetching] = useState(false);
+
+  const { data: centers = [], isLoading, isRefetching, refetch } = useCenters();
 
   const filteredCenters = useMemo(() => {
-    return CENTERS_DATA.filter((center) => {
+    return centers.filter((center) => {
       const matchesSearch =
-        center.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        center.area.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        center.address.toLowerCase().includes(searchQuery.toLowerCase());
+        (center.centerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (center.address || '').toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesCat =
-        selectedCategory === 'All' || center.category === selectedCategory;
+        selectedCategory === 'All' || center.centerType === selectedCategory;
 
-      const matchesGender =
-        selectedGender === 'All' || center.genderType === selectedGender;
-
-      return matchesSearch && matchesCat && matchesGender;
-    }).sort((a, b) => {
-      if (sortBy === 'Rating') return b.rating - a.rating;
-      if (sortBy === 'Distance') {
-        return parseFloat(a.distance) - parseFloat(b.distance);
-      }
-      return 0;
+      return matchesSearch && matchesCat;
     });
-  }, [searchQuery, selectedCategory, selectedGender, sortBy]);
+  }, [centers, searchQuery, selectedCategory, selectedGender, sortBy]);
 
-  const handleCenterPress = (center: CenterItem) => {
+  const handleCenterPress = (center: CenterSummary) => {
     setSelectedCenter(center);
     setIsDetailOpen(true);
   };
@@ -230,11 +53,8 @@ export function MemberCentersScreen() {
     setSortBy('Rating');
   };
 
-  const onRefresh = () => {
-    setIsRefetching(true);
-    setTimeout(() => {
-      setIsRefetching(false);
-    }, 600);
+  const handleRefresh = async () => {
+    await refetch();
   };
 
   return (
@@ -303,7 +123,7 @@ export function MemberCentersScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
-            onRefresh={onRefresh}
+            onRefresh={handleRefresh}
             tintColor={BrandColors.teal}
             colors={[BrandColors.teal]}
           />
@@ -316,9 +136,11 @@ export function MemberCentersScreen() {
           </Text>
         </View>
 
-        {filteredCenters.length > 0 ? (
+        {isLoading && !isRefetching ? (
+          <ActivityIndicator size="large" color={BrandColors.teal} style={{ marginTop: 40 }} />
+        ) : filteredCenters.length > 0 ? (
           filteredCenters.map((center) => (
-            <CenterCard key={center.id} center={center} onPress={handleCenterPress} />
+            <CenterCard key={`${center.tenantSlug}-${center.branchId}`} center={center} onPress={handleCenterPress} />
           ))
         ) : (
           <View style={styles.emptyState}>
@@ -330,11 +152,13 @@ export function MemberCentersScreen() {
       </ScrollView>
 
       {/* Detail Modal */}
-      <CenterDetailModal
-        visible={isDetailOpen}
-        center={selectedCenter}
-        onClose={() => setIsDetailOpen(false)}
-      />
+      {selectedCenter && (
+        <CenterDetailModal
+          visible={isDetailOpen}
+          center={selectedCenter}
+          onClose={() => setIsDetailOpen(false)}
+        />
+      )}
 
       {/* Filters Modal */}
       <CenterFiltersModal

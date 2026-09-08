@@ -11,6 +11,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.context.ApplicationContext;
+import com.company.project.repositories.MemberRepository;
 
 import java.io.IOException;
 
@@ -34,12 +36,14 @@ import java.io.IOException;
 public class TenantContextFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final ApplicationContext applicationContext;
 
     @Value("${tenant.routing.enabled:false}")
     private boolean tenantRoutingEnabled;
 
-    public TenantContextFilter(JwtService jwtService) {
+    public TenantContextFilter(JwtService jwtService, ApplicationContext applicationContext) {
         this.jwtService = jwtService;
+        this.applicationContext = applicationContext;
     }
 
     @Override
@@ -62,18 +66,53 @@ public class TenantContextFilter extends OncePerRequestFilter {
                         .anyMatch(a -> a.equals("ROLE_GYMBIOS_ADMIN"));
 
                 if (!isGymbiosAdmin) {
+                    UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
                     String tenantSlug = null;
                     String authHeader = request.getHeader("Authorization");
                     if (authHeader != null && authHeader.startsWith("Bearer ")) {
                         tenantSlug = jwtService.extractTenant(authHeader.substring(7));
                     }
-
-                    if (tenantSlug == null || tenantSlug.isBlank()) {
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                                "Request is missing a valid tenant context");
-                        return;
+                    
+                    if (userDetails.isGlobal()) {
+                        String headerTenant = request.getHeader("X-Tenant-ID");
+                        if (headerTenant != null && !headerTenant.isBlank()) {
+                            tenantSlug = headerTenant;
+                        }
                     }
-                    TenantContextHolder.setCurrentTenant(tenantSlug);
+
+                    String path = request.getRequestURI();
+                    boolean isGlobalExemptPath = path.startsWith("/api/auth/")
+                            || path.startsWith("/api/mobile/auth/")
+                            || path.startsWith("/api/mobile/profile/")
+                            || path.startsWith("/api/mobile/discovery/")
+                            || path.startsWith("/api/community")
+                            || path.startsWith("/api/notifications");
+
+                    if (tenantSlug != null && !tenantSlug.isBlank()) {
+                        TenantContextHolder.setCurrentTenant(tenantSlug);
+                        
+                        // Validate multi-tenant authorization for global users on protected member paths
+                        if (userDetails.isGlobal() && !isGlobalExemptPath) {
+                            MemberRepository memberRepository = applicationContext.getBean(MemberRepository.class);
+                            if (!memberRepository.existsByGlobalUserId(userDetails.getId())) {
+                                TenantContextHolder.clear();
+                                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied: Not a member of this Gym");
+                                return;
+                            }
+                        }
+                    } else {
+                        // Keep legacy exemptions for non-mobile apps (staff, trainers)
+                        boolean isLegacyExemptPath = isGlobalExemptPath 
+                                || path.equals("/api/branches/my-branches")
+                                || path.equals("/api/members/me");
+
+                        // Global users can access endpoints without a tenant (e.g., to see empty dashboard before joining a gym)
+                        if (!isLegacyExemptPath && !userDetails.isGlobal()) {
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                                    "Request is missing a valid tenant context");
+                            return;
+                        }
+                    }
                 }
                 // GYMBIOS_ADMIN: skip tenant resolution entirely, same as BranchContextFilter.
             }

@@ -133,12 +133,13 @@ public class NotificationScheduler {
 
         // Individual notification for each member's own account
         for (Member m : expiring) {
-            if (m.getUserId() != null) {
+            Long targetId = m.getUserId() != null ? m.getUserId() : m.getGlobalUserId();
+            if (targetId != null) {
                 String daysLeft = m.getExpiryDate() != null
                         ? String.valueOf(java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), m.getExpiryDate().toLocalDate()))
                         : "?";
                 notificationService.notifyUser(
-                        m.getUserId(),
+                        targetId,
                         "Membership Expiring Soon",
                         "Your membership expires in " + daysLeft + " day" + (daysLeft.equals("1") ? "" : "s") + ". Renew now to stay active.",
                         "WARNING", "MEDIUM", "MEMBERS",
@@ -180,9 +181,10 @@ public class NotificationScheduler {
         );
 
         for (Member m : expired) {
-            if (m.getUserId() != null) {
+            Long targetId = m.getUserId() != null ? m.getUserId() : m.getGlobalUserId();
+            if (targetId != null) {
                 notificationService.notifyUser(
-                        m.getUserId(),
+                        targetId,
                         "Membership Expired",
                         "Your membership has expired. Please renew to continue accessing the gym.",
                         "DANGER", "HIGH", "MEMBERS",

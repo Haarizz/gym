@@ -106,7 +106,7 @@ export function mapLoginResponseToSession(
       fullName: ROLE_DISPLAY_NAMES[appRole] ?? response.username,
       appRole,
       permissions,
-      branchId: response.branchId ?? response.branch_id,
+      branchId: response.branchId ?? response.defaultBranchId ?? response.default_branch_id ?? response.branch_id,
       profileCompleted: response.profileCompleted ?? response.profile_completed ?? true,
     }),
   });

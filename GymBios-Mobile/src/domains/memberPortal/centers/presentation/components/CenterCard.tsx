@@ -1,100 +1,57 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
-import type { MembershipPlanItem } from './PlanCard';
-
-export interface TrainerItem {
-  name: string;
-  specialty: string;
-  avatar: string;
-}
-
-export interface CenterItem {
-  id: string;
-  name: string;
-  category: string;
-  address: string;
-  area: string;
-  distance: string;
-  rating: number;
-  reviews: number;
-  about: string;
-  facilities: string[];
-  trainers: TrainerItem[];
-  timings: string;
-  genderType: string;
-  plans: MembershipPlanItem[];
-  phone: string;
-  established: string;
-}
+import type { CenterSummary } from '@/domains/discovery';
 
 interface CenterCardProps {
-  center: CenterItem;
-  onPress: (center: CenterItem) => void;
+  center: CenterSummary;
+  onPress: (center: CenterSummary) => void;
 }
 
 export function CenterCard({ center, onPress }: CenterCardProps) {
-  const lowestPlanPrice = Math.min(...center.plans.map((p) => p.price));
-
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       onPress={() => onPress(center)}
       accessibilityRole="button"
-      accessibilityLabel={center.name}
+      accessibilityLabel={center.centerName}
     >
       {/* Banner / Header Box */}
       <View style={styles.banner}>
         <View style={styles.bannerHeader}>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{center.category}</Text>
-          </View>
-          <View style={styles.distanceBadge}>
-            <Feather name="navigation" size={11} color="#FFFFFF" />
-            <Text style={styles.distanceText}>{center.distance}</Text>
-          </View>
+          {center.centerType && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{center.centerType}</Text>
+            </View>
+          )}
+          {/* Distance would go here if available */}
         </View>
 
         <View style={styles.bannerBottom}>
-          <Text style={styles.centerName}>{center.name}</Text>
-          <View style={styles.ratingRow}>
-            <View style={styles.starBox}>
-              <Feather name="star" size={12} color="#F59E0B" />
-              <Text style={styles.ratingText}>{center.rating}</Text>
-            </View>
-            <Text style={styles.reviewsText}>({center.reviews} reviews)</Text>
-          </View>
+          <Text style={styles.centerName}>{center.centerName}</Text>
         </View>
       </View>
 
       {/* Body info */}
       <View style={styles.body}>
-        <View style={styles.locationRow}>
-          <Feather name="map-pin" size={13} color={BrandColors.textSecondary} />
-          <Text style={styles.addressText} numberOfLines={1}>
-            {center.address}
-          </Text>
-        </View>
-
-        {/* Facility tags */}
-        <View style={styles.facilityTagsRow}>
-          {center.facilities.slice(0, 3).map((facility, idx) => (
-            <View key={idx} style={styles.facilityChip}>
-              <Text style={styles.facilityChipText}>{facility}</Text>
-            </View>
-          ))}
-          {center.facilities.length > 3 && (
-            <View style={styles.facilityMoreChip}>
-              <Text style={styles.facilityMoreText}>+{center.facilities.length - 3} more</Text>
-            </View>
-          )}
-        </View>
+        {center.address && (
+          <View style={styles.locationRow}>
+            <Feather name="map-pin" size={13} color={BrandColors.textSecondary} />
+            <Text style={styles.addressText} numberOfLines={1}>
+              {center.address}
+            </Text>
+          </View>
+        )}
 
         {/* Footer */}
         <View style={styles.footer}>
           <View>
             <Text style={styles.startingFromLabel}>Plans starting from</Text>
-            <Text style={styles.startingPrice}>₹{lowestPlanPrice.toLocaleString()} / mo</Text>
+            {center.startingPrice != null ? (
+              <Text style={styles.startingPrice}>₹{center.startingPrice.toLocaleString()} / mo</Text>
+            ) : (
+              <Text style={styles.startingPrice}>View Plans</Text>
+            )}
           </View>
 
           <View style={styles.exploreButton}>

@@ -24,6 +24,7 @@ public class JwtService {
     private int jwtExpirationMs;
 
     public static final String TENANT_CLAIM = "tenant";
+    public static final String IS_GLOBAL_CLAIM = "isGlobal";
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -31,6 +32,11 @@ public class JwtService {
 
     public String extractTenant(String token) {
         return extractClaim(token, claims -> claims.get(TENANT_CLAIM, String.class));
+    }
+
+    public Boolean extractIsGlobal(String token) {
+        Boolean isGlobal = extractClaim(token, claims -> claims.get(IS_GLOBAL_CLAIM, Boolean.class));
+        return isGlobal != null ? isGlobal : false;
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {

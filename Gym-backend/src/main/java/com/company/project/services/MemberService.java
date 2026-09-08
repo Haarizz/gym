@@ -129,6 +129,13 @@ public class MemberService {
     }
 
     @Transactional(readOnly = true)
+    public MemberResponseDTO getMemberByGlobalUserId(Long globalUserId) {
+        Member member = memberRepository.findByGlobalUserId(globalUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found for globalUserId: " + globalUserId));
+        return MemberResponseDTO.fromEntity(member);
+    }
+
+    @Transactional(readOnly = true)
     public MemberResponseDTO getMemberById(Long id) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
@@ -441,9 +448,19 @@ public class MemberService {
         return MemberResponseDTO.fromEntity(saved);
     }
 
+    public void linkGlobalUser(Long memberId, Long globalUserId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
+        member.setGlobalUserId(globalUserId);
+        memberRepository.save(member);
+    }
+
     public MemberResponseDTO setMemberCredentials(Long id, String appUsername, String appPassword) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + id));
+        if (member.getGlobalUserId() != null) {
+            throw new BusinessRuleViolationException("Global mobile accounts manage their own credentials");
+        }
 
         if (member.getUserId() != null) {
             // Already has an account — just update the password
@@ -484,6 +501,9 @@ public class MemberService {
     public MemberResponseDTO toggleMemberAccess(Long id, boolean enabled) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + id));
+        if (member.getGlobalUserId() != null) {
+            throw new BusinessRuleViolationException("Cannot toggle access for global mobile accounts");
+        }
         if (member.getUserId() == null) {
             throw new EntityNotFoundException("This member has no linked app account");
         }

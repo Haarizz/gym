@@ -153,15 +153,22 @@ public class BookingService {
                 "/bookings",
                 "BOOKING_CREATED_ADMIN_" + today, 1
         );
-        if (member != null && member.getUserId() != null) {
-            notificationService.notifyUser(
-                    member.getUserId(),
-                    "Booking Confirmed",
-                    "Your booking for " + sessionName + " is confirmed.",
-                    "SUCCESS", "MEDIUM", "BOOKINGS",
-                    booking.getId(), "/book-session",
-                    "BOOKING_CREATED_" + booking.getId()
-            );
+        if (member != null) {
+            Long targetId = member.getUserId() != null ? member.getUserId() : member.getGlobalUserId();
+            if (targetId != null) {
+                try {
+                    notificationService.notifyUser(
+                            targetId,
+                            "Booking Confirmed",
+                            "Your booking for " + sessionName + " is confirmed.",
+                            "SUCCESS", "MEDIUM", "BOOKINGS",
+                            booking.getId(), "/book-session",
+                            "BOOKING_CREATED_" + booking.getId()
+                    );
+                } catch (Exception e) {
+                    // Log error
+                }
+            }
         }
 
         return toResponse(booking);
@@ -190,15 +197,22 @@ public class BookingService {
                     booking.getId(), "/bookings",
                     "BOOKING_CANCELLED_" + booking.getId()
             );
-            if (booking.getMember() != null && booking.getMember().getUserId() != null) {
-                notificationService.notifyUser(
-                        booking.getMember().getUserId(),
-                        "Booking Cancelled",
-                        "Your booking for " + sName + " has been cancelled.",
-                        "WARNING", "MEDIUM", "BOOKINGS",
-                        booking.getId(), "/book-session",
-                        "BOOKING_CANCELLED_USER_" + booking.getId()
-                );
+            if (booking.getMember() != null) {
+                Long targetId = booking.getMember().getUserId() != null ? booking.getMember().getUserId() : booking.getMember().getGlobalUserId();
+                if (targetId != null) {
+                    try {
+                        notificationService.notifyUser(
+                                targetId,
+                                "Booking Cancelled",
+                                "Your booking for " + sName + " has been cancelled.",
+                                "WARNING", "MEDIUM", "BOOKINGS",
+                                booking.getId(), "/book-session",
+                                "BOOKING_CANCELLED_USER_" + booking.getId()
+                        );
+                    } catch (Exception e) {
+                        // Log error
+                    }
+                }
             }
         }
 

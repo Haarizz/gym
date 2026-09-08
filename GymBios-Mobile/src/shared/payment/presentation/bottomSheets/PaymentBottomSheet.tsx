@@ -35,6 +35,7 @@ export function PaymentBottomSheet({
   currency = '₹',
   allowDiscount = true,
   initialDiscount = { type: 'none', value: 0 },
+  isProcessing = false,
   onClose,
   onComplete,
 }: PaymentBottomSheetProps) {
@@ -469,6 +470,7 @@ export function PaymentBottomSheet({
           onPress={handleComplete}
           size="lg"
           style={styles.actionButton}
+          loading={isProcessing}
         />
       </View>
     </AppBottomSheet>

@@ -20,15 +20,22 @@ public class UserDetailsImpl implements UserDetails {
 
     private Collection<? extends GrantedAuthority> authorities;
     private boolean isEnabled;
+    private boolean isGlobal;
 
     public UserDetailsImpl(Long id, String username, String email, String password,
                           Collection<? extends GrantedAuthority> authorities, boolean isEnabled) {
+        this(id, username, email, password, authorities, isEnabled, false);
+    }
+
+    public UserDetailsImpl(Long id, String username, String email, String password,
+                          Collection<? extends GrantedAuthority> authorities, boolean isEnabled, boolean isGlobal) {
         this.id = id;
         this.username = username;
         this.email = email;
         this.password = password;
         this.authorities = authorities;
         this.isEnabled = isEnabled;
+        this.isGlobal = isGlobal;
     }
 
     public static UserDetailsImpl build(User user) {
@@ -55,12 +62,15 @@ public class UserDetailsImpl implements UserDetails {
                 user.getEmail(),
                 user.getPasswordHash(),
                 authorities,
-                user.isEnabled()
+                user.isEnabled(),
+                false // Default to false for legacy/tenant build calls
         );
     }
 
     public Long getId() { return id; }
     public String getEmail() { return email; }
+    public boolean isGlobal() { return isGlobal; }
+    public void setGlobal(boolean isGlobal) { this.isGlobal = isGlobal; }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

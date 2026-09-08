@@ -28,7 +28,14 @@ public class MobileMemberPaymentsService {
         if (principal == null || principal.getId() == null) {
             throw new EntityNotFoundException("User not authenticated");
         }
-        return memberRepository.findByUserId(principal.getId());
+        java.util.Optional<Member> memberOpt = principal.isGlobal()
+                ? memberRepository.findByGlobalUserId(principal.getId())
+                : memberRepository.findByUserId(principal.getId());
+        // Fallback for stale tokens with IS_GLOBAL_CLAIM=true but no globalUserId record
+        if (memberOpt.isEmpty() && principal.isGlobal()) {
+            memberOpt = memberRepository.findByUserId(principal.getId());
+        }
+        return memberOpt;
     }
 
     public List<MobilePaymentHistoryDTO> getPaymentHistory(UserDetailsImpl principal) {

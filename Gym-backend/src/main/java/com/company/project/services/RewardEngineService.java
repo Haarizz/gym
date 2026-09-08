@@ -336,9 +336,10 @@ public class RewardEngineService {
         }
 
         memberRepository.findByMemberId(reward.getMemberId()).ifPresent(member -> {
-            if (member.getUserId() != null) {
+            Long targetId = member.getUserId() != null ? member.getUserId() : member.getGlobalUserId();
+            if (targetId != null) {
                 try {
-                    notificationService.notifyUser(member.getUserId(), title, message,
+                    notificationService.notifyUser(targetId, title, message,
                             "SUCCESS", priority, "REFERRALS", reward.getId(), "/my-rewards",
                             "REWARD_GENERATED_USER_" + reward.getId());
                 } catch (Exception ex) {

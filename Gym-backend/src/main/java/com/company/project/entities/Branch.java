@@ -23,6 +23,18 @@ public class Branch extends BaseEntity {
 
     private String email;
 
+    private Double lat;
+    private Double lng;
+
+    @Column(name = "center_type")
+    private String centerType;
+
+    @Column(name = "access_type")
+    private String accessType;
+
+    @Column(name = "operating_hours", columnDefinition = "TEXT")
+    private String operatingHours;
+
     // ACTIVE / INACTIVE
     @Column(nullable = false)
     private String status = "ACTIVE";
@@ -61,4 +73,19 @@ public class Branch extends BaseEntity {
 
     public boolean isDefault() { return isDefault; }
     public void setDefault(boolean isDefault) { this.isDefault = isDefault; }
+
+    public Double getLat() { return lat; }
+    public void setLat(Double lat) { this.lat = lat; }
+
+    public Double getLng() { return lng; }
+    public void setLng(Double lng) { this.lng = lng; }
+
+    public String getCenterType() { return centerType; }
+    public void setCenterType(String centerType) { this.centerType = centerType; }
+
+    public String getAccessType() { return accessType; }
+    public void setAccessType(String accessType) { this.accessType = accessType; }
+
+    public String getOperatingHours() { return operatingHours; }
+    public void setOperatingHours(String operatingHours) { this.operatingHours = operatingHours; }
 }

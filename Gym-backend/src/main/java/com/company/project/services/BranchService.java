@@ -30,17 +30,20 @@ public class BranchService {
     private final UserBranchRepository userBranchRepository;
     private final StaffRepository staffRepository;
     private final MemberRepository memberRepository;
+    private final DiscoverySyncService discoverySyncService;
 
     public BranchService(BranchRepository branchRepository,
                          StaffBranchRepository staffBranchRepository,
                          UserBranchRepository userBranchRepository,
                          StaffRepository staffRepository,
-                         MemberRepository memberRepository) {
+                         MemberRepository memberRepository,
+                         DiscoverySyncService discoverySyncService) {
         this.branchRepository = branchRepository;
         this.staffBranchRepository = staffBranchRepository;
         this.userBranchRepository = userBranchRepository;
         this.staffRepository = staffRepository;
         this.memberRepository = memberRepository;
+        this.discoverySyncService = discoverySyncService;
     }
 
     // ── Branch CRUD ─────────────────────────────────────────────────────────
@@ -75,6 +78,11 @@ public class BranchService {
         branch.setEmail(request.getEmail());
         branch.setStatus(request.getStatus() != null ? request.getStatus() : "ACTIVE");
         branch = branchRepository.save(branch);
+        try {
+            discoverySyncService.syncBranch(branch);
+        } catch (Exception e) {
+            // log error but don't fail transaction if sync fails
+        }
         return toResponseDTO(branch);
     }
 
@@ -94,6 +102,11 @@ public class BranchService {
         if (request.getEmail() != null) branch.setEmail(request.getEmail());
         if (request.getStatus() != null) branch.setStatus(request.getStatus());
         branch = branchRepository.save(branch);
+        try {
+            discoverySyncService.syncBranch(branch);
+        } catch (Exception e) {
+            // log error but don't fail transaction if sync fails
+        }
         return toResponseDTO(branch);
     }
 
@@ -105,6 +118,11 @@ public class BranchService {
         }
         branch.setStatus(status);
         branch = branchRepository.save(branch);
+        try {
+            discoverySyncService.syncBranch(branch);
+        } catch (Exception e) {
+            // log error but don't fail transaction if sync fails
+        }
         return toResponseDTO(branch);
     }
 
@@ -120,10 +138,32 @@ public class BranchService {
      */
     public List<BranchResponseDTO> getMyBranches() {
         UserDetailsImpl userDetails = getCurrentUser();
+        
         if (isSuperAdmin(userDetails) || isGymOwnerAdmin(userDetails)) {
             return getActiveBranches();
         }
-        List<Long> branchIds = userBranchRepository.findBranchIdsByUserId(userDetails.getId());
+        
+        List<Long> branchIds = new java.util.ArrayList<>(userBranchRepository.findBranchIdsByUserId(userDetails.getId()));
+        
+        // Also include the branch from the user's Member record if they are a member
+        if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MEMBER"))) {
+            java.util.Optional<com.company.project.entities.Member> memberOpt = userDetails.isGlobal()
+                ? memberRepository.findByGlobalUserId(userDetails.getId())
+                : memberRepository.findByUserId(userDetails.getId());
+                
+            // Fallback for stale tokens
+            if (memberOpt.isEmpty() && userDetails.isGlobal()) {
+                memberOpt = memberRepository.findByUserId(userDetails.getId());
+            }
+            
+            memberOpt.map(com.company.project.entities.Member::getBranchId)
+                    .ifPresent(branchId -> {
+                        if (!branchIds.contains(branchId)) {
+                            branchIds.add(branchId);
+                        }
+                    });
+        }
+        
         return branchRepository.findByIdIn(branchIds).stream()
                 .filter(b -> "ACTIVE".equals(b.getStatus()))
                 .map(this::toResponseDTO)

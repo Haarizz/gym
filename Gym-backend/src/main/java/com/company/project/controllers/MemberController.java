@@ -48,7 +48,16 @@ public class MemberController {
             return ResponseEntity.status(401).body("Not authenticated");
         }
         try {
-            return ResponseEntity.ok(memberService.getMemberByUserId(principal.getId()));
+            if (principal.isGlobal()) {
+                try {
+                    return ResponseEntity.ok(memberService.getMemberByGlobalUserId(principal.getId()));
+                } catch (RuntimeException e) {
+                    // Fallback for stale tokens with IS_GLOBAL_CLAIM=true but no globalUserId record
+                    return ResponseEntity.ok(memberService.getMemberByUserId(principal.getId()));
+                }
+            } else {
+                return ResponseEntity.ok(memberService.getMemberByUserId(principal.getId()));
+            }
         } catch (RuntimeException e) {
             return ResponseEntity.status(404).body("No membership record found for this account.");
         }

@@ -128,13 +128,24 @@ export function createUseRestoreSession(
 
     const restoreMutation = useMutation({
       mutationFn: () => restoreSession.execute(),
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         if (result.success && result.value) {
           setSession(result.value.session);
           if (result.value.pendingRole) {
             setPendingRole(result.value.pendingRole);
           }
         }
+        
+        try {
+          const { secureStorage, StorageKeys } = await import('@/core/platform/storage');
+          const activeTenant = await secureStorage.getItem(StorageKeys.activeTenant);
+          if (activeTenant) {
+            useAuthStore.getState().setActiveTenant(activeTenant);
+          }
+        } catch (e) {
+          console.error('Failed to restore active tenant', e);
+        }
+
         setHydrated(true);
       },
     });

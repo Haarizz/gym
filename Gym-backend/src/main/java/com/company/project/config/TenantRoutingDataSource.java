@@ -47,10 +47,10 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
 
     @Override
     protected DataSource determineTargetDataSource() {
-        String tenantSlug = TenantContextHolder.getCurrentTenant();
+        String tenantSlug = TenantContextHolder.getCurrentTenant(); System.out.println("TenantRoutingDataSource resolve: " + tenantSlug);
         if (tenantSlug != null && !tenantSlug.equals(defaultTenantSlug)) {
             TenantDataSourceRegistry registry = registryProvider.getObject();
-            if (registry.hasConnection(tenantSlug)) {
+            System.out.println("Registry has connection for " + tenantSlug + ": " + registry.hasConnection(tenantSlug)); if (registry.hasConnection(tenantSlug)) {
                 return registry.getDataSource(tenantSlug);
             }
         }

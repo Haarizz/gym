@@ -1,29 +1,40 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
-
-export interface MembershipPlanItem {
-  id: string;
-  name: string;
-  duration: string;
-  durationMonths: number;
-  price: number;
-  originalPrice?: number;
-  taxPct: number;
-  features: string[];
-  popular?: boolean;
-  offer?: string;
-}
+import type { CenterPlan } from '@/domains/discovery';
 
 interface PlanCardProps {
-  plan: MembershipPlanItem;
-  onSelect: (plan: MembershipPlanItem) => void;
+  plan: CenterPlan;
+  onSelect: (plan: CenterPlan) => void;
 }
 
 export function PlanCard({ plan, onSelect }: PlanCardProps) {
+  // Determine if it's a popular plan based on some criteria, maybe discount > 0 or a flag if we had one.
+  const isPopular = false; // We can set this to false for now unless we have a specific field for it
+
+  // Determine original price and discount text
+  const originalPrice = plan.discount && plan.discount > 0 ? plan.price + plan.discount : null;
+  const offerText = plan.discount && plan.discount > 0 ? `Save ₹${plan.discount.toLocaleString()}` : null;
+
+  // Assemble features from description or selected features
+  const features = [];
+  if (plan.description) {
+    features.push(plan.description);
+  }
+  if (plan.selectedFacilities && plan.selectedFacilities.length > 0) {
+    features.push(`Access to ${plan.selectedFacilities.length} facilities`);
+  }
+  if (plan.maxSessions) {
+    features.push(`Up to ${plan.maxSessions} sessions`);
+  }
+  
+  if (features.length === 0) {
+    features.push('Standard membership features');
+  }
+
   return (
-    <View style={[styles.card, plan.popular && styles.popularCard]}>
-      {plan.popular && (
+    <View style={[styles.card, isPopular && styles.popularCard]}>
+      {isPopular && (
         <View style={styles.popularBadge}>
           <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
         </View>
@@ -35,16 +46,16 @@ export function PlanCard({ plan, onSelect }: PlanCardProps) {
           <Text style={styles.durationText}>{plan.duration}</Text>
         </View>
         <View style={styles.priceContainer}>
-          {plan.originalPrice && (
-            <Text style={styles.originalPrice}>₹{plan.originalPrice.toLocaleString()}</Text>
+          {originalPrice && (
+            <Text style={styles.originalPrice}>₹{originalPrice.toLocaleString()}</Text>
           )}
           <Text style={styles.price}>₹{plan.price.toLocaleString()}</Text>
-          {plan.offer && <Text style={styles.offerBadge}>{plan.offer}</Text>}
+          {offerText && <Text style={styles.offerBadge}>{offerText}</Text>}
         </View>
       </View>
 
       <View style={styles.featuresList}>
-        {plan.features.map((feature, idx) => (
+        {features.map((feature, idx) => (
           <View key={idx} style={styles.featureRow}>
             <Feather name="check" size={14} color={BrandColors.teal} />
             <Text style={styles.featureText}>{feature}</Text>
@@ -55,7 +66,7 @@ export function PlanCard({ plan, onSelect }: PlanCardProps) {
       <Pressable
         style={({ pressed }) => [
           styles.selectButton,
-          plan.popular ? styles.selectButtonPopular : styles.selectButtonRegular,
+          isPopular ? styles.selectButtonPopular : styles.selectButtonRegular,
           pressed && styles.pressed,
         ]}
         onPress={() => onSelect(plan)}
@@ -63,7 +74,7 @@ export function PlanCard({ plan, onSelect }: PlanCardProps) {
         <Text
           style={[
             styles.selectButtonText,
-            plan.popular ? styles.selectButtonTextPopular : styles.selectButtonTextRegular,
+            isPopular ? styles.selectButtonTextPopular : styles.selectButtonTextRegular,
           ]}
         >
           Select {plan.name}
@@ -117,6 +128,8 @@ const styles = StyleSheet.create({
     fontSize: TypographyScale.subtitle,
     fontWeight: '800',
     color: BrandColors.textPrimary,
+    flex: 1,
+    marginRight: 8,
   },
   durationText: {
     fontSize: TypographyScale.small,
@@ -161,6 +174,7 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 13,
     color: BrandColors.textSecondary,
+    flex: 1,
   },
   selectButton: {
     marginTop: Spacing.two,
