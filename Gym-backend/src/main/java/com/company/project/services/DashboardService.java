@@ -109,7 +109,8 @@ public class DashboardService {
                     .filter(r -> r.getTransactionDate().isBefore(blockEnd) || r.getTransactionDate().equals(blockEnd))
                     .map(Receipt::getPaidAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            points.add(new RevenueDataPoint(h + (h < 12 ? " AM" : (h == 12 ? " PM" : " PM")), blockSum, blockSum.multiply(BigDecimal.valueOf(1.2)))); // Mock target
+            // No revenue-target feature exists yet, so target is left unset rather than fabricated
+            points.add(new RevenueDataPoint(h + (h < 12 ? " AM" : (h == 12 ? " PM" : " PM")), blockSum, null));
         }
         return points;
     }

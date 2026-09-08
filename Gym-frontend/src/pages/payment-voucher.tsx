@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { format } from "date-fns";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { paymentVoucherService, type PaymentVoucher as PVApiType, type PaymentVoucherCreateRequest } from "../utils/supabase/payment-voucher-service";
+import { exportAsCsv } from "../utils/export-utils";
 import { purchaseService, type Supplier } from "../utils/supabase/purchase-service";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -155,11 +157,40 @@ export function PaymentVoucher() {
   const { currencyCode } = useCurrency();
   const [allVouchers, setAllVouchers] = useState<PaymentVoucher[]>([]);
   const [loadingVouchers, setLoadingVouchers] = useState(true);
+  const [totalVoucherCount, setTotalVoucherCount] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [summaryData, setSummaryData] = useState({
+    totalPaidThisMonth: 0, totalPending: 0, overdueCount: 0, upcomingPayments: 0,
+  });
 
-  const loadVouchers = useCallback(async () => {
+  // Filters/sort/page are pushed to the server (Specification + Pageable) rather than
+  // fetching every voucher and slicing client-side — the stats cards come from a
+  // separate true-branch-wide aggregate (getStats()) so they stay correct once the
+  // list itself only ever holds one page.
+  const loadVouchers = useCallback(async (opts: {
+    category: string; search: string; status: string; paymentMethod: string;
+    dateRange: { from?: Date; to?: Date }; sortField: string; sortDirection: "asc" | "desc";
+    page: number; limit: number;
+  }) => {
     try {
       setLoadingVouchers(true);
-      const data = await paymentVoucherService.getPaymentVouchers();
+      const supplierType = opts.category === "supplier" ? "Supplier" : undefined;
+      const category = opts.category === "supplier" ? undefined : opts.category;
+      const page = await paymentVoucherService.getPaymentVouchers({
+        search: opts.search || undefined,
+        status: opts.status !== "all" ? opts.status : undefined,
+        supplierType,
+        category: category !== "all" ? category : undefined,
+        from: opts.dateRange.from ? format(opts.dateRange.from, "yyyy-MM-dd") : undefined,
+        to: opts.dateRange.to ? format(opts.dateRange.to, "yyyy-MM-dd") : undefined,
+        sortField: opts.sortField,
+        sortDirection: opts.sortDirection,
+        page: opts.page,
+        limit: opts.limit,
+      });
+      const data = page.vouchers;
+      setTotalVoucherCount(page.pagination.total);
+      setServerTotalPages(page.pagination.totalPages);
       const mapped: PaymentVoucher[] = data.map((v: PVApiType) => ({
         id: v.id,
         voucherNo: v.voucherNo,
@@ -196,8 +227,6 @@ export function PaymentVoucher() {
     }
   }, []);
 
-  useEffect(() => { loadVouchers(); }, [loadVouchers]);
-
   // Filters & sorting state
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -208,6 +237,58 @@ export function PaymentVoucher() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Any filter/sort change resets to page 1 and re-fetches from the server.
+  useEffect(() => {
+    setCurrentPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, searchQuery, selectedDateRange, selectedStatus, sortField, sortDirection, itemsPerPage]);
+
+  useEffect(() => {
+    loadVouchers({
+      category: selectedCategory,
+      search: searchQuery,
+      status: selectedStatus,
+      paymentMethod: selectedPaymentMethod,
+      dateRange: selectedDateRange,
+      sortField,
+      sortDirection,
+      page: currentPage,
+      limit: itemsPerPage,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, searchQuery, selectedStatus, selectedDateRange, sortField, sortDirection, currentPage, itemsPerPage]);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const s = await paymentVoucherService.getStats();
+      setSummaryData(s);
+    } catch (err: any) {
+      console.error("Failed to load payment voucher stats:", err);
+    }
+  }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+
+  // After any create/update/delete/status-change: reload the current page (a mutation
+  // can change which rows match the active filters) and the stats cards together.
+  const refreshVouchers = useCallback(async () => {
+    await Promise.all([
+      loadVouchers({
+        category: selectedCategory,
+        search: searchQuery,
+        status: selectedStatus,
+        paymentMethod: selectedPaymentMethod,
+        dateRange: selectedDateRange,
+        sortField,
+        sortDirection,
+        page: currentPage,
+        limit: itemsPerPage,
+      }),
+      loadStats(),
+    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, searchQuery, selectedStatus, selectedPaymentMethod, selectedDateRange, sortField, sortDirection, currentPage, itemsPerPage, loadStats]);
   const [selectedVoucher, setSelectedVoucher] = useState<PaymentVoucher | null>(null);
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -239,85 +320,21 @@ export function PaymentVoucher() {
   const [savingForm, setSavingForm] = useState(false);
   const [deletingVoucher, setDeletingVoucher] = useState(false);
 
-  const summaryData = useMemo(() => {
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-
-    const thisMonthVouchers = allVouchers.filter(v => {
-      const parts = v.paymentDate.split("-").map(Number);
-      return (parts[1] - 1) === currentMonth && parts[0] === currentYear;
-    });
-
-    const totalPaidThisMonth = thisMonthVouchers
-      .filter(v => v.status === "Paid")
-      .reduce((sum, v) => sum + v.amount, 0);
-
-    const totalPending = allVouchers
-      .filter(v => v.status === "Pending" || v.status === "Partial")
-      .reduce((sum, v) => sum + v.amount, 0);
-
-    const overdueCount = allVouchers.filter(v => v.status === "Overdue").length;
-
-    const upcomingPayments = allVouchers.filter(v => {
-      const [y, m, d] = v.paymentDate.split("-").map(Number);
-      const paymentDate = new Date(y, m - 1, d);
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      return paymentDate <= nextWeek && v.status === "Pending";
-    }).length;
-
-    return { totalPaidThisMonth, totalPending, overdueCount, upcomingPayments };
-  }, [allVouchers]);
-
+  // Search/status/category/date-range/sort/page are all applied server-side (see
+  // loadVouchers) — allVouchers already holds exactly one page of already-filtered,
+  // already-sorted results. Payment method has no backend query param (a narrow,
+  // secondary filter not worth a new Specification clause — same tradeoff as
+  // Expenses' tax-rate filter), so it's the one remaining client-side pass, applied
+  // on top of the current page only.
   const filteredAndSortedVouchers = useMemo(() => {
-    let filtered = allVouchers.filter(voucher => {
-      if (selectedCategory !== "all") {
-        if (selectedCategory === "pending" && voucher.status !== "Pending" && voucher.status !== "Partial") return false;
-        if (selectedCategory === "paid" && voucher.status !== "Paid") return false;
-        if (selectedCategory === "overdue" && voucher.status !== "Overdue") return false;
-        if (selectedCategory === "supplier" && voucher.supplierType !== "Supplier") return false;
-      }
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        if (
-          !voucher.voucherNo.toLowerCase().includes(q) &&
-          !voucher.supplierName.toLowerCase().includes(q) &&
-          !(voucher.billNo?.toLowerCase().includes(q)) &&
-          !voucher.description.toLowerCase().includes(q)
-        ) return false;
-      }
-      if (selectedStatus !== "all" && voucher.status.toLowerCase() !== selectedStatus) return false;
-      if (selectedPaymentMethod !== "all" && voucher.paymentMethod.toLowerCase().replace(/ /g, "-") !== selectedPaymentMethod) return false;
-      if (selectedDateRange.from || selectedDateRange.to) {
-        const [y, m, d] = voucher.paymentDate.split("-").map(Number);
-        const vDate = new Date(y, m - 1, d);
-        if (selectedDateRange.from && vDate < selectedDateRange.from) return false;
-        if (selectedDateRange.to && vDate > selectedDateRange.to) return false;
-      }
-      return true;
-    });
+    if (selectedPaymentMethod === "all") return allVouchers;
+    return allVouchers.filter(voucher =>
+      voucher.paymentMethod.toLowerCase().replace(/ /g, "-") === selectedPaymentMethod
+    );
+  }, [allVouchers, selectedPaymentMethod]);
 
-    filtered.sort((a, b) => {
-      let aVal: any = a[sortField as keyof PaymentVoucher];
-      let bVal: any = b[sortField as keyof PaymentVoucher];
-      if (sortField === "amount") {
-        aVal = Number(aVal); bVal = Number(bVal);
-      } else if (sortField === "paymentDate") {
-        aVal = new Date(aVal); bVal = new Date(bVal);
-      } else {
-        aVal = String(aVal ?? "").toLowerCase(); bVal = String(bVal ?? "").toLowerCase();
-      }
-      return sortDirection === "asc" ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
-    });
-
-    return filtered;
-  }, [allVouchers, selectedCategory, searchQuery, selectedStatus, selectedPaymentMethod, selectedDateRange, sortField, sortDirection]);
-
-  const totalPages = Math.ceil(filteredAndSortedVouchers.length / itemsPerPage);
-  const paginatedVouchers = filteredAndSortedVouchers.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedVouchers = filteredAndSortedVouchers;
+  const totalPages = serverTotalPages;
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -333,7 +350,49 @@ export function PaymentVoucher() {
     setIsDetailsOpen(true);
   };
 
-  const handleExport = () => toast.success("Exporting payment vouchers...");
+  // Exports every voucher matching the active filters, not just the current page —
+  // re-fetches with a high limit rather than exporting only what's on screen.
+  // "PDF" is browser print (matches financial-reports.tsx's convention) since there's
+  // no backend PDF generator.
+  const handleExport = async (exportFormat: "csv" | "pdf" = "csv") => {
+    if (exportFormat === "pdf") {
+      window.print();
+      return;
+    }
+    try {
+      const supplierType = selectedCategory === "supplier" ? "Supplier" : undefined;
+      const category = selectedCategory === "supplier" ? undefined : selectedCategory;
+      const result = await paymentVoucherService.getPaymentVouchers({
+        search: searchQuery || undefined,
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+        supplierType,
+        category: category !== "all" ? category : undefined,
+        from: selectedDateRange.from ? format(selectedDateRange.from, "yyyy-MM-dd") : undefined,
+        to: selectedDateRange.to ? format(selectedDateRange.to, "yyyy-MM-dd") : undefined,
+        sortField,
+        sortDirection,
+        page: 1,
+        limit: Math.max(totalVoucherCount, 1),
+      });
+      const rows = (selectedPaymentMethod === "all"
+        ? result.vouchers
+        : result.vouchers.filter(v => v.paymentMethod.toLowerCase().replace(/ /g, "-") === selectedPaymentMethod)
+      ).map(v => [v.voucherNo, v.supplierName, v.supplierType, v.billNo ?? "", v.paymentDate, v.amount, v.paymentMethod, v.status]);
+
+      if (rows.length === 0) {
+        toast.error("No payment vouchers to export");
+        return;
+      }
+      exportAsCsv(
+        `payment-vouchers_${format(new Date(), "yyyy-MM-dd")}.csv`,
+        ["Voucher No", "Supplier", "Type", "Bill No", "Payment Date", "Amount", "Payment Method", "Status"],
+        rows
+      );
+      toast.success("Export started");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to export payment vouchers");
+    }
+  };
 
   const openCreate = () => {
     setForm(emptyForm);
@@ -455,7 +514,7 @@ export function PaymentVoucher() {
       await paymentVoucherService.createPaymentVoucher(toRequest(form));
       toast.success("Payment voucher created");
       setShowCreateDialog(false);
-      await loadVouchers();
+      await refreshVouchers();
     } catch (err: any) {
       toast.error(err.message || "Failed to create payment voucher");
     } finally {
@@ -474,7 +533,7 @@ export function PaymentVoucher() {
       toast.success("Payment voucher updated");
       setShowEditDialog(false);
       if (selectedVoucher?.id === editingId) setIsDetailsOpen(false);
-      await loadVouchers();
+      await refreshVouchers();
     } catch (err: any) {
       toast.error(err.message || "Failed to update payment voucher");
     } finally {
@@ -490,7 +549,7 @@ export function PaymentVoucher() {
       toast.success("Payment voucher deleted");
       if (selectedVoucher?.id === deleteConfirmId) setIsDetailsOpen(false);
       setDeleteConfirmId(null);
-      await loadVouchers();
+      await refreshVouchers();
     } catch (err: any) {
       toast.error(err.message || "Failed to delete payment voucher");
     } finally {
@@ -505,7 +564,7 @@ export function PaymentVoucher() {
       if (selectedVoucher?.id === id) {
         setSelectedVoucher(prev => prev ? { ...prev, status: status as any } : null);
       }
-      await loadVouchers();
+      await refreshVouchers();
     } catch (err: any) {
       toast.error(err.message || "Failed to update status");
     }
@@ -930,11 +989,11 @@ export function PaymentVoucher() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleExport}>
+                  <DropdownMenuItem onClick={() => handleExport("csv")}>
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
                     Export as CSV
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExport}>
+                  <DropdownMenuItem onClick={() => handleExport("pdf")}>
                     <FileText className="h-4 w-4 mr-2" />
                     Export as PDF
                   </DropdownMenuItem>
@@ -1156,7 +1215,7 @@ export function PaymentVoucher() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-gymbios-primary">
-                    Payment Vouchers ({filteredAndSortedVouchers.length})
+                    Payment Vouchers ({totalVoucherCount})
                   </CardTitle>
 
                   <div className="flex items-center space-x-2">
@@ -1290,9 +1349,9 @@ export function PaymentVoucher() {
                 {/* Pagination */}
                 <div className="flex items-center justify-between mt-6">
                   <p className="text-sm text-muted-foreground whitespace-nowrap">
-                    {filteredAndSortedVouchers.length === 0
+                    {totalVoucherCount === 0
                       ? "No results"
-                      : `Showing ${((currentPage - 1) * itemsPerPage) + 1} to ${Math.min(currentPage * itemsPerPage, filteredAndSortedVouchers.length)} of ${filteredAndSortedVouchers.length} results`}
+                      : `Showing ${((currentPage - 1) * itemsPerPage) + 1} to ${Math.min(currentPage * itemsPerPage, totalVoucherCount)} of ${totalVoucherCount} results`}
                   </p>
 
                   <div className="flex items-center space-x-2">

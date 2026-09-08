@@ -82,19 +82,58 @@ public class PayrollAnalyticsService {
     }
 
     private List<PayrollDashboardDTO.ClassBookingTrend> buildClassBookingTrends(Long branchId) {
-        // Return mock trends for now as it requires complex temporal aggregation
+        String tBranchFilter = branchId != null ? " AND t.branchId = :branchId " : "";
+        String sBranchFilter = branchId != null ? " AND s.branchId = :branchId " : "";
+
+        YearMonth current = YearMonth.now();
+        YearMonth start = current.minusMonths(5);
+        LocalDate rangeStart = start.atDay(1);
+        LocalDate rangeEnd = current.atEndOfMonth();
+
+        // Classes held per month, keyed by "YYYY-MM"
+        List<Object[]> classRows = withBranch(entityManager.createQuery(
+                "SELECT FUNCTION('to_char', t.date, 'YYYY-MM'), COUNT(t) FROM TrainingSession t " +
+                        "WHERE t.date BETWEEN :rangeStart AND :rangeEnd " + tBranchFilter +
+                        " GROUP BY FUNCTION('to_char', t.date, 'YYYY-MM')", Object[].class)
+                .setParameter("rangeStart", rangeStart)
+                .setParameter("rangeEnd", rangeEnd), branchId)
+                .getResultList();
+
+        // Confirmed bookings per month (joined through the session date)
+        List<Object[]> bookingRows = withBranch(entityManager.createQuery(
+                "SELECT FUNCTION('to_char', b.session.date, 'YYYY-MM'), COUNT(b) FROM Booking b " +
+                        "WHERE b.status = 'confirmed' AND b.session.date BETWEEN :rangeStart AND :rangeEnd "
+                        + (branchId != null ? " AND b.session.branchId = :branchId " : "") +
+                        " GROUP BY FUNCTION('to_char', b.session.date, 'YYYY-MM')", Object[].class)
+                .setParameter("rangeStart", rangeStart)
+                .setParameter("rangeEnd", rangeEnd), branchId)
+                .getResultList();
+
+        // Paid payroll per month
+        List<Object[]> payrollRows = withBranch(entityManager.createQuery(
+                "SELECT FUNCTION('to_char', s.paymentDate, 'YYYY-MM'), SUM(s.netSalary) FROM SalaryPayment s " +
+                        "WHERE s.status = 'Paid' AND s.paymentDate BETWEEN :rangeStart AND :rangeEnd " + sBranchFilter +
+                        " GROUP BY FUNCTION('to_char', s.paymentDate, 'YYYY-MM')", Object[].class)
+                .setParameter("rangeStart", rangeStart)
+                .setParameter("rangeEnd", rangeEnd), branchId)
+                .getResultList();
+
+        java.util.Map<String, Long> classesByMonth = new java.util.HashMap<>();
+        for (Object[] row : classRows) classesByMonth.put((String) row[0], ((Number) row[1]).longValue());
+        java.util.Map<String, Long> bookingsByMonth = new java.util.HashMap<>();
+        for (Object[] row : bookingRows) bookingsByMonth.put((String) row[0], ((Number) row[1]).longValue());
+        java.util.Map<String, BigDecimal> payrollByMonth = new java.util.HashMap<>();
+        for (Object[] row : payrollRows) payrollByMonth.put((String) row[0], (BigDecimal) row[1]);
+
         List<PayrollDashboardDTO.ClassBookingTrend> trends = new ArrayList<>();
-        String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun"};
-        long[] classes = {18, 20, 22, 23, 25, 27};
-        long[] bookings = {142, 156, 168, 156, 189, 201};
-        double[] payroll = {165000, 172000, 178000, 185000, 192000, 198000};
-        
-        for (int i=0; i<6; i++) {
+        for (int i = 0; i < 6; i++) {
+            YearMonth ym = start.plusMonths(i);
+            String key = ym.toString(); // "YYYY-MM"
             PayrollDashboardDTO.ClassBookingTrend t = new PayrollDashboardDTO.ClassBookingTrend();
-            t.setMonth(months[i]);
-            t.setClasses(classes[i]);
-            t.setBookings(bookings[i]);
-            t.setPayroll(BigDecimal.valueOf(payroll[i]));
+            t.setMonth(ym.getMonth().name().substring(0, 1) + ym.getMonth().name().substring(1, 3).toLowerCase());
+            t.setClasses(classesByMonth.getOrDefault(key, 0L));
+            t.setBookings(bookingsByMonth.getOrDefault(key, 0L));
+            t.setPayroll(payrollByMonth.getOrDefault(key, BigDecimal.ZERO));
             trends.add(t);
         }
         return trends;
@@ -208,21 +247,30 @@ public class PayrollAnalyticsService {
 
     private List<PayrollDashboardDTO.TopPerformingClass> buildTopPerformingClasses(Long branchId) {
         String branchFilter = branchId != null ? " AND t.branchId = :branchId " : "";
-        List<com.company.project.entities.TrainingSession> sessions = withBranch(entityManager.createQuery(
-                "SELECT t FROM TrainingSession t WHERE t.status = 'active' " + branchFilter + " ORDER BY t.price DESC", com.company.project.entities.TrainingSession.class), branchId)
-                
+
+        // Rank by actual confirmed-booking count, not list price — "top performing" means well
+        // attended, and revenue is summed from each booking's real price rather than
+        // session price × a fabricated booking count.
+        List<Object[]> rows = withBranch(entityManager.createQuery(
+                "SELECT t, COUNT(b), COALESCE(SUM(b.price), 0) FROM TrainingSession t " +
+                        "LEFT JOIN Booking b ON b.session = t AND b.status = 'confirmed' " +
+                        "WHERE t.status = 'active' " + branchFilter +
+                        " GROUP BY t ORDER BY COUNT(b) DESC", Object[].class), branchId)
                 .setMaxResults(3)
                 .getResultList();
 
-        return sessions.stream().map(t -> {
+        return rows.stream().map(row -> {
+            com.company.project.entities.TrainingSession t = (com.company.project.entities.TrainingSession) row[0];
+            long bookings = ((Number) row[1]).longValue();
+            BigDecimal revenue = (BigDecimal) row[2];
+
             PayrollDashboardDTO.TopPerformingClass c = new PayrollDashboardDTO.TopPerformingClass();
             c.setId(t.getId());
             c.setClassName(t.getName());
             c.setInstructor(t.getTrainer() != null ? t.getTrainer().getName() : "Unassigned");
-            c.setBookings((long)(Math.random() * t.getCapacity())); // Mock bookings count since complex join might be slow for now
+            c.setBookings(bookings);
             c.setCapacity(t.getCapacity() != null ? t.getCapacity() : 0);
-            c.setRevenue(t.getPrice() != null ? t.getPrice().multiply(BigDecimal.valueOf(c.getBookings())) : BigDecimal.ZERO);
-            c.setRating(4.5 + Math.random() * 0.5); // Mock rating if missing in DB
+            c.setRevenue(revenue);
             return c;
         }).toList();
     }

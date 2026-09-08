@@ -48,6 +48,7 @@ import { format, addMonths } from "date-fns";
 import { BarChart, Bar, PieChart as RechartsPie, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { toast } from "sonner";
 import { salaryPaymentsService } from "../utils/supabase/salary-payments-service";
+import { exportAsCsv } from "../utils/export-utils";
 
 interface SalaryPaymentsProps {
   onNavigate?: (section: string) => void;
@@ -350,6 +351,39 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
     } else {
       setSelectedEmployees(filteredEmployees.map(e => e.id));
     }
+  };
+
+  const handleExportEmployees = () => {
+    if (filteredEmployees.length === 0) {
+      toast.error("No employees to export");
+      return;
+    }
+    exportAsCsv(
+      `payroll-employees_${format(new Date(), "yyyy-MM-dd")}.csv`,
+      ["Employee ID", "Name", "Department", "Designation", "Base Salary", "Allowances", "Deductions", "Net Salary", "Status", "Last Payment Date"],
+      filteredEmployees.map(e => [
+        e.employeeId, e.name, e.department, e.designation,
+        e.baseSalary, e.allowances, e.deductions, e.netSalary, e.paymentStatus,
+        e.lastPaymentDate ? format(e.lastPaymentDate, "yyyy-MM-dd") : "",
+      ])
+    );
+    toast.success("Export started");
+  };
+
+  const handleExportPaymentHistory = () => {
+    if (paymentHistory.length === 0) {
+      toast.error("No payment history to export");
+      return;
+    }
+    exportAsCsv(
+      `salary-payments_${format(new Date(), "yyyy-MM-dd")}.csv`,
+      ["Employee", "Month", "Year", "Net Salary", "Payment Date", "Status", "Processed By"],
+      paymentHistory.map(p => [
+        p.employeeName, p.month, p.year, p.netSalary,
+        format(p.paymentDate, "yyyy-MM-dd"), p.status, p.processedBy,
+      ])
+    );
+    toast.success("Export started");
   };
 
   const getStatusColor = (status: string) => {
@@ -656,7 +690,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => toast.info("Export feature coming soon")}
+                    onClick={handleExportEmployees}
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Export
@@ -844,7 +878,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => toast.info("Exporting payment report...")}
+                  onClick={handleExportPaymentHistory}
                 >
                   <Download className="mr-2 h-4 w-4" />
                   Export Report

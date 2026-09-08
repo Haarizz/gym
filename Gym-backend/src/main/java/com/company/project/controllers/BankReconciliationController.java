@@ -57,6 +57,26 @@ public class BankReconciliationController {
         return ResponseEntity.ok(bankReconciliationService.matchLine(id, lineId, journalVoucherId));
     }
 
+    /** Posts an unmatched DEBIT line (money the bank took out) as a Bank Charges Expense entry and matches it. */
+    @PostMapping("/{id}/lines/{lineId}/post-bank-charge")
+    public ResponseEntity<BankReconciliationResponseDTO> postBankCharge(
+            @PathVariable Long id,
+            @PathVariable Long lineId,
+            @RequestBody(required = false) Map<String, Object> body) {
+        String description = body != null && body.get("description") != null ? String.valueOf(body.get("description")) : null;
+        return ResponseEntity.ok(bankReconciliationService.postBankCharge(id, lineId, description));
+    }
+
+    /** Posts an unmatched CREDIT line (money the bank added) as Interest Income and matches it. */
+    @PostMapping("/{id}/lines/{lineId}/post-bank-interest")
+    public ResponseEntity<BankReconciliationResponseDTO> postBankInterest(
+            @PathVariable Long id,
+            @PathVariable Long lineId,
+            @RequestBody(required = false) Map<String, Object> body) {
+        String description = body != null && body.get("description") != null ? String.valueOf(body.get("description")) : null;
+        return ResponseEntity.ok(bankReconciliationService.postBankInterest(id, lineId, description));
+    }
+
     @PostMapping("/{id}/lines/{lineId}/unmatch")
     public ResponseEntity<BankReconciliationResponseDTO> unmatchLine(
             @PathVariable Long id,

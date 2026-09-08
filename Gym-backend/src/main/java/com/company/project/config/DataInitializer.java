@@ -395,11 +395,13 @@ public class DataInitializer implements CommandLineRunner {
             new DefaultAccount("4000", "Membership Revenue", "REVENUE"),
             new DefaultAccount("4100", "POS Sales Revenue", "REVENUE"),
             new DefaultAccount("4200", "Service / Add-on Revenue", "REVENUE"),
+            new DefaultAccount("4300", "Interest Income", "REVENUE"),
             new DefaultAccount("5000", "Salary Expense", "EXPENSE"),
             new DefaultAccount("5100", "Maintenance Expense", "EXPENSE"),
             new DefaultAccount("5200", "Purchase / COGS", "EXPENSE"),
             new DefaultAccount("5700", "Miscellaneous Expense", "EXPENSE"),
-            new DefaultAccount("5800", "Depreciation Expense", "EXPENSE")
+            new DefaultAccount("5800", "Depreciation Expense", "EXPENSE"),
+            new DefaultAccount("5900", "Bank Charges Expense", "EXPENSE")
         );
 
         for (DefaultAccount d : defaults) {

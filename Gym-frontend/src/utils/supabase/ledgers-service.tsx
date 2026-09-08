@@ -41,6 +41,42 @@ export interface LedgerTransaction {
   costCenter: string | null;
 }
 
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface LedgerTransactionsPage {
+  transactions: LedgerTransaction[];
+  pagination: Pagination;
+}
+
+function mapPagination(r: any): Pagination {
+  return {
+    page: Number(r?.page ?? 1),
+    limit: Number(r?.limit ?? 25),
+    total: Number(r?.total ?? 0),
+    totalPages: Number(r?.total_pages ?? r?.totalPages ?? 1),
+  };
+}
+
+function mapLedgerTransaction(r: any): LedgerTransaction {
+  return {
+    id: r.id,
+    date: r.date,
+    type: r.type,
+    referenceNo: r.reference_no,
+    description: r.description ?? null,
+    debit: r.debit ?? 0,
+    credit: r.credit ?? 0,
+    branch: r.branch ?? null,
+    status: r.status ?? null,
+    costCenter: r.cost_center ?? null,
+  };
+}
+
 export interface AccountHead {
   id: number;
   code: string;
@@ -203,6 +239,18 @@ class LedgersService {
     return mapAccountHead(await res.json());
   }
 
+  /** Fills in any missing accounts from the standard Chart of Accounts for the active branch. Safe to call repeatedly. Returns only the accounts actually created. */
+  async seedDefaultAccountHeads(): Promise<AccountHead[]> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/account-heads/seed-defaults`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err || "Failed to seed default accounts");
+    }
+    return (await res.json()).map(mapAccountHead);
+  }
+
   async updateAccountHead(
     id: number,
     req: AccountHeadCreateRequest
@@ -358,36 +406,37 @@ class LedgersService {
     if (!res.ok) throw new Error("Failed to delete cost center");
   }
 
+  /**
+   * Returns one page of the merged Receipt/Payment/Journal Voucher ledger view.
+   * `limit` defaults to a large value (200) for callers that just want "the recent
+   * activity" without building a pager (e.g. the Financials dashboard's top-20
+   * slice) — pass an explicit page/limit for a real paged UI (see ledgers.tsx).
+   */
   async getTransactions(params?: {
     from?: string;
     to?: string;
     type?: string;
     search?: string;
-  }): Promise<LedgerTransaction[]> {
+    page?: number;
+    limit?: number;
+  }): Promise<LedgerTransactionsPage> {
     const query = new URLSearchParams();
     if (params?.from) query.set("from", params.from);
     if (params?.to) query.set("to", params.to);
     if (params?.type) query.set("type", params.type);
     if (params?.search) query.set("search", params.search);
-    const qs = query.toString();
+    query.set("page", String(params?.page ?? 1));
+    query.set("limit", String(params?.limit ?? 200));
     const res = await authService.makeAuthenticatedRequest(
-      `${BASE_URL}/ledger-transactions${qs ? "?" + qs : ""}`,
+      `${BASE_URL}/ledger-transactions?${query.toString()}`,
       { method: "GET" }
     );
     if (!res.ok) throw new Error("Failed to fetch ledger transactions");
     const data = await res.json();
-    return data.map((r: any) => ({
-      id: r.id,
-      date: r.date,
-      type: r.type,
-      referenceNo: r.reference_no,
-      description: r.description ?? null,
-      debit: r.debit ?? 0,
-      credit: r.credit ?? 0,
-      branch: r.branch ?? null,
-      status: r.status ?? null,
-      costCenter: r.cost_center ?? null,
-    }));
+    return {
+      transactions: (data?.transactions ?? []).map(mapLedgerTransaction),
+      pagination: mapPagination(data?.pagination),
+    };
   }
 }
 

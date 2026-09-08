@@ -65,12 +65,15 @@ import {
   Clock,
   RefreshCw,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../components/ui/utils";
 import { toast } from "sonner";
 import { expensesService, type Expense, type ExpenseCreateRequest, type ExpenseStats } from "../utils/supabase/expenses-service";
+import { exportAsCsv } from "../utils/export-utils";
 import { purchaseService, type Supplier } from "../utils/supabase/purchase-service";
 import { ledgersService, type CostCenter } from "../utils/supabase/ledgers-service";
 
@@ -126,6 +129,10 @@ export function Expenses() {
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState("");
   const [realCostCenters, setRealCostCenters] = useState<CostCenter[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalExpenseCount, setTotalExpenseCount] = useState(0);
+  const pageSize = 25;
 
   const locations = ["Downtown", "Mall Branch", "Marina Branch", "All Locations"];
   const categories = ["Utilities", "Rent", "Equipment", "Operational", "Marketing", "Salaries", "Maintenance", "Other"];
@@ -138,16 +145,48 @@ export function Expenses() {
   const taxRates = ["0", "5", "10"];
   const statuses = ["pending", "paid", "approved", "rejected", "draft"];
 
+  // Expense list is fetched server-side, filtered and paginated — matches ReceiptService's
+  // established pagination pattern. Tax rate has no backend query param (a narrow,
+  // secondary filter not worth a new Specification clause), so it stays a client-side
+  // pass over the current page only.
+  const loadExpenses = async () => {
+    try {
+      setLoading(true);
+      const result = await expensesService.getExpenses({
+        search: searchTerm || undefined,
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+        category: selectedCategory !== "all" ? selectedCategory : undefined,
+        location: selectedLocation !== "all" ? selectedLocation : undefined,
+        page: currentPage,
+        limit: pageSize,
+      });
+      setExpenses(result.expenses);
+      setTotalPages(result.pagination.totalPages);
+      setTotalExpenseCount(result.pagination.total);
+      // A delete (or a filter narrowing the result set) can leave currentPage past
+      // the new last page — snap back rather than showing an empty page forever.
+      if (result.pagination.totalPages > 0 && currentPage > result.pagination.totalPages) {
+        setCurrentPage(result.pagination.totalPages);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load expenses");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [expenseData, statsData, suppliersData, costCentersData] = await Promise.all([
-        expensesService.getExpenses(),
+      const [expenseResult, statsData, suppliersData, costCentersData] = await Promise.all([
+        expensesService.getExpenses({ page: currentPage, limit: pageSize }),
         expensesService.getStats(),
         purchaseService.getActiveSuppliers().catch(() => []),
         ledgersService.getCostCenters().catch(() => []),
       ]);
-      setExpenses(expenseData);
+      setExpenses(expenseResult.expenses);
+      setTotalPages(expenseResult.pagination.totalPages);
+      setTotalExpenseCount(expenseResult.pagination.total);
       setStats(statsData);
       setSuppliers(suppliersData);
       setRealCostCenters(costCentersData.filter(c => c.isActive !== false));
@@ -160,33 +199,70 @@ export function Expenses() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredExpenses = expenses.filter((expense) => {
-    const matchesSearch =
-      expense.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.notes.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesLocation = selectedLocation === "all" || expense.location === selectedLocation;
-    const matchesCategory = selectedCategory === "all" || expense.category === selectedCategory;
-    const matchesStatus = selectedStatus === "all" || expense.status === selectedStatus;
-    const matchesTaxRate = selectedTaxRate === "all" || expense.taxRate.toString() === selectedTaxRate;
-    return matchesSearch && matchesLocation && matchesCategory && matchesStatus && matchesTaxRate;
-  });
+  // Filters/page changes re-fetch from the server rather than filtering an already-loaded
+  // list — any change to search/status/category/location resets back to page 1.
+  useEffect(() => {
+    setCurrentPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, selectedStatus, selectedCategory, selectedLocation]);
 
-  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.totalAmount, 0);
-  const totalTax = filteredExpenses.reduce((sum, e) => sum + e.taxAmount, 0);
-  const topCategory = Object.entries(
-    filteredExpenses.reduce((acc, e) => {
-      acc[e.category] = (acc[e.category] || 0) + e.totalAmount;
-      return acc;
-    }, {} as Record<string, number>)
-  ).sort(([, a], [, b]) => b - a)[0];
+  useEffect(() => {
+    loadExpenses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, selectedStatus, selectedCategory, selectedLocation, currentPage]);
+
+  const filteredExpenses = selectedTaxRate === "all"
+    ? expenses
+    : expenses.filter((expense) => expense.taxRate.toString() === selectedTaxRate);
+
+  // True branch-wide (approved) totals from /api/expenses/stats — NOT a sum over the
+  // currently loaded page, which pagination made an incomplete/misleading source for
+  // a number labeled "Total Expenses".
+  const totalExpenses = stats?.totalAmount ?? 0;
+  const totalTax = stats?.totalTax ?? 0;
+  const topCategory = stats?.byCategory
+    ? Object.entries(stats.byCategory).sort(([, a], [, b]) => b - a)[0]
+    : undefined;
 
   const calculateTotal = () => {
     const amount = form.amount || 0;
     const taxRate = form.taxRate || 0;
     return amount + (amount * taxRate) / 100;
+  };
+
+  // Exports every expense matching the active filters, not just the current page —
+  // re-fetches with a high limit rather than exporting only what's on screen.
+  const handleExport = async () => {
+    try {
+      const result = await expensesService.getExpenses({
+        search: searchTerm || undefined,
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+        category: selectedCategory !== "all" ? selectedCategory : undefined,
+        location: selectedLocation !== "all" ? selectedLocation : undefined,
+        page: 1,
+        limit: Math.max(totalExpenseCount, 1),
+      });
+      const rows = (selectedTaxRate === "all"
+        ? result.expenses
+        : result.expenses.filter((e) => e.taxRate.toString() === selectedTaxRate)
+      ).map((e) => [e.date, e.vendorName, e.category, e.location, e.amount, e.taxRate, e.taxAmount, e.totalAmount, e.status]);
+
+      if (rows.length === 0) {
+        toast.error("No expenses to export");
+        return;
+      }
+      exportAsCsv(
+        `expenses_${format(new Date(), "yyyy-MM-dd")}.csv`,
+        ["Date", "Vendor", "Category", "Location", "Amount", "Tax Rate %", "Tax Amount", "Total", "Status"],
+        rows
+      );
+      toast.success("Export started");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to export expenses");
+    }
   };
 
   const resetForm = () => {
@@ -451,7 +527,7 @@ export function Expenses() {
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
+          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -492,7 +568,7 @@ export function Expenses() {
             <div className="text-2xl font-bold text-orange-700">
               <CurrencyGlyph /> {totalExpenses.toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{filteredExpenses.length} transactions</p>
+            <p className="text-xs text-muted-foreground mt-1">{stats?.totalCount ?? totalExpenseCount} transactions</p>
           </CardContent>
         </Card>
 
@@ -735,6 +811,37 @@ export function Expenses() {
                   Clear Filters
                 </Button>
               )}
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalExpenseCount)} of {totalExpenseCount} expenses
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <div className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

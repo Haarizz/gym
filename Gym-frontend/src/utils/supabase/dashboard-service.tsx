@@ -133,7 +133,6 @@ export interface RevenueDataPoint {
   day?: string;
   week?: string;
   revenue: number;
-  target: number;
 }
 
 export interface MembershipDistribution {

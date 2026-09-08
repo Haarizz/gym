@@ -93,6 +93,43 @@ function mapPaymentVoucher(r: any): PaymentVoucher {
   };
 }
 
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PaymentVouchersPage {
+  vouchers: PaymentVoucher[];
+  pagination: Pagination;
+}
+
+export interface PaymentVoucherStats {
+  totalPaidThisMonth: number;
+  totalPending: number;
+  overdueCount: number;
+  upcomingPayments: number;
+}
+
+function mapPagination(r: any): Pagination {
+  return {
+    page: Number(r?.page ?? 1),
+    limit: Number(r?.limit ?? 25),
+    total: Number(r?.total ?? 0),
+    totalPages: Number(r?.total_pages ?? r?.totalPages ?? 1),
+  };
+}
+
+function mapStats(r: any): PaymentVoucherStats {
+  return {
+    totalPaidThisMonth: Number(r?.total_paid_this_month ?? r?.totalPaidThisMonth ?? 0),
+    totalPending: Number(r?.total_pending ?? r?.totalPending ?? 0),
+    overdueCount: Number(r?.overdue_count ?? r?.overdueCount ?? 0),
+    upcomingPayments: Number(r?.upcoming_payments ?? r?.upcomingPayments ?? 0),
+  };
+}
+
 function toBody(req: PaymentVoucherCreateRequest) {
   return {
     supplier_name: req.supplierName,
@@ -125,18 +162,41 @@ class PaymentVoucherService {
     search?: string;
     status?: string;
     supplierType?: string;
-  } = {}): Promise<PaymentVoucher[]> {
+    category?: string;
+    from?: string;
+    to?: string;
+    sortField?: string;
+    sortDirection?: "asc" | "desc";
+    page?: number;
+    limit?: number;
+  } = {}): Promise<PaymentVouchersPage> {
     const params = new URLSearchParams();
     if (filters.search) params.append("search", filters.search);
     if (filters.status) params.append("status", filters.status);
     if (filters.supplierType) params.append("supplier_type", filters.supplierType);
+    if (filters.category) params.append("category", filters.category);
+    if (filters.from) params.append("from", filters.from);
+    if (filters.to) params.append("to", filters.to);
+    if (filters.sortField) params.append("sort_field", filters.sortField);
+    if (filters.sortDirection) params.append("sort_direction", filters.sortDirection);
+    params.append("page", String(filters.page ?? 1));
+    params.append("limit", String(filters.limit ?? 25));
 
     const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/payment-vouchers?${params.toString()}`
     );
     if (!res.ok) throw new Error("Failed to load payment vouchers");
     const data = await res.json();
-    return (data ?? []).map(mapPaymentVoucher);
+    return {
+      vouchers: (data?.vouchers ?? []).map(mapPaymentVoucher),
+      pagination: mapPagination(data?.pagination),
+    };
+  }
+
+  async getStats(): Promise<PaymentVoucherStats> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/payment-vouchers/stats`);
+    if (!res.ok) throw new Error("Failed to load payment voucher stats");
+    return mapStats(await res.json());
   }
 
   async getPaymentVoucher(id: string): Promise<PaymentVoucher> {

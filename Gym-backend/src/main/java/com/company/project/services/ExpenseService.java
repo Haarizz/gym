@@ -2,11 +2,19 @@ package com.company.project.services;
 
 import com.company.project.dto.ExpenseRequestDTO;
 import com.company.project.dto.ExpenseResponseDTO;
+import com.company.project.dto.ExpensesPageResponseDTO;
 import com.company.project.dto.ExpenseStatsDTO;
+import com.company.project.dto.PaginationDTO;
 import com.company.project.entities.Expense;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.CostCenterRepository;
 import com.company.project.repositories.ExpenseRepository;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,29 +46,64 @@ public class ExpenseService {
         this.branchService = branchService;
     }
 
-    public List<ExpenseResponseDTO> getExpenses(String search, String status, String category,
-                                                String location, LocalDate from, LocalDate to) {
-        Long branchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
-        List<Expense> expenses = expenseRepository.findAllByOrderByDateDesc();
-        return expenses.stream()
-                .filter(e -> branchId == null || branchId.equals(e.getBranchId()))
-                .filter(e -> {
-                    if (search == null || search.isBlank()) return true;
-                    String s = search.toLowerCase(Locale.ROOT);
-                    return (e.getVendorName() != null && e.getVendorName().toLowerCase(Locale.ROOT).contains(s))
-                            || (e.getCategory() != null && e.getCategory().toLowerCase(Locale.ROOT).contains(s))
-                            || (e.getNotes() != null && e.getNotes().toLowerCase(Locale.ROOT).contains(s));
-                })
-                .filter(e -> status == null || status.isBlank() || status.equalsIgnoreCase("all")
-                        || (e.getStatus() != null && e.getStatus().equalsIgnoreCase(status)))
-                .filter(e -> category == null || category.isBlank() || category.equalsIgnoreCase("all")
-                        || (e.getCategory() != null && e.getCategory().equalsIgnoreCase(category)))
-                .filter(e -> location == null || location.isBlank()
-                        || (e.getLocation() != null && e.getLocation().equalsIgnoreCase(location)))
-                .filter(e -> from == null || (e.getDate() != null && !e.getDate().isBefore(from)))
-                .filter(e -> to == null || (e.getDate() != null && !e.getDate().isAfter(to)))
+    /**
+     * Real DB-level pagination (Specification + Pageable, matching ReceiptService's
+     * established pattern) — previously loaded every expense on the branch into
+     * memory before filtering/returning the whole list, with no cap. Branch scoping
+     * is not re-applied here: Expense already carries @Filter("branchFilter"), which
+     * BranchFilterAspect enables on every @Transactional method, so it's enforced at
+     * the SQL level automatically for this query exactly as it was for the old
+     * findAllByOrderByDateDesc() call.
+     */
+    @Transactional(readOnly = true)
+    public ExpensesPageResponseDTO getExpenses(String search, String status, String category,
+                                                String location, LocalDate from, LocalDate to,
+                                                int page, int limit) {
+        Specification<Expense> spec = buildSpec(search, status, category, location, from, to);
+        Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "date"));
+        Page<Expense> expensePage = expenseRepository.findAll(spec, pageable);
+
+        List<ExpenseResponseDTO> dtos = expensePage.getContent().stream()
                 .map(ExpenseResponseDTO::fromEntity)
                 .collect(Collectors.toList());
+
+        PaginationDTO pagination = new PaginationDTO(
+                page, limit, expensePage.getTotalElements(), expensePage.getTotalPages());
+
+        return new ExpensesPageResponseDTO(dtos, pagination);
+    }
+
+    private Specification<Expense> buildSpec(String search, String status, String category,
+                                              String location, LocalDate from, LocalDate to) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (search != null && !search.isBlank()) {
+                String pattern = "%" + search.toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("vendorName")), pattern),
+                        cb.like(cb.lower(root.get("category")), pattern),
+                        cb.like(cb.lower(root.get("notes")), pattern)
+                ));
+            }
+            if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) {
+                predicates.add(cb.equal(cb.lower(root.get("status")), status.toLowerCase(Locale.ROOT)));
+            }
+            if (category != null && !category.isBlank() && !category.equalsIgnoreCase("all")) {
+                predicates.add(cb.equal(cb.lower(root.get("category")), category.toLowerCase(Locale.ROOT)));
+            }
+            if (location != null && !location.isBlank()) {
+                predicates.add(cb.equal(cb.lower(root.get("location")), location.toLowerCase(Locale.ROOT)));
+            }
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("date"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("date"), to));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
     }
 
     public ExpenseStatsDTO getStats() {

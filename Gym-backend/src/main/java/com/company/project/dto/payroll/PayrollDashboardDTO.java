@@ -192,7 +192,6 @@ public class PayrollDashboardDTO {
         private long bookings;
         private int capacity;
         private BigDecimal revenue;
-        private double rating;
 
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
@@ -206,7 +205,5 @@ public class PayrollDashboardDTO {
         public void setCapacity(int capacity) { this.capacity = capacity; }
         public BigDecimal getRevenue() { return revenue; }
         public void setRevenue(BigDecimal revenue) { this.revenue = revenue; }
-        public double getRating() { return rating; }
-        public void setRating(double rating) { this.rating = rating; }
     }
 }

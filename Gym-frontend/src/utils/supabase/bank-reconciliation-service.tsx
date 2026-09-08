@@ -206,6 +206,42 @@ class BankReconciliationService {
     return mapReconciliation(await res.json());
   }
 
+  /** Posts an unmatched DEBIT line (money the bank took out) as a Bank Charges Expense entry and matches it. */
+  async postBankCharge(
+    reconciliationId: number,
+    lineId: number,
+    description?: string
+  ): Promise<BankReconciliation> {
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/bank-reconciliations/${reconciliationId}/lines/${lineId}/post-bank-charge`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: description ?? null }),
+      }
+    );
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to post bank charge"));
+    return mapReconciliation(await res.json());
+  }
+
+  /** Posts an unmatched CREDIT line (money the bank added) as Interest Income and matches it. */
+  async postBankInterest(
+    reconciliationId: number,
+    lineId: number,
+    description?: string
+  ): Promise<BankReconciliation> {
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/bank-reconciliations/${reconciliationId}/lines/${lineId}/post-bank-interest`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: description ?? null }),
+      }
+    );
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to post bank interest"));
+    return mapReconciliation(await res.json());
+  }
+
   async unmatchLine(
     reconciliationId: number,
     lineId: number

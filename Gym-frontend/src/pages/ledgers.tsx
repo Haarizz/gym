@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useCurrency, CurrencyValue } from '../utils/currency';
 import { useBranch } from '../utils/branch-context';
 import { toast } from 'sonner';
+import { exportAsExcel } from '../utils/export-utils';
 import { ledgersService, AccountHead as ApiAccountHead, CostCenter as ApiCostCenter, LedgerTransaction } from '../utils/supabase/ledgers-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -105,6 +106,7 @@ export function Ledgers() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [showAddAccount, setShowAddAccount] = useState(false);
+  const [seedingDefaults, setSeedingDefaults] = useState(false);
   const [showAccountDetails, setShowAccountDetails] = useState(false);
   
   // Cost Centers state
@@ -116,6 +118,10 @@ export function Ledgers() {
 
   // Transactions state
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
+  const [txCurrentPage, setTxCurrentPage] = useState(1);
+  const [txTotalPages, setTxTotalPages] = useState(1);
+  const [txTotalCount, setTxTotalCount] = useState(0);
+  const txPageSize = 25;
   const [txDateFrom, setTxDateFrom] = useState('');
   const [txDateTo, setTxDateTo] = useState('');
   const [txTypeFilter, setTxTypeFilter] = useState('all');
@@ -264,22 +270,32 @@ export function Ledgers() {
   const loadTransactions = useCallback(async () => {
     setTxLoading(true);
     try {
-      const data = await ledgersService.getTransactions({
+      const result = await ledgersService.getTransactions({
         from: txDateFrom || undefined,
         to: txDateTo || undefined,
         type: txTypeFilter !== 'all' ? txTypeFilter : undefined,
         search: txSearch || undefined,
+        page: txCurrentPage,
+        limit: txPageSize,
       });
-      setTransactions(data);
+      setTransactions(result.transactions);
+      setTxTotalPages(result.pagination.totalPages);
+      setTxTotalCount(result.pagination.total);
     } catch {
       toast.error('Failed to load transactions');
     } finally {
       setTxLoading(false);
     }
-  }, [txDateFrom, txDateTo, txTypeFilter, txSearch, activeBranchId]);
+  }, [txDateFrom, txDateTo, txTypeFilter, txSearch, txCurrentPage, activeBranchId]);
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
   useEffect(() => { loadCostCenters(); }, [loadCostCenters]);
+
+  // Any filter change resets back to page 1 and re-fetches.
+  useEffect(() => {
+    setTxCurrentPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txDateFrom, txDateTo, txTypeFilter, txSearch]);
 
   useEffect(() => {
     if (activeTab === 'transactions') {
@@ -405,6 +421,29 @@ export function Ledgers() {
     }
   };
 
+  // Fills in any missing accounts from the standard Chart of Accounts for this branch.
+  // For gyms provisioned before every new gym started getting the full chart seeded
+  // automatically — accounts otherwise only appear one at a time, lazily, the moment
+  // something happens to post to that code first, leaving this screen showing an
+  // incomplete, unpredictable subset. Safe to click more than once — already-present
+  // codes are left untouched.
+  const handleSeedDefaults = async () => {
+    setSeedingDefaults(true);
+    try {
+      const created = await ledgersService.seedDefaultAccountHeads();
+      if (created.length === 0) {
+        toast.info('Chart of Accounts already has all standard accounts');
+      } else {
+        toast.success(`Added ${created.length} missing account${created.length === 1 ? '' : 's'}`);
+        await loadAccounts();
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to seed default accounts');
+    } finally {
+      setSeedingDefaults(false);
+    }
+  };
+
   const handleAddCostCenter = async () => {
     if (!newCostCenter.name || !newCostCenter.branch) {
       toast.error('Please fill in name and branch');
@@ -515,9 +554,39 @@ export function Ledgers() {
     }
   };
 
-  const exportLedger = (format: string) => {
-    console.log(`Exporting ledger as ${format}`);
-    alert(`Ledger will be exported as ${format.toUpperCase()}`);
+  // Exports whichever tab is currently active — Chart of Accounts, Cost Centers, or
+  // Transactions each have a different shape, so there's no single generic export.
+  // "pdf" is browser print (matches financial-reports.tsx's convention) since there's
+  // no backend PDF generator; "excel" is a real .xls file via export-utils.
+  const exportLedger = (fileFormat: 'excel' | 'pdf') => {
+    if (fileFormat === 'pdf') {
+      window.print();
+      return;
+    }
+    const dateLabel = new Date().toISOString().split('T')[0];
+    if (activeTab === 'cost-centers') {
+      if (filteredCostCenters.length === 0) { toast.error('No cost centers to export'); return; }
+      exportAsExcel(
+        `cost-centers_${dateLabel}.xls`,
+        ['Code', 'Name', 'Branch', 'Manager', 'Budget', 'Spent', 'Utilization %', 'Status'],
+        filteredCostCenters.map(cc => [cc.code, cc.name, cc.branch ?? '', cc.manager ?? '', cc.budget, cc.spent, cc.utilization, cc.isActive ? 'Active' : 'Inactive'])
+      );
+    } else if (activeTab === 'transactions') {
+      if (transactions.length === 0) { toast.error('No transactions to export'); return; }
+      exportAsExcel(
+        `transactions_${dateLabel}.xls`,
+        ['Date', 'Reference', 'Type', 'Description', 'Debit', 'Credit', 'Branch', 'Status'],
+        transactions.map(tx => [tx.date, tx.referenceNo, tx.type, tx.description ?? '', tx.debit, tx.credit, tx.branch ?? '', tx.status ?? ''])
+      );
+    } else {
+      if (filteredAccounts.length === 0) { toast.error('No accounts to export'); return; }
+      exportAsExcel(
+        `chart-of-accounts_${dateLabel}.xls`,
+        ['Code', 'Name', 'Group', 'Branch', 'Cost Center', 'Opening Balance', 'Current Balance', 'Status'],
+        filteredAccounts.map(a => [a.code, a.name, a.group, a.branch, a.costCenter, a.openingBalance, a.currentBalance, a.status])
+      );
+    }
+    toast.success('Export started');
   };
 
   const openAccountDetails = (account: any) => {
@@ -689,10 +758,18 @@ export function Ledgers() {
                     </Select>
                   </div>
 
-                  <div className="flex items-end">
-                    <Button onClick={() => setShowAddAccount(true)} className="w-full">
+                  <div className="flex items-end gap-2">
+                    <Button onClick={() => setShowAddAccount(true)} className="flex-1">
                       <Plus className="h-4 w-4 mr-2" />
                       New Account
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleSeedDefaults}
+                      disabled={seedingDefaults}
+                      title="Add any missing standard accounts (Cash at Bank, Accounts Receivable, etc.)"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${seedingDefaults ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
                 </div>
@@ -1113,7 +1190,7 @@ export function Ledgers() {
               <CardHeader>
                 <CardTitle>All Transactions</CardTitle>
                 <CardDescription>
-                  Financial transactions from all vouchers and expenses ({transactions.length} records)
+                  Financial transactions from all vouchers and expenses ({txTotalCount} records)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1186,6 +1263,35 @@ export function Ledgers() {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+                )}
+
+                {txTotalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {((txCurrentPage - 1) * txPageSize) + 1} to {Math.min(txCurrentPage * txPageSize, txTotalCount)} of {txTotalCount} transactions
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTxCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={txCurrentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="text-sm">
+                        Page {txCurrentPage} of {txTotalPages}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTxCurrentPage(p => Math.min(txTotalPages, p + 1))}
+                        disabled={txCurrentPage === txTotalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

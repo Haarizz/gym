@@ -1,18 +1,28 @@
 package com.company.project.services;
 
+import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.PaymentVoucherBillDTO;
 import com.company.project.dto.PaymentVoucherRequestDTO;
 import com.company.project.dto.PaymentVoucherResponseDTO;
+import com.company.project.dto.PaymentVouchersPageResponseDTO;
+import com.company.project.dto.PaymentVoucherStatsDTO;
 import com.company.project.entities.PaymentVoucher;
 import com.company.project.entities.PaymentVoucherBill;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.PaymentVoucherBillRepository;
 import com.company.project.repositories.PaymentVoucherRepository;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -37,27 +47,128 @@ public class PaymentVoucherService {
         this.voucherNumberService     = voucherNumberService;
     }
 
-    public List<PaymentVoucherResponseDTO> getPaymentVouchers(
-            String search, String status, String supplierType) {
-        List<PaymentVoucher> all = paymentVoucherRepository.findAllByOrderByPaymentDateDesc();
-        return all.stream()
-                .filter(pv -> {
-                    if (search == null || search.isBlank()) return true;
-                    String s = search.toLowerCase(Locale.ROOT);
-                    return (pv.getVoucherNo() != null && pv.getVoucherNo().toLowerCase(Locale.ROOT).contains(s))
-                            || (pv.getSupplierName() != null && pv.getSupplierName().toLowerCase(Locale.ROOT).contains(s))
-                            || (pv.getBillNo() != null && pv.getBillNo().toLowerCase(Locale.ROOT).contains(s))
-                            || (pv.getDescription() != null && pv.getDescription().toLowerCase(Locale.ROOT).contains(s));
-                })
-                .filter(pv -> status == null || status.isBlank() || status.equalsIgnoreCase("all")
-                        || (pv.getStatus() != null && pv.getStatus().equalsIgnoreCase(status)))
-                .filter(pv -> supplierType == null || supplierType.isBlank() || supplierType.equalsIgnoreCase("all")
-                        || (pv.getSupplierType() != null && pv.getSupplierType().equalsIgnoreCase(supplierType)))
+    private static final List<String> SORTABLE_FIELDS = List.of(
+            "voucherNo", "supplierName", "paymentDate", "amount", "status", "supplierType");
+
+    /**
+     * Real DB-level pagination (Specification + Pageable, matching ReceiptService's
+     * established pattern) — previously loaded every payment voucher on the branch
+     * into memory before filtering/sorting/returning the whole list, with no cap.
+     * Branch scoping is not re-applied here: PaymentVoucher already carries
+     * @Filter("branchFilter"), enabled automatically for this query exactly as it
+     * was for the old findAllByOrderByPaymentDateDesc() call.
+     *
+     * `category` mirrors the frontend's composite quick-filter exactly (not a raw
+     * column match): "pending" = status IN (Pending, Partial), "paid" = status =
+     * Paid, "overdue" = status = Overdue, "supplier" = supplierType = Supplier —
+     * kept in sync with payment-voucher.tsx's filteredAndSortedVouchers logic.
+     */
+    @Transactional(readOnly = true)
+    public PaymentVouchersPageResponseDTO getPaymentVouchers(
+            String search, String status, String supplierType, String category,
+            LocalDate from, LocalDate to, String sortField, String sortDirection,
+            int page, int limit) {
+        Specification<PaymentVoucher> spec = buildSpec(search, status, supplierType, category, from, to);
+
+        String sortBy = SORTABLE_FIELDS.contains(sortField) ? sortField : "paymentDate";
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(direction, sortBy));
+
+        Page<PaymentVoucher> voucherPage = paymentVoucherRepository.findAll(spec, pageable);
+
+        List<PaymentVoucherResponseDTO> dtos = voucherPage.getContent().stream()
                 .map(pv -> {
                     List<PaymentVoucherBill> bills = billRepository.findByPaymentVoucherId(pv.getId());
                     return PaymentVoucherResponseDTO.fromEntity(pv, bills);
                 })
                 .collect(Collectors.toList());
+
+        PaginationDTO pagination = new PaginationDTO(
+                page, limit, voucherPage.getTotalElements(), voucherPage.getTotalPages());
+
+        return new PaymentVouchersPageResponseDTO(dtos, pagination);
+    }
+
+    private Specification<PaymentVoucher> buildSpec(String search, String status, String supplierType,
+                                                      String category, LocalDate from, LocalDate to) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (search != null && !search.isBlank()) {
+                String pattern = "%" + search.toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("voucherNo")), pattern),
+                        cb.like(cb.lower(root.get("supplierName")), pattern),
+                        cb.like(cb.lower(root.get("billNo")), pattern),
+                        cb.like(cb.lower(root.get("description")), pattern)
+                ));
+            }
+            if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) {
+                predicates.add(cb.equal(cb.lower(root.get("status")), status.toLowerCase(Locale.ROOT)));
+            }
+            if (supplierType != null && !supplierType.isBlank() && !supplierType.equalsIgnoreCase("all")) {
+                predicates.add(cb.equal(cb.lower(root.get("supplierType")), supplierType.toLowerCase(Locale.ROOT)));
+            }
+            if (category != null && !category.isBlank() && !category.equalsIgnoreCase("all")) {
+                switch (category.toLowerCase(Locale.ROOT)) {
+                    case "pending" -> predicates.add(cb.lower(root.get("status")).in("pending", "partial"));
+                    case "paid" -> predicates.add(cb.equal(cb.lower(root.get("status")), "paid"));
+                    case "overdue" -> predicates.add(cb.equal(cb.lower(root.get("status")), "overdue"));
+                    case "supplier" -> predicates.add(cb.equal(cb.lower(root.get("supplierType")), "supplier"));
+                    default -> { /* unrecognized category — no additional filter */ }
+                }
+            }
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("paymentDate"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("paymentDate"), to));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    /**
+     * True branch-wide stats for the dashboard cards — mirrors ExpenseService.getStats():
+     * a full aggregate over every voucher, independent of the current page/filters, so
+     * these numbers stay correct once the list itself is paginated.
+     */
+    @Transactional(readOnly = true)
+    public PaymentVoucherStatsDTO getStats() {
+        List<PaymentVoucher> all = paymentVoucherRepository.findAll();
+
+        LocalDate now = LocalDate.now();
+        BigDecimal totalPaidThisMonth = all.stream()
+                .filter(v -> "Paid".equalsIgnoreCase(v.getStatus())
+                        && v.getPaymentDate() != null
+                        && v.getPaymentDate().getMonthValue() == now.getMonthValue()
+                        && v.getPaymentDate().getYear() == now.getYear())
+                .map(PaymentVoucher::getAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalPending = all.stream()
+                .filter(v -> "Pending".equalsIgnoreCase(v.getStatus()) || "Partial".equalsIgnoreCase(v.getStatus()))
+                .map(PaymentVoucher::getAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long overdueCount = all.stream().filter(v -> "Overdue".equalsIgnoreCase(v.getStatus())).count();
+
+        LocalDate nextWeek = now.plusDays(7);
+        long upcomingPayments = all.stream()
+                .filter(v -> "Pending".equalsIgnoreCase(v.getStatus())
+                        && v.getPaymentDate() != null
+                        && !v.getPaymentDate().isAfter(nextWeek))
+                .count();
+
+        PaymentVoucherStatsDTO stats = new PaymentVoucherStatsDTO();
+        stats.setTotalPaidThisMonth(totalPaidThisMonth);
+        stats.setTotalPending(totalPending);
+        stats.setOverdueCount(overdueCount);
+        stats.setUpcomingPayments(upcomingPayments);
+        return stats;
     }
 
     public PaymentVoucherResponseDTO getPaymentVoucherById(Long id) {

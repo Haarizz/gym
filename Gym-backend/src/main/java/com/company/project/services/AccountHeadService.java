@@ -121,6 +121,60 @@ public class AccountHeadService {
         accountHeadRepository.delete(a);
     }
 
+    /**
+     * Fills in any missing accounts from the standard Chart of Accounts for the
+     * caller's active branch — same list as DataInitializer.seedDefaultAccountHeads()
+     * (the primary DB's boot-time seeder) and TenantProvisioningService.seedDefaultAccountHeads()
+     * (run automatically for every new gym going forward). Exists as a callable,
+     * idempotent action for branches that were provisioned before that fix landed and
+     * so never got seeded — those accounts otherwise only ever appear lazily, one at a
+     * time, the moment something happens to post to that code first (see
+     * FinancialEventService.updateAccountBalance's auto-create fallback), leaving the
+     * Chart of Accounts screen showing an incomplete, unpredictable subset. Skips any
+     * code that already exists (branch-scoped via findFirstByCode, which the active
+     * branchFilter already restricts to this branch) rather than failing on it, so
+     * it's always safe to call again. Keep this list in sync with the other two.
+     */
+    public List<AccountHeadResponseDTO> seedDefaults() {
+        record DefaultAccount(String code, String name, String type) {}
+        List<DefaultAccount> defaults = List.of(
+                new DefaultAccount("1000", "Cash in Hand", "ASSET"),
+                new DefaultAccount("1001", "Cash at Bank", "ASSET"),
+                new DefaultAccount("1100", "Accounts Receivable", "ASSET"),
+                new DefaultAccount("1400", "Salary Advance Receivable", "ASSET"),
+                new DefaultAccount("1500", "Fixed Assets", "ASSET"),
+                new DefaultAccount("1600", "Accumulated Depreciation", "ASSET"),
+                new DefaultAccount("2000", "Accounts Payable", "LIABILITY"),
+                new DefaultAccount("2100", "Tax / GST Payable", "LIABILITY"),
+                new DefaultAccount("2200", "GST Input Credit", "LIABILITY"),
+                new DefaultAccount("2300", "Deferred Revenue", "LIABILITY"),
+                new DefaultAccount("4000", "Membership Revenue", "REVENUE"),
+                new DefaultAccount("4100", "POS Sales Revenue", "REVENUE"),
+                new DefaultAccount("4200", "Service / Add-on Revenue", "REVENUE"),
+                new DefaultAccount("4300", "Interest Income", "REVENUE"),
+                new DefaultAccount("5000", "Salary Expense", "EXPENSE"),
+                new DefaultAccount("5100", "Maintenance Expense", "EXPENSE"),
+                new DefaultAccount("5200", "Purchase / COGS", "EXPENSE"),
+                new DefaultAccount("5700", "Miscellaneous Expense", "EXPENSE"),
+                new DefaultAccount("5800", "Depreciation Expense", "EXPENSE"),
+                new DefaultAccount("5900", "Bank Charges Expense", "EXPENSE")
+        );
+
+        List<AccountHead> created = new ArrayList<>();
+        for (DefaultAccount d : defaults) {
+            if (accountHeadRepository.findFirstByCode(d.code()).isPresent()) continue;
+            AccountHead a = new AccountHead();
+            a.setCode(d.code());
+            a.setName(d.name());
+            a.setType(d.type());
+            a.setOpeningBalance(BigDecimal.ZERO);
+            a.setCurrentBalance(BigDecimal.ZERO);
+            a.setIsActive(true);
+            created.add(accountHeadRepository.save(a));
+        }
+        return created.stream().map(AccountHeadResponseDTO::fromEntity).collect(Collectors.toList());
+    }
+
     @Transactional(readOnly = true)
     public List<LedgerEntryDTO> getAllLedgerEntries(LocalDate from, LocalDate to) {
         List<JournalVoucher> jvs;

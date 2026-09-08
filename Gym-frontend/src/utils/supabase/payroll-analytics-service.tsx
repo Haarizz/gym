@@ -62,7 +62,6 @@ export interface PayrollDashboardData {
     bookings: number;
     capacity: number;
     revenue: number;
-    rating: number;
   }>;
 }
 

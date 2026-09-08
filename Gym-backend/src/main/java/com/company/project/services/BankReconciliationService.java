@@ -13,6 +13,7 @@ import com.company.project.entities.JournalVoucherLine;
 import com.company.project.repositories.AccountHeadRepository;
 import com.company.project.repositories.BankReconciliationRepository;
 import com.company.project.repositories.BankStatementLineRepository;
+import com.company.project.repositories.JournalEntrySourceRepository;
 import com.company.project.repositories.JournalVoucherLineRepository;
 import com.company.project.repositories.JournalVoucherRepository;
 import org.springframework.stereotype.Service;
@@ -65,17 +66,23 @@ public class BankReconciliationService {
     private final AccountHeadRepository accountHeadRepository;
     private final JournalVoucherRepository journalVoucherRepository;
     private final JournalVoucherLineRepository journalVoucherLineRepository;
+    private final JournalEntrySourceRepository sourceRepo;
+    private final FinancialEventService financialEventService;
 
     public BankReconciliationService(BankReconciliationRepository reconciliationRepository,
                                      BankStatementLineRepository lineRepository,
                                      AccountHeadRepository accountHeadRepository,
                                      JournalVoucherRepository journalVoucherRepository,
-                                     JournalVoucherLineRepository journalVoucherLineRepository) {
+                                     JournalVoucherLineRepository journalVoucherLineRepository,
+                                     JournalEntrySourceRepository sourceRepo,
+                                     FinancialEventService financialEventService) {
         this.reconciliationRepository = reconciliationRepository;
         this.lineRepository = lineRepository;
         this.accountHeadRepository = accountHeadRepository;
         this.journalVoucherRepository = journalVoucherRepository;
         this.journalVoucherLineRepository = journalVoucherLineRepository;
+        this.sourceRepo = sourceRepo;
+        this.financialEventService = financialEventService;
     }
 
     @Transactional(readOnly = true)
@@ -188,6 +195,81 @@ public class BankReconciliationService {
         lineRepository.save(line);
         updateStatus(reconciliationId);
         return getById(reconciliationId);
+    }
+
+    /**
+     * Posts a bank statement DEBIT line (money the bank took out) as a Bank Charges
+     * Expense entry and immediately matches it — for a fee that has no corresponding
+     * source document anywhere else in the system, so there is nothing to select in
+     * the manual-match picker. Only usable on an unmatched line; a line that already
+     * corresponds to a real entered transaction should be matched via matchLine()
+     * instead, not re-posted as a generic charge.
+     */
+    public BankReconciliationResponseDTO postBankCharge(Long reconciliationId, Long lineId, String description) {
+        BankStatementLine line = requireUnmatchedLine(reconciliationId, lineId);
+        if (!"DEBIT".equalsIgnoreCase(line.getType())) {
+            throw new IllegalStateException("Only a DEBIT statement line (money leaving the account) can be posted as a bank charge");
+        }
+        BankReconciliation reconciliation = reconciliationRepository.findById(reconciliationId)
+                .orElseThrow(() -> new IllegalArgumentException("Reconciliation not found: " + reconciliationId));
+        String bankAccountCode = resolveBankAccountCode(reconciliation.getBankAccountName());
+
+        financialEventService.onBankCharge(line.getId(), line.getTransactionDate(), bankAccountCode,
+                reconciliation.getBankAccountName(), line.getAmount(),
+                description != null && !description.isBlank() ? description : line.getDescription());
+
+        return applyPostedMatch(reconciliation, line, "BankStatementLineCharge");
+    }
+
+    /**
+     * Posts a bank statement CREDIT line (money the bank added) as Interest Income
+     * and immediately matches it. Mirrors {@link #postBankCharge} for the deposit side.
+     */
+    public BankReconciliationResponseDTO postBankInterest(Long reconciliationId, Long lineId, String description) {
+        BankStatementLine line = requireUnmatchedLine(reconciliationId, lineId);
+        if (!"CREDIT".equalsIgnoreCase(line.getType())) {
+            throw new IllegalStateException("Only a CREDIT statement line (money entering the account) can be posted as bank interest");
+        }
+        BankReconciliation reconciliation = reconciliationRepository.findById(reconciliationId)
+                .orElseThrow(() -> new IllegalArgumentException("Reconciliation not found: " + reconciliationId));
+        String bankAccountCode = resolveBankAccountCode(reconciliation.getBankAccountName());
+
+        financialEventService.onBankInterest(line.getId(), line.getTransactionDate(), bankAccountCode,
+                reconciliation.getBankAccountName(), line.getAmount(),
+                description != null && !description.isBlank() ? description : line.getDescription());
+
+        return applyPostedMatch(reconciliation, line, "BankStatementLineInterest");
+    }
+
+    private BankStatementLine requireUnmatchedLine(Long reconciliationId, Long lineId) {
+        BankStatementLine line = lineRepository.findById(lineId)
+                .orElseThrow(() -> new IllegalArgumentException("Line not found: " + lineId));
+        if (!reconciliationId.equals(line.getReconciliationId())) {
+            throw new IllegalArgumentException("Line " + lineId + " does not belong to reconciliation " + reconciliationId);
+        }
+        if (Boolean.TRUE.equals(line.getIsMatched())) {
+            throw new IllegalStateException("Line is already matched");
+        }
+        if (line.getAmount() == null || line.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Line has no positive amount to post");
+        }
+        return line;
+    }
+
+    /** Marks the line matched against the journal voucher FinancialEventService just created for it. */
+    private BankReconciliationResponseDTO applyPostedMatch(BankReconciliation reconciliation, BankStatementLine line, String sourceEntityType) {
+        Long jvId = sourceRepo.findBySourceEntityTypeAndSourceEntityId(sourceEntityType, line.getId())
+                .orElseThrow(() -> new IllegalStateException("Journal voucher was not created for line " + line.getId()))
+                .getJournalVoucherId();
+        JournalVoucher jv = journalVoucherRepository.findById(jvId)
+                .orElseThrow(() -> new IllegalStateException("Journal voucher " + jvId + " not found after posting"));
+
+        line.setIsMatched(true);
+        line.setMatchedJournalVoucherId(jv.getId());
+        line.setMatchedVoucherNo(jv.getVoucherNo());
+        lineRepository.save(line);
+        updateStatus(reconciliation.getId());
+        return getById(reconciliation.getId());
     }
 
     public BankReconciliationResponseDTO unmatchLine(Long reconciliationId, Long lineId) {

@@ -65,7 +65,7 @@ export function LocationPicker({ id, value, onChange, placeholder }: LocationPic
           <MapPin className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
           <Input
             id={id}
-            className="!pl-10"
+            className="pl-10"
             value={query}
             onChange={(e) => handleInputChange(e.target.value)}
             onFocus={() => query.trim().length >= 3 && suggestions.length > 0 && setOpen(true)}

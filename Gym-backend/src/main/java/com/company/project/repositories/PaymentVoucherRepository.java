@@ -2,11 +2,12 @@ package com.company.project.repositories;
 
 import com.company.project.entities.PaymentVoucher;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.time.LocalDate;
 import java.util.List;
 
-public interface PaymentVoucherRepository extends JpaRepository<PaymentVoucher, Long> {
+public interface PaymentVoucherRepository extends JpaRepository<PaymentVoucher, Long>, JpaSpecificationExecutor<PaymentVoucher> {
 
     List<PaymentVoucher> findAllByOrderByPaymentDateDesc();
 

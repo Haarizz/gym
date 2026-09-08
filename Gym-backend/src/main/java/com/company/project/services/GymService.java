@@ -234,7 +234,15 @@ public class GymService {
             gym.setSlug(newSlug);
         }
         if (request.getAddress() != null) gym.setAddress(request.getAddress());
-        if (request.getPhone() != null) gym.setPhone(request.getPhone());
+        if (request.getPhone() != null) {
+            // Matches the gyms.phone column (VARCHAR(50), see V29 migration) — reject
+            // clearly here instead of letting an oversized value reach the database and
+            // surface as a raw DataIntegrityViolationException/SQL error to the user.
+            if (request.getPhone().length() > 50) {
+                throw new BusinessRuleViolationException("Phone number must be 50 characters or fewer");
+            }
+            gym.setPhone(request.getPhone());
+        }
         if (request.getEmail() != null) gym.setEmail(request.getEmail());
         if (request.getContactPerson() != null) gym.setContactPerson(request.getContactPerson());
         if (request.getLat() != null) gym.setLat(request.getLat());

@@ -50,6 +50,7 @@ import java.util.Optional;
  *   4000  Membership Revenue
  *   4100  POS Sales Revenue
  *   4200  Service / Add-on Revenue
+ *   4300  Interest Income
  *
  *   EXPENSES
  *   5000  Salary Expense
@@ -58,6 +59,7 @@ import java.util.Optional;
  *   5300  Referral & Loyalty Rewards Expense
  *   5700  Miscellaneous Expense
  *   5800  Depreciation Expense
+ *   5900  Bank Charges Expense
  */
 @Service
 @Transactional
@@ -80,12 +82,14 @@ public class FinancialEventService {
     public static final String ACC_MEMBERSHIP_REVENUE  = "4000";
     public static final String ACC_SALES_REVENUE       = "4100";
     public static final String ACC_SERVICE_REVENUE     = "4200";
+    public static final String ACC_INTEREST_INCOME     = "4300";
     public static final String ACC_SALARY_EXPENSE      = "5000";
     public static final String ACC_MAINTENANCE_EXPENSE = "5100";
     public static final String ACC_PURCHASE_COGS       = "5200";
     public static final String ACC_REWARD_EXPENSE      = "5300";
     public static final String ACC_MISC_EXPENSE        = "5700";
     public static final String ACC_DEPRECIATION_EXPENSE = "5800";
+    public static final String ACC_BANK_CHARGES_EXPENSE = "5900";
     public static final String ACC_REWARD_LIABILITY    = "2400";
 
     private final JournalVoucherRepository          jvRepo;
@@ -288,6 +292,51 @@ public class FinancialEventService {
         JournalVoucher jv = createAndPost(
                 "Invoice Issued: " + invoice.getInvoiceNumber(), date, lines, "INVOICE");
         registerSource("Invoice", invoice.getId(), "INVOICE", jv.getId());
+    }
+
+    /**
+     * INVOICE PAYMENT SETTLED — an invoice has reached full PAID status, either at
+     * creation (zero-balance invoice, no separate receivable was ever posted) or via
+     * markInvoiceAsPaid() once cumulative payments cover the total.
+     *
+     * If the invoice was previously journaled by onInvoiceIssued() (i.e. it was
+     * UNPAID and carried a real Accounts Receivable balance), this settles that
+     * receivable:
+     *   DR Cash/Bank              (totalAmount)
+     *   CR Accounts Receivable    (totalAmount)
+     *
+     * If the invoice was PAID in full at creation (never journaled by
+     * onInvoiceIssued — no receivable was ever recorded), this recognizes the
+     * revenue directly instead, exactly as onInvoiceIssued would have, but with
+     * cash rather than AR as the debit leg:
+     *   DR Cash/Bank              (totalAmount)
+     *   CR Membership Revenue     (subtotal)
+     *   CR Tax / GST Payable      (taxAmount)
+     */
+    public void onInvoicePaymentSettled(Invoice invoice) {
+        if (alreadyJournaled("InvoicePayment", invoice.getId())) return;
+
+        BigDecimal total = safe(invoice.getTotalAmount());
+        if (total.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        boolean receivableWasPosted = sourceRepo.existsBySourceEntityTypeAndSourceEntityId("Invoice", invoice.getId());
+
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_CASH_AT_BANK, "Cash at Bank", total, "Invoice payment " + invoice.getInvoiceNumber()));
+        if (receivableWasPosted) {
+            lines.add(cr(ACC_RECEIVABLE, "Accounts Receivable", total, "Invoice " + invoice.getInvoiceNumber() + " settled"));
+        } else {
+            BigDecimal subtotal = safe(invoice.getSubtotal());
+            BigDecimal tax = safe(invoice.getTaxAmount());
+            lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", subtotal, "Invoice Revenue"));
+            if (tax.compareTo(BigDecimal.ZERO) > 0) {
+                lines.add(cr(ACC_TAX_PAYABLE, "Tax / GST Payable", tax, "Invoice Tax"));
+            }
+        }
+
+        JournalVoucher jv = createAndPost(
+                "Invoice Payment: " + invoice.getInvoiceNumber(), LocalDate.now(), lines, "INVOICE");
+        registerSource("InvoicePayment", invoice.getId(), "INVOICE", jv.getId());
     }
 
     /**
@@ -754,6 +803,63 @@ public class FinancialEventService {
                 + (voucher.getNarration() != null ? " — " + voucher.getNarration() : ""),
                 voucher.getDate(), lines, "CONTRA");
         registerSource("ContraVoucher", voucher.getId(), "CONTRA", jv.getId());
+    }
+
+    /**
+     * BANK CHARGE — a fee the bank deducted that has no corresponding source document
+     * anywhere else in the system (e.g. a monthly account-keeping fee on the statement).
+     * Raised from the bank reconciliation screen for a statement line that has no
+     * matching ledger entry, rather than requiring the user to leave reconciliation and
+     * create a manual Journal Voucher first.
+     * DR  Bank Charges Expense   (amount)
+     * CR  [bankAccountCode]      (amount)
+     *
+     * Idempotency is keyed by the statement line itself, not the reconciliation — the
+     * same line can only ever produce one journal entry, but a reconciliation with many
+     * unmatched lines can post several of these independently.
+     */
+    public void onBankCharge(Long statementLineId, LocalDate date, String bankAccountCode,
+                              String bankAccountName, BigDecimal amount, String description) {
+        if (alreadyJournaled("BankStatementLineCharge", statementLineId)) return;
+        BigDecimal amt = safe(amount);
+        if (amt.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = List.of(
+                dr(ACC_BANK_CHARGES_EXPENSE, "Bank Charges Expense", amt,
+                        description != null ? description : "Bank charge"),
+                cr(bankAccountCode, bankAccountName, amt,
+                        description != null ? description : "Bank charge")
+        );
+
+        JournalVoucher jv = createAndPost(
+                "Bank Charge" + (description != null ? ": " + description : ""),
+                date != null ? date : LocalDate.now(), lines, "BANK_RECONCILIATION");
+        registerSource("BankStatementLineCharge", statementLineId, "BANK_RECONCILIATION", jv.getId());
+    }
+
+    /**
+     * BANK INTEREST — interest the bank credited that has no corresponding source
+     * document elsewhere in the system. Same rationale as {@link #onBankCharge}.
+     * DR  [bankAccountCode]      (amount)
+     * CR  Interest Income        (amount)
+     */
+    public void onBankInterest(Long statementLineId, LocalDate date, String bankAccountCode,
+                                String bankAccountName, BigDecimal amount, String description) {
+        if (alreadyJournaled("BankStatementLineInterest", statementLineId)) return;
+        BigDecimal amt = safe(amount);
+        if (amt.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = List.of(
+                dr(bankAccountCode, bankAccountName, amt,
+                        description != null ? description : "Bank interest"),
+                cr(ACC_INTEREST_INCOME, "Interest Income", amt,
+                        description != null ? description : "Bank interest")
+        );
+
+        JournalVoucher jv = createAndPost(
+                "Bank Interest" + (description != null ? ": " + description : ""),
+                date != null ? date : LocalDate.now(), lines, "BANK_RECONCILIATION");
+        registerSource("BankStatementLineInterest", statementLineId, "BANK_RECONCILIATION", jv.getId());
     }
 
     /**
