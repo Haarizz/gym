@@ -10,6 +10,12 @@ import { Label } from "../components/ui/label";
 import { Switch } from "../components/ui/switch";
 import { LocationPicker } from "../components/shared/location-picker";
 import { gymApi, GymDTO } from '../utils/supabase/gym-service';
+import { toast } from 'sonner';
+
+// Matches the gyms.phone DB column (VARCHAR(50), see backend V29 migration) —
+// enforced client-side so a too-long value never reaches the network, and again
+// server-side (GymService.updateGym) as the source of truth.
+const PHONE_MAX_LENGTH = 50;
 
 export function GymManagement() {
   const [gyms, setGyms] = useState<GymDTO[]>([]);
@@ -104,6 +110,10 @@ export function GymManagement() {
   const handleEditGym = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingGym) return;
+    if (editFormData.phone.length > PHONE_MAX_LENGTH) {
+      toast.error(`Phone number must be ${PHONE_MAX_LENGTH} characters or fewer`);
+      return;
+    }
     try {
       // Phase 8: a gym created since the per-tenant-database cutover (source ===
       // 'TENANT') has no primary-DB Gym row to update — its own details live in
@@ -120,7 +130,7 @@ export function GymManagement() {
     } catch (error: any) {
       console.error('Failed to update gym', error);
       const msg = error.response?.data?.message || error.message || 'Slug must be unique.';
-      alert(`Failed to update gym. ${msg}`);
+      toast.error(`Failed to update gym. ${msg}`);
     }
   };
 
@@ -259,7 +269,7 @@ export function GymManagement() {
       </Card>
 
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Gym</DialogTitle>
           </DialogHeader>
@@ -300,6 +310,7 @@ export function GymManagement() {
                 value={formData.phone}
                 onChange={e => setFormData({...formData, phone: e.target.value})}
                 placeholder="Contact phone"
+                maxLength={PHONE_MAX_LENGTH}
               />
             </div>
             <div className="space-y-2">
@@ -355,7 +366,7 @@ export function GymManagement() {
       </Dialog>
 
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Gym</DialogTitle>
           </DialogHeader>
@@ -402,6 +413,7 @@ export function GymManagement() {
                 value={editFormData.phone}
                 onChange={e => setEditFormData({...editFormData, phone: e.target.value})}
                 placeholder="Contact phone"
+                maxLength={PHONE_MAX_LENGTH}
               />
             </div>
             <div className="space-y-2">

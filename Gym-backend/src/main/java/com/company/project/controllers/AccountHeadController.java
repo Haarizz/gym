@@ -52,6 +52,12 @@ public class AccountHeadController {
                 .body(accountHeadService.createAccountHead(request));
     }
 
+    /** Fills in any missing accounts from the standard Chart of Accounts for the active branch. Safe to call repeatedly — already-present codes are skipped. Returns only the accounts actually created. */
+    @PostMapping("/seed-defaults")
+    public ResponseEntity<List<AccountHeadResponseDTO>> seedDefaults() {
+        return ResponseEntity.ok(accountHeadService.seedDefaults());
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<AccountHeadResponseDTO> updateAccountHead(
             @PathVariable Long id,

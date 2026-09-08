@@ -24,6 +24,16 @@ export function BranchManagement() {
     email: '',
     status: 'ACTIVE'
   });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<BranchDTO | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    branch_name: '',
+    branch_code: '',
+    address: '',
+    phone: '',
+    email: '',
+    status: 'ACTIVE'
+  });
 
   const loadBranches = async () => {
     try {
@@ -53,6 +63,35 @@ export function BranchManagement() {
       console.error('Failed to add branch', error);
       const msg = error.response?.data?.message || error.message || 'Code must be unique.';
       alert(`Failed to add branch. ${msg}`);
+    }
+  };
+
+  const openEditModal = (branch: BranchDTO) => {
+    setEditingBranch(branch);
+    setEditFormData({
+      branch_name: branch.branch_name || branch.name || '',
+      branch_code: branch.branch_code || branch.code || '',
+      address: branch.address || '',
+      phone: branch.phone || '',
+      email: branch.email || '',
+      status: branch.status || 'ACTIVE',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBranch) return;
+    try {
+      await branchApi.updateBranch(editingBranch.id, editFormData);
+      setShowEditModal(false);
+      setEditingBranch(null);
+      loadBranches();
+      await refreshBranches();
+    } catch (error: any) {
+      console.error('Failed to update branch', error);
+      const msg = error.response?.data?.message || error.message || 'Code must be unique.';
+      alert(`Failed to update branch. ${msg}`);
     }
   };
 
@@ -139,11 +178,21 @@ export function BranchManagement() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Switch
-                      checked={branch.status === 'ACTIVE'}
-                      onCheckedChange={() => toggleStatus(branch.id, branch.status)}
-                      aria-label="Toggle Status"
-                    />
+                    <div className="flex items-center justify-end space-x-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditModal(branch)}
+                        aria-label="Edit branch"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Switch
+                        checked={branch.status === 'ACTIVE'}
+                        onCheckedChange={() => toggleStatus(branch.id, branch.status)}
+                        aria-label="Toggle Status"
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -198,6 +247,69 @@ export function BranchManagement() {
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
               <Button type="submit">Save Branch</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Branch</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditBranch} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit_branch_name">Branch Name</Label>
+              <Input
+                id="edit_branch_name"
+                required
+                value={editFormData.branch_name}
+                onChange={(e) => setEditFormData({...editFormData, branch_name: e.target.value})}
+                placeholder="e.g. Downtown Center"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_branch_code">Branch Code</Label>
+              <Input
+                id="edit_branch_code"
+                required
+                value={editFormData.branch_code}
+                onChange={(e) => setEditFormData({...editFormData, branch_code: e.target.value.toUpperCase()})}
+                className="uppercase"
+                placeholder="e.g. NYC"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_address">Address</Label>
+              <Input
+                id="edit_address"
+                value={editFormData.address}
+                onChange={e => setEditFormData({...editFormData, address: e.target.value})}
+                placeholder="Full address"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_phone">Phone</Label>
+              <Input
+                id="edit_phone"
+                value={editFormData.phone}
+                onChange={e => setEditFormData({...editFormData, phone: e.target.value})}
+                placeholder="Contact phone"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_email">Email</Label>
+              <Input
+                id="edit_email"
+                type="email"
+                value={editFormData.email}
+                onChange={e => setEditFormData({...editFormData, email: e.target.value})}
+                placeholder="Contact email"
+              />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+              <Button type="submit">Save Changes</Button>
             </DialogFooter>
           </form>
         </DialogContent>

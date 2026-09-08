@@ -1,9 +1,13 @@
 package com.company.project.services;
 
 import com.company.project.dto.LedgerTransactionDTO;
+import com.company.project.dto.LedgerTransactionsPageResponseDTO;
+import com.company.project.dto.PaginationDTO;
 import com.company.project.entities.JournalVoucher;
+import com.company.project.entities.JournalVoucherLine;
 import com.company.project.entities.PaymentVoucher;
 import com.company.project.entities.ReceiptVoucher;
+import com.company.project.repositories.JournalVoucherLineRepository;
 import com.company.project.repositories.JournalVoucherRepository;
 import com.company.project.repositories.PaymentVoucherRepository;
 import com.company.project.repositories.ReceiptVoucherRepository;
@@ -14,8 +18,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -50,13 +56,39 @@ public class LedgerTransactionService {
     private final ReceiptVoucherRepository receiptVoucherRepository;
     private final PaymentVoucherRepository paymentVoucherRepository;
     private final JournalVoucherRepository journalVoucherRepository;
+    private final JournalVoucherLineRepository journalVoucherLineRepository;
 
     public LedgerTransactionService(ReceiptVoucherRepository receiptVoucherRepository,
                                      PaymentVoucherRepository paymentVoucherRepository,
-                                     JournalVoucherRepository journalVoucherRepository) {
+                                     JournalVoucherRepository journalVoucherRepository,
+                                     JournalVoucherLineRepository journalVoucherLineRepository) {
         this.receiptVoucherRepository = receiptVoucherRepository;
         this.paymentVoucherRepository = paymentVoucherRepository;
         this.journalVoucherRepository = journalVoucherRepository;
+        this.journalVoucherLineRepository = journalVoucherLineRepository;
+    }
+
+    /**
+     * Real, capped pagination over a UNION of three different entity types (Receipt
+     * Vouchers, Payment Vouchers, POSTED Journal Vouchers) — not a single JPA query,
+     * since there's no one entity to build a Page<T> from. Each source is still
+     * fetched branch-scoped and date-filtered at the query level exactly as before;
+     * the three lists are merged and sorted as before, and only the requested page
+     * is returned along with a real total count, so the response is finally bounded
+     * instead of shipping every transaction ever recorded to the browser in one call.
+     */
+    public LedgerTransactionsPageResponseDTO getTransactionsPage(LocalDate from, LocalDate to,
+                                                                  String type, String search,
+                                                                  int page, int limit) {
+        List<LedgerTransactionDTO> all = getTransactions(from, to, type, search);
+        int total = all.size();
+        int totalPages = (int) Math.ceil(total / (double) limit);
+        int fromIndex = Math.min((page - 1) * limit, total);
+        int toIndex = Math.min(fromIndex + limit, total);
+        List<LedgerTransactionDTO> pageContent = all.subList(fromIndex, toIndex);
+
+        PaginationDTO pagination = new PaginationDTO(page, limit, total, totalPages);
+        return new LedgerTransactionsPageResponseDTO(pageContent, pagination);
     }
 
     public List<LedgerTransactionDTO> getTransactions(LocalDate from, LocalDate to,
@@ -122,6 +154,21 @@ public class LedgerTransactionService {
             List<JournalVoucher> jvs = (from != null && to != null)
                     ? journalVoucherRepository.findByStatusAndDateBetweenOrderByDateDesc("POSTED", from, to)
                     : journalVoucherRepository.findByStatusOrderByDateDesc("POSTED");
+
+            // Batch-fetch every line for every JV in one query rather than one query per
+            // voucher, and take the first non-null cost center as "the" cost center for
+            // that voucher row — a JV can have lines on several cost centers at once, so
+            // this is a representative value for the list view, not a guaranteed-unique one.
+            List<Long> jvIds = jvs.stream().map(JournalVoucher::getId).collect(Collectors.toList());
+            Map<Long, String> costCenterByJvId = new HashMap<>();
+            if (!jvIds.isEmpty()) {
+                for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(jvIds)) {
+                    if (line.getCostCenter() != null && !line.getCostCenter().isBlank()) {
+                        costCenterByJvId.putIfAbsent(line.getJournalVoucherId(), line.getCostCenter());
+                    }
+                }
+            }
+
             for (JournalVoucher jv : jvs) {
                 LocalDate date = jv.getDate();
                 // Only needed for the single-bound case — from+to is already
@@ -139,7 +186,7 @@ public class LedgerTransactionService {
                 dto.setCredit(jv.getTotalCredit() != null ? jv.getTotalCredit() : BigDecimal.ZERO);
                 dto.setBranch(null);
                 dto.setStatus(jv.getStatus());
-                dto.setCostCenter(null);
+                dto.setCostCenter(costCenterByJvId.get(jv.getId()));
                 result.add(dto);
             }
         }

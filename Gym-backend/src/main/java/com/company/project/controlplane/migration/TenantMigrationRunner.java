@@ -83,6 +83,16 @@ public class TenantMigrationRunner implements CommandLineRunner {
             try {
                 DataSource tenantDs = tenantDataSourceRegistry.getDataSource(tenant.getSlug());
                 Flyway flyway = Flyway.configure().dataSource(tenantDs).load();
+                // repair() before migrate(): a migration file legitimately edited after a
+                // tenant was already provisioned against the old version (e.g. V24 gaining
+                // an "IF NOT EXISTS" guard, same schema effect either way) leaves that
+                // tenant's flyway_schema_history recording the old checksum — migrate()
+                // alone then refuses to run ANYTHING for that tenant, including unrelated
+                // later migrations, until this is resolved. repair() only realigns the
+                // recorded checksum to match today's file; it never re-executes SQL, so
+                // it's safe to call unconditionally on every run (a no-op when nothing
+                // has drifted).
+                flyway.repair();
                 var result = flyway.migrate();
                 log.info("TenantMigrationRunner: tenant '{}' — {} migration(s) applied", tenant.getSlug(), result.migrationsExecuted);
                 logStep(tenant.getId(), "SCHEMA_MIGRATION_ROLLOUT", null);

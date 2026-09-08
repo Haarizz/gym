@@ -156,6 +156,9 @@ public class TenantProvisioningService {
             logStep(tenantId, "CREATE_BRANCH", null);
             Long branchId = createInitialBranchAndGym(tenantDs, gymName, slug, address, lat, lng);
 
+            logStep(tenantId, "SEED_ACCOUNT_HEADS", null);
+            seedDefaultAccountHeads(tenantDs, branchId);
+
             logStep(tenantId, "CREATE_OWNER", null);
             String passwordHash = passwordEncoder.encode(rawOwnerPassword);
             Long ownerUserId = createOwnerUser(tenantDs, branchId, ownerUsername, passwordHash, ownerEmail);
@@ -547,6 +550,65 @@ public class TenantProvisioningService {
                 }
             }
             throw new IllegalStateException("No default branch found after migration — V18 seed row missing");
+        }
+    }
+
+    /**
+     * Seeds the standard Chart of Accounts for the tenant's initial branch — unlike
+     * seedRolesAndPermissions' sibling data (sample products/suppliers/warehouses),
+     * this is NOT demo data: it's the account structure the ledger itself depends
+     * on. Without it, AccountHead rows only ever come into existence lazily, one at
+     * a time, the moment something happens to post to that code first (see
+     * FinancialEventService.updateAccountBalance's auto-create fallback) — so a real
+     * gym's Chart of Accounts screen silently shows an incomplete, unpredictable
+     * subset of accounts (whichever ones a transaction has touched so far) instead
+     * of the full standard chart. Mirrors DataInitializer.seedDefaultAccountHeads()
+     * exactly (same codes/names/types) so the primary DB and every tenant DB agree;
+     * keep both lists in sync if the chart changes.
+     *
+     * Must run after createInitialBranchAndGym: account_heads has a unique
+     * (branch_id, code) constraint, so every row needs a real branch_id.
+     * ON CONFLICT DO NOTHING makes this idempotent for retry-provisioning.
+     */
+    private void seedDefaultAccountHeads(DataSource tenantDs, Long branchId) throws Exception {
+        record DefaultAccount(String code, String name, String type) {}
+        List<DefaultAccount> defaults = List.of(
+                new DefaultAccount("1000", "Cash in Hand", "ASSET"),
+                new DefaultAccount("1001", "Cash at Bank", "ASSET"),
+                new DefaultAccount("1100", "Accounts Receivable", "ASSET"),
+                new DefaultAccount("1400", "Salary Advance Receivable", "ASSET"),
+                new DefaultAccount("1500", "Fixed Assets", "ASSET"),
+                new DefaultAccount("1600", "Accumulated Depreciation", "ASSET"),
+                new DefaultAccount("2000", "Accounts Payable", "LIABILITY"),
+                new DefaultAccount("2100", "Tax / GST Payable", "LIABILITY"),
+                new DefaultAccount("2200", "GST Input Credit", "LIABILITY"),
+                new DefaultAccount("2300", "Deferred Revenue", "LIABILITY"),
+                new DefaultAccount("4000", "Membership Revenue", "REVENUE"),
+                new DefaultAccount("4100", "POS Sales Revenue", "REVENUE"),
+                new DefaultAccount("4200", "Service / Add-on Revenue", "REVENUE"),
+                new DefaultAccount("4300", "Interest Income", "REVENUE"),
+                new DefaultAccount("5000", "Salary Expense", "EXPENSE"),
+                new DefaultAccount("5100", "Maintenance Expense", "EXPENSE"),
+                new DefaultAccount("5200", "Purchase / COGS", "EXPENSE"),
+                new DefaultAccount("5700", "Miscellaneous Expense", "EXPENSE"),
+                new DefaultAccount("5800", "Depreciation Expense", "EXPENSE"),
+                new DefaultAccount("5900", "Bank Charges Expense", "EXPENSE")
+        );
+
+        try (Connection conn = tenantDs.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO account_heads " +
+                             "(code, name, type, branch_id, opening_balance, current_balance, currency_code, is_active, created_at) " +
+                             "VALUES (?, ?, ?, ?, 0, 0, 'AED', true, now()) " +
+                             "ON CONFLICT (branch_id, code) DO NOTHING")) {
+            for (DefaultAccount d : defaults) {
+                ps.setString(1, d.code());
+                ps.setString(2, d.name());
+                ps.setString(3, d.type());
+                ps.setLong(4, branchId);
+                ps.addBatch();
+            }
+            ps.executeBatch();
         }
     }
 

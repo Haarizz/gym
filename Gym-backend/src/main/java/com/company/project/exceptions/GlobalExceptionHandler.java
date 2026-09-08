@@ -2,6 +2,7 @@ package com.company.project.exceptions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -51,6 +52,27 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
         return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
+    }
+
+    /**
+     * A DB constraint rejected the write (value too long for a column, a unique
+     * constraint, a not-null violation, an FK violation, ...). Spring/Hibernate's
+     * DataIntegrityViolationException.getMessage() includes the raw failing SQL
+     * and every bound parameter value — confirmed live: an oversized Gym.phone
+     * (VARCHAR(50), unvalidated on both frontend and backend) hit exactly this
+     * exception, and before this handler existed it fell through to the generic
+     * catch-all below, which put that raw SQL/parameter text straight into a
+     * browser alert(). Without a dedicated handler here, ANY oversized/duplicate/
+     * invalid field on ANY entity leaks the same way, not just Gym.phone — this
+     * closes it for every endpoint at once rather than patching each field's
+     * length individually (which still happened for phone specifically, since a
+     * real validation error is friendlier than even a clean generic message).
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation", ex);
+        return build(HttpStatus.CONFLICT, "DATA_INTEGRITY_VIOLATION",
+                "The data provided could not be saved — a value may be too long, missing, or already in use.");
     }
 
     /**

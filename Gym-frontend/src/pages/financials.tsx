@@ -18,17 +18,13 @@ import {
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
-  Eye,
-  Plus,
-  Filter,
-  Download,
   RefreshCw,
   Wallet,
   PieChart as PieChartIcon,
   BarChart3,
   Activity
 } from 'lucide-react';
-import { financialAnalyticsService } from '../utils/supabase/financial-analytics-service';
+import { financialAnalyticsService, OutstandingPayment, PendingReconciliation } from '../utils/supabase/financial-analytics-service';
 import { ledgersService, LedgerTransaction } from '../utils/supabase/ledgers-service';
 
 // Chart colours for expense breakdown
@@ -46,6 +42,11 @@ export function Financials() {
     pendingReconciliations: 0,
     outstandingPayments: 0,
   });
+  const [kpiTrend, setKpiTrend] = useState({
+    income: null as number | null,
+    expenses: null as number | null,
+    profit: null as number | null,
+  });
   const [monthlyTrends, setMonthlyTrends] = useState<
     { month: string; income: number; expenses: number; profit: number }[]
   >([]);
@@ -55,16 +56,26 @@ export function Financials() {
   const [recentTransactions, setRecentTransactions] = useState<
     { id: string | number; date: string; description: string; category: string; amount: number; type: string; status: string }[]
   >([]);
+  const [pendingReconciliations, setPendingReconciliations] = useState<PendingReconciliation[]>([]);
+  const [outstandingPayments, setOutstandingPayments] = useState<OutstandingPayment[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Percentage change vs. the prior period; null when there's no prior period to compare against
+  const percentChange = (current: number, previous: number): number | null => {
+    if (previous === 0) return current === 0 ? 0 : null;
+    return ((current - previous) / Math.abs(previous)) * 100;
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [dashboard, trend, expCat, ledger] = await Promise.all([
+      const [dashboard, trend, expCat, ledger, reconciliations, payments] = await Promise.all([
         financialAnalyticsService.getDashboard(),
         financialAnalyticsService.getMonthlyTrend(6),
         financialAnalyticsService.getExpenseByCategory(),
-        ledgersService.getTransactions(),
+        ledgersService.getTransactions({ limit: 20 }),
+        financialAnalyticsService.getPendingReconciliations(),
+        financialAnalyticsService.getOutstandingPayments(),
       ]);
 
       setKpiData({
@@ -75,6 +86,19 @@ export function Financials() {
         pendingReconciliations: dashboard.pendingReconciliations,
         outstandingPayments: dashboard.outstandingPayments,
       });
+
+      // Trend badges compare the most recent two months of real data — no fabricated deltas
+      if (trend.length >= 2) {
+        const last = trend[trend.length - 1];
+        const prev = trend[trend.length - 2];
+        setKpiTrend({
+          income: percentChange(last.revenue, prev.revenue),
+          expenses: percentChange(last.expenses, prev.expenses),
+          profit: percentChange(last.profit, prev.profit),
+        });
+      } else {
+        setKpiTrend({ income: null, expenses: null, profit: null });
+      }
 
       setMonthlyTrends(
         trend.map((t) => ({
@@ -93,9 +117,9 @@ export function Financials() {
         }))
       );
 
-      // Map ledger entries → transaction rows (most recent 20)
+      // Map ledger entries → transaction rows (most recent 20, already limited server-side)
       setRecentTransactions(
-        ledger.slice(0, 20).map((t: LedgerTransaction) => {
+        ledger.transactions.map((t: LedgerTransaction) => {
           const isCredit = t.credit > 0;
           return {
             id: t.id,
@@ -108,6 +132,9 @@ export function Financials() {
           };
         })
       );
+
+      setPendingReconciliations(reconciliations);
+      setOutstandingPayments(payments);
     } catch (err) {
       console.error('Failed to load financials data:', err);
     } finally {
@@ -129,13 +156,30 @@ export function Financials() {
       case 'Action Required': return 'bg-red-100 text-red-800';
       case 'Pending Review':  return 'bg-blue-100 text-blue-800';
       case 'Minor Variance':  return 'bg-gray-100 text-gray-800';
+      case 'OPEN':        return 'bg-orange-100 text-orange-800';
+      case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  // Reconciliations and outstanding vendor payments have no backend API yet
-  const pendingReconciliations: { id: number; account: string; bank: string; lastReconciled: string; difference: number; status: string }[] = [];
-  const outstandingPayments: { id: number; vendor: string; description: string; amount: number; dueDate: string; overdue: boolean }[] = [];
+  // Renders a real period-over-period change badge, or a neutral placeholder when there's
+  // no prior month to compare against (e.g. a brand-new gym with under two months of data).
+  const renderTrendBadge = (value: number | null) => {
+    if (value === null) {
+      return <span className="text-sm text-gray-400">No prior data</span>;
+    }
+    const isUp = value >= 0;
+    const Icon = isUp ? TrendingUp : TrendingDown;
+    const colorClass = isUp ? 'text-green-600' : 'text-red-600';
+    return (
+      <>
+        <Icon className={`h-4 w-4 ${colorClass} mr-1`} />
+        <span className={`text-sm ${colorClass}`}>
+          {isUp ? '+' : ''}{value.toFixed(1)}%
+        </span>
+      </>
+    );
+  };
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -148,14 +192,6 @@ export function Financials() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
           <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -174,8 +210,7 @@ export function Financials() {
                   <CurrencyValue amount={kpiData.totalIncome} />
                 </p>
                 <div className="flex items-center mt-2">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">+12.5%</span>
+                  {renderTrendBadge(kpiTrend.income)}
                 </div>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
@@ -194,8 +229,7 @@ export function Financials() {
                   <CurrencyValue amount={kpiData.totalExpenses} />
                 </p>
                 <div className="flex items-center mt-2">
-                  <TrendingUp className="h-4 w-4 text-red-500 mr-1" />
-                  <span className="text-sm text-red-600">+8.2%</span>
+                  {renderTrendBadge(kpiTrend.expenses)}
                 </div>
               </div>
               <div className="p-3 bg-red-100 rounded-lg">
@@ -214,8 +248,7 @@ export function Financials() {
                   <CurrencyValue amount={kpiData.grossProfit} />
                 </p>
                 <div className="flex items-center mt-2">
-                  <TrendingUp className="h-4 w-4 text-blue-500 mr-1" />
-                  <span className="text-sm text-blue-600">+18.3%</span>
+                  {renderTrendBadge(kpiTrend.profit)}
                 </div>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
@@ -234,8 +267,7 @@ export function Financials() {
                   <CurrencyValue amount={kpiData.netBalance} />
                 </p>
                 <div className="flex items-center mt-2">
-                  <TrendingUp className="h-4 w-4 text-cyan-500 mr-1" />
-                  <span className="text-sm text-cyan-600">+15.7%</span>
+                  {renderTrendBadge(kpiTrend.profit)}
                 </div>
               </div>
               <div className="p-3 bg-cyan-100 rounded-lg">
@@ -299,10 +331,6 @@ export function Financials() {
                 </CardTitle>
                 <CardDescription>Monthly comparison over the last 6 months</CardDescription>
               </div>
-              <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -350,10 +378,6 @@ export function Financials() {
                 </CardTitle>
                 <CardDescription>Current month expense distribution</CardDescription>
               </div>
-              <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -400,10 +424,6 @@ export function Financials() {
                   </CardTitle>
                   <CardDescription>Latest financial transactions and activities</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Transaction
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -415,11 +435,16 @@ export function Financials() {
                     <TableHead>Category</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentTransactions.map((transaction) => (
+                  {recentTransactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                        No transactions recorded yet
+                      </TableCell>
+                    </TableRow>
+                  ) : recentTransactions.map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell>
                         {new Date(transaction.date).toLocaleDateString('en-GB')}
@@ -429,8 +454,8 @@ export function Financials() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={
-                          transaction.category === 'Income' 
-                            ? 'border-green-200 text-green-700 bg-green-50' 
+                          transaction.category === 'Income'
+                            ? 'border-green-200 text-green-700 bg-green-50'
                             : 'border-red-200 text-red-700 bg-red-50'
                         }>
                           {transaction.category}
@@ -438,8 +463,8 @@ export function Financials() {
                       </TableCell>
                       <TableCell>
                         <span className={
-                          transaction.amount > 0 
-                            ? 'text-green-600 font-semibold' 
+                          transaction.amount > 0
+                            ? 'text-green-600 font-semibold'
                             : 'text-red-600 font-semibold'
                         }>
                           {transaction.amount > 0 ? '+' : ''}<CurrencyValue amount={Math.abs(transaction.amount)} />
@@ -449,11 +474,6 @@ export function Financials() {
                         <Badge className={getStatusColor(transaction.status)}>
                           {transaction.status}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -475,10 +495,6 @@ export function Financials() {
                   </CardTitle>
                   <CardDescription>Bank accounts requiring reconciliation</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Start Reconciliation
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -490,21 +506,26 @@ export function Financials() {
                     <TableHead>Last Reconciled</TableHead>
                     <TableHead>Difference</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pendingReconciliations.map((recon) => (
+                  {pendingReconciliations.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                        No pending reconciliations
+                      </TableCell>
+                    </TableRow>
+                  ) : pendingReconciliations.map((recon) => (
                     <TableRow key={recon.id}>
                       <TableCell className="font-medium">{recon.account}</TableCell>
                       <TableCell>{recon.bank}</TableCell>
                       <TableCell>
-                        {new Date(recon.lastReconciled).toLocaleDateString('en-GB')}
+                        {recon.lastReconciled ? new Date(recon.lastReconciled).toLocaleDateString('en-GB') : '—'}
                       </TableCell>
                       <TableCell>
                         <span className={
-                          recon.difference >= 0 
-                            ? 'text-green-600' 
+                          recon.difference >= 0
+                            ? 'text-green-600'
                             : 'text-red-600'
                         }>
                           {recon.difference >= 0 ? '+' : ''}<CurrencyValue amount={Math.abs(recon.difference)} />
@@ -514,11 +535,6 @@ export function Financials() {
                         <Badge className={getStatusColor(recon.status)}>
                           {recon.status}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -540,10 +556,6 @@ export function Financials() {
                   </CardTitle>
                   <CardDescription>Payments due to vendors and suppliers</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Record Payment
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -555,31 +567,31 @@ export function Financials() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {outstandingPayments.map((payment) => (
+                  {outstandingPayments.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                        No outstanding payments
+                      </TableCell>
+                    </TableRow>
+                  ) : outstandingPayments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">{payment.vendor}</TableCell>
                       <TableCell>{payment.description}</TableCell>
                       <TableCell><CurrencyValue amount={payment.amount} /></TableCell>
                       <TableCell>
-                        {new Date(payment.dueDate).toLocaleDateString('en-GB')}
+                        {payment.dueDate ? new Date(payment.dueDate).toLocaleDateString('en-GB') : '—'}
                       </TableCell>
                       <TableCell>
                         <Badge className={
-                          payment.overdue 
-                            ? 'bg-red-100 text-red-800' 
+                          payment.overdue
+                            ? 'bg-red-100 text-red-800'
                             : 'bg-green-100 text-green-800'
                         }>
                           {payment.overdue ? 'Overdue' : 'Pending'}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

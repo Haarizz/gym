@@ -154,6 +154,7 @@ export function BankReconciliation() {
   const [candidateSearch, setCandidateSearch] = useState("");
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
   const [matchingInProgress, setMatchingInProgress] = useState(false);
+  const [postingChargeOrInterest, setPostingChargeOrInterest] = useState(false);
 
   // Auto-match review
   const [showAutoMatchDialog, setShowAutoMatchDialog] = useState(false);
@@ -397,6 +398,38 @@ export function BankReconciliation() {
       }
     } catch (e: any) {
       toast.error(e.message || "Failed to unmatch transaction");
+    }
+  };
+
+  // For a statement line with no source document anywhere else in the system (a bank fee or
+  // interest credit nobody has entered yet) — creates the missing journal entry directly and
+  // matches it in one step, instead of requiring a trip to Journal Vouchers and back.
+  const handlePostAsChargeOrInterest = async (transaction: BankTransaction) => {
+    if (!currentReconciliation) { toast.error("No active reconciliation"); return; }
+    setPostingChargeOrInterest(true);
+    try {
+      const updated = transaction.type === "Debit"
+        ? await bankReconciliationService.postBankCharge(currentReconciliation.id, transaction.lineId, transaction.description)
+        : await bankReconciliationService.postBankInterest(currentReconciliation.id, transaction.lineId, transaction.description);
+      toast.success(transaction.type === "Debit" ? "Posted as bank charge and matched" : "Posted as interest income and matched");
+      setCurrentReconciliation(updated);
+      setAllTransactions(mapLinesToTransactions(updated));
+      setShowMatchPicker(false);
+      setSelectedCandidateId(null);
+      const updatedLine = updated.lines.find(l => l.id === transaction.lineId);
+      if (updatedLine && selectedTransaction?.lineId === transaction.lineId) {
+        setSelectedTransaction({
+          ...selectedTransaction,
+          status: "Matched",
+          ledgerReference: updatedLine.matchedVoucherNo ?? undefined,
+          matchedBy: "System",
+          matchedDate: updatedLine.transactionDate,
+        });
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to post transaction");
+    } finally {
+      setPostingChargeOrInterest(false);
     }
   };
 
@@ -1353,9 +1386,13 @@ export function BankReconciliation() {
                                   : matchCandidates;
                                 if (filtered.length === 0) {
                                   return (
-                                    <div className="p-6 text-center text-sm text-muted-foreground">
-                                      No unmatched posted ledger entries found for this amount. Record the
-                                      transaction in the ledger first, then come back to match it.
+                                    <div className="p-6 text-center text-sm text-muted-foreground space-y-3">
+                                      <p>No unmatched posted ledger entries found for this amount.</p>
+                                      <p>
+                                        If this is a bank {selectedTransaction.type === "Debit" ? "fee" : "interest credit"} with
+                                        no source document elsewhere, post it directly below. Otherwise, record the
+                                        transaction in the ledger first, then come back to match it.
+                                      </p>
                                     </div>
                                   );
                                 }
@@ -1394,15 +1431,35 @@ export function BankReconciliation() {
                                 Cancel
                               </Button>
                             </div>
+                            <Button
+                              variant="outline"
+                              className="w-full border-amber-500 text-amber-700 hover:bg-amber-50"
+                              disabled={postingChargeOrInterest}
+                              onClick={() => handlePostAsChargeOrInterest(selectedTransaction)}
+                            >
+                              {postingChargeOrInterest ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                              {selectedTransaction.type === "Debit" ? "Post as Bank Charge" : "Post as Interest Income"}
+                            </Button>
                           </div>
                         ) : (
-                          <Button
-                            className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-base font-medium"
-                            onClick={() => loadMatchCandidates(selectedTransaction)}
-                          >
-                            <CheckCircle className="h-5 w-5 mr-2" />
-                            Match with Ledger
-                          </Button>
+                          <div className="space-y-2">
+                            <Button
+                              className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-base font-medium"
+                              onClick={() => loadMatchCandidates(selectedTransaction)}
+                            >
+                              <CheckCircle className="h-5 w-5 mr-2" />
+                              Match with Ledger
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="w-full border-amber-500 text-amber-700 hover:bg-amber-50"
+                              disabled={postingChargeOrInterest}
+                              onClick={() => handlePostAsChargeOrInterest(selectedTransaction)}
+                            >
+                              {postingChargeOrInterest ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                              {selectedTransaction.type === "Debit" ? "Post as Bank Charge" : "Post as Interest Income"}
+                            </Button>
+                          </div>
                         )}
                       </>
                     )}

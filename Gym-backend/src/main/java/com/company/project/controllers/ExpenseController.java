@@ -3,6 +3,7 @@ package com.company.project.controllers;
 import com.company.project.dto.ExpenseRequestDTO;
 import com.company.project.dto.ExpenseResponseDTO;
 import com.company.project.dto.ExpenseStatsDTO;
+import com.company.project.dto.ExpensesPageResponseDTO;
 import com.company.project.services.ExpenseService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -10,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -24,14 +24,16 @@ public class ExpenseController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ExpenseResponseDTO>> getExpenses(
+    public ResponseEntity<ExpensesPageResponseDTO> getExpenses(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String location,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ResponseEntity.ok(expenseService.getExpenses(search, status, category, location, from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "25") int limit) {
+        return ResponseEntity.ok(expenseService.getExpenses(search, status, category, location, from, to, page, limit));
     }
 
     @GetMapping("/stats")

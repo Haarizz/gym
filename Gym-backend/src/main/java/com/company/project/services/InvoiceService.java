@@ -73,6 +73,8 @@ public class InvoiceService {
 
         if ("UNPAID".equals(saved.getStatus())) {
             financialEventService.onInvoiceIssued(saved);
+        } else if ("PAID".equals(saved.getStatus())) {
+            financialEventService.onInvoicePaymentSettled(saved);
         }
 
         return toDTO(saved);
@@ -109,8 +111,12 @@ public class InvoiceService {
         } else if (newAmountPaid.compareTo(BigDecimal.ZERO) > 0) {
             invoice.setStatus("PARTIAL");
         }
-        
-        invoiceRepository.save(invoice);
+
+        Invoice saved = invoiceRepository.save(invoice);
+
+        if ("PAID".equals(saved.getStatus())) {
+            financialEventService.onInvoicePaymentSettled(saved);
+        }
     }
 
     private InvoiceDTO toDTO(Invoice invoice) {

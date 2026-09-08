@@ -574,10 +574,6 @@ export function PayrollEmployees() {
                   </CardTitle>
                   <CardDescription>Most popular classes and instructor performance</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Class
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -589,37 +585,30 @@ export function PayrollEmployees() {
                     <TableHead>Bookings</TableHead>
                     <TableHead>Capacity</TableHead>
                     <TableHead>Revenue</TableHead>
-                    <TableHead>Rating</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {topPerformingClasses.map((classData) => (
+                  {topPerformingClasses.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                        No class bookings recorded yet
+                      </TableCell>
+                    </TableRow>
+                  ) : topPerformingClasses.map((classData) => (
                     <TableRow key={classData.id}>
                       <TableCell className="font-medium">{classData.className}</TableCell>
                       <TableCell>{classData.instructor}</TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <span>{classData.bookings}</span>
-                          <Progress 
-                            value={(classData.bookings / classData.capacity) * 100} 
+                          <Progress
+                            value={classData.capacity > 0 ? (classData.bookings / classData.capacity) * 100 : 0}
                             className="w-16 h-2"
                           />
                         </div>
                       </TableCell>
                       <TableCell>{classData.capacity}</TableCell>
                       <TableCell><CurrencyValue amount={classData.revenue} /></TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <span className="text-yellow-500">⭐</span>
-                          <span>{classData.rating}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

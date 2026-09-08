@@ -37,4 +37,14 @@ public class FinancialAnalyticsController {
     public ResponseEntity<List<Map<String, Object>>> getExpenseByCategory() {
         return ResponseEntity.ok(financialAnalyticsService.getExpenseByCategory());
     }
+
+    @GetMapping("/outstanding-payments")
+    public ResponseEntity<List<Map<String, Object>>> getOutstandingPayments() {
+        return ResponseEntity.ok(financialAnalyticsService.getOutstandingPayments());
+    }
+
+    @GetMapping("/pending-reconciliations")
+    public ResponseEntity<List<Map<String, Object>>> getPendingReconciliations() {
+        return ResponseEntity.ok(financialAnalyticsService.getPendingReconciliations());
+    }
 }

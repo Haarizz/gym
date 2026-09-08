@@ -248,6 +248,55 @@ public class FinancialAnalyticsService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  OUTSTANDING SUPPLIER PAYMENTS  (unpaid/partial bills, most overdue first)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public List<Map<String, Object>> getOutstandingPayments() {
+        LocalDate today = LocalDate.now();
+        return supplierBillRepository.findAll().stream()
+                .filter(b -> !"CANCELLED".equals(b.getStatus()) && !"PAID".equals(b.getPaymentStatus()))
+                .map(b -> {
+                    BigDecimal balance = safe(b.getTotalAmount()).subtract(safe(b.getAmountPaid()));
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("id", b.getId());
+                    item.put("vendor", b.getSupplierName());
+                    item.put("description", b.getBillNumber() != null ? b.getBillNumber() : b.getInvoiceNumber());
+                    item.put("amount", balance);
+                    item.put("dueDate", b.getDueDate());
+                    item.put("overdue", b.getDueDate() != null && b.getDueDate().isBefore(today));
+                    return item;
+                })
+                .sorted((a, b) -> {
+                    LocalDate da = (LocalDate) a.get("dueDate");
+                    LocalDate db = (LocalDate) b.get("dueDate");
+                    if (da == null) return 1;
+                    if (db == null) return -1;
+                    return da.compareTo(db);
+                })
+                .collect(Collectors.toList());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  PENDING BANK RECONCILIATIONS  (OPEN / IN_PROGRESS statements)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public List<Map<String, Object>> getPendingReconciliations() {
+        return bankReconciliationRepository.findAllByOrderByStatementDateDesc().stream()
+                .filter(r -> "OPEN".equals(r.getStatus()) || "IN_PROGRESS".equals(r.getStatus()))
+                .map(r -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("id", r.getId());
+                    item.put("account", r.getBankAccountName());
+                    item.put("bank", r.getBankAccountName());
+                    item.put("lastReconciled", r.getStatementDate());
+                    item.put("difference", safe(r.getDifference()));
+                    item.put("status", r.getStatus());
+                    return item;
+                })
+                .collect(Collectors.toList());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 

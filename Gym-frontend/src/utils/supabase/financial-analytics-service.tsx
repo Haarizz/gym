@@ -30,6 +30,24 @@ export interface ExpenseByCategory {
   amount: number;
 }
 
+export interface OutstandingPayment {
+  id: number;
+  vendor: string;
+  description: string;
+  amount: number;
+  dueDate: string | null;
+  overdue: boolean;
+}
+
+export interface PendingReconciliation {
+  id: number;
+  account: string;
+  bank: string;
+  lastReconciled: string | null;
+  difference: number;
+  status: string;
+}
+
 class FinancialAnalyticsService {
   async getDashboard(): Promise<AnalyticsDashboard> {
     const res = await authService.makeAuthenticatedRequest(
@@ -88,6 +106,40 @@ class FinancialAnalyticsService {
     return data.map((d: any) => ({
       category: d.category,
       amount: d.amount ?? 0,
+    }));
+  }
+
+  async getOutstandingPayments(): Promise<OutstandingPayment[]> {
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/financial-analytics/outstanding-payments`,
+      { method: "GET" }
+    );
+    if (!res.ok) throw new Error("Failed to fetch outstanding payments");
+    const data = await res.json();
+    return data.map((d: any) => ({
+      id: d.id,
+      vendor: d.vendor ?? "Unknown vendor",
+      description: d.description ?? "",
+      amount: d.amount ?? 0,
+      dueDate: d.dueDate ?? null,
+      overdue: !!d.overdue,
+    }));
+  }
+
+  async getPendingReconciliations(): Promise<PendingReconciliation[]> {
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/financial-analytics/pending-reconciliations`,
+      { method: "GET" }
+    );
+    if (!res.ok) throw new Error("Failed to fetch pending reconciliations");
+    const data = await res.json();
+    return data.map((d: any) => ({
+      id: d.id,
+      account: d.account ?? "",
+      bank: d.bank ?? "",
+      lastReconciled: d.lastReconciled ?? null,
+      difference: d.difference ?? 0,
+      status: d.status ?? "",
     }));
   }
 }

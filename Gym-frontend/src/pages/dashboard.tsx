@@ -929,23 +929,14 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   <XAxis dataKey={dateFilter === 'today' ? 'time' : dateFilter === 'week' ? 'day' : 'week'} />
                   <YAxis />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke="#3b82f6" 
-                    fill="#3b82f6" 
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#3b82f6"
+                    fill="#3b82f6"
                     fillOpacity={0.1}
                     strokeWidth={3}
                     name={`Revenue (${currencyCode})`}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="target" 
-                    stroke="#10b981" 
-                    fill="transparent"
-                    strokeDasharray="5 5"
-                    strokeWidth={2}
-                    name={`Target (${currencyCode})`}
                   />
                 </AreaChart>
               </ResponsiveContainer>

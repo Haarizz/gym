@@ -19,6 +19,7 @@ public class Gym extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String address;
 
+    @Column(length = 50)
     private String phone;
 
     private String email;

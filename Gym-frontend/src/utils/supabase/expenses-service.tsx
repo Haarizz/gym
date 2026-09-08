@@ -42,6 +42,27 @@ export interface ExpenseStats {
   byCategory: Record<string, number>;
 }
 
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ExpensesPage {
+  expenses: Expense[];
+  pagination: Pagination;
+}
+
+function mapPagination(r: any): Pagination {
+  return {
+    page: Number(r?.page ?? 1),
+    limit: Number(r?.limit ?? 25),
+    total: Number(r?.total ?? 0),
+    totalPages: Number(r?.total_pages ?? r?.totalPages ?? 1),
+  };
+}
+
 function mapExpense(r: any): Expense {
   return {
     id: String(r.id),
@@ -96,7 +117,9 @@ class ExpensesService {
     location?: string;
     from?: string;
     to?: string;
-  } = {}): Promise<Expense[]> {
+    page?: number;
+    limit?: number;
+  } = {}): Promise<ExpensesPage> {
     const params = new URLSearchParams();
     if (filters.search) params.append("search", filters.search);
     if (filters.status) params.append("status", filters.status);
@@ -104,13 +127,18 @@ class ExpensesService {
     if (filters.location) params.append("location", filters.location);
     if (filters.from) params.append("from", filters.from);
     if (filters.to) params.append("to", filters.to);
+    params.append("page", String(filters.page ?? 1));
+    params.append("limit", String(filters.limit ?? 25));
 
     const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/expenses?${params.toString()}`
     );
     if (!res.ok) throw new Error("Failed to load expenses");
     const data = await res.json();
-    return (data ?? []).map(mapExpense);
+    return {
+      expenses: (data?.expenses ?? []).map(mapExpense),
+      pagination: mapPagination(data?.pagination),
+    };
   }
 
   async getStats(): Promise<ExpenseStats> {
