@@ -44,6 +44,7 @@ public class AuthService {
     private final GymRepository gymRepository;
     private final UserDirectoryRepository userDirectoryRepository;
     private final com.company.project.repositories.UserProfileRepository userProfileRepository;
+    private final com.company.project.repositories.MemberRepository memberRepository;
 
     @org.springframework.beans.factory.annotation.Value("${tenant.routing.enabled:false}")
     private boolean tenantRoutingEnabled;
@@ -61,7 +62,8 @@ public class AuthService {
             com.company.project.repositories.BranchRepository branchRepository,
             GymRepository gymRepository,
             UserDirectoryRepository userDirectoryRepository,
-            com.company.project.repositories.UserProfileRepository userProfileRepository
+            com.company.project.repositories.UserProfileRepository userProfileRepository,
+            com.company.project.repositories.MemberRepository memberRepository
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -76,6 +78,7 @@ public class AuthService {
         this.branchRepository = branchRepository;
         this.userDirectoryRepository = userDirectoryRepository;
         this.userProfileRepository = userProfileRepository;
+        this.memberRepository = memberRepository;
     }
 
     @Transactional
@@ -158,9 +161,16 @@ public class AuthService {
                         .orElse(null);
             }
 
-            java.util.Map<String, Object> extraClaims = java.util.Map.of();
+            java.util.Map<String, Object> extraClaims = new java.util.HashMap<>();
             if (tenantRoutingEnabled && tenantSlug != null) {
-                extraClaims = java.util.Map.of(JwtService.TENANT_CLAIM, tenantSlug);
+                extraClaims.put(JwtService.TENANT_CLAIM, tenantSlug);
+            }
+            // If the user has ROLE_MEMBER and no tenant is resolved via the directory, this is a global mobile user.
+            boolean isGlobalUser = userDetails.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_MEMBER")) && tenantRoutingEnabled && loginTenantSlug == null;
+            if (isGlobalUser) {
+                extraClaims.put(JwtService.IS_GLOBAL_CLAIM, true);
+                userDetails.setGlobal(true);
             }
             String jwt = jwtService.generateToken(extraClaims, userDetails);
             List<String> roles = extractRoles(userDetails);
@@ -171,6 +181,12 @@ public class AuthService {
                     .map(com.company.project.dto.BranchResponseDTO::getId)
                     .findFirst()
                     .orElse(accessibleBranches.isEmpty() ? null : accessibleBranches.get(0).getId());
+
+            if (defaultBranchId == null && roles.contains("ROLE_MEMBER")) {
+                defaultBranchId = memberRepository.findByUserId(userDetails.getId())
+                        .map(com.company.project.entities.Member::getBranchId)
+                        .orElse(null);
+            }
 
             String staffName = staffRepository.findByUserId(userDetails.getId())
                     .map(com.company.project.entities.Staff::getName)
@@ -214,6 +230,12 @@ public class AuthService {
                 .map(com.company.project.dto.BranchResponseDTO::getId)
                 .findFirst()
                 .orElse(accessibleBranches.isEmpty() ? null : accessibleBranches.get(0).getId());
+
+        if (defaultBranchId == null && roles.contains("ROLE_MEMBER")) {
+            defaultBranchId = memberRepository.findByUserId(userDetails.getId())
+                    .map(com.company.project.entities.Member::getBranchId)
+                    .orElse(null);
+        }
 
         String staffName = staffRepository.findByUserId(userDetails.getId())
                 .map(com.company.project.entities.Staff::getName)
@@ -291,7 +313,26 @@ public class AuthService {
             // been retired (see Branch entity/BranchRepository — Phase 5 cutover).
             branches = branchRepository.findByStatus("ACTIVE");
         } else {
-            List<Long> branchIds = userBranchRepository.findBranchIdsByUserId(userDetails.getId());
+            List<Long> branchIds = new java.util.ArrayList<>(userBranchRepository.findBranchIdsByUserId(userDetails.getId()));
+            
+            if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MEMBER"))) {
+                java.util.Optional<com.company.project.entities.Member> memberOpt = userDetails.isGlobal()
+                    ? memberRepository.findByGlobalUserId(userDetails.getId())
+                    : memberRepository.findByUserId(userDetails.getId());
+                
+                // Fallback for stale tokens
+                if (memberOpt.isEmpty() && userDetails.isGlobal()) {
+                    memberOpt = memberRepository.findByUserId(userDetails.getId());
+                }
+                
+                memberOpt.map(com.company.project.entities.Member::getBranchId)
+                        .ifPresent(branchId -> {
+                            if (!branchIds.contains(branchId)) {
+                                branchIds.add(branchId);
+                            }
+                        });
+            }
+            
             branches = branchRepository.findByIdIn(branchIds).stream()
                     .filter(b -> "ACTIVE".equals(b.getStatus()))
                     .collect(Collectors.toList());

@@ -39,9 +39,12 @@ public class BranchContextFilter extends OncePerRequestFilter {
     private static final String BRANCH_HEADER = "X-Active-Branch-Id";
 
     private final UserBranchRepository userBranchRepository;
+    private final com.company.project.repositories.MemberRepository memberRepository;
 
-    public BranchContextFilter(UserBranchRepository userBranchRepository) {
+    public BranchContextFilter(UserBranchRepository userBranchRepository,
+                               com.company.project.repositories.MemberRepository memberRepository) {
         this.userBranchRepository = userBranchRepository;
+        this.memberRepository = memberRepository;
     }
 
     @Override
@@ -51,21 +54,21 @@ public class BranchContextFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
         String path = request.getRequestURI();
+
+        // Completely skip filter for auth endpoints
         if (path.startsWith("/api/auth/")
-                || path.startsWith("/api/mobile/auth/")
-                || path.startsWith("/api/mobile/profile/")
-                || path.startsWith("/api/mobile/")
-                || path.startsWith("/api/community")
-                || path.startsWith("/api/notifications")
-                || path.equals("/api/branches/my-branches")
-                || path.equals("/api/members/me")) {
-            // Mobile endpoints are scoped to the authenticated user via JWT (not branch).
-            // /api/branches/my-branches must also be reachable so members can discover gyms.
-            // /api/members/me is used to fetch the user's member profile on mount.
-            // Self-registered members with no gym assignment must not be blocked here.
+                || path.startsWith("/api/mobile/auth/")) {
             filterChain.doFilter(request, response);
             return;
         }
+
+        // Determine if this is a "soft" endpoint where branch is optional.
+        // Self-registered members with no gym assignment must not be blocked here.
+        boolean isSoftEndpoint = path.startsWith("/api/mobile/")
+                || path.startsWith("/api/community")
+                || path.startsWith("/api/notifications")
+                || path.equals("/api/branches/my-branches")
+                || path.equals("/api/members/me");
 
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -98,10 +101,19 @@ public class BranchContextFilter extends OncePerRequestFilter {
 
                     if (isAdmin || userBranchRepository.existsByUserIdAndBranchId(userDetails.getId(), branchId)) {
                         BranchContextHolder.setActiveBranchId(branchId);
+                    } else if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MEMBER"))) {
+                        // Members can send any branch ID in the header (to view classes in other branches
+                        // or check in). Business logic validates if they actually have an active membership 
+                        // for that branch.
+                        BranchContextHolder.setActiveBranchId(branchId);
                     } else {
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                                "You do not have access to the requested branch");
-                        return;
+                        if (isSoftEndpoint) {
+                            BranchContextHolder.setActiveBranchId(null);
+                        } else {
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                                    "You do not have access to the requested branch");
+                            return;
+                        }
                     }
                 } else if (isAdmin) {
                     // No header, admin — consolidated "All Branches" view.
@@ -112,18 +124,43 @@ public class BranchContextFilter extends OncePerRequestFilter {
                     List<Long> accessibleBranchIds = userBranchRepository.findBranchIdsByUserId(userDetails.getId());
                     if (accessibleBranchIds.size() == 1) {
                         BranchContextHolder.setActiveBranchId(accessibleBranchIds.get(0));
+                    } else if (accessibleBranchIds.isEmpty() && userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MEMBER"))) {
+                        Long memberBranchId = memberRepository.findByUserId(userDetails.getId())
+                                .map(com.company.project.entities.Member::getBranchId).orElse(null);
+                        if (memberBranchId != null) {
+                            BranchContextHolder.setActiveBranchId(memberBranchId);
+                        } else if (isSoftEndpoint) {
+                            BranchContextHolder.setActiveBranchId(null);
+                        } else {
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                                    "No branch is assigned to this user");
+                            return;
+                        }
                     } else if (accessibleBranchIds.isEmpty()) {
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                                "No branch is assigned to this user");
-                        return;
+                        if (isSoftEndpoint) {
+                            BranchContextHolder.setActiveBranchId(null);
+                        } else {
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                                    "No branch is assigned to this user");
+                            return;
+                        }
                     } else {
-                        response.sendError(HttpServletResponse.SC_BAD_REQUEST,
-                                BRANCH_HEADER + " header is required when a user has access to multiple branches");
-                        return;
+                        if (isSoftEndpoint) {
+                            BranchContextHolder.setActiveBranchId(null);
+                        } else {
+                            response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                                    BRANCH_HEADER + " header is required when a user has access to multiple branches");
+                            return;
+                        }
                     }
                 }
             }
+        } catch (Exception e) {
+            // Log and ignore to prevent filter chain breakage on unexpected errors
+            logger.error("Could not set user branch context in filter", e);
+        }
 
+        try {
             filterChain.doFilter(request, response);
         } finally {
             BranchContextHolder.clear();

@@ -16,6 +16,8 @@ export interface LoginResponseApiModel {
   permissions?: string[];
   branchId?: number;
   branch_id?: number;
+  defaultBranchId?: number;
+  default_branch_id?: number;
   profileCompleted?: boolean;
   profile_completed?: boolean;
 }

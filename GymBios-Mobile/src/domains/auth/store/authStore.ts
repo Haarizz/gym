@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { setApiClientToken } from '@/core/network/apiClient';
+import { setApiClientToken, setApiClientTenant } from '@/core/network/apiClient';
 import { setHttpClientToken } from '@/core/platform/api/httpClient';
 
 import type { Session } from '../domain/entities/Session';
@@ -14,9 +14,11 @@ interface AuthStoreState {
   permissions: string[];
   pendingRole: AppRole | null;
   isHydrated: boolean;
+  activeTenant: string | null;
   setSession: (session: Session | null) => void;
   setPendingRole: (role: AppRole | null) => void;
   setHydrated: (isHydrated: boolean) => void;
+  setActiveTenant: (tenant: string | null) => void;
   reset: () => void;
 }
 
@@ -27,6 +29,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   permissions: [],
   pendingRole: null,
   isHydrated: false,
+  activeTenant: null,
   setSession: (session) => {
     setApiClientToken(session?.accessToken ?? null);
     setHttpClientToken(session?.accessToken ?? null);
@@ -40,6 +43,18 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   },
   setPendingRole: (pendingRole) => set({ pendingRole }),
   setHydrated: (isHydrated) => set({ isHydrated }),
+  setActiveTenant: (tenant) => {
+    setApiClientTenant(tenant);
+    set({ activeTenant: tenant });
+    // Persist to secure storage asynchronously
+    import('@/core/platform/storage').then(({ secureStorage, StorageKeys }) => {
+      if (tenant) {
+        secureStorage.setItem(StorageKeys.activeTenant, tenant).catch(console.error);
+      } else {
+        secureStorage.removeItem(StorageKeys.activeTenant).catch(console.error);
+      }
+    });
+  },
   reset: () => {
     setApiClientToken(null);
     setHttpClientToken(null);

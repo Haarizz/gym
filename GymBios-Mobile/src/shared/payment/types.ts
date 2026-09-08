@@ -80,6 +80,7 @@ export interface PaymentBottomSheetProps {
   currency?: string;
   allowDiscount?: boolean;
   initialDiscount?: { type: DiscountType; value: number };
+  isProcessing?: boolean;
   onClose: () => void;
   onComplete: (result: PaymentResult) => void;
 }

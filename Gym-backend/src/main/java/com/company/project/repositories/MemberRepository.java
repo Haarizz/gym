@@ -26,6 +26,12 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     Optional<Member> findByUserId(Long userId);
 
+    Optional<Member> findByGlobalUserId(Long globalUserId);
+
+    boolean existsByGlobalUserId(Long globalUserId);
+
+    boolean existsByGlobalUserIdAndBranchId(Long globalUserId, Long branchId);
+
     Optional<Member> findByFaceId(String faceId);
 
     long countByMembershipStatus(String membershipStatus);

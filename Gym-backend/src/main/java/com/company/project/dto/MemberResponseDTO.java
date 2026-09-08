@@ -68,8 +68,10 @@ public class MemberResponseDTO {
 
     // App authentication fields
     private Long userId;
+    private Long globalUserId;
     private String appUsername;
     private Boolean appAccessEnabled;
+    private Long branchId;
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -126,8 +128,10 @@ public class MemberResponseDTO {
         dto.isMinor              = m.getIsMinor();
         dto.billedToHead         = m.getBilledToHead();
         dto.userId              = m.getUserId();
+        dto.globalUserId        = m.getGlobalUserId();
         dto.appUsername         = m.getAppUsername();
         dto.appAccessEnabled    = m.getAppAccessEnabled();
+        dto.branchId            = m.getBranchId();
         return dto;
     }
 
@@ -187,8 +191,12 @@ public class MemberResponseDTO {
     public Boolean getBilledToHead() { return billedToHead; }
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
+    public Long getGlobalUserId() { return globalUserId; }
+    public void setGlobalUserId(Long globalUserId) { this.globalUserId = globalUserId; }
     public String getAppUsername() { return appUsername; }
     public void setAppUsername(String appUsername) { this.appUsername = appUsername; }
     public Boolean getAppAccessEnabled() { return appAccessEnabled; }
     public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 }

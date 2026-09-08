@@ -71,9 +71,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             username = jwtService.extractUsername(jwt);
+            boolean isGlobal = jwtService.extractIsGlobal(jwt);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+
+                if (userDetails instanceof UserDetailsImpl) {
+                    ((UserDetailsImpl) userDetails).setGlobal(isGlobal);
+                }
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(

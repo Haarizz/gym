@@ -201,8 +201,9 @@ public class RewardRedemptionService {
 
         for (ReferralReward reward : expiringSoon) {
             memberRepository.findByMemberId(reward.getMemberId()).ifPresent(member -> {
-                if (member.getUserId() != null) {
-                    notificationService.notifyUser(member.getUserId(), "Reward Expiring Soon",
+                Long targetId = member.getUserId() != null ? member.getUserId() : member.getGlobalUserId();
+                if (targetId != null) {
+                    notificationService.notifyUser(targetId, "Reward Expiring Soon",
                             reward.getRewardName() + " expires on " + reward.getExpiryDate() + ".",
                             "WARNING", "MEDIUM", "REFERRALS", reward.getId(), "/my-rewards",
                             "REWARD_EXPIRING_USER_" + reward.getId() + "_" + today);
@@ -272,8 +273,9 @@ public class RewardRedemptionService {
 
     private void notifyRedeemed(ReferralReward reward) {
         memberRepository.findByMemberId(reward.getMemberId()).ifPresent(member -> {
-            if (member.getUserId() != null) {
-                notificationService.notifyUser(member.getUserId(), "Reward Redeemed",
+            Long targetId = member.getUserId() != null ? member.getUserId() : member.getGlobalUserId();
+            if (targetId != null) {
+                notificationService.notifyUser(targetId, "Reward Redeemed",
                         reward.getRewardName() + " has been redeemed.", "SUCCESS", "LOW", "REFERRALS",
                         reward.getId(), "/my-rewards", "REWARD_REDEEMED_USER_" + reward.getId());
             }

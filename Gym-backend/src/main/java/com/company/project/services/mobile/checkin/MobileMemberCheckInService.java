@@ -13,6 +13,8 @@ import com.company.project.security.UserDetailsImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -35,8 +37,14 @@ public class MobileMemberCheckInService {
         if (principal == null || principal.getId() == null) {
             throw new EntityNotFoundException("User not authenticated");
         }
-        return memberRepository.findByUserId(principal.getId())
-                .orElseThrow(() -> new EntityNotFoundException("No member profile linked to this user account"));
+        Optional<Member> memberOpt = principal.isGlobal()
+                ? memberRepository.findByGlobalUserId(principal.getId())
+                : memberRepository.findByUserId(principal.getId());
+        // Fallback for stale tokens with IS_GLOBAL_CLAIM=true but no globalUserId record
+        if (memberOpt.isEmpty() && principal.isGlobal()) {
+            memberOpt = memberRepository.findByUserId(principal.getId());
+        }
+        return memberOpt.orElseThrow(() -> new EntityNotFoundException("No member profile linked to this user account"));
     }
 
     @Transactional(readOnly = true)
@@ -45,7 +53,13 @@ public class MobileMemberCheckInService {
             return new MemberCheckInStatusResponseDTO(false, null, null);
         }
 
-        var memberOpt = memberRepository.findByUserId(principal.getId());
+        var memberOpt = principal.isGlobal()
+                ? memberRepository.findByGlobalUserId(principal.getId())
+                : memberRepository.findByUserId(principal.getId());
+        // Fallback for stale tokens with IS_GLOBAL_CLAIM=true but no globalUserId record
+        if (memberOpt.isEmpty() && principal.isGlobal()) {
+            memberOpt = memberRepository.findByUserId(principal.getId());
+        }
         if (memberOpt.isEmpty()) {
             return new MemberCheckInStatusResponseDTO(false, null, null);
         }

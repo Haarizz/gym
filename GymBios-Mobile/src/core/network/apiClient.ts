@@ -40,6 +40,14 @@ export function setApiClientBranch(branchId: number | 'ALL') {
   }
 }
 
+export function setApiClientTenant(tenant: string | null) {
+  if (tenant) {
+    apiClient.defaults.headers.common['X-Tenant-ID'] = tenant;
+  } else {
+    delete apiClient.defaults.headers.common['X-Tenant-ID'];
+  }
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiErrorBody>) => {

@@ -22,6 +22,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.company.project.services.DiscoverySyncService;
 
 import javax.sql.DataSource;
 import java.security.SecureRandom;
@@ -62,6 +63,7 @@ public class TenantProvisioningService {
     private final UserDirectoryRepository userDirectoryRepository;
     private final PasswordEncoder passwordEncoder;
     private final CredentialEncryptionService credentialEncryptionService;
+    private final DiscoverySyncService discoverySyncService;
 
     @Value("${spring.datasource.url}")
     private String adminJdbcUrl;
@@ -81,13 +83,15 @@ public class TenantProvisioningService {
             TenantProvisioningLogRepository provisioningLogRepository,
             UserDirectoryRepository userDirectoryRepository,
             PasswordEncoder passwordEncoder,
-            CredentialEncryptionService credentialEncryptionService) {
+            CredentialEncryptionService credentialEncryptionService,
+            DiscoverySyncService discoverySyncService) {
         this.tenantRepository = tenantRepository;
         this.tenantConnectionRepository = tenantConnectionRepository;
         this.provisioningLogRepository = provisioningLogRepository;
         this.userDirectoryRepository = userDirectoryRepository;
         this.passwordEncoder = passwordEncoder;
         this.credentialEncryptionService = credentialEncryptionService;
+        this.discoverySyncService = discoverySyncService;
     }
 
     /**
@@ -161,6 +165,9 @@ public class TenantProvisioningService {
 
             activateTenant(tenantId, ownerUserId);
             logStep(tenantId, "ACTIVATE", null);
+
+            discoverySyncService.backfillForTenant(slug);
+            logStep(tenantId, "SYNC_DISCOVERY", null);
         } catch (Exception e) {
             log.error("Tenant provisioning failed for tenantId={} slug={}", tenantId, slug, e);
             markFailed(tenantId);

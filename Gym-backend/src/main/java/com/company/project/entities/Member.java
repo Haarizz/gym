@@ -364,6 +364,12 @@ public class Member extends BaseEntity implements BranchAware {
     public BigDecimal getWalletBalance() { return walletBalance; }
     public void setWalletBalance(BigDecimal walletBalance) { this.walletBalance = walletBalance; }
 
+    @Column(name = "global_user_id")
+    private Long globalUserId;
+
+    public Long getGlobalUserId() { return globalUserId; }
+    public void setGlobalUserId(Long globalUserId) { this.globalUserId = globalUserId; }
+
     @Column(name = "branch_id")
     private Long branchId;
 
