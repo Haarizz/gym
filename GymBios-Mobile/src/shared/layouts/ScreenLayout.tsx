@@ -13,6 +13,14 @@ interface ScreenLayoutProps {
 // so scrollable content is never hidden behind it.
 export const TAB_BAR_HEIGHT = 74;
 
+// Runtime clearance needed below the tab bar's visual content: the design
+// height plus whatever the device's actual system nav/gesture inset is.
+// Screens add their own normal design spacing (e.g. Spacing.six) on top.
+export function useTabBarBottomInset(): number {
+  const insets = useSafeAreaInsets();
+  return TAB_BAR_HEIGHT + insets.bottom;
+}
+
 export function ScreenLayout({ children, scrollable = false }: ScreenLayoutProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();

@@ -3,9 +3,9 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 
-import { BottomTabInset, BrandColors, Radius, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
 
 import { HubFeatureCard } from '@/domains/attendance/presentation/components/hub/HubFeatureCard';
@@ -27,6 +27,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
  */
 export function CheckInHubScreen() {
   const router = useRouter();
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { summary, isLoading, error, refetch, isRefetching } = useRecentCheckIns();
 
   const handleRefresh = useCallback(() => {
@@ -44,7 +45,7 @@ export function CheckInHubScreen() {
           colors={CHECK_IN_COLORS}
         />
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
           showsVerticalScrollIndicator={false}
         >
           <AttendanceSkeleton variant="overview" count={4} />
@@ -59,7 +60,7 @@ export function CheckInHubScreen() {
     return (
       <ScreenLayout>
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -88,7 +89,7 @@ export function CheckInHubScreen() {
   return (
     <ScreenLayout>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -159,7 +160,6 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.three,
     gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   statsGrid: {
     flexDirection: 'row',

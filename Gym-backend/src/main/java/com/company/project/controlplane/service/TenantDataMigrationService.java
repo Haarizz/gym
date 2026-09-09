@@ -122,9 +122,6 @@ public class TenantDataMigrationService {
             String tenantDbPassword = tenantProvisioningService.provisionDatabase(dbName, roleName, null);
             logStep(tenant.getId(), "CREATE_DATABASE", null);
 
-            storeConnection(tenant.getId(), dbName, roleName, tenantDbPassword);
-            logStep(tenant.getId(), "STORE_CONNECTION", null);
-
             DataSource tenantDs = tenantProvisioningService.buildTenantDataSource(dbName, roleName, tenantDbPassword);
 
             tenantProvisioningService.runSchemaAndMigrations(tenantDs, gym.slug);
@@ -170,6 +167,16 @@ public class TenantDataMigrationService {
             VerificationReport report = migrationVerifier.verify(primarySource, tenantDs, gymId, branchIds);
             logStep(tenant.getId(), "VERIFY", report.overallPass() ? null : "Verification found discrepancies — see logs");
 
+            // Only now — after every row (members included) has actually landed in the
+            // tenant database — make it routable. TenantRoutingDataSource/
+            // TenantDataSourceRegistry.hasConnection() start sending LIVE traffic here
+            // the instant this row exists, so storing it any earlier (as this used to do,
+            // right after CREATE_DATABASE) opens a window where a real member's requests
+            // get routed to a tenant database that doesn't have their row yet, failing
+            // authorization checks like TenantContextFilter's membership check.
+            storeConnection(tenant.getId(), dbName, roleName, tenantDbPassword);
+            logStep(tenant.getId(), "STORE_CONNECTION", null);
+
             setTenantStatus(tenant.getId(), "ACTIVE");
             logStep(tenant.getId(), "ACTIVATE", null);
             log.info("Migration complete for gym id={} slug={} — verification pass={}", gymId, gym.slug, report.overallPass());
@@ -177,6 +184,13 @@ public class TenantDataMigrationService {
             log.error("Data migration failed for gymId={} slug={}", gymId, gym.slug, e);
             setTenantStatus(tenant.getId(), "PROVISION_FAILED");
             logStep(tenant.getId(), "MIGRATION_FAILED", e.getMessage());
+            // A failed attempt must never leave live traffic routed to an incomplete
+            // database. storeConnection now runs last (after copyAll/verify), so a
+            // failure here almost never wrote one this attempt — but a *previous*
+            // failed/interrupted attempt (or a failure between storeConnection and
+            // ACTIVATE below) could have left a stale row that would otherwise strand
+            // this tenant's traffic on a half-populated database indefinitely.
+            removeStaleConnection(tenant.getId());
             throw e;
         }
     }
@@ -254,6 +268,10 @@ public class TenantDataMigrationService {
         connection.setDbUsername(roleName);
         connection.setDbCredentialEnc(credentialEncryptionService.encrypt(tenantDbPassword));
         tenantConnectionRepository.save(connection);
+    }
+
+    private void removeStaleConnection(Long tenantId) {
+        tenantConnectionRepository.findByTenantId(tenantId).ifPresent(tenantConnectionRepository::delete);
     }
 
     private String extractHost(String jdbcUrl) {

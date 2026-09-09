@@ -148,6 +148,7 @@ const styles = StyleSheet.create({
   },
 
   input: {
+    flex: 1,
     minHeight: 48,
     borderWidth: 1,
     borderRadius: Radius.md,
@@ -156,6 +157,7 @@ const styles = StyleSheet.create({
   },
 
   authInput: {
+    flex: 1,
     height: 56,
     backgroundColor: '#ffffff',
     borderWidth: 1.5,

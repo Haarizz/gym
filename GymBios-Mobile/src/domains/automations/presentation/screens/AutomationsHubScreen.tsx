@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
-import { Spacing, BrandColors, BottomTabInset } from '@/core/theme';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
+import { Spacing, BrandColors } from '@/core/theme';
 
 import { HubActionButton } from '../components/HubActionButton';
 import { AutomationsOverviewScreen } from './AutomationsOverviewScreen';
@@ -11,6 +11,7 @@ type AutomationsTab = 'overview' | 'workflows';
 
 export const AutomationsHubScreen = () => {
   const [activeTab, setActiveTab] = useState<AutomationsTab>('overview');
+  const bottomInset = useTabBarBottomInset();
 
   const renderContent = () => {
     switch (activeTab) {
@@ -49,7 +50,7 @@ export const AutomationsHubScreen = () => {
         </View>
 
         {/* Content Area */}
-        <View style={styles.contentArea}>
+        <View style={[styles.contentArea, { paddingBottom: bottomInset }]}>
           {renderContent()}
         </View>
       </View>
@@ -79,7 +80,6 @@ const styles = StyleSheet.create({
   },
   contentArea: {
     flex: 1,
-    paddingBottom: BottomTabInset,
   },
 });
 

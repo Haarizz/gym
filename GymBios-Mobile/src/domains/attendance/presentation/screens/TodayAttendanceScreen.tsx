@@ -6,9 +6,9 @@ import {
   View,
 } from 'react-native';
 
-import { BottomTabInset, BrandColors, Spacing } from '@/core/theme';
+import { BrandColors, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { SearchBar } from '@/shared/components/SearchBar';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { Typography } from '@/shared/components/Typography';
@@ -36,6 +36,7 @@ interface TodayAttendanceScreenProps {
  * filter into a sticky header, and uses pull-to-refresh.
  */
 export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { datePeriod, search, apiFilters, setDatePeriod, setSearch } =
     useAttendanceFilters();
 
@@ -210,7 +211,7 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
         data={attendance}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -236,7 +237,6 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: Spacing.three,
     gap: Spacing.two,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   pagination: {
     alignItems: 'center',

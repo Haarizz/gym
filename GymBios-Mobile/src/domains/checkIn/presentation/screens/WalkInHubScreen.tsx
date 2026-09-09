@@ -5,8 +5,8 @@ import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
-import { BrandColors, BottomTabInset, Spacing } from '@/core/theme';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
+import { BrandColors, Spacing } from '@/core/theme';
 import { HubFeatureCard } from '@/domains/attendance/presentation/components/hub/HubFeatureCard';
 
 import { useRecentCheckIns } from '../hooks/useRecentCheckIns';
@@ -21,6 +21,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
  */
 export function WalkInHubScreen() {
   const router = useRouter();
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { recentVisitors } = useRecentCheckIns();
   const { selectedBranchId } = useBranchContext();
 
@@ -33,7 +34,7 @@ export function WalkInHubScreen() {
         onBack={() => router.back()}
       />
 
-      <View style={styles.content}>
+      <View style={[styles.content, { paddingBottom: bottomInset }]}>
         <HubFeatureCard
           title="Register Visitor"
           subtitle="Fill visitor details, select a daily plan, and process payment."
@@ -67,6 +68,5 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.three,
     gap: Spacing.two,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
 });

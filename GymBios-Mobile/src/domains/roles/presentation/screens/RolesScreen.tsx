@@ -6,7 +6,8 @@ import Feather from '@expo/vector-icons/Feather';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { SearchBar } from '@/shared/components/SearchBar';
 import { Loader } from '@/shared/components/Loader';
-import { BrandColors, Spacing, BottomTabInset } from '@/core/theme';
+import { BrandColors, Spacing } from '@/core/theme';
+import { useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 
 import { useRoleSearch } from '../hooks/useRoleSearch';
 import { useRoleActions } from '../../hooks/useRoleActions';
@@ -19,6 +20,7 @@ import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function RolesScreen() {
   const router = useRouter();
+  const bottomInset = useTabBarBottomInset() + 80; // extra clearance for the FAB
   const { roles, loading, search, setSearch } = useRoleSearch();
   const { deleteRole, duplicateRole } = useRoleActions();
   
@@ -84,7 +86,7 @@ export function RolesScreen() {
         <FlatList
           data={roles}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: bottomInset }]}
           renderItem={({ item }) => (
             <RoleCard 
               role={item} 
@@ -102,8 +104,8 @@ export function RolesScreen() {
       )}
 
       {/* Floating Action Button */}
-      <TouchableOpacity 
-        style={styles.fab} 
+      <TouchableOpacity
+        style={[styles.fab, { bottom: bottomInset }]}
         onPress={handleCreateRole}
         activeOpacity={0.8}
       >
@@ -137,12 +139,10 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: Spacing.three,
-    paddingBottom: BottomTabInset + 80, // Extra space for FAB
   },
   fab: {
     position: 'absolute',
     right: Spacing.four,
-    bottom: BottomTabInset + 80, // Increased to clear custom center tab button
     width: 56,
     height: 56,
     borderRadius: 18,

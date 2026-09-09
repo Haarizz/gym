@@ -4,9 +4,9 @@ import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
-import { BrandColors, BottomTabInset, Spacing } from '@/core/theme';
+import { BrandColors, Spacing } from '@/core/theme';
 
 import { MemberSearchBar } from '../components/members/MemberSearchBar';
 import { MemberList } from '../components/members/MemberList';
@@ -23,6 +23,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
 
 export function MembersStaffCheckInScreen() {
   const router = useRouter();
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<any>(null);
 
@@ -85,7 +86,7 @@ export function MembersStaffCheckInScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -166,7 +167,6 @@ export function MembersStaffCheckInScreen() {
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   searchContainer: {
     paddingHorizontal: Spacing.three,

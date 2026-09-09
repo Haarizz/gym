@@ -2,9 +2,9 @@ import { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
-import { BottomTabInset, BrandColors, Radius, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
 
 import { useAttendanceStats } from '../../hooks/useAttendance';
@@ -37,6 +37,7 @@ export function AttendanceHubScreen({
   onNavigateToTrends,
   onNavigateToReports,
 }: AttendanceHubScreenProps) {
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { stats, loading, error, refresh } = useAttendanceStats();
 
   const handleRefresh = useCallback(() => {
@@ -54,7 +55,7 @@ export function AttendanceHubScreen({
           colors={[BrandColors.teal, BrandColors.tealDark]}
         />
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
           showsVerticalScrollIndicator={false}
         >
           <AttendanceSkeleton variant="overview" count={4} />
@@ -74,7 +75,7 @@ export function AttendanceHubScreen({
           colors={[BrandColors.teal, BrandColors.tealDark]}
         />
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -130,7 +131,7 @@ export function AttendanceHubScreen({
     <ScreenLayout>
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -290,7 +291,6 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.three,
     gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   statsGrid: {
     flexDirection: 'row',

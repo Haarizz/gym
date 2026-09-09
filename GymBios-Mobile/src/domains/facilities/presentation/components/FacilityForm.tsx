@@ -5,7 +5,8 @@ import Feather from '@expo/vector-icons/Feather';
 import { Input } from '@/shared/components/Input';
 import { Button } from '@/shared/components/Button';
 import { Typography } from '@/shared/components/Typography';
-import { BrandColors, Spacing, Radius, BottomTabInset } from '@/core/theme';
+import { BrandColors, Spacing, Radius } from '@/core/theme';
+import { useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import type { Facility, FacilityRequest } from '../../domain/Facility';
 
 interface FacilityFormProps {
@@ -17,6 +18,7 @@ interface FacilityFormProps {
 const RATE_TYPES = ['Per Hour', 'Per Half Day', 'Per Full Day', 'Per Month'];
 
 export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFormProps) {
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [iconName, setIconName] = useState(initialData?.iconName || 'box');
@@ -84,7 +86,7 @@ export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFo
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: bottomInset }]} showsVerticalScrollIndicator={false}>
       <Input
         label="Facility Name"
         value={name}
@@ -186,7 +188,6 @@ const styles = StyleSheet.create({
   container: {
     padding: Spacing.three,
     gap: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   textArea: {
     height: 80,

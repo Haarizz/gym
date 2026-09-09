@@ -6,9 +6,9 @@ import {
   View,
 } from 'react-native';
 
-import { BottomTabInset, BrandColors, Radius, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
 
@@ -40,6 +40,7 @@ interface AttendanceReportsScreenProps {
  * screen.  The period selector stays sticky at the top.
  */
 export function AttendanceReportsScreen({ onBack }: AttendanceReportsScreenProps) {
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { period, apiRange, setPeriod } = useReportDateRange();
 
   const {
@@ -80,7 +81,7 @@ export function AttendanceReportsScreen({ onBack }: AttendanceReportsScreenProps
           <ReportPeriodSelector value={period} onChange={setPeriod} />
         </View>
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
           showsVerticalScrollIndicator={false}
         >
           <AttendanceSkeleton variant="overview" count={4} />
@@ -104,7 +105,7 @@ export function AttendanceReportsScreen({ onBack }: AttendanceReportsScreenProps
           <ReportPeriodSelector value={period} onChange={setPeriod} />
         </View>
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -139,7 +140,7 @@ export function AttendanceReportsScreen({ onBack }: AttendanceReportsScreenProps
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -191,7 +192,6 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: Spacing.three,
     gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   exportSection: {
     marginTop: Spacing.two,

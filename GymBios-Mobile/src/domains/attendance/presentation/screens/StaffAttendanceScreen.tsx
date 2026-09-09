@@ -6,9 +6,9 @@ import {
   View,
 } from 'react-native';
 
-import { BottomTabInset, BrandColors, Spacing } from '@/core/theme';
+import { BrandColors, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { SearchBar } from '@/shared/components/SearchBar';
 import { EmptyState } from '@/shared/components/EmptyState';
 
@@ -35,6 +35,7 @@ interface StaffAttendanceScreenProps {
 export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
   const { staffRecords, loading, error, refresh } = useStaffAttendance();
   const [search, setSearch] = useState('');
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
 
   const filtered = useMemo(() => {
     if (!search.trim()) return staffRecords;
@@ -157,7 +158,7 @@ export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
         data={filtered}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -180,6 +181,5 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: Spacing.three,
     gap: Spacing.two,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
 });

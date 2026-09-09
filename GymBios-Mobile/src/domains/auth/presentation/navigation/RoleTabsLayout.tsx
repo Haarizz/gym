@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Tabs, useRouter, useSegments } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors } from '@/core/theme';
+import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { AppBottomSheet, ModuleSheet } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
 import {
@@ -65,6 +65,7 @@ export function RoleTabsLayout({
 }: RoleTabsLayoutProps) {
   const router = useRouter();
   const segments = useSegments();
+  const insets = useSafeAreaInsets();
   const [isModulesOpen, setIsModulesOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false);
@@ -164,6 +165,10 @@ export function RoleTabsLayout({
 
             tabBarStyle: [
               styles.tabBar,
+              {
+                height: TAB_BAR_HEIGHT + insets.bottom,
+                paddingBottom: TAB_BAR_BOTTOM_PADDING + insets.bottom,
+              },
               (isFullScreen || isCommunityScreen) && {
                 display: 'none',
               },
@@ -210,6 +215,7 @@ export function RoleTabsLayout({
           <Pressable
             style={({ pressed }) => [
               styles.modulesFabContainer,
+              { bottom: MODULES_FAB_BOTTOM_PADDING + insets.bottom },
               pressed && styles.modulesFabPressed,
             ]}
             onPress={() => setIsModulesOpen(true)}
@@ -271,6 +277,12 @@ export function RoleTabsLayout({
     </SafeAreaView>
   );
 }
+
+// Normal design spacing below the tab bar's icon/label content and below
+// the modules FAB — the actual system nav/gesture clearance is added on top
+// of these at runtime via insets.bottom, not baked into the constant.
+const TAB_BAR_BOTTOM_PADDING = 12;
+const MODULES_FAB_BOTTOM_PADDING = 18;
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -360,10 +372,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
 
-    height: 74,
-
+    // height and paddingBottom are set dynamically (see tabBarStyle above)
+    // so the tab bar clears the device's actual system nav/gesture inset.
     paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
 
     backgroundColor: '#FFF',
 
@@ -398,7 +409,8 @@ const styles = StyleSheet.create({
   modulesFabContainer: {
     position: 'absolute',
     alignSelf: 'center',
-    bottom: Platform.OS === 'ios' ? 22 : 18,
+    // bottom is set dynamically (see the Pressable above) to clear the
+    // device's actual system nav/gesture inset.
     alignItems: 'center',
     zIndex: 99,
     elevation: 20,

@@ -3,11 +3,11 @@ import { RefreshControl, ScrollView, StyleSheet, View, Alert } from 'react-nativ
 import { useRouter } from 'expo-router';
 
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { SearchBar } from '@/shared/components/SearchBar';
 import { Button } from '@/shared/components/Button';
 import { Typography } from '@/shared/components/Typography';
-import { BrandColors, BottomTabInset, Spacing } from '@/core/theme';
+import { BrandColors, Spacing } from '@/core/theme';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { Loader } from '@/shared/components/Loader';
 
@@ -22,7 +22,8 @@ const FACILITIES_COLORS: [string, string] = [BrandColors.teal, '#0f766e'];
 
 export function FacilitiesScreen() {
   const router = useRouter();
-  
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
+
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<FacilityStatusFilter>('All');
   
@@ -117,7 +118,7 @@ export function FacilitiesScreen() {
     <ScreenLayout>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -153,7 +154,6 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.three,
     gap: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   addButton: {
     marginBottom: Spacing.one,

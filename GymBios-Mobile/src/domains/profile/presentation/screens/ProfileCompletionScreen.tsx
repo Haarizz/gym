@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import {
-  Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
   Alert,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -180,6 +179,7 @@ function CharTextInput({
 export function ProfileCompletionScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState(1);
   const [dateValue, setDateValue] = useState<Date | undefined>(undefined);
   const { updateProfile, isUpdating } = useMobileProfile();
@@ -242,6 +242,7 @@ export function ProfileCompletionScreen() {
 
   return (
     <SafeAreaView
+      edges={['top']}
       style={[styles.safe, { backgroundColor: theme.screen }]}
     >
       {/* ── Sticky top bar ── */}
@@ -701,8 +702,7 @@ export function ProfileCompletionScreen() {
           {
             backgroundColor: theme.background,
             borderTopColor: theme.border,
-            paddingBottom:
-              Platform.OS === 'ios' ? Spacing.three : Spacing.two,
+            paddingBottom: Spacing.two + insets.bottom,
           },
         ]}
       >

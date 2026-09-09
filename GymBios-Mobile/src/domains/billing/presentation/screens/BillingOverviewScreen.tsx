@@ -2,9 +2,9 @@ import React, { useCallback } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
-import { BottomTabInset, BrandColors, Radius, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
 
 import {
@@ -50,6 +50,7 @@ export function BillingOverviewScreen({
   onNavigateToCollectionReports,
   onNavigateToCreateReceipt,
 }: BillingOverviewScreenProps) {
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { stats, loading: statsLoading, error: statsError, refresh: refreshStats } = useBillingStats();
   const { receipts, loading: receiptsLoading, error: receiptsError, refresh: refreshReceipts } = useReceipts({ limit: 3, page: 1 });
   const { dues, loading: duesLoading, error: duesError, refresh: refreshDues } = useMemberDues();
@@ -109,7 +110,7 @@ export function BillingOverviewScreen({
   return (
     <ScreenLayout>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -330,7 +331,6 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.three,
     gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   heroBanner: {
     flexDirection: 'row',
