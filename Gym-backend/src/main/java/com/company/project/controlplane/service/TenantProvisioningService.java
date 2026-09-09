@@ -570,7 +570,11 @@ public class TenantProvisioningService {
      * (branch_id, code) constraint, so every row needs a real branch_id.
      * ON CONFLICT DO NOTHING makes this idempotent for retry-provisioning.
      */
-    private void seedDefaultAccountHeads(DataSource tenantDs, Long branchId) throws Exception {
+    // Public (not private): reused by TenantAccountHeadBackfillRunner (different
+    // package) to backfill the standard chart into tenants/branches provisioned
+    // before this seeding existed (see that class's doc comment) — same idempotent
+    // ON CONFLICT DO NOTHING insert, just invoked outside the initial-provisioning flow.
+    public void seedDefaultAccountHeads(DataSource tenantDs, Long branchId) throws Exception {
         record DefaultAccount(String code, String name, String type) {}
         List<DefaultAccount> defaults = List.of(
                 new DefaultAccount("1000", "Cash in Hand", "ASSET"),
