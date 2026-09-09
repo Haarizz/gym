@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
-import { BrandColors, Glass } from '@/core/theme';
+import { BrandColors } from '@/core/theme';
 import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { AppBottomSheet, GlassSurface, ModuleSheet } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
@@ -90,7 +90,7 @@ export function RoleTabsLayout({
   return (
     <SafeAreaView
       edges={isFullScreen ? [] : ['top']}
-      style={[styles.safeArea, { backgroundColor: isFullScreen ? BrandColors.screenBackground : resolvedColors[0] }]}>
+      style={styles.safeArea}>
       <View style={styles.container}>
         {!isFullScreen && showRoleHeader && (
           <GlassSurface tint={resolvedColors} radius={0} style={styles.header}>
@@ -115,7 +115,7 @@ export function RoleTabsLayout({
 
               <View style={styles.headerTextContainer}>
                 <Text style={styles.greeting}>{greeting}</Text>
-                <Pressable 
+                <Pressable
                   onPress={() => isAdmin && setIsBranchSelectorOpen(true)}
                   style={{ flexDirection: 'row', alignItems: 'center' }}
                 >
@@ -161,13 +161,12 @@ export function RoleTabsLayout({
             tabBarActiveTintColor: activeColor,
             tabBarInactiveTintColor: '#94A3B8',
 
-            tabBarShowLabel: true,
+            tabBarShowLabel: false,
 
             tabBarStyle: [
               styles.tabBar,
               {
-                height: TAB_BAR_HEIGHT + insets.bottom,
-                paddingBottom: TAB_BAR_BOTTOM_PADDING + insets.bottom,
+                bottom: insets.bottom > 0 ? insets.bottom : 24,
               },
               (isFullScreen || isCommunityScreen) && {
                 display: 'none',
@@ -176,11 +175,9 @@ export function RoleTabsLayout({
 
             tabBarItemStyle: styles.tabItem,
 
-            tabBarLabelStyle: styles.tabLabel,
-
-            tabBarIconStyle: {
-              marginBottom: 2,
-            },
+            tabBarBackground: () => (
+              <GlassSurface radius={26} style={StyleSheet.absoluteFill} />
+            ),
           }}>
           {tabs.map((tab) => (
             <Tabs.Screen
@@ -190,13 +187,25 @@ export function RoleTabsLayout({
                 title: tab.title,
                 tabBarLabel: tab.title,
                 href: (tab.name === 'index' ? `/${roleGroup}` : `/${roleGroup}/${tab.name}`) as any,
-                tabBarIcon: ({ color, size }) => (
-                  <Feather
-                    name={tab.icon}
-                    color={color}
-                    size={size}
-                  />
-                ),
+                tabBarIcon: ({ color, size, focused }) => {
+                  const iconColor = focused ? activeColor : 'rgba(30,42,58,0.45)';
+                  return (
+                    <View style={[
+                      styles.iconContainer,
+                      focused && {
+                        backgroundColor: `${activeColor}29`,
+                        borderWidth: 1,
+                        borderColor: `${activeColor}66`,
+                      }
+                    ]}>
+                      <Feather
+                        name={tab.icon}
+                        color={iconColor}
+                        size={22}
+                      />
+                    </View>
+                  );
+                },
               }}
             />
           ))}
@@ -287,6 +296,10 @@ const MODULES_FAB_BOTTOM_PADDING = 18;
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    // Always screen background — the header GlassSurface provides the role
+    // colour. This makes the rounded bottom-corner gaps invisible since they
+    // blend with the screen content below.
+    backgroundColor: BrandColors.screenBackground,
   },
 
   container: {
@@ -368,42 +381,36 @@ const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
 
-    left: 0,
-    right: 0,
-    bottom: 0,
+    left: 20,
+    right: 20,
 
-    // height and paddingBottom are set dynamically (see tabBarStyle above)
-    // so the tab bar clears the device's actual system nav/gesture inset.
-    paddingTop: 8,
+    height: 72,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
 
-    backgroundColor: Glass.fillStrong,
+    // Visuals (fill, blur, border, shadow) come entirely from the
+    // GlassSurface rendered via tabBarBackground below — this container
+    // only needs to be transparent and clip the icon row to the pill shape.
+    backgroundColor: 'transparent',
+    borderRadius: 26,
+    overflow: 'hidden',
 
-    borderTopWidth: 1,
-    borderTopColor: Glass.border,
-
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-
-    elevation: 16,
-
-    shadowColor: Glass.shadowColor,
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
+    zIndex: 40,
   },
 
   tabItem: {
-    paddingVertical: 4,
-    gap: 2,
+    flex: 1,
+    paddingVertical: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 2,
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   modulesFabContainer: {

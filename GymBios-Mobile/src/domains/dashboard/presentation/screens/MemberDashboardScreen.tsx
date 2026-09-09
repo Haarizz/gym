@@ -1,6 +1,8 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, Loader } from '@/shared/components';
+import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMemberDashboard } from '../../hooks/useMemberDashboard';
 import { MemberWelcomeCard } from '../components/MemberWelcomeCard';
 import { MemberActiveMembershipCard } from '../components/MemberActiveMembershipCard';
@@ -12,6 +14,7 @@ import { MemberOfferBanner } from '../components/MemberOfferBanner';
 
 export function MemberDashboardScreen() {
   const { data, isLoading, refetch, isRefetching } = useMemberDashboard();
+  const insets = useSafeAreaInsets();
 
   if (isLoading && !data) {
     return (
@@ -23,12 +26,15 @@ export function MemberDashboardScreen() {
 
   return (
     <View style={styles.root}>
-      <GlassBlob color={BrandColors.memberGold} size={340} opacity={0.42} top={-90} right={-60} />
-      <GlassBlob color={BrandColors.teal} size={300} opacity={0.3} top={340} left={-70} />
-      <GlassBlob color={BrandColors.memberGold} size={260} opacity={0.24} top={760} right={-80} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 280, overflow: 'hidden' }} pointerEvents="none">
+        <GlassBlob color={BrandColors.memberGold} size={340} opacity={0.42} top={-90} right={-60} />
+      </View>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 24 }
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -61,7 +67,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: Spacing.four,
-    paddingBottom: Spacing.six + 50,
     gap: Spacing.four,
   },
   loaderContainer: {
