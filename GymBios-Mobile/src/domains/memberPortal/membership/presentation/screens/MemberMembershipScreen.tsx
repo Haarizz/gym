@@ -11,6 +11,7 @@ import {
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassBlob, GlassSurface } from '@/shared/components';
 import { MembershipStatusCard, type MembershipDetails } from '../components/MembershipStatusCard';
 import { MembershipBenefitsTab } from '../components/MembershipBenefitsTab';
 import { MembershipPaymentsTab } from '../components/MembershipPaymentsTab';
@@ -94,7 +95,7 @@ export function MemberMembershipScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.center]}>
+      <View style={[styles.root, styles.center]}>
         <ActivityIndicator size="large" color={BrandColors.teal} />
       </View>
     );
@@ -102,22 +103,30 @@ export function MemberMembershipScreen() {
 
   if (isError || !membership) {
     return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[styles.content, styles.center]}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
-      >
-        <Feather name="alert-triangle" size={48} color={BrandColors.trainerAmber} />
-        <Text style={styles.errorText}>Failed to load membership data.</Text>
-        <Pressable style={styles.retryButton} onPress={onRefresh}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </ScrollView>
+      <View style={styles.root}>
+        <GlassBlob color={BrandColors.teal} size={260} opacity={0.2} top={-70} right={-80} />
+        <GlassBlob color={BrandColors.tealDark} size={220} opacity={0.16} top={420} left={-90} />
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[styles.content, styles.center]}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
+        >
+          <Feather name="alert-triangle" size={48} color={BrandColors.trainerAmber} />
+          <Text style={styles.errorText}>Failed to load membership data.</Text>
+          <Pressable style={styles.retryButton} onPress={onRefresh}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+        </ScrollView>
+      </View>
     );
   }
 
   return (
-    <ScrollView
+    <View style={styles.root}>
+      <GlassBlob color={BrandColors.teal} size={340} opacity={0.4} top={-90} right={-60} />
+      <GlassBlob color={BrandColors.tealDark} size={300} opacity={0.28} top={340} left={-70} />
+      <GlassBlob color={BrandColors.memberGold} size={240} opacity={0.2} top={760} right={-70} />
+      <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
@@ -171,7 +180,7 @@ export function MemberMembershipScreen() {
       </View>
 
       {/* Segmented Tab Selector */}
-      <View style={styles.tabBar}>
+      <GlassSurface radius={Radius.lg} style={styles.tabBar}>
         <Pressable
           style={[styles.tabItem, activeTab === 'benefits' && styles.tabItemActive]}
           onPress={() => setActiveTab('benefits')}
@@ -204,7 +213,7 @@ export function MemberMembershipScreen() {
             Add-ons
           </Text>
         </Pressable>
-      </View>
+      </GlassSurface>
 
       {/* Tab Content */}
       {activeTab === 'benefits' && (
@@ -250,14 +259,18 @@ export function MemberMembershipScreen() {
         onClose={() => setIsRenewModalOpen(false)}
         onSuccess={handleRenewSuccess}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: BrandColors.screenBackground,
+  },
+  container: {
+    flex: 1,
   },
   content: {
     padding: Spacing.four,
@@ -339,9 +352,7 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#E2E8F0',
     padding: 3,
-    borderRadius: Radius.lg,
   },
   tabItem: {
     flex: 1,

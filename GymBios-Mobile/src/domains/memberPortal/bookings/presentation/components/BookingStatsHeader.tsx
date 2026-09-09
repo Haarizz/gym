@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 
 interface BookingStatsHeaderProps {
   upcomingCount: number;
@@ -14,26 +15,26 @@ export function BookingStatsHeader({
 }: BookingStatsHeaderProps) {
   return (
     <View style={styles.grid}>
-      <View style={styles.card}>
+      <GlassSurface radius={Radius.md} style={styles.card}>
         <Text style={styles.label}>Upcoming</Text>
         <Text style={[styles.value, { color: BrandColors.memberGold }]}>
           {upcomingCount}
         </Text>
-      </View>
+      </GlassSurface>
 
-      <View style={styles.card}>
+      <GlassSurface radius={Radius.md} style={styles.card}>
         <Text style={styles.label}>This Week</Text>
         <Text style={[styles.value, { color: BrandColors.teal }]}>
           {thisWeekCount}
         </Text>
-      </View>
+      </GlassSurface>
 
-      <View style={styles.card}>
+      <GlassSurface radius={Radius.md} style={styles.card}>
         <Text style={styles.label}>Attended</Text>
         <Text style={[styles.value, { color: BrandColors.trainerAmber }]}>
           {attendedCount}
         </Text>
-      </View>
+      </GlassSurface>
     </View>
   );
 }
@@ -45,17 +46,8 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.md,
     padding: Spacing.three,
     alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   label: {
     fontSize: TypographyScale.small,

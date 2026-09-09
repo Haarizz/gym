@@ -6,6 +6,7 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { Typography } from '@/shared/components/Typography';
 import { Loader } from '@/shared/components/Loader';
+import { GlassBlob, GlassSurface } from '@/shared/components';
 
 import { useMyPerformance } from '../../hooks/useMyPerformance';
 import { PerformanceOverviewCard } from '../components/PerformanceOverviewCard';
@@ -19,6 +20,9 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+      <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
+      <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
+      <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
       <AppHeader
         title="My Performance"
         subtitle="Performance scores, analytics & ratings"
@@ -34,7 +38,7 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
             <PerformanceOverviewCard performance={performance} />
 
             {/* Performance Insights Card */}
-            <View style={styles.insightsCard}>
+            <GlassSurface radius={Radius.lg} style={styles.insightsCard}>
               <View style={styles.insightsHeader}>
                 <Feather name="bar-chart-2" size={20} color={BrandColors.teal} style={styles.insightsIcon} />
                 <Typography variant="subtitle" style={styles.insightsTitle}>
@@ -77,7 +81,7 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
                   </Typography>
                 </View>
               </View>
-            </View>
+            </GlassSurface>
           </>
         )}
       </ScrollView>
@@ -96,16 +100,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.six,
   },
   insightsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   insightsHeader: {
     flexDirection: 'row',

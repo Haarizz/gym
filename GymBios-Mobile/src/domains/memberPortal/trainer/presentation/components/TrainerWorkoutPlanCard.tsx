@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { BrandColors, Glass, heroTint, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 export function TrainerWorkoutPlanCard() {
   const handleViewPlan = () => {
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   planBanner: {
-    backgroundColor: BrandColors.tealDark,
+    backgroundColor: heroTint(BrandColors.tealDark),
     borderRadius: Radius.lg,
     padding: Spacing.four,
     gap: Spacing.three,
@@ -71,7 +71,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   planInnerCard: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: Glass.fill,
+    borderWidth: 1,
+    borderColor: Glass.border,
     borderRadius: Radius.md,
     padding: Spacing.three + 2,
     gap: Spacing.two,

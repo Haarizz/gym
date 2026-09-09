@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 
-import { Spacing, BottomTabInset } from '@/core/theme';
+import { Spacing } from '@/core/theme';
 import { Input } from '@/shared/components/Input';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Button } from '@/shared/components/Button';
+import { useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 
 import type { CreateTrainingStreamRequest } from '../../application/TrainingStreamRepository';
 import { useStaff } from '@/domains/hr/presentation/hooks/useStaff';
@@ -25,6 +26,7 @@ export function TrainingStreamForm({
   submitLabel = 'Save',
   isUpload = false,
 }: TrainingStreamFormProps) {
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { staff } = useStaff();
 
   const [title, setTitle] = useState(initialValues?.title || '');
@@ -83,7 +85,7 @@ export function TrainingStreamForm({
 
   return (
     <ScrollView
-      contentContainerStyle={styles.scroll}
+      contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
@@ -187,7 +189,6 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.three,
     gap: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   row: {
     flexDirection: 'row',

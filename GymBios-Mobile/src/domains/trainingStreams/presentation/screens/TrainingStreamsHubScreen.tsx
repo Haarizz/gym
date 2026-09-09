@@ -2,9 +2,9 @@ import { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { BottomTabInset, BrandColors, Spacing } from '@/core/theme';
+import { BrandColors, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { SearchBar } from '@/shared/components/SearchBar';
 
 import { useTrainingStreams, useTrainingStreamAnalytics } from '../../hooks/useTrainingStreams';
@@ -16,6 +16,7 @@ import { TrainingStreamStats } from '../components/TrainingStreamStats';
 
 export function TrainingStreamsHubScreen() {
   const router = useRouter();
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { activeTab, setActiveTab, search, setSearch, getQueryFilters } = useTrainingStreamFilters();
   
   const filters = getQueryFilters();
@@ -32,7 +33,7 @@ export function TrainingStreamsHubScreen() {
   return (
     <ScreenLayout>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -111,7 +112,6 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.three,
     gap: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   actionsRow: {
     flexDirection: 'row',

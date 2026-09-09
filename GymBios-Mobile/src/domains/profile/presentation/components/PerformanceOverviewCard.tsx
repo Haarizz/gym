@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { GlassSurface } from '@/shared/components';
 import type { UserPerformance } from '../../domain';
 
 interface PerformanceOverviewCardProps {
@@ -63,7 +64,7 @@ export function PerformanceOverviewCard({ performance }: PerformanceOverviewCard
       </View>
 
       {/* KPI Trends Section */}
-      <View style={styles.kpiContainer}>
+      <GlassSurface radius={Radius.lg} style={styles.kpiContainer}>
         <Typography variant="subtitle" style={styles.kpiHeader}>
           Key Performance Indicators
         </Typography>
@@ -86,7 +87,7 @@ export function PerformanceOverviewCard({ performance }: PerformanceOverviewCard
             </View>
           ))}
         </View>
-      </View>
+      </GlassSurface>
     </View>
   );
 }
@@ -130,11 +131,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one,
   },
   kpiContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
   },
   kpiHeader: {
     color: BrandColors.textPrimary,

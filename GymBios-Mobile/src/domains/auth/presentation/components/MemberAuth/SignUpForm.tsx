@@ -48,7 +48,7 @@ export function SignUpForm({ onSwitchToSignin, onRegister, isLoading, errorMessa
           name="fullName"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              variant="auth"
+              variant="glass"
               label="Full name"
               placeholder="Your full name"
               autoCapitalize="words"
@@ -67,7 +67,7 @@ export function SignUpForm({ onSwitchToSignin, onRegister, isLoading, errorMessa
           name="username"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              variant="auth"
+              variant="glass"
               label="Username"
               placeholder="Choose a username"
               autoCapitalize="none"
@@ -86,7 +86,7 @@ export function SignUpForm({ onSwitchToSignin, onRegister, isLoading, errorMessa
           name="email"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              variant="auth"
+              variant="glass"
               label="Email"
               placeholder="you@example.com"
               autoCapitalize="none"
@@ -107,7 +107,7 @@ export function SignUpForm({ onSwitchToSignin, onRegister, isLoading, errorMessa
           render={({ field: { onChange, onBlur, value } }) => (
             <View style={styles.passwordField}>
               <Input
-                variant="auth"
+                variant="glass"
                 label="Password"
                 placeholder="Create a password"
                 secureTextEntry

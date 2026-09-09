@@ -4,10 +4,10 @@ import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Button } from '@/shared/components/Button';
 import { Typography } from '@/shared/components/Typography';
-import { BrandColors, BottomTabInset, Radius, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { PaymentBottomSheet } from '@/shared/payment';
 import type { PaymentResult } from '@/shared/payment/types';
 
@@ -26,6 +26,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
  */
 export function WalkInRegistrationScreen() {
   const router = useRouter();
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const queryClient = useQueryClient();
   const [isPaymentVisible, setIsPaymentVisible] = useState(false);
 
@@ -82,7 +83,7 @@ export function WalkInRegistrationScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         keyboardShouldPersistTaps="handled"
       >
         <WalkInForm
@@ -138,7 +139,6 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.three,
     gap: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   actionBar: {
     flexDirection: 'row',

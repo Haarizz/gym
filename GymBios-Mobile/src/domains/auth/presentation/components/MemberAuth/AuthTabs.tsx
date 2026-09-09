@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Typography } from '@/shared/components';
+import { Pressable, StyleSheet } from 'react-native';
+import { Glass } from '@/core/theme';
+import { GlassSurface, Typography } from '@/shared/components';
 
 interface AuthTabsProps {
   activeTab: 'signin' | 'signup';
@@ -8,14 +9,13 @@ interface AuthTabsProps {
 
 export function AuthTabs({ activeTab, onTabChange }: AuthTabsProps) {
   return (
-    <View style={styles.tabs}>
+    <GlassSurface radius={16} style={styles.tabs}>
       <Pressable
         style={[styles.tab, activeTab === 'signin' && styles.tabActive]}
         onPress={() => onTabChange('signin')}>
         <Typography style={[styles.tabText, activeTab === 'signin' && styles.tabTextActive]}>
           Sign In
         </Typography>
-        {activeTab === 'signin' && <View style={styles.tabIndicator} />}
       </Pressable>
       <Pressable
         style={[styles.tab, activeTab === 'signup' && styles.tabActive]}
@@ -23,40 +23,38 @@ export function AuthTabs({ activeTab, onTabChange }: AuthTabsProps) {
         <Typography style={[styles.tabText, activeTab === 'signup' && styles.tabTextActive]}>
           Create Account
         </Typography>
-        {activeTab === 'signup' && <View style={styles.tabIndicator} />}
       </Pressable>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   tabs: {
     flexDirection: 'row',
-    gap: 26,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E3E9E5',
+    padding: 5,
+    gap: 4,
     marginBottom: 22,
   },
   tab: {
-    paddingBottom: 12,
-    position: 'relative',
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
   },
-  tabActive: {},
+  tabActive: {
+    backgroundColor: Glass.fillStrong,
+    shadowColor: '#0a3f34',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   tabText: {
-    fontSize: 14.5,
-    fontWeight: '600',
-    color: '#9AA6A1',
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#6E7C77',
   },
   tabTextActive: {
     color: '#0A3F34',
-  },
-  tabIndicator: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: -1,
-    height: 2,
-    backgroundColor: '#0E6653',
-    borderRadius: 2,
   },
 });

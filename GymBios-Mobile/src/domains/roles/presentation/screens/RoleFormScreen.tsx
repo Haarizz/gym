@@ -6,7 +6,8 @@ import { AppHeader } from '@/shared/components/AppHeader';
 import { Input } from '@/shared/components/Input';
 import { SearchBar } from '@/shared/components/SearchBar';
 import { Loader } from '@/shared/components/Loader';
-import { BrandColors, Spacing, BottomTabInset } from '@/core/theme';
+import { BrandColors, Spacing } from '@/core/theme';
+import { useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
 
 import { useRoles } from '../../hooks/useRoles';
@@ -71,6 +72,7 @@ interface RoleFormContentProps {
 }
 
 function RoleFormContent({ initialData, isEditing, roleId, submitting, onSubmitAction, onSuccess }: RoleFormContentProps) {
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const {
     roleName,
     setRoleName,
@@ -120,7 +122,7 @@ function RoleFormContent({ initialData, isEditing, roleId, submitting, onSubmitA
       />
 
       <ScrollView 
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
@@ -177,7 +179,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContent: {
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   section: {
     padding: Spacing.three,

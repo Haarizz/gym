@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { AdminPaymentMixItem } from '../../domain/AdminDashboardData';
 
 interface AdminPaymentMixCardProps {
@@ -8,7 +9,7 @@ interface AdminPaymentMixCardProps {
 
 export function AdminPaymentMixCard({ paymentMix }: AdminPaymentMixCardProps) {
   return (
-    <View style={styles.container}>
+    <GlassSurface radius={16} style={styles.container}>
       <Text style={styles.title}>Payment Mix</Text>
       <View style={styles.list}>
         {paymentMix.map((payment, idx) => (
@@ -31,20 +32,13 @@ export function AdminPaymentMixCard({ paymentMix }: AdminPaymentMixCardProps) {
           </View>
         ))}
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   title: {
     fontSize: 16,

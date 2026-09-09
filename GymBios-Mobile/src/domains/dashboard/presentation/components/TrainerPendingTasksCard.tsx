@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { TrainerPendingTask } from '../../domain/TrainerDashboardData';
 
 interface TrainerPendingTasksCardProps {
@@ -15,7 +16,7 @@ export function TrainerPendingTasksCard({
   if (!tasks || tasks.length === 0) return null;
 
   return (
-    <View style={styles.container}>
+    <GlassSurface tint="#D97706" radius={Radius.md} style={styles.container}>
       <Text style={styles.title}>Pending Tasks</Text>
       <View style={styles.list}>
         {tasks.map((item) => (
@@ -52,16 +53,12 @@ export function TrainerPendingTasksCard({
           </Pressable>
         ))}
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FEFCE8',
-    borderWidth: 1,
-    borderColor: '#FEF08A',
-    borderRadius: Radius.md,
     padding: Spacing.four,
   },
   title: {

@@ -4,8 +4,8 @@ import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
-import { BottomTabInset, Spacing } from '@/core/theme';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
+import { Spacing } from '@/core/theme';
 import { SlideIn } from '@/shared/components/Animations/SlideIn';
 import { AppHeader } from '@/shared/components/AppHeader';
 
@@ -25,6 +25,7 @@ const CHECK_IN_COLORS: [string, string] = ['#155c4c', '#0f4a3d'];
 
 export function StaffCheckInScreen() {
   const router = useRouter();
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { profile } = useProfile();
   const branchName = profile?.branch || 'All Branches';
 
@@ -127,7 +128,7 @@ export function StaffCheckInScreen() {
       <SlideIn right style={{ flex: 1 }}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -222,7 +223,6 @@ export function StaffCheckInScreen() {
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingBottom: BottomTabInset + Spacing.six,
     paddingTop: Spacing.three,
   },
   refreshBtn: {

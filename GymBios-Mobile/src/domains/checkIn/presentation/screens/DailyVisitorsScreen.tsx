@@ -4,9 +4,9 @@ import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
-import { BrandColors, BottomTabInset, Spacing } from '@/core/theme';
+import { BrandColors, Spacing } from '@/core/theme';
 
 import { WalkInVisitorList } from '../components/walkIn/WalkInVisitorList';
 import { useRecentCheckIns } from '../hooks/useRecentCheckIns';
@@ -19,6 +19,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
  */
 export function DailyVisitorsScreen() {
   const router = useRouter();
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { recentVisitors, isLoading, refetch, isRefetching } = useRecentCheckIns();
 
   const handleRefresh = useCallback(() => {
@@ -36,7 +37,7 @@ export function DailyVisitorsScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -68,7 +69,6 @@ export function DailyVisitorsScreen() {
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   headerRow: {
     flexDirection: 'row',

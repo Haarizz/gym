@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
 
 interface AdminQuickActionsCardProps {
   onCreateOffer?: () => void;
@@ -110,7 +110,9 @@ const styles = StyleSheet.create({
   },
   button: {
     width: '48.5%',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: Glass.fill,
+    borderWidth: 1,
+    borderColor: Glass.border,
     borderRadius: Radius.md,
     paddingVertical: 12,
     alignItems: 'center',

@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { GlassSurface } from '@/shared/components';
 import type { UserTarget } from '../../domain';
 
 interface TargetCardProps {
@@ -19,7 +20,7 @@ export function TargetCard({ target }: TargetCardProps) {
   const progressBarColor = isCompleted ? '#16a34a' : isOverdue ? '#dc2626' : BrandColors.teal;
 
   return (
-    <View style={styles.card}>
+    <GlassSurface radius={Radius.lg} style={styles.card}>
       <View style={styles.header}>
         <View style={styles.iconAndTitle}>
           <View style={styles.iconBadge}>
@@ -68,23 +69,14 @@ export function TargetCard({ target }: TargetCardProps) {
           </Typography>
         </View>
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
     marginBottom: Spacing.three,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   header: {
     flexDirection: 'row',

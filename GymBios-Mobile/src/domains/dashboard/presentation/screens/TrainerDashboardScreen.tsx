@@ -1,6 +1,6 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { BrandColors, Spacing } from '@/core/theme';
-import { Loader } from '@/shared/components';
+import { GlassBlob, Loader } from '@/shared/components';
 import { useTrainerDashboard } from '../../hooks/useTrainerDashboard';
 import { TrainerWelcomeCard } from '../components/TrainerWelcomeCard';
 import { TrainerStatsGrid } from '../components/TrainerStatsGrid';
@@ -20,39 +20,46 @@ export function TrainerDashboardScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={() => refetch()}
-          tintColor={BrandColors.trainerAmber}
-          colors={[BrandColors.trainerAmber]}
+    <View style={styles.root}>
+      <GlassBlob color={BrandColors.trainerAmber} size={260} opacity={0.24} top={-70} right={-80} />
+      <GlassBlob color={BrandColors.trainerAmber} size={200} opacity={0.16} top={420} left={-90} />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => refetch()}
+            tintColor={BrandColors.trainerAmber}
+            colors={[BrandColors.trainerAmber]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <TrainerWelcomeCard trainerInfo={data.trainerInfo} />
+        <TrainerStatsGrid stats={data.todaysStats} />
+        <TrainerPendingTasksCard
+          tasks={data.pendingTasks}
+          onToggleTask={togglePendingTask}
         />
-      }
-      showsVerticalScrollIndicator={false}
-    >
-      <TrainerWelcomeCard trainerInfo={data.trainerInfo} />
-      <TrainerStatsGrid stats={data.todaysStats} />
-      <TrainerPendingTasksCard
-        tasks={data.pendingTasks}
-        onToggleTask={togglePendingTask}
-      />
-      <TrainerTodayScheduleCard 
-        sessions={data.todaySessions} 
-        onStartSession={(session) => startSession(session.id)}
-        onFinishSession={(session) => finishSession(session.id)}
-      />
-      <TrainerQuickActions />
-    </ScrollView>
+        <TrainerTodayScheduleCard
+          sessions={data.todaySessions}
+          onStartSession={(session) => startSession(session.id)}
+          onFinishSession={(session) => finishSession(session.id)}
+        />
+        <TrainerQuickActions />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: BrandColors.screenBackground,
+  },
+  container: {
+    flex: 1,
   },
   content: {
     padding: Spacing.four,

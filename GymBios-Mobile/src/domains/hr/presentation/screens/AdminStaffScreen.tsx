@@ -5,7 +5,7 @@ import { FlatList, StyleSheet, View, ScrollView, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/core/hooks';
-import { BottomTabInset, Radius, Spacing } from '@/core/theme';
+import { Radius, Spacing } from '@/core/theme';
 
 import { EmptyState } from '@/shared/components/EmptyState';
 import { Pagination } from '@/shared/components/Pagination';

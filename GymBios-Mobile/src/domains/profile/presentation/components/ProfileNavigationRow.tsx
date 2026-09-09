@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { GlassSurface } from '@/shared/components';
 
 interface ProfileNavigationRowProps {
   icon: keyof typeof Feather.glyphMap;
@@ -24,58 +25,53 @@ export function ProfileNavigationRow({
 }: ProfileNavigationRowProps) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      style={({ pressed }) => [styles.pressable, pressed && styles.rowPressed]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={title}
     >
-      <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
-        <Feather name={icon} size={20} color={iconColor} />
-      </View>
-
-      <View style={styles.textContainer}>
-        <Typography variant="body" style={styles.title}>
-          {title}
-        </Typography>
-        {subtitle && (
-          <Typography variant="caption" color="textSecondary" style={styles.subtitle}>
-            {subtitle}
-          </Typography>
-        )}
-      </View>
-
-      {badge && (
-        <View style={styles.badge}>
-          <Typography variant="caption" style={styles.badgeText}>
-            {badge}
-          </Typography>
+      <GlassSurface radius={Radius.lg} style={styles.row}>
+        <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
+          <Feather name={icon} size={20} color={iconColor} />
         </View>
-      )}
 
-      <Feather name="chevron-right" size={20} color="#94a3b8" />
+        <View style={styles.textContainer}>
+          <Typography variant="body" style={styles.title}>
+            {title}
+          </Typography>
+          {subtitle && (
+            <Typography variant="caption" color="textSecondary" style={styles.subtitle}>
+              {subtitle}
+            </Typography>
+          )}
+        </View>
+
+        {badge && (
+          <View style={styles.badge}>
+            <Typography variant="caption" style={styles.badgeText}>
+              {badge}
+            </Typography>
+          </View>
+        )}
+
+        <Feather name="chevron-right" size={20} color="#94a3b8" />
+      </GlassSurface>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  pressable: {
+    marginBottom: Spacing.two,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.three,
-    borderRadius: Radius.lg,
-    marginBottom: Spacing.two,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
   },
   rowPressed: {
-    backgroundColor: '#f8fafc',
+    opacity: 0.9,
     transform: [{ scale: 0.985 }],
   },
   iconContainer: {

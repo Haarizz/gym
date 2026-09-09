@@ -2,6 +2,7 @@ import { StyleSheet, Switch, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { GlassSurface } from '@/shared/components';
 import type { LinkedAccount } from '../../domain';
 
 interface SettingSwitchRowProps {
@@ -81,7 +82,7 @@ interface SettingsCardProps {
 
 export function SettingsCard({ title, icon, children }: SettingsCardProps) {
   return (
-    <View style={styles.card}>
+    <GlassSurface radius={Radius.lg} style={styles.card}>
       <View style={styles.cardHeader}>
         <Feather name={icon} size={18} color={BrandColors.teal} style={styles.cardHeaderIcon} />
         <Typography variant="subtitle" style={styles.cardTitle}>
@@ -89,23 +90,14 @@ export function SettingsCard({ title, icon, children }: SettingsCardProps) {
         </Typography>
       </View>
       <View style={styles.cardContent}>{children}</View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
     marginBottom: Spacing.three,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
   },
   cardHeader: {
     flexDirection: 'row',

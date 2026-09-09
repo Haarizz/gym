@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { TrainerTodaySession } from '../../domain/TrainerDashboardData';
 
 interface TrainerTodayScheduleCardProps {
@@ -30,7 +31,7 @@ export function TrainerTodayScheduleCard({
   };
 
   return (
-    <View style={styles.container}>
+    <GlassSurface radius={Radius.lg} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Today's Schedule</Text>
         <Pressable onPress={handleViewAll} hitSlop={8}>
@@ -114,20 +115,13 @@ export function TrainerTodayScheduleCard({
           );
         })}
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   header: {
     flexDirection: 'row',

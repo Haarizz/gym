@@ -3,6 +3,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Avatar } from '@/shared/components/Avatar';
 import { Typography } from '@/shared/components/Typography';
+import { GlassSurface } from '@/shared/components';
 import type { Profile, ProfileSummary } from '../../domain';
 
 interface ProfileSummaryCardProps {
@@ -63,7 +64,7 @@ export function ProfileSummaryCard({
       </View>
 
       {/* Three Summary Metrics */}
-      <View style={styles.metricsContainer}>
+      <GlassSurface radius={Radius.lg} style={styles.metricsContainer}>
         <View style={styles.metricBox}>
           <Typography variant="caption" style={styles.metricLabel}>
             Performance
@@ -94,7 +95,7 @@ export function ProfileSummaryCard({
             {attendanceRate}%
           </Typography>
         </View>
-      </View>
+      </GlassSurface>
     </View>
   );
 }
@@ -158,17 +159,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.two,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   metricBox: {
     flex: 1,

@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { BrandColors, Glass, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { MemberTodayScheduleItem } from '../../domain/MemberDashboardData';
 
 interface MemberTodayScheduleCardProps {
@@ -12,9 +13,9 @@ export function MemberTodayScheduleCard({ schedule }: MemberTodayScheduleCardPro
   const router = useRouter();
 
   return (
-    <View style={styles.card}>
+    <GlassSurface radius={18} style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Today&apos;s Schedule</Text>
+        <Text style={styles.headerTitle}>Today's Schedule</Text>
         <Pressable
           hitSlop={8}
           onPress={() => router.push('/(member)/bookings' as any)}
@@ -32,8 +33,9 @@ export function MemberTodayScheduleCard({ schedule }: MemberTodayScheduleCardPro
 
             return (
               <View key={item.id ?? index} style={styles.itemCard}>
+                {/* Time badge — amber glass */}
                 <View style={styles.timeBadge}>
-                  <Feather name="clock" size={12} color={BrandColors.trainerAmber} />
+                  <Feather name="clock" size={11} color="#C9821E" />
                   <Text style={styles.timeText}>{item.time}</Text>
                 </View>
 
@@ -72,7 +74,10 @@ export function MemberTodayScheduleCard({ schedule }: MemberTodayScheduleCardPro
         </View>
       ) : (
         <View style={styles.emptyState}>
-          <Feather name="calendar" size={24} color="#94A3B8" />
+          {/* Glass icon box matching reference .empty-icon */}
+          <View style={styles.emptyIconBox}>
+            <Feather name="calendar" size={20} color={BrandColors.textSecondary} />
+          </View>
           <Text style={styles.emptyText}>No classes booked for today</Text>
           <Pressable
             style={styles.bookNowButton}
@@ -82,22 +87,13 @@ export function MemberTodayScheduleCard({ schedule }: MemberTodayScheduleCardPro
           </Pressable>
         </View>
       )}
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   header: {
     flexDirection: 'row',
@@ -107,41 +103,47 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: TypographyScale.subtitle,
-    fontWeight: '700',
+    fontWeight: '800',
     color: BrandColors.textPrimary,
+    letterSpacing: -0.2,
   },
   viewAllText: {
     fontSize: TypographyScale.small,
-    fontWeight: '600',
-    color: BrandColors.memberGold,
+    fontWeight: '700',
+    color: '#C9821E',
   },
   list: {
-    gap: Spacing.three,
+    gap: Spacing.two + 2,
   },
+  // Item rows — white glass surface instead of plain #f9fafe
   itemCard: {
     flexDirection: 'row',
-    backgroundColor: BrandColors.screenBackground,
-    borderRadius: Radius.md,
+    backgroundColor: Glass.fill,
+    borderRadius: Radius.lg,
     padding: Spacing.three,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Glass.border,
     gap: Spacing.three,
+    overflow: 'hidden',
   },
+  // Amber glass time badge
   timeBadge: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: Radius.sm,
+    backgroundColor: 'rgba(242,187,61,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(242,187,61,0.4)',
+    borderRadius: Radius.md,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.two,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-start',
-    gap: 2,
-    minWidth: 70,
+    gap: 3,
+    minWidth: 68,
   },
   timeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: BrandColors.trainerAmber,
+    color: '#C9821E',
     marginTop: 2,
     textAlign: 'center',
   },
@@ -152,10 +154,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: BrandColors.textPrimary,
+    letterSpacing: -0.1,
   },
   trainerName: {
     fontSize: TypographyScale.small,
     color: BrandColors.textSecondary,
+    fontWeight: '500',
     marginTop: 2,
   },
   itemFooter: {
@@ -166,14 +170,18 @@ const styles = StyleSheet.create({
   },
   spotBadge: {
     paddingHorizontal: Spacing.two,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: Radius.full,
   },
   spotBadgeAvailable: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: 'rgba(21,128,61,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(21,128,61,0.28)',
   },
   spotBadgeFull: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'rgba(185,28,28,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(185,28,28,0.25)',
   },
   spotBadgeText: {
     fontSize: 10,
@@ -187,29 +195,43 @@ const styles = StyleSheet.create({
   },
   detailsText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: BrandColors.memberGold,
+    fontWeight: '700',
+    color: '#C9821E',
   },
+  // Empty state
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.five,
     gap: Spacing.two,
   },
+  // Glass icon box — matching reference .empty-icon
+  emptyIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: Glass.fill,
+    borderWidth: 1,
+    borderColor: Glass.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.two,
+  },
   emptyText: {
     fontSize: TypographyScale.body,
+    fontWeight: '600',
     color: BrandColors.textSecondary,
   },
   bookNowButton: {
     marginTop: Spacing.two,
     paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.two + 2,
     backgroundColor: BrandColors.memberGold,
     borderRadius: Radius.full,
   },
   bookNowText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#4a3200',
   },
 });

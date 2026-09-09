@@ -102,8 +102,32 @@ export const Radius = {
   full: 9999,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+// Liquid-glass panel recipe: translucent white fill + soft white border +
+// navy-tinted shadow. Used by GlassSurface/GlassBlob and the 'glass' Input
+// variant. Colour behind these fills (a gradient or a GlassBlob) is what
+// makes them read as "glass" rather than flat grey — see gymbios-liquid-glass.html.
+export const Glass = {
+  fill: 'rgba(255,255,255,0.45)',
+  fillStrong: 'rgba(255,255,255,0.68)',
+  border: 'rgba(255,255,255,0.65)',
+  highlight: 'rgba(255,255,255,0.5)',
+  shadowColor: 'rgba(30,42,58,0.16)',
+} as const;
+
+// A "solid" hero card in the reference (active plan, check-in) is still
+// ~72-88% opaque, not fully opaque — enough that the GlassBlob behind it
+// still bleeds through at the edges so it keeps reading as glass rather
+// than a flat opaque card. Use this instead of a bare hex backgroundColor
+// on any hero/CTA card that sits over a GlassBlob-backed screen.
+export function heroTint(hex: string, alpha = 0.88): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 export const TypographyScale = {
   caption: 10,

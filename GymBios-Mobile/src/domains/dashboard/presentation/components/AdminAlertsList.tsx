@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { AdminAlertItem } from '../../domain/AdminDashboardData';
 
 interface AdminAlertsListProps {
@@ -15,12 +16,11 @@ export function AdminAlertsList({ alerts }: AdminAlertsListProps) {
       {alerts.map((alert, idx) => {
         const isUrgent = alert.urgent;
         return (
-          <View
+          <GlassSurface
             key={idx}
-            style={[
-              styles.alertCard,
-              isUrgent ? styles.alertCardUrgent : styles.alertCardNormal,
-            ]}
+            tint={isUrgent ? '#DC2626' : '#D97706'}
+            radius={Radius.md}
+            style={styles.alertCard}
           >
             <Feather
               name="bell"
@@ -35,7 +35,7 @@ export function AdminAlertsList({ alerts }: AdminAlertsListProps) {
             >
               {alert.text}
             </Text>
-          </View>
+          </GlassSurface>
         );
       })}
     </View>
@@ -50,17 +50,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.three,
-    borderRadius: Radius.md,
-    borderWidth: 1,
     gap: Spacing.two,
-  },
-  alertCardUrgent: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-  },
-  alertCardNormal: {
-    backgroundColor: '#FEFCE8',
-    borderColor: '#FEF08A',
   },
   alertText: {
     fontSize: 13,

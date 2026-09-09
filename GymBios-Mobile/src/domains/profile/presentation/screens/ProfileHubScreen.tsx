@@ -14,6 +14,7 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { ConfirmationModal } from '@/shared/components/ConfirmationModal';
+import { GlassBlob, GlassSurface } from '@/shared/components';
 import { useRestoreSession } from '@/domains/auth';
 
 import { useProfile } from '../../hooks/useProfile';
@@ -105,6 +106,9 @@ export function ProfileHubScreen({
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
       <View style={styles.container}>
+        <GlassBlob color={BrandColors.teal} size={340} opacity={0.36} top={-90} right={-60} />
+        <GlassBlob color={BrandColors.memberGold} size={300} opacity={0.28} top={340} left={-70} />
+        <GlassBlob color={BrandColors.teal} size={240} opacity={0.2} top={760} right={-70} />
         <ProfileHubHeader onClose={onClose} />
 
         <ScrollView
@@ -171,24 +175,26 @@ export function ProfileHubScreen({
           {/* Distinct Logout Button */}
           <View style={styles.logoutContainer}>
             <Pressable
-              style={({ pressed }) => [
-                styles.logoutButton,
-                pressed && styles.logoutButtonPressed,
-                isLoggingOut && styles.logoutButtonDisabled,
-              ]}
+              style={({ pressed }) => [pressed && styles.logoutPressed]}
               onPress={() => setLogoutModalVisible(true)}
               disabled={isLoggingOut}
               accessibilityRole="button"
               accessibilityLabel="Log out"
             >
-              {isLoggingOut ? (
-                <ActivityIndicator size="small" color="#ef4444" style={styles.logoutIcon} />
-              ) : (
-                <Feather name="log-out" size={18} color="#ef4444" style={styles.logoutIcon} />
-              )}
-              <Typography variant="body" style={styles.logoutText}>
-                {isLoggingOut ? 'Logging out...' : 'Log out'}
-              </Typography>
+              <GlassSurface
+                tint="#ef4444"
+                radius={Radius.lg}
+                style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
+              >
+                {isLoggingOut ? (
+                  <ActivityIndicator size="small" color="#ef4444" style={styles.logoutIcon} />
+                ) : (
+                  <Feather name="log-out" size={18} color="#ef4444" style={styles.logoutIcon} />
+                )}
+                <Typography variant="body" style={styles.logoutText}>
+                  {isLoggingOut ? 'Logging out...' : 'Log out'}
+                </Typography>
+              </GlassSurface>
             </Pressable>
           </View>
         </ScrollView>
@@ -250,11 +256,11 @@ export function ProfileHubScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: BrandColors.screenBackground,
   },
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: BrandColors.screenBackground,
   },
   scrollContent: {
     paddingHorizontal: Spacing.four,
@@ -272,13 +278,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.three,
-    borderRadius: Radius.lg,
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fee2e2',
   },
-  logoutButtonPressed: {
-    backgroundColor: '#fee2e2',
+  logoutPressed: {
+    opacity: 0.85,
     transform: [{ scale: 0.985 }],
   },
   logoutButtonDisabled: {

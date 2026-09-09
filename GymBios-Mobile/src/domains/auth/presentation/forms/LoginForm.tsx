@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { z } from 'zod';
 
 import { Spacing } from '@/core/theme';
-import { Button, Input, Typography } from '@/shared/components';
+import { Button, GlassSurface, Input, Typography } from '@/shared/components';
 
 import type { RoleLoginConfig } from '../config/roleConfig';
 
@@ -36,12 +36,12 @@ export function LoginForm({ config, onSubmit, loading = false, errorMessage }: L
   });
 
   return (
-    <View style={styles.card}>
+    <GlassSurface strong radius={24} style={styles.card}>
       <View style={styles.header}>
         <View
           style={[
             styles.roleBadge,
-            { backgroundColor: `${config.accentColor}18` },
+            { backgroundColor: `${config.accentColor}22`, borderColor: `${config.accentColor}40` },
           ]}
         >
           <Typography
@@ -70,7 +70,7 @@ export function LoginForm({ config, onSubmit, loading = false, errorMessage }: L
           name="username"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              variant="auth"
+              variant="glass"
               label="Username"
               placeholder="Enter your username"
               autoCapitalize="none"
@@ -90,7 +90,7 @@ export function LoginForm({ config, onSubmit, loading = false, errorMessage }: L
           name="password"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              variant="auth"
+              variant="glass"
               label="Password"
               placeholder="Enter your password"
               secureTextEntry
@@ -120,27 +120,19 @@ export function LoginForm({ config, onSubmit, loading = false, errorMessage }: L
         onPress={handleSubmit(onSubmit)}
         style={styles.button}
       />
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
     paddingHorizontal: 28,
     paddingVertical: 32,
-    // iOS shadow
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.10,
-    shadowRadius: 24,
-    // Android elevation
-    elevation: 8,
     gap: 0,
   },
   roleBadge: {
     borderRadius: 999,
+    borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 5,
     marginBottom: 20,

@@ -7,9 +7,9 @@ import {
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
-import { BottomTabInset, BrandColors, Radius, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
 
 import { useAttendanceStats } from '../../hooks/useAttendance';
@@ -35,6 +35,7 @@ interface WeeklyTrendsScreenProps {
  * for easy scanning on a small screen.
  */
 export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
+  const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { stats, loading, error, refresh } = useAttendanceStats();
 
   const handleRefresh = useCallback(() => {
@@ -53,7 +54,7 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
           onBack={onBack}
         />
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
           showsVerticalScrollIndicator={false}
         >
           <AttendanceSkeleton variant="overview" count={4} />
@@ -74,7 +75,7 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
           onBack={onBack}
         />
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -126,7 +127,7 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
       />
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -219,7 +220,6 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.three,
     gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.six,
   },
   card: {
     backgroundColor: BrandColors.white,

@@ -1,6 +1,6 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { BrandColors, Spacing } from '@/core/theme';
-import { Loader } from '@/shared/components';
+import { GlassBlob, Loader } from '@/shared/components';
 import { useStaffDashboard } from '../../hooks/useStaffDashboard';
 import { StaffWelcomeCard } from '../components/StaffWelcomeCard';
 import { StaffStatsGrid } from '../components/StaffStatsGrid';
@@ -21,33 +21,40 @@ export function StaffDashboardScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={() => refetch()}
-          tintColor={BrandColors.teal}
-          colors={[BrandColors.teal]}
-        />
-      }
-      showsVerticalScrollIndicator={false}
-    >
-      <StaffWelcomeCard staffInfo={data.staffInfo} />
-      <StaffStatsGrid stats={data.todaysStats} />
-      <StaffQuickActions />
-      <StaffUrgentFollowUpsCard followUps={data.urgentFollowUps} />
-      <StaffRecentConversionsCard conversions={data.recentConversions} />
-      <StaffMonthSummaryCard summary={data.monthlySummary} />
-    </ScrollView>
+    <View style={styles.root}>
+      <GlassBlob color={BrandColors.teal} size={260} opacity={0.22} top={-70} right={-80} />
+      <GlassBlob color={BrandColors.tealDark} size={220} opacity={0.18} top={420} left={-90} />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => refetch()}
+            tintColor={BrandColors.teal}
+            colors={[BrandColors.teal]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <StaffWelcomeCard staffInfo={data.staffInfo} />
+        <StaffStatsGrid stats={data.todaysStats} />
+        <StaffQuickActions />
+        <StaffUrgentFollowUpsCard followUps={data.urgentFollowUps} />
+        <StaffRecentConversionsCard conversions={data.recentConversions} />
+        <StaffMonthSummaryCard summary={data.monthlySummary} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: BrandColors.screenBackground,
+  },
+  container: {
+    flex: 1,
   },
   content: {
     padding: Spacing.four,

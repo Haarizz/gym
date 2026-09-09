@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Spacing } from '@/core/theme';
-import { Typography } from '@/shared/components';
+import { GlassBlob, Typography } from '@/shared/components';
 
 import { ROLE_LOGIN_CONFIG } from '../config/roleConfig';
 import { LoginForm } from '../forms/LoginForm';
@@ -43,6 +43,8 @@ export function RoleLoginScreen({ role, useLogin }: RoleLoginScreenProps) {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      <GlassBlob color={config.accentColor} size={280} opacity={0.3} top={-90} left={-70} />
+      <GlassBlob color={BrandColors.teal} size={240} opacity={0.22} bottom={40} right={-80} />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <KeyboardAvoidingView

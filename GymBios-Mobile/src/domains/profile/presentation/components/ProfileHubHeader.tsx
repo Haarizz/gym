@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
-import { BrandColors, Spacing } from '@/core/theme';
+import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 
 interface ProfileHubHeaderProps {
@@ -9,16 +9,29 @@ interface ProfileHubHeaderProps {
 }
 
 export function ProfileHubHeader({ title, onClose }: ProfileHubHeaderProps) {
+  if (!title) {
+    // No title — just float the close button absolutely, zero-height row
+    return (
+      <View style={styles.closeBtnOnly}>
+        <Pressable
+          hitSlop={14}
+          onPress={onClose}
+          style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Close profile hub"
+        >
+          <Feather name="x" size={20} color={BrandColors.textPrimary} />
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.header}>
       <View style={styles.titleContainer}>
-        {title ? (
-          <Typography variant="subtitle" style={styles.title}>
-            {title}
-          </Typography>
-        ) : (
-          <View style={styles.placeholder} />
-        )}
+        <Typography variant="subtitle" style={styles.title}>
+          {title}
+        </Typography>
       </View>
       <Pressable
         hitSlop={14}
@@ -27,21 +40,22 @@ export function ProfileHubHeader({ title, onClose }: ProfileHubHeaderProps) {
         accessibilityRole="button"
         accessibilityLabel="Close profile hub"
       >
-        <Feather name="x" size={22} color={BrandColors.textPrimary} />
+        <Feather name="x" size={20} color={BrandColors.textPrimary} />
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // When there IS a title — full-width row
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.two,
+    paddingTop: Spacing.three,
     paddingBottom: Spacing.two,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'transparent',
   },
   titleContainer: {
     flex: 1,
@@ -51,19 +65,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: BrandColors.textPrimary,
   },
-  placeholder: {
-    width: 24,
+  // When there is NO title — just the close button aligned to top-right
+  closeBtnOnly: {
+    alignItems: 'flex-end',
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
+    backgroundColor: 'transparent',
   },
   closeButton: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f1f5f9',
+    borderRadius: Radius.full,
+    backgroundColor: Glass.fill,
+    borderWidth: 1,
+    borderColor: Glass.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonPressed: {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: Glass.fillStrong,
     transform: [{ scale: 0.94 }],
   },
 });

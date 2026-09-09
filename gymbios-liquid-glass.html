@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GymBios — Liquid Glass Reference</title>
+<style>
+  :root{
+    --gold: #F2BB3D;
+    --gold-deep: #E5A521;
+    --green: #1B5A4C;
+    --green-deep: #123F35;
+    --navy: #1E2A3A;
+    --slate: #5B6472;
+    --bg: #EEF1F5;
+    --orange: #F2994A;
+    --purple: #8E6FF0;
+    --white: #ffffff;
+
+    --glass-fill: rgba(255,255,255,0.42);
+    --glass-fill-strong: rgba(255,255,255,0.6);
+    --glass-border: rgba(255,255,255,0.65);
+    --glass-shadow: 0 8px 32px rgba(30,42,58,0.14);
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    font-family: 'SF Pro Display','Segoe UI',system-ui,-apple-system,sans-serif;
+    background: var(--bg);
+    color: var(--navy);
+  }
+
+  .intro{
+    max-width: 900px;
+    margin: 48px auto 32px;
+    padding: 0 24px;
+  }
+  .intro h1{
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  .intro p{
+    color: var(--slate);
+    line-height: 1.55;
+    font-size: 15px;
+    max-width: 640px;
+  }
+  .swatches{
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+  }
+  .swatch{
+    width:38px; height:38px; border-radius:10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    border: 2px solid white;
+  }
+
+  .stage{
+    display:flex;
+    flex-wrap: wrap;
+    gap: 40px;
+    justify-content:center;
+    padding: 0 24px 80px;
+  }
+
+  .phone-block{ text-align:center; }
+  .phone-label{
+    font-size:13px;
+    color: var(--slate);
+    margin-bottom:14px;
+    font-weight:600;
+    letter-spacing: 0.01em;
+  }
+
+  .phone{
+    width: 340px;
+    height: 700px;
+    border-radius: 44px;
+    padding: 12px;
+    background: linear-gradient(160deg, #2b2f36, #14161a);
+    box-shadow: 0 30px 60px rgba(20,25,35,0.35), inset 0 0 0 1px rgba(255,255,255,0.06);
+    position: relative;
+  }
+  .screen{
+    position:relative;
+    width:100%;
+    height:100%;
+    border-radius: 34px;
+    overflow:hidden;
+    background: var(--bg);
+  }
+
+  /* Ambient color blobs that the glass panels blur against — this is what
+     makes the frosted panels actually read as "glass" rather than flat white */
+  .blob{
+    position:absolute;
+    border-radius:50%;
+    filter: blur(10px);
+    opacity: 0.9;
+    z-index:0;
+  }
+  .blob-gold{
+    width:260px; height:260px;
+    background: radial-gradient(circle at 30% 30%, var(--gold), rgba(242,187,61,0));
+    top:-90px; left:-60px;
+  }
+  .blob-green{
+    width:280px; height:280px;
+    background: radial-gradient(circle at 60% 60%, var(--green), rgba(27,90,76,0));
+    bottom:60px; right:-100px;
+    opacity: 0.55;
+  }
+  .blob-orange{
+    width:180px; height:180px;
+    background: radial-gradient(circle, var(--orange), rgba(242,153,74,0));
+    top:280px; left:-70px;
+    opacity:0.35;
+  }
+  .blob-purple{
+    width:200px; height:200px;
+    background: radial-gradient(circle, var(--purple), rgba(142,111,240,0));
+    bottom:220px; left:120px;
+    opacity:0.3;
+  }
+
+  .content{
+    position:relative;
+    z-index:2;
+    height:100%;
+    overflow-y:auto;
+    padding: 20px 16px 100px;
+    -ms-overflow-style: none;
+    scrollbar-width:none;
+  }
+  .content::-webkit-scrollbar{ display:none; }
+
+  .status-dot-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:11px;
+    color: var(--navy);
+    padding: 6px 6px 12px;
+    font-weight:600;
+    opacity:0.7;
+  }
+
+  /* ---------- Glass primitives ---------- */
+  .glass{
+    background: var(--glass-fill);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    border-radius: 22px;
+    box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .glass-strong{
+    background: var(--glass-fill-strong);
+  }
+
+  /* Header */
+  .header{
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:relative;
+  }
+  .header::before{
+    content:"";
+    position:absolute; inset:0;
+    border-radius: 22px;
+    background: linear-gradient(120deg, rgba(242,187,61,0.55), rgba(255,255,255,0.25));
+    z-index:-1;
+  }
+  .header-left{ display:flex; align-items:center; gap:12px; }
+  .avatar{
+    width:42px; height:42px; border-radius:14px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.9), rgba(255,255,255,0.4));
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; color: var(--gold-deep);
+    border: 1px solid rgba(255,255,255,0.8);
+    font-size:16px;
+  }
+  .greet-sub{ font-size:12px; color: rgba(30,42,58,0.65); font-weight:500; }
+  .greet-main{ font-size:16px; font-weight:700; color: var(--navy); }
+  .icon-btn{
+    width:38px; height:38px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.7);
+    backdrop-filter: blur(10px);
+    font-size:16px;
+  }
+
+  /* Stat row */
+  .stat-row{ display:flex; gap:10px; margin-bottom:16px; }
+  .stat-card{
+    flex:1;
+    padding: 14px 10px;
+    text-align:center;
+  }
+  .stat-label{ font-size:11.5px; color: var(--slate); margin-bottom:6px; font-weight:600;}
+  .stat-value{ font-size:20px; font-weight:800; }
+  .v-gold{ color: var(--gold-deep); }
+  .v-green{ color: var(--green); }
+
+  /* CTA */
+  .cta{
+    padding: 16px;
+    text-align:center;
+    font-weight:700;
+    font-size:15px;
+    color: #4a3200;
+    margin-bottom: 18px;
+    background: linear-gradient(135deg, rgba(255,214,110,0.85), rgba(242,187,61,0.65));
+    border: 1px solid rgba(255,255,255,0.8);
+    box-shadow: 0 10px 24px rgba(229,165,33,0.35), inset 0 1px 0 rgba(255,255,255,0.7);
+    position: relative;
+    overflow:hidden;
+  }
+  .cta::after{
+    content:"";
+    position:absolute;
+    top:-40%; left:-20%;
+    width:60%; height:180%;
+    background: linear-gradient(120deg, rgba(255,255,255,0.55), rgba(255,255,255,0));
+    transform: rotate(20deg);
+  }
+
+  /* Section card */
+  .section{
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .section-title{
+    font-size:15px;
+    font-weight:800;
+    margin-bottom:14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .section-title span.link{
+    font-size:12.5px;
+    color: var(--gold-deep);
+    font-weight:700;
+  }
+  .empty-state{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: 30px 10px 20px;
+    color: var(--slate);
+  }
+  .empty-icon{
+    width:44px; height:44px;
+    border-radius:14px;
+    background: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.7);
+    display:flex; align-items:center; justify-content:center;
+    margin-bottom:12px;
+    font-size:18px;
+  }
+  .empty-state p{ margin:0; font-size:13.5px; font-weight:600; }
+
+  /* Membership card (green glass) */
+  .plan-card{
+    padding: 20px;
+    margin-bottom: 16px;
+    position:relative;
+    overflow:hidden;
+    background: linear-gradient(150deg, rgba(27,90,76,0.72), rgba(18,63,53,0.55));
+    border: 1px solid rgba(255,255,255,0.35);
+    color: white;
+  }
+  .plan-card::before{
+    content:"";
+    position:absolute; top:-60px; right:-40px;
+    width:160px; height:160px; border-radius:50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.25), rgba(255,255,255,0));
+  }
+  .plan-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;}
+  .plan-label{ font-size:12px; opacity:0.8; }
+  .plan-name{ font-size:21px; font-weight:800; margin: 2px 0 2px;}
+  .plan-price{ font-size:12.5px; opacity:0.85; margin-bottom:14px;}
+  .active-pill{
+    background: rgba(255,255,255,0.22);
+    border: 1px solid rgba(255,255,255,0.5);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size:11px;
+    font-weight:700;
+    backdrop-filter: blur(6px);
+  }
+  .progress-track{
+    height:6px; border-radius:999px;
+    background: rgba(255,255,255,0.25);
+    margin: 6px 0 12px;
+    overflow:hidden;
+  }
+  .progress-fill{
+    height:100%; width:78%;
+    background: rgba(255,255,255,0.9);
+    border-radius:999px;
+  }
+  .plan-meta{ display:flex; justify-content:space-between; font-size:11.5px; opacity:0.9;}
+  .plan-meta b{ display:block; font-size:13px; margin-top:2px;}
+
+  .btn-row{ display:flex; gap:10px; margin-bottom:16px; }
+  .glass-btn{
+    flex:1;
+    padding: 13px;
+    text-align:center;
+    font-weight:700;
+    font-size:13.5px;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn-gold-text{ color:var(--gold-deep); border-color: rgba(242,187,61,0.55); }
+  .btn-orange-text{ color:var(--orange); border-color: rgba(242,153,74,0.5); }
+
+  .tabs{ display:flex; gap:8px; margin-bottom:16px; }
+  .tab{
+    flex:1;
+    padding:10px;
+    text-align:center;
+    font-size:12.5px;
+    font-weight:700;
+    color: var(--slate);
+    border-radius:14px;
+  }
+  .tab.active{
+    background: rgba(255,255,255,0.65);
+    color: var(--navy);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  }
+  .benefit-row{
+    display:flex; align-items:center; gap:10px;
+    padding: 10px 4px;
+    font-size:13.5px;
+    font-weight:600;
+  }
+  .check{
+    width:20px; height:20px; border-radius:50%;
+    background: rgba(27,90,76,0.15);
+    color: var(--green);
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px;
+  }
+
+  .info-banner{
+    padding:14px;
+    display:flex; gap:10px; align-items:flex-start;
+    background: rgba(120,170,255,0.18);
+    border-color: rgba(120,170,255,0.4);
+  }
+  .info-banner .dot{
+    width:26px;height:26px;border-radius:8px;
+    background: rgba(120,170,255,0.35);
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px; flex-shrink:0;
+  }
+  .info-banner b{ display:block; font-size:13px; color:#2451A6; margin-bottom:2px;}
+  .info-banner span{ font-size:12px; color: #3E5C93; }
+
+  /* Bottom nav */
+  .tabbar{
+    position:absolute;
+    left:12px; right:12px; bottom:14px;
+    padding: 10px 8px;
+    display:flex;
+    justify-content:space-around;
+    z-index:5;
+    background: rgba(255,255,255,0.55);
+  }
+  .tabbar-item{
+    display:flex; align-items:center; justify-content:center;
+    color: var(--slate);
+    padding: 12px 16px;
+    border-radius:14px;
+  }
+  .tabbar-item svg{ width:22px; height:22px; display:block; }
+  .tabbar-item.active{
+    color: var(--gold-deep);
+    background: rgba(242,187,61,0.22);
+  }
+
+  /* Home welcome card */
+  .welcome-card{
+    padding:16px 18px;
+    margin-bottom:16px;
+  }
+  .welcome-card h3{ margin:0 0 4px; font-size:16px; }
+  .welcome-card p{ margin:0; font-size:12.5px; color: var(--slate); font-weight:500;}
+
+  .membership-hero{
+    padding: 18px;
+    margin-bottom: 14px;
+    background: linear-gradient(135deg, rgba(255,214,110,0.75), rgba(242,187,61,0.5));
+    border: 1px solid rgba(255,255,255,0.7);
+    color: #4a3200;
+  }
+  .membership-hero .plan-top{ margin-bottom:2px; }
+  .membership-hero .plan-label{ color: rgba(74,50,0,0.75); }
+  .membership-hero .plan-name{ color:#4a3200; }
+  .membership-hero .plan-price{ color: rgba(74,50,0,0.75); display:none;}
+  .hero-days{ font-size:30px; font-weight:800; }
+  .hero-row{ display:flex; justify-content:space-between; align-items:flex-end; margin-top:10px;}
+  .hero-row div span{ display:block; font-size:11px; opacity:0.75; }
+
+  .checkin-glass{
+    padding:16px 18px;
+    margin-bottom:16px;
+    display:flex; align-items:center; justify-content:space-between;
+    background: linear-gradient(120deg, rgba(27,90,76,0.75), rgba(18,63,53,0.55));
+    color:white;
+    border: 1px solid rgba(255,255,255,0.35);
+  }
+  .checkin-left{ display:flex; align-items:center; gap:12px; }
+  .checkin-ic{
+    width:38px;height:38px;border-radius:12px;
+    background: rgba(255,255,255,0.18);
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;
+  }
+  .checkin-left b{ display:block; font-size:14.5px; }
+  .checkin-left span{ font-size:11.5px; opacity:0.85; }
+
+  .mini-stats{ display:flex; gap:10px; margin-bottom:16px; }
+  .mini-card{ flex:1; padding:14px 8px; text-align:center; }
+  .mini-ic{
+    width:32px; height:32px; border-radius:10px;
+    margin: 0 auto 8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; color:white;
+  }
+  .ic-green{ background: var(--green); }
+  .ic-gold{ background: var(--gold-deep); }
+  .ic-purple{ background: var(--purple); }
+
+  footer.notes{
+    max-width: 900px;
+    margin: 0 auto 80px;
+    padding: 0 24px;
+  }
+  footer.notes h2{ font-size:18px; margin-bottom:10px;}
+  footer.notes ul{ color: var(--slate); font-size:14px; line-height:1.7; padding-left:20px;}
+  footer.notes code{
+    background: rgba(0,0,0,0.06);
+    padding: 1px 6px;
+    border-radius:6px;
+    font-size:12.5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Liquid glass direction for GymBios</h1>
+  <p>Same gold + deep‑green palette, rebuilt as layered frosted panels over soft
+  colour blobs. The blur only reads as "glass" because there's colour underneath
+  it to refract — flat white backgrounds won't produce this effect in the real app,
+  so keep a subtle gradient or image behind any glass surface.</p>
+  <div class="swatches">
+    <div class="swatch" style="background:#F2BB3D"></div>
+    <div class="swatch" style="background:#1B5A4C"></div>
+    <div class="swatch" style="background:#1E2A3A"></div>
+    <div class="swatch" style="background:#F2994A"></div>
+    <div class="swatch" style="background:#8E6FF0"></div>
+    <div class="swatch" style="background:#EEF1F5"></div>
+  </div>
+</div>
+
+<div class="stage">
+
+  <!-- SCREEN 1: HOME / BOOKINGS empty state -->
+  <div class="phone-block">
+    <div class="phone-label">Bookings — empty state</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="blob blob-gold"></div>
+        <div class="blob blob-green"></div>
+        <div class="blob blob-orange"></div>
+        <div class="content">
+          <div class="status-dot-row"><span>10:01</span><span>●●● 35%</span></div>
+
+          <div class="header glass">
+            <div class="header-left">
+              <div class="avatar">N</div>
+              <div>
+                <div class="greet-sub">Good Morning</div>
+                <div class="greet-main">Nandana · Branch 1</div>
+              </div>
+            </div>
+            <div class="icon-btn">⚙</div>
+          </div>
+
+          <div class="stat-row">
+            <div class="stat-card glass">
+              <div class="stat-label">Upcoming</div>
+              <div class="stat-value v-gold">0</div>
+            </div>
+            <div class="stat-card glass">
+              <div class="stat-label">This Week</div>
+              <div class="stat-value v-green">0</div>
+            </div>
+            <div class="stat-card glass">
+              <div class="stat-label">Attended</div>
+              <div class="stat-value v-gold">0</div>
+            </div>
+          </div>
+
+          <div class="cta">+ Book a New Class</div>
+
+          <div class="section glass">
+            <div class="section-title">Upcoming Classes</div>
+            <div class="empty-state">
+              <div class="empty-icon">🗓</div>
+              <p>No upcoming classes booked</p>
+            </div>
+          </div>
+
+          <div class="section glass">
+            <div class="section-title">Past Classes</div>
+            <div class="empty-state">
+              <div class="empty-icon">✓</div>
+              <p>No past classes</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar glass">
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg></div>
+          <div class="tabbar-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.7.5 4.5 2.4 4.5 4.8"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.2"/><path d="M2.5 9.5h19"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: HOME dashboard -->
+  <div class="phone-block">
+    <div class="phone-label">Home dashboard</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="blob blob-gold"></div>
+        <div class="blob blob-purple"></div>
+        <div class="blob blob-green" style="bottom:-40px;"></div>
+        <div class="content">
+          <div class="status-dot-row"><span>10:01</span><span>●●● 35%</span></div>
+
+          <div class="header glass">
+            <div class="header-left">
+              <div class="avatar">N</div>
+              <div>
+                <div class="greet-sub">Good Morning</div>
+                <div class="greet-main">Nandana · Branch 1</div>
+              </div>
+            </div>
+            <div class="icon-btn">⚙</div>
+          </div>
+
+          <div class="welcome-card glass">
+            <h3>Welcome back, Nandana 👋</h3>
+            <p>Ready to crush your goals today?</p>
+          </div>
+
+          <div class="membership-hero glass">
+            <div class="plan-top">
+              <div>
+                <div class="plan-label">Active Membership</div>
+                <div class="plan-name">Golden Premium</div>
+              </div>
+              <div class="active-pill" style="background:rgba(74,50,0,0.12); color:#4a3200; border-color:rgba(74,50,0,0.25);">ACTIVE</div>
+            </div>
+            <div class="hero-row">
+              <div>
+                <span>Days Remaining</span>
+                <b class="hero-days">120</b>
+              </div>
+              <div style="text-align:right;">
+                <span>Valid Until</span>
+                <b style="font-size:14px;">Jan 7, 2027</b>
+              </div>
+            </div>
+          </div>
+
+          <div class="checkin-glass glass">
+            <div class="checkin-left">
+              <div class="checkin-ic">▢</div>
+              <div>
+                <b>Check In Now</b>
+                <span>Gate access ready</span>
+              </div>
+            </div>
+            <span>›</span>
+          </div>
+
+          <div class="mini-stats">
+            <div class="mini-card glass">
+              <div class="mini-ic ic-green">✓</div>
+              <div class="stat-value" style="font-size:16px;">1</div>
+              <div class="stat-label">Check-ins</div>
+            </div>
+            <div class="mini-card glass">
+              <div class="mini-ic ic-gold">🗓</div>
+              <div class="stat-value" style="font-size:16px;">0</div>
+              <div class="stat-label">Classes</div>
+            </div>
+            <div class="mini-card glass">
+              <div class="mini-ic ic-purple">🏅</div>
+              <div class="stat-value" style="font-size:16px;">1</div>
+              <div class="stat-label">Streak</div>
+            </div>
+          </div>
+
+          <div class="section glass">
+            <div class="section-title">Today's Schedule <span class="link">View All</span></div>
+            <div class="empty-state" style="padding-top:6px;">
+              <p>Nothing scheduled — book a class to see it here.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar glass">
+          <div class="tabbar-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.7.5 4.5 2.4 4.5 4.8"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.2"/><path d="M2.5 9.5h19"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: MEMBERSHIP -->
+  <div class="phone-block">
+    <div class="phone-label">Membership</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="blob blob-green"></div>
+        <div class="blob blob-gold" style="top:200px; left:-100px;"></div>
+        <div class="content">
+          <div class="status-dot-row"><span>10:01</span><span>●●● 35%</span></div>
+
+          <div class="header glass">
+            <div class="header-left">
+              <div class="avatar">N</div>
+              <div>
+                <div class="greet-sub">Good Morning</div>
+                <div class="greet-main">Nandana · Branch 1</div>
+              </div>
+            </div>
+            <div class="icon-btn">⚙</div>
+          </div>
+
+          <div class="plan-card glass">
+            <div class="plan-top">
+              <div>
+                <div class="plan-label">Current Plan</div>
+                <div class="plan-name">Golden Premium</div>
+                <div class="plan-price">₹50 / 4 monthly</div>
+              </div>
+              <div class="active-pill">✓ ACTIVE</div>
+            </div>
+            <div style="font-size:11.5px; opacity:0.85; margin-top:6px;">Membership Progress <b style="float:right;">120 days left</b></div>
+            <div class="progress-track"><div class="progress-fill"></div></div>
+            <div class="plan-meta">
+              <div>Started<b>Sep 7, 2026</b></div>
+              <div>Auto Renew<b>OFF</b></div>
+              <div style="text-align:right;">Expires<b>Jan 7, 2027</b></div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <div class="glass-btn glass btn-gold-text">↻ Renew Now</div>
+            <div class="glass-btn glass btn-orange-text">⏸ Freeze</div>
+          </div>
+
+          <div class="tabs glass" style="padding:5px;">
+            <div class="tab active">Benefits</div>
+            <div class="tab">Payments</div>
+            <div class="tab">Add-ons</div>
+          </div>
+
+          <div class="section glass">
+            <div class="section-title">Your Plan Benefits</div>
+            <div class="benefit-row"><div class="check">✓</div>Plan Details</div>
+            <div class="benefit-row"><div class="check">✓</div>Unlimited Access</div>
+          </div>
+
+          <div class="section info-banner glass">
+            <div class="dot">⏸</div>
+            <div>
+              <b>Freeze Available</b>
+              <span>Your plan includes 30 freeze days.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar glass">
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.7.5 4.5 2.4 4.5 4.8"/></svg></div>
+          <div class="tabbar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></div>
+          <div class="tabbar-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.2"/><path d="M2.5 9.5h19"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="notes">
+  <h2>Implementation notes for React Native</h2>
+  <ul>
+    <li>Use <code>expo-blur</code>'s <code>&lt;BlurView intensity={40} tint="light"&gt;</code> for every glass panel — CSS <code>backdrop-filter</code> has no RN equivalent.</li>
+    <li>Glass only looks right with colour behind it: keep the gold/green radial blobs (or a subtle background image) behind scroll content, positioned absolutely under the ScrollView.</li>
+    <li>Panel style: ~40–60% white fill, 1px semi‑transparent white border, soft shadow with the brand colour tinted in at low opacity rather than plain black.</li>
+    <li>Keep solid colour (not glass) only on the two hero cards — active plan and check‑in — so the palette still reads clearly against the frosted neutrals.</li>
+    <li>Respect Reduce Transparency / low-end Android: fall back to solid <code>rgba(255,255,255,0.9)</code> cards when blur isn't available.</li>
+  </ul>
+</footer>
+
+</body>
+</html>

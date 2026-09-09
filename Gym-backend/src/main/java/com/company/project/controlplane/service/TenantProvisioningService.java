@@ -541,6 +541,17 @@ public class TenantProvisioningService {
                 ps.setObject(5, lng);
                 ps.executeUpdate();
             }
+
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE branches SET "
+                            + "address = COALESCE(?, address), lat = COALESCE(?, lat), lng = COALESCE(?, lng), "
+                            + "updated_at = now() WHERE is_default = true")) {
+                ps.setObject(1, address);
+                ps.setObject(2, lat);
+                ps.setObject(3, lng);
+                ps.executeUpdate();
+            }
+
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT id FROM branches WHERE is_default = true")) {
                 try (ResultSet rs = ps.executeQuery()) {

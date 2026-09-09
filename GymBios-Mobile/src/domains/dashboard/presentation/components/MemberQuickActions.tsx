@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { BrandColors, Glass, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 
 export function MemberQuickActions() {
   const router = useRouter();
@@ -10,80 +11,71 @@ export function MemberQuickActions() {
     {
       label: 'Book a Class',
       icon: 'calendar' as const,
-      color: BrandColors.memberGold,
-      bgColor: '#FEF3C7',
+      color: '#C9821E',        // dark amber — legible on glass
+      bgColor: BrandColors.memberGold,
       onPress: () => router.push('/(member)/bookings' as any),
     },
     {
       label: 'My Trainer',
       icon: 'user' as const,
-      color: BrandColors.teal,
-      bgColor: '#CCFBF1',
+      color: '#1B5A4C',        // deep teal
+      bgColor: BrandColors.teal,
       onPress: () => router.push('/(member)/trainer' as any),
     },
     {
       label: 'Membership',
       icon: 'credit-card' as const,
-      color: BrandColors.trainerAmber,
-      bgColor: '#FFEDD5',
+      color: '#b45309',        // warm amber
+      bgColor: '#F59E0B',
       onPress: () => router.push('/(member)/membership' as any),
     },
     {
       label: 'Find Centers',
       icon: 'map-pin' as const,
-      color: '#8B5CF6',
-      bgColor: '#EDE9FE',
+      color: '#6D28D9',        // violet
+      bgColor: '#8B5CF6',
       onPress: () => router.push('/(member)/centers' as any),
     },
   ];
 
   return (
-    <View style={styles.card}>
+    <GlassSurface radius={18} style={styles.card}>
       <Text style={styles.title}>Quick Actions</Text>
       <View style={styles.grid}>
         {actions.map((action, index) => (
           <Pressable
             key={index}
-            style={({ pressed }) => [
-              styles.actionButton,
-              { borderColor: action.color },
-              pressed && styles.pressed,
-            ]}
+            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
             onPress={action.onPress}
             accessibilityRole="button"
             accessibilityLabel={action.label}
           >
-            <View style={[styles.iconCircle, { backgroundColor: action.bgColor }]}>
-              <Feather name={action.icon} size={18} color={action.color} />
+            {/* Glass-frosted button face */}
+            <View style={styles.actionInner}>
+              <View style={[styles.iconCircle, { backgroundColor: action.bgColor }]}>
+                <Feather name={action.icon} size={16} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.actionLabel, { color: action.color }]}>
+                {action.label}
+              </Text>
             </View>
-            <Text style={[styles.actionLabel, { color: action.color }]}>
-              {action.label}
-            </Text>
           </Pressable>
         ))}
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   title: {
     fontSize: TypographyScale.subtitle,
-    fontWeight: '700',
+    fontWeight: '800',
     color: BrandColors.textPrimary,
     marginBottom: Spacing.three,
+    letterSpacing: -0.2,
   },
   grid: {
     flexDirection: 'row',
@@ -91,25 +83,29 @@ const styles = StyleSheet.create({
     gap: Spacing.two + 2,
   },
   actionButton: {
-    width: '48%',
+    width: '47.5%',
     flexGrow: 1,
+    overflow: 'hidden',
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Glass.border,
+    backgroundColor: Glass.fill,
+  },
+  actionInner: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.three,
-    borderRadius: Radius.md,
-    borderWidth: 1.5,
-    backgroundColor: BrandColors.surface,
     gap: Spacing.two,
   },
   pressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.75,
+    transform: [{ scale: 0.97 }],
   },
   iconCircle: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -117,5 +113,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     flex: 1,
+    letterSpacing: -0.1,
   },
 });

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
-import { Pagination } from '@/shared/components';
+import { BrandColors, Glass, heroTint, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface, Pagination } from '@/shared/components';
 import { PaymentBottomSheet } from '@/shared/payment';
 import type { PaymentResult } from '@/shared/payment/types';
 import { AddOn, AddOnCatalogResponse } from '../../domain/models';
@@ -71,7 +71,7 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
   return (
     <View style={styles.container}>
       {/* Available Add-ons Card */}
-      <View style={styles.card}>
+      <GlassSurface radius={Radius.lg} style={styles.card}>
         <View style={styles.headerRow}>
           <Text style={styles.cardTitle}>Available Add-ons</Text>
           <Feather name="gift" size={18} color={BrandColors.memberGold} />
@@ -106,7 +106,7 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
           totalPages={pagination.totalPages}
           onPageChange={setPage}
         />
-      </View>
+      </GlassSurface>
 
       {/* Active Add-ons Card */}
       <View style={styles.activeCard}>
@@ -158,16 +158,7 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
   },
   card: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   headerRow: {
     flexDirection: 'row',
@@ -217,7 +208,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   activeCard: {
-    backgroundColor: BrandColors.tealDark,
+    backgroundColor: heroTint(BrandColors.tealDark),
     borderRadius: Radius.lg,
     padding: Spacing.four,
     gap: Spacing.two,
@@ -229,7 +220,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   activeItem: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: Glass.fill,
+    borderWidth: 1,
+    borderColor: Glass.border,
     borderRadius: Radius.md,
     padding: Spacing.three,
   },

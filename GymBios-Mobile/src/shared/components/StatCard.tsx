@@ -1,8 +1,9 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
-import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { GlassSurface } from '@/shared/components/Glass/GlassSurface';
 
 interface StatCardProps {
   label: string;
@@ -14,8 +15,6 @@ interface StatCardProps {
 }
 
 export function StatCard({ label, value, iconName, color, onPress }: StatCardProps) {
-  const cardStyle = [styles.card, !onPress && styles.cardInactive];
-
   const content = (
     <>
       <View style={[styles.icon, { backgroundColor: color }]}>
@@ -33,47 +32,50 @@ export function StatCard({ label, value, iconName, color, onPress }: StatCardPro
   if (onPress) {
     return (
       <Pressable
-        style={({ pressed }) => [cardStyle, pressed && styles.cardPressed]}
+        style={({ pressed }) => [
+          styles.cardWrapper,
+          !onPress && styles.cardInactive,
+          pressed && styles.cardPressed,
+        ]}
         onPress={onPress}
         accessibilityRole="button"
       >
-        {content}
+        <GlassSurface style={styles.card}>{content}</GlassSurface>
       </Pressable>
     );
   }
 
-  return <View style={cardStyle}>{content}</View>;
+  return (
+    <GlassSurface style={[styles.card, styles.cardInactive]}>
+      {content}
+    </GlassSurface>
+  );
 }
 
 export function PlaceholderPanel({ title, description }: { title: string; description: string }) {
   return (
-    <View style={styles.panel}>
+    <GlassSurface style={styles.panel}>
       <Typography variant="subtitle">{title}</Typography>
       <Typography variant="bodySmall" color="textSecondary" style={styles.panelDescription}>
         {description}
       </Typography>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
+  cardWrapper: {
+    flex: 1,
+  },
   card: {
     flex: 1,
-    backgroundColor: '#ffffff',
     borderRadius: Radius.md,
     padding: Spacing.three,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
-  /** Subtle visual cue that this card does not yet have an interactive report. */
   cardInactive: {
     opacity: 0.55,
   },
-  /** Brief press-in feedback. */
   cardPressed: {
     opacity: 0.75,
   },
@@ -91,7 +93,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.half,
   },
   panel: {
-    backgroundColor: '#ffffff',
     borderRadius: Radius.lg,
     padding: Spacing.four,
     gap: Spacing.two,
