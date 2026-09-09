@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassBlob } from '@/shared/components';
 import { CenterCard } from '../components/CenterCard';
 import { CenterDetailModal } from '../components/CenterDetailModal';
 import { CenterFiltersModal } from '../components/CenterFiltersModal';
@@ -59,6 +60,9 @@ export function MemberCentersScreen() {
 
   return (
     <View style={styles.container}>
+      <GlassBlob color={BrandColors.teal} size={340} opacity={0.4} top={-90} right={-60} />
+      <GlassBlob color={BrandColors.tealDark} size={300} opacity={0.28} top={340} left={-70} />
+      <GlassBlob color={BrandColors.memberGold} size={240} opacity={0.2} top={760} right={-70} />
       {/* Search & Filter Header */}
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>

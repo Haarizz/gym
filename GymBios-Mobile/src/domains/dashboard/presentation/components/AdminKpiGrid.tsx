@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { AdminKpiItem, AdminReportType } from '../../domain/AdminDashboardData';
 
 interface AdminKpiGridProps {
@@ -19,8 +20,7 @@ export function AdminKpiGrid({ kpis, onSelectKpi }: AdminKpiGridProps) {
           <Pressable
             key={kpi.id}
             style={({ pressed }) => [
-              styles.card,
-              isClickable && styles.cardClickable,
+              styles.pressable,
               pressed && isClickable && styles.cardPressed,
             ]}
             onPress={() => isClickable && onSelectKpi(kpi.id as AdminReportType)}
@@ -28,37 +28,39 @@ export function AdminKpiGrid({ kpis, onSelectKpi }: AdminKpiGridProps) {
             accessibilityRole={isClickable ? 'button' : 'none'}
             accessibilityLabel={`${kpi.label}, ${kpi.value}, ${kpi.change}`}
           >
-            {/* Icon Box */}
-            <View style={[styles.iconBox, { backgroundColor: kpi.color }]}>
-              <Feather name={kpi.icon as any} size={18} color="#FFFFFF" />
-            </View>
-
-            {/* Label */}
-            <Text style={styles.label} numberOfLines={1}>
-              {kpi.label}
-            </Text>
-
-            {/* Value & Trend Row */}
-            <View style={styles.valueRow}>
-              <Text style={styles.value} numberOfLines={1}>
-                {kpi.value}
-              </Text>
-              <View style={styles.trendBox}>
-                <Feather
-                  name={isUp ? 'arrow-up-right' : 'arrow-down-right'}
-                  size={14}
-                  color={isUp ? '#16A34A' : '#DC2626'}
-                />
-                <Text
-                  style={[
-                    styles.changeText,
-                    { color: isUp ? '#16A34A' : '#DC2626' },
-                  ]}
-                >
-                  {kpi.change}
-                </Text>
+            <GlassSurface radius={Radius.lg} style={styles.card}>
+              {/* Icon Box */}
+              <View style={[styles.iconBox, { backgroundColor: kpi.color }]}>
+                <Feather name={kpi.icon as any} size={18} color="#FFFFFF" />
               </View>
-            </View>
+
+              {/* Label */}
+              <Text style={styles.label} numberOfLines={1}>
+                {kpi.label}
+              </Text>
+
+              {/* Value & Trend Row */}
+              <View style={styles.valueRow}>
+                <Text style={styles.value} numberOfLines={1}>
+                  {kpi.value}
+                </Text>
+                <View style={styles.trendBox}>
+                  <Feather
+                    name={isUp ? 'arrow-up-right' : 'arrow-down-right'}
+                    size={14}
+                    color={isUp ? '#16A34A' : '#DC2626'}
+                  />
+                  <Text
+                    style={[
+                      styles.changeText,
+                      { color: isUp ? '#16A34A' : '#DC2626' },
+                    ]}
+                  >
+                    {kpi.change}
+                  </Text>
+                </View>
+              </View>
+            </GlassSurface>
           </Pressable>
         );
       })}
@@ -72,20 +74,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.two,
   },
-  card: {
+  pressable: {
     width: '48.5%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
-    padding: Spacing.three + 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
-  cardClickable: {
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+  card: {
+    padding: Spacing.three + 2,
   },
   cardPressed: {
     opacity: 0.85,

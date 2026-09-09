@@ -2,6 +2,7 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { UrgentFollowUpItem } from '../../domain/StaffDashboardData';
 
 interface StaffUrgentFollowUpsCardProps {
@@ -28,7 +29,7 @@ export function StaffUrgentFollowUpsCard({
   };
 
   return (
-    <View style={styles.container}>
+    <GlassSurface radius={Radius.lg} style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Feather name="alert-circle" size={18} color="#EF4444" />
@@ -43,12 +44,11 @@ export function StaffUrgentFollowUpsCard({
         {followUps.map((lead, idx) => {
           const isHigh = lead.priority === 'high';
           return (
-            <View
+            <GlassSurface
               key={lead.id ?? idx}
-              style={[
-                styles.leadCard,
-                isHigh ? styles.leadCardHigh : styles.leadCardMed,
-              ]}
+              tint={isHigh ? '#DC2626' : '#D97706'}
+              radius={Radius.md}
+              style={styles.leadCard}
             >
               <View style={styles.leadHeader}>
                 <View style={styles.leadInfo}>
@@ -84,24 +84,17 @@ export function StaffUrgentFollowUpsCard({
                   <Text style={styles.callButtonText}>Call Now</Text>
                 </Pressable>
               </View>
-            </View>
+            </GlassSurface>
           );
         })}
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   header: {
     flexDirection: 'row',
@@ -128,17 +121,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   leadCard: {
-    borderWidth: 1.5,
-    borderRadius: Radius.md,
     padding: Spacing.three,
-  },
-  leadCardHigh: {
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-  },
-  leadCardMed: {
-    borderColor: '#FEF08A',
-    backgroundColor: '#FEFCE8',
   },
   leadHeader: {
     flexDirection: 'row',

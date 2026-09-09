@@ -42,7 +42,7 @@ export function SignInForm({ isLoading, errorMessage, onLogin, onSwitchToSignup 
           name="username"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              variant="auth"
+              variant="glass"
               label="Username or email"
               placeholder="e.g. arjun.k"
               autoCapitalize="none"
@@ -61,7 +61,7 @@ export function SignInForm({ isLoading, errorMessage, onLogin, onSwitchToSignup 
           name="password"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              variant="auth"
+              variant="glass"
               label="Password"
               placeholder="Enter your password"
               secureTextEntry

@@ -9,9 +9,9 @@ import {
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
-import { BrandColors } from '@/core/theme';
+import { BrandColors, Glass } from '@/core/theme';
 import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
-import { AppBottomSheet, ModuleSheet } from '@/shared/components';
+import { AppBottomSheet, GlassSurface, ModuleSheet } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
 import {
   NotificationPanel,
@@ -93,7 +93,7 @@ export function RoleTabsLayout({
       style={[styles.safeArea, { backgroundColor: isFullScreen ? BrandColors.screenBackground : resolvedColors[0] }]}>
       <View style={styles.container}>
         {!isFullScreen && showRoleHeader && (
-          <View style={[styles.header, { backgroundColor: resolvedColors[0] }]}>
+          <GlassSurface tint={resolvedColors} radius={0} style={styles.header}>
             <View style={styles.headerLeft}>
               <Pressable
                 hitSlop={12}
@@ -108,8 +108,8 @@ export function RoleTabsLayout({
                   size={36}
                   initials={initials}
                   imageUrl={profile?.photoUrl}
-                  backgroundColor="rgba(255,255,255,0.2)"
-                  textColor="#FFFFFF"
+                  backgroundColor="rgba(255,255,255,0.55)"
+                  textColor={BrandColors.textPrimary}
                 />
               </Pressable>
 
@@ -122,7 +122,7 @@ export function RoleTabsLayout({
                   <Text style={styles.titleText}>
                     {profile?.name || title} · {selectedBranchId === 'ALL' ? 'All branches' : availableBranches.find(b => b.id === selectedBranchId)?.branch_name || 'All branches'}
                   </Text>
-                  {isAdmin && <Feather name="chevron-down" size={16} color="#FFF" style={{ marginLeft: 4 }} />}
+                  {isAdmin && <Feather name="chevron-down" size={16} color={BrandColors.textPrimary} style={{ marginLeft: 4 }} />}
                 </Pressable>
               </View>
             </View>
@@ -134,7 +134,7 @@ export function RoleTabsLayout({
               accessibilityRole="button"
               accessibilityLabel={`Notifications, ${unreadCount} unread`}
             >
-              <Feather name="bell" size={20} color="#FFF" />
+              <Feather name="bell" size={20} color={BrandColors.textPrimary} />
               {unreadCount > 0 && (
                 <View style={styles.notificationBadge}>
                   {unreadCount > 1 && unreadCount <= 99 ? (
@@ -145,7 +145,7 @@ export function RoleTabsLayout({
                 </View>
               )}
             </Pressable>
-          </View>
+          </GlassSurface>
         )}
 
         <Tabs
@@ -315,12 +315,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.55)',
     marginRight: 10,
   },
 
   avatarText: {
-    color: '#FFF',
+    color: BrandColors.textPrimary,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -331,11 +331,11 @@ const styles = StyleSheet.create({
 
   greeting: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(30,42,58,0.65)',
   },
 
   titleText: {
-    color: '#FFF',
+    color: BrandColors.textPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -376,18 +376,18 @@ const styles = StyleSheet.create({
     // so the tab bar clears the device's actual system nav/gesture inset.
     paddingTop: 8,
 
-    backgroundColor: '#FFF',
+    backgroundColor: Glass.fillStrong,
 
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
+    borderTopWidth: 1,
+    borderTopColor: Glass.border,
 
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
 
     elevation: 16,
 
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
+    shadowColor: Glass.shadowColor,
+    shadowOpacity: 1,
     shadowRadius: 12,
     shadowOffset: {
       width: 0,

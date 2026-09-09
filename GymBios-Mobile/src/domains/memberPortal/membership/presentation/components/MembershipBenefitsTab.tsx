@@ -1,7 +1,13 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { BrandColors, Glass, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { MembershipDetails } from './MembershipStatusCard';
+
+// Purple gradient glass (offer banner)
+const PURPLE_START = 'rgba(124,58,237,0.82)';
+const PURPLE_END   = 'rgba(109,40,217,0.68)';
 
 interface MembershipBenefitsTabProps {
   membership: MembershipDetails;
@@ -16,14 +22,17 @@ export function MembershipBenefitsTab({
 }: MembershipBenefitsTabProps) {
   return (
     <View style={styles.container}>
-      {/* Plan Benefits Card */}
-      <View style={styles.card}>
+      {/* Plan Benefits — white glass */}
+      <GlassSurface radius={Radius.lg} style={styles.card}>
         <Text style={styles.cardTitle}>Your Plan Benefits</Text>
         <View style={styles.benefitsGrid}>
           {membership.benefits && membership.benefits.length > 0 ? (
             membership.benefits.map((benefit, index) => (
               <View key={index} style={styles.benefitRow}>
-                <Feather name="check-circle" size={16} color={BrandColors.teal} />
+                {/* Glass check circle */}
+                <View style={styles.checkCircle}>
+                  <Feather name="check" size={11} color={BrandColors.teal} />
+                </View>
                 <Text style={styles.benefitText}>{benefit}</Text>
               </View>
             ))
@@ -31,34 +40,43 @@ export function MembershipBenefitsTab({
             <Text style={styles.emptyText}>No specific benefits listed for your plan.</Text>
           )}
         </View>
-      </View>
+      </GlassSurface>
 
-      {/* Freeze Info Card */}
+      {/* Freeze Info — info-banner recipe from reference */}
       {membership.freezeAvailable && (
         <View style={styles.freezeCard}>
-          <View style={styles.freezeHeader}>
-            <View style={styles.freezeIconCircle}>
-              <Feather name="pause-circle" size={20} color="#2563EB" />
-            </View>
-            <View style={styles.freezeInfo}>
-              <Text style={styles.freezeTitle}>Freeze Available</Text>
-              <Text style={styles.freezeDesc}>
-                Your plan includes {membership.freezeDaysAllowed} freeze days. Pause your
-                membership temporarily without losing active days.
-              </Text>
-              <Pressable hitSlop={8} onPress={onOpenFreeze} style={styles.freezeLink}>
-                <Text style={styles.freezeLinkText}>Request Membership Freeze →</Text>
-              </Pressable>
-            </View>
+          {/* Glass icon */}
+          <View style={styles.freezeIconCircle}>
+            <Feather name="pause-circle" size={18} color="#2563EB" />
+          </View>
+          <View style={styles.freezeInfo}>
+            <Text style={styles.freezeTitle}>Freeze Available</Text>
+            <Text style={styles.freezeDesc}>
+              Your plan includes {membership.freezeDaysAllowed} freeze days. Pause your membership temporarily without losing active days.
+            </Text>
+            <Pressable hitSlop={8} onPress={onOpenFreeze} style={styles.freezeLink}>
+              <Text style={styles.freezeLinkText}>Request Membership Freeze →</Text>
+            </Pressable>
           </View>
         </View>
       )}
 
-      {/* Early Renewal Banner */}
+      {/* Early Renewal Banner — purple glass */}
       {membership.renewalOfferAvailable && (
         <View style={styles.offerBanner}>
+          <LinearGradient
+            colors={[PURPLE_START, PURPLE_END]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Shine overlay */}
+          <View pointerEvents="none" style={styles.shineOverlay} />
+
           <View style={styles.offerHeader}>
-            <Feather name="gift" size={20} color="#FFFFFF" />
+            <View style={styles.offerIconBox}>
+              <Feather name="gift" size={15} color="#FFFFFF" />
+            </View>
             <Text style={styles.offerTitle}>Early Renewal Offer! 🎉</Text>
           </View>
           <Text style={styles.offerDesc}>
@@ -83,22 +101,14 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
   },
   card: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   cardTitle: {
     fontSize: TypographyScale.subtitle,
-    fontWeight: '700',
+    fontWeight: '800',
     color: BrandColors.textPrimary,
     marginBottom: Spacing.three,
+    letterSpacing: -0.2,
   },
   benefitsGrid: {
     gap: Spacing.three,
@@ -108,67 +118,93 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two + 2,
   },
+  // Glass check circle — matching reference `.check`
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(27,90,76,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(27,90,76,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   benefitText: {
     fontSize: TypographyScale.body,
     color: BrandColors.textPrimary,
-    fontWeight: '500',
+    fontWeight: '600',
+    flex: 1,
   },
   emptyText: {
     fontSize: 13,
     color: BrandColors.textSecondary,
     fontStyle: 'italic',
   },
+  // Freeze info-banner — reference `.info-banner` recipe: rgba(120,170,255,0.18)
   freezeCard: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: Radius.lg,
-    padding: Spacing.four,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  freezeHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.three,
+    backgroundColor: 'rgba(120,170,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(120,170,255,0.42)',
+    borderRadius: Radius.lg,
+    padding: Spacing.four,
   },
   freezeIconCircle: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: '#DBEAFE',
+    borderRadius: 10,
+    backgroundColor: 'rgba(120,170,255,0.32)',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   freezeInfo: {
     flex: 1,
   },
   freezeTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#1E40AF',
-    marginBottom: 2,
+    color: '#2451A6',
+    marginBottom: 3,
   },
   freezeDesc: {
-    fontSize: 13,
-    color: '#1E3A8A',
-    lineHeight: 18,
+    fontSize: 12,
+    color: '#3E5C93',
+    lineHeight: 17,
+    fontWeight: '500',
   },
   freezeLink: {
     marginTop: Spacing.two,
   },
   freezeLinkText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#2563EB',
   },
+  // Offer banner — purple glass
   offerBanner: {
-    backgroundColor: '#8B5CF6',
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
     padding: Spacing.four,
-    shadowColor: '#8B5CF6',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.32)',
+    shadowColor: 'rgba(109,40,217,0.45)',
+    shadowOpacity: 1,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+    position: 'relative',
+  },
+  shineOverlay: {
+    position: 'absolute',
+    top: '-40%',
+    left: '-15%',
+    width: '55%',
+    height: '180%',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    transform: [{ rotate: '22deg' }],
   },
   offerHeader: {
     flexDirection: 'row',
@@ -176,31 +212,43 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     marginBottom: Spacing.two,
   },
+  offerIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   offerTitle: {
     fontSize: TypographyScale.subtitle,
     fontWeight: '800',
     color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
   offerDesc: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.92)',
-    lineHeight: 18,
+    lineHeight: 19,
     marginBottom: Spacing.three,
+    fontWeight: '500',
   },
   claimButton: {
     backgroundColor: '#FFFFFF',
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two + 2,
-    borderRadius: Radius.md,
+    borderRadius: Radius.full,
   },
   claimButtonPressed: {
     opacity: 0.9,
-    transform: [{ scale: 0.98 }],
+    transform: [{ scale: 0.97 }],
   },
   claimButtonText: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#8B5CF6',
+    color: '#6D28D9',
   },
 });

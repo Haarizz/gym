@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { StaffMonthSummary } from '../../domain/StaffDashboardData';
 
 interface StaffMonthSummaryCardProps {
@@ -8,7 +9,7 @@ interface StaffMonthSummaryCardProps {
 
 export function StaffMonthSummaryCard({ summary }: StaffMonthSummaryCardProps) {
   return (
-    <View style={styles.container}>
+    <GlassSurface radius={Radius.lg} style={styles.container}>
       <Text style={styles.title}>This Month</Text>
 
       <View style={styles.row}>
@@ -30,20 +31,13 @@ export function StaffMonthSummaryCard({ summary }: StaffMonthSummaryCardProps) {
         <Text style={styles.label}>Conversion Rate</Text>
         <Text style={styles.value}>{summary.conversionRate}%</Text>
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   title: {
     fontSize: 16,

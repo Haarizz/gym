@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 
 export interface TrainerProgressData {
   sessionsCompleted: number;
@@ -16,7 +17,7 @@ interface TrainerProgressCardProps {
 
 export function TrainerProgressCard({ progress }: TrainerProgressCardProps) {
   return (
-    <View style={styles.card}>
+    <GlassSurface radius={Radius.lg} style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>My Progress</Text>
         <Feather name="award" size={20} color={BrandColors.memberGold} />
@@ -57,22 +58,13 @@ export function TrainerProgressCard({ progress }: TrainerProgressCardProps) {
         <Text style={styles.footerLabel}>Sessions Completed</Text>
         <Text style={styles.footerValue}>{progress.sessionsCompleted}</Text>
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     gap: Spacing.three,
   },
   header: {

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 
 export interface UpcomingSessionData {
   id?: string | number;
@@ -22,7 +23,7 @@ export function TrainerUpcomingSessionsCard() {
   };
 
   return (
-    <View style={styles.card}>
+    <GlassSurface radius={Radius.lg} style={styles.card}>
       <Text style={styles.title}>Upcoming Coach Sessions</Text>
       <View style={styles.sessionList}>
         {SESSIONS.map((session, index) => {
@@ -58,22 +59,13 @@ export function TrainerUpcomingSessionsCard() {
       >
         <Text style={styles.bookButtonText}>Book Another Session</Text>
       </Pressable>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     gap: Spacing.three,
   },
   title: {

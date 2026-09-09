@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
-import { Radius, Spacing } from '@/core/theme';
+import { Glass, Radius, Spacing } from '@/core/theme';
 import type { RecentConversionItem } from '../../domain/StaffDashboardData';
 
 interface StaffRecentConversionsCardProps {
@@ -68,7 +68,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: Glass.fill,
+    borderWidth: 1,
+    borderColor: Glass.border,
     borderRadius: Radius.md,
     padding: Spacing.three,
   },

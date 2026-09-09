@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { MemberQuickStatItem } from '../../domain/MemberDashboardData';
 
 interface MemberStatsGridProps {
@@ -14,9 +15,9 @@ export function MemberStatsGrid({ stats }: MemberStatsGridProps) {
         const iconName = (stat.icon as any) || 'activity';
 
         return (
-          <View key={index} style={styles.card}>
+          <GlassSurface key={index} radius={Radius.lg} style={styles.card}>
             <View style={[styles.iconBox, { backgroundColor: stat.color }]}>
-              <Feather name={iconName} size={18} color="#FFFFFF" />
+              <Feather name={iconName} size={16} color="#FFFFFF" />
             </View>
             <Text style={styles.value} numberOfLines={1}>
               {stat.value}
@@ -24,7 +25,7 @@ export function MemberStatsGrid({ stats }: MemberStatsGridProps) {
             <Text style={styles.label} numberOfLines={1}>
               {stat.label}
             </Text>
-          </View>
+          </GlassSurface>
         );
       })}
     </View>
@@ -39,39 +40,31 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.three,
+    paddingVertical: Spacing.three + 2,
     paddingHorizontal: Spacing.two,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.md,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.two,
   },
   value: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: BrandColors.textPrimary,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   label: {
     fontSize: TypographyScale.caption,
-    fontWeight: '500',
+    fontWeight: '600',
     color: BrandColors.textSecondary,
-    marginTop: 2,
+    marginTop: 3,
     textAlign: 'center',
   },
 });

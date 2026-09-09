@@ -2,7 +2,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
-import { Spacing } from '@/core/theme';
+import { Glass, Radius, Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
 import { Typography } from '@/shared/components/Typography';
 
@@ -25,7 +25,10 @@ export function EmptyState({
 
   return (
     <View style={styles.container}>
-      <Feather name={icon} size={48} color={theme.textSecondary} style={styles.icon} />
+      {/* Glass icon box — matching reference .empty-icon */}
+      <View style={styles.iconBox}>
+        <Feather name={icon} size={24} color={theme.textSecondary} />
+      </View>
       <Typography variant="subtitle" style={styles.title}>
         {title}
       </Typography>
@@ -46,8 +49,22 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.six,
     paddingHorizontal: Spacing.four,
   },
-  icon: {
+  // Glass icon box — reference .empty-icon: white glass fill + glass border, rounded square
+  iconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: Radius.lg,
+    backgroundColor: Glass.fill,
+    borderWidth: 1,
+    borderColor: Glass.border,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: Spacing.three,
+    shadowColor: Glass.shadowColor,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 2,
   },
   title: {
     marginBottom: Spacing.two,

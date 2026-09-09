@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
+import { GlassBlob } from '@/shared/components';
 
 import { useMySettings } from '../../hooks/useMySettings';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
@@ -39,6 +40,9 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+      <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
+      <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
+      <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
       <AppHeader
         title="Settings"
         subtitle="Notifications, linked accounts & privacy"

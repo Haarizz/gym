@@ -1,7 +1,7 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { BrandColors, Glass, heroTint, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 export interface TrainerProfileData {
   name: string;
@@ -89,7 +89,7 @@ export function TrainerProfileCard({ trainer }: TrainerProfileCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: BrandColors.trainerAmber,
+    backgroundColor: heroTint(BrandColors.trainerAmber),
     borderRadius: Radius.xl,
     padding: Spacing.four + 2,
     shadowColor: '#EA580C',
@@ -108,7 +108,9 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: Glass.fill,
+    borderWidth: 1,
+    borderColor: Glass.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -171,7 +173,9 @@ const styles = StyleSheet.create({
   },
   callButton: {
     width: 48,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: Glass.fill,
+    borderWidth: 1,
+    borderColor: Glass.border,
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',

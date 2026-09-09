@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 
 interface TrainerQuickActionsProps {
   onMessageMember?: () => void;
@@ -38,7 +39,7 @@ export function TrainerQuickActions({
   };
 
   return (
-    <View style={styles.container}>
+    <GlassSurface radius={Radius.lg} style={styles.container}>
       <Text style={styles.title}>Quick Actions</Text>
       <View style={styles.grid}>
         <Pressable
@@ -85,20 +86,13 @@ export function TrainerQuickActions({
           </Text>
         </Pressable>
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   title: {
     fontSize: 16,

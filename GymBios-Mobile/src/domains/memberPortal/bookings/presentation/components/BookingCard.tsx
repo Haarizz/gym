@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import { ConfirmationModal } from '@/shared/components/ConfirmationModal/ConfirmationModal';
 
 export interface BookingItemData {
@@ -40,7 +41,7 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
   };
 
   return (
-    <View style={styles.card}>
+    <GlassSurface radius={Radius.lg} style={styles.card}>
       <View style={styles.header}>
         <View style={styles.titleInfo}>
           <Text style={styles.className}>{booking.class}</Text>
@@ -118,22 +119,13 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
         onConfirm={confirmCancel}
         onClose={() => setIsCancelConfirmVisible(false)}
       />
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
     gap: Spacing.three,
   },
   header: {

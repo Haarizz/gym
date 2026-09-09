@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { BrandColors, Glass } from '@/core/theme';
+import { GlassBlob } from '@/shared/components';
+
 import type { createUseLogin, createUseRegister } from '../hooks/useAuthFlow';
 import { AuthHeader } from '../components/MemberAuth/AuthHeader';
 import { AuthTabs } from '../components/MemberAuth/AuthTabs';
@@ -29,6 +32,9 @@ export function MemberAuthScreen({ useLogin, useRegister }: MemberAuthScreenProp
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill as any}
         />
+        <GlassBlob color={BrandColors.teal} size={340} opacity={0.38} top={-90} right={-60} />
+        <GlassBlob color={BrandColors.memberGold} size={300} opacity={0.4} top={180} left={-80} />
+        <GlassBlob color={BrandColors.teal} size={240} opacity={0.24} top={620} right={-70} />
       </View>
 
       <KeyboardAvoidingView
@@ -90,7 +96,10 @@ const styles = StyleSheet.create({
   },
   sheet: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Glass.fillStrong,
+    borderWidth: 1,
+    borderColor: Glass.border,
+    borderBottomWidth: 0,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     padding: 24,

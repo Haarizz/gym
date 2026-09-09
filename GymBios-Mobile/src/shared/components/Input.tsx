@@ -9,15 +9,15 @@ import {
 } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
-import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
 
 import { Typography } from './Typography';
 
 export interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
-  /** 'default' uses the standard themed style; 'auth' uses a white card-style input for login screens */
-  variant?: 'default' | 'auth';
+  /** 'default' uses the standard themed style; 'auth' is a white card-style input for login screens; 'glass' is the same shape with a translucent frosted fill for glass-panel screens */
+  variant?: 'default' | 'auth' | 'glass';
   containerStyle?: any;
   leftIcon?: React.ReactNode;
 }
@@ -39,9 +39,18 @@ export function Input({
   const [passwordVisible, setPasswordVisible] = useState(false);
 
   const isAuth = variant === 'auth';
+  const isGlass = variant === 'glass';
   const isPasswordField = !!rest.secureTextEntry;
 
-  const inputStyle = isAuth
+  const inputStyle = isGlass
+    ? [
+        styles.authInput,
+        styles.glassInput,
+        focused && !error && styles.authInputFocused,
+        error && styles.authInputError,
+        style,
+      ]
+    : isAuth
     ? [
         styles.authInput,
         focused && !error && styles.authInputFocused,
@@ -63,7 +72,7 @@ export function Input({
       {label ? (
         <Typography
           variant="bodySmallBold"
-          style={[styles.label, isAuth && styles.authLabel]}
+          style={[styles.label, (isAuth || isGlass) && styles.authLabel]}
         >
           {label}
         </Typography>
@@ -77,10 +86,10 @@ export function Input({
             isPasswordField ? !passwordVisible : rest.secureTextEntry
           }
           placeholderTextColor={
-            isAuth ? '#94a3b8' : theme.textSecondary
+            isAuth || isGlass ? '#94a3b8' : theme.textSecondary
           }
           style={[
-            isAuth ? { color: '#1e293b' } : { color: theme.text },
+            isAuth || isGlass ? { color: '#1e293b' } : { color: theme.text },
             inputStyle,
           ]}
           onFocus={(e) => {
@@ -176,6 +185,12 @@ const styles = StyleSheet.create({
 
     // Android
     elevation: 2,
+  },
+
+  glassInput: {
+    backgroundColor: Glass.fill,
+    borderColor: Glass.border,
+    shadowColor: Glass.shadowColor,
   },
 
   authInputFocused: {

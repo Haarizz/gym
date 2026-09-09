@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { GlassSurface } from '@/shared/components';
 import type { UserTransaction } from '../../domain';
 
 interface TransactionCardProps {
@@ -30,7 +31,7 @@ export function TransactionCard({ transaction }: TransactionCardProps) {
   const statusColor = transaction.status === 'completed' ? '#166534' : '#854d0e';
 
   return (
-    <View style={styles.card}>
+    <GlassSurface radius={Radius.lg} style={styles.card}>
       <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
         <Feather name={iconName} size={18} color={iconColor} />
       </View>
@@ -68,7 +69,7 @@ export function TransactionCard({ transaction }: TransactionCardProps) {
           </Typography>
         </View>
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
@@ -76,17 +77,8 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
     padding: Spacing.three,
-    borderRadius: Radius.lg,
     marginBottom: Spacing.two,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
   },
   iconBox: {
     width: 40,

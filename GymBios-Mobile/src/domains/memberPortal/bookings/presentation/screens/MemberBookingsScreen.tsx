@@ -11,6 +11,7 @@ import {
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassBlob, GlassSurface } from '@/shared/components';
 import { BookingStatsHeader } from '../components/BookingStatsHeader';
 import { BookingCard, type BookingItemData } from '../components/BookingCard';
 import { PastBookingItem, type PastBookingData } from '../components/PastBookingItem';
@@ -74,7 +75,7 @@ export function MemberBookingsScreen() {
 
   if (isLoading && !isRefetching) {
     return (
-      <View style={[styles.container, styles.center]}>
+      <View style={[styles.root, styles.center]}>
         <ActivityIndicator size="large" color={BrandColors.memberGold} />
       </View>
     );
@@ -124,19 +125,23 @@ export function MemberBookingsScreen() {
   });
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={onRefresh}
-          tintColor={BrandColors.memberGold}
-          colors={[BrandColors.memberGold]}
-        />
-      }
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.root}>
+      <GlassBlob color={BrandColors.memberGold} size={340} opacity={0.42} top={-90} right={-60} />
+      <GlassBlob color={BrandColors.teal} size={300} opacity={0.3} top={340} left={-70} />
+      <GlassBlob color={BrandColors.memberGold} size={260} opacity={0.24} top={760} right={-80} />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={onRefresh}
+            tintColor={BrandColors.memberGold}
+            colors={[BrandColors.memberGold]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
       {/* Header Stats */}
       <BookingStatsHeader
         upcomingCount={stats?.upcoming || 0}
@@ -156,7 +161,7 @@ export function MemberBookingsScreen() {
       </Pressable>
 
       {/* Upcoming Bookings Section */}
-      <View style={styles.sectionCard}>
+      <GlassSurface radius={Radius.lg} style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>Upcoming Classes</Text>
         {mappedUpcoming.length > 0 ? (
           <View style={styles.list}>
@@ -175,10 +180,10 @@ export function MemberBookingsScreen() {
             <Text style={styles.emptyText}>No upcoming classes booked</Text>
           </View>
         )}
-      </View>
+      </GlassSurface>
 
       {/* Past Bookings Section */}
-      <View style={styles.sectionCard}>
+      <GlassSurface radius={Radius.lg} style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>Past Classes</Text>
         {mappedPast.length > 0 ? (
           <View style={styles.list}>
@@ -191,7 +196,7 @@ export function MemberBookingsScreen() {
             <Text style={styles.emptyText}>No past classes</Text>
           </View>
         )}
-      </View>
+      </GlassSurface>
 
       {/* Booking Modal */}
       <BookClassModal
@@ -233,14 +238,18 @@ export function MemberBookingsScreen() {
           </View>
         )}
       </AppBottomSheet>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: BrandColors.screenBackground,
+  },
+  container: {
+    flex: 1,
   },
   center: {
     justifyContent: 'center',
@@ -275,16 +284,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   sectionCard: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   sectionTitle: {
     fontSize: TypographyScale.subtitle,

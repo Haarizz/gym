@@ -7,6 +7,7 @@ import { AppHeader } from '@/shared/components/AppHeader';
 import { Typography } from '@/shared/components/Typography';
 import { Loader } from '@/shared/components/Loader';
 import { EmptyState } from '@/shared/components/EmptyState';
+import { GlassBlob, GlassSurface } from '@/shared/components';
 
 import { useMyTargets } from '../../hooks/useMyTargets';
 import { TargetCard } from '../components/TargetCard';
@@ -33,6 +34,9 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+      <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
+      <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
+      <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
       <AppHeader
         title="My Targets"
         subtitle="Track personal goals & progress metrics"
@@ -42,7 +46,7 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Summary Card */}
-        <View style={styles.summaryCard}>
+        <GlassSurface radius={Radius.lg} style={styles.summaryCard}>
           <View style={styles.summaryBox}>
             <Typography variant="title" style={styles.summaryValue}>
               {activeTargets.length}
@@ -73,10 +77,10 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
               Success Rate
             </Typography>
           </View>
-        </View>
+        </GlassSurface>
 
         {/* Filter Pills */}
-        <View style={styles.filterBar}>
+        <GlassSurface radius={Radius.full} style={styles.filterBar}>
           {(['all', 'active', 'completed'] as const).map((tab) => {
             const isSelected = filter === tab;
             const label = tab === 'all' ? `All (${targets.length})` : tab === 'active' ? `Active (${activeTargets.length})` : `Completed (${completedTargets.length})`;
@@ -95,7 +99,7 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
               </Pressable>
             );
           })}
-        </View>
+        </GlassSurface>
 
         {/* Target Cards */}
         {isLoading ? (
@@ -125,17 +129,8 @@ const styles = StyleSheet.create({
   summaryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
     padding: Spacing.three,
     marginBottom: Spacing.four,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   summaryBox: {
     flex: 1,
@@ -160,13 +155,13 @@ const styles = StyleSheet.create({
   filterBar: {
     flexDirection: 'row',
     gap: Spacing.two,
+    padding: 4,
     marginBottom: Spacing.four,
   },
   filterPill: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: Radius.full,
-    backgroundColor: '#f1f5f9',
   },
   filterPillSelected: {
     backgroundColor: BrandColors.teal,

@@ -6,6 +6,7 @@ import { AppHeader } from '@/shared/components/AppHeader';
 import { Typography } from '@/shared/components/Typography';
 import { Loader } from '@/shared/components/Loader';
 import { EmptyState } from '@/shared/components/EmptyState';
+import { GlassBlob, GlassSurface } from '@/shared/components';
 
 import { useMyTransactions } from '../../hooks/useMyTransactions';
 import { TransactionCard } from '../components/TransactionCard';
@@ -19,6 +20,9 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+      <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
+      <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
+      <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
       <AppHeader
         title="Transactions"
         subtitle="Salary, purchases & payment activity"
@@ -29,41 +33,41 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Transaction Summary Header Tiles */}
         <View style={styles.summaryGrid}>
-          <View style={styles.summaryTile}>
+          <GlassSurface radius={Radius.lg} style={styles.summaryTile}>
             <Typography variant="subtitle" style={[styles.summaryValue, { color: '#16a34a' }]}>
               ${summary.totalEarnings.toLocaleString()}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               Total Earnings
             </Typography>
-          </View>
+          </GlassSurface>
 
-          <View style={styles.summaryTile}>
+          <GlassSurface radius={Radius.lg} style={styles.summaryTile}>
             <Typography variant="subtitle" style={styles.summaryValue}>
               {summary.totalTransactions}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               Transactions
             </Typography>
-          </View>
+          </GlassSurface>
 
-          <View style={styles.summaryTile}>
+          <GlassSurface radius={Radius.lg} style={styles.summaryTile}>
             <Typography variant="subtitle" style={[styles.summaryValue, { color: '#7c3aed' }]}>
               {summary.totalPurchases}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               Purchases
             </Typography>
-          </View>
+          </GlassSurface>
 
-          <View style={styles.summaryTile}>
+          <GlassSurface radius={Radius.lg} style={styles.summaryTile}>
             <Typography variant="subtitle" style={[styles.summaryValue, { color: '#d97706' }]}>
               {summary.totalBonuses}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               Bonuses
             </Typography>
-          </View>
+          </GlassSurface>
         </View>
 
         {/* Transactions List */}
@@ -99,17 +103,8 @@ const styles = StyleSheet.create({
   },
   summaryTile: {
     flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
     padding: Spacing.three,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
   },
   summaryValue: {
     fontSize: 16,

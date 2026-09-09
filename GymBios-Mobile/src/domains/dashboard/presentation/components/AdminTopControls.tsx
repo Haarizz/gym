@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 
 interface AdminTopControlsProps {
   branch?: string;
@@ -22,7 +23,7 @@ export function AdminTopControls({
   onBellPress,
 }: AdminTopControlsProps) {
   return (
-    <View style={styles.container}>
+    <GlassSurface radius={16} style={styles.container}>
       {/* Top Filter Row */}
       <View style={styles.filterRow}>
         <Pressable
@@ -67,20 +68,13 @@ export function AdminTopControls({
           {hasAlerts && <View style={styles.alertDot} />}
         </Pressable>
       </View>
-    </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   filterRow: {
     flexDirection: 'row',

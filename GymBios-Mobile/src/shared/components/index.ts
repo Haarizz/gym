@@ -35,3 +35,5 @@ export {
 } from './ConfirmationModal';
 export { Pagination, type PaginationProps } from './Pagination';
 export { TrafficLightSelector } from './TrafficLightSelector';
+export { GlassSurface, type GlassSurfaceProps } from './Glass/GlassSurface';
+export { GlassBlob, type GlassBlobProps } from './Glass/GlassBlob';

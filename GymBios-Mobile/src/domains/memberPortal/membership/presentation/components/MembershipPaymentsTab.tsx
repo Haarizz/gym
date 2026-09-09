@@ -1,6 +1,7 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import { useMembershipPayments } from '../../hooks/useMembershipPayments';
 
 export function MembershipPaymentsTab() {
@@ -9,7 +10,7 @@ export function MembershipPaymentsTab() {
   return (
     <View style={styles.container}>
       {/* Payment History */}
-      <View style={styles.card}>
+      <GlassSurface radius={Radius.lg} style={styles.card}>
         <Text style={styles.cardTitle}>Payment History</Text>
         
         {isLoading && (
@@ -67,10 +68,10 @@ export function MembershipPaymentsTab() {
             })}
           </View>
         )}
-      </View>
+      </GlassSurface>
 
       {/* Payment Method Card */}
-      <View style={styles.card}>
+      <GlassSurface radius={Radius.lg} style={styles.card}>
         <Text style={styles.cardTitle}>Saved Payment Method</Text>
         <View style={styles.emptyStateBox}>
           <Feather name="info" size={20} color={BrandColors.textSecondary} />
@@ -78,7 +79,7 @@ export function MembershipPaymentsTab() {
             Saved payment methods are currently unavailable. Please use a new payment method during checkout.
           </Text>
         </View>
-      </View>
+      </GlassSurface>
     </View>
   );
 }
@@ -97,16 +98,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   card: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
     padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   cardTitle: {
     fontSize: TypographyScale.subtitle,

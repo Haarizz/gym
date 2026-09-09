@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { BrandColors, Spacing } from '@/core/theme';
-import { Loader } from '@/shared/components';
+import { GlassBlob, Loader } from '@/shared/components';
 import type { AdminReportType } from '../../domain/AdminDashboardData';
 import { useAdminDashboard } from '../../hooks/useAdminDashboard';
 import { AdminTopControls } from '../components/AdminTopControls';
@@ -25,7 +25,9 @@ export function AdminDashboardScreen() {
   }
 
   return (
-    <>
+    <View style={styles.root}>
+      <GlassBlob color={BrandColors.teal} size={260} opacity={0.22} top={-70} right={-80} />
+      <GlassBlob color={BrandColors.tealDark} size={220} opacity={0.18} top={420} left={-90} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
@@ -64,14 +66,17 @@ export function AdminDashboardScreen() {
         selectedReport={selectedReport}
         onClose={() => setSelectedReport(null)}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: BrandColors.screenBackground,
+  },
+  container: {
+    flex: 1,
   },
   content: {
     padding: Spacing.four,

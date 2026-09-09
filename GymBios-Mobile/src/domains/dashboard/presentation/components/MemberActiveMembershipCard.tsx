@@ -1,11 +1,17 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { BrandColors, Glass, Radius, Spacing, TypographyScale } from '@/core/theme';
 import type { MemberInfo } from '../../domain/MemberDashboardData';
 
 interface MemberActiveMembershipCardProps {
   memberInfo: MemberInfo;
 }
+
+// Gold-glass recipe from the reference: linear-gradient(135deg, rgba(255,214,110,0.85), rgba(242,187,61,0.65))
+// Text is dark amber (#4a3200), not white — ensures legibility on a gold background.
+const GOLD_START = 'rgba(255,214,110,0.88)';
+const GOLD_END   = 'rgba(242,187,61,0.68)';
 
 export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershipCardProps) {
   const formattedDate = memberInfo.validUntil
@@ -41,15 +47,28 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
 
   return (
     <View style={styles.card}>
+      {/* Gold gradient glass background */}
+      <LinearGradient
+        colors={[GOLD_START, GOLD_END]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Decorative shine overlay — top-left highlight streak */}
+      <View pointerEvents="none" style={styles.shineOverlay} />
+      {/* Decorative radial blob — top-right */}
+      <View pointerEvents="none" style={styles.blobDecor} />
+
       <View style={styles.topRow}>
         <View style={styles.infoLeft}>
           <Text style={styles.badgeLabel}>Active Membership</Text>
           <Text style={styles.membershipType}>{memberInfo.membershipType}</Text>
           <View style={styles.locationRow}>
-            <Feather name="map-pin" size={12} color="rgba(255,255,255,0.9)" />
+            <Feather name="map-pin" size={12} color="rgba(74,50,0,0.75)" />
             <Text style={styles.gymName}>{memberInfo.gymName}</Text>
           </View>
         </View>
+        {/* Active pill — amber-dark semi-transparent glass */}
         <View style={styles.statusPill}>
           <Text style={styles.statusText}>{memberInfo.isActive ? 'ACTIVE' : 'INACTIVE'}</Text>
         </View>
@@ -73,14 +92,35 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: BrandColors.memberGold,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
     padding: Spacing.four + 2,
-    shadowColor: '#F59E0B',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
+    shadowColor: 'rgba(229,165,33,0.45)',
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+    position: 'relative',
+  },
+  shineOverlay: {
+    position: 'absolute',
+    top: '-40%',
+    left: '-20%',
+    width: '60%',
+    height: '180%',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    transform: [{ rotate: '20deg' }],
+  },
+  blobDecor: {
+    position: 'absolute',
+    top: -50,
+    right: -30,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   topRow: {
     flexDirection: 'row',
@@ -93,14 +133,15 @@ const styles = StyleSheet.create({
   },
   badgeLabel: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: '500',
+    color: 'rgba(74,50,0,0.75)',
+    fontWeight: '600',
     marginBottom: 4,
   },
   membershipType: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#4a3200',
+    letterSpacing: -0.5,
   },
   locationRow: {
     flexDirection: 'row',
@@ -110,69 +151,74 @@ const styles = StyleSheet.create({
   },
   gymName: {
     fontSize: TypographyScale.body,
-    color: '#FFFFFF',
-    fontWeight: '500',
+    color: 'rgba(74,50,0,0.85)',
+    fontWeight: '600',
   },
   statusPill: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(74,50,0,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(74,50,0,0.28)',
     paddingHorizontal: Spacing.three,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: Radius.full,
   },
   statusText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+    fontWeight: '800',
+    color: '#4a3200',
+    letterSpacing: 0.8,
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    marginVertical: Spacing.two,
+    backgroundColor: 'rgba(74,50,0,0.18)',
+    marginVertical: Spacing.three,
   },
   bottomRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingTop: 4,
   },
   statLabel: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(74,50,0,0.75)',
+    fontWeight: '500',
     marginBottom: 2,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 34,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#4a3200',
+    lineHeight: 36,
+    letterSpacing: -1,
   },
   statRight: {
     alignItems: 'flex-end',
   },
   statValueDate: {
-    fontSize: TypographyScale.body,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#4a3200',
     marginTop: 2,
   },
+  // Inactive state
   inactiveCard: {
     backgroundColor: BrandColors.screenBackground,
+    borderColor: BrandColors.neutral[200],
     shadowColor: 'transparent',
     borderWidth: 1,
-    borderColor: BrandColors.neutral[200],
   },
   inactiveTextDark: {
-    color: '#111827', // dark gray for main text
+    color: '#111827',
   },
   inactiveTextLight: {
-    color: '#6B7280', // lighter gray for labels
+    color: '#6B7280',
   },
   inactiveDivider: {
     backgroundColor: BrandColors.neutral[200],
   },
   inactivePrompt: {
     fontSize: TypographyScale.body,
-    color: '#4B5563', // gray-600
+    color: '#4B5563',
     lineHeight: 20,
     marginTop: Spacing.two,
   },

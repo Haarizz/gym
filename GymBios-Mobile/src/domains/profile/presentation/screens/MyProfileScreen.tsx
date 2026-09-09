@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BrandColors, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { AvatarPicker } from '@/shared/components/AvatarPicker';
 import { Button } from '@/shared/components/Button';
-import { Card } from '@/shared/components/Card';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
+import { GlassBlob, GlassSurface } from '@/shared/components';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
@@ -124,6 +124,9 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+      <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
+      <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
+      <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
       <AppHeader
         title="My Profile"
         subtitle="Manage your personal details & credentials"
@@ -159,7 +162,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
           </View>
 
           {/* Personal Information Card */}
-          <Card style={styles.card}>
+          <GlassSurface radius={Radius.lg} style={styles.card}>
             <View style={styles.cardHeader}>
               <Typography variant="subtitle" style={styles.cardTitle}>
                 Personal Information
@@ -254,10 +257,10 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
                 />
               )}
             </View>
-          </Card>
+          </GlassSurface>
 
           {/* Change Password Card */}
-          <Card style={styles.card}>
+          <GlassSurface radius={Radius.lg} style={styles.card}>
             <View style={styles.cardHeader}>
               <Typography variant="subtitle" style={styles.cardTitle}>
                 Change Password
@@ -298,7 +301,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
                 style={styles.saveButton}
               />
             </View>
-          </Card>
+          </GlassSurface>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
