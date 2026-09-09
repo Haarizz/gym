@@ -567,13 +567,6 @@ const menuItems = [
         path: "/payroll-analytics",
         permission: "PAYROLL_ANALYTICS_VIEW",
       },
-      {
-        title: "Settings",
-        icon: Settings,
-        id: "payroll-settings",
-        path: "/payroll-settings",
-        permission: "SETTINGS_VIEW",
-      },
     ],
   },
 
@@ -945,7 +938,6 @@ export default function App() {
         "recruitment",
         "payroll-reports",
         "payroll-analytics",
-        "payroll-settings",
       ];
 
       // Auto-expand My Profile for its sub-items

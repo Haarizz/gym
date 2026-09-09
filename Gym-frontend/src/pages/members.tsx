@@ -643,6 +643,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   const getComputedStatus = (member: Member) => {
     if (member.membership_status === 'pending_approval') return 'pending_approval';
+    // Frozen/suspended are deliberate overrides of the membership timeline —
+    // they must win over an expiry-date check, otherwise a frozen member whose
+    // plan end date has already passed gets miscategorized as "Expired".
+    const rawStatus = (member.membership_status || '').toLowerCase();
+    if (rawStatus === 'frozen' || rawStatus === 'suspended') {
+      return member.membership_status!.charAt(0).toUpperCase() + member.membership_status!.slice(1);
+    }
     const endDateStr = getMembershipEndDate(member);
     if (endDateStr) {
       const end = new Date(endDateStr);
