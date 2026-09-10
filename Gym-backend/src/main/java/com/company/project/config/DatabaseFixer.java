@@ -50,5 +50,20 @@ public class DatabaseFixer implements CommandLineRunner {
         } catch (Exception e) {
             System.err.println("Failed to drop constraint: " + e.getMessage());
         }
+
+        try {
+            jdbcTemplate.execute("INSERT INTO permissions (created_at, action, description, module, permission_key) " +
+                    "SELECT now(), 'APPROVE', 'MEMBERS - APPROVE', 'MEMBERS', 'MEMBERS_APPROVE' " +
+                    "WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'MEMBERS_APPROVE')");
+            jdbcTemplate.execute("INSERT INTO role_permissions (created_at, permission_id, role_id) " +
+                    "SELECT now(), p.id, r.id FROM permissions p, roles r " +
+                    "WHERE p.permission_key = 'MEMBERS_APPROVE' AND r.role_name IN ('ADMIN', 'MANAGER', 'RECEPTIONIST') " +
+                    "AND NOT EXISTS (SELECT 1 FROM role_permissions rp WHERE rp.permission_id = p.id AND rp.role_id = r.id)");
+            System.out.println("======================================================");
+            System.out.println("Successfully backfilled MEMBERS_APPROVE permission.");
+            System.out.println("======================================================");
+        } catch (Exception e) {
+            System.err.println("Failed to backfill MEMBERS_APPROVE permission: " + e.getMessage());
+        }
     }
 }

@@ -58,7 +58,8 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   reset: () => {
     setApiClientToken(null);
     setHttpClientToken(null);
-    
+    setApiClientTenant(null);
+
     set({
       user: null,
       session: null,
@@ -66,7 +67,17 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       permissions: [],
       pendingRole: null,
       isHydrated: true,
+      activeTenant: null,
     });
+
+    // Deliberately NOT clearing activeTenant from secure storage here — a member's
+    // gym doesn't change just because they logged out. Login (see useLogin.onSuccess)
+    // restores it from storage the same way session-restore already does; if it were
+    // wiped here, a global member who logs out and back in would have no way to
+    // reach their gym's tenant DB again for the rest of the session (their JWT
+    // carries no tenant claim — see AuthService.login/isGlobalUser — so this
+    // client-side value is the ONLY thing that routes their requests to the right
+    // database at all).
   },
 }));
 

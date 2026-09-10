@@ -42,6 +42,7 @@ public class ReceiptResponseDTO {
     private java.math.BigDecimal totalPaidToDate;
     private java.math.BigDecimal balanceAfter;
     private String linkedBillId;
+    private String approvalStatus;
     private String createdAt;
     private String updatedAt;
 
@@ -83,6 +84,7 @@ public class ReceiptResponseDTO {
         dto.totalPaidToDate = r.getTotalPaidToDate();
         dto.balanceAfter    = r.getBalanceAfter();
         dto.linkedBillId    = r.getLinkedBillId() != null ? String.valueOf(r.getLinkedBillId()) : null;
+        dto.approvalStatus  = r.getApprovalStatus();
         dto.createdAt       = r.getCreatedAt() != null ? r.getCreatedAt().format(ISO) + "Z" : null;
         dto.updatedAt       = r.getUpdatedAt() != null ? r.getUpdatedAt().format(ISO) + "Z" : null;
         return dto;
@@ -118,6 +120,7 @@ public class ReceiptResponseDTO {
     public java.math.BigDecimal getTotalPaidToDate() { return totalPaidToDate; }
     public java.math.BigDecimal getBalanceAfter() { return balanceAfter; }
     public String getLinkedBillId() { return linkedBillId; }
+    public String getApprovalStatus() { return approvalStatus; }
     public String getCreatedAt() { return createdAt; }
     public String getUpdatedAt() { return updatedAt; }
 }

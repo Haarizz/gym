@@ -10,6 +10,11 @@ export function useMyBranches() {
   return useQuery({
     queryKey: ['my-branches'],
     queryFn: () => branchRepository.getMyBranches(),
+    // A member whose Cash/Credit/Mixed purchase is still awaiting reception
+    // approval gets a 403 here by design (see TenantContextFilter on the
+    // backend) — retrying is pointless until staff act, and the default
+    // retry:3 turned every mount into a burst of repeated 403s.
+    retry: false,
   });
 }
 
@@ -17,5 +22,6 @@ export function useAllBranches() {
   return useQuery({
     queryKey: ['all-branches'],
     queryFn: () => branchRepository.getAllBranches(),
+    retry: false,
   });
 }

@@ -170,6 +170,13 @@ public class MemberService {
         member.setApprovedBy(approvedBy);
         member.setApprovedAt(LocalDateTime.now());
         member.setAppAccessEnabled(true);
+        // Was set to "pending_approval" at self-service purchase time (see
+        // MobileDiscoveryController) so the Members directory wouldn't show them as
+        // a normal active member before staff confirmed the payment — now that it's
+        // confirmed, they're a normal active member.
+        if ("pending_approval".equals(member.getMembershipStatus())) {
+            member.setMembershipStatus("Active");
+        }
         Member saved = memberRepository.save(member);
 
         return MemberResponseDTO.fromEntity(saved);

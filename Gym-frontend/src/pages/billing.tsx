@@ -182,8 +182,20 @@ export function Billing({ onNavigate }: BillingProps = {}) {
       case "Overdue":  return "bg-red-100 text-red-800";
       case "Partial":  return "bg-orange-100 text-orange-800";
       case "Due Soon": return "bg-orange-100 text-orange-800";
+      case "Request":  return "bg-blue-100 text-blue-800";
+      case "Rejected": return "bg-red-100 text-red-800";
       default:         return "bg-gray-100 text-gray-800";
     }
+  };
+
+  // A mobile Cash/Credit/Mixed purchase sits in `approval_status` PENDING until
+  // reception approves it — its receipt.status is still whatever the paid amount
+  // computes to (often "Paid"), so it must be overridden here or the page shows a
+  // member as fully paid before staff have actually confirmed the payment.
+  const getDisplayStatus = (receipt: Receipt) => {
+    if (receipt.approval_status === "PENDING") return "Request";
+    if (receipt.approval_status === "REJECTED") return "Rejected";
+    return receipt.status;
   };
 
   const toggleChannel = (list: string[], setList: (v: string[]) => void, ch: string) =>
@@ -254,7 +266,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
     const rows = receipts.map(r => {
       const paid = Number(r.paid_amount ?? 0);
       const remainingDue = Number(r.balance_after ?? 0);
-      return `"${r.receipt_no}","${r.member_name}","${r.member_id}","${r.plan_name ?? ''}","${r.transaction_type}","${paid.toFixed(2)}","${remainingDue.toFixed(2)}","${r.transaction_date ? new Date(r.transaction_date).toLocaleString() : ''}","${r.payment_method ?? ''}","${r.processed_by ?? ''}","${r.status}"`;
+      return `"${r.receipt_no}","${r.member_name}","${r.member_id}","${r.plan_name ?? ''}","${r.transaction_type}","${paid.toFixed(2)}","${remainingDue.toFixed(2)}","${r.transaction_date ? new Date(r.transaction_date).toLocaleString() : ''}","${r.payment_method ?? ''}","${r.processed_by ?? ''}","${getDisplayStatus(r)}"`;
     }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -556,7 +568,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         </TableCell>
                         <TableCell>{receipt.processed_by ?? '-'}</TableCell>
                         <TableCell>
-                          <Badge className={getStatusColor(receipt.status)}>{receipt.status}</Badge>
+                          <Badge className={getStatusColor(getDisplayStatus(receipt))}>{getDisplayStatus(receipt)}</Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -1175,7 +1187,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                     {selectedReceipt.transaction_date ? new Date(selectedReceipt.transaction_date).toLocaleDateString() : '-'}
                   </div>
                 </div>
-                <Badge className={getStatusColor(selectedReceipt.status)}>{selectedReceipt.status}</Badge>
+                <Badge className={getStatusColor(getDisplayStatus(selectedReceipt))}>{getDisplayStatus(selectedReceipt)}</Badge>
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between">
