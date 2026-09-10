@@ -88,7 +88,11 @@ public class TenantContextFilter extends OncePerRequestFilter {
                             || path.startsWith("/api/community")
                             || path.startsWith("/api/notifications");
 
-                    if (tenantSlug != null && !tenantSlug.isBlank()) {
+                    boolean isStrictlyGlobalPath = path.startsWith("/api/mobile/auth/")
+                            || path.startsWith("/api/mobile/profile/")
+                            || path.startsWith("/api/mobile/discovery/");
+
+                    if (tenantSlug != null && !tenantSlug.isBlank() && !isStrictlyGlobalPath) {
                         TenantContextHolder.setCurrentTenant(tenantSlug);
                         
                         // Validate multi-tenant authorization for global users on protected member paths
