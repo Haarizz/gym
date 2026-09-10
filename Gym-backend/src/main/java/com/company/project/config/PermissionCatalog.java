@@ -27,7 +27,7 @@ public final class PermissionCatalog {
     static {
         MODULES.put("DASHBOARD", ACTIONS_VIEW_ONLY);
         MODULES.put("COMMUNITY", ACTIONS_FULL);
-        MODULES.put("MEMBERS", ACTIONS_FULL);
+        MODULES.put("MEMBERS", ACTIONS_FULL_APPROVE);
         MODULES.put("BILLING", ACTIONS_FULL);
         MODULES.put("MEMBERSHIP_PLANS", ACTIONS_FULL);
         MODULES.put("ATTENDANCE", ACTIONS_FULL);

@@ -73,6 +73,11 @@ public class MemberResponseDTO {
     private Boolean appAccessEnabled;
     private Long branchId;
 
+    private String approvalStatus;
+    private String approvedBy;
+    private String approvedAt;
+    private String rejectionReason;
+
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public static MemberResponseDTO fromEntity(Member m) {
@@ -132,6 +137,10 @@ public class MemberResponseDTO {
         dto.appUsername         = m.getAppUsername();
         dto.appAccessEnabled    = m.getAppAccessEnabled();
         dto.branchId            = m.getBranchId();
+        dto.approvalStatus      = m.getApprovalStatus();
+        dto.approvedBy          = m.getApprovedBy();
+        dto.approvedAt          = m.getApprovedAt()          != null ? m.getApprovedAt().format(ISO) + "Z"          : null;
+        dto.rejectionReason     = m.getRejectionReason();
         return dto;
     }
 
@@ -199,4 +208,12 @@ public class MemberResponseDTO {
     public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
+    public String getApprovalStatus() { return approvalStatus; }
+    public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+    public String getApprovedAt() { return approvedAt; }
+    public void setApprovedAt(String approvedAt) { this.approvedAt = approvedAt; }
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 }

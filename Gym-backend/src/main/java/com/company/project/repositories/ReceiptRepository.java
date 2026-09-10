@@ -53,6 +53,12 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
     // Full transaction history for a member's Statement of Account (primary: by DB id)
     List<Receipt> findByMemberDbIdOrderByTransactionDateAsc(Long memberDbId);
 
+    // The receipt awaiting reception approval for a mobile Cash/Credit/Mixed purchase
+    // (see MobileDiscoveryController/MemberService.approveMemberPayment) — a member
+    // only ever has one PENDING receipt at a time (created once, at signup), but this
+    // is ordered defensively in case that ever changes.
+    java.util.Optional<Receipt> findTopByMemberDbIdAndApprovalStatusOrderByIdDesc(Long memberDbId, String approvalStatus);
+
     // How many times a member has renewed — used to evaluate "renewal count" promotional
     // eligibility rules, since Member itself carries no renewal counter of its own.
     long countByMemberDbIdAndTransactionType(Long memberDbId, String transactionType);

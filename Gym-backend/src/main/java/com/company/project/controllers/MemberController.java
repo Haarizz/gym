@@ -39,6 +39,52 @@ public class MemberController {
     }
 
     /**
+     * GET /api/members/pending-approvals?page=1&limit=20
+     * Mobile Cash/Credit/Mixed purchases awaiting reception approval — backs the
+     * Approvals sidebar tab.
+     */
+    @GetMapping("/pending-approvals")
+    public ResponseEntity<MembersPageResponseDTO> getPendingApprovals(
+            @RequestParam(defaultValue = "1")  int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(memberService.getPendingApprovals(page, limit));
+    }
+
+    /**
+     * POST /api/members/{id}/approve-payment
+     * Body (optional): { "remarks": "..." }
+     * Approves a mobile Cash/Credit/Mixed purchase awaiting reception approval —
+     * unlocks the member's app access and posts the payment to the ledger.
+     */
+    @PostMapping("/{id}/approve-payment")
+    public ResponseEntity<MemberResponseDTO> approveMemberPayment(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> body,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        String approvedBy = principal != null ? principal.getUsername() : "Admin";
+        return ResponseEntity.ok(memberService.approveMemberPayment(id, approvedBy));
+    }
+
+    /**
+     * POST /api/members/{id}/reject-payment
+     * Body: { "reason": "..." }
+     * Rejects a mobile Cash/Credit/Mixed purchase — the member stays locked out and
+     * their membership is marked inactive.
+     */
+    @PostMapping("/{id}/reject-payment")
+    public ResponseEntity<?> rejectMemberPayment(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> body,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        String reason = body != null ? body.get("reason") : null;
+        if (reason == null || reason.isBlank()) {
+            return ResponseEntity.badRequest().body("A rejection reason is required");
+        }
+        String rejectedBy = principal != null ? principal.getUsername() : "Admin";
+        return ResponseEntity.ok(memberService.rejectMemberPayment(id, rejectedBy, reason));
+    }
+
+    /**
      * GET /api/members/me
      * Returns the member record for the currently authenticated user (extracted from JWT).
      */

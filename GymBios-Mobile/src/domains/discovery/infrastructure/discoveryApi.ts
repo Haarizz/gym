@@ -1,5 +1,6 @@
 import { apiClient } from '@/core/network/apiClient';
 import type { CenterSummary, CenterDetails, CenterPlan } from '../domain/models';
+import type { PaymentResult } from '@/shared/payment/types';
 
 export const discoveryApi = {
   getCenters: async (): Promise<CenterSummary[]> => {
@@ -83,10 +84,24 @@ export const discoveryApi = {
     }));
   },
 
-  purchaseMembership: async (tenantSlug: string, branchId: number, planId: number): Promise<any> => {
+  purchaseMembership: async (
+    tenantSlug: string,
+    branchId: number,
+    planId: number,
+    payment?: PaymentResult
+  ): Promise<any> => {
     const response = await apiClient.post<any>(
       `/mobile/discovery/centers/${tenantSlug}/${branchId}/purchase`,
-      { planId }
+      {
+        planId,
+        paymentMethodUsed: payment?.paymentMethodUsed,
+        paymentBreakdown: payment?.paymentBreakdown,
+        paidAmount: payment?.summary.paidAmount,
+        outstandingBalance: payment?.outstandingBalance,
+        paymentDueDate: payment?.summary.paymentDueDate,
+        bankAccountCode: payment?.bankAccountCode,
+        bankAccountName: payment?.bankAccountName,
+      }
     );
     return response.data;
   },

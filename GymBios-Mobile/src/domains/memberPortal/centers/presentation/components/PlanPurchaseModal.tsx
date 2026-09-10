@@ -33,18 +33,33 @@ export function PlanPurchaseModal({
         tenantSlug: center.tenantSlug,
         branchId: center.branchId,
         planId: plan.id,
+        payment: result,
       },
       {
-        onSuccess: () => {
-          toast.success(`You have successfully subscribed to ${plan.name} at ${center.centerName}. Your membership is now active!`, {
-            title: 'Purchase Successful! 🎉',
-            duration: 4000,
-          });
-          
-          // Import useAuthStore dynamically or normally
+        onSuccess: (data: any) => {
+          const approvalStatus = data?.approval_status;
+
+          // Switch into this gym's tenant context either way — a pending member
+          // still needs X-Tenant-ID sent on later requests (e.g. GET /members/me)
+          // so the app can detect and display the pending/locked state. The backend
+          // (TenantContextFilter) blocks every member-facing endpoint except
+          // discovery/profile/auth while approval_status is PENDING, regardless of
+          // this switch, so it does not grant early access.
           const { setActiveTenant } = require('@/domains/auth/store/authStore').useAuthStore.getState();
           setActiveTenant(center.tenantSlug);
-          
+
+          if (approvalStatus === 'PENDING') {
+            toast.success(
+              `Your payment for ${plan.name} at ${center.centerName} is submitted and awaiting approval from gym staff.`,
+              { title: 'Payment Submitted', duration: 5000 }
+            );
+          } else {
+            toast.success(`You have successfully subscribed to ${plan.name} at ${center.centerName}. Your membership is now active!`, {
+              title: 'Purchase Successful! 🎉',
+              duration: 4000,
+            });
+          }
+
           onSuccess();
           onClose();
         },

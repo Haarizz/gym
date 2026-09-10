@@ -386,6 +386,67 @@ public class ReceiptService {
         return createReceiptForMember(member, transactionType, paymentStatus, null, null, null, null);
     }
 
+    /**
+     * Stamps a freshly-created receipt as awaiting reception approval (mobile
+     * Cash/Credit/Mixed purchase — see MobileDiscoveryController) and saves it.
+     * Called from MemberService.createMember right after the receipt is created,
+     * before the general-ledger posting that createMember then skips for it.
+     */
+    public Receipt markPendingApproval(Receipt receipt) {
+        receipt.setApprovalStatus("PENDING");
+        return receiptRepository.save(receipt);
+    }
+
+    /**
+     * The receipt awaiting reception approval for a member's mobile Cash/Credit/
+     * Mixed purchase, or null if there isn't one — used by
+     * MemberService.approveMemberPayment/rejectMemberPayment.
+     */
+    public Receipt findPendingReceiptForMember(Long memberDbId) {
+        return receiptRepository.findTopByMemberDbIdAndApprovalStatusOrderByIdDesc(memberDbId, "PENDING")
+                .orElse(null);
+    }
+
+    /**
+     * Marks a pending receipt APPROVED and, now that reception has confirmed the
+     * cash/credit was actually received, posts it to the General Ledger — deferred
+     * from creation time specifically for PENDING receipts (see
+     * MemberService.createMember).
+     */
+    public Receipt approveReceipt(Receipt receipt, String approvedBy) {
+        receipt.setApprovalStatus("APPROVED");
+        receipt.setApprovedBy(approvedBy);
+        receipt.setApprovedAt(LocalDateTime.now());
+        Receipt saved = receiptRepository.save(receipt);
+
+        if (saved.getPaidAmount() != null && saved.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            financialEventService.onMemberPaymentReceived(saved);
+            receiptVoucherService.createVoucherFromModule(
+                    "Member Registration – " + saved.getMemberName(),
+                    "Membership",
+                    saved.getMemberName(),
+                    saved.getMemberDbId(),
+                    saved.getPaidAmount(),
+                    saved.getPaymentMethod(),
+                    saved.getMemberId(),
+                    null,
+                    "New member: " + saved.getPlanName()
+                            + (saved.getBankAccountName() != null && !saved.getBankAccountName().isBlank()
+                                    ? " | Bank: " + saved.getBankAccountName() : ""),
+                    saved.getPaymentBreakdown()
+            );
+        }
+        return saved;
+    }
+
+    public Receipt rejectReceipt(Receipt receipt, String rejectedBy, String reason) {
+        receipt.setApprovalStatus("REJECTED");
+        receipt.setApprovedBy(rejectedBy);
+        receipt.setApprovedAt(LocalDateTime.now());
+        receipt.setRejectionReason(reason);
+        return receiptRepository.save(receipt);
+    }
+
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,
                                           List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown) {
         return createReceiptForMember(member, transactionType, paymentStatus, paymentBreakdown, null, null, null);

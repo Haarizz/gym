@@ -194,6 +194,23 @@ public class Member extends BaseEntity implements BranchAware {
     @Column(name = "wallet_balance", precision = 12, scale = 2)
     private BigDecimal walletBalance = BigDecimal.ZERO;
 
+    // Reception/admin approval gate for a mobile self-service purchase paid by
+    // Cash/Credit/Mixed — null when no approval was ever required (in-person
+    // registration, or a mobile purchase paid by Card/Cheque/Online, which stay
+    // auto-active). "PENDING" blocks mobile app access via appAccessEnabled until
+    // staff approves or rejects it in the web app's Approvals tab.
+    @Column(name = "approval_status")
+    private String approvalStatus;
+
+    @Column(name = "approved_by")
+    private String approvedBy;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     public Member() {}
 
     // ── Getters & Setters ───────────────────────────────────────────────────
@@ -363,6 +380,18 @@ public class Member extends BaseEntity implements BranchAware {
 
     public BigDecimal getWalletBalance() { return walletBalance; }
     public void setWalletBalance(BigDecimal walletBalance) { this.walletBalance = walletBalance; }
+
+    public String getApprovalStatus() { return approvalStatus; }
+    public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+
+    public LocalDateTime getApprovedAt() { return approvedAt; }
+    public void setApprovedAt(LocalDateTime approvedAt) { this.approvedAt = approvedAt; }
+
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 
     @Column(name = "global_user_id")
     private Long globalUserId;

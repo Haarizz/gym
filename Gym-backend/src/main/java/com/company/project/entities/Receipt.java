@@ -135,6 +135,22 @@ public class Receipt extends BaseEntity implements BranchAware {
     @Column(name = "invoice_id")
     private Long invoiceId;
 
+    // Mirrors Member.approvalStatus for the receipt tied to a pending mobile
+    // Cash/Credit/Mixed purchase — null when no approval was required. Kept on the
+    // receipt (not just the member) so the general-ledger posting can be deferred
+    // until approval regardless of what the member's own status becomes later.
+    @Column(name = "approval_status")
+    private String approvalStatus;
+
+    @Column(name = "approved_by")
+    private String approvedBy;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     public Receipt() {}
 
     // ── Getters & Setters ────────────────────────────────────────────────────
@@ -228,5 +244,17 @@ public class Receipt extends BaseEntity implements BranchAware {
 
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
+
+    public String getApprovalStatus() { return approvalStatus; }
+    public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+
+    public LocalDateTime getApprovedAt() { return approvedAt; }
+    public void setApprovedAt(LocalDateTime approvedAt) { this.approvedAt = approvedAt; }
+
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 
 }

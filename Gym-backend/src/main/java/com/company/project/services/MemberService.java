@@ -127,6 +127,81 @@ public class MemberService {
         return new MembersPageResponseDTO(dtos, pagination);
     }
 
+    /**
+     * Mobile Cash/Credit/Mixed purchases awaiting reception approval — backs the
+     * web app's Approvals tab. See MobileDiscoveryController.purchaseMembership for
+     * how a member lands in this state.
+     */
+    @Transactional(readOnly = true)
+    public MembersPageResponseDTO getPendingApprovals(int page, int limit) {
+        Pageable pageable = PageRequest.of(page - 1, limit);
+        Page<Member> memberPage = memberRepository.findByApprovalStatusOrderByJoinDateDesc("PENDING", pageable);
+
+        List<MemberResponseDTO> dtos = memberPage.getContent().stream()
+                .map(MemberResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+
+        PaginationDTO pagination = new PaginationDTO(
+                page, limit,
+                memberPage.getTotalElements(),
+                memberPage.getTotalPages()
+        );
+
+        return new MembersPageResponseDTO(dtos, pagination);
+    }
+
+    /**
+     * Reception/admin approves a mobile Cash/Credit/Mixed purchase: unlocks the
+     * member's app access and posts the deferred receipt to the General Ledger.
+     */
+    public MemberResponseDTO approveMemberPayment(Long memberId, String approvedBy) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
+        if (!"PENDING".equals(member.getApprovalStatus())) {
+            throw new BusinessRuleViolationException("This member has no payment awaiting approval");
+        }
+
+        com.company.project.entities.Receipt receipt = receiptService.findPendingReceiptForMember(member.getId());
+        if (receipt != null) {
+            receiptService.approveReceipt(receipt, approvedBy);
+        }
+
+        member.setApprovalStatus("APPROVED");
+        member.setApprovedBy(approvedBy);
+        member.setApprovedAt(LocalDateTime.now());
+        member.setAppAccessEnabled(true);
+        Member saved = memberRepository.save(member);
+
+        return MemberResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * Reception/admin rejects a mobile Cash/Credit/Mixed purchase: the member stays
+     * locked out and their membership is marked inactive rather than left "Active"
+     * with no valid payment behind it.
+     */
+    public MemberResponseDTO rejectMemberPayment(Long memberId, String rejectedBy, String reason) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
+        if (!"PENDING".equals(member.getApprovalStatus())) {
+            throw new BusinessRuleViolationException("This member has no payment awaiting approval");
+        }
+
+        com.company.project.entities.Receipt receipt = receiptService.findPendingReceiptForMember(member.getId());
+        if (receipt != null) {
+            receiptService.rejectReceipt(receipt, rejectedBy, reason);
+        }
+
+        member.setApprovalStatus("REJECTED");
+        member.setApprovedBy(rejectedBy);
+        member.setApprovedAt(LocalDateTime.now());
+        member.setRejectionReason(reason);
+        member.setMembershipStatus("inactive");
+        Member saved = memberRepository.save(member);
+
+        return MemberResponseDTO.fromEntity(saved);
+    }
+
     @Transactional(readOnly = true)
     public MemberResponseDTO getMemberByUserId(Long userId) {
         Member member = memberRepository.findByUserId(userId)
@@ -377,11 +452,23 @@ public class MemberService {
                 request.getBankAccountCode(), request.getBankAccountName(), combinedFee, minorCharges,
                 request.getProcessedByStaffId());
 
+        // A mobile self-service purchase paid by Cash/Credit/Mixed is awaiting
+        // reception approval (see MobileDiscoveryController) — mirror the member's
+        // approval gate onto its receipt too, so ledger posting below can be
+        // deferred until MemberApprovalService actually approves it.
+        if ("PENDING".equals(saved.getApprovalStatus())) {
+            receipt = receiptService.markPendingApproval(receipt);
+        }
+
         // Post to General Ledger for whatever amount was actually received — a partial/
         // credit payment (e.g. AED 5 received against a AED 45 invoice) must still post
         // the AED 5 through the real payment method; it is NOT skipped just because the
-        // member's overall status is "pending" rather than "paid".
-        if (receipt.getPaidAmount() != null && receipt.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+        // member's overall status is "pending" rather than "paid". A receipt still
+        // awaiting reception approval is the one exception — nothing is posted until
+        // staff confirms the cash/credit was actually received (see
+        // MemberApprovalService.approveMemberPayment, which posts it then).
+        if (!"PENDING".equals(receipt.getApprovalStatus())
+                && receipt.getPaidAmount() != null && receipt.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
             financialEventService.onMemberPaymentReceived(receipt);
             receiptVoucherService.createVoucherFromModule(
                     "Member Registration – " + saved.getName(),
@@ -510,6 +597,19 @@ public class MemberService {
         }
 
         return MemberResponseDTO.fromEntity(memberRepository.findById(id).orElseThrow());
+    }
+
+    /**
+     * Sets appAccessEnabled directly, bypassing the User/toggleMemberAccess flow —
+     * for globalUserId-linked mobile accounts (which have no local User row and are
+     * explicitly rejected by toggleMemberAccess). Used to lock/unlock a member's
+     * mobile access while their Cash/Credit/Mixed purchase awaits reception approval.
+     */
+    public MemberResponseDTO setAppAccessEnabled(Long id, boolean enabled) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + id));
+        member.setAppAccessEnabled(enabled);
+        return MemberResponseDTO.fromEntity(memberRepository.save(member));
     }
 
     public MemberResponseDTO toggleMemberAccess(Long id, boolean enabled) {
@@ -1238,6 +1338,7 @@ public class MemberService {
         if (r.getIsFamilyHead()        != null) m.setIsFamilyHead(r.getIsFamilyHead());
         if (r.getFamilyHeadId()        != null) m.setFamilyHeadId(r.getFamilyHeadId());
         if (r.getRelationshipToHead()  != null) m.setRelationshipToHead(r.getRelationshipToHead());
+        if (r.getApprovalStatus()      != null) m.setApprovalStatus(r.getApprovalStatus());
     }
 
     /**

@@ -349,6 +349,15 @@ public class DataInitializer implements CommandLineRunner {
         )) {
             grantPermissionIfMissing("TRAINER", key);
         }
+
+        // MEMBERS_APPROVE (Approvals tab — mobile Cash/Credit/Mixed purchases awaiting
+        // reception approval) is new on the MEMBERS module; ADMIN's GRANTS entry is
+        // PermissionCatalog.allKeys() but seedDefaultRolePermissions only ever applies
+        // to a role's FIRST seeding, so every already-provisioned gym's ADMIN needs
+        // this backfilled explicitly too, same as MANAGER/RECEPTIONIST below.
+        grantPermissionIfMissing("ADMIN", "MEMBERS_APPROVE");
+        grantPermissionIfMissing("MANAGER", "MEMBERS_APPROVE");
+        grantPermissionIfMissing("RECEPTIONIST", "MEMBERS_APPROVE");
     }
 
     private void seedDefaultRolePermissions(String roleName, List<String> permissionKeys) {

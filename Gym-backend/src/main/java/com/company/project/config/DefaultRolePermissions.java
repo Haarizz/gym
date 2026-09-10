@@ -53,7 +53,7 @@ public final class DefaultRolePermissions {
 
         List<String> managerGrants = new ArrayList<>(List.of(
                 "DASHBOARD_VIEW",
-                "MEMBERS_VIEW", "MEMBERS_CREATE", "MEMBERS_EDIT", "MEMBERS_EXPORT",
+                "MEMBERS_VIEW", "MEMBERS_CREATE", "MEMBERS_EDIT", "MEMBERS_EXPORT", "MEMBERS_APPROVE",
                 "MEMBER_CONNECT_VIEW", "MEMBER_CONNECT_CREATE", "MEMBER_CONNECT_EDIT", "MEMBER_CONNECT_EXPORT",
                 "PROMOTIONS_CAMPAIGN_VIEW", "PROMOTIONS_CAMPAIGN_CREATE", "PROMOTIONS_CAMPAIGN_EDIT", "PROMOTIONS_CAMPAIGN_EXPORT",
                 "REFERRALS_VIEW", "REFERRALS_CREATE", "REFERRALS_EDIT", "REFERRALS_EXPORT",
@@ -146,7 +146,7 @@ public final class DefaultRolePermissions {
         // Matches the spec's worked example exactly.
         GRANTS.put("RECEPTIONIST", List.of(
                 "DASHBOARD_VIEW",
-                "MEMBERS_VIEW", "MEMBERS_CREATE", "MEMBERS_EDIT",
+                "MEMBERS_VIEW", "MEMBERS_CREATE", "MEMBERS_EDIT", "MEMBERS_APPROVE",
                 "PAYMENTS_VIEW", "PAYMENTS_CREATE",
                 "REPORTS_VIEW"
         ));

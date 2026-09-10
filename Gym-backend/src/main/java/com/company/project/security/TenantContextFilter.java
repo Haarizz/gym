@@ -88,6 +88,14 @@ public class TenantContextFilter extends OncePerRequestFilter {
                             || path.startsWith("/api/community")
                             || path.startsWith("/api/notifications");
 
+                    // A member awaiting reception approval must still be able to check
+                    // their own status (approval_status/app_access_enabled) — otherwise
+                    // the app has no way to detect or display the pending/locked state
+                    // once the access-enabled check below starts blocking everything
+                    // else. Exempt ONLY from that specific check, not from the "not a
+                    // member of this gym" check above it.
+                    boolean isOwnStatusCheckPath = path.equals("/api/members/me");
+
                     boolean isStrictlyGlobalPath = path.startsWith("/api/mobile/auth/")
                             || path.startsWith("/api/mobile/profile/")
                             || path.startsWith("/api/mobile/discovery/");
@@ -98,9 +106,24 @@ public class TenantContextFilter extends OncePerRequestFilter {
                         // Validate multi-tenant authorization for global users on protected member paths
                         if (userDetails.isGlobal() && !isGlobalExemptPath) {
                             MemberRepository memberRepository = applicationContext.getBean(MemberRepository.class);
-                            if (!memberRepository.existsByGlobalUserId(userDetails.getId())) {
+                            var member = memberRepository.findByGlobalUserId(userDetails.getId()).orElse(null);
+                            if (member == null) {
                                 TenantContextHolder.clear();
                                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied: Not a member of this Gym");
+                                return;
+                            }
+                            // A Cash/Credit/Mixed mobile purchase awaiting reception approval
+                            // (see MobileDiscoveryController.purchaseMembership) has
+                            // appAccessEnabled=false until staff approve/reject it in the
+                            // web app's Approvals tab — block every other member-facing
+                            // mobile endpoint for this gym until then, so the restriction
+                            // can't be bypassed by calling an API other than /purchase.
+                            // /api/members/me stays reachable (see isOwnStatusCheckPath)
+                            // so the app can keep checking whether it's been resolved.
+                            if (!isOwnStatusCheckPath && Boolean.FALSE.equals(member.getAppAccessEnabled())) {
+                                TenantContextHolder.clear();
+                                response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                                        "Access Denied: Membership payment is awaiting approval");
                                 return;
                             }
                         }

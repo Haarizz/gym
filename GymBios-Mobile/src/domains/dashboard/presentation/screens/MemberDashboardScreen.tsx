@@ -4,6 +4,8 @@ import { GlassBlob, Loader } from '@/shared/components';
 import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMemberDashboard } from '../../hooks/useMemberDashboard';
+import { useMembershipApprovalStatus } from '@/domains/discovery/hooks/useMembershipApprovalStatus';
+import { PendingApprovalScreen } from '@/domains/discovery/presentation/PendingApprovalScreen';
 import { MemberWelcomeCard } from '../components/MemberWelcomeCard';
 import { MemberActiveMembershipCard } from '../components/MemberActiveMembershipCard';
 import { MemberCheckInCard } from '../components/MemberCheckInCard';
@@ -14,6 +16,7 @@ import { MemberOfferBanner } from '../components/MemberOfferBanner';
 
 export function MemberDashboardScreen() {
   const { data, isLoading, refetch, isRefetching } = useMemberDashboard();
+  const approval = useMembershipApprovalStatus();
   const insets = useSafeAreaInsets();
 
   if (isLoading && !data) {
@@ -21,6 +24,17 @@ export function MemberDashboardScreen() {
       <View style={styles.loaderContainer}>
         <Loader message="Loading member portal..." />
       </View>
+    );
+  }
+
+  if (approval.data?.approvalStatus === 'PENDING') {
+    return (
+      <PendingApprovalScreen
+        membershipPlan={approval.data.membershipPlan}
+        gymName={approval.data.gymName}
+        onRefresh={() => approval.refetch()}
+        isRefreshing={approval.isRefetching}
+      />
     );
   }
 

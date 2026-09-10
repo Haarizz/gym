@@ -115,6 +115,7 @@ import { Recruitment } from "./pages/recruitment";
 import { PayrollReports } from "./pages/payroll-reports";
 import { PayrollAnalytics } from "./pages/payroll-analytics";
 import { RolesPermissions } from "./pages/roles-permissions";
+import { Approvals } from "./pages/approvals";
 import { usePermissions, hasPermission } from "./utils/permissions";
 
 import ErrorBoundary from "./components/shared/error-boundary";
@@ -194,6 +195,13 @@ const menuItems = [
     id: "dashboard",
     path: "/dashboard",
     permission: "DASHBOARD_VIEW",
+  },
+  {
+    title: "Approvals",
+    icon: ClipboardList,
+    id: "approvals",
+    path: "/approvals",
+    permission: "MEMBERS_APPROVE",
   },
   {
     title: "Community",
@@ -1004,6 +1012,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to={isGymbiosAdmin ? "/gym-management" : "/dashboard"} replace />} />
       <Route path="/dashboard" element={<Dashboard onNavigate={handleNavClick} />} />
+      <Route path="/approvals" element={<Approvals />} />
       <Route path="/community" element={<Community />} />
       <Route path="/members" element={<Members onNavigate={handleNavClick} initialTab={navigationParams.tab} />} />
       <Route path="/members/add" element={<AddMember onNavigate={handleNavClick} />} />

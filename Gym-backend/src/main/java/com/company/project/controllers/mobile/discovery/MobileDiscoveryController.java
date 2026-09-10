@@ -24,6 +24,7 @@ import com.company.project.security.UserDetailsImpl;
 import com.company.project.dto.mobile.MobilePurchaseRequestDTO;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
+import com.company.project.services.NotificationService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import jakarta.persistence.EntityManagerFactory;
@@ -53,6 +54,17 @@ public class MobileDiscoveryController {
     private final MemberRepository memberRepository;
     private final com.company.project.services.GlobalUserService globalUserService;
     private final EntityManagerFactory entityManagerFactory;
+    private final NotificationService notificationService;
+
+    // Payment methods that require reception/admin approval before the member gets
+    // app access — cash and credit need physical/manual verification that the money
+    // was actually received or the credit terms are acceptable; mixed is included
+    // because it always contains at least one such leg. Matched case-insensitively
+    // against MobilePurchaseRequestDTO.paymentMethodUsed, which mirrors the mobile
+    // PaymentBottomSheet's method titles ("Cash", "Credit", "Mixed") rather than the
+    // narrower backend PaymentMethod enum (which has no CREDIT value).
+    private static final java.util.Set<String> APPROVAL_REQUIRED_METHODS =
+            java.util.Set.of("cash", "credit", "mixed");
 
     public MobileDiscoveryController(
             GlobalBranchDiscoveryRepository globalDiscoveryRepository,
@@ -64,7 +76,8 @@ public class MobileDiscoveryController {
             MemberService memberService,
             MemberRepository memberRepository,
             com.company.project.services.GlobalUserService globalUserService,
-            EntityManagerFactory entityManagerFactory) {
+            EntityManagerFactory entityManagerFactory,
+            NotificationService notificationService) {
         this.globalDiscoveryRepository = globalDiscoveryRepository;
         this.branchRepository = branchRepository;
         this.gymRepository = gymRepository;
@@ -75,6 +88,7 @@ public class MobileDiscoveryController {
         this.memberRepository = memberRepository;
         this.globalUserService = globalUserService;
         this.entityManagerFactory = entityManagerFactory;
+        this.notificationService = notificationService;
     }
 
     @GetMapping
@@ -234,26 +248,75 @@ public class MobileDiscoveryController {
             memberRequest.setMembershipPlanId(request.getPlanId());
             memberRequest.setMembershipType(plan.getPlanType() != null ? plan.getPlanType() : "Standard");
             memberRequest.setMembershipStatus("Active");
-            
+
+            // Payment details collected by the mobile PaymentBottomSheet — previously
+            // discarded (only planId was sent). Cash/Credit/Mixed require reception
+            // approval before the member gets app access; other methods (Card/Cheque/
+            // Bank Transfer/Online) stay auto-active exactly as before.
+            String paymentMethodUsed = request.getPaymentMethodUsed();
+            boolean requiresApproval = paymentMethodUsed != null
+                    && APPROVAL_REQUIRED_METHODS.contains(paymentMethodUsed.trim().toLowerCase());
+
+            if (paymentMethodUsed != null) memberRequest.setPaymentMethodUsed(paymentMethodUsed);
+            if (request.getPaymentBreakdown() != null) memberRequest.setPaymentBreakdown(request.getPaymentBreakdown());
+            if (request.getBankAccountCode() != null) memberRequest.setBankAccountCode(request.getBankAccountCode());
+            if (request.getBankAccountName() != null) memberRequest.setBankAccountName(request.getBankAccountName());
+            if (request.getPaymentDueDate() != null) memberRequest.setNextPaymentDate(request.getPaymentDueDate());
+            // Fee paid so far, derived the same way ReceiptService does elsewhere
+            // (invoice total − outstanding) — membershipFee/outstandingBalance are
+            // what actually drives paidAmount on the created receipt.
+            if (request.getPaidAmount() != null) {
+                BigDecimal planPrice = plan.getPrice() != null ? plan.getPrice() : BigDecimal.ZERO;
+                memberRequest.setMembershipFee(planPrice);
+                BigDecimal outstanding = request.getOutstandingBalance() != null
+                        ? request.getOutstandingBalance()
+                        : planPrice.subtract(request.getPaidAmount()).max(BigDecimal.ZERO);
+                memberRequest.setOutstandingBalance(outstanding);
+                memberRequest.setPaymentStatus(outstanding.compareTo(BigDecimal.ZERO) <= 0 ? "paid"
+                        : (request.getPaidAmount().compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending"));
+            }
+            if (requiresApproval) {
+                memberRequest.setApprovalStatus("PENDING");
+            }
+
             String todayIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
             memberRequest.setJoinDate(todayIso);
             memberRequest.setMembershipStartDate(todayIso);
 
             // Execute create (generates invoice/payment)
             MemberResponseDTO createdMember = memberService.createMember(memberRequest);
-            
+
             // Note: Currently, createMember doesn't take globalUserId in the DTO,
             // we should technically set it on the Member entity.
             // But since MemberService is complex, we use a service method or update it manually.
-            // Wait, we need to set globalUserId! 
-            // We can add it to MemberRequestDTO and have MemberService.applyRequest set it, 
+            // Wait, we need to set globalUserId!
+            // We can add it to MemberRequestDTO and have MemberService.applyRequest set it,
             // or just update it after creation. For safety without altering MemberService deeply,
             // we will update it in a separate step or add it to MemberRequestDTO.
             // Actually, we must use a service that updates it, or update it directly if we have MemberRepository.
             // Since we don't have MemberRepository here, we will just call a new method on MemberService
             // or add it to MemberRequestDTO. Let's assume we can add it to MemberRequestDTO later if needed.
             memberService.linkGlobalUser(Long.valueOf(createdMember.getId()), globalUserId);
-            
+
+            if (requiresApproval) {
+                // appAccessEnabled=false is the actual gate — TenantContextFilter 403s
+                // every other member-facing mobile endpoint while it's false (see its
+                // global-user authorization check). globalUserId-linked members aren't
+                // covered by the legacy User.enabled/toggleMemberAccess flow, hence the
+                // separate setter here instead of reusing that path.
+                createdMember = memberService.setAppAccessEnabled(Long.valueOf(createdMember.getId()), false);
+
+                notificationService.notifyRoles(
+                        List.of("ADMIN", "MANAGER", "RECEPTIONIST"),
+                        "Payment awaiting approval",
+                        createdMember.getName() + " paid via " + paymentMethodUsed
+                                + " for " + createdMember.getMembershipPlan() + " — needs reception approval.",
+                        "WARNING", "HIGH", "MEMBERS",
+                        Long.valueOf(createdMember.getId()), "/approvals",
+                        "PAYMENT_PENDING_" + createdMember.getId()
+                );
+            }
+
             return ResponseEntity.ok(createdMember);
         } finally {
             BranchContextHolder.clear();

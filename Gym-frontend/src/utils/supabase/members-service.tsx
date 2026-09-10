@@ -70,6 +70,13 @@ export interface Member {
   // Which staff member actually handled this sale — credited toward their revenue
   // target regardless of which account is logged in. Write-only (create/renew).
   processed_by_staff_id?: number;
+  // Reception/admin approval gate for a mobile self-service purchase paid by
+  // Cash/Credit/Mixed — undefined/null when no approval was ever required.
+  // "PENDING" means app_access_enabled is false until an Approvals action resolves it.
+  approval_status?: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  rejection_reason?: string | null;
 }
 
 // One row in the Add Member "Family Members" section, or the payload for
@@ -207,6 +214,37 @@ class MembersService {
       { method: 'PATCH', body: JSON.stringify({ enabled }) }
     );
     if (!response.ok) throw new Error(await parseApiError(response, `Failed to toggle member access: ${response.status}`));
+    return response.json();
+  }
+
+  // Mobile Cash/Credit/Mixed purchases awaiting reception approval — Approvals tab.
+  async getPendingApprovals(pagination: PaginationParams = {}): Promise<MembersResponse> {
+    const params = new URLSearchParams();
+    if (pagination.page)  params.append('page',  String(pagination.page));
+    if (pagination.limit) params.append('limit', String(pagination.limit));
+
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/pending-approvals?${params.toString()}`
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch pending approvals: ${response.status}`));
+    return response.json();
+  }
+
+  async approveMemberPayment(id: string): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/approve-payment`,
+      { method: 'POST', body: JSON.stringify({}) }
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to approve payment: ${response.status}`));
+    return response.json();
+  }
+
+  async rejectMemberPayment(id: string, reason: string): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/reject-payment`,
+      { method: 'POST', body: JSON.stringify({ reason }) }
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to reject payment: ${response.status}`));
     return response.json();
   }
 
