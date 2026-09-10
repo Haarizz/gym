@@ -38,6 +38,14 @@ public class GeocodingService {
                 .queryParam("format", "jsonv2")
                 .queryParam("addressdetails", 0)
                 .queryParam("limit", RESULT_LIMIT)
+                // This platform operates across India and the UAE, and Nominatim's
+                // free-text fuzzy matching pulls in loosely-related results from
+                // anywhere in the world on short/partial queries (e.g. "Sakthy")
+                // without this hint. dedupe collapses near-identical entries (same
+                // place, different OSM elements) that otherwise pad out the
+                // RESULT_LIMIT with redundant noise.
+                .queryParam("countrycodes", "in,ae")
+                .queryParam("dedupe", 1)
                 .toUriString();
 
         try {
