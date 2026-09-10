@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glass Tab Bar — Fix Reference</title>
+<style>
+  :root{
+    --teal: #1B5A4C;
+    --gold: #F2BB3D;
+    --amber: #E58A3D;
+    --navy: #1E2A3A;
+    --slate-muted: rgba(30,42,58,0.45);
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    font-family: 'SF Pro Display','Segoe UI',system-ui,-apple-system,sans-serif;
+    background: #EEF1F5;
+    color: var(--navy);
+    padding: 40px 20px 100px;
+  }
+  h1{ font-size:22px; margin: 0 auto 6px; max-width:900px; }
+  p.lead{ color:#5B6472; font-size:14px; max-width:640px; margin: 0 auto 40px; line-height:1.6;}
+  .wrap{ max-width: 900px; margin: 0 auto; }
+
+  .block{ margin-bottom: 56px; }
+  .block h2{ font-size:15px; margin: 0 0 4px; }
+  .block .note{ color:#5B6472; font-size:13px; margin: 0 0 18px; }
+
+  /* ---------- BEFORE (broken) ---------- */
+  .stage-dark{
+    background: radial-gradient(circle at 70% 20%, #1a4a55, #06181c 70%);
+    border-radius: 24px;
+    padding: 50px 30px;
+  }
+  .before-bar{
+    max-width: 420px;
+    margin: 0 auto;
+    display:flex;
+    justify-content:space-around;
+    padding: 8px 6px;
+    background: rgba(255,255,255,0.68);
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: 26px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+  }
+  .before-item{
+    display:flex; flex-direction:column; align-items:center;
+    padding: 10px 18px 22px; /* the leftover bottom padding = the visible gap bug */
+    border-radius: 18px;
+  }
+  .before-item.active{
+    background: #ffffff; /* white on near-white = invisible */
+  }
+  .before-item svg{ width:22px; height:22px; color: var(--navy); opacity:0.5; }
+  .before-item.active svg{ color: var(--navy); opacity:0.9; }
+
+  .tag{
+    display:inline-block;
+    font-size:11px;
+    font-weight:700;
+    padding: 3px 9px;
+    border-radius:999px;
+    margin-bottom:10px;
+  }
+  .tag-bad{ background:#FBE3E3; color:#B3261E; }
+  .tag-good{ background:#DDF2E6; color:#146C43; }
+
+  /* ---------- AFTER (fixed) ---------- */
+  .fixed-bar{
+    max-width: 420px;
+    margin: 0 auto;
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    padding: 10px;
+    gap: 4px;
+    background: rgba(255,255,255,0.35);
+    border: 1px solid rgba(255,255,255,0.55);
+    border-radius: 26px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .fixed-item{
+    width: 48px;
+    height: 48px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius: 16px;
+    position: relative;
+  }
+  .fixed-item svg{
+    width: 22px;
+    height: 22px;
+    color: var(--slate-muted);
+    stroke-width: 2;
+    transition: color .15s ease;
+  }
+  .fixed-item.active{
+    background: var(--tint-wash);
+    border: 1px solid var(--tint-ring);
+    box-shadow: 0 0 0 1px var(--tint-ring) inset, 0 4px 12px var(--tint-shadow);
+  }
+  .fixed-item.active svg{ color: var(--tint-solid); }
+
+  .theme-teal   { --tint-wash: rgba(27,90,76,0.16);  --tint-ring: rgba(27,90,76,0.4);  --tint-shadow: rgba(27,90,76,0.25);  --tint-solid: #1B5A4C; }
+  .theme-gold   { --tint-wash: rgba(242,187,61,0.22); --tint-ring: rgba(242,187,61,0.5); --tint-shadow: rgba(229,165,33,0.3); --tint-solid: #C98A0E; }
+  .theme-amber  { --tint-wash: rgba(229,138,61,0.2);  --tint-ring: rgba(229,138,61,0.45);--tint-shadow: rgba(229,138,61,0.28);--tint-solid: #B96A22; }
+
+  .stage-dark-fixed{
+    background: radial-gradient(circle at 70% 20%, #1a4a55, #06181c 70%);
+    border-radius: 24px;
+    padding: 50px 30px;
+  }
+  .row{ display:flex; gap:24px; flex-wrap:wrap; justify-content:center; margin-top:26px;}
+  .row .col{ text-align:center; }
+  .row .col span{ display:block; font-size:11px; color:#5B6472; margin-top:8px; font-weight:600;}
+
+  /* ---------- IN CONTEXT: light app background ---------- */
+  .phone-preview{
+    max-width: 340px;
+    margin: 0 auto;
+    border-radius: 30px;
+    overflow:hidden;
+    background: linear-gradient(180deg, #EEF1F5, #E4E8ED);
+    padding: 24px 14px 14px;
+    position:relative;
+    box-shadow: 0 20px 50px rgba(20,25,35,0.18);
+  }
+  .phone-preview .fake-blob{
+    position:absolute;
+    width:220px; height:220px;
+    border-radius:50%;
+    background: radial-gradient(circle, rgba(27,90,76,0.35), rgba(27,90,76,0));
+    bottom: -40px; left: -60px;
+    z-index:0;
+  }
+  .phone-preview .fixed-bar{ position:relative; z-index:1; }
+
+  code{
+    display:block;
+    white-space:pre;
+    background: #1c2430;
+    color: #d9e4f0;
+    padding: 16px 18px;
+    border-radius: 12px;
+    font-size: 12.5px;
+    line-height:1.6;
+    overflow-x:auto;
+    margin-top: 20px;
+  }
+  .icons-legend{
+    display:flex; gap:18px; justify-content:center; margin-top:18px; flex-wrap:wrap;
+  }
+  .icons-legend div{ display:flex; align-items:center; gap:6px; font-size:12px; color:#5B6472; }
+  .swatch{ width:12px; height:12px; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Glass tab bar — before / after</h1>
+  <p class="lead">The two bugs come from the same root cause: the tab items were sized for icon+label, then the label was removed without resizing the box, and the active state reused a plain white fill that has nothing to contrast against on a light/glass background.</p>
+
+  <div class="block">
+    <span class="tag tag-bad">Before — current behaviour</span>
+    <h2>Fixed-height item with leftover label padding, white active fill</h2>
+    <p class="note">Notice the extra empty space below each icon, and the active "Home" tab barely readable against the frosted white bar.</p>
+    <div class="stage-dark">
+      <div class="before-bar">
+        <div class="before-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+        </div>
+        <div class="before-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.3l2.3 2.3 4.7-4.9"/></svg>
+        </div>
+        <div class="before-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+        </div>
+        <div class="before-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/><path d="M12 12l4-4"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <span class="tag tag-good">After — fixed</span>
+    <h2>Square item, centered icon, colour-tinted active state</h2>
+    <p class="note">Same 48×48 box for every item regardless of state. Active item gets a low-opacity wash of the role's primary colour, a thin ring in the same hue, and the icon itself renders solid in that colour. Inactive icons drop to a muted slate so the active one reads clearly at a glance — mirrors the reference image's dark-glass bar, adapted for a light/glass context.</p>
+    <div class="stage-dark-fixed">
+      <div class="row">
+        <div class="col">
+          <div class="fixed-bar">
+            <div class="fixed-item active theme-teal">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+            </div>
+            <div class="fixed-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.3l2.3 2.3 4.7-4.9"/></svg>
+            </div>
+            <div class="fixed-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            </div>
+            <div class="fixed-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/><path d="M12 12l4-4"/></svg>
+            </div>
+          </div>
+          <span>Teal (member/default)</span>
+        </div>
+
+        <div class="col">
+          <div class="fixed-bar">
+            <div class="fixed-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+            </div>
+            <div class="fixed-item active theme-gold">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.3l2.3 2.3 4.7-4.9"/></svg>
+            </div>
+            <div class="fixed-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            </div>
+            <div class="fixed-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/><path d="M12 12l4-4"/></svg>
+            </div>
+          </div>
+          <span>Gold (member accent)</span>
+        </div>
+
+        <div class="col">
+          <div class="fixed-bar">
+            <div class="fixed-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+            </div>
+            <div class="fixed-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.3l2.3 2.3 4.7-4.9"/></svg>
+            </div>
+            <div class="fixed-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            </div>
+            <div class="fixed-item active theme-amber">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/><path d="M12 12l4-4"/></svg>
+            </div>
+          </div>
+          <span>Amber (trainer accent)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>In context — over the app's light background</h2>
+    <p class="note">Confirms the lower opacity (0.35 fill vs the old 0.68) still holds up against a pale surface, not just the dark reference image.</p>
+    <div class="phone-preview">
+      <div class="fake-blob"></div>
+      <div class="fixed-bar">
+        <div class="fixed-item active theme-teal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+        </div>
+        <div class="fixed-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+        </div>
+        <div class="fixed-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.7.5 4.5 2.4 4.5 4.8"/></svg>
+        </div>
+        <div class="fixed-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
+        </div>
+        <div class="fixed-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.2"/><path d="M2.5 9.5h19"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>React Native translation</h2>
+    <p class="note"><code>primaryColor</code> here is the per-role <code>resolvedColors[0]</code> already computed in <code>RoleTabsLayout.tsx</code> — same value used for the header tint.</p>
+<code>const tabBar = {
+  flexDirection: 'row',
+  justifyContent: 'space-around',
+  alignItems: 'center',
+  padding: 10,
+  gap: 4,
+  backgroundColor: 'rgba(255,255,255,0.35)',   // was 0.68 (Glass.fillStrong)
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.55)',
+  borderRadius: 26,
+};
+
+const tabItem = {
+  width: 48,          // fixed box — no residual label padding
+  height: 48,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 16,
+};
+
+const tabItemActive = (primaryColor) => ({
+  backgroundColor: `${primaryColor}29`,   // ~16% wash
+  borderWidth: 1,
+  borderColor: `${primaryColor}66`,       // ~40% ring
+});
+
+const iconColor = (isActive, primaryColor) =>
+  isActive ? primaryColor : 'rgba(30,42,58,0.45)';</code>
+  </div>
+
+</div>
+</body>
+</html>

@@ -26,6 +26,7 @@ import {
   MODULE_ROUTES,
 } from './layoutRoutes';
 import { TabIcon } from './tabConfigs';
+import { RoleTabBarStyles, renderTabBarBackground, renderTabBarIcon } from './RoleTabBar';
 
 export type { TabIcon };
 export * from './layoutRoutes';
@@ -43,6 +44,8 @@ interface RoleTabsLayoutProps {
     icon: TabIcon;
   }>;
 }
+
+
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -90,7 +93,7 @@ export function RoleTabsLayout({
   return (
     <SafeAreaView
       edges={isFullScreen ? [] : ['top']}
-      style={[styles.safeArea, { backgroundColor: isFullScreen ? BrandColors.screenBackground : resolvedColors[0] }]}>
+      style={styles.safeArea}>
       <View style={styles.container}>
         {!isFullScreen && showRoleHeader && (
           <GlassSurface tint={resolvedColors} radius={0} style={styles.header}>
@@ -115,7 +118,7 @@ export function RoleTabsLayout({
 
               <View style={styles.headerTextContainer}>
                 <Text style={styles.greeting}>{greeting}</Text>
-                <Pressable 
+                <Pressable
                   onPress={() => isAdmin && setIsBranchSelectorOpen(true)}
                   style={{ flexDirection: 'row', alignItems: 'center' }}
                 >
@@ -161,26 +164,22 @@ export function RoleTabsLayout({
             tabBarActiveTintColor: activeColor,
             tabBarInactiveTintColor: '#94A3B8',
 
-            tabBarShowLabel: true,
+            tabBarShowLabel: false,
+            tabBarIconStyle: { marginBottom: 0 },
 
             tabBarStyle: [
-              styles.tabBar,
+              RoleTabBarStyles.tabBar,
               {
-                height: TAB_BAR_HEIGHT + insets.bottom,
-                paddingBottom: TAB_BAR_BOTTOM_PADDING + insets.bottom,
+                bottom: (insets.bottom > 0 ? insets.bottom : 24) + 6,
               },
               (isFullScreen || isCommunityScreen) && {
                 display: 'none',
               },
             ],
 
-            tabBarItemStyle: styles.tabItem,
+            tabBarItemStyle: RoleTabBarStyles.tabItem,
 
-            tabBarLabelStyle: styles.tabLabel,
-
-            tabBarIconStyle: {
-              marginBottom: 2,
-            },
+            tabBarBackground: renderTabBarBackground(),
           }}>
           {tabs.map((tab) => (
             <Tabs.Screen
@@ -190,13 +189,7 @@ export function RoleTabsLayout({
                 title: tab.title,
                 tabBarLabel: tab.title,
                 href: (tab.name === 'index' ? `/${roleGroup}` : `/${roleGroup}/${tab.name}`) as any,
-                tabBarIcon: ({ color, size }) => (
-                  <Feather
-                    name={tab.icon}
-                    color={color}
-                    size={size}
-                  />
-                ),
+                tabBarIcon: renderTabBarIcon(tab.icon, activeColor),
               }}
             />
           ))}
@@ -287,6 +280,10 @@ const MODULES_FAB_BOTTOM_PADDING = 18;
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    // Always screen background — the header GlassSurface provides the role
+    // colour. This makes the rounded bottom-corner gaps invisible since they
+    // blend with the screen content below.
+    backgroundColor: BrandColors.screenBackground,
   },
 
   container: {
@@ -365,46 +362,7 @@ const styles = StyleSheet.create({
     lineHeight: 11,
   },
 
-  tabBar: {
-    position: 'absolute',
 
-    left: 0,
-    right: 0,
-    bottom: 0,
-
-    // height and paddingBottom are set dynamically (see tabBarStyle above)
-    // so the tab bar clears the device's actual system nav/gesture inset.
-    paddingTop: 8,
-
-    backgroundColor: Glass.fillStrong,
-
-    borderTopWidth: 1,
-    borderTopColor: Glass.border,
-
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-
-    elevation: 16,
-
-    shadowColor: Glass.shadowColor,
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-  },
-
-  tabItem: {
-    paddingVertical: 4,
-    gap: 2,
-  },
-
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 2,
-  },
 
   modulesFabContainer: {
     position: 'absolute',

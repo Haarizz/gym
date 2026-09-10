@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, Loader } from '@/shared/components';
+import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AdminReportType } from '../../domain/AdminDashboardData';
 import { useAdminDashboard } from '../../hooks/useAdminDashboard';
 import { AdminTopControls } from '../components/AdminTopControls';
@@ -15,6 +17,7 @@ import { AdminReportDetailSheet } from '../components/AdminReportDetailSheet';
 export function AdminDashboardScreen() {
   const [selectedReport, setSelectedReport] = useState<AdminReportType>(null);
   const { data, isLoading, refetch, isRefetching } = useAdminDashboard();
+  const insets = useSafeAreaInsets();
 
   if (isLoading && !data) {
     return (
@@ -26,11 +29,15 @@ export function AdminDashboardScreen() {
 
   return (
     <View style={styles.root}>
-      <GlassBlob color={BrandColors.teal} size={260} opacity={0.22} top={-70} right={-80} />
-      <GlassBlob color={BrandColors.tealDark} size={220} opacity={0.18} top={420} left={-90} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 280, overflow: 'hidden' }} pointerEvents="none">
+        <GlassBlob color={BrandColors.teal} size={260} opacity={0.22} top={-70} right={-80} />
+      </View>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 24 }
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -80,7 +87,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: Spacing.four,
-    paddingBottom: Spacing.six + 40,
     gap: Spacing.four,
   },
   loaderContainer: {
