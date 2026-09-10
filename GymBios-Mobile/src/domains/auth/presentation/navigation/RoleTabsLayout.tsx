@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
-import { BrandColors } from '@/core/theme';
+import { BrandColors, Glass } from '@/core/theme';
 import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { AppBottomSheet, GlassSurface, ModuleSheet } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
@@ -26,6 +26,7 @@ import {
   MODULE_ROUTES,
 } from './layoutRoutes';
 import { TabIcon } from './tabConfigs';
+import { RoleTabBarStyles, renderTabBarBackground, renderTabBarIcon } from './RoleTabBar';
 
 export type { TabIcon };
 export * from './layoutRoutes';
@@ -43,6 +44,8 @@ interface RoleTabsLayoutProps {
     icon: TabIcon;
   }>;
 }
+
+
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -162,22 +165,21 @@ export function RoleTabsLayout({
             tabBarInactiveTintColor: '#94A3B8',
 
             tabBarShowLabel: false,
+            tabBarIconStyle: { marginBottom: 0 },
 
             tabBarStyle: [
-              styles.tabBar,
+              RoleTabBarStyles.tabBar,
               {
-                bottom: insets.bottom > 0 ? insets.bottom : 24,
+                bottom: (insets.bottom > 0 ? insets.bottom : 24) + 6,
               },
               (isFullScreen || isCommunityScreen) && {
                 display: 'none',
               },
             ],
 
-            tabBarItemStyle: styles.tabItem,
+            tabBarItemStyle: RoleTabBarStyles.tabItem,
 
-            tabBarBackground: () => (
-              <GlassSurface radius={26} style={StyleSheet.absoluteFill} />
-            ),
+            tabBarBackground: renderTabBarBackground(),
           }}>
           {tabs.map((tab) => (
             <Tabs.Screen
@@ -187,25 +189,7 @@ export function RoleTabsLayout({
                 title: tab.title,
                 tabBarLabel: tab.title,
                 href: (tab.name === 'index' ? `/${roleGroup}` : `/${roleGroup}/${tab.name}`) as any,
-                tabBarIcon: ({ color, size, focused }) => {
-                  const iconColor = focused ? activeColor : 'rgba(30,42,58,0.45)';
-                  return (
-                    <View style={[
-                      styles.iconContainer,
-                      focused && {
-                        backgroundColor: `${activeColor}29`,
-                        borderWidth: 1,
-                        borderColor: `${activeColor}66`,
-                      }
-                    ]}>
-                      <Feather
-                        name={tab.icon}
-                        color={iconColor}
-                        size={22}
-                      />
-                    </View>
-                  );
-                },
+                tabBarIcon: renderTabBarIcon(tab.icon, activeColor),
               }}
             />
           ))}
@@ -378,40 +362,7 @@ const styles = StyleSheet.create({
     lineHeight: 11,
   },
 
-  tabBar: {
-    position: 'absolute',
 
-    left: 20,
-    right: 20,
-
-    height: 72,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-
-    // Visuals (fill, blur, border, shadow) come entirely from the
-    // GlassSurface rendered via tabBarBackground below — this container
-    // only needs to be transparent and clip the icon row to the pill shape.
-    backgroundColor: 'transparent',
-    borderRadius: 26,
-    overflow: 'hidden',
-
-    zIndex: 40,
-  },
-
-  tabItem: {
-    flex: 1,
-    paddingVertical: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   modulesFabContainer: {
     position: 'absolute',

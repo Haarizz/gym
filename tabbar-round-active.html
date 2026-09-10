@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tab Bar — Round Active Icon Reference</title>
+<style>
+  :root{
+    --gold: #F2BB3D;
+    --gold-deep: #C98A0E;
+    --navy: #1E2A3A;
+    --slate-muted: rgba(30,42,58,0.45);
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    font-family: 'SF Pro Display','Segoe UI',system-ui,-apple-system,sans-serif;
+    background: #EEF1F5;
+    color: var(--navy);
+    padding: 40px 20px 100px;
+  }
+  .wrap{ max-width: 760px; margin: 0 auto; }
+  h1{ font-size: 20px; margin: 0 0 8px; }
+  p.lead{ color:#5B6472; font-size:14px; line-height:1.6; margin: 0 0 36px; max-width: 620px;}
+
+  .block{ margin-bottom: 48px; }
+  .block h2{ font-size:14.5px; margin:0 0 4px; }
+  .block .note{ color:#5B6472; font-size:13px; margin:0 0 18px; line-height:1.5;}
+
+  .tag{
+    display:inline-block; font-size:11px; font-weight:700;
+    padding:3px 9px; border-radius:999px; margin-bottom:10px;
+  }
+  .tag-bad{ background:#FBE3E3; color:#B3261E; }
+  .tag-good{ background:#DDF2E6; color:#146C43; }
+
+  /* card-like scroll content behind, to test separation */
+  .fake-screen{
+    background: #F6F7F9;
+    border-radius: 24px;
+    padding: 24px 16px 90px;
+    position: relative;
+    overflow: hidden;
+  }
+  .fake-card{
+    background: #fff;
+    border-radius: 20px;
+    padding: 18px 18px 60px;
+    box-shadow: 0 1px 2px rgba(20,25,35,0.05);
+  }
+  .fake-card-title{
+    display:flex; justify-content:space-between; align-items:center;
+    font-weight:800; font-size:16px;
+  }
+  .fake-card-title span{ color: var(--gold-deep); font-weight:700; font-size:13px;}
+
+  /* ---------- BEFORE: square highlight, weak separation ---------- */
+  .tabbar-before{
+    position: absolute;
+    left: 16px; right: 16px; bottom: 14px;
+    height: 62px;
+    display:flex; justify-content:space-around; align-items:center;
+    background: rgba(255,255,255,0.55);
+    border: 1px solid rgba(255,255,255,1);
+    border-radius: 26px;
+  }
+  .tabitem-before{
+    width: 44px; height: 44px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius: 14px;
+  }
+  .tabitem-before.active{
+    background: rgba(242,187,61,0.28);
+    border: 1px solid rgba(242,187,61,0.5);
+  }
+  .tabitem-before svg{ width:20px; height:20px; color: var(--slate-muted); }
+  .tabitem-before.active svg{ color: var(--gold-deep); }
+
+  /* ---------- AFTER: round pill highlight, clear separation ---------- */
+  .tabbar-after{
+    position: absolute;
+    left: 16px; right: 16px; bottom: 20px;
+    height: 66px;
+    display:flex; justify-content:space-around; align-items:center;
+    background: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.9);
+    border-radius: 33px;
+    overflow: hidden;
+    box-shadow:
+      0 14px 30px rgba(20,25,35,0.16),
+      0 2px 6px rgba(20,25,35,0.08),
+      inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+  /* subtle outer hairline so the edge reads even on a white screen */
+  .tabbar-after::after{
+    content:"";
+    position:absolute; inset:0;
+    border-radius: 33px;
+    border: 1px solid rgba(30,42,58,0.06);
+    pointer-events:none;
+  }
+  .tabitem-after{
+    width: 46px; height: 46px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius: 999px; /* round, not square */
+  }
+  .tabitem-after.active{
+    background: radial-gradient(circle at 35% 30%, rgba(255,224,140,0.95), rgba(242,187,61,0.55));
+    box-shadow: 0 4px 10px rgba(229,165,33,0.35), inset 0 1px 0 rgba(255,255,255,0.7);
+  }
+  .tabitem-after svg{ width:21px; height:21px; color: var(--slate-muted); stroke-width:2; }
+  .tabitem-after.active svg{ color: #7A4E06; }
+
+  code{
+    display:block; white-space:pre;
+    background:#1c2430; color:#d9e4f0;
+    padding:16px 18px; border-radius:12px;
+    font-size:12.5px; line-height:1.6;
+    overflow-x:auto; margin-top:20px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Round active icon + clearer glass separation</h1>
+  <p class="lead">Two changes: the active tab's highlight is now a full circle (not a rounded square), and the bar itself has a stronger shadow + faint outer hairline so it visibly separates from a white card sitting directly behind it, instead of merging into it.</p>
+
+  <div class="block">
+    <span class="tag tag-bad">Before</span>
+    <h2>Square active highlight, bar blends into the white card above</h2>
+    <div class="fake-screen">
+      <div class="fake-card">
+        <div class="fake-card-title">Today's Schedule <span>View All</span></div>
+      </div>
+      <div class="tabbar-before">
+        <div class="tabitem-before active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+        </div>
+        <div class="tabitem-before">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+        </div>
+        <div class="tabitem-before">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.7.5 4.5 2.4 4.5 4.8"/></svg>
+        </div>
+        <div class="tabitem-before">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
+        </div>
+        <div class="tabitem-before">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.2"/><path d="M2.5 9.5h19"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <span class="tag tag-good">After</span>
+    <h2>Round golden pill on the active icon, visible separation from content above</h2>
+    <div class="fake-screen">
+      <div class="fake-card">
+        <div class="fake-card-title">Today's Schedule <span>View All</span></div>
+      </div>
+      <div class="tabbar-after">
+        <div class="tabitem-after active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+        </div>
+        <div class="tabitem-after">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+        </div>
+        <div class="tabitem-after">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c2.7.5 4.5 2.4 4.5 4.8"/></svg>
+        </div>
+        <div class="tabitem-after">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
+        </div>
+        <div class="tabitem-after">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.2"/><path d="M2.5 9.5h19"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>React Native translation</h2>
+    <p class="note">Drop-in replacement for <code>styles.iconContainer</code> and the active-state override in <code>RoleTabsLayout.tsx</code>.</p>
+<code>iconContainer: {
+  width: 46,
+  height: 46,
+  borderRadius: 23,          // round, was 16 (rounded square)
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+// inline override when focused, in tabBarIcon:
+focused && {
+  backgroundColor: `${activeColor}CC`,  // solid-ish gold, not a light wash
+  shadowColor: activeColor,
+  shadowOpacity: 0.35,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 4,
+}
+
+// tabBar container — stronger separation from content behind it
+tabBar: {
+  ...
+  borderRadius: 33,
+  overflow: 'hidden',
+  shadowColor: 'rgba(20,25,35,0.16)',
+  shadowOpacity: 1,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 8 },
+  elevation: 18,
+  bottom: (insets.bottom > 0 ? insets.bottom : 24) + 6, // a touch more lift off content
+}</code>
+  </div>
+
+</div>
+</body>
+</html>
