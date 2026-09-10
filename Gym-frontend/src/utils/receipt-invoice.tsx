@@ -250,11 +250,18 @@ export function buildReceiptInvoiceHtml(receipt: Receipt, currencyCode: string, 
     ? new Date(receipt.transaction_date).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })
     : "-";
 
+  // A mobile Cash/Credit/Mixed purchase still awaiting reception approval must
+  // never print as "Paid" — that's the exact document a member could point to
+  // as proof of payment before staff have actually confirmed it was received.
+  const displayStatus = receipt.approval_status === "PENDING" ? "Request"
+    : receipt.approval_status === "REJECTED" ? "Rejected"
+    : receipt.status;
+
   const data: ReceiptPrintData = {
     receiptNo: receipt.receipt_no,
     invoiceNo: receipt.invoice_no,
     dateStr,
-    status: receipt.status,
+    status: displayStatus,
     billTo: {
       name: receipt.member_name,
       memberId: receipt.member_id,

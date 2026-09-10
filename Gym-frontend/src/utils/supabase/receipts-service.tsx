@@ -68,6 +68,7 @@ export interface Receipt {
   balance_after?: number;
   // If this row is itself a settlement, the bill (receipt id) it paid down.
   linked_bill_id?: string;
+  approval_status?: string;
   created_at: string;
   updated_at: string;
 }

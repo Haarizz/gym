@@ -11,6 +11,8 @@ import com.company.project.repositories.GymRepository;
 import com.company.project.security.TenantContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,21 @@ public class DiscoverySyncService {
     private final BranchRepository branchRepository;
     private final GymRepository gymRepository;
     private final TenantRoutingDataSource tenantDataSource;
+
+    /**
+     * Self-reference injected lazily to avoid a circular-dependency error at
+     * startup. Used exclusively by backfillForTenant so that its loop calls
+     * syncBranch through the Spring AOP proxy rather than via plain
+     * this.syncBranch() — a direct call bypasses the proxy and therefore
+     * ignores the @Transactional("controlPlaneTransactionManager") annotation
+     * on syncBranch, which causes the control-plane save to run without the
+     * correct transaction manager and silently fails to persist the
+     * global_branch_discovery row for the main (default) branch created during
+     * provisioning.
+     */
+    @Lazy
+    @Autowired
+    private DiscoverySyncService self;
 
     public DiscoverySyncService(
             GlobalBranchDiscoveryRepository discoveryRepository,
@@ -74,9 +91,11 @@ public class DiscoverySyncService {
             
             List<Branch> branches = branchRepository.findAll();
             
-            // Write to control plane outside of tenant context
+            // Call through the Spring proxy (self) so that @Transactional("controlPlaneTransactionManager")
+            // on syncBranch is honoured for each branch — direct this.syncBranch() would bypass the proxy
+            // and leave the control-plane save without its required transaction manager.
             for (Branch branch : branches) {
-                syncBranch(branch);
+                self.syncBranch(branch);
             }
             log.info("Backfilled {} branches for tenant {}", branches.size(), tenantSlug);
         } catch (Exception e) {

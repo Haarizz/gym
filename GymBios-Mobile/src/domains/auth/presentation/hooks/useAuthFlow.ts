@@ -50,7 +50,7 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
           password: values.password,
           role,
         }),
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         if (!result.success) {
           setErrorMessage(result.error);
           analytics.track({ name: 'auth_login_failed', properties: { role } });
@@ -59,6 +59,23 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
 
         setErrorMessage(undefined);
         setSession(result.value);
+
+        // A global member's JWT carries no tenant claim (they may join gyms after
+        // the fact, and could belong to more than one) — X-Tenant-ID, sourced from
+        // this locally persisted value, is the only thing that routes their
+        // requests to the right tenant database. Restore it here the same way
+        // session-restore does, so a fresh login (not just resuming an existing
+        // session) also re-establishes it.
+        try {
+          const { secureStorage, StorageKeys } = await import('@/core/platform/storage');
+          const activeTenant = await secureStorage.getItem(StorageKeys.activeTenant);
+          if (activeTenant) {
+            useAuthStore.getState().setActiveTenant(activeTenant);
+          }
+        } catch (e) {
+          console.error('Failed to restore active tenant', e);
+        }
+
         analytics.track({
           name: 'auth_login_success',
           properties: { userId: result.value.user.id, role: result.value.appRole },
