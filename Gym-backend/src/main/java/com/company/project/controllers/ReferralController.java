@@ -100,6 +100,18 @@ public class ReferralController {
         return ResponseEntity.ok(referralService.markExpired(id));
     }
 
+    /** POST /api/referrals/{id}/verify-photo */
+    @PostMapping("/{id}/verify-photo")
+    public ResponseEntity<ReferralResponseDTO> verifyPhoto(@PathVariable Long id) {
+        return ResponseEntity.ok(referralService.verifyPhoto(id));
+    }
+
+    /** POST /api/referrals/{id}/unverify-photo */
+    @PostMapping("/{id}/unverify-photo")
+    public ResponseEntity<ReferralResponseDTO> unverifyPhoto(@PathVariable Long id) {
+        return ResponseEntity.ok(referralService.unverifyPhoto(id));
+    }
+
     /** GET /api/referrals/unredeemed-reward?memberId=MBR-0000000001 */
     @GetMapping("/unredeemed-reward")
     public ResponseEntity<ReferralResponseDTO> getUnredeemedReward(@RequestParam String memberId) {

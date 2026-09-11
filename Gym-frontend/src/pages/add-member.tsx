@@ -1013,9 +1013,20 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     const isMemberIdValid = isEditMode ? !!formData.memberId : true;
     if (!isMemberIdValid || !formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.membershipPlan) {
       toast.error('Please fill in all required fields', {
-        description: isEditMode 
-          ? 'Member ID, first name, last name, email, phone, and membership plan are required.' 
+        description: isEditMode
+          ? 'Member ID, first name, last name, email, phone, and membership plan are required.'
           : 'First name, last name, email, phone, and membership plan are required.',
+        duration: 4000
+      });
+      return;
+    }
+
+    // Joining/Start Date must be explicit — leaving them blank previously let the
+    // backend silently default Start Date to "now" and still compute a real expiry
+    // date from it, with no indication to the user that a substitution happened.
+    if (!formData.joiningDate || !formData.startDate) {
+      toast.error('Please fill in all required fields', {
+        description: 'Joining date and start date are required.',
         duration: 4000
       });
       return;
@@ -2699,13 +2710,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="joiningDate" className="mb-1.5 flex items-center gap-1.5"><FaCalendarDays className="h-3.5 w-3.5" />Joining Date</Label>
-                <Input id="joiningDate" type="date" value={formData.joiningDate} onChange={(e) => setFormData({...formData, joiningDate: e.target.value})} />
+                <Label htmlFor="joiningDate" className="mb-1.5 flex items-center gap-1.5"><FaCalendarDays className="h-3.5 w-3.5" />Joining Date <span className="text-red-500">*</span></Label>
+                <Input id="joiningDate" type="date" required value={formData.joiningDate} onChange={(e) => setFormData({...formData, joiningDate: e.target.value})} />
                 <p className="text-xs text-muted-foreground mt-1">Date member officially joins</p>
               </div>
               <div>
-                <Label htmlFor="startDate" className="mb-1.5 flex items-center gap-1.5"><FaCalendarDays className="h-3.5 w-3.5" />Start Date</Label>
-                <Input id="startDate" type="date" min={formData.joiningDate} value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
+                <Label htmlFor="startDate" className="mb-1.5 flex items-center gap-1.5"><FaCalendarDays className="h-3.5 w-3.5" />Start Date <span className="text-red-500">*</span></Label>
+                <Input id="startDate" type="date" required min={formData.joiningDate} value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
                 <p className="text-xs text-muted-foreground mt-1">Membership service start date</p>
               </div>
             </div>

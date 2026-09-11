@@ -35,13 +35,24 @@ const REWARD_TYPE_LABELS: Record<RewardType, string> = {
   WALLET_CREDIT: 'Wallet Credit',
   MEMBERSHIP_EXTENSION: 'Membership Extension',
   MEMBERSHIP_DISCOUNT: 'Membership Discount',
-  FREE_PT: 'Free PT Session',
+  FREE_PT: 'Free PT / Class',
   FREE_CLASS: 'Free Class',
   COUPON: 'Coupon',
   LOYALTY_POINTS: 'Loyalty Points',
   GIFT: 'Gift',
   CASH: 'Cash',
 };
+
+// Reward types selectable when creating/editing a rule. FREE_CLASS is folded into
+// the combined "Free PT / Class" option (stored as FREE_PT); CASH, GIFT, and
+// LOYALTY_POINTS are hidden here but remain valid values for existing rules/data.
+const SELECTABLE_REWARD_TYPES: RewardType[] = [
+  'WALLET_CREDIT',
+  'MEMBERSHIP_EXTENSION',
+  'MEMBERSHIP_DISCOUNT',
+  'FREE_PT',
+  'COUPON',
+];
 
 const REDEMPTION_ACTION_LABELS: Record<RedemptionAction, string> = {
   AUTO_WALLET: 'Auto-credit to Wallet',
@@ -644,7 +655,7 @@ export function RewardRules({ autoOpenSignal }: { autoOpenSignal?: number } = {}
               >
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(REWARD_TYPE_LABELS) as RewardType[]).map((rt) => (
+                  {SELECTABLE_REWARD_TYPES.map((rt) => (
                     <SelectItem key={rt} value={rt}>{REWARD_TYPE_LABELS[rt]}</SelectItem>
                   ))}
                 </SelectContent>

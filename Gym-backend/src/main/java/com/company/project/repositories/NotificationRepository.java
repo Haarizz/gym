@@ -27,7 +27,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         SELECT n FROM Notification n
         WHERE n.companyId = :cid
           AND n.isDeleted = false
-          AND (:branchId IS NULL OR n.branchId = :branchId)
+          AND (:branchId IS NULL OR n.branchId IS NULL OR n.branchId = :branchId)
           AND (
                n.targetUserId = :uid
             OR (n.targetRole IN :roles AND n.targetUserId IS NULL)
@@ -54,7 +54,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         WHERE n.companyId = :cid
           AND n.isDeleted = false
           AND n.isRead = false
-          AND (:branchId IS NULL OR n.branchId = :branchId)
+          AND (:branchId IS NULL OR n.branchId IS NULL OR n.branchId = :branchId)
           AND (
                n.targetUserId = :uid
             OR (n.targetRole IN :roles AND n.targetUserId IS NULL)
@@ -74,7 +74,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         WHERE n.companyId = :cid
           AND n.isDeleted = false
           AND n.isRead = false
-          AND (:branchId IS NULL OR n.branchId = :branchId)
+          AND (:branchId IS NULL OR n.branchId IS NULL OR n.branchId = :branchId)
           AND (
                n.targetUserId = :uid
             OR (n.targetRole IN :roles AND n.targetUserId IS NULL)

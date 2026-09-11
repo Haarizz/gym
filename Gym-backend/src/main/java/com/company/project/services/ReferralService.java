@@ -10,6 +10,7 @@ import com.company.project.dto.ReferralStatsDTO;
 import com.company.project.dto.ReferralValidationResponseDTO;
 import com.company.project.dto.RewardRuleRequestDTO;
 import com.company.project.dto.RewardRuleResponseDTO;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.entities.Referral;
 import com.company.project.entities.ReferralRewardRule;
@@ -26,12 +27,15 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -214,6 +218,12 @@ public class ReferralService {
         Referral ref = referralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id));
 
+        if (ref.getRefereePhoto() != null && !ref.getRefereePhoto().isBlank()
+                && !Boolean.TRUE.equals(ref.getPhotoVerified())) {
+            throw new BusinessRuleViolationException(
+                    "The referred person's photo must be verified by staff before this referral can be marked successful.");
+        }
+
         if (ref.getRewardAmount() == null || ref.getRewardAmount().compareTo(BigDecimal.ZERO) <= 0) {
             ruleRepository.findByIsActiveTrue().stream()
                 .filter(r -> "referrer".equalsIgnoreCase(r.getEligibility()) || "both".equalsIgnoreCase(r.getEligibility()))
@@ -267,6 +277,37 @@ public class ReferralService {
                 .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id));
         ref.setStatus("expired");
         return toDTO(referralRepository.save(ref));
+    }
+
+    /** Staff confirms the uploaded referee photo matches the person who showed up. */
+    public ReferralResponseDTO verifyPhoto(Long id) {
+        Referral ref = referralRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id));
+        if (ref.getRefereePhoto() == null || ref.getRefereePhoto().isBlank()) {
+            throw new BusinessRuleViolationException("This referral has no photo to verify");
+        }
+        ref.setPhotoVerified(true);
+        ref.setPhotoVerifiedBy(currentUser());
+        ref.setPhotoVerifiedAt(LocalDateTime.now());
+        return toDTO(referralRepository.save(ref));
+    }
+
+    /** Reverts a verification, e.g. if staff confirmed the wrong referral by mistake. */
+    public ReferralResponseDTO unverifyPhoto(Long id) {
+        Referral ref = referralRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + id));
+        ref.setPhotoVerified(false);
+        ref.setPhotoVerifiedBy(null);
+        ref.setPhotoVerifiedAt(null);
+        return toDTO(referralRepository.save(ref));
+    }
+
+    private String currentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            return "SYSTEM";
+        }
+        return auth.getName();
     }
 
     @Transactional(readOnly = true)
@@ -431,7 +472,12 @@ public class ReferralService {
         if (req.getRefereeName() != null) ref.setRefereeName(req.getRefereeName());
         if (req.getRefereeEmail() != null) ref.setRefereeEmail(req.getRefereeEmail());
         if (req.getRefereePhone() != null) ref.setRefereePhone(req.getRefereePhone());
-        if (req.getRefereePhoto() != null) ref.setRefereePhoto(req.getRefereePhoto());
+        if (req.getRefereePhoto() != null && !req.getRefereePhoto().equals(ref.getRefereePhoto())) {
+            ref.setRefereePhoto(req.getRefereePhoto());
+            ref.setPhotoVerified(false);
+            ref.setPhotoVerifiedBy(null);
+            ref.setPhotoVerifiedAt(null);
+        }
         if (req.getStatus() != null) ref.setStatus(req.getStatus());
         if (req.getRewardAmount() != null) ref.setRewardAmount(req.getRewardAmount());
         if (req.getDate() != null) ref.setDate(req.getDate());
@@ -462,6 +508,9 @@ public class ReferralService {
         dto.setRefereeEmail(ref.getRefereeEmail());
         dto.setRefereePhone(ref.getRefereePhone());
         dto.setRefereePhoto(ref.getRefereePhoto());
+        dto.setPhotoVerified(ref.getPhotoVerified());
+        dto.setPhotoVerifiedBy(ref.getPhotoVerifiedBy());
+        dto.setPhotoVerifiedAt(ref.getPhotoVerifiedAt());
         dto.setReferralCode(ref.getReferralCode());
         String linkDomain = loadOrCreateSettings().getLinkDomain();
         dto.setReferralLink((linkDomain != null && !linkDomain.isBlank() ? linkDomain : "gymbios.app/ref") + "/" + ref.getReferralCode());

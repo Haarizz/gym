@@ -61,7 +61,8 @@ import {
   ChevronsUpDown,
   Camera,
   Upload,
-  Trash2
+  Trash2,
+  ShieldCheck
 } from 'lucide-react';
 import { toast } from "sonner";
 
@@ -200,6 +201,9 @@ export function Referrals() {
       toast.error('Referral program is disabled', { description: 'Enable it under Settings to log new referrals.' });
       return;
     }
+    // Reward rules may have been created/toggled on the Reward Rules tab since
+    // this page first loaded — refetch so the dropdown below reflects them.
+    referralService.getRules().then(setApiRules).catch(() => {});
     setShowAddReferral(true);
   };
 
@@ -302,6 +306,39 @@ export function Referrals() {
   }, [filterStatus, searchTerm]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const handleVerifyPhoto = useCallback(async (referralId: number) => {
+    try {
+      const updated = await referralService.verifyPhoto(referralId);
+      toast.success('Photo verified');
+      setViewingReferral((p) => (p && Number(p.id) === referralId ? updated : p));
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to verify photo');
+    }
+  }, [loadData]);
+
+  const handleUnverifyPhoto = useCallback(async (referralId: number) => {
+    try {
+      const updated = await referralService.unverifyPhoto(referralId);
+      toast.success('Verification removed');
+      setViewingReferral((p) => (p && Number(p.id) === referralId ? updated : p));
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove verification');
+    }
+  }, [loadData]);
+
+  const handleMarkSuccessful = useCallback(async (referralId: number, closeDialog?: () => void) => {
+    try {
+      await referralService.markSuccessful(referralId);
+      toast.success('Referral marked successful');
+      closeDialog?.();
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update');
+    }
+  }, [loadData]);
 
   const referralStats = {
     totalReferrals: apiStats.totalReferrals,
@@ -903,7 +940,7 @@ export function Referrals() {
                             <X className="h-4 w-4" />
                           </Button>
                           {activity.status === 'pending' && (
-                            <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700" onClick={async () => { try { await referralService.markSuccessful(Number(activity.id)); toast.success('Referral marked successful'); loadData(); } catch { toast.error('Failed to update'); } }}>
+                            <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700" onClick={() => handleMarkSuccessful(Number(activity.id))}>
                               <CheckCircle className="h-4 w-4" />
                             </Button>
                           )}
@@ -1181,9 +1218,35 @@ export function Referrals() {
                   <div className="col-span-2"><Label className="text-xs text-muted-foreground">Notes</Label><p className="text-sm">{viewingReferral.notes}</p></div>
                 )}
               </div>
+
+              {viewingReferral.refereePhoto && (
+                <div className="rounded-lg border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-muted-foreground">Referral Person Photo</Label>
+                    {viewingReferral.photoVerified ? (
+                      <Badge className="bg-green-100 text-green-800">
+                        <ShieldCheck className="h-3 w-3 mr-1" /> Verified{viewingReferral.photoVerifiedBy ? ` by ${viewingReferral.photoVerifiedBy}` : ''}
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-yellow-100 text-yellow-800">Not Verified</Badge>
+                    )}
+                  </div>
+                  <img src={viewingReferral.refereePhoto} alt="Referral person" className="w-24 h-24 rounded-lg object-cover border" />
+                  {viewingReferral.photoVerified ? (
+                    <Button size="sm" variant="outline" onClick={() => handleUnverifyPhoto(Number(viewingReferral.id))}>
+                      Remove Verification
+                    </Button>
+                  ) : (
+                    <Button size="sm" className="gap-2" onClick={() => handleVerifyPhoto(Number(viewingReferral.id))}>
+                      <ShieldCheck className="h-4 w-4" /> Verify Photo
+                    </Button>
+                  )}
+                </div>
+              )}
+
               {viewingReferral.status === 'pending' && (
                 <div className="flex gap-2 pt-2">
-                  <Button size="sm" className="flex-1" onClick={async () => { try { await referralService.markSuccessful(Number(viewingReferral.id)); toast.success('Marked successful'); setShowViewReferral(false); loadData(); } catch { toast.error('Failed'); } }}>Mark Successful</Button>
+                  <Button size="sm" className="flex-1" onClick={() => handleMarkSuccessful(Number(viewingReferral.id), () => setShowViewReferral(false))}>Mark Successful</Button>
                   <Button size="sm" variant="outline" className="flex-1" onClick={async () => { try { await referralService.markExpired(Number(viewingReferral.id)); toast.success('Marked expired'); setShowViewReferral(false); loadData(); } catch { toast.error('Failed'); } }}>Mark Expired</Button>
                 </div>
               )}

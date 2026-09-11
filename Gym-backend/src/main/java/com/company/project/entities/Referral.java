@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
@@ -40,6 +41,18 @@ public class Referral extends BaseEntity implements BranchAware {
     // Stored the same way as Member.photoUrl (no separate file storage in this app).
     @Column(name = "referee_photo", columnDefinition = "TEXT")
     private String refereePhoto;
+
+    // Front-desk confirmation that the uploaded photo matches the person who
+    // showed up. Required before markSuccessful() will generate any reward
+    // when a photo was submitted — see RewardEngineService.
+    @Column(name = "photo_verified")
+    private Boolean photoVerified = false;
+
+    @Column(name = "photo_verified_by")
+    private String photoVerifiedBy;
+
+    @Column(name = "photo_verified_at")
+    private LocalDateTime photoVerifiedAt;
 
     // Unique referral code used by the referee to sign up
     @Column(name = "referral_code", unique = true)
@@ -124,6 +137,15 @@ public class Referral extends BaseEntity implements BranchAware {
 
     public String getRefereePhoto() { return refereePhoto; }
     public void setRefereePhoto(String refereePhoto) { this.refereePhoto = refereePhoto; }
+
+    public Boolean getPhotoVerified() { return photoVerified; }
+    public void setPhotoVerified(Boolean photoVerified) { this.photoVerified = photoVerified; }
+
+    public String getPhotoVerifiedBy() { return photoVerifiedBy; }
+    public void setPhotoVerifiedBy(String photoVerifiedBy) { this.photoVerifiedBy = photoVerifiedBy; }
+
+    public LocalDateTime getPhotoVerifiedAt() { return photoVerifiedAt; }
+    public void setPhotoVerifiedAt(LocalDateTime photoVerifiedAt) { this.photoVerifiedAt = photoVerifiedAt; }
 
     public String getReferralCode() { return referralCode; }
     public void setReferralCode(String referralCode) { this.referralCode = referralCode; }

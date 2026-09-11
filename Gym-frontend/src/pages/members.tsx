@@ -55,7 +55,6 @@ import {
   Pencil,
   XCircle,
   Bell,
-  ShieldBan,
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
@@ -459,7 +458,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const inactiveMembers = statusCounts.inactive;
   const expiredMembers = statusCounts.expired;
   const frozenMembers = statusCounts.frozen;
-  const suspendedMembers = statusCounts.suspended;
 
   const autoUnfreezePending = members.filter(m => {
     const status = (m.membership_status || "").toLowerCase();
@@ -1137,7 +1135,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
         <Card
           className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
           style={selectedStatus === 'all' ? { boxShadow: '0 0 0 2px #6366f1' } : undefined}
@@ -1223,22 +1221,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </CardContent>
         </Card>
 
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={selectedStatus === 'suspended' ? { boxShadow: '0 0 0 2px #ea580c' } : undefined}
-          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'suspended' ? 'all' : 'suspended'); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Suspended</CardTitle>
-            <div className="bg-orange-50 p-2 rounded-lg">
-              <ShieldBan className="h-4 w-4 text-orange-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{suspendedMembers}</div>
-            <p className="text-xs text-muted-foreground">Suspended members</p>
-          </CardContent>
-        </Card>
       </div>
 
       <style>{`

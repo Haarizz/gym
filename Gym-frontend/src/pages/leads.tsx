@@ -98,13 +98,13 @@ interface Lead {
   nextFollowUp?: Date;
   createdDate: Date;
   lastContactDate?: Date;
-  interestLevel: number; // 1-10 scale
+  interestLevel?: number; // 1-10 scale, set explicitly — not auto-calculated
   notes: string;
   tags: string[];
   membershipInterest?: string;
   budget?: number;
   preferredContactMethod: 'email' | 'phone' | 'whatsapp' | 'sms';
-  leadScore: number; // 1-100 calculated score
+  leadScore?: number; // 1-100, set explicitly — not auto-calculated
   interactions: LeadInteraction[];
   followUps: LeadFollowUp[];
   avatar?: string;
@@ -138,6 +138,16 @@ interface Staff {
   name: string;
 }
 
+// Clamps a number-input's raw string to [min, max], preserving an empty string
+// (so the field can be cleared) and passing through partial/invalid input as-is
+// while the user is still typing.
+function clampNumberInput(raw: string, min: number, max: number): string {
+  if (raw === '') return raw;
+  const n = Number(raw);
+  if (Number.isNaN(n)) return raw;
+  return String(Math.min(max, Math.max(min, n)));
+}
+
 export function Leads() {
   const { currencyCode } = useCurrency();
   const [activeView, setActiveView] = useState<'table' | 'kanban'>('table');
@@ -158,7 +168,7 @@ export function Leads() {
 
   // API state
   const [apiLeads, setApiLeads] = useState<LeadResponse[]>([]);
-  const [newLead, setNewLead] = useState({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '' });
+  const [newLead, setNewLead] = useState({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', interestLevel: '', leadScore: '' });
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [showEditLead, setShowEditLead] = useState(false);
   const [editLead, setEditLead] = useState({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', status: 'new', assignedStaff: '', nextFollowUp: '', membershipInterest: '', interestLevel: '5', leadScore: '50' });
@@ -221,13 +231,13 @@ export function Leads() {
     nextFollowUp: parseOptionalDate(l.nextFollowUp),
     createdDate: parseSafeDate(l.createdAt),
     lastContactDate: parseOptionalDate(l.lastContactDate),
-    interestLevel: l.interestLevel || 5,
+    interestLevel: l.interestLevel ?? undefined,
     notes: l.notes || '',
     tags: l.tags || [],
     membershipInterest: l.membershipInterest,
     budget: l.budget,
     preferredContactMethod: (l.preferredContactMethod as Lead['preferredContactMethod']) || 'email',
-    leadScore: l.leadScore || 50,
+    leadScore: l.leadScore ?? undefined,
     interactions: (l.interactions || []).map(i => ({
       id: String(i.id),
       type: i.type as LeadInteraction['type'],
@@ -261,7 +271,8 @@ export function Leads() {
       !['converted', 'lost'].includes(lead.status)
     ).length;
     const hotLeads = displayLeads.filter(lead => lead.priority === 'high' && !['converted', 'lost'].includes(lead.status)).length;
-    const avgLeadScore = displayLeads.length > 0 ? displayLeads.reduce((sum, lead) => sum + lead.leadScore, 0) / displayLeads.length : 0;
+    const scoredLeads = displayLeads.filter(lead => lead.leadScore != null);
+    const avgLeadScore = scoredLeads.length > 0 ? scoredLeads.reduce((sum, lead) => sum + (lead.leadScore ?? 0), 0) / scoredLeads.length : 0;
 
     const totalLeads = leadStats?.totalLeads ?? displayLeads.length;
     const convertedLeads = leadStats?.convertedLeads ?? displayLeads.filter(lead => lead.status === 'converted').length;
@@ -428,8 +439,8 @@ export function Leads() {
       assignedStaff: lead.assignedStaff || '',
       nextFollowUp: lead.nextFollowUp ? lead.nextFollowUp.toISOString().split('T')[0] : '',
       membershipInterest: lead.membershipInterest || '',
-      interestLevel: String(lead.interestLevel),
-      leadScore: String(lead.leadScore),
+      interestLevel: lead.interestLevel != null ? String(lead.interestLevel) : '',
+      leadScore: lead.leadScore != null ? String(lead.leadScore) : '',
     });
     setShowEditLead(true);
   }, []);
@@ -732,6 +743,7 @@ export function Leads() {
                   <TableHead>Source</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Score</TableHead>
+                  <TableHead>Interest</TableHead>
                   <TableHead>Assigned</TableHead>
                   <TableHead>Next Follow-up</TableHead>
                   <TableHead>Actions</TableHead>
@@ -795,10 +807,24 @@ export function Leads() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium">{lead.leadScore}</span>
-                        <Progress value={lead.leadScore} className="w-16 h-2" />
-                      </div>
+                      {lead.leadScore != null ? (
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">{lead.leadScore}</span>
+                          <Progress value={lead.leadScore} className="w-16 h-2" />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not set</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {lead.interestLevel != null ? (
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">{lead.interestLevel}/10</span>
+                          <Progress value={lead.interestLevel * 10} className="w-16 h-2" />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not set</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
@@ -898,10 +924,14 @@ export function Leads() {
                           {getSourceIcon(lead.source)}
                           <span className="text-xs capitalize">{lead.source.replace('-', ' ')}</span>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <span className="text-xs font-medium">{lead.leadScore}</span>
-                          <Progress value={lead.leadScore} className="w-8 h-1" />
-                        </div>
+                        {lead.leadScore != null ? (
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs font-medium">{lead.leadScore}</span>
+                            <Progress value={lead.leadScore} className="w-8 h-1" />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not set</span>
+                        )}
                       </div>
 
                       {lead.nextFollowUp && (
@@ -1003,10 +1033,14 @@ export function Leads() {
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Lead Score</Label>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium">{selectedLead.leadScore}</span>
-                          <Progress value={selectedLead.leadScore} className="w-20 h-2" />
-                        </div>
+                        {selectedLead.leadScore != null ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">{selectedLead.leadScore}</span>
+                            <Progress value={selectedLead.leadScore} className="w-20 h-2" />
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Not set</p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1028,10 +1062,14 @@ export function Leads() {
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Interest Level</Label>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium">{selectedLead.interestLevel}/10</span>
-                          <Progress value={selectedLead.interestLevel * 10} className="w-20 h-2" />
-                        </div>
+                        {selectedLead.interestLevel != null ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">{selectedLead.interestLevel}/10</span>
+                            <Progress value={selectedLead.interestLevel * 10} className="w-20 h-2" />
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Not set</p>
+                        )}
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Membership Interest</Label>
@@ -1260,6 +1298,14 @@ export function Leads() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label htmlFor="interestLevel">Interest Level (1-10) <span className="text-muted-foreground font-normal">(Optional)</span></Label>
+              <Input id="interestLevel" type="number" min="1" max="10" placeholder="e.g. 5" value={newLead.interestLevel} onChange={e => setNewLead(p => ({ ...p, interestLevel: clampNumberInput(e.target.value, 1, 10) }))} />
+            </div>
+            <div>
+              <Label htmlFor="leadScore">Lead Score (1-100) <span className="text-muted-foreground font-normal">(Optional)</span></Label>
+              <Input id="leadScore" type="number" min="1" max="100" placeholder="e.g. 50" value={newLead.leadScore} onChange={e => setNewLead(p => ({ ...p, leadScore: clampNumberInput(e.target.value, 1, 100) }))} />
+            </div>
             <div className="md:col-span-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea id="notes" placeholder="Enter any additional notes about this lead" value={newLead.notes} onChange={e => setNewLead(p => ({ ...p, notes: e.target.value }))} />
@@ -1269,9 +1315,20 @@ export function Leads() {
             <Button variant="outline" onClick={() => setShowAddLead(false)}>Cancel</Button>
             <Button onClick={async () => {
               try {
-                await leadService.create({ firstName: newLead.firstName, lastName: newLead.lastName || undefined, email: newLead.email || undefined, phone: newLead.phone || undefined, source: newLead.source, priority: newLead.priority, notes: newLead.notes || undefined, status: 'new' });
+                await leadService.create({
+                  firstName: newLead.firstName,
+                  lastName: newLead.lastName || undefined,
+                  email: newLead.email || undefined,
+                  phone: newLead.phone || undefined,
+                  source: newLead.source,
+                  priority: newLead.priority,
+                  notes: newLead.notes || undefined,
+                  status: 'new',
+                  interestLevel: newLead.interestLevel ? Number(newLead.interestLevel) : undefined,
+                  leadScore: newLead.leadScore ? Number(newLead.leadScore) : undefined,
+                });
                 toast.success('Lead added successfully');
-                setNewLead({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '' });
+                setNewLead({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', interestLevel: '', leadScore: '' });
                 setShowAddLead(false);
                 await loadLeads();
               } catch (error) {
@@ -1366,11 +1423,11 @@ export function Leads() {
             </div>
             <div>
               <Label>Interest Level (1-10)</Label>
-              <Input type="number" min="1" max="10" value={editLead.interestLevel} onChange={e => setEditLead(p => ({ ...p, interestLevel: e.target.value }))} />
+              <Input type="number" min="1" max="10" value={editLead.interestLevel} onChange={e => setEditLead(p => ({ ...p, interestLevel: clampNumberInput(e.target.value, 1, 10) }))} />
             </div>
             <div>
               <Label>Lead Score (1-100)</Label>
-              <Input type="number" min="1" max="100" value={editLead.leadScore} onChange={e => setEditLead(p => ({ ...p, leadScore: e.target.value }))} />
+              <Input type="number" min="1" max="100" value={editLead.leadScore} onChange={e => setEditLead(p => ({ ...p, leadScore: clampNumberInput(e.target.value, 1, 100) }))} />
             </div>
             <div className="md:col-span-2">
               <Label>Notes</Label>
