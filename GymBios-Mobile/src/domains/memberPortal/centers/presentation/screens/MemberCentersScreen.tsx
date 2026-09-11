@@ -16,6 +16,7 @@ import { CenterCard } from '../components/CenterCard';
 import { CenterDetailModal } from '../components/CenterDetailModal';
 import { CenterFiltersModal } from '../components/CenterFiltersModal';
 import { useCenters, type CenterSummary } from '@/domains/discovery';
+import { useAuthStore } from '@/domains/auth/store/authStore';
 
 const CATEGORY_TABS = ['All', 'Gym', 'Fitness Center', 'Wellness Center', 'Studio'];
 
@@ -46,6 +47,14 @@ export function MemberCentersScreen() {
   const handleCenterPress = (center: CenterSummary) => {
     setSelectedCenter(center);
     setIsDetailOpen(true);
+
+    // A member's JWT carries no tenant claim (see AuthService.login), so
+    // X-Tenant-ID — sourced from this locally persisted value — is the only thing
+    // that routes their requests to this gym's own database. Opening a center
+    // they already belong to re-establishes it if it was ever lost (e.g. a
+    // logout previously wiped it, or a fresh install), self-healing the "no
+    // active membership" dashboard without requiring a repeat purchase.
+    useAuthStore.getState().setActiveTenant(center.tenantSlug);
   };
 
   const handleResetFilters = () => {

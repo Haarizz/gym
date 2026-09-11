@@ -247,7 +247,6 @@ public class MobileDiscoveryController {
             // Set Membership details
             memberRequest.setMembershipPlanId(request.getPlanId());
             memberRequest.setMembershipType(plan.getPlanType() != null ? plan.getPlanType() : "Standard");
-            memberRequest.setMembershipStatus("Active");
 
             // Payment details collected by the mobile PaymentBottomSheet — previously
             // discarded (only planId was sent). Cash/Credit/Mixed require reception
@@ -256,6 +255,13 @@ public class MobileDiscoveryController {
             String paymentMethodUsed = request.getPaymentMethodUsed();
             boolean requiresApproval = paymentMethodUsed != null
                     && APPROVAL_REQUIRED_METHODS.contains(paymentMethodUsed.trim().toLowerCase());
+
+            // A member still awaiting reception approval must not show up as a normal
+            // "Active" member in the Members directory/stat cards — the frontend's
+            // getComputedStatus() (members.tsx) already special-cases this exact
+            // string and renders it as "Pending Approval", excluded from the
+            // Active/Inactive/Expired/Frozen/Suspended buckets.
+            memberRequest.setMembershipStatus(requiresApproval ? "pending_approval" : "Active");
 
             if (paymentMethodUsed != null) memberRequest.setPaymentMethodUsed(paymentMethodUsed);
             if (request.getPaymentBreakdown() != null) memberRequest.setPaymentBreakdown(request.getPaymentBreakdown());
