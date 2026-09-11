@@ -68,7 +68,7 @@ export function CenterDetailModal({ visible, center, onClose }: CenterDetailModa
             {/* Hero Card */}
             <View style={styles.heroCard}>
               <View style={styles.heroHeader}>
-                {center.centerType && (
+                {!!center.centerType && (
                   <View style={styles.categoryBadge}>
                     <Text style={styles.categoryText}>{center.centerType}</Text>
                   </View>
@@ -77,14 +77,14 @@ export function CenterDetailModal({ visible, center, onClose }: CenterDetailModa
               </View>
 
               <Text style={styles.heroName}>{center.centerName}</Text>
-              {center.address && <Text style={styles.heroAddress}>{center.address}</Text>}
+              {!!center.address && <Text style={styles.heroAddress}>{center.address}</Text>}
 
               <View style={styles.heroActions}>
                 <Pressable style={styles.directionButton} onPress={handleNavigate}>
                   <Feather name="navigation" size={14} color="#FFFFFF" />
                   <Text style={styles.directionButtonText}>Directions</Text>
                 </Pressable>
-                {details?.phone && (
+                {!!details?.phone && (
                   <Pressable style={styles.callActionButton} onPress={handleCall}>
                     <Feather name="phone-call" size={14} color={BrandColors.teal} />
                     <Text style={styles.callActionText}>Call</Text>
@@ -100,9 +100,9 @@ export function CenterDetailModal({ visible, center, onClose }: CenterDetailModa
                 {/* About Section */}
                 <View style={styles.sectionCard}>
                   <Text style={styles.sectionHeading}>About This Center</Text>
-                  {details.about && <Text style={styles.aboutText}>{details.about}</Text>}
+                  {!!details.about && <Text style={styles.aboutText}>{details.about}</Text>}
 
-                  {details.operatingHours && (
+                  {!!details.operatingHours && (
                     <View style={styles.timingBox}>
                       <Feather name="clock" size={16} color={BrandColors.trainerAmber} />
                       <View style={styles.timingInfo}>
@@ -112,7 +112,7 @@ export function CenterDetailModal({ visible, center, onClose }: CenterDetailModa
                     </View>
                   )}
 
-                  {details.accessType && (
+                  {!!details.accessType && (
                     <View style={styles.genderBox}>
                       <Feather name="users" size={16} color={BrandColors.teal} />
                       <View style={styles.timingInfo}>
@@ -124,7 +124,7 @@ export function CenterDetailModal({ visible, center, onClose }: CenterDetailModa
                 </View>
 
                 {/* Facilities / Amenities */}
-                {details.amenities && details.amenities.length > 0 && (
+                {!!details.amenities && details.amenities.length > 0 && (
                   <View style={styles.sectionCard}>
                     <Text style={styles.sectionHeading}>Facilities & Amenities</Text>
                     <View style={styles.facilityGrid}>
@@ -139,7 +139,7 @@ export function CenterDetailModal({ visible, center, onClose }: CenterDetailModa
                 )}
 
                 {/* Certified Trainers */}
-                {details.trainers && details.trainers.length > 0 && (
+                {!!details.trainers && details.trainers.length > 0 && (
                   <View style={styles.sectionCard}>
                     <Text style={styles.sectionHeading}>Certified Trainers</Text>
                     <View style={styles.trainerList}>
