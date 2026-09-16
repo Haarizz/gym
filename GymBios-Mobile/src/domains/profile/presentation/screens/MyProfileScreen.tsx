@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
-import { AppHeader } from '@/shared/components/AppHeader';
 import { AvatarPicker } from '@/shared/components/AvatarPicker';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
@@ -127,12 +127,31 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
       <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
-      <AppHeader
-        title="My Profile"
-        subtitle="Manage your personal details & credentials"
-        colors={[BrandColors.teal, BrandColors.tealDark]}
-        onBack={onBack}
-      />
+
+      <GlassSurface
+        tint={[BrandColors.teal, BrandColors.tealDark]}
+        strong
+        radius={Radius.xl}
+        style={styles.header}
+      >
+        <Pressable
+          onPress={onBack}
+          hitSlop={12}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Feather name="chevron-left" size={20} color="#ffffff" />
+        </Pressable>
+        <View style={styles.headerTitles}>
+          <Typography variant="subtitle" style={styles.headerTitle}>
+            My Profile
+          </Typography>
+          <Typography variant="bodySmall" style={styles.headerSubtitle}>
+            Manage your personal details & credentials
+          </Typography>
+        </View>
+      </GlassSurface>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -183,6 +202,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
 
             <View style={styles.form}>
               <Input
+                variant="glass"
                 label="Full Name"
                 value={displayName}
                 onChangeText={setEditedName}
@@ -191,6 +211,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
               />
 
               <Input
+                variant="glass"
                 label="Email Address"
                 value={displayEmail}
                 onChangeText={setEditedEmail}
@@ -201,6 +222,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
               />
 
               <Input
+                variant="glass"
                 label="Phone Number"
                 value={displayPhone}
                 onChangeText={setEditedPhone}
@@ -219,6 +241,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
                 </View>
               ) : (
                 <Input
+                  variant="glass"
                   label="Address"
                   value={displayAddress}
                   editable={false}
@@ -316,6 +339,35 @@ const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.three,
+    padding: Spacing.three,
+    marginHorizontal: Spacing.four,
+    marginTop: Spacing.two,
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.md,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitles: {
+    flex: 1,
+  },
+  headerTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  headerSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+  },
   scrollContent: {
     padding: Spacing.four,
     gap: Spacing.four,
@@ -354,7 +406,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one,
     paddingTop: Spacing.two,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: 'rgba(30,42,58,0.08)',
   },
   readOnlyItem: {
     flex: 1,

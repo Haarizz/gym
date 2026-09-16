@@ -30,6 +30,7 @@ import {
   profileCompletionSchema,
   type ProfileCompletionValues,
 } from '../components/ProfileCompletion/schemas';
+import { useAuthStore } from '@/domains/auth/store/authStore';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -184,6 +185,8 @@ export function ProfileCompletionScreen() {
   const [dateValue, setDateValue] = useState<Date | undefined>(undefined);
   const { updateProfile, isUpdating } = useMobileProfile();
 
+  const user = useAuthStore((state) => state.user);
+
   const {
     control,
     handleSubmit,
@@ -193,7 +196,7 @@ export function ProfileCompletionScreen() {
   } = useForm<ProfileCompletionValues>({
     resolver: zodResolver(profileCompletionSchema),
     defaultValues: {
-      fullName: '',
+      fullName: user?.fullName || '',
       phone: '',
       dateOfBirth: '',
       gender: '',
@@ -424,7 +427,6 @@ export function ProfileCompletionScreen() {
                     });
                   }}
                   maximumDate={new Date()}
-                  required
                   error={errors.dateOfBirth?.message}
                 />
               </View>

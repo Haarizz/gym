@@ -89,4 +89,12 @@ export class ProfileApi {
       photoUrl: data.photo_url,
     };
   }
+
+  /**
+   * GET /api/mobile/profile/transactions
+   */
+  async getTransactions(): Promise<any> {
+    const response = await apiClient.get<any>('/mobile/profile/transactions');
+    return response.data;
+  }
 }

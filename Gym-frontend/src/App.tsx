@@ -56,6 +56,7 @@ import { Messaging } from "./pages/messaging";
 import { Automations } from "./pages/automations";
 import { PostWorkoutCheckin } from "./pages/post-workout-checkin";
 import { PlansServicesCatalog } from "./pages/plans-services-catalog";
+import { CatalogResolver } from "./pages/catalog/resolver";
 import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
 import { BranchManagement } from "./pages/branch-management";
@@ -1043,6 +1044,7 @@ export default function App() {
       <Route path="/automations" element={<Automations />} />
       <Route path="/post-workout-checkin" element={<PostWorkoutCheckin />} />
       <Route path="/plans-services-catalog" element={<PlansServicesCatalog />} />
+      <Route path="/catalog/t/:tenantSlug/b/:branchId" element={<CatalogResolver />} />
       <Route path="/member-connect-reports" element={<MemberConnectReports />} />
       <Route path="/member-connect-analytics" element={<MemberConnectAnalytics />} />
       

@@ -176,55 +176,30 @@ export class ApiProfileRepository implements ProfileRepository {
     transactions: UserTransaction[];
     summary: UserTransactionSummary;
   }> {
-    return {
-      transactions: [
-        {
-          id: 'T001',
-          type: 'salary',
-          description: 'Monthly Salary Credit',
-          amount: 4285,
-          date: '2024-10-30T10:00:00Z',
-          status: 'completed',
+    try {
+      const data = await this.api.getTransactions();
+      
+      return {
+        transactions: data.transactions || [],
+        summary: {
+          totalEarnings: data.summary?.total_earnings ?? data.summary?.totalEarnings ?? 0,
+          totalTransactions: data.summary?.total_transactions ?? data.summary?.totalTransactions ?? 0,
+          totalPurchases: data.summary?.total_purchases ?? data.summary?.totalPurchases ?? 0,
+          totalBonuses: data.summary?.total_bonuses ?? data.summary?.totalBonuses ?? 0,
         },
-        {
-          id: 'T002',
-          type: 'bonus',
-          description: 'Quarterly Performance Bonus',
-          amount: 500,
-          date: '2024-10-15T14:30:00Z',
-          status: 'completed',
+      };
+    } catch {
+      // Fallback in case of network error or if endpoint is unreachable
+      return {
+        transactions: [],
+        summary: {
+          totalEarnings: 0,
+          totalTransactions: 0,
+          totalPurchases: 0,
+          totalBonuses: 0,
         },
-        {
-          id: 'T003',
-          type: 'attendance',
-          description: 'Morning Shift Check-in Verified',
-          date: '2024-10-30T07:00:00Z',
-          status: 'completed',
-        },
-        {
-          id: 'T004',
-          type: 'purchase',
-          description: 'Cafeteria & Pro-Shop Purchase',
-          amount: 25,
-          date: '2024-10-29T13:15:00Z',
-          status: 'completed',
-        },
-        {
-          id: 'T005',
-          type: 'membership',
-          description: 'Annual Membership Plan Renewal',
-          amount: 1200,
-          date: '2024-10-01T09:00:00Z',
-          status: 'completed',
-        },
-      ],
-      summary: {
-        totalEarnings: 4785,
-        totalTransactions: 156,
-        totalPurchases: 89,
-        totalBonuses: 2,
-      },
-    };
+      };
+    }
   }
 
   async getSettings(): Promise<UserSettings> {

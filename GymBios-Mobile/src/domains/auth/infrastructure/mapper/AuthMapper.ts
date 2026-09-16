@@ -103,7 +103,7 @@ export function mapLoginResponseToSession(
       id: String(response.userId ?? response.user_id),
       username: response.username,
       email: `${response.username}@gymbios.local`,
-      fullName: ROLE_DISPLAY_NAMES[appRole] ?? response.username,
+      fullName: response.fullName ?? ROLE_DISPLAY_NAMES[appRole] ?? response.username,
       appRole,
       permissions,
       branchId: response.branchId ?? response.defaultBranchId ?? response.default_branch_id ?? response.branch_id,

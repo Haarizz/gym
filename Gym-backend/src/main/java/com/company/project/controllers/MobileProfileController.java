@@ -34,4 +34,13 @@ public class MobileProfileController {
         }
         return ResponseEntity.ok(mobileProfileService.updateProfile(principal.getId(), request));
     }
+
+    @GetMapping("/transactions")
+    public ResponseEntity<com.company.project.dto.MobileProfileTransactionsDTO> getMyTransactions(
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(mobileProfileService.getTransactions(principal));
+    }
 }

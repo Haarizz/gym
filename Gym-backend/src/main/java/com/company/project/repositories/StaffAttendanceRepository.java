@@ -29,4 +29,6 @@ public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance
     // All active sessions that started before a given time (for auto-close)
     @Query("SELECT sa FROM StaffAttendance sa WHERE sa.status = 'working' AND sa.clockInTime < :before")
     List<StaffAttendance> findActiveSessionsBefore(@Param("before") LocalDateTime before);
+
+    List<StaffAttendance> findByStaff_IdOrderByClockInTimeDesc(Long staffId);
 }

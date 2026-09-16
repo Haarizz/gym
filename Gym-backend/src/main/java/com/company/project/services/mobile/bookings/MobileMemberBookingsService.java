@@ -130,15 +130,19 @@ public class MobileMemberBookingsService {
         final LocalDate targetDate = (date == null) ? LocalDate.now() : date;
 
         // Use existing TrainingSessionService to fetch all available sessions for the specific date
-        List<com.company.project.dto.TrainingSessionResponseDTO> sessions = trainingSessionService.getSessions(null, null, targetDate, targetDate, null);
+        List<com.company.project.dto.TrainingSessionResponseDTO> sessions = trainingSessionService.getSessions("class", null, targetDate, targetDate, null);
         
         // Find existing bookings for this member on this date to check memberBookingState
-        List<Booking> memberBookings = mobileBookingRepository.findPastBookings(member.getId(), targetDate.plusDays(1), LocalTime.MIDNIGHT);
+        List<Booking> memberBookings = new java.util.ArrayList<>(mobileBookingRepository.findPastBookings(member.getId(), targetDate.plusDays(1), LocalTime.MIDNIGHT));
         memberBookings.addAll(mobileBookingRepository.findUpcomingBookings(member.getId(), targetDate.minusDays(1), LocalTime.MAX));
         
         Map<Long, String> sessionStatusMap = memberBookings.stream()
                 .filter(b -> b.getSession() != null && b.getSession().getDate() != null && b.getSession().getDate().equals(targetDate))
-                .collect(Collectors.toMap(b -> b.getSession().getId(), Booking::getStatus, (s1, s2) -> s1));
+                .collect(Collectors.toMap(
+                        b -> b.getSession().getId(), 
+                        b -> b.getStatus() != null ? b.getStatus() : "confirmed", 
+                        (s1, s2) -> s1
+                ));
 
         List<AvailableClassDTO> availableClasses = new ArrayList<>();
         for (com.company.project.dto.TrainingSessionResponseDTO session : sessions) {

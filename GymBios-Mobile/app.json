@@ -8,7 +8,8 @@
     "scheme": "gymbiosmobile",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "associatedDomains": ["applinks:TODO_PRODUCTION_DOMAIN"]
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +19,21 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anandu389.GymBiosMobile"
+      "package": "com.anandu389.GymBiosMobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "TODO_PRODUCTION_DOMAIN",
+              "pathPrefix": "/catalog/t/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "output": "static",

@@ -65,13 +65,11 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
         // this locally persisted value, is the only thing that routes their
         // requests to the right tenant database. Restore it here the same way
         // session-restore does, so a fresh login (not just resuming an existing
-        // session) also re-establishes it.
+        // session) also re-establishes it. Scoped to this user's id, so a stale
+        // tenant left behind by a different account on this device is dropped
+        // rather than inherited.
         try {
-          const { secureStorage, StorageKeys } = await import('@/core/platform/storage');
-          const activeTenant = await secureStorage.getItem(StorageKeys.activeTenant);
-          if (activeTenant) {
-            useAuthStore.getState().setActiveTenant(activeTenant);
-          }
+          await useAuthStore.getState().restoreActiveTenantForUser(result.value.user.id);
         } catch (e) {
           console.error('Failed to restore active tenant', e);
         }
@@ -81,7 +79,14 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
           properties: { userId: result.value.user.id, role: result.value.appRole },
         });
         analytics.identify(result.value.user.id);
-        router.replace(getRoleHomeHref(result.value.appRole));
+        
+        const pending = useAuthStore.getState().pendingDeepLinkIntent;
+        if (pending && pending.type === 'catalog-branch') {
+          useAuthStore.getState().setPendingDeepLinkIntent(null);
+          router.replace(`/catalog/t/${pending.tenantSlug}/b/${pending.branchId}`);
+        } else {
+          router.replace(getRoleHomeHref(result.value.appRole));
+        }
       },
     });
 
@@ -151,16 +156,16 @@ export function createUseRestoreSession(
           if (result.value.pendingRole) {
             setPendingRole(result.value.pendingRole);
           }
-        }
-        
-        try {
-          const { secureStorage, StorageKeys } = await import('@/core/platform/storage');
-          const activeTenant = await secureStorage.getItem(StorageKeys.activeTenant);
-          if (activeTenant) {
-            useAuthStore.getState().setActiveTenant(activeTenant);
+
+          // Scoped to this user's id, so a stale tenant left behind by a
+          // different account on this device is dropped rather than inherited.
+          if (result.value.session) {
+            try {
+              await useAuthStore.getState().restoreActiveTenantForUser(result.value.session.user.id);
+            } catch (e) {
+              console.error('Failed to restore active tenant', e);
+            }
           }
-        } catch (e) {
-          console.error('Failed to restore active tenant', e);
         }
 
         setHydrated(true);

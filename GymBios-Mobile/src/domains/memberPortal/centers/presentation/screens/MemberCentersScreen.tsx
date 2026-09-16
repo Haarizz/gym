@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -16,11 +16,14 @@ import { CenterCard } from '../components/CenterCard';
 import { CenterDetailModal } from '../components/CenterDetailModal';
 import { CenterFiltersModal } from '../components/CenterFiltersModal';
 import { useCenters, type CenterSummary } from '@/domains/discovery';
-import { useAuthStore } from '@/domains/auth/store/authStore';
 
 const CATEGORY_TABS = ['All', 'Gym', 'Fitness Center', 'Wellness Center', 'Studio'];
 
-export function MemberCentersScreen() {
+export function MemberCentersScreen({
+  initialDeepLink,
+}: {
+  initialDeepLink?: { tenantSlug: string; branchId: string };
+} = {}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedGender, setSelectedGender] = useState('All');
@@ -30,6 +33,29 @@ export function MemberCentersScreen() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const { data: centers = [], isLoading, isRefetching, refetch } = useCenters();
+
+  // Idempotent deep-link resolution effect
+  useEffect(() => {
+    if (!initialDeepLink || centers.length === 0) return;
+
+    // We check if we ALREADY have this center selected to avoid re-triggering.
+    // Also, handle if the deep link changes (a NEW destination while mounted).
+    const isAlreadySelected = 
+      selectedCenter?.tenantSlug === initialDeepLink.tenantSlug &&
+      selectedCenter?.branchId?.toString() === initialDeepLink.branchId?.toString();
+
+    if (!isAlreadySelected) {
+      const match = centers.find(c => 
+        c.tenantSlug === initialDeepLink.tenantSlug && 
+        c.branchId?.toString() === initialDeepLink.branchId?.toString()
+      );
+
+      if (match) {
+        setSelectedCenter(match);
+        setIsDetailOpen(true);
+      }
+    }
+  }, [initialDeepLink, centers, selectedCenter]);
 
   const filteredCenters = useMemo(() => {
     return centers.filter((center) => {
@@ -48,13 +74,16 @@ export function MemberCentersScreen() {
     setSelectedCenter(center);
     setIsDetailOpen(true);
 
-    // A member's JWT carries no tenant claim (see AuthService.login), so
-    // X-Tenant-ID — sourced from this locally persisted value — is the only thing
-    // that routes their requests to this gym's own database. Opening a center
-    // they already belong to re-establishes it if it was ever lost (e.g. a
-    // logout previously wiped it, or a fresh install), self-healing the "no
-    // active membership" dashboard without requiring a repeat purchase.
-    useAuthStore.getState().setActiveTenant(center.tenantSlug);
+    // Deliberately NOT calling setActiveTenant here. This screen is the public
+    // marketplace browse/search list of every center on the platform — tapping
+    // a card to view its details is not proof of membership there, and blindly
+    // switching X-Tenant-ID to whatever card was tapped would send every
+    // subsequent request (dashboard, my-branches, status...) under a gym the
+    // member may have no relationship with, which the backend then correctly
+    // 403s as "not a member of this Gym". The active tenant is established
+    // for real in two places only: restoreActiveTenantForUser (login/session
+    // restore, from this user's own persisted value) and PlanPurchaseModal's
+    // purchase onSuccess (after the backend confirms membership was created).
   };
 
   const handleResetFilters = () => {

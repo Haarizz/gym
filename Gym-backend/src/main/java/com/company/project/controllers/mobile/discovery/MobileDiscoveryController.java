@@ -9,6 +9,7 @@ import com.company.project.dto.MembershipPlanResponseDTO;
 import com.company.project.dto.StaffResponseDTO;
 import com.company.project.entities.Branch;
 import com.company.project.entities.Gym;
+import com.company.project.entities.Member;
 import com.company.project.entities.UserProfile;
 import com.company.project.repositories.BranchRepository;
 import com.company.project.repositories.GymRepository;
@@ -16,6 +17,7 @@ import com.company.project.repositories.UserProfileRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.services.FacilityService;
 import com.company.project.services.MembershipPlanService;
+import com.company.project.services.MobileReferralResolutionService;
 import com.company.project.services.StaffService;
 import com.company.project.services.MemberService;
 import com.company.project.security.TenantContextHolder;
@@ -55,6 +57,7 @@ public class MobileDiscoveryController {
     private final com.company.project.services.GlobalUserService globalUserService;
     private final EntityManagerFactory entityManagerFactory;
     private final NotificationService notificationService;
+    private final MobileReferralResolutionService mobileReferralResolutionService;
 
     // Payment methods that require reception/admin approval before the member gets
     // app access — cash and credit need physical/manual verification that the money
@@ -77,7 +80,8 @@ public class MobileDiscoveryController {
             MemberRepository memberRepository,
             com.company.project.services.GlobalUserService globalUserService,
             EntityManagerFactory entityManagerFactory,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            MobileReferralResolutionService mobileReferralResolutionService) {
         this.globalDiscoveryRepository = globalDiscoveryRepository;
         this.branchRepository = branchRepository;
         this.gymRepository = gymRepository;
@@ -89,6 +93,7 @@ public class MobileDiscoveryController {
         this.globalUserService = globalUserService;
         this.entityManagerFactory = entityManagerFactory;
         this.notificationService = notificationService;
+        this.mobileReferralResolutionService = mobileReferralResolutionService;
     }
 
     @GetMapping
@@ -321,6 +326,26 @@ public class MobileDiscoveryController {
                         Long.valueOf(createdMember.getId()), "/approvals",
                         "PAYMENT_PENDING_" + createdMember.getId()
                 );
+            }
+
+            // Convert any pending mobile referral for this user now, while
+            // TenantContextHolder/BranchContextHolder are still set to this purchase's
+            // tenant/branch. This used to run from an @AfterReturning aspect on this
+            // method, which fired AFTER the finally below had already cleared both
+            // holders — every real-time conversion silently failed as a result, only
+            // ever succeeding via the separate retry endpoints (which run in their own
+            // fresh request with fresh context). Doing it inline here, before the
+            // context is torn down, avoids needing to restore any of it.
+            try {
+                Member fakeMember = new Member();
+                fakeMember.setMemberId(createdMember.getMemberId());
+                fakeMember.setName(createdMember.getName());
+                fakeMember.setEmail(createdMember.getEmail());
+                fakeMember.setPhone(createdMember.getPhone());
+                mobileReferralResolutionService.convertReferral(globalUserId, fakeMember);
+            } catch (Exception e) {
+                System.err.println("Referral conversion failed after successful purchase: " + e.getMessage());
+                e.printStackTrace();
             }
 
             return ResponseEntity.ok(createdMember);

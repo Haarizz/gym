@@ -35,7 +35,7 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
         <View style={styles.summaryGrid}>
           <GlassSurface radius={Radius.lg} style={styles.summaryTile}>
             <Typography variant="subtitle" style={[styles.summaryValue, { color: '#16a34a' }]}>
-              ${summary.totalEarnings.toLocaleString()}
+              ${(summary?.totalEarnings ?? 0).toLocaleString()}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               Total Earnings
@@ -44,7 +44,7 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
 
           <GlassSurface radius={Radius.lg} style={styles.summaryTile}>
             <Typography variant="subtitle" style={styles.summaryValue}>
-              {summary.totalTransactions}
+              {summary?.totalTransactions ?? 0}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               Transactions
@@ -53,7 +53,7 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
 
           <GlassSurface radius={Radius.lg} style={styles.summaryTile}>
             <Typography variant="subtitle" style={[styles.summaryValue, { color: '#7c3aed' }]}>
-              {summary.totalPurchases}
+              {summary?.totalPurchases ?? 0}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               Purchases
@@ -62,7 +62,7 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
 
           <GlassSurface radius={Radius.lg} style={styles.summaryTile}>
             <Typography variant="subtitle" style={[styles.summaryValue, { color: '#d97706' }]}>
-              {summary.totalBonuses}
+              {summary?.totalBonuses ?? 0}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               Bonuses

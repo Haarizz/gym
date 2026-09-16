@@ -20,6 +20,7 @@ export interface LoginResponseApiModel {
   default_branch_id?: number;
   profileCompleted?: boolean;
   profile_completed?: boolean;
+  fullName?: string;
 }
 
 export type MeResponseApiModel = LoginResponseApiModel;
