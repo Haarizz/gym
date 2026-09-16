@@ -89,6 +89,11 @@ public final class PermissionCatalog {
         MODULES.put("SETTINGS", ACTIONS_VIEW_EDIT);
         MODULES.put("BRANCH_MANAGEMENT", ACTIONS_ADMIN);
         MODULES.put("GYM_MANAGEMENT", ACTIONS_ADMIN);
+        // Platform-owner-only, like GYM_MANAGEMENT: the Super Admin's gym-signup
+        // pipeline (Leads -> Follow Up -> Pending Approval). See DefaultRolePermissions
+        // for the GYMBIOS_ADMIN grant and RoleService.getEffectivePermissionKeys for
+        // the code-enforced fixed set that actually governs this at runtime.
+        MODULES.put("PLATFORM_LEADS", ACTIONS_ADMIN);
         MODULES.put("ADMINISTRATION", ACTIONS_ADMIN);
     }
 

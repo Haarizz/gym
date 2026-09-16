@@ -116,6 +116,22 @@ public class TenantDataSourceRegistry implements DisposableBean {
         }
     }
 
+    /**
+     * Force-closes and evicts this one tenant's cached pool immediately, regardless
+     * of idle time — unlike evictIdlePools, which only ever reaps pools idle past
+     * IDLE_TTL. Needed before a hard-delete's DROP DATABASE: Postgres refuses to
+     * drop a database with open connections, and a recently-accessed tenant's pool
+     * would otherwise sit here open for up to IDLE_TTL with no other way to close
+     * it on demand. A no-op if this tenant has no cached pool (never accessed, or
+     * already evicted) — the caller's DROP DATABASE still needs to succeed either way.
+     */
+    public void evict(String tenantSlug) {
+        CachedPool removed = cache.remove(tenantSlug);
+        if (removed != null) {
+            closeQuietly(tenantSlug, removed.dataSource());
+        }
+    }
+
     /** Closes every still-cached pool on graceful application shutdown — these are plain fields, not Spring beans, so nothing else would ever close them. */
     @Override
     public void destroy() {

@@ -92,6 +92,25 @@ export const geocodingApi = {
   },
 };
 
+// The backend serializes this DTO with spring.jackson.property-naming-strategy=
+// SNAKE_CASE, so the real wire shape is {tenant_id, name, slug, status} — not
+// {tenantId, ...} as TenantProvisioningResponseDTO's TypeScript shape claims.
+// Returning res.data as-is (as createGym/retryProvisioning used to) left
+// .tenantId undefined at runtime; callers using it downstream (pending-
+// approval.tsx's markApproved(approveTarget.id, createdGym.tenantId, ...)) sent
+// a request body with no gymTenantId key at all, which PlatformLeadController's
+// mark-approved endpoint rejects with an empty 400 — confirmed live: the gym was
+// created successfully every time, only this bookkeeping call failed, 100% of
+// the time, not intermittently.
+function mapTenantProvisioningResponse(wire: any): TenantProvisioningResponseDTO {
+  return {
+    tenantId: wire.tenantId ?? wire.tenant_id,
+    name: wire.name,
+    slug: wire.slug,
+    status: wire.status,
+  };
+}
+
 export const gymApi = {
   getAllGyms: async () => {
     const res = await api.get<GymDTO[]>('/gyms');
@@ -103,14 +122,25 @@ export const gymApi = {
     return res.data;
   },
 
+  /**
+   * Early UX check only — createGym re-validates at submit time regardless (the
+   * backend checks both the primary gyms table and the control-plane tenants
+   * table; a slug can be "taken" by a legacy or inactive tenant that never shows
+   * up in getAllGyms()'s listing).
+   */
+  checkSlugAvailable: async (slug: string): Promise<boolean> => {
+    const res = await api.get<{ available: boolean }>('/gyms/check-slug', { params: { slug } });
+    return res.data.available;
+  },
+
   createGym: async (data: GymRequestDTO) => {
     const res = await api.post<TenantProvisioningResponseDTO>('/gyms', toGymRequestBody(data));
-    return res.data;
+    return mapTenantProvisioningResponse(res.data);
   },
 
   retryProvisioning: async (tenantId: number, data: Partial<GymRequestDTO>) => {
     const res = await api.post<TenantProvisioningResponseDTO>(`/gyms/${tenantId}/retry-provisioning`, toGymRequestBody(data));
-    return res.data;
+    return mapTenantProvisioningResponse(res.data);
   },
 
   updateGym: async (id: number, data: GymRequestDTO) => {
@@ -138,5 +168,14 @@ export const gymApi = {
   updateTenantGymStatus: async (tenantId: number, status: string) => {
     const res = await api.patch<GymDTO>(`/gyms/tenant/${tenantId}/status`, { status });
     return res.data;
+  },
+
+  /**
+   * Irreversible hard delete — drops the tenant's dedicated Postgres database and
+   * role, then removes its control-plane rows. Only ever call this after explicit
+   * user confirmation; there is no undo, unlike updateTenantGymStatus.
+   */
+  deleteTenantGym: async (tenantId: number) => {
+    await api.delete(`/gyms/tenant/${tenantId}`);
   }
 };

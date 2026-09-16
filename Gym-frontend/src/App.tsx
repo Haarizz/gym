@@ -116,6 +116,9 @@ import { PayrollReports } from "./pages/payroll-reports";
 import { PayrollAnalytics } from "./pages/payroll-analytics";
 import { RolesPermissions } from "./pages/roles-permissions";
 import { Approvals } from "./pages/approvals";
+import { PendingApproval } from "./pages/pending-approval";
+import { PlatformLeads } from "./pages/platform-leads";
+import { PlatformFollowUp } from "./pages/platform-follow-up";
 import { usePermissions, hasPermission } from "./utils/permissions";
 
 import ErrorBoundary from "./components/shared/error-boundary";
@@ -177,7 +180,8 @@ import {
   Award,
   Search,
   Box,
-  Info
+  Info,
+  ClipboardCheck
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
@@ -607,6 +611,27 @@ const menuItems = [
     permission: "GYM_MANAGEMENT_VIEW",
   },
   {
+    title: "Pending Approval",
+    icon: ClipboardCheck,
+    id: "pending-approval",
+    path: "/pending-approval",
+    permission: "GYM_MANAGEMENT_VIEW",
+  },
+  {
+    title: "Leads",
+    icon: Target,
+    id: "platform-leads",
+    path: "/platform-leads",
+    permission: "GYM_MANAGEMENT_VIEW",
+  },
+  {
+    title: "Follow Up",
+    icon: CalendarClock,
+    id: "platform-follow-up",
+    path: "/platform-follow-up",
+    permission: "GYM_MANAGEMENT_VIEW",
+  },
+  {
     title: "Settings",
     icon: Settings,
     id: "settings",
@@ -743,9 +768,13 @@ export default function App() {
 
   // Re-filters whenever permissions change (login, logout, or a live role edit).
   const permissions = usePermissions();
-  // GYMBIOS_ADMIN (platform owner) is scoped to Gym Management only — it manages
-  // gym clients, not its own branch/profile, so both are hidden for this role
-  // specifically rather than gated by the normal per-module permission system.
+  // GYMBIOS_ADMIN (platform owner) is scoped to Gym Management + the platform
+  // sales/onboarding queues (Pending Approval, Leads, Follow Up) only — it manages
+  // gym clients and prospects, not its own branch/profile, so both are hidden for
+  // this role specifically rather than gated by the normal per-module permission
+  // system.
+  const gymbiosAdminMenuIds = ['gym-management', 'pending-approval', 'platform-leads', 'platform-follow-up'];
+  const gymbiosAdminPaths = ['/gym-management', '/pending-approval', '/platform-leads', '/platform-follow-up', '/'];
   const rolesRaw = sessionStorage.getItem('roles');
   const roles = rolesRaw ? (JSON.parse(rolesRaw) as string[]) : [];
   const isGymbiosAdmin = roles.some(r => r.toLowerCase().replace('role_', '') === 'gymbios_admin') || sessionStorage.getItem('gymbios_role_name')?.toLowerCase().replace('role_', '') === 'gymbios_admin';
@@ -757,7 +786,7 @@ export default function App() {
     || sessionStorage.getItem('gymbios_role_name')?.toLowerCase().replace('role_', '') === 'admin';
   const visibleMenuItems = useMemo(
     () => filterMenuByPermission(menuItems, hasPermission).filter(
-      (item) => isGymbiosAdmin ? item.id === 'gym-management' : true
+      (item) => isGymbiosAdmin ? gymbiosAdminMenuIds.includes(item.id) : true
     ),
     [permissions, isGymbiosAdmin],
   );
@@ -765,8 +794,8 @@ export default function App() {
   // Blocks direct URL navigation to a gated page too — sidebar hiding alone
   // doesn't stop typing e.g. /payroll-employees straight into the address bar.
   const requiredRoutePermission = routePermissionMap[location.pathname];
-  const routeAllowed = isGymbiosAdmin 
-    ? (location.pathname === '/gym-management' || location.pathname === '/')
+  const routeAllowed = isGymbiosAdmin
+    ? gymbiosAdminPaths.includes(location.pathname)
     : (!requiredRoutePermission || permissions.includes(requiredRoutePermission));
 
   // Provide navigation params from location state if available
@@ -780,7 +809,7 @@ export default function App() {
   useEffect(() => {
     const path = window.location.pathname;
     const emergencyMatch = path.match(/^\/emergency\/(.+)$/);
-    
+
     if (emergencyMatch) {
       setIsEmergencyRoute(true);
       setEmergencyMemberId(emergencyMatch[1]);
@@ -1116,6 +1145,9 @@ export default function App() {
       <Route path="/manage-assets" element={<ManageAssets />} />
       <Route path="/branch-management" element={<BranchManagement />} />
       <Route path="/gym-management" element={<GymManagement />} />
+      <Route path="/pending-approval" element={<PendingApproval />} />
+      <Route path="/platform-leads" element={<PlatformLeads />} />
+      <Route path="/platform-follow-up" element={<PlatformFollowUp />} />
       <Route path="/asset-history" element={<AssetHistoryPage />} />
       <Route path="/asset-transactions" element={<AssetTransactions />} />
       <Route path="/asset-reports" element={<AssetReports />} />
@@ -1393,7 +1425,7 @@ export default function App() {
               <ProtectedRoute isAuthenticated={isAuthenticated}>
                 {routeAllowed ? (
                   <React.Fragment key={`branch-${activeBranchId || 'all'}`}>
-                    {isAllBranches && currentPath !== '/gym-management' && (
+                    {isAllBranches && !gymbiosAdminPaths.includes(currentPath) && (
                       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 m-4 rounded-r-md flex items-start shadow-sm">
                         <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
                         <div>

@@ -24,8 +24,10 @@ import {
   Apple,
   ArrowRight,
   Shield,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { GymBiosPricing } from "./gymbios-pricing";
 
 interface LoginProps {
   onLogin: (
@@ -43,6 +45,8 @@ export function Login({ onLogin }: LoginProps) {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [errors, setErrors] = useState({
     email: "",
     password: "",
@@ -467,9 +471,14 @@ export function Login({ onLogin }: LoginProps) {
               <p className="text-center text-sm text-gray-600 w-full">
                 New to GymBios?{" "}
                 <Button
+                  type="button"
                   variant="link"
                   size="sm"
                   className="text-blue-600 hover:text-blue-700 p-0 h-auto"
+                  onClick={() => {
+                    setOnboardingOpen(false);
+                    setShowPricing(true);
+                  }}
                 >
                   Request a demo
                 </Button>
@@ -479,12 +488,13 @@ export function Login({ onLogin }: LoginProps) {
 
           {/* Footer */}
           <div className="mt-8 text-center text-sm text-gray-500">
-            <p>© 2024 GymBios. All rights reserved.</p>
+            <p>© 2026 GymBios. All rights reserved.</p>
             <div className="flex justify-center space-x-4 mt-2">
               <Button
                 variant="link"
                 size="sm"
                 className="text-gray-500 hover:text-gray-700 p-0 h-auto"
+                onClick={() => window.open('/privacy-policy', '_blank', 'noopener,noreferrer')}
               >
                 Privacy Policy
               </Button>
@@ -492,6 +502,7 @@ export function Login({ onLogin }: LoginProps) {
                 variant="link"
                 size="sm"
                 className="text-gray-500 hover:text-gray-700 p-0 h-auto"
+                onClick={() => window.open('/terms-of-service', '_blank', 'noopener,noreferrer')}
               >
                 Terms of Service
               </Button>
@@ -499,6 +510,7 @@ export function Login({ onLogin }: LoginProps) {
                 variant="link"
                 size="sm"
                 className="text-gray-500 hover:text-gray-700 p-0 h-auto"
+                onClick={() => window.open('/support', '_blank', 'noopener,noreferrer')}
               >
                 Support
               </Button>
@@ -506,6 +518,26 @@ export function Login({ onLogin }: LoginProps) {
           </div>
         </div>
       </div>
+
+      {/* Request a Demo - GymBios Pricing Overlay */}
+      {showPricing && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50">
+          {!onboardingOpen && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPricing(false)}
+              className="fixed top-4 right-4 h-9 w-9 p-0 rounded-full bg-white shadow-md border-gray-200 hover:bg-gray-50"
+              style={{ zIndex: 60 }}
+              aria-label="Close pricing"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+          <GymBiosPricing onOnboardingOpenChange={setOnboardingOpen} />
+        </div>
+      )}
     </div>
   );
 }
