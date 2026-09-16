@@ -50,16 +50,18 @@ public class RoleService {
     }
 
     /**
-     * GYMBIOS_ADMIN (the platform owner) is scoped to Gym Management only — it creates
-     * and manages gym clients, nothing else. This is a fixed set, not stored role_permissions
-     * rows, so it can't drift from the catalog and can't be edited away via the UI (see
-     * updateRole's guard below).
+     * GYMBIOS_ADMIN (the platform owner) is scoped to Gym Management and the platform
+     * sales/onboarding pipeline (Leads -> Follow Up -> Pending Approval) only — it
+     * creates and manages gym clients and the leads that become them, nothing else.
+     * This is a fixed set, not stored role_permissions rows, so it can't drift from
+     * the catalog and can't be edited away via the UI (see updateRole's guard below).
      */
     @Transactional(readOnly = true)
     public List<String> getEffectivePermissionKeys(Role role) {
         if (role.getRoleName() != null && role.getRoleName().equalsIgnoreCase(ADMIN_ROLE_NAME)) {
-            return PermissionCatalog.MODULES.get("GYM_MANAGEMENT").stream()
-                    .map(action -> PermissionCatalog.key("GYM_MANAGEMENT", action))
+            return List.of("GYM_MANAGEMENT", "PLATFORM_LEADS").stream()
+                    .flatMap(module -> PermissionCatalog.MODULES.get(module).stream()
+                            .map(action -> PermissionCatalog.key(module, action)))
                     .collect(Collectors.toList());
         }
         return rolePermissionRepository.findByRoleId(role.getId()).stream()

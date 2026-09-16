@@ -44,6 +44,17 @@ public class GymController {
     }
 
     /**
+     * GET /api/gyms/check-slug?slug=... — early UX check for the Add Gym /
+     * Pending Approval forms, so a collision surfaces before submit instead of
+     * after. Not authoritative: createGym re-checks at submit time regardless.
+     */
+    @GetMapping("/check-slug")
+    @PreAuthorize("hasAuthority('GYM_MANAGEMENT_VIEW')")
+    public ResponseEntity<Map<String, Boolean>> checkSlugAvailable(@RequestParam String slug) {
+        return ResponseEntity.ok(Map.of("available", gymService.isSlugAvailable(slug)));
+    }
+
+    /**
      * POST /api/gyms — create a new gym. Phase 3: always provisions a brand-new,
      * dedicated Postgres database asynchronously; 202 means "accepted, not yet
      * complete" — poll GET on the control-plane tenant (not yet exposed as its own
@@ -140,6 +151,20 @@ public class GymController {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(gymService.updateTenantGymStatus(tenantId, status));
+    }
+
+    /**
+     * DELETE /api/gyms/tenant/{tenantId} — irreversible hard delete: drops this
+     * tenant's dedicated Postgres database and role, then removes every
+     * control-plane row referencing it. Gated on the DELETE action (distinct from
+     * EDIT, which every other tenant-mutation endpoint above uses) since this has
+     * no undo, unlike a status toggle.
+     */
+    @DeleteMapping("/tenant/{tenantId}")
+    @PreAuthorize("hasAuthority('GYM_MANAGEMENT_DELETE')")
+    public ResponseEntity<Void> deleteTenantGym(@PathVariable Long tenantId) {
+        gymService.deleteTenantGym(tenantId);
+        return ResponseEntity.noContent().build();
     }
 
     /** POST /api/gyms/{id}/owner — issue or reset the gym owner's login credentials */

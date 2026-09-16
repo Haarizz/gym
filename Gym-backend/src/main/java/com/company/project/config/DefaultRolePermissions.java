@@ -35,20 +35,22 @@ public final class DefaultRolePermissions {
 
     public static final Map<String, List<String>> GRANTS = new LinkedHashMap<>();
     static {
-        // GYMBIOS_ADMIN (platform owner) is scoped to Gym Management only.
+        // GYMBIOS_ADMIN (platform owner) is scoped to Gym Management and the platform
+        // sales/onboarding pipeline (Leads -> Follow Up -> Pending Approval) only.
         // RoleService.getEffectivePermissionKeys already enforces this as a fixed set
         // regardless of these stored rows; seeding them too keeps the Roles &
         // Permissions screen's display of this role accurate.
         GRANTS.put("GYMBIOS_ADMIN", List.of(
-                "GYM_MANAGEMENT_VIEW", "GYM_MANAGEMENT_CREATE", "GYM_MANAGEMENT_EDIT", "GYM_MANAGEMENT_DELETE"
+                "GYM_MANAGEMENT_VIEW", "GYM_MANAGEMENT_CREATE", "GYM_MANAGEMENT_EDIT", "GYM_MANAGEMENT_DELETE",
+                "PLATFORM_LEADS_VIEW", "PLATFORM_LEADS_CREATE", "PLATFORM_LEADS_EDIT", "PLATFORM_LEADS_DELETE"
         ));
 
-        // ADMIN (gym owner) gets every operational module except GYM_MANAGEMENT itself
-        // (creating/managing other gyms stays platform-owner only). Each gym's owner is
-        // scoped to their own gym's data via their branch assignments, not a
-        // restricted permission set.
+        // ADMIN (gym owner) gets every operational module except GYM_MANAGEMENT and
+        // PLATFORM_LEADS (creating/managing other gyms, and the sales pipeline that
+        // feeds it, stay platform-owner only). Each gym's owner is scoped to their own
+        // gym's data via their branch assignments, not a restricted permission set.
         GRANTS.put("ADMIN", PermissionCatalog.allKeys().stream()
-                .filter(key -> !key.startsWith("GYM_MANAGEMENT_"))
+                .filter(key -> !key.startsWith("GYM_MANAGEMENT_") && !key.startsWith("PLATFORM_LEADS_"))
                 .collect(Collectors.toList()));
 
         List<String> managerGrants = new ArrayList<>(List.of(

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, CheckCircle2, XCircle, Search, Dumbbell } from 'lucide-react';
+import { Plus, Edit2, CheckCircle2, XCircle, Search, Dumbbell, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -156,6 +156,33 @@ export function GymManagement() {
     }
   };
 
+  /**
+   * Irreversible hard delete — only offered for TENANT-sourced gyms (every gym
+   * created since Phase 3's per-tenant-database cutover), since the backend
+   * endpoint only knows how to drop a control-plane tenant's own database/role.
+   * Deliberately not offered for PRIMARY-sourced gyms (Main Gym, Power Gym's
+   * legacy pre-cutover siblings) — no equivalent teardown exists for those, and
+   * they were never in scope for this operation anyway.
+   */
+  const handleDeleteGym = async (gym: GymDTO) => {
+    const tenantId = getTenantId(gym);
+    if (tenantId == null) return;
+    if (!window.confirm(
+      `Permanently delete "${gym.name}"? This drops its entire database and cannot be undone. Type-confirm by clicking OK only if you are certain.`
+    )) {
+      return;
+    }
+    try {
+      await gymApi.deleteTenantGym(tenantId);
+      toast.success(`${gym.name} permanently deleted.`);
+      loadGyms();
+    } catch (error: any) {
+      console.error('Failed to delete gym', error);
+      const msg = error.response?.data?.message || error.message || 'Please try again.';
+      toast.error(`Failed to delete gym. ${msg}`);
+    }
+  };
+
   const filteredGyms = gyms.filter(g => {
     const q = searchQuery || '';
     return g.name.toLowerCase().includes(q.toLowerCase()) ||
@@ -252,6 +279,17 @@ export function GymManagement() {
                         onCheckedChange={() => toggleStatus(gym)}
                         aria-label="Toggle Status"
                       />
+                      {gym.source === 'TENANT' && !((gym as any).isDefault ?? (gym as any).is_default) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteGym(gym)}
+                          aria-label="Delete gym"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

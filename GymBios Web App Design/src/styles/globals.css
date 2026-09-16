@@ -1,0 +1,401 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  /* GymBios Official Brand Colors - Teal Green Theme (per COLOR_THEME_GUIDE.md) */
+  --gymbios-primary: #2B7A78;
+  --gymbios-accent: #E63946;
+  --gymbios-primary-hover: #236360;
+  --gymbios-accent-hover: #d32f3d;
+  --gymbios-main-bg: #F9FAFB;
+  --gymbios-heading: #1E293B;
+  --gymbios-body: #1E293B;
+  --gymbios-white: #FFFFFF;
+  --gymbios-success: #4CAF50;
+  --gymbios-warning: #FFC107;
+  --gymbios-error: #E63946;
+  --gymbios-selected-row: rgba(43, 122, 120, 0.1);
+  
+  /* Updated color system for GymBios - Teal Green Primary + Red Accent */
+  --background: #F9FAFB;
+  --foreground: #1E293B;
+  --card: #ffffff;
+  --card-foreground: #1E293B;
+  --popover: #ffffff;
+  --popover-foreground: #1E293B;
+  --primary: #2B7A78;
+  --primary-foreground: #ffffff;
+  --secondary: #E2E8F0;
+  --secondary-foreground: #1E293B;
+  --muted: #f2f4f7;
+  --muted-foreground: #4b5563;
+  --accent: #E63946;
+  --accent-foreground: #ffffff;
+  --destructive: #E63946;
+  --destructive-foreground: #ffffff;
+  --border: #d1d5db;
+  --input: transparent;
+  --input-background: #ffffff;
+  --switch-background: #cbced4;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #2B7A78;
+  --chart-1: #2B7A78;
+  --chart-2: #009688;
+  --chart-3: #4CAF50;
+  --chart-4: #FFC107;
+  --chart-5: #E63946;
+  --radius: 0.625rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  
+  /* GymBios Sidebar Design - Teal Green */
+  --sidebar: #2B7A78;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #2B7A78;
+  --sidebar-accent: rgba(255, 255, 255, 0.1);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #ffffff;
+  --sidebar-active: rgba(255, 255, 255, 0.2);
+}
+
+.dark {
+  /* Dark mode with GymBios Teal Green branding preserved */
+  --background: #1a1a1a;
+  --foreground: #ffffff;
+  --card: #262626;
+  --card-foreground: #ffffff;
+  --popover: #262626;
+  --popover-foreground: #ffffff;
+  --primary: #2B7A78;
+  --primary-foreground: #ffffff;
+  --secondary: #1e3a3f;
+  --secondary-foreground: #ffffff;
+  --muted: #404040;
+  --muted-foreground: #a1a1a1;
+  --accent: #E63946;
+  --accent-foreground: #ffffff;
+  --destructive: #E63946;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: #404040;
+  --ring: #2B7A78;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: #2B7A78;
+  --chart-2: #009688;
+  --chart-3: #4CAF50;
+  --chart-4: #FFC107;
+  --chart-5: #E63946;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  
+  /* Dark mode sidebar - Teal Green */
+  --sidebar: #2B7A78;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #2B7A78;
+  --sidebar-accent: #236360;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h3 {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h4 {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* GymBios Specific Design Elements - Teal Green Theme */
+@layer components {
+  /* Primary Background Utilities */
+  .bg-gradient-primary {
+    background: var(--gymbios-primary);
+  }
+  
+  .bg-gradient-primary-hover {
+    background: var(--gymbios-primary-hover);
+  }
+  
+  .bg-gradient-light {
+    background: rgba(43, 122, 120, 0.1);
+  }
+  
+  .border-gradient {
+    border: 2px solid var(--gymbios-primary);
+  }
+  
+  /* Primary Button Styling - Teal Green */
+  .btn-primary {
+    background: var(--gymbios-primary);
+    color: var(--gymbios-white);
+    border: none;
+    transition: all 0.3s ease-in-out;
+    transform: translateY(0);
+  }
+  
+  .btn-primary:hover {
+    background: var(--gymbios-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(43, 122, 120, 0.3);
+  }
+  
+  /* Secondary Button Styling */
+  .btn-secondary {
+    background-color: var(--gymbios-white);
+    color: var(--gymbios-primary);
+    border: 2px solid var(--gymbios-primary);
+    transition: all 0.3s ease-in-out;
+  }
+  
+  .btn-secondary:hover {
+    background: rgba(43, 122, 120, 0.1);
+    transform: translateY(-1px);
+  }
+  
+  /* Table Header Styling */
+  .table-header {
+    color: var(--gymbios-primary);
+    font-weight: var(--font-weight-medium);
+  }
+  
+  /* Selected Row Highlighting */
+  .row-selected {
+    background-color: var(--gymbios-selected-row);
+  }
+  
+  /* Form Labels */
+  .form-label {
+    color: var(--gymbios-primary);
+    font-weight: var(--font-weight-medium);
+  }
+  
+  /* Input Focus Border - Teal Green */
+  .input-focus:focus {
+    border: 2px solid var(--gymbios-primary);
+    outline: none;
+  }
+  
+  /* Sidebar Active Menu Item with Teal Green Theme */
+  .sidebar-item-active {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: var(--gymbios-white) !important;
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    position: relative;
+  }
+  
+  .sidebar-item-active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--gymbios-white);
+    border-radius: 0 4px 4px 0;
+  }
+  
+  .sidebar-item-active .lucide {
+    color: var(--gymbios-white) !important;
+  }
+  
+  /* Sidebar Hover Effect with Smooth Animation */
+  .sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    transition: all 0.3s ease-in-out;
+    backdrop-filter: blur(5px);
+  }
+  
+  /* Icon Hover Glow with Enhanced Effect */
+  .sidebar-icon:hover {
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+    transform: scale(1.05);
+    transition: all 0.3s ease-in-out;
+  }
+  
+  /* Smooth Transitions */
+  .sidebar-item {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Floating Action Button - Teal Green */
+  .fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    background: var(--gymbios-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(43, 122, 120, 0.3);
+    transition: all 0.3s ease-in-out;
+    z-index: 1000;
+  }
+  
+  .fab:hover {
+    transform: scale(1.1);
+    background: var(--gymbios-primary-hover);
+    box-shadow: 0 6px 25px rgba(43, 122, 120, 0.4);
+  }
+  
+  /* Status Colors */
+  .status-success {
+    color: var(--gymbios-success);
+  }
+  
+  .status-warning {
+    color: var(--gymbios-warning);
+  }
+  
+  .status-error {
+    color: var(--gymbios-error);
+  }
+  
+  .bg-success {
+    background-color: var(--gymbios-success);
+  }
+  
+  .bg-warning {
+    background-color: var(--gymbios-warning);
+  }
+  
+  .bg-error {
+    background-color: var(--gymbios-error);
+  }
+  
+  /* Top Navigation Bar */
+  .top-nav {
+    background-color: var(--gymbios-white);
+    border-bottom: 2px solid var(--gymbios-primary);
+  }
+  
+  /* Active Tab Indicator */
+  .tab-active {
+    border-bottom: 2px solid var(--gymbios-primary);
+    color: var(--gymbios-primary);
+  }
+}

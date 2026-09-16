@@ -2,6 +2,7 @@ package com.company.project.controlplane.service;
 
 import com.company.project.config.DefaultRolePermissions;
 import com.company.project.config.PermissionCatalog;
+import com.company.project.config.TenantDataSourceRegistry;
 import com.company.project.controlplane.entities.Tenant;
 import com.company.project.controlplane.entities.TenantConnection;
 import com.company.project.controlplane.entities.TenantProvisioningLog;
@@ -64,6 +65,7 @@ public class TenantProvisioningService {
     private final PasswordEncoder passwordEncoder;
     private final CredentialEncryptionService credentialEncryptionService;
     private final DiscoverySyncService discoverySyncService;
+    private final TenantDataSourceRegistry tenantDataSourceRegistry;
 
     @Value("${spring.datasource.url}")
     private String adminJdbcUrl;
@@ -84,7 +86,8 @@ public class TenantProvisioningService {
             UserDirectoryRepository userDirectoryRepository,
             PasswordEncoder passwordEncoder,
             CredentialEncryptionService credentialEncryptionService,
-            DiscoverySyncService discoverySyncService) {
+            DiscoverySyncService discoverySyncService,
+            TenantDataSourceRegistry tenantDataSourceRegistry) {
         this.tenantRepository = tenantRepository;
         this.tenantConnectionRepository = tenantConnectionRepository;
         this.provisioningLogRepository = provisioningLogRepository;
@@ -92,6 +95,7 @@ public class TenantProvisioningService {
         this.passwordEncoder = passwordEncoder;
         this.credentialEncryptionService = credentialEncryptionService;
         this.discoverySyncService = discoverySyncService;
+        this.tenantDataSourceRegistry = tenantDataSourceRegistry;
     }
 
     /**
@@ -285,6 +289,50 @@ public class TenantProvisioningService {
             }
             return password;
         }
+    }
+
+    /**
+     * Reverse of provisionDatabase: terminates any remaining backend connections to
+     * this tenant's database (belt-and-suspenders on top of the caller evicting its
+     * own cached pool first — a stray connection from anywhere else would otherwise
+     * make DROP DATABASE fail outright), then drops the database and finally the
+     * role that owns it. Order matters: Postgres refuses to drop a role that still
+     * owns a database. Both drops are IF EXISTS, so this is safe to call even if a
+     * prior partial attempt already removed one or the other. Same system-database
+     * connection pattern as provisionDatabase, for the same reason (DROP
+     * DATABASE/ROLE cannot run inside a transaction block, and must not run against
+     * the database being dropped).
+     */
+    void deprovisionDatabase(String dbName, String roleName) throws Exception {
+        String systemDbUrl = adminJdbcUrl.replaceAll("/[^/]+$", "/postgres");
+        try (Connection conn = DriverManager.getConnection(systemDbUrl, adminUsername, adminPassword)) {
+            try (PreparedStatement terminate = conn.prepareStatement(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ? AND pid <> pg_backend_pid()")) {
+                terminate.setString(1, dbName);
+                terminate.executeQuery();
+            }
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("DROP DATABASE IF EXISTS " + quoteIdentifier(dbName));
+                stmt.executeUpdate("DROP ROLE IF EXISTS " + quoteIdentifier(roleName));
+            }
+        }
+    }
+
+    /**
+     * Full teardown entry point for a hard-delete, mirroring beginProvisioning/
+     * provisionAsync as createGym's pair of entry points: derives this tenant's
+     * dbName/roleName the same deterministic way provisioning did, force-evicts any
+     * pooled connection this app instance is holding open for it (TenantDataSourceRegistry
+     * has no other way to close one on demand outside its idle sweep), then drops
+     * the database and role. Callers are responsible for deleting the corresponding
+     * Tenant/TenantConnection/TenantProvisioningLog control-plane rows — this method
+     * only tears down the actual Postgres database + role.
+     */
+    public void deprovisionTenantBySlug(String slug) throws Exception {
+        String dbName = dbNamePrefix + sanitize(slug);
+        String roleName = roleNameFor(slug);
+        tenantDataSourceRegistry.evict(slug);
+        deprovisionDatabase(dbName, roleName);
     }
 
     /** Decrypted password from a prior attempt's stored TenantConnection, or null if this tenant has never gotten that far before. */

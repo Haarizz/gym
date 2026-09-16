@@ -3,8 +3,11 @@ package com.company.project.services;
 import com.company.project.config.TenantDataSourceRegistry;
 import com.company.project.controlplane.entities.Tenant;
 import com.company.project.controlplane.entities.TenantConnection;
+import com.company.project.controlplane.repositories.PlatformLeadRepository;
 import com.company.project.controlplane.repositories.TenantConnectionRepository;
+import com.company.project.controlplane.repositories.TenantProvisioningLogRepository;
 import com.company.project.controlplane.repositories.TenantRepository;
+import com.company.project.controlplane.repositories.UserDirectoryRepository;
 import com.company.project.controlplane.service.TenantProvisioningService;
 import com.company.project.dto.GymRequestDTO;
 import com.company.project.dto.GymResponseDTO;
@@ -50,8 +53,17 @@ public class GymService {
     private final TenantRepository tenantRepository;
     private final TenantConnectionRepository tenantConnectionRepository;
     private final TenantDataSourceRegistry tenantDataSourceRegistry;
+    private final TenantProvisioningLogRepository tenantProvisioningLogRepository;
+    private final UserDirectoryRepository userDirectoryRepository;
+    private final PlatformLeadRepository platformLeadRepository;
 
     private static final Logger log = LoggerFactory.getLogger(GymService.class);
+
+    // Hard-delete is refused for these slugs regardless of what the caller passes —
+    // a second, service-level guard independent of whatever the controller/frontend
+    // currently excludes from its own delete affordance, since this operation is
+    // irreversible (drops the tenant's real database).
+    private static final Set<String> PROTECTED_SLUGS = Set.of("main-gym", "power-gym");
 
     public GymService(GymRepository gymRepository,
                        BranchRepository branchRepository,
@@ -62,7 +74,10 @@ public class GymService {
                        TenantProvisioningService tenantProvisioningService,
                        TenantRepository tenantRepository,
                        TenantConnectionRepository tenantConnectionRepository,
-                       TenantDataSourceRegistry tenantDataSourceRegistry) {
+                       TenantDataSourceRegistry tenantDataSourceRegistry,
+                       TenantProvisioningLogRepository tenantProvisioningLogRepository,
+                       UserDirectoryRepository userDirectoryRepository,
+                       PlatformLeadRepository platformLeadRepository) {
         this.gymRepository = gymRepository;
         this.branchRepository = branchRepository;
         this.userRepository = userRepository;
@@ -73,6 +88,9 @@ public class GymService {
         this.tenantRepository = tenantRepository;
         this.tenantConnectionRepository = tenantConnectionRepository;
         this.tenantDataSourceRegistry = tenantDataSourceRegistry;
+        this.tenantProvisioningLogRepository = tenantProvisioningLogRepository;
+        this.userDirectoryRepository = userDirectoryRepository;
+        this.platformLeadRepository = platformLeadRepository;
     }
 
     // ── Gym CRUD ────────────────────────────────────────────────────────────
@@ -149,6 +167,18 @@ public class GymService {
                 request.getAddress(), request.getLat(), request.getLng());
 
         return new TenantProvisioningResponseDTO(tenant.getId(), tenant.getName(), tenant.getSlug(), tenant.getStatus());
+    }
+
+    /**
+     * Same dual-DB uniqueness check createGym enforces (see its javadoc), exposed
+     * standalone so a form can validate a slug before submitting — createGym still
+     * re-checks at submit time regardless, this is purely an early UX signal and
+     * not authoritative (a slug could be taken by another request between the
+     * check and the actual create call).
+     */
+    public boolean isSlugAvailable(String slug) {
+        String normalized = slug.toLowerCase();
+        return !gymRepository.existsBySlug(normalized) && !tenantRepository.existsBySlug(normalized);
     }
 
     /**
@@ -431,6 +461,51 @@ public class GymService {
             throw new RuntimeException("Failed to update tenant gym status for tenantId=" + tenantId, e);
         }
         return toResponseDTO(tenant);
+    }
+
+    /**
+     * Hard delete: irreversibly drops this tenant's dedicated Postgres database and
+     * role, then removes every control-plane row referencing it. Unlike
+     * updateTenantGymStatus (a reversible business-status toggle), there is no
+     * undo — explicitly requested over deactivation. Refuses PROTECTED_SLUGS
+     * regardless of tenantId, so this can never be pointed at Main Gym or Power Gym
+     * even by a bad/stale tenantId. Deletion order matters for FK-less
+     * cross-database references the same way creation order did in
+     * TenantProvisioningService: deprovision the real Postgres objects first (while
+     * TenantConnection still has the dbName/role needed to find them), then remove
+     * the control-plane rows that pointed at them.
+     */
+    public void deleteTenantGym(Long tenantId) {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant not found: " + tenantId));
+        if (PROTECTED_SLUGS.contains(tenant.getSlug())) {
+            throw new BusinessRuleViolationException("Refusing to delete a protected gym: " + tenant.getSlug());
+        }
+
+        try {
+            tenantProvisioningService.deprovisionTenantBySlug(tenant.getSlug());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to drop database/role for tenant slug=" + tenant.getSlug(), e);
+        }
+
+        userDirectoryRepository.findByTenantSlug(tenant.getSlug())
+                .forEach(userDirectoryRepository::delete);
+        tenantProvisioningLogRepository.findByTenantIdOrderByAttemptedAtAsc(tenantId)
+                .forEach(tenantProvisioningLogRepository::delete);
+        tenantConnectionRepository.findByTenantId(tenantId)
+                .ifPresent(tenantConnectionRepository::delete);
+        // A gym created via the lead-approval flow (PlatformLeadService.markApproved)
+        // has a platform_leads row FK-referencing this tenant's id — deleting the
+        // Tenant row without first clearing that reference fails with a
+        // ConstraintViolationException (confirmed live). The lead itself is a
+        // historical record of the signup, not something this delete should touch,
+        // so only the now-dangling gymTenantId link is cleared; gymSlug (a plain
+        // unconstrained column) is left as-is as a record of what the gym was called.
+        platformLeadRepository.findByGymTenantId(tenantId).forEach(lead -> {
+            lead.setGymTenantId(null);
+            platformLeadRepository.save(lead);
+        });
+        tenantRepository.delete(tenant);
     }
 
     private void populateFromTenantDatabase(GymResponseDTO dto, String tenantSlug) {

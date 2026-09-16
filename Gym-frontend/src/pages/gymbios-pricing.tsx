@@ -32,6 +32,7 @@ import {
   Brain,
   Gauge
 } from "lucide-react";
+import { BusinessOnboardingFullscreen } from "./business-onboarding-fullscreen";
 
 const plans = [
   {
@@ -151,11 +152,83 @@ const trustIndicators = [
   { label: "Free Data Migration", icon: CheckCircle },
 ];
 
-export function GymBiosPricing() {
+const comparisonRows = [
+  {
+    label: "Multi-branch & franchise control",
+    values: ["—", "✓", "✓"],
+  },
+  {
+    label: "Advanced BI & Intelligence",
+    values: ["—", "Limited", "Full"],
+  },
+  {
+    label: "Workforce & performance management",
+    values: ["Basic", "Advanced", "Advanced + AI insights"],
+  },
+  {
+    label: "Marketing & revenue growth tools",
+    values: ["Basic campaigns", "Enhanced", "Full suite"],
+  },
+  {
+    label: "Automation & workflows",
+    values: ["Core workflows", "Extended", "Advanced automation"],
+  },
+];
+
+const faqs = [
+  {
+    question: "Is there a setup or onboarding fee?",
+    answer:
+      "For most gyms, onboarding is included in the subscription. For complex multi-branch rollouts, we'll quote a one-time onboarding project if needed.",
+  },
+  {
+    question: "Can I migrate from my existing system?",
+    answer:
+      "Yes. We support guided data migration for members, plans, payments, and more. Our team will help you structure the import.",
+  },
+  {
+    question: "Is GymBios suitable for multi-branch or franchise setups?",
+    answer:
+      "Absolutely. Standard, Professional, and Enterprise plans are designed with multi-location control and intelligence in mind.",
+  },
+  {
+    question: "Can I upgrade between plans later?",
+    answer:
+      "Yes, you can upgrade at any time as your business grows. We'll pro-rate and align your billing cycle.",
+  },
+  {
+    question: "Do you offer support and training?",
+    answer:
+      "All plans include support. Higher tiers include priority support, training sessions, and a dedicated success manager on Enterprise.",
+  },
+];
+
+export function GymBiosPricing({
+  onOnboardingOpenChange,
+}: {
+  onOnboardingOpenChange?: (open: boolean) => void;
+} = {}) {
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
+  const [onboardingOpen, setOnboardingOpenState] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+
+  const setOnboardingOpen = (open: boolean) => {
+    setOnboardingOpenState(open);
+    onOnboardingOpenChange?.(open);
+  };
+
+  const handlePlanSelect = (planName: string) => {
+    setSelectedPlan(planName);
+    setOnboardingOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50">
+      <style>{`
+        .pricing-row:hover {
+          background-color: #f8fafc;
+        }
+      `}</style>
       {/* Hero Banner Section */}
       <motion.div 
         initial={{ opacity: 0 }}
@@ -214,7 +287,10 @@ export function GymBiosPricing() {
               {trustIndicators.map((indicator, index) => {
                 const IconComponent = indicator.icon;
                 return (
-                  <div key={index} className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm">
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm border border-white/30 hover:shadow-md hover:bg-white transition-all duration-200"
+                  >
                     <IconComponent className="h-4 w-4 text-green-500" />
                     <span className="font-medium">{indicator.label}</span>
                   </div>
@@ -229,11 +305,20 @@ export function GymBiosPricing() {
               transition={{ delay: 0.8, duration: 0.6 }}
               className="flex flex-col sm:flex-row items-center justify-center gap-4"
             >
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 py-4 text-lg font-medium shadow-lg hover:shadow-xl transition-all duration-300">
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90 text-white px-8 py-4 text-lg font-medium shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+                onClick={() => handlePlanSelect("Trial")}
+              >
                 <Sparkles className="h-5 w-5 mr-2" />
                 Start Free Trial
               </Button>
-              <Button variant="outline" size="lg" className="px-8 py-4 text-lg font-medium border-2 hover:bg-gray-50 transition-all duration-300">
+              <Button
+                variant="outline"
+                size="lg"
+                className="px-8 py-4 text-lg font-medium border-2 bg-white hover:bg-gray-50 hover:border-primary/50 transition-all duration-300"
+                onClick={() => handlePlanSelect("Enterprise")}
+              >
                 <Phone className="h-5 w-5 mr-2" />
                 Schedule Demo
               </Button>
@@ -294,14 +379,14 @@ export function GymBiosPricing() {
                   }}
                   className="relative"
                 >
-                  <Card 
-                    className={`h-full border-2 transition-all duration-300 ${
-                      plan.popular 
-                        ? 'border-primary shadow-lg ring-4 ring-primary/20' 
-                        : plan.premium 
-                        ? 'border-amber-400 shadow-xl bg-gradient-to-br from-amber-50 to-orange-50 ring-4 ring-amber-400/20' 
+                  <Card
+                    className={`h-full flex flex-col border-2 transition-all duration-300 ${
+                      plan.popular
+                        ? 'border-primary shadow-lg ring-4 ring-primary/20'
+                        : plan.premium
+                        ? 'border-amber-400 shadow-xl bg-gradient-to-br from-amber-50 to-orange-50 ring-4 ring-amber-400/20'
                         : 'border-gray-200 hover:border-primary/50 hover:shadow-lg'
-                    } ${isHovered ? 'shadow-2xl scale-105' : ''}`}
+                    } ${isHovered ? 'shadow-2xl' : ''}`}
                   >
                     {/* Popular Badge */}
                     {plan.popular && (
@@ -342,9 +427,13 @@ export function GymBiosPricing() {
                       <p className="text-sm text-muted-foreground">{plan.focus}</p>
                     </CardHeader>
 
-                    <CardContent className="space-y-6">
+                    <div className="px-6 pt-2">
+                      <Separator />
+                    </div>
+
+                    <CardContent className="space-y-6 flex flex-col flex-1 pt-6">
                       {/* Features List */}
-                      <div className="space-y-3">
+                      <div className="space-y-3 flex-1">
                         {plan.features.map((feature, featureIndex) => (
                           <motion.div
                             key={featureIndex}
@@ -365,16 +454,17 @@ export function GymBiosPricing() {
                       <motion.div
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className="pt-4"
+                        className="pt-4 mt-auto"
                       >
-                        <Button 
+                        <Button
                           className={`w-full py-6 text-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl ${
-                            plan.popular 
-                              ? 'bg-primary hover:bg-primary/90 text-white' 
+                            plan.popular
+                              ? 'bg-primary hover:bg-primary/90 text-white'
                               : plan.premium
                               ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white'
-                              : 'bg-gray-900 hover:bg-gray-800 text-white hover:bg-primary'
+                              : 'bg-gray-900 hover:bg-primary text-white'
                           }`}
+                          onClick={() => handlePlanSelect(plan.name)}
                         >
                           {plan.cta}
                           <ArrowRight className="h-5 w-5 ml-2" />
@@ -385,6 +475,49 @@ export function GymBiosPricing() {
                 </motion.div>
               );
             })}
+          </div>
+        </motion.div>
+
+        {/* Quick Comparison */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.6, duration: 0.8 }}
+          className="mt-24"
+        >
+          <div className="mb-6 flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="text-2xl font-bold text-gray-900">Quick comparison</h3>
+            <span className="text-sm text-gray-500">
+              A high-level view of what changes as you scale
+            </span>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-sm shadow-sm">
+            <div className="grid grid-cols-4 bg-slate-100 border-b border-slate-200">
+              <div className="px-4 py-3 font-medium text-slate-500">Capability</div>
+              <div className="px-4 py-3 font-semibold text-slate-800">Essentials</div>
+              <div className="px-4 py-3 font-semibold text-slate-800">Standard</div>
+              <div className="px-4 py-3 font-semibold text-slate-800">Professional</div>
+            </div>
+            {comparisonRows.map((row) => (
+              <div
+                key={row.label}
+                className="pricing-row grid grid-cols-4 border-t border-slate-200 transition-colors duration-200"
+              >
+                <div className="px-4 py-3 text-slate-600">{row.label}</div>
+                {row.values.map((val, idx) => (
+                  <div key={idx} className="px-4 py-3 text-slate-700">
+                    {val === "✓" ? (
+                      <span className="inline-flex items-center gap-1">
+                        <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                        <span>Included</span>
+                      </span>
+                    ) : (
+                      val
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         </motion.div>
 
@@ -435,6 +568,37 @@ export function GymBiosPricing() {
           </div>
         </motion.div>
 
+        {/* FAQ Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 2.2, duration: 0.8 }}
+          className="mt-24"
+        >
+          <div className="text-center mb-16">
+            <h3 className="text-4xl font-bold text-gray-900 mb-4">Frequently asked questions</h3>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              If you have more questions, our team is happy to walk you through the best fit for your gym.
+            </p>
+          </div>
+          <div className="max-w-3xl mx-auto space-y-3">
+            {faqs.map((faq) => (
+              <div
+                key={faq.question}
+                className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm hover:shadow-md hover:border-primary/50 transition-all duration-200"
+              >
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-1" />
+                  <div>
+                    <p className="font-medium text-gray-900 mb-1">{faq.question}</p>
+                    <p className="text-sm text-gray-600">{faq.answer}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
         {/* Contact Section */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
@@ -461,7 +625,47 @@ export function GymBiosPricing() {
             </Button>
           </div>
         </motion.div>
+
+        {/* Final CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 2.8, duration: 0.8 }}
+          className="mt-24 rounded-2xl bg-primary px-6 py-8 text-center text-white shadow-md"
+        >
+          <h3 className="text-2xl font-semibold mb-2">
+            Ready to make GymBios your gym's operating system?
+          </h3>
+          <p className="text-white/90 mb-6 max-w-2xl mx-auto">
+            Start with a plan that fits today — and upgrade as your business grows. Our team will support you at every stage.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button
+              size="lg"
+              className="bg-white text-gray-900 hover:bg-gray-100 font-medium px-6"
+              onClick={() => handlePlanSelect("Trial")}
+            >
+              Start Free Trial
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-white bg-transparent text-white hover:bg-white/10 hover:text-white font-medium px-6"
+              onClick={() => handlePlanSelect("Enterprise")}
+            >
+              Book a Product Walkthrough
+            </Button>
+          </div>
+        </motion.div>
       </div>
+
+      {/* Business Onboarding Full-Screen */}
+      <BusinessOnboardingFullscreen
+        open={onboardingOpen}
+        onOpenChange={setOnboardingOpen}
+        selectedPlan={selectedPlan}
+      />
     </div>
   );
 }
