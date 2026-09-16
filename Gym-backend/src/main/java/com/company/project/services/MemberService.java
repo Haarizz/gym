@@ -1167,13 +1167,19 @@ public class MemberService {
         Member saved = memberRepository.save(member);
         cascadeFreezeStateToBilledToHeadDependents(saved, "frozen", freezeStart, freezeUntil, request.getReason(), 0);
 
+        // eventKey includes the freeze start instant so a member frozen more than once
+        // over their membership lifetime doesn't collide with its own prior notification
+        // (a static "MEMBER_FROZEN_<id>" key would hit the eventKey unique constraint on
+        // every re-freeze, which throws inside the REQUIRES_NEW notification transaction
+        // and marks this outer transaction rollback-only, failing the freeze entirely).
+        String freezeEventSuffix = saved.getId() + "_" + freezeStart;
         notificationService.notifyRoles(
                 List.of("GYMBIOS_ADMIN", "MANAGER"),
                 "Membership Frozen",
                 saved.getName() + "'s membership has been frozen.",
                 "WARNING", "MEDIUM", "MEMBERS",
                 saved.getId(), "/members",
-                "MEMBER_FROZEN_" + saved.getId()
+                "MEMBER_FROZEN_" + freezeEventSuffix
         );
         if (saved.getUserId() != null) {
             notificationService.notifyUser(
@@ -1183,7 +1189,7 @@ public class MemberService {
                     (request.getReason() != null ? ": " + request.getReason() : "."),
                     "WARNING", "MEDIUM", "MEMBERS",
                     saved.getId(), "/member-hub",
-                    "MEMBER_FROZEN_USER_" + saved.getId()
+                    "MEMBER_FROZEN_USER_" + freezeEventSuffix
             );
         }
         return MemberResponseDTO.fromEntity(saved);
@@ -1228,13 +1234,17 @@ public class MemberService {
         Member saved = memberRepository.save(member);
         cascadeFreezeStateToBilledToHeadDependents(saved, "active", null, null, null, daysFrozen);
 
+        // eventKey includes "now" so a member unfrozen more than once over their membership
+        // lifetime doesn't collide with its own prior notification — see the matching note
+        // in freezeMember() above.
+        String unfreezeEventSuffix = saved.getId() + "_" + LocalDateTime.now();
         notificationService.notifyRoles(
                 List.of("GYMBIOS_ADMIN", "MANAGER"),
                 "Membership Unfrozen",
                 saved.getName() + "'s membership has been reactivated.",
                 "SUCCESS", "LOW", "MEMBERS",
                 saved.getId(), "/members",
-                "MEMBER_UNFROZEN_" + saved.getId()
+                "MEMBER_UNFROZEN_" + unfreezeEventSuffix
         );
         if (saved.getUserId() != null) {
             notificationService.notifyUser(
@@ -1243,7 +1253,7 @@ public class MemberService {
                     "Your membership has been reactivated. Welcome back!",
                     "SUCCESS", "MEDIUM", "MEMBERS",
                     saved.getId(), "/member-hub",
-                    "MEMBER_UNFROZEN_USER_" + saved.getId()
+                    "MEMBER_UNFROZEN_USER_" + unfreezeEventSuffix
             );
         }
         return MemberResponseDTO.fromEntity(saved);

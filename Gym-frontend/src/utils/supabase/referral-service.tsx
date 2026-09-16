@@ -13,6 +13,9 @@ export interface ReferralResponse {
   refereeEmail?: string;
   refereePhone?: string;
   refereePhoto?: string;
+  photoVerified?: boolean;
+  photoVerifiedBy?: string;
+  photoVerifiedAt?: string;
   referralCode: string;
   referralLink: string;
   status: 'pending' | 'successful' | 'expired';
@@ -135,6 +138,9 @@ export const referralService = {
         refereeEmail: r.referee_email,
         refereePhone: r.referee_phone,
         refereePhoto: r.referee_photo,
+        photoVerified: r.photo_verified,
+        photoVerifiedBy: r.photo_verified_by,
+        photoVerifiedAt: r.photo_verified_at,
         referralCode: r.referral_code,
         referralLink: r.referral_link,
         rewardAmount: r.reward_amount,
@@ -189,6 +195,9 @@ export const referralService = {
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
       refereePhoto: r.referee_photo,
+      photoVerified: r.photo_verified,
+      photoVerifiedBy: r.photo_verified_by,
+      photoVerifiedAt: r.photo_verified_at,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
@@ -237,6 +246,9 @@ export const referralService = {
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
       refereePhoto: r.referee_photo,
+      photoVerified: r.photo_verified,
+      photoVerifiedBy: r.photo_verified_by,
+      photoVerifiedAt: r.photo_verified_at,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
@@ -281,6 +293,9 @@ export const referralService = {
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
       refereePhoto: r.referee_photo,
+      photoVerified: r.photo_verified,
+      photoVerifiedBy: r.photo_verified_by,
+      photoVerifiedAt: r.photo_verified_at,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
@@ -314,7 +329,10 @@ export const referralService = {
         referee_member_id: opts.refereeMemberId,
       }) : undefined,
     });
-    if (!res.ok) throw new Error('Failed to mark referral as successful');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || 'Failed to mark referral as successful');
+    }
     const r = await res.json();
     return {
       ...r,
@@ -324,6 +342,9 @@ export const referralService = {
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
       refereePhoto: r.referee_photo,
+      photoVerified: r.photo_verified,
+      photoVerifiedBy: r.photo_verified_by,
+      photoVerifiedAt: r.photo_verified_at,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
@@ -351,6 +372,74 @@ export const referralService = {
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
       refereePhoto: r.referee_photo,
+      photoVerified: r.photo_verified,
+      photoVerifiedBy: r.photo_verified_by,
+      photoVerifiedAt: r.photo_verified_at,
+      referralCode: r.referral_code,
+      referralLink: r.referral_link,
+      rewardAmount: r.reward_amount,
+      visitDate: r.visit_date,
+      signupDate: r.signup_date,
+      paymentDate: r.payment_date,
+      ruleId: r.rule_id,
+      ruleName: r.rule_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    };
+  },
+
+  /** Staff confirms the uploaded referee photo matches the person who showed up. */
+  async verifyPhoto(id: number): Promise<ReferralResponse> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/${id}/verify-photo`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || 'Failed to verify photo');
+    }
+    const r = await res.json();
+    return {
+      ...r,
+      referrerMemberId: r.referrer_member_id,
+      referrerName: r.referrer_name,
+      refereeName: r.referee_name,
+      refereeEmail: r.referee_email,
+      refereePhone: r.referee_phone,
+      refereePhoto: r.referee_photo,
+      photoVerified: r.photo_verified,
+      photoVerifiedBy: r.photo_verified_by,
+      photoVerifiedAt: r.photo_verified_at,
+      referralCode: r.referral_code,
+      referralLink: r.referral_link,
+      rewardAmount: r.reward_amount,
+      visitDate: r.visit_date,
+      signupDate: r.signup_date,
+      paymentDate: r.payment_date,
+      ruleId: r.rule_id,
+      ruleName: r.rule_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    };
+  },
+
+  /** Reverts a verification, e.g. if staff confirmed the wrong referral by mistake. */
+  async unverifyPhoto(id: number): Promise<ReferralResponse> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/referrals/${id}/unverify-photo`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to unverify photo');
+    const r = await res.json();
+    return {
+      ...r,
+      referrerMemberId: r.referrer_member_id,
+      referrerName: r.referrer_name,
+      refereeName: r.referee_name,
+      refereeEmail: r.referee_email,
+      refereePhone: r.referee_phone,
+      refereePhoto: r.referee_photo,
+      photoVerified: r.photo_verified,
+      photoVerifiedBy: r.photo_verified_by,
+      photoVerifiedAt: r.photo_verified_at,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
@@ -382,6 +471,9 @@ export const referralService = {
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
       refereePhoto: r.referee_photo,
+      photoVerified: r.photo_verified,
+      photoVerifiedBy: r.photo_verified_by,
+      photoVerifiedAt: r.photo_verified_at,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,
@@ -410,6 +502,9 @@ export const referralService = {
       refereeEmail: r.referee_email,
       refereePhone: r.referee_phone,
       refereePhoto: r.referee_photo,
+      photoVerified: r.photo_verified,
+      photoVerifiedBy: r.photo_verified_by,
+      photoVerifiedAt: r.photo_verified_at,
       referralCode: r.referral_code,
       referralLink: r.referral_link,
       rewardAmount: r.reward_amount,

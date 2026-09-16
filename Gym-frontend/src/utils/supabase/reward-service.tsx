@@ -152,8 +152,11 @@ export interface Coupon {
 
 async function getHeaders(): Promise<HeadersInit> {
   const token = authService.getAccessToken();
+  const activeBranchId = sessionStorage.getItem('activeBranchId');
+  const isAllBranches = activeBranchId === null || activeBranchId === 'null' || activeBranchId === 'undefined';
   return {
     'Content-Type': 'application/json',
+    ...(isAllBranches ? {} : { 'X-Active-Branch-Id': activeBranchId }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }

@@ -473,8 +473,8 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     }
     setSavingFreeze(true);
     try {
-      const freezeUntil = freezeEndDate.toISOString().split('T')[0] + 'T00:00:00Z';
-      const freezeStart = freezeStartDate ? freezeStartDate.toISOString().split('T')[0] + 'T00:00:00Z' : undefined;
+      const freezeUntil = format(freezeEndDate, 'yyyy-MM-dd') + 'T00:00:00Z';
+      const freezeStart = freezeStartDate ? format(freezeStartDate, 'yyyy-MM-dd') + 'T00:00:00Z' : undefined;
       await membersService.freezeMember(String(memberId), { freezeUntil, freezeStartDate: freezeStart, reason: freezeReason || undefined });
       toast.success('Membership frozen successfully');
       setIsFreezeDialogOpen(false);

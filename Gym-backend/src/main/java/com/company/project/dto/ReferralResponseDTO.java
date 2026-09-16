@@ -17,6 +17,10 @@ public class ReferralResponseDTO {
     private String refereeEmail;
     private String refereePhone;
     private String refereePhoto;
+    private Boolean photoVerified;
+    private String photoVerifiedBy;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
+    private LocalDateTime photoVerifiedAt;
     private String referralCode;
     private String referralLink;
     private String status;
@@ -59,6 +63,15 @@ public class ReferralResponseDTO {
 
     public String getRefereePhoto() { return refereePhoto; }
     public void setRefereePhoto(String refereePhoto) { this.refereePhoto = refereePhoto; }
+
+    public Boolean getPhotoVerified() { return photoVerified; }
+    public void setPhotoVerified(Boolean photoVerified) { this.photoVerified = photoVerified; }
+
+    public String getPhotoVerifiedBy() { return photoVerifiedBy; }
+    public void setPhotoVerifiedBy(String photoVerifiedBy) { this.photoVerifiedBy = photoVerifiedBy; }
+
+    public LocalDateTime getPhotoVerifiedAt() { return photoVerifiedAt; }
+    public void setPhotoVerifiedAt(LocalDateTime photoVerifiedAt) { this.photoVerifiedAt = photoVerifiedAt; }
 
     public String getReferralCode() { return referralCode; }
     public void setReferralCode(String referralCode) { this.referralCode = referralCode; }

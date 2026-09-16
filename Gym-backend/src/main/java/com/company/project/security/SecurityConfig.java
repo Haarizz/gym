@@ -57,6 +57,14 @@ public class SecurityConfig {
                 // Public auth endpoints — no token required (register/login/username-check/mobile-register)
                 .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/check-username", "/api/mobile/auth/register", "/error").permitAll()
 
+                // Public lead-capture endpoint — the "Request a demo" onboarding form on the
+                // unauthenticated pricing/login page (business-onboarding-fullscreen.tsx) submits
+                // here with no session. Rate-limited + honeypot-checked in PlatformLeadService;
+                // every other /api/platform-leads/** route stays gated by @PreAuthorize
+                // (PLATFORM_LEADS_* — GYMBIOS_ADMIN only, see DefaultRolePermissions) under the
+                // authenticated() catch-all below.
+                .requestMatchers(HttpMethod.POST, "/api/platform-leads").permitAll()
+
                 // Platform-owner-only endpoints. GYMBIOS_ADMIN is scoped to Gym Management
                 // only (see RoleService.getEffectivePermissionKeys) — it has no business on
                 // any of these operational routes, so it is deliberately absent from all of

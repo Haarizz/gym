@@ -76,16 +76,13 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
 
   const totalDays = calculateFreezeDays();
 
-  // Days a member has been frozen so far — from freeze_start_date up to now
-  // (or freeze_end_date, if that's already passed).
-  const daysFrozenSoFar = (m: Member): number => {
-    if (!m.freeze_start_date) return 0;
-    const start = new Date(m.freeze_start_date);
-    const scheduledEnd = m.freeze_end_date ? new Date(m.freeze_end_date) : null;
-    const end = scheduledEnd && scheduledEnd < new Date() ? scheduledEnd : new Date();
-    return Math.max(0, differenceInDays(end, start));
+  // Total planned freeze duration (Start → End, inclusive) — matches the "Days"
+  // column shown in the table and the Freeze History modal below.
+  const plannedFreezeDays = (m: Member): number => {
+    if (!m.freeze_start_date || !m.freeze_end_date) return 0;
+    return Math.max(0, differenceInDays(new Date(m.freeze_end_date), new Date(m.freeze_start_date)) + 1);
   };
-  const totalFrozenDays = frozenMembers.reduce((acc, m) => acc + daysFrozenSoFar(m), 0);
+  const totalFrozenDays = frozenMembers.reduce((acc, m) => acc + plannedFreezeDays(m), 0);
   const endingSoonCount = frozenMembers.filter(m => {
     if (!m.freeze_end_date) return false;
     const end = new Date(m.freeze_end_date);
@@ -133,8 +130,8 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
     }
     setIsSubmitting(true);
     try {
-      const freezeUntil = freezeEndDate.toISOString().split('T')[0] + 'T00:00:00Z';
-      const freezeStart = freezeStartDate.toISOString().split('T')[0] + 'T00:00:00Z';
+      const freezeUntil = format(freezeEndDate, 'yyyy-MM-dd') + 'T00:00:00Z';
+      const freezeStart = format(freezeStartDate, 'yyyy-MM-dd') + 'T00:00:00Z';
       await membersService.freezeMember(String(selectedMember.id), {
         freezeUntil,
         freezeStartDate: freezeStart,
@@ -600,7 +597,11 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                         {selectedMemberHistory.freeze_end_date ? format(new Date(selectedMemberHistory.freeze_end_date), 'dd MMM yyyy') : '—'}
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-blue-100 text-blue-700 border-blue-200">{daysFrozenSoFar(selectedMemberHistory)}d</Badge>
+                        <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                          {selectedMemberHistory.freeze_end_date
+                            ? differenceInDays(new Date(selectedMemberHistory.freeze_end_date), new Date(selectedMemberHistory.freeze_start_date)) + 1
+                            : 0}d
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-sm">{selectedMemberHistory.freeze_reason || '—'}</TableCell>
                       <TableCell>
