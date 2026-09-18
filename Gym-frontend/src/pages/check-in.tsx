@@ -243,6 +243,12 @@ export function CheckIn() {
     return p.name.toLowerCase().includes(q) || p.bizId.toLowerCase().includes(q);
   });
 
+  // member_id → attendance record id, for members currently checked in (no checkout yet)
+  const activeMemberAttendance = todayAttendance.reduce<Record<number, number>>((map, r) => {
+    if (r.status === 'active') map[r.member_id] = r.id;
+    return map;
+  }, {});
+
   const todayCount  = todayAttendance.length + dailyCheckIns.length;
   const activeCount = todayAttendance.length + dailyCheckIns.filter(d => d.status === 'Active').length;
   const occupancy   = Math.round((activeCount / gymCapacity) * 100);
@@ -296,6 +302,10 @@ export function CheckIn() {
   const handleCheckIn = async (person: PersonEntry) => {
     if (person.kind === 'staff') {
       toast.info('Staff clock-in is managed through the Attendance module');
+      return;
+    }
+    if (activeMemberAttendance[person.id]) {
+      toast.error(`${person.name} is already checked in`);
       return;
     }
     if (person.status !== 'active') {
@@ -602,11 +612,17 @@ export function CheckIn() {
                         key={`${person.kind}-${person.id}`}
                         person={person}
                         onCheckIn={handleCheckIn}
+                        onMemberCheckOut={() => handleCheckOut(activeMemberAttendance[person.id], person.name)}
                         onStaffClockIn={handleStaffClockIn}
                         onStaffClockOut={handleStaffClockOut}
                         isChecking={checkingInId === person.id}
+                        isCheckedIn={!!activeMemberAttendance[person.id]}
                         isClockedIn={!!staffActiveMap[person.id]}
-                        isActing={checkingInId === person.id || checkingOutId === person.id}
+                        isActing={
+                          checkingInId === person.id ||
+                          checkingOutId === person.id ||
+                          checkingOutId === activeMemberAttendance[person.id]
+                        }
                       />
                     ))}
                   </div>
@@ -1030,12 +1046,14 @@ export function CheckIn() {
 
 // ── PersonRow sub-component ───────────────────────────────────────────────────
 
-function PersonRow({ person, onCheckIn, onStaffClockIn, onStaffClockOut, isChecking, isClockedIn, isActing }: {
+function PersonRow({ person, onCheckIn, onMemberCheckOut, onStaffClockIn, onStaffClockOut, isChecking, isCheckedIn, isClockedIn, isActing }: {
   person: PersonEntry;
   onCheckIn: (p: PersonEntry) => void;
+  onMemberCheckOut: () => void;
   onStaffClockIn: (p: PersonEntry) => void;
   onStaffClockOut: (p: PersonEntry) => void;
   isChecking: boolean;
+  isCheckedIn: boolean;
   isClockedIn: boolean;
   isActing: boolean;
 }) {
@@ -1072,17 +1090,33 @@ function PersonRow({ person, onCheckIn, onStaffClockIn, onStaffClockOut, isCheck
       <div className="flex items-center space-x-2">
         <Badge className={`${statusColor} border-0 text-xs capitalize`}>{person.status}</Badge>
         {isMember ? (
-          <Button
-            size="sm"
-            className="btn-primary"
-            onClick={() => onCheckIn(person)}
-            disabled={isActing || !isActive}
-          >
-            {isChecking
-              ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
-              : <><LogIn className="mr-1 h-3 w-3" /> Check In</>
-            }
-          </Button>
+          isCheckedIn ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50 text-xs"
+              onClick={onMemberCheckOut}
+              disabled={isActing}
+            >
+              {isActing
+                ? <div className="animate-spin rounded-full h-3 w-3 border-b border-red-500 mr-1" />
+                : <LogOut className="mr-1 h-3 w-3" />
+              }
+              Check Out
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="btn-primary"
+              onClick={() => onCheckIn(person)}
+              disabled={isActing || !isActive}
+            >
+              {isChecking
+                ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+                : <><LogIn className="mr-1 h-3 w-3" /> Check In</>
+              }
+            </Button>
+          )
         ) : isClockedIn ? (
           <Button
             size="sm"

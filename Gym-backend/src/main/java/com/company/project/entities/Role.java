@@ -18,6 +18,11 @@ public class Role extends BaseEntity {
     @Column(name = "is_system", nullable = false)
     private boolean isSystem = false;
 
+    // Retail POS | F&B POS | null (unassigned) — which POS mode this role's
+    // users get in POS Mode (GymOS's POS Mode Options widget).
+    @Column(name = "pos_mode")
+    private String posMode;
+
     public Role() {}
 
     public Role(String roleName) {
@@ -36,4 +41,7 @@ public class Role extends BaseEntity {
 
     public boolean isSystem() { return isSystem; }
     public void setSystem(boolean system) { isSystem = system; }
+
+    public String getPosMode() { return posMode; }
+    public void setPosMode(String posMode) { this.posMode = posMode; }
 }

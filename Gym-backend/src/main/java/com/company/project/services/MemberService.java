@@ -240,6 +240,7 @@ public class MemberService {
     public MemberResponseDTO createMember(MemberRequestDTO request) {
         Member member = new Member();
         Long branchId = branchService.resolveBranchForCreate(null); // Assume active branch
+        branchService.assertBranchActive(branchId);
         member.setBranchId(branchId);
         
         applyRequest(request, member);
@@ -1096,6 +1097,9 @@ public class MemberService {
     public MemberResponseDTO addFamilyMember(Long headId, FamilyMemberDTO fm) {
         Member head = memberRepository.findById(headId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
+        if (head.getBranchId() != null) {
+            branchService.assertBranchActive(head.getBranchId());
+        }
         if (fm.getName() == null || fm.getName().isBlank()) {
             throw new IllegalArgumentException("Family member name is required.");
         }

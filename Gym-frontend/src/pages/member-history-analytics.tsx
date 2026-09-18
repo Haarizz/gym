@@ -1017,7 +1017,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           <Card className="overflow-hidden border-primary/20">
             <Tabs defaultValue="timeline" className="w-full">
               <CardHeader className="bg-gradient-light border-b border-primary/10">
-                <TabsList className="w-full overflow-x-auto flex flex-nowrap gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-border/70">
+                <TabsList className="w-full min-w-0 overflow-x-auto flex flex-nowrap gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-border/70">
                   <TabsTrigger value="timeline" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
                     Activity Timeline
                   </TabsTrigger>

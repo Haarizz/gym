@@ -84,7 +84,7 @@ public final class PermissionCatalog {
         MODULES.put("REPORTS", ACTIONS_VIEW_EXPORT);
         MODULES.put("ASSETS", ACTIONS_FULL);
 
-        MODULES.put("GYMOS", ACTIONS_VIEW_ONLY);
+        MODULES.put("GYMOS", ACTIONS_VIEW_EDIT);
         MODULES.put("BIOS", ACTIONS_VIEW_ONLY);
         MODULES.put("SETTINGS", ACTIONS_VIEW_EDIT);
         MODULES.put("BRANCH_MANAGEMENT", ACTIONS_ADMIN);

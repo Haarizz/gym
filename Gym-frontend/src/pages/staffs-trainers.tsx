@@ -841,9 +841,18 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   };
 
   const getStatusColor = (status: string) => {
-    if (status === 'active') return 'bg-green-100 text-green-800';
-    if (status === 'on_leave') return 'bg-yellow-100 text-yellow-800';
+    const normalized = status?.toLowerCase();
+    if (normalized === 'active') return 'bg-green-100 text-green-800';
+    if (normalized === 'on_leave') return 'bg-yellow-100 text-yellow-800';
     return 'bg-red-100 text-red-800';
+  };
+
+  const getStatusLabel = (status: string) => {
+    return status
+      ?.toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   if (!hasPermission("STAFF_VIEW")) {
@@ -911,7 +920,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{staffList.filter(s => s.status === 'active').length}</div>
+            <div className="text-2xl font-bold text-green-600">{staffList.filter(s => s.status?.toLowerCase() === 'active').length}</div>
             <p className="text-xs text-muted-foreground">Currently active</p>
           </CardContent>
         </Card>
@@ -1174,7 +1183,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                         </TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(employee.status)}>
-                            {employee.status}
+                            {getStatusLabel(employee.status)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -1184,7 +1193,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" sideOffset={40}>
                               <DropdownMenuItem onClick={() => setSelectedEmployee(employee)}>
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Profile
@@ -2442,7 +2451,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               { value: 'inactive', label: 'Inactive', icon: <UserX       className="h-4 w-4" />, color: 'text-red-600',    bg: 'bg-red-50 border-red-200 hover:bg-red-100' },
               { value: 'on_leave', label: 'On Leave', icon: <Clock       className="h-4 w-4" />, color: 'text-yellow-600', bg: 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100' },
             ] as const).map(opt => {
-              const isCurrent = statusEmployee?.status === opt.value;
+              const isCurrent = statusEmployee?.status?.toLowerCase() === opt.value;
               return (
                 <button
                   key={opt.value}

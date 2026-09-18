@@ -8,9 +8,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Central mapping from exception type to HTTP status + a structured error body
@@ -71,8 +75,98 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         log.warn("Data integrity violation", ex);
-        return build(HttpStatus.CONFLICT, "DATA_INTEGRITY_VIOLATION",
-                "The data provided could not be saved — a value may be too long, missing, or already in use.");
+        return build(HttpStatus.CONFLICT, "DATA_INTEGRITY_VIOLATION", describeDataIntegrityViolation(ex));
+    }
+
+    /**
+     * Builds a field-specific message from the driver's structured error info.
+     * The postgres driver is a <scope>runtime</scope> dependency (pom.xml), so
+     * PSQLException/ServerErrorMessage aren't on the compile classpath here —
+     * this reaches getServerErrorMessage().getColumn()/getSQLState() via
+     * reflection instead of adding a compile-time driver dependency. Falls
+     * back to the generic message whenever that detail isn't available, e.g.
+     * a non-Postgres constraint check or a cause type this can't introspect.
+     */
+    private String describeDataIntegrityViolation(DataIntegrityViolationException ex) {
+        String fallback = "The data provided could not be saved — a value may be too long, missing, or already in use.";
+
+        Throwable psqlEx = findCauseByClassName(ex, "org.postgresql.util.PSQLException");
+        if (psqlEx == null) {
+            return fallback;
+        }
+
+        try {
+            Method getServerErrorMessage = psqlEx.getClass().getMethod("getServerErrorMessage");
+            Object error = getServerErrorMessage.invoke(psqlEx);
+            if (error == null) {
+                return fallback;
+            }
+
+            String column = (String) error.getClass().getMethod("getColumn").invoke(error);
+            String sqlState = (String) error.getClass().getMethod("getSQLState").invoke(error);
+            String detailMessage = (String) error.getClass().getMethod("getMessage").invoke(error);
+            String field = humanizeColumn(column);
+
+            // 23505 = unique_violation, 23502 = not_null_violation, 23503 = foreign_key_violation,
+            // 22001 = string_data_right_truncation (value too long for the column type)
+            if ("23505".equals(sqlState)) {
+                return field != null
+                        ? "This " + field + " is already in use by another record."
+                        : "A duplicate value was provided — this record already exists.";
+            }
+            if ("23502".equals(sqlState)) {
+                return field != null
+                        ? "The " + field + " field is required and was left empty."
+                        : "A required field was left empty.";
+            }
+            if ("23503".equals(sqlState)) {
+                return field != null
+                        ? "The selected " + field + " does not exist or has been removed."
+                        : "A referenced record does not exist or has been removed.";
+            }
+            if ("22001".equals(sqlState)
+                    || (detailMessage != null && detailMessage.toLowerCase(Locale.ROOT).contains("too long"))) {
+                // Postgres doesn't report a column for this SQLSTATE, but the message
+                // names the column's declared type/length (e.g. "character varying(50)"),
+                // which is still more actionable than nothing.
+                String typeDetail = extractTypeDetail(detailMessage);
+                return typeDetail != null
+                        ? "A value is too long for its field (max " + typeDetail + ")."
+                        : "One of the provided values is too long.";
+            }
+            return fallback;
+        } catch (ReflectiveOperationException | ClassCastException e) {
+            log.debug("Could not introspect PSQLException detail", e);
+            return fallback;
+        }
+    }
+
+    private Throwable findCauseByClassName(Throwable ex, String className) {
+        Throwable cause = ex;
+        while (cause != null) {
+            if (className.equals(cause.getClass().getName())) {
+                return cause;
+            }
+            cause = cause.getCause();
+        }
+        return null;
+    }
+
+    private String humanizeColumn(String column) {
+        if (column == null || column.isBlank()) {
+            return null;
+        }
+        return column.replace('_', ' ');
+    }
+
+    private static final Pattern TYPE_LENGTH_PATTERN = Pattern.compile("character varying\\((\\d+)\\)");
+
+    private String extractTypeDetail(String message) {
+        if (message == null) {
+            return null;
+        }
+        Matcher matcher = TYPE_LENGTH_PATTERN.matcher(message);
+        return matcher.find() ? matcher.group(1) + " characters" : null;
     }
 
     /**

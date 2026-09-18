@@ -9,9 +9,10 @@ public class RoleResponseDTO {
     private boolean isSystem;
     private long userCount;
     private List<String> permissionKeys;
+    private String posMode;
 
     public static RoleResponseDTO of(Long id, String roleName, String description, boolean isSystem,
-                                      long userCount, List<String> permissionKeys) {
+                                      long userCount, List<String> permissionKeys, String posMode) {
         RoleResponseDTO dto = new RoleResponseDTO();
         dto.id = id;
         dto.roleName = roleName;
@@ -19,6 +20,7 @@ public class RoleResponseDTO {
         dto.isSystem = isSystem;
         dto.userCount = userCount;
         dto.permissionKeys = permissionKeys;
+        dto.posMode = posMode;
         return dto;
     }
 
@@ -39,4 +41,7 @@ public class RoleResponseDTO {
 
     public List<String> getPermissionKeys() { return permissionKeys; }
     public void setPermissionKeys(List<String> permissionKeys) { this.permissionKeys = permissionKeys; }
+
+    public String getPosMode() { return posMode; }
+    public void setPosMode(String posMode) { this.posMode = posMode; }
 }

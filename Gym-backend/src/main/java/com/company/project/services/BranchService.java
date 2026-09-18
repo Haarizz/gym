@@ -208,6 +208,22 @@ public class BranchService {
     }
 
     /**
+     * Rejects creating records (members, plans, ...) under a branch that has
+     * been deactivated. Branch status is a plain "ACTIVE"/"INACTIVE" string
+     * (Branch.status), so this is deliberately case-insensitive to match the
+     * existing default-branch guard in updateBranchStatus.
+     */
+    public void assertBranchActive(Long branchId) {
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new com.company.project.exceptions.EntityNotFoundException(
+                        "Branch not found: " + branchId));
+        if ("INACTIVE".equalsIgnoreCase(branch.getStatus())) {
+            throw new com.company.project.exceptions.BusinessRuleViolationException(
+                    "Branch \"" + branch.getBranchName() + "\" is inactive — reactivate it before creating new records here.");
+        }
+    }
+
+    /**
      * Returns the list of branch IDs the current user can access.
      * Used for filtering in "All Branches" mode for non-admin users.
      */

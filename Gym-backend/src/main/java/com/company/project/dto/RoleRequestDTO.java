@@ -6,6 +6,7 @@ public class RoleRequestDTO {
     private String roleName;
     private String description;
     private List<String> permissionKeys;
+    private String posMode;
 
     public String getRoleName() { return roleName; }
     public void setRoleName(String roleName) { this.roleName = roleName; }
@@ -15,4 +16,7 @@ public class RoleRequestDTO {
 
     public List<String> getPermissionKeys() { return permissionKeys; }
     public void setPermissionKeys(List<String> permissionKeys) { this.permissionKeys = permissionKeys; }
+
+    public String getPosMode() { return posMode; }
+    public void setPosMode(String posMode) { this.posMode = posMode; }
 }

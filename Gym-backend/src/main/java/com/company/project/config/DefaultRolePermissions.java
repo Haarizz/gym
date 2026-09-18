@@ -107,7 +107,7 @@ public final class DefaultRolePermissions {
                 "FISCAL_PERIODS_VIEW", "FISCAL_PERIODS_CREATE", "FISCAL_PERIODS_EDIT", "FISCAL_PERIODS_EXPORT",
                 "FINANCIAL_REPORTS_VIEW", "FINANCIAL_REPORTS_EXPORT",
                 "FINANCIAL_ANALYTICS_VIEW", "FINANCIAL_ANALYTICS_EXPORT",
-                "GYMOS_VIEW", "BIOS_VIEW",
+                "GYMOS_VIEW", "GYMOS_EDIT", "BIOS_VIEW",
                 "SETTINGS_VIEW", "SETTINGS_EDIT",
                 "ADMINISTRATION_VIEW"
         ));
