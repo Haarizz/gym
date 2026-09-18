@@ -114,6 +114,7 @@ public class RoleService {
         role.setRoleName(req.getRoleName().trim());
         role.setDescription(req.getDescription());
         role.setSystem(false);
+        role.setPosMode(normalizePosMode(req.getPosMode()));
         role = roleRepository.save(role);
 
         applyPermissions(role, req.getPermissionKeys());
@@ -143,6 +144,7 @@ public class RoleService {
             role.setRoleName(req.getRoleName().trim());
         }
         if (req.getDescription() != null) role.setDescription(req.getDescription());
+        if (req.getPosMode() != null) role.setPosMode(normalizePosMode(req.getPosMode()));
         role = roleRepository.save(role);
 
         if (isAdmin) {
@@ -206,6 +208,15 @@ public class RoleService {
         return result;
     }
 
+    private String normalizePosMode(String posMode) {
+        if (posMode == null || posMode.isBlank()) return null;
+        String trimmed = posMode.trim();
+        if (!"Retail POS".equalsIgnoreCase(trimmed) && !"F&B POS".equalsIgnoreCase(trimmed)) {
+            throw new BusinessRuleViolationException("posMode must be 'Retail POS' or 'F&B POS'");
+        }
+        return trimmed.equalsIgnoreCase("Retail POS") ? "Retail POS" : "F&B POS";
+    }
+
     private void applyPermissions(Role role, List<String> permissionKeys) {
         rolePermissionRepository.deleteByRoleId(role.getId());
         // Without an explicit flush here, Hibernate's default action-queue order runs
@@ -232,6 +243,6 @@ public class RoleService {
         long userCount = userRoleRepository.countByRoleId(role.getId());
         return RoleResponseDTO.of(role.getId(), role.getRoleName(), role.getDescription(),
                 role.isSystem() || role.getRoleName().equalsIgnoreCase(ADMIN_ROLE_NAME),
-                userCount, getEffectivePermissionKeys(role));
+                userCount, getEffectivePermissionKeys(role), role.getPosMode());
     }
 }

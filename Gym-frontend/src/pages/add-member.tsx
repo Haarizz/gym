@@ -2799,16 +2799,16 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       </div>
 
                       <div className="grid grid-cols-3 gap-4 mb-4">
-                        <div className="text-center">
-                          <div className="text-xl font-bold text-gray-900">{plan.durationValue || '-'}</div>
+                        <div className="text-center min-w-0">
+                          <div className="text-xl font-bold text-gray-900 truncate">{plan.durationValue || '-'}</div>
                           <div className="text-xs text-gray-500 uppercase tracking-wide">{plan.durationType || 'Duration'}</div>
                         </div>
-                        <div className="text-center">
-                          <div className="text-xl font-bold text-blue-600">{plan.planType}</div>
+                        <div className="text-center min-w-0">
+                          <div className="text-xl font-bold text-blue-600 truncate" title={plan.planType}>{plan.planType}</div>
                           <div className="text-xs text-gray-500 uppercase tracking-wide">Type</div>
                         </div>
-                        <div className="text-center">
-                          <div className="text-xl font-bold text-green-600">{plan.maxSessions ?? '∞'}</div>
+                        <div className="text-center min-w-0">
+                          <div className="text-xl font-bold text-green-600 truncate">{plan.maxSessions ?? '∞'}</div>
                           <div className="text-xs text-gray-500 uppercase tracking-wide">Sessions</div>
                         </div>
                       </div>

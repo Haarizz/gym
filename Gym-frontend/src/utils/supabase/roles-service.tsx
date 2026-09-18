@@ -9,12 +9,14 @@ export interface Role {
   is_system: boolean;
   user_count: number;
   permission_keys: string[];
+  pos_mode?: string;
 }
 
 export interface RoleRequestData {
   role_name: string;
   description?: string;
   permission_keys: string[];
+  pos_mode?: string;
 }
 
 export interface RolePageResponse {

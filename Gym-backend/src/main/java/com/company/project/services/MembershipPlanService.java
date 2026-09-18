@@ -45,8 +45,11 @@ public class MembershipPlanService {
         MembershipPlan plan = new MembershipPlan();
         
         Long branchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
+        if (branchId != null) {
+            branchService.assertBranchActive(branchId);
+        }
         plan.setBranchId(branchId);
-        
+
         applyRequest(plan, req);
         return MembershipPlanResponseDTO.fromEntity(planRepository.save(plan));
     }

@@ -1,5 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CurrencyGlyph } from '../utils/currency';
+import { moduleService, PlatformModuleResponse, ModuleAuditLogEntry } from '../utils/supabase/module-service';
+import { staffService, StaffTarget } from '../utils/supabase/staff-service';
+import { rolesService, Role } from '../utils/supabase/roles-service';
+import { integrationService, IntegrationResponse, IntegrationStatus } from '../utils/supabase/integration-service';
+import { accessControlDeviceService, AccessControlDeviceResponse, DeviceStatus } from '../utils/supabase/access-control-device-service';
+import { notificationService, AppNotification } from '../utils/supabase/notification-service';
+import { NotificationPanel } from '../components/shared/NotificationPanel';
+import { gymOsSettingsService, settingsToMap } from '../utils/supabase/gymos-settings-service';
+import { deactivationReasonService, DeactivationReason } from '../utils/supabase/deactivation-reason-service';
+import { catalogDisplaySectionService, CatalogDisplaySection } from '../utils/supabase/catalog-display-section-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -8,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Switch } from "../components/ui/switch";
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { SetTargets } from "./set-targets";
 import { TargetsOverview } from "./targets-overview";
@@ -68,182 +79,534 @@ import {
   TrendingUpDown
 } from 'lucide-react';
 
-// Sample data for KPIs
-const kpiData = {
-  modulesActiveTotal: { active: 8, total: 12 },
-  usersWithPermissions: 45,
-  apiIntegrationsActive: 6,
-  accessControlDevicesOnline: 18,
-  pendingNotifications: 3
-};
-
-// Sample data for modules
-const moduleStatus = [
-  { module: 'Community Management', status: 'active', uptime: 99.8, lastUpdate: '2024-09-20' },
-  { module: 'Member Connect', status: 'active', uptime: 98.5, lastUpdate: '2024-09-18' },
-  { module: 'Sales & Purchases', status: 'active', uptime: 99.2, lastUpdate: '2024-09-15' },
-  { module: 'Financials', status: 'active', uptime: 97.8, lastUpdate: '2024-09-22' },
-  { module: 'Payroll & Employees', status: 'active', uptime: 99.5, lastUpdate: '2024-09-19' },
-  { module: 'Assets Management', status: 'active', uptime: 98.9, lastUpdate: '2024-09-21' },
-  { module: 'BiOS Analytics', status: 'maintenance', uptime: 95.2, lastUpdate: '2024-09-10' },
-  { module: 'Advanced Reports', status: 'active', uptime: 99.1, lastUpdate: '2024-09-16' }
-];
-
-const apiIntegrations = [
-  { name: 'Payment Gateway (Stripe)', status: 'active', lastCall: '2024-09-25 14:32', successRate: 99.7 },
-  { name: 'SMS Service (Twilio)', status: 'active', lastCall: '2024-09-25 14:30', successRate: 98.9 },
-  { name: 'Email Service (SendGrid)', status: 'active', lastCall: '2024-09-25 14:28', successRate: 99.2 },
-  { name: 'Face Recognition API', status: 'active', lastCall: '2024-09-25 14:25', successRate: 97.8 },
-  { name: 'Equipment IoT Platform', status: 'error', lastCall: '2024-09-25 12:15', successRate: 85.3 },
-  { name: 'Backup Service (AWS)', status: 'active', lastCall: '2024-09-25 14:00', successRate: 99.9 }
-];
-
-const accessControlDevices = [
-  { id: 'AC001', name: 'Main Entrance - Face Scanner', type: 'Face Recognition', location: 'Main Entrance', status: 'online', lastSync: '2024-09-25 14:30' },
-  { id: 'AC002', name: 'Gym Floor - Card Reader', type: 'NFC/Card Reader', location: 'Gym Floor', status: 'online', lastSync: '2024-09-25 14:29' },
-  { id: 'AC003', name: 'Locker Room A - QR Scanner', type: 'QR Scanner', location: 'Locker Room A', status: 'online', lastSync: '2024-09-25 14:28' },
-  { id: 'AC004', name: 'VIP Area - Biometric', type: 'Fingerprint', location: 'VIP Area', status: 'offline', lastSync: '2024-09-25 12:45' },
-  { id: 'AC005', name: 'Staff Area - Keypad', type: 'PIN Entry', location: 'Staff Area', status: 'online', lastSync: '2024-09-25 14:31' }
-];
-
-const systemConfiguration = [
-  { setting: 'Database Backup Schedule', value: 'Daily at 2:00 AM', lastChanged: '2024-09-01', changedBy: 'System Admin' },
-  { setting: 'Session Timeout', value: '30 minutes', lastChanged: '2024-08-15', changedBy: 'IT Manager' },
-  { setting: 'API Rate Limiting', value: '1000 req/hour', lastChanged: '2024-09-10', changedBy: 'Dev Team' },
-  { setting: 'Auto-logout Inactive Users', value: '60 minutes', lastChanged: '2024-08-20', changedBy: 'Security Admin' },
-  { setting: 'Data Retention Period', value: '7 years', lastChanged: '2024-07-01', changedBy: 'Compliance Officer' }
-];
-
-const recentActivity = [
-  {
-    id: 1,
-    timestamp: '2024-09-25 14:32:15',
-    activity: 'API Integration Updated',
-    details: 'Payment Gateway configuration updated',
-    user: 'System Admin',
-    type: 'Configuration',
-    status: 'Success'
-  },
-  {
-    id: 2,
-    timestamp: '2024-09-25 14:15:22',
-    activity: 'Device Offline Alert',
-    details: 'VIP Area Biometric scanner lost connection',
-    user: 'System Monitor',
-    type: 'Alert',
-    status: 'Warning'
-  },
-  {
-    id: 3,
-    timestamp: '2024-09-25 13:45:33',
-    activity: 'User Permission Changed',
-    details: 'Added admin permissions for trainer@gym.com',
-    user: 'HR Manager',
-    type: 'Security',
-    status: 'Success'
-  },
-  {
-    id: 4,
-    timestamp: '2024-09-25 12:30:18',
-    activity: 'Module Status Changed',
-    details: 'BiOS Analytics module set to maintenance mode',
-    user: 'IT Manager',
-    type: 'Maintenance',
-    status: 'Warning'
-  },
-  {
-    id: 5,
-    timestamp: '2024-09-25 11:20:45',
-    activity: 'Backup Completed',
-    details: 'Daily database backup completed successfully',
-    user: 'System',
-    type: 'Backup',
-    status: 'Success'
-  }
-];
-
-const pendingNotifications = [
-  {
-    id: 1,
-    title: 'Device Maintenance Required',
-    description: 'VIP Area Biometric scanner needs calibration',
-    priority: 'High',
-    created: '2024-09-25 12:45',
-    type: 'Device Alert'
-  },
-  {
-    id: 2,
-    title: 'API Rate Limit Warning',
-    description: 'Equipment IoT Platform approaching rate limit (85%)',
-    priority: 'Medium',
-    created: '2024-09-25 10:30',
-    type: 'API Alert'
-  },
-  {
-    id: 3,
-    title: 'Security Update Available',
-    description: 'New security patch available for Access Control System',
-    priority: 'Medium',
-    created: '2024-09-24 16:20',
-    type: 'Security Update'
-  }
-];
-
-const userRoleStats = [
-  { role: 'Super Admin', count: 2, permissions: 'Full Access' },
-  { role: 'Gym Manager', count: 3, permissions: 'Management Access' },
-  { role: 'Front Desk Staff', count: 8, permissions: 'Member Management' },
-  { role: 'Trainers', count: 18, permissions: 'Class & Training Access' },
-  { role: 'Maintenance Staff', count: 6, permissions: 'Equipment Access' },
-  { role: 'Accountant', count: 2, permissions: 'Financial Access' },
-  { role: 'IT Support', count: 3, permissions: 'System Configuration' },
-  { role: 'Marketing', count: 3, permissions: 'Campaign Management' }
-];
-
-// Sample data for Plans & Services Catalog Configuration
-const catalogOptions = [
-  {
-    id: 'membership-plans',
-    title: 'Membership Plans & Pricing',
-    description: 'Display gym membership packages and pricing tiers',
-    enabled: true,
-    count: 8
-  },
-  {
-    id: 'training-streams',
-    title: 'Training Streams',
-    description: 'Show available training programs and specialties',
-    enabled: true,
-    count: 12
-  },
-  {
-    id: 'classes',
-    title: 'Classes',
-    description: 'List group fitness classes and schedules',
-    enabled: false,
-    count: 24
-  }
-];
-
-// Sample data for User Roles and POS assignments
-const userRoles = [
-  { id: 1, name: 'Front Desk', users: 8, posMode: 'Retail POS' },
-  { id: 2, name: 'Trainers', users: 15, posMode: 'F&B POS' },
-  { id: 3, name: 'Managers', users: 3, posMode: 'Retail POS' },
-  { id: 4, name: 'Cashiers', users: 5, posMode: 'Retail POS' },
-  { id: 5, name: 'Admin', users: 2, posMode: 'Retail POS' }
-];
-
 interface GymOSProps {
   onNavigate?: (section: string) => void;
 }
 
 export function GymOS({ onNavigate }: GymOSProps = {}) {
-    const [catalogSettings, setCatalogSettings] = useState(catalogOptions);
-  const [roleAssignments, setRoleAssignments] = useState(userRoles);
+    const [catalogSections, setCatalogSections] = useState<CatalogDisplaySection[]>([]);
+  const [catalogSectionsLoading, setCatalogSectionsLoading] = useState(true);
+  const [catalogSectionsError, setCatalogSectionsError] = useState<string | null>(null);
+  const [catalogToggleId, setCatalogToggleId] = useState<number | null>(null);
+  const [posModeSavingId, setPosModeSavingId] = useState<string | null>(null);
   const [showCatalogConfig, setShowCatalogConfig] = useState(false);
   const [showPOSConfig, setShowPOSConfig] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [modules, setModules] = useState<PlatformModuleResponse[]>([]);
+  const [modulesLoading, setModulesLoading] = useState(true);
+  const [modulesError, setModulesError] = useState<string | null>(null);
+  const [moduleActionKey, setModuleActionKey] = useState<string | null>(null);
+  const [performanceTargets, setPerformanceTargets] = useState<StaffTarget[]>([]);
+  const [performanceLoading, setPerformanceLoading] = useState(true);
+  const [performanceError, setPerformanceError] = useState<string | null>(null);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesError, setRolesError] = useState<string | null>(null);
+  const [auditLog, setAuditLog] = useState<ModuleAuditLogEntry[]>([]);
+  const [auditLogLoading, setAuditLogLoading] = useState(true);
+  const [auditLogError, setAuditLogError] = useState<string | null>(null);
+
+  const [transferPolicy, setTransferPolicy] = useState<Record<string, string>>({});
+  const [transferPolicyLoading, setTransferPolicyLoading] = useState(true);
+  const [transferPolicyError, setTransferPolicyError] = useState<string | null>(null);
+  const [transferPolicySaving, setTransferPolicySaving] = useState(false);
+  const [transferPolicyDraft, setTransferPolicyDraft] = useState({
+    allow_transfer: 'true',
+    fee_structure: 'flat',
+    default_transfer_fee: '100',
+    min_days_after_joining: '15',
+    require_admin_approval: 'false',
+  });
+
+  const loadTransferPolicy = useCallback(async () => {
+    setTransferPolicyLoading(true);
+    setTransferPolicyError(null);
+    try {
+      const data = await gymOsSettingsService.getByCategory('TRANSFER_POLICY');
+      const map = settingsToMap(data);
+      setTransferPolicy(map);
+      setTransferPolicyDraft(prev => ({ ...prev, ...map }));
+    } catch (err) {
+      setTransferPolicyError('Failed to load transfer policy');
+    } finally {
+      setTransferPolicyLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTransferPolicy();
+  }, [loadTransferPolicy]);
+
+  const saveTransferPolicy = async () => {
+    setTransferPolicySaving(true);
+    setTransferPolicyError(null);
+    try {
+      const data = await gymOsSettingsService.bulkUpsert('TRANSFER_POLICY', transferPolicyDraft);
+      setTransferPolicy(settingsToMap(data));
+    } catch (err) {
+      setTransferPolicyError('Failed to save transfer policy');
+    } finally {
+      setTransferPolicySaving(false);
+    }
+  };
+
+  const [deactivationPolicy, setDeactivationPolicy] = useState<Record<string, string>>({});
+  const [deactivationPolicyLoading, setDeactivationPolicyLoading] = useState(true);
+  const [deactivationPolicyError, setDeactivationPolicyError] = useState<string | null>(null);
+  const [deactivationPolicySaving, setDeactivationPolicySaving] = useState(false);
+  const [deactivationPolicyDraft, setDeactivationPolicyDraft] = useState({
+    allow_deactivation: 'true',
+    allow_refund: 'true',
+    refund_method: 'prorated',
+    approval_required: 'true',
+  });
+
+  const loadDeactivationPolicy = useCallback(async () => {
+    setDeactivationPolicyLoading(true);
+    setDeactivationPolicyError(null);
+    try {
+      const data = await gymOsSettingsService.getByCategory('DEACTIVATION_POLICY');
+      const map = settingsToMap(data);
+      setDeactivationPolicy(map);
+      setDeactivationPolicyDraft(prev => ({ ...prev, ...map }));
+    } catch (err) {
+      setDeactivationPolicyError('Failed to load deactivation policy');
+    } finally {
+      setDeactivationPolicyLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDeactivationPolicy();
+  }, [loadDeactivationPolicy]);
+
+  const saveDeactivationPolicy = async () => {
+    setDeactivationPolicySaving(true);
+    setDeactivationPolicyError(null);
+    try {
+      const data = await gymOsSettingsService.bulkUpsert('DEACTIVATION_POLICY', deactivationPolicyDraft);
+      setDeactivationPolicy(settingsToMap(data));
+    } catch (err) {
+      setDeactivationPolicyError('Failed to save deactivation policy');
+    } finally {
+      setDeactivationPolicySaving(false);
+    }
+  };
+
+  const [deactivationReasons, setDeactivationReasons] = useState<DeactivationReason[]>([]);
+  const [deactivationReasonsLoading, setDeactivationReasonsLoading] = useState(true);
+  const [deactivationReasonsError, setDeactivationReasonsError] = useState<string | null>(null);
+  const [newDeactivationReason, setNewDeactivationReason] = useState('');
+  const [addReasonSaving, setAddReasonSaving] = useState(false);
+
+  const loadDeactivationReasons = useCallback(async () => {
+    setDeactivationReasonsLoading(true);
+    setDeactivationReasonsError(null);
+    try {
+      const data = await deactivationReasonService.getAll();
+      setDeactivationReasons(data);
+    } catch (err) {
+      setDeactivationReasonsError('Failed to load deactivation reasons');
+    } finally {
+      setDeactivationReasonsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDeactivationReasons();
+  }, [loadDeactivationReasons]);
+
+  const toggleDeactivationReason = async (reason: DeactivationReason) => {
+    try {
+      const updated = await deactivationReasonService.update(reason.id, { active: !reason.active });
+      setDeactivationReasons(prev => prev.map(r => (r.id === reason.id ? updated : r)));
+    } catch (err) {
+      setDeactivationReasonsError('Failed to update reason');
+    }
+  };
+
+  const addDeactivationReason = async () => {
+    if (!newDeactivationReason.trim()) return;
+    setAddReasonSaving(true);
+    try {
+      const created = await deactivationReasonService.create({ reason: newDeactivationReason.trim() });
+      setDeactivationReasons(prev => [...prev, created]);
+      setNewDeactivationReason('');
+    } catch (err: any) {
+      setDeactivationReasonsError(err?.response?.data?.message || 'Failed to add reason');
+    } finally {
+      setAddReasonSaving(false);
+    }
+  };
+
+  const removeDeactivationReason = async (id: number) => {
+    try {
+      await deactivationReasonService.remove(id);
+      setDeactivationReasons(prev => prev.filter(r => r.id !== id));
+    } catch (err) {
+      setDeactivationReasonsError('Failed to remove reason');
+    }
+  };
+
+  const [systemConfig, setSystemConfig] = useState<Record<string, string>>({});
+  const [systemConfigLoading, setSystemConfigLoading] = useState(true);
+  const [systemConfigError, setSystemConfigError] = useState<string | null>(null);
+  const [systemConfigSaving, setSystemConfigSaving] = useState(false);
+  const [showSystemConfig, setShowSystemConfig] = useState(false);
+  const [systemConfigDraft, setSystemConfigDraft] = useState({ session_timeout_minutes: '30', auto_logout_minutes: '60' });
+
+  const loadSystemConfig = useCallback(async () => {
+    setSystemConfigLoading(true);
+    setSystemConfigError(null);
+    try {
+      const data = await gymOsSettingsService.getByCategory('SYSTEM_CONFIG');
+      const map = settingsToMap(data);
+      setSystemConfig(map);
+      setSystemConfigDraft({
+        session_timeout_minutes: map.session_timeout_minutes || '30',
+        auto_logout_minutes: map.auto_logout_minutes || '60',
+      });
+    } catch (err) {
+      setSystemConfigError('Failed to load system configuration');
+    } finally {
+      setSystemConfigLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSystemConfig();
+  }, [loadSystemConfig]);
+
+  const saveSystemConfig = async () => {
+    setSystemConfigSaving(true);
+    setSystemConfigError(null);
+    try {
+      const data = await gymOsSettingsService.bulkUpsert('SYSTEM_CONFIG', systemConfigDraft);
+      setSystemConfig(settingsToMap(data));
+      setShowSystemConfig(false);
+    } catch (err) {
+      setSystemConfigError('Failed to save system configuration');
+    } finally {
+      setSystemConfigSaving(false);
+    }
+  };
+
+  const loadCatalogSections = useCallback(async () => {
+    setCatalogSectionsLoading(true);
+    setCatalogSectionsError(null);
+    try {
+      const data = await catalogDisplaySectionService.getAll();
+      setCatalogSections(data);
+    } catch (err) {
+      setCatalogSectionsError('Failed to load catalog sections');
+    } finally {
+      setCatalogSectionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCatalogSections();
+  }, [loadCatalogSections]);
+
+  const toggleCatalogSection = async (id: number) => {
+    setCatalogToggleId(id);
+    try {
+      const updated = await catalogDisplaySectionService.toggle(id);
+      setCatalogSections(prev => prev.map(s => (s.id === id ? updated : s)));
+    } catch (err) {
+      setCatalogSectionsError('Failed to update section');
+    } finally {
+      setCatalogToggleId(null);
+    }
+  };
+
+  const [showAddCatalogSection, setShowAddCatalogSection] = useState(false);
+  const [newCatalogSection, setNewCatalogSection] = useState({ sectionKey: '', title: '', description: '' });
+  const [addCatalogSectionError, setAddCatalogSectionError] = useState<string | null>(null);
+  const [addCatalogSectionSaving, setAddCatalogSectionSaving] = useState(false);
+
+  const submitNewCatalogSection = async () => {
+    if (!newCatalogSection.sectionKey.trim() || !newCatalogSection.title.trim()) {
+      setAddCatalogSectionError('Key and title are required');
+      return;
+    }
+    setAddCatalogSectionSaving(true);
+    setAddCatalogSectionError(null);
+    try {
+      const created = await catalogDisplaySectionService.create(newCatalogSection);
+      setCatalogSections(prev => [...prev, created]);
+      setShowAddCatalogSection(false);
+      setNewCatalogSection({ sectionKey: '', title: '', description: '' });
+    } catch (err: any) {
+      setAddCatalogSectionError(err?.response?.data?.message || 'Failed to create section');
+    } finally {
+      setAddCatalogSectionSaving(false);
+    }
+  };
+
+  const loadRoles = useCallback(async () => {
+    setRolesLoading(true);
+    setRolesError(null);
+    try {
+      const res = await rolesService.getRoles('', 1, 100);
+      setRoles(res.data);
+    } catch (err) {
+      setRolesError('Failed to load roles');
+    } finally {
+      setRolesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRoles();
+  }, [loadRoles]);
+
+  const totalUsersWithRoles = roles.reduce((sum, r) => sum + (r.user_count || 0), 0);
+  const adminRoleUserCount = roles
+    .filter(r => r.is_system || /admin/i.test(r.role_name))
+    .reduce((sum, r) => sum + (r.user_count || 0), 0);
+  const topRolesByUsers = [...roles].sort((a, b) => b.user_count - a.user_count).slice(0, 2);
+
+  const loadAuditLog = useCallback(async () => {
+    setAuditLogLoading(true);
+    setAuditLogError(null);
+    try {
+      const data = await moduleService.getAuditLog(20);
+      setAuditLog(data);
+    } catch (err) {
+      setAuditLogError('Failed to load recent activity');
+    } finally {
+      setAuditLogLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAuditLog();
+  }, [loadAuditLog]);
+
+  const [integrations, setIntegrations] = useState<IntegrationResponse[]>([]);
+  const [integrationsLoading, setIntegrationsLoading] = useState(true);
+  const [integrationsError, setIntegrationsError] = useState<string | null>(null);
+  const [integrationActionId, setIntegrationActionId] = useState<number | null>(null);
+
+  const loadIntegrations = useCallback(async () => {
+    setIntegrationsLoading(true);
+    setIntegrationsError(null);
+    try {
+      const data = await integrationService.getAll();
+      setIntegrations(data);
+    } catch (err) {
+      setIntegrationsError('Failed to load integrations');
+    } finally {
+      setIntegrationsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadIntegrations();
+  }, [loadIntegrations]);
+
+  const connectedIntegrationsCount = integrations.filter(i => i.status === 'CONNECTED').length;
+  const erroredIntegrationsCount = integrations.filter(i => i.status === 'ERROR').length;
+  const avgIntegrationSuccessRate = integrations.filter(i => i.successRate != null).length > 0
+    ? integrations.filter(i => i.successRate != null).reduce((sum, i) => sum + (i.successRate || 0), 0)
+      / integrations.filter(i => i.successRate != null).length
+    : 0;
+
+  const [showAddIntegration, setShowAddIntegration] = useState(false);
+  const [newIntegration, setNewIntegration] = useState({ integrationKey: '', name: '', category: '' });
+  const [addIntegrationError, setAddIntegrationError] = useState<string | null>(null);
+  const [addIntegrationSaving, setAddIntegrationSaving] = useState(false);
+
+  const submitNewIntegration = async () => {
+    if (!newIntegration.integrationKey.trim() || !newIntegration.name.trim() || !newIntegration.category.trim()) {
+      setAddIntegrationError('Key, name, and category are required');
+      return;
+    }
+    setAddIntegrationSaving(true);
+    setAddIntegrationError(null);
+    try {
+      const created = await integrationService.create(newIntegration);
+      setIntegrations(prev => [...prev, created]);
+      setShowAddIntegration(false);
+      setNewIntegration({ integrationKey: '', name: '', category: '' });
+    } catch (err: any) {
+      setAddIntegrationError(err?.response?.data?.message || 'Failed to create integration');
+    } finally {
+      setAddIntegrationSaving(false);
+    }
+  };
+
+  const cycleIntegrationStatus = async (integration: IntegrationResponse) => {
+    const next: IntegrationStatus = integration.status === 'DISCONNECTED' ? 'CONNECTED'
+      : integration.status === 'CONNECTED' ? 'ERROR' : 'DISCONNECTED';
+    setIntegrationActionId(integration.id);
+    try {
+      const updated = await integrationService.setStatus(integration.id, next);
+      setIntegrations(prev => prev.map(i => (i.id === integration.id ? updated : i)));
+    } catch (err) {
+      setIntegrationsError('Failed to update integration status');
+    } finally {
+      setIntegrationActionId(null);
+    }
+  };
+
+  const [devices, setDevices] = useState<AccessControlDeviceResponse[]>([]);
+  const [devicesLoading, setDevicesLoading] = useState(true);
+  const [devicesError, setDevicesError] = useState<string | null>(null);
+  const [deviceActionId, setDeviceActionId] = useState<number | null>(null);
+
+  const loadDevices = useCallback(async () => {
+    setDevicesLoading(true);
+    setDevicesError(null);
+    try {
+      const data = await accessControlDeviceService.getAll();
+      setDevices(data);
+    } catch (err) {
+      setDevicesError('Failed to load access control devices');
+    } finally {
+      setDevicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDevices();
+  }, [loadDevices]);
+
+  const onlineDevicesCount = devices.filter(d => d.status === 'ONLINE').length;
+  const offlineDevicesCount = devices.filter(d => d.status === 'OFFLINE').length;
+
+  const [showAddDevice, setShowAddDevice] = useState(false);
+  const [newDevice, setNewDevice] = useState({ deviceCode: '', name: '', deviceType: '', location: '' });
+  const [addDeviceError, setAddDeviceError] = useState<string | null>(null);
+  const [addDeviceSaving, setAddDeviceSaving] = useState(false);
+
+  const submitNewDevice = async () => {
+    if (!newDevice.deviceCode.trim() || !newDevice.name.trim() || !newDevice.deviceType.trim()) {
+      setAddDeviceError('Code, name, and type are required');
+      return;
+    }
+    setAddDeviceSaving(true);
+    setAddDeviceError(null);
+    try {
+      const created = await accessControlDeviceService.create(newDevice);
+      setDevices(prev => [...prev, created]);
+      setShowAddDevice(false);
+      setNewDevice({ deviceCode: '', name: '', deviceType: '', location: '' });
+    } catch (err: any) {
+      setAddDeviceError(err?.response?.data?.message || 'Failed to create device');
+    } finally {
+      setAddDeviceSaving(false);
+    }
+  };
+
+  const cycleDeviceStatus = async (device: AccessControlDeviceResponse) => {
+    const next: DeviceStatus = device.status === 'OFFLINE' ? 'ONLINE'
+      : device.status === 'ONLINE' ? 'MAINTENANCE' : 'OFFLINE';
+    setDeviceActionId(device.id);
+    try {
+      const updated = await accessControlDeviceService.setStatus(device.id, next);
+      setDevices(prev => prev.map(d => (d.id === device.id ? updated : d)));
+    } catch (err) {
+      setDevicesError('Failed to update device status');
+    } finally {
+      setDeviceActionId(null);
+    }
+  };
+
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const [notificationsTotal, setNotificationsTotal] = useState(0);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+
+  const loadNotifications = useCallback(async () => {
+    setNotificationsLoading(true);
+    setNotificationsError(null);
+    try {
+      const page = await notificationService.getNotifications(0, 10);
+      setNotifications(page.content);
+      setNotificationsTotal(page.totalElements);
+    } catch (err) {
+      setNotificationsError('Failed to load notifications');
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  const unreadNotifications = notifications.filter(n => !n.isRead);
+
+  const markNotificationRead = async (id: number) => {
+    try {
+      await notificationService.markAsRead(id);
+      setNotifications(prev => prev.map(n => (n.id === id ? { ...n, isRead: true } : n)));
+    } catch (err) {
+      setNotificationsError('Failed to update notification');
+    }
+  };
+
+  const loadPerformanceTargets = useCallback(async () => {
+    setPerformanceLoading(true);
+    setPerformanceError(null);
+    try {
+      const now = new Date();
+      const data = await staffService.getTargets(now.getFullYear(), now.getMonth() + 1);
+      setPerformanceTargets(data);
+    } catch (err) {
+      setPerformanceError('Failed to load performance metrics');
+    } finally {
+      setPerformanceLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPerformanceTargets();
+  }, [loadPerformanceTargets]);
+
+  const individualPerformanceTargets = performanceTargets.filter(t => t.scope === 'individual');
+  const activeStaffCount = new Set(individualPerformanceTargets.map(t => t.staff_db_id)).size;
+  const targetsMetCount = individualPerformanceTargets.filter(t => (t.percentage || 0) >= 100).length;
+  const targetsInProgressCount = individualPerformanceTargets.filter(t => (t.percentage || 0) < 100).length;
+  const totalPerformanceCommission = individualPerformanceTargets.reduce((sum, t) => sum + (t.commission_earned || 0), 0);
+  const overallPerformancePercentage = individualPerformanceTargets.length > 0
+    ? individualPerformanceTargets.reduce((sum, t) => sum + (t.percentage || 0), 0) / individualPerformanceTargets.length
+    : 0;
+
+  const loadModules = useCallback(async () => {
+    setModulesLoading(true);
+    setModulesError(null);
+    try {
+      const data = await moduleService.getAll();
+      setModules(data);
+    } catch (err) {
+      setModulesError('Failed to load modules');
+    } finally {
+      setModulesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadModules();
+  }, [loadModules]);
+
+  const toggleModuleEnabled = async (moduleKey: string, enabled: boolean) => {
+    setModuleActionKey(moduleKey);
+    try {
+      const updated = await moduleService.setEnabled(moduleKey, enabled);
+      setModules(prev => prev.map(m => (m.moduleKey === moduleKey ? updated : m)));
+    } catch (err) {
+      setModulesError('Failed to update module');
+    } finally {
+      setModuleActionKey(null);
+    }
+  };
+
+  const activeModuleCount = modules.filter(m => m.status === 'ACTIVE').length;
+  const maintenanceModuleCount = modules.filter(m => m.status === 'MAINTENANCE').length;
 
   const getCurrentPeriod = () => {
     return new Date().toLocaleDateString('en-GB', { 
@@ -287,28 +650,23 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
     }
   };
 
-  const toggleCatalogOption = (id: string) => {
-    setCatalogSettings(prev => 
-      prev.map(option => 
-        option.id === id ? { ...option, enabled: !option.enabled } : option
-      )
-    );
+  const updateRolePOSMode = async (roleId: string, posMode: string) => {
+    setPosModeSavingId(roleId);
+    try {
+      const updated = await rolesService.updateRole(roleId, { pos_mode: posMode });
+      setRoles(prev => prev.map(r => (r.id === roleId ? updated : r)));
+    } catch (err) {
+      setRolesError('Failed to update POS mode');
+    } finally {
+      setPosModeSavingId(null);
+    }
   };
 
-  const updateRolePOSMode = (roleId: number, posMode: string) => {
-    setRoleAssignments(prev =>
-      prev.map(role =>
-        role.id === roleId ? { ...role, posMode } : role
-      )
-    );
-  };
+  const getTotalUsers = () => totalUsersWithRoles;
+  const getRetailPOSCount = () => roles.filter(role => role.pos_mode === 'Retail POS').reduce((sum, role) => sum + (role.user_count || 0), 0);
+  const getFnBPOSCount = () => roles.filter(role => role.pos_mode === 'F&B POS').reduce((sum, role) => sum + (role.user_count || 0), 0);
 
-  const getTotalUsers = () => roleAssignments.reduce((sum, role) => sum + role.users, 0);
-  const getRetailPOSCount = () => roleAssignments.filter(role => role.posMode === 'Retail POS').reduce((sum, role) => sum + role.users, 0);
-  const getFnBPOSCount = () => roleAssignments.filter(role => role.posMode === 'F&B POS').reduce((sum, role) => sum + role.users, 0);
-  
-  const getEnabledCatalogCount = () => catalogSettings.filter(option => option.enabled).length;
-  const getTotalCatalogItems = () => catalogSettings.reduce((sum, option) => sum + option.count, 0);
+  const getEnabledCatalogCount = () => catalogSections.filter(s => s.enabled).length;
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -378,30 +736,33 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
-                    {catalogSettings.map((option) => (
-                      <div key={option.id} className="flex items-start space-x-4 p-4 border rounded-lg">
+                    {catalogSectionsError && (
+                      <p className="text-sm text-red-600">{catalogSectionsError}</p>
+                    )}
+                    {catalogSectionsLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading sections...</p>
+                    ) : catalogSections.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No sections configured yet.</p>
+                    ) : catalogSections.map((section) => (
+                      <div key={section.id} className="flex items-start space-x-4 p-4 border rounded-lg">
                         <div className="flex items-center space-x-3 flex-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => toggleCatalogOption(option.id)}
+                            disabled={catalogToggleId === section.id}
+                            onClick={() => toggleCatalogSection(section.id)}
                             className="p-0 h-auto"
                           >
-                            {option.enabled ? (
+                            {section.enabled ? (
                               <CheckSquare className="h-5 w-5 text-blue-600" />
                             ) : (
                               <Square className="h-5 w-5 text-gray-400" />
                             )}
                           </Button>
                           <div className="flex-1">
-                            <div className="flex items-center space-x-2">
-                              <h4 className="font-medium">{option.title}</h4>
-                              <Badge variant="secondary" className="text-xs">
-                                {option.count} items
-                              </Badge>
-                            </div>
+                            <h4 className="font-medium">{section.title}</h4>
                             <p className="text-sm text-muted-foreground mt-1">
-                              {option.description}
+                              {section.description}
                             </p>
                           </div>
                         </div>
@@ -409,11 +770,8 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     ))}
                   </div>
                   <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setShowCatalogConfig(false)}>
-                      Cancel
-                    </Button>
                     <Button onClick={() => setShowCatalogConfig(false)}>
-                      Save Configuration
+                      Done
                     </Button>
                   </div>
                 </DialogContent>
@@ -421,13 +779,18 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {catalogSectionsError && (
+              <p className="text-sm text-red-600">{catalogSectionsError}</p>
+            )}
             {/* Summary Stats */}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-blue-50 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-blue-600">Active Sections</p>
-                    <p className="text-2xl font-bold text-blue-700">{getEnabledCatalogCount()}</p>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {catalogSectionsLoading ? '—' : getEnabledCatalogCount()}
+                    </p>
                   </div>
                   <div className="p-2 bg-blue-100 rounded">
                     <Eye className="h-4 w-4 text-blue-600" />
@@ -437,8 +800,10 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div className="p-4 bg-green-50 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-green-600">Total Items</p>
-                    <p className="text-2xl font-bold text-green-700">{getTotalCatalogItems()}</p>
+                    <p className="text-sm text-green-600">Total Sections</p>
+                    <p className="text-2xl font-bold text-green-700">
+                      {catalogSectionsLoading ? '—' : catalogSections.length}
+                    </p>
                   </div>
                   <div className="p-2 bg-green-100 rounded">
                     <Star className="h-4 w-4 text-green-600" />
@@ -450,31 +815,79 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
             {/* Current Configuration Preview */}
             <div className="space-y-3">
               <h4 className="font-medium text-sm text-gray-700">Currently Displayed:</h4>
-              {catalogSettings.filter(option => option.enabled).map((option) => (
-                <div key={option.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <div className="flex items-center space-x-2">
-                    <CheckSquare className="h-4 w-4 text-green-600" />
-                    <span className="text-sm">{option.title}</span>
-                  </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {option.count}
-                  </Badge>
-                </div>
-              ))}
-              {catalogSettings.filter(option => !option.enabled).length > 0 && (
-                <div className="text-xs text-muted-foreground">
-                  + {catalogSettings.filter(option => !option.enabled).length} hidden section(s)
-                </div>
+              {catalogSectionsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : (
+                <>
+                  {catalogSections.filter(s => s.enabled).map((section) => (
+                    <div key={section.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <div className="flex items-center space-x-2">
+                        <CheckSquare className="h-4 w-4 text-green-600" />
+                        <span className="text-sm">{section.title}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {catalogSections.filter(s => !s.enabled).length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      + {catalogSections.filter(s => !s.enabled).length} hidden section(s)
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
             {/* Action Buttons */}
             <div className="flex justify-between pt-2">
-              <Button variant="ghost" size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                Add Option
-              </Button>
-              <Button variant="ghost" size="sm">
+              <Dialog open={showAddCatalogSection} onOpenChange={setShowAddCatalogSection}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Option
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[480px]">
+                  <DialogHeader>
+                    <DialogTitle>Add Catalog Section</DialogTitle>
+                    <DialogDescription>Add a new section to the walk-in inquiry catalog.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3 py-2">
+                    {addCatalogSectionError && (
+                      <p className="text-sm text-red-600">{addCatalogSectionError}</p>
+                    )}
+                    <div className="space-y-1">
+                      <label className="text-sm text-gray-600">Key (e.g. group-classes)</label>
+                      <input
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                        value={newCatalogSection.sectionKey}
+                        onChange={(e) => setNewCatalogSection(prev => ({ ...prev, sectionKey: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm text-gray-600">Title</label>
+                      <input
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                        value={newCatalogSection.title}
+                        onChange={(e) => setNewCatalogSection(prev => ({ ...prev, title: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm text-gray-600">Description</label>
+                      <input
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                        value={newCatalogSection.description}
+                        onChange={(e) => setNewCatalogSection(prev => ({ ...prev, description: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowAddCatalogSection(false)}>Cancel</Button>
+                    <Button onClick={submitNewCatalogSection} disabled={addCatalogSectionSaving}>
+                      {addCatalogSectionSaving ? 'Saving...' : 'Add Section'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Button variant="ghost" size="sm" onClick={() => setShowCatalogConfig(true)}>
                 <Eye className="h-4 w-4 mr-1" />
                 View All
               </Button>
@@ -509,29 +922,32 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4">
+                    {rolesError && (
+                      <p className="text-sm text-red-600 mb-3">{rolesError}</p>
+                    )}
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Role Name</TableHead>
                           <TableHead>User Count</TableHead>
                           <TableHead>Assigned POS Mode</TableHead>
-                          <TableHead>Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {roleAssignments.map((role) => (
+                        {roles.map((role) => (
                           <TableRow key={role.id}>
-                            <TableCell className="font-medium">{role.name}</TableCell>
+                            <TableCell className="font-medium">{role.role_name}</TableCell>
                             <TableCell>
-                              <Badge variant="outline">{role.users} users</Badge>
+                              <Badge variant="outline">{role.user_count} users</Badge>
                             </TableCell>
                             <TableCell>
                               <Select
-                                value={role.posMode}
+                                value={role.pos_mode || ''}
+                                disabled={posModeSavingId === role.id}
                                 onValueChange={(value) => updateRolePOSMode(role.id, value)}
                               >
                                 <SelectTrigger className="w-40">
-                                  <SelectValue />
+                                  <SelectValue placeholder="Unassigned" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="Retail POS">
@@ -549,20 +965,14 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                                 </SelectContent>
                               </Select>
                             </TableCell>
-                            <TableCell>
-                              <Button variant="ghost" size="sm">Save</Button>
-                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setShowPOSConfig(false)}>
-                      Cancel
-                    </Button>
+                  <div className="flex justify-end">
                     <Button onClick={() => setShowPOSConfig(false)}>
-                      Save All Changes
+                      Done
                     </Button>
                   </div>
                 </DialogContent>
@@ -577,21 +987,21 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   <Users className="h-5 w-5 text-purple-600" />
                 </div>
                 <p className="text-sm text-purple-600">Total Roles</p>
-                <p className="text-2xl font-bold text-purple-700">{roleAssignments.length}</p>
+                <p className="text-2xl font-bold text-purple-700">{rolesLoading ? '—' : roles.length}</p>
               </div>
               <div className="p-4 bg-green-50 rounded-lg text-center">
                 <div className="flex items-center justify-center mb-2">
                   <ShoppingCart className="h-5 w-5 text-green-600" />
                 </div>
                 <p className="text-sm text-green-600">Retail POS</p>
-                <p className="text-2xl font-bold text-green-700">{getRetailPOSCount()}</p>
+                <p className="text-2xl font-bold text-green-700">{rolesLoading ? '—' : getRetailPOSCount()}</p>
               </div>
               <div className="p-4 bg-orange-50 rounded-lg text-center">
                 <div className="flex items-center justify-center mb-2">
                   <ChefHat className="h-5 w-5 text-orange-600" />
                 </div>
                 <p className="text-sm text-orange-600">F&B POS</p>
-                <p className="text-2xl font-bold text-orange-700">{getFnBPOSCount()}</p>
+                <p className="text-2xl font-bold text-orange-700">{rolesLoading ? '—' : getFnBPOSCount()}</p>
               </div>
             </div>
 
@@ -599,38 +1009,55 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
             <div className="space-y-3">
               <h4 className="font-medium text-sm text-gray-700">Current Assignments:</h4>
               <div className="space-y-2">
-                {roleAssignments.slice(0, 3).map((role) => (
+                {rolesLoading ? (
+                  <div className="text-sm text-gray-400">Loading roles...</div>
+                ) : roles.length === 0 ? (
+                  <div className="text-sm text-gray-400">No roles configured</div>
+                ) : roles.slice(0, 3).map((role) => (
                   <div key={role.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                     <div className="flex items-center space-x-2">
                       <Users className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm font-medium">{role.name}</span>
-                      <Badge variant="secondary" className="text-xs">{role.users}</Badge>
+                      <span className="text-sm font-medium">{role.role_name}</span>
+                      <Badge variant="secondary" className="text-xs">{role.user_count}</Badge>
                     </div>
                     <div className="flex items-center space-x-1">
-                      {role.posMode === 'Retail POS' ? (
+                      {role.pos_mode === 'Retail POS' ? (
                         <ShoppingCart className="h-3 w-3 text-green-600" />
-                      ) : (
+                      ) : role.pos_mode === 'F&B POS' ? (
                         <ChefHat className="h-3 w-3 text-orange-600" />
-                      )}
-                      <span className="text-xs">{role.posMode}</span>
+                      ) : null}
+                      <span className="text-xs">{role.pos_mode || 'Unassigned'}</span>
                     </div>
                   </div>
                 ))}
-                {roleAssignments.length > 3 && (
+                {roles.length > 3 && (
                   <div className="text-xs text-muted-foreground text-center">
-                    + {roleAssignments.length - 3} more role(s)
+                    + {roles.length - 3} more role(s)
                   </div>
                 )}
               </div>
             </div>
 
             {/* Validation Status */}
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <CheckSquare className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-green-700">All roles properly assigned</span>
-              </div>
-            </div>
+            {!rolesLoading && roles.length > 0 && (
+              roles.every(r => r.pos_mode) ? (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <CheckSquare className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-green-700">All roles properly assigned</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <span className="text-sm text-yellow-700">
+                      {roles.filter(r => !r.pos_mode).length} role(s) missing a POS mode assignment
+                    </span>
+                  </div>
+                </div>
+              )
+            )}
           </CardContent>
         </Card>
       </div>
@@ -643,15 +1070,15 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div>
                 <p className="text-sm font-medium text-gray-600">Modules Active</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {kpiData.modulesActiveTotal.active} / {kpiData.modulesActiveTotal.total}
+                  {activeModuleCount} / {modules.length}
                 </p>
                 <div className="flex items-center mt-2">
-                  <Progress 
-                    value={(kpiData.modulesActiveTotal.active / kpiData.modulesActiveTotal.total) * 100} 
+                  <Progress
+                    value={modules.length ? (activeModuleCount / modules.length) * 100 : 0}
                     className="w-16 h-2 mr-2"
                   />
                   <span className="text-sm text-blue-600">
-                    {Math.round((kpiData.modulesActiveTotal.active / kpiData.modulesActiveTotal.total) * 100)}%
+                    {modules.length ? Math.round((activeModuleCount / modules.length) * 100) : 0}%
                   </span>
                 </div>
               </div>
@@ -668,11 +1095,11 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div>
                 <p className="text-sm font-medium text-gray-600">Users with Permissions</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {kpiData.usersWithPermissions}
+                  {rolesLoading ? '—' : totalUsersWithRoles}
                 </p>
                 <div className="flex items-center mt-2">
                   <Shield className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">Across 8 roles</span>
+                  <span className="text-sm text-green-600">Across {roles.length} role{roles.length === 1 ? '' : 's'}</span>
                 </div>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
@@ -688,11 +1115,13 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div>
                 <p className="text-sm font-medium text-gray-600">API Integrations Active</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {kpiData.apiIntegrationsActive}
+                  {integrationsLoading ? '—' : connectedIntegrationsCount}
                 </p>
                 <div className="flex items-center mt-2">
                   <Plug className="h-4 w-4 text-purple-500 mr-1" />
-                  <span className="text-sm text-purple-600">1 with errors</span>
+                  <span className="text-sm text-purple-600">
+                    {integrationsLoading ? 'Loading…' : `${erroredIntegrationsCount} with errors`}
+                  </span>
                 </div>
               </div>
               <div className="p-3 bg-purple-100 rounded-lg">
@@ -708,11 +1137,13 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div>
                 <p className="text-sm font-medium text-gray-600">Devices Online</p>
                 <p className="text-2xl font-bold text-cyan-600">
-                  {kpiData.accessControlDevicesOnline}
+                  {devicesLoading ? '—' : onlineDevicesCount}
                 </p>
                 <div className="flex items-center mt-2">
                   <Wifi className="h-4 w-4 text-cyan-500 mr-1" />
-                  <span className="text-sm text-cyan-600">1 offline</span>
+                  <span className="text-sm text-cyan-600">
+                    {devicesLoading ? 'Loading…' : `${offlineDevicesCount} offline`}
+                  </span>
                 </div>
               </div>
               <div className="p-3 bg-cyan-100 rounded-lg">
@@ -728,11 +1159,13 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div>
                 <p className="text-sm font-medium text-gray-600">Pending Notifications</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  {kpiData.pendingNotifications}
+                  {notificationsLoading ? '—' : unreadNotifications.length}
                 </p>
                 <div className="flex items-center mt-2">
                   <AlertTriangle className="h-4 w-4 text-orange-500 mr-1" />
-                  <span className="text-sm text-orange-600">Requires attention</span>
+                  <span className="text-sm text-orange-600">
+                    {unreadNotifications.length > 0 ? 'Requires attention' : 'All caught up'}
+                  </span>
                 </div>
               </div>
               <div className="p-3 bg-orange-100 rounded-lg">
@@ -753,34 +1186,30 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                 <Folder className="h-5 w-5 text-blue-600" />
                 <CardTitle>Module Management</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Configure</Button>
+              <Button variant="outline" size="sm" onClick={loadModules} disabled={modulesLoading}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${modulesLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Modules Installed</span>
-                <span className="font-semibold">{kpiData.modulesActiveTotal.total}</span>
+                <span className="font-semibold">{modules.length}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Currently Active</span>
-                <Badge className="bg-green-100 text-green-800">{kpiData.modulesActiveTotal.active}</Badge>
+                <Badge className="bg-green-100 text-green-800">{activeModuleCount}</Badge>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Under Maintenance</span>
-                <Badge className="bg-yellow-100 text-yellow-800">1</Badge>
+                <Badge className="bg-yellow-100 text-yellow-800">{maintenanceModuleCount}</Badge>
               </div>
-              <Progress value={95} className="h-2" />
-              <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Module
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Eye className="h-4 w-4 mr-1" />
-                  View All
-                </Button>
-              </div>
+              <Progress value={modules.length ? (activeModuleCount / modules.length) * 100 : 0} className="h-2" />
+              {modulesError && (
+                <p className="text-xs text-red-600">{modulesError}</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -793,39 +1222,44 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                 <Shield className="h-5 w-5 text-green-600" />
                 <CardTitle>User Roles & Permissions</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Manage</Button>
+              <Button variant="outline" size="sm" onClick={() => onNavigate?.('administration/roles-permissions')}>Manage</Button>
             </div>
           </CardHeader>
           <CardContent>
+            {rolesError && (
+              <p className="text-xs text-red-600 mb-2">{rolesError}</p>
+            )}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Total Roles</span>
-                <span className="font-semibold">8</span>
+                <span className="font-semibold">{rolesLoading ? '—' : roles.length}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Users with Admin Role</span>
-                <Badge className="bg-red-100 text-red-800">5</Badge>
+                <Badge className="bg-red-100 text-red-800">{rolesLoading ? '—' : adminRoleUserCount}</Badge>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Active Users</span>
-                <Badge className="bg-green-100 text-green-800">{kpiData.usersWithPermissions}</Badge>
+                <Badge className="bg-green-100 text-green-800">{rolesLoading ? '—' : totalUsersWithRoles}</Badge>
               </div>
               <div className="pt-2 space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span>Trainers</span>
-                  <span>18</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Front Desk</span>
-                  <span>8</span>
-                </div>
+                {rolesLoading ? (
+                  <div className="text-sm text-gray-400">Loading roles...</div>
+                ) : topRolesByUsers.length === 0 ? (
+                  <div className="text-sm text-gray-400">No roles configured</div>
+                ) : topRolesByUsers.map((role) => (
+                  <div key={role.id} className="flex justify-between text-sm">
+                    <span>{role.role_name}</span>
+                    <span>{role.user_count}</span>
+                  </div>
+                ))}
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => onNavigate?.('administration/roles-permissions')}>
                   <Plus className="h-4 w-4 mr-1" />
                   Add Role
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => onNavigate?.('administration/roles-permissions')}>
                   <Eye className="h-4 w-4 mr-1" />
                   View All
                 </Button>
@@ -842,34 +1276,57 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                 <Plug className="h-5 w-5 text-purple-600" />
                 <CardTitle>API Integration</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Configure</Button>
+              <Button variant="outline" size="sm" onClick={loadIntegrations} disabled={integrationsLoading}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${integrationsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
+            {integrationsError && (
+              <p className="text-xs text-red-600 mb-2">{integrationsError}</p>
+            )}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Connected APIs</span>
-                <span className="font-semibold">{kpiData.apiIntegrationsActive}</span>
+                <span className="font-semibold">{integrationsLoading ? '—' : `${connectedIntegrationsCount} / ${integrations.length}`}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Health Status</span>
-                <Badge className="bg-yellow-100 text-yellow-800">1 Error</Badge>
+                <Badge className={erroredIntegrationsCount > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
+                  {integrationsLoading ? '—' : erroredIntegrationsCount > 0 ? `${erroredIntegrationsCount} Error${erroredIntegrationsCount === 1 ? '' : 's'}` : 'Healthy'}
+                </Badge>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Success Rate</span>
-                <span className="text-sm font-semibold text-green-600">97.8%</span>
+                <span className="text-sm text-gray-600">Avg. Success Rate</span>
+                <span className="text-sm font-semibold text-green-600">
+                  {integrationsLoading ? '—' : `${avgIntegrationSuccessRate.toFixed(1)}%`}
+                </span>
               </div>
-              <Progress value={97.8} className="h-2" />
-              <div className="text-xs text-gray-500">Last sync: 2 minutes ago</div>
-              <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add API
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Activity className="h-4 w-4 mr-1" />
-                  Monitor
-                </Button>
+              <Progress value={avgIntegrationSuccessRate} className="h-2" />
+              <div className="pt-2 space-y-1">
+                {integrationsLoading ? (
+                  <div className="text-sm text-gray-400">Loading integrations...</div>
+                ) : integrations.length === 0 ? (
+                  <div className="text-sm text-gray-400">No integrations configured</div>
+                ) : integrations.map((integration) => (
+                  <div key={integration.id} className="flex justify-between items-center text-sm">
+                    <span>{integration.name}</span>
+                    <button
+                      onClick={() => cycleIntegrationStatus(integration)}
+                      disabled={integrationActionId === integration.id}
+                      title="Click to change status"
+                    >
+                      <Badge className={
+                        integration.status === 'CONNECTED' ? 'bg-green-100 text-green-800' :
+                        integration.status === 'ERROR' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }>
+                        {integration.status === 'CONNECTED' ? 'Connected' : integration.status === 'ERROR' ? 'Error' : 'Disconnected'}
+                      </Badge>
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </CardContent>
@@ -883,42 +1340,57 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                 <Smartphone className="h-5 w-5 text-cyan-600" />
                 <CardTitle>Access Control Devices</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Manage</Button>
+              <Button variant="outline" size="sm" onClick={loadDevices} disabled={devicesLoading}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${devicesLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
+            {devicesError && (
+              <p className="text-xs text-red-600 mb-2">{devicesError}</p>
+            )}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Total Devices</span>
-                <span className="font-semibold">19</span>
+                <span className="font-semibold">{devicesLoading ? '—' : devices.length}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Online</span>
-                <Badge className="bg-green-100 text-green-800">{kpiData.accessControlDevicesOnline}</Badge>
+                <Badge className="bg-green-100 text-green-800">{devicesLoading ? '—' : onlineDevicesCount}</Badge>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Offline</span>
-                <Badge className="bg-red-100 text-red-800">1</Badge>
+                <Badge className="bg-red-100 text-red-800">{devicesLoading ? '—' : offlineDevicesCount}</Badge>
               </div>
               <div className="pt-2 space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span>Face Scanners</span>
-                  <span>8</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Card Readers</span>
-                  <span>11</span>
-                </div>
-              </div>
-              <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Device
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Settings className="h-4 w-4 mr-1" />
-                  Configure
-                </Button>
+                {devicesLoading ? (
+                  <div className="text-sm text-gray-400">Loading devices...</div>
+                ) : devices.length === 0 ? (
+                  <div className="text-sm text-gray-400">No devices registered</div>
+                ) : devices.slice(0, 4).map((device) => (
+                  <div key={device.id} className="flex justify-between items-center text-sm">
+                    <span>{device.name}</span>
+                    <button
+                      onClick={() => cycleDeviceStatus(device)}
+                      disabled={deviceActionId === device.id}
+                      title="Click to change status"
+                    >
+                      <Badge className={
+                        device.status === 'ONLINE' ? 'bg-green-100 text-green-800' :
+                        device.status === 'MAINTENANCE' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }>
+                        {device.status === 'ONLINE' ? 'Online' : device.status === 'MAINTENANCE' ? 'Maintenance' : 'Offline'}
+                      </Badge>
+                    </button>
+                  </div>
+                ))}
+                {devices.length > 4 && (
+                  <div className="text-xs text-muted-foreground text-center pt-1">
+                    + {devices.length - 4} more device(s)
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -932,41 +1404,67 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                 <Database className="h-5 w-5 text-gray-600" />
                 <CardTitle>System Configuration</CardTitle>
               </div>
-              <Button variant="outline" size="sm">Settings</Button>
+              <Dialog open={showSystemConfig} onOpenChange={setShowSystemConfig}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">Settings</Button>
+                </DialogTrigger>
+                <DialogContent className="w-auto max-w-[340px]">
+                  <DialogHeader>
+                    <DialogTitle>System Configuration</DialogTitle>
+                    <DialogDescription>Session and auto-logout timing for this gym.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3 py-2">
+                    {systemConfigError && (
+                      <p className="text-sm text-red-600">{systemConfigError}</p>
+                    )}
+                    <div className="space-y-1">
+                      <label className="text-sm text-gray-600">Session Timeout (minutes)</label>
+                      <input
+                        type="number"
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                        value={systemConfigDraft.session_timeout_minutes}
+                        onChange={(e) => setSystemConfigDraft(prev => ({ ...prev, session_timeout_minutes: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm text-gray-600">Auto-logout Inactive Users (minutes)</label>
+                      <input
+                        type="number"
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                        value={systemConfigDraft.auto_logout_minutes}
+                        onChange={(e) => setSystemConfigDraft(prev => ({ ...prev, auto_logout_minutes: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowSystemConfig(false)}>Cancel</Button>
+                    <Button onClick={saveSystemConfig} disabled={systemConfigSaving}>
+                      {systemConfigSaving ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Config Changes</span>
-                <span className="font-semibold">12 this month</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Last Updated</span>
-                <span className="text-sm">2 hours ago</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Backup Status</span>
-                <Badge className="bg-green-100 text-green-800">Completed</Badge>
-              </div>
+              {systemConfigError && (
+                <p className="text-xs text-red-600">{systemConfigError}</p>
+              )}
               <div className="pt-2 space-y-1">
                 <div className="flex justify-between text-sm">
                   <span>Session Timeout</span>
-                  <span>30 min</span>
+                  <span>{systemConfigLoading ? '—' : `${systemConfig.session_timeout_minutes || '30'} min`}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Auto-logout</span>
-                  <span>60 min</span>
+                  <span>{systemConfigLoading ? '—' : `${systemConfig.auto_logout_minutes || '60'} min`}</span>
                 </div>
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => setShowSystemConfig(true)}>
                   <Settings className="h-4 w-4 mr-1" />
                   Configure
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Download className="h-4 w-4 mr-1" />
-                  Backup
                 </Button>
               </div>
             </div>
@@ -981,43 +1479,80 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                 <Bell className="h-5 w-5 text-orange-600" />
                 <CardTitle>Notifications</CardTitle>
               </div>
-              <Button variant="outline" size="sm">View All</Button>
+              <Button variant="outline" size="sm" onClick={loadNotifications} disabled={notificationsLoading}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${notificationsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
+            {notificationsError && (
+              <p className="text-xs text-red-600 mb-2">{notificationsError}</p>
+            )}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Pending</span>
-                <Badge className="bg-orange-100 text-orange-800">{kpiData.pendingNotifications}</Badge>
+                <Badge className="bg-orange-100 text-orange-800">{notificationsLoading ? '—' : unreadNotifications.length}</Badge>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Unread Today</span>
-                <span className="font-semibold">7</span>
+                <span className="text-sm text-gray-600">Total</span>
+                <span className="font-semibold">{notificationsLoading ? '—' : notificationsTotal}</span>
               </div>
               <div className="space-y-2 pt-2">
-                <div className="text-sm p-2 bg-red-50 rounded">
-                  <div className="font-medium text-red-800">Device Offline</div>
-                  <div className="text-red-600 text-xs">VIP Area scanner</div>
-                </div>
-                <div className="text-sm p-2 bg-yellow-50 rounded">
-                  <div className="font-medium text-yellow-800">API Rate Limit</div>
-                  <div className="text-yellow-600 text-xs">Equipment IoT (85%)</div>
-                </div>
+                {notificationsLoading ? (
+                  <div className="text-sm text-gray-400">Loading notifications...</div>
+                ) : unreadNotifications.length === 0 ? (
+                  <div className="text-sm text-gray-400">No pending notifications</div>
+                ) : unreadNotifications.slice(0, 3).map((n) => (
+                  <div
+                    key={n.id}
+                    className={`text-sm p-2 rounded ${
+                      n.type === 'DANGER' ? 'bg-red-50' :
+                      n.type === 'WARNING' ? 'bg-yellow-50' :
+                      n.type === 'SUCCESS' ? 'bg-green-50' : 'bg-blue-50'
+                    }`}
+                  >
+                    <div className={`font-medium ${
+                      n.type === 'DANGER' ? 'text-red-800' :
+                      n.type === 'WARNING' ? 'text-yellow-800' :
+                      n.type === 'SUCCESS' ? 'text-green-800' : 'text-blue-800'
+                    }`}>{n.title}</div>
+                    <div className={`text-xs ${
+                      n.type === 'DANGER' ? 'text-red-600' :
+                      n.type === 'WARNING' ? 'text-yellow-600' :
+                      n.type === 'SUCCESS' ? 'text-green-600' : 'text-blue-600'
+                    }`}>{n.message}</div>
+                  </div>
+                ))}
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={unreadNotifications.length === 0}
+                  onClick={() => unreadNotifications.forEach(n => markNotificationRead(n.id))}
+                >
                   <CheckCircle className="h-4 w-4 mr-1" />
                   Mark Read
                 </Button>
-                <Button variant="ghost" size="sm">
-                  <Settings className="h-4 w-4 mr-1" />
-                  Configure
+                <Button variant="ghost" size="sm" onClick={() => setNotificationPanelOpen(true)}>
+                  <Eye className="h-4 w-4 mr-1" />
+                  View All
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <NotificationPanel
+        open={notificationPanelOpen}
+        onClose={() => {
+          setNotificationPanelOpen(false);
+          loadNotifications();
+        }}
+        onCountChange={() => {}}
+      />
 
       {/* Bottom Section - Tabbed Tables */}
       <Tabs defaultValue="activity" className="space-y-6">
@@ -1039,47 +1574,52 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <Activity className="h-5 w-5 text-blue-600" />
                     <span>Recent System Activity</span>
                   </CardTitle>
-                  <CardDescription>Latest system changes and alerts</CardDescription>
+                  <CardDescription>Latest module management changes</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                <Button variant="outline" size="sm" onClick={loadAuditLog} disabled={auditLogLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${auditLogLoading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
+              {auditLogError && (
+                <p className="text-sm text-red-600 mb-3">{auditLogError}</p>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Timestamp</TableHead>
-                    <TableHead>Activity</TableHead>
-                    <TableHead>Details</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Module</TableHead>
+                    <TableHead>Summary</TableHead>
+                    <TableHead>Performed By</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentActivity.map((activity) => (
-                    <TableRow key={activity.id}>
-                      <TableCell className="text-sm">{activity.timestamp}</TableCell>
-                      <TableCell className="font-medium">{activity.activity}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{activity.details}</TableCell>
-                      <TableCell>{activity.user}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{activity.type}</Badge>
+                  {auditLogLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-sm text-gray-500 py-6">
+                        Loading activity...
+                      </TableCell>
+                    </TableRow>
+                  ) : auditLog.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-sm text-gray-500 py-6">
+                        No recent activity
+                      </TableCell>
+                    </TableRow>
+                  ) : auditLog.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="text-sm">
+                        {new Date(entry.createdAt).toLocaleString('en-GB')}
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(activity.status)}>
-                          {activity.status}
-                        </Badge>
+                        <Badge variant="outline">{entry.action.replace('_', ' ')}</Badge>
                       </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+                      <TableCell className="font-medium">{entry.moduleKey}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{entry.summary}</TableCell>
+                      <TableCell>{entry.performedBy || 'System'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1100,57 +1640,80 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   </CardTitle>
                   <CardDescription>Real-time status of all system modules</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Module Settings
+                <Button variant="outline" size="sm" onClick={loadModules} disabled={modulesLoading}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
+              {modulesError && (
+                <p className="text-sm text-red-600 mb-3">{modulesError}</p>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Module Name</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Uptime</TableHead>
-                    <TableHead>Last Update</TableHead>
+                    <TableHead>Last Changed</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {moduleStatus.map((module, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{module.module}</TableCell>
+                  {modulesLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-sm text-gray-500 py-6">
+                        Loading modules...
+                      </TableCell>
+                    </TableRow>
+                  ) : modules.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-sm text-gray-500 py-6">
+                        No modules found
+                      </TableCell>
+                    </TableRow>
+                  ) : modules.map((module) => (
+                    <TableRow key={module.moduleKey}>
+                      <TableCell className="font-medium">{module.displayName}</TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(module.status)}>
-                          {module.status === 'active' ? (
+                        <Badge className={getStatusColor(module.status.toLowerCase())}>
+                          {module.status === 'ACTIVE' ? (
                             <><CheckCircle className="h-3 w-3 mr-1" /> Active</>
-                          ) : (
+                          ) : module.status === 'MAINTENANCE' ? (
                             <><Clock className="h-3 w-3 mr-1" /> Maintenance</>
+                          ) : (
+                            <><XCircle className="h-3 w-3 mr-1" /> Inactive</>
                           )}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Progress value={module.uptime} className="w-16 h-2" />
-                          <span className="text-sm">{module.uptime}%</span>
-                        </div>
+                        {module.lastStatusChangeAt
+                          ? new Date(module.lastStatusChangeAt).toLocaleDateString('en-GB')
+                          : new Date(module.createdAt).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell>{new Date(module.lastUpdate).toLocaleDateString('en-GB')}</TableCell>
                       <TableCell>
                         <div className="flex space-x-1">
-                          {module.status === 'active' ? (
-                            <Button variant="ghost" size="sm">
+                          {module.enabled ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={moduleActionKey === module.moduleKey}
+                              onClick={() => toggleModuleEnabled(module.moduleKey, false)}
+                              title="Disable module"
+                            >
                               <Pause className="h-4 w-4 text-yellow-600" />
                             </Button>
                           ) : (
-                            <Button variant="ghost" size="sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={moduleActionKey === module.moduleKey}
+                              onClick={() => toggleModuleEnabled(module.moduleKey, true)}
+                              title="Enable module"
+                            >
                               <Play className="h-4 w-4 text-green-600" />
                             </Button>
                           )}
-                          <Button variant="ghost" size="sm">
-                            <Settings className="h-4 w-4" />
-                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1173,50 +1736,135 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   </CardTitle>
                   <CardDescription>Performance and status of all API connections</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Integration
-                </Button>
+                <Dialog open={showAddIntegration} onOpenChange={setShowAddIntegration}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Integration
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[480px]">
+                    <DialogHeader>
+                      <DialogTitle>Add Integration</DialogTitle>
+                      <DialogDescription>Register a new third-party integration to track.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                      {addIntegrationError && (
+                        <p className="text-sm text-red-600">{addIntegrationError}</p>
+                      )}
+                      <div className="space-y-1">
+                        <label className="text-sm text-gray-600">Key (e.g. PAYMENT_GATEWAY)</label>
+                        <input
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                          value={newIntegration.integrationKey}
+                          onChange={(e) => setNewIntegration(prev => ({ ...prev, integrationKey: e.target.value.toUpperCase() }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm text-gray-600">Name</label>
+                        <input
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                          value={newIntegration.name}
+                          onChange={(e) => setNewIntegration(prev => ({ ...prev, name: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm text-gray-600">Category</label>
+                        <input
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                          placeholder="Payments, Messaging, ..."
+                          value={newIntegration.category}
+                          onChange={(e) => setNewIntegration(prev => ({ ...prev, category: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="outline" onClick={() => setShowAddIntegration(false)}>Cancel</Button>
+                      <Button onClick={submitNewIntegration} disabled={addIntegrationSaving}>
+                        {addIntegrationSaving ? 'Saving...' : 'Add Integration'}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardHeader>
             <CardContent>
+              {integrationsError && (
+                <p className="text-sm text-red-600 mb-3">{integrationsError}</p>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>API Name</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Last Call</TableHead>
+                    <TableHead>Last Sync</TableHead>
                     <TableHead>Success Rate</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {apiIntegrations.map((api, index) => (
-                    <TableRow key={index}>
+                  {integrationsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-gray-500 py-6">
+                        Loading integrations...
+                      </TableCell>
+                    </TableRow>
+                  ) : integrations.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-gray-500 py-6">
+                        No integrations configured
+                      </TableCell>
+                    </TableRow>
+                  ) : integrations.map((api) => (
+                    <TableRow key={api.id}>
                       <TableCell className="font-medium">{api.name}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{api.category}</TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(api.status)}>
-                          {api.status === 'active' ? (
-                            <><CheckCircle className="h-3 w-3 mr-1" /> Active</>
-                          ) : (
+                        <Badge className={
+                          api.status === 'CONNECTED' ? 'bg-green-100 text-green-800' :
+                          api.status === 'ERROR' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }>
+                          {api.status === 'CONNECTED' ? (
+                            <><CheckCircle className="h-3 w-3 mr-1" /> Connected</>
+                          ) : api.status === 'ERROR' ? (
                             <><XCircle className="h-3 w-3 mr-1" /> Error</>
+                          ) : (
+                            <>Disconnected</>
                           )}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm">{api.lastCall}</TableCell>
+                      <TableCell className="text-sm">
+                        {api.lastSyncAt ? new Date(api.lastSyncAt).toLocaleString('en-GB') : 'Never'}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          <Progress value={api.successRate} className="w-16 h-2" />
-                          <span className="text-sm">{api.successRate}%</span>
+                          <Progress value={api.successRate || 0} className="w-16 h-2" />
+                          <span className="text-sm">{api.successRate != null ? `${api.successRate}%` : '—'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-1">
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Cycle status"
+                            disabled={integrationActionId === api.id}
+                            onClick={() => cycleIntegrationStatus(api)}
+                          >
                             <Activity className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
-                            <Settings className="h-4 w-4" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Remove integration"
+                            onClick={async () => {
+                              await integrationService.remove(api.id);
+                              setIntegrations(prev => prev.filter(i => i.id !== api.id));
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -1240,13 +1888,80 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   </CardTitle>
                   <CardDescription>Real-time status of all access control devices</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Device
-                </Button>
+                <Dialog open={showAddDevice} onOpenChange={setShowAddDevice}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Device
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[480px]">
+                    <DialogHeader>
+                      <DialogTitle>Add Access Control Device</DialogTitle>
+                      <DialogDescription>Register a new device for this branch.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                      {addDeviceError && (
+                        <p className="text-sm text-red-600">{addDeviceError}</p>
+                      )}
+                      <div className="space-y-1">
+                        <label className="text-sm text-gray-600">Device Code (e.g. AC-006)</label>
+                        <input
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                          value={newDevice.deviceCode}
+                          onChange={(e) => setNewDevice(prev => ({ ...prev, deviceCode: e.target.value.toUpperCase() }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm text-gray-600">Name</label>
+                        <input
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                          value={newDevice.name}
+                          onChange={(e) => setNewDevice(prev => ({ ...prev, name: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm text-gray-600">Type</label>
+                        <Select
+                          value={newDevice.deviceType}
+                          onValueChange={(value) => setNewDevice(prev => ({ ...prev, deviceType: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select device type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Face Recognition">Face Recognition</SelectItem>
+                            <SelectItem value="NFC/Card Reader">NFC / Card Reader</SelectItem>
+                            <SelectItem value="QR Scanner">QR Scanner</SelectItem>
+                            <SelectItem value="Fingerprint">Fingerprint</SelectItem>
+                            <SelectItem value="PIN Entry">PIN Entry</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm text-gray-600">Location</label>
+                        <input
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                          placeholder="Main Entrance, Gym Floor, ..."
+                          value={newDevice.location}
+                          onChange={(e) => setNewDevice(prev => ({ ...prev, location: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="outline" onClick={() => setShowAddDevice(false)}>Cancel</Button>
+                      <Button onClick={submitNewDevice} disabled={addDeviceSaving}>
+                        {addDeviceSaving ? 'Saving...' : 'Add Device'}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardHeader>
             <CardContent>
+              {devicesError && (
+                <p className="text-sm text-red-600 mb-3">{devicesError}</p>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1259,38 +1974,72 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {accessControlDevices.map((device) => (
+                  {devicesLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-gray-500 py-6">
+                        Loading devices...
+                      </TableCell>
+                    </TableRow>
+                  ) : devices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-gray-500 py-6">
+                        No devices registered
+                      </TableCell>
+                    </TableRow>
+                  ) : devices.map((device) => (
                     <TableRow key={device.id}>
                       <TableCell className="font-medium">{device.name}</TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          {getDeviceIcon(device.type)}
-                          <span>{device.type}</span>
+                          {getDeviceIcon(device.deviceType)}
+                          <span>{device.deviceType}</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-1">
                           <MapPin className="h-3 w-3 text-gray-400" />
-                          <span>{device.location}</span>
+                          <span>{device.location || '—'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(device.status)}>
-                          {device.status === 'online' ? (
+                        <Badge className={
+                          device.status === 'ONLINE' ? 'bg-green-100 text-green-800' :
+                          device.status === 'MAINTENANCE' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }>
+                          {device.status === 'ONLINE' ? (
                             <><Wifi className="h-3 w-3 mr-1" /> Online</>
+                          ) : device.status === 'MAINTENANCE' ? (
+                            <><Clock className="h-3 w-3 mr-1" /> Maintenance</>
                           ) : (
                             <><WifiOff className="h-3 w-3 mr-1" /> Offline</>
                           )}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm">{device.lastSync}</TableCell>
+                      <TableCell className="text-sm">
+                        {device.lastSyncAt ? new Date(device.lastSyncAt).toLocaleString('en-GB') : 'Never'}
+                      </TableCell>
                       <TableCell>
                         <div className="flex space-x-1">
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Cycle status"
+                            disabled={deviceActionId === device.id}
+                            onClick={() => cycleDeviceStatus(device)}
+                          >
                             <RefreshCw className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
-                            <Settings className="h-4 w-4" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Remove device"
+                            onClick={async () => {
+                              await accessControlDeviceService.remove(device.id);
+                              setDevices(prev => prev.filter(d => d.id !== device.id));
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -1314,45 +2063,90 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   </CardTitle>
                   <CardDescription>Important alerts and system notifications</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={unreadNotifications.length === 0}
+                  onClick={async () => {
+                    await notificationService.markAllRead();
+                    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+                  }}
+                >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Mark All Read
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
+              {notificationsError && (
+                <p className="text-sm text-red-600 mb-3">{notificationsError}</p>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Title</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead>Message</TableHead>
                     <TableHead>Priority</TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead>Module</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pendingNotifications.map((notification) => (
-                    <TableRow key={notification.id}>
+                  {notificationsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-gray-500 py-6">
+                        Loading notifications...
+                      </TableCell>
+                    </TableRow>
+                  ) : notifications.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-gray-500 py-6">
+                        No notifications
+                      </TableCell>
+                    </TableRow>
+                  ) : notifications.map((notification) => (
+                    <TableRow key={notification.id} className={notification.isRead ? 'opacity-60' : ''}>
                       <TableCell className="font-medium">{notification.title}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{notification.description}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{notification.message}</TableCell>
                       <TableCell>
-                        <Badge className={getPriorityColor(notification.priority)}>
+                        <Badge className={
+                          notification.priority === 'CRITICAL' || notification.priority === 'HIGH' ? 'bg-red-100 text-red-800' :
+                          notification.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                        }>
                           {notification.priority}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{notification.type}</Badge>
+                        <Badge variant="outline">{notification.module}</Badge>
                       </TableCell>
-                      <TableCell className="text-sm">{notification.created}</TableCell>
+                      <TableCell className="text-sm">
+                        {new Date(notification.createdAt).toLocaleString('en-GB')}
+                      </TableCell>
                       <TableCell>
                         <div className="flex space-x-1">
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          {!notification.isRead && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Mark read"
+                              onClick={() => markNotificationRead(notification.id)}
+                            >
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Delete"
+                            onClick={async () => {
+                              await notificationService.deleteNotification(notification.id);
+                              setNotifications(prev => prev.filter(n => n.id !== notification.id));
+                              setNotificationsTotal(prev => Math.max(0, prev - 1));
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -1377,7 +2171,7 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <p className="text-muted-foreground mb-6">
                 Access Point of Sale functionality for retail and F&B operations.
               </p>
-              <Button onClick={() => onNavigate?.('pos-mode')} className="w-full">
+              <Button onClick={() => onNavigate?.('point-of-sale')} className="w-full">
                 <CreditCard className="h-4 w-4 mr-2" />
                 Launch POS Mode
               </Button>
@@ -1415,7 +2209,9 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-blue-600">Active Targets</p>
-                        <p className="text-2xl font-bold text-blue-700">5</p>
+                        <p className="text-2xl font-bold text-blue-700">
+                          {performanceLoading ? '—' : individualPerformanceTargets.length}
+                        </p>
                       </div>
                       <div className="p-2 bg-blue-100 rounded">
                         <Activity className="h-4 w-4 text-blue-600" />
@@ -1456,7 +2252,9 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-green-600">Overall Progress</p>
-                        <p className="text-2xl font-bold text-green-700">76.8%</p>
+                        <p className="text-2xl font-bold text-green-700">
+                          {performanceLoading ? '—' : `${overallPerformancePercentage.toFixed(1)}%`}
+                        </p>
                       </div>
                       <div className="p-2 bg-green-100 rounded">
                         <TrendingUp className="h-4 w-4 text-green-600" />
@@ -1474,40 +2272,78 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
           {/* Performance Summary */}
           <Card className="bg-white border-0 shadow-sm">
             <CardHeader>
-              <CardTitle>Performance Summary</CardTitle>
-              <CardDescription>Overview of current staff performance metrics</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Performance Summary</CardTitle>
+                  <CardDescription>Overview of current staff performance metrics</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={performanceLoading}
+                  onClick={loadPerformanceTargets}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${performanceLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-blue-50 rounded-lg text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <Users className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <p className="text-sm text-blue-600">Active Staff</p>
-                  <p className="text-2xl font-bold text-blue-700">5</p>
+              {performanceError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">
+                  {performanceError}
                 </div>
-                <div className="p-4 bg-green-50 rounded-lg text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+              )}
+              {!performanceLoading && !performanceError && individualPerformanceTargets.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No performance targets set for this period yet.
+                  <div className="mt-3">
+                    <Button size="sm" onClick={() => onNavigate?.('set-targets')}>
+                      <Target className="h-4 w-4 mr-2" />
+                      Set a Target
+                    </Button>
                   </div>
-                  <p className="text-sm text-green-600">Targets Met</p>
-                  <p className="text-2xl font-bold text-green-700">2</p>
                 </div>
-                <div className="p-4 bg-yellow-50 rounded-lg text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <Clock className="h-5 w-5 text-yellow-600" />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-blue-50 rounded-lg text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <Users className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <p className="text-sm text-blue-600">Active Staff</p>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {performanceLoading ? '—' : activeStaffCount}
+                    </p>
                   </div>
-                  <p className="text-sm text-yellow-600">In Progress</p>
-                  <p className="text-2xl font-bold text-yellow-700">3</p>
-                </div>
-                <div className="p-4 bg-purple-50 rounded-lg text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <Calculator className="h-5 w-5 text-purple-600" />
+                  <div className="p-4 bg-green-50 rounded-lg text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    </div>
+                    <p className="text-sm text-green-600">Targets Met</p>
+                    <p className="text-2xl font-bold text-green-700">
+                      {performanceLoading ? '—' : targetsMetCount}
+                    </p>
                   </div>
-                  <p className="text-sm text-purple-600">Total Commission</p>
-                  <p className="text-2xl font-bold text-purple-700"><CurrencyGlyph /> 1,540</p>
+                  <div className="p-4 bg-yellow-50 rounded-lg text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <Clock className="h-5 w-5 text-yellow-600" />
+                    </div>
+                    <p className="text-sm text-yellow-600">In Progress</p>
+                    <p className="text-2xl font-bold text-yellow-700">
+                      {performanceLoading ? '—' : targetsInProgressCount}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-purple-50 rounded-lg text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <Calculator className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <p className="text-sm text-purple-600">Total Commission</p>
+                    <p className="text-2xl font-bold text-purple-700">
+                      {performanceLoading ? '—' : <><CurrencyGlyph /> {totalPerformanceCommission.toLocaleString()}</>}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1547,19 +2383,25 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                       </CardDescription>
                     </div>
                   </div>
-                  <Badge className="bg-green-100 text-green-700">Active</Badge>
+                  <Badge className={transferPolicyDraft.allow_transfer === 'true' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
+                    {transferPolicyDraft.allow_transfer === 'true' ? 'Active' : 'Disabled'}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {transferPolicyError && (
+                  <p className="text-sm text-red-600">{transferPolicyError}</p>
+                )}
                 {/* Allow Transfer Toggle */}
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-900">Allow Transfer</h4>
                     <p className="text-sm text-gray-600">Enable or disable membership transfer feature</p>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <Badge className="bg-green-100 text-green-700">Enabled</Badge>
-                  </div>
+                  <Switch
+                    checked={transferPolicyDraft.allow_transfer === 'true'}
+                    onCheckedChange={(checked) => setTransferPolicyDraft(prev => ({ ...prev, allow_transfer: String(checked) }))}
+                  />
                 </div>
 
                 {/* Transfer Fee Policy */}
@@ -1568,7 +2410,10 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm text-gray-600 block mb-2">Fee Structure</label>
-                      <Select defaultValue="flat">
+                      <Select
+                        value={transferPolicyDraft.fee_structure}
+                        onValueChange={(value) => setTransferPolicyDraft(prev => ({ ...prev, fee_structure: value }))}
+                      >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -1585,7 +2430,8 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                         <span className="text-gray-600 mr-2"><CurrencyGlyph /></span>
                         <input
                           type="number"
-                          defaultValue="100"
+                          value={transferPolicyDraft.default_transfer_fee}
+                          onChange={(e) => setTransferPolicyDraft(prev => ({ ...prev, default_transfer_fee: e.target.value }))}
                           className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
                         />
                       </div>
@@ -1604,7 +2450,8 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <input
                       type="number"
                       placeholder="15"
-                      defaultValue="15"
+                      value={transferPolicyDraft.min_days_after_joining}
+                      onChange={(e) => setTransferPolicyDraft(prev => ({ ...prev, min_days_after_joining: e.target.value }))}
                       className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
                     />
                     <p className="text-xs text-gray-500 mt-1">e.g., Transfer allowed only after 15 days of joining</p>
@@ -1617,7 +2464,17 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <h4 className="font-semibold text-gray-900">Require Admin Approval</h4>
                     <p className="text-sm text-gray-600">All transfer requests need manager approval</p>
                   </div>
-                  <Badge className="bg-yellow-100 text-yellow-700">Optional</Badge>
+                  <Switch
+                    checked={transferPolicyDraft.require_admin_approval === 'true'}
+                    onCheckedChange={(checked) => setTransferPolicyDraft(prev => ({ ...prev, require_admin_approval: String(checked) }))}
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={saveTransferPolicy} disabled={transferPolicySaving || transferPolicyLoading}>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {transferPolicySaving ? 'Saving...' : 'Save Transfer Policy'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -1637,17 +2494,25 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                       </CardDescription>
                     </div>
                   </div>
-                  <Badge className="bg-green-100 text-green-700">Active</Badge>
+                  <Badge className={deactivationPolicyDraft.allow_deactivation === 'true' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
+                    {deactivationPolicyDraft.allow_deactivation === 'true' ? 'Active' : 'Disabled'}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {deactivationPolicyError && (
+                  <p className="text-sm text-red-600">{deactivationPolicyError}</p>
+                )}
                 {/* Allow Deactivation Toggle */}
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-900">Allow Deactivation</h4>
                     <p className="text-sm text-gray-600">Global toggle for membership deactivation feature</p>
                   </div>
-                  <Badge className="bg-green-100 text-green-700">Enabled</Badge>
+                  <Switch
+                    checked={deactivationPolicyDraft.allow_deactivation === 'true'}
+                    onCheckedChange={(checked) => setDeactivationPolicyDraft(prev => ({ ...prev, allow_deactivation: String(checked) }))}
+                  />
                 </div>
 
                 {/* Allow Refund Toggle */}
@@ -1656,7 +2521,10 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <h4 className="font-semibold text-gray-900">Allow Refund</h4>
                     <p className="text-sm text-gray-600">Enable refund processing during deactivation</p>
                   </div>
-                  <Badge className="bg-green-100 text-green-700">Enabled</Badge>
+                  <Switch
+                    checked={deactivationPolicyDraft.allow_refund === 'true'}
+                    onCheckedChange={(checked) => setDeactivationPolicyDraft(prev => ({ ...prev, allow_refund: String(checked) }))}
+                  />
                 </div>
 
                 {/* Refund Method */}
@@ -1665,7 +2533,10 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   <p className="text-sm text-gray-600 mb-2">
                     Determines how refund amounts are calculated
                   </p>
-                  <Select defaultValue="prorated">
+                  <Select
+                    value={deactivationPolicyDraft.refund_method}
+                    onValueChange={(value) => setDeactivationPolicyDraft(prev => ({ ...prev, refund_method: value }))}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -1686,7 +2557,10 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <h4 className="font-semibold text-gray-900">Approval Required</h4>
                     <p className="text-sm text-gray-600">Require manager approval for deactivation</p>
                   </div>
-                  <Badge className="bg-blue-100 text-blue-700">Yes</Badge>
+                  <Switch
+                    checked={deactivationPolicyDraft.approval_required === 'true'}
+                    onCheckedChange={(checked) => setDeactivationPolicyDraft(prev => ({ ...prev, approval_required: String(checked) }))}
+                  />
                 </div>
 
                 {/* Default Deactivation Reasons */}
@@ -1695,42 +2569,54 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   <p className="text-sm text-gray-600 mb-3">
                     Pre-defined reasons for reporting consistency
                   </p>
+                  {deactivationReasonsError && (
+                    <p className="text-sm text-red-600">{deactivationReasonsError}</p>
+                  )}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
-                      <span className="text-sm">Member Relocation</span>
-                      <Badge variant="outline" className="text-xs">Active</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
-                      <span className="text-sm">Medical Reasons</span>
-                      <Badge variant="outline" className="text-xs">Active</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
-                      <span className="text-sm">Financial Issues</span>
-                      <Badge variant="outline" className="text-xs">Active</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
-                      <span className="text-sm">Dissatisfaction</span>
-                      <Badge variant="outline" className="text-xs">Active</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
-                      <span className="text-sm">Other</span>
-                      <Badge variant="outline" className="text-xs">Active</Badge>
-                    </div>
+                    {deactivationReasonsLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading reasons...</p>
+                    ) : deactivationReasons.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No reasons configured yet.</p>
+                    ) : deactivationReasons.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                        <span className="text-sm">{r.reason}</span>
+                        <div className="flex items-center space-x-2">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs cursor-pointer ${r.active ? '' : 'opacity-50'}`}
+                            onClick={() => toggleDeactivationReason(r)}
+                          >
+                            {r.active ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <Button variant="ghost" size="sm" onClick={() => removeDeactivationReason(r.id)}>
+                            <Trash2 className="h-3 w-3 text-red-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                  <div className="flex items-center space-x-2 pt-2">
+                    <input
+                      className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
+                      placeholder="New reason..."
+                      value={newDeactivationReason}
+                      onChange={(e) => setNewDeactivationReason(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addDeactivationReason(); }}
+                    />
+                    <Button variant="outline" size="sm" onClick={addDeactivationReason} disabled={addReasonSaving}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={saveDeactivationPolicy} disabled={deactivationPolicySaving || deactivationPolicyLoading}>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {deactivationPolicySaving ? 'Saving...' : 'Save Deactivation Policy'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Save Button */}
-            <div className="flex justify-end space-x-3">
-              <Button variant="outline">
-                Reset to Defaults
-              </Button>
-              <Button className="btn-primary">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Save Configuration
-              </Button>
-            </div>
           </div>
         </TabsContent>
 
