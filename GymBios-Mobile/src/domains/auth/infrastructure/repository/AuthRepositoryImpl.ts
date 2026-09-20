@@ -1,6 +1,7 @@
 import { secureStorage, StorageKeys } from '@/core/platform/storage';
 import type { Result } from '@/core/types';
 
+import type { PendingRegistration, RegistrationStatus } from '../../domain/entities/PendingRegistration';
 import type { Session } from '../../domain/entities/Session';
 import type { AuthRepository } from '../../domain/repositories/AuthRepository';
 import { AppRoleValue } from '../../domain/valueObjects/AppRole';
@@ -34,12 +35,70 @@ export class AuthRepositoryImpl implements AuthRepository {
     return result;
   }
 
-  async registerMobileUser(payload: any): Promise<Result<Session, string>> {
+  async registerMobileUser(payload: any): Promise<Result<PendingRegistration, string>> {
+    // No session is created here — only a pending-registration handle. A JWT
+    // only ever exists once verifyOtp succeeds (see that method below).
     const result = await this.remoteDataSource.registerMobileUser(payload);
     if (result.success) {
-      await this.persistSession(result.value);
+      await this.persistPendingRegistration(result.value);
     }
     return result;
+  }
+
+  async verifyOtp(registrationToken: string, otp: string): Promise<Result<Session, string>> {
+    const result = await this.remoteDataSource.verifyOtp(registrationToken, otp);
+    if (result.success) {
+      await this.persistSession(result.value);
+      await this.clearPendingRegistration();
+    }
+    return result;
+  }
+
+  async resendOtp(
+    registrationToken: string,
+  ): Promise<Result<Pick<PendingRegistration, 'otpExpiresAt' | 'resendAvailableAt' | 'devOtp'>, string>> {
+    const result = await this.remoteDataSource.resendOtp(registrationToken);
+    if (result.success) {
+      const stored = await this.getStoredPendingRegistration();
+      if (stored.success && stored.value) {
+        await this.persistPendingRegistration({ ...stored.value, ...result.value });
+      }
+    }
+    return result;
+  }
+
+  getRegistrationStatus(registrationToken: string): Promise<Result<RegistrationStatus, string>> {
+    return this.remoteDataSource.getRegistrationStatus(registrationToken);
+  }
+
+  async persistPendingRegistration(pending: PendingRegistration): Promise<Result<void, string>> {
+    try {
+      await secureStorage.setItem(StorageKeys.pendingRegistration, JSON.stringify(pending));
+      return { success: true, value: undefined };
+    } catch {
+      return { success: false, error: 'Failed to store pending registration' };
+    }
+  }
+
+  async getStoredPendingRegistration(): Promise<Result<PendingRegistration | null, string>> {
+    try {
+      const raw = await secureStorage.getItem(StorageKeys.pendingRegistration);
+      if (!raw) {
+        return { success: true, value: null };
+      }
+      return { success: true, value: JSON.parse(raw) as PendingRegistration };
+    } catch {
+      return { success: false, error: 'Failed to read pending registration' };
+    }
+  }
+
+  async clearPendingRegistration(): Promise<Result<void, string>> {
+    try {
+      await secureStorage.removeItem(StorageKeys.pendingRegistration);
+      return { success: true, value: undefined };
+    } catch {
+      return { success: false, error: 'Failed to clear pending registration' };
+    }
   }
 
   async getStoredSession(): Promise<Result<Session | null, string>> {

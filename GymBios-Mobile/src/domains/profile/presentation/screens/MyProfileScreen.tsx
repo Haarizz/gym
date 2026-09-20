@@ -8,7 +8,7 @@ import { AvatarPicker } from '@/shared/components/AvatarPicker';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
-import { GlassBlob, GlassSurface } from '@/shared/components';
+import { GlassBlob, GlassHeader, GlassSurface, InfoRow } from '@/shared/components';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
@@ -40,11 +40,6 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
-  const displayName = isEditing ? editedName : (profile?.name || '');
-  const displayEmail = isEditing ? editedEmail : (profile?.email || '');
-  const displayPhone = isEditing ? editedPhone : (profile?.phone || '');
-  const displayAddress = isEditing ? editedAddress : (profile?.address || '');
 
   const handleStartEdit = () => {
     setEditedName(profile?.name || '');
@@ -128,30 +123,11 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
 
-      <GlassSurface
-        tint={[BrandColors.teal, BrandColors.tealDark]}
-        strong
-        radius={Radius.xl}
-        style={styles.header}
-      >
-        <Pressable
-          onPress={onBack}
-          hitSlop={12}
-          style={styles.backButton}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Feather name="chevron-left" size={20} color="#ffffff" />
-        </Pressable>
-        <View style={styles.headerTitles}>
-          <Typography variant="subtitle" style={styles.headerTitle}>
-            My Profile
-          </Typography>
-          <Typography variant="bodySmall" style={styles.headerSubtitle}>
-            Manage your personal details & credentials
-          </Typography>
-        </View>
-      </GlassSurface>
+      <GlassHeader
+        title="My Profile"
+        subtitle="Manage your personal details & credentials"
+        onBack={onBack}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -164,7 +140,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
           {/* Avatar Section with AvatarPicker */}
           <View style={styles.avatarSection}>
             <AvatarPicker
-              name={displayName || 'User'}
+              name={profile?.name || 'User'}
               photoUrl={profile?.photoUrl}
               onChangePhoto={async (uri) => {
                 if (uri) {
@@ -186,52 +162,53 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
               <Typography variant="subtitle" style={styles.cardTitle}>
                 Personal Information
               </Typography>
-              <Button
-                size="md"
-                variant={isEditing ? 'outline' : 'secondary'}
-                title={isEditing ? 'Cancel' : 'Edit'}
-                onPress={() => {
-                  if (isEditing) {
-                    handleCancelEdit();
-                  } else {
-                    handleStartEdit();
-                  }
-                }}
-              />
+              <Pressable
+                onPress={isEditing ? handleCancelEdit : handleStartEdit}
+                style={styles.editPill}
+                accessibilityRole="button"
+                accessibilityLabel={isEditing ? 'Cancel editing' : 'Edit personal information'}
+              >
+                <Feather
+                  name={isEditing ? 'x' : 'edit-2'}
+                  size={12}
+                  color={BrandColors.tealDark}
+                  style={styles.editPillIcon}
+                />
+                <Typography variant="caption" style={styles.editPillText}>
+                  {isEditing ? 'Cancel' : 'Edit'}
+                </Typography>
+              </Pressable>
             </View>
 
-            <View style={styles.form}>
-              <Input
-                variant="glass"
-                label="Full Name"
-                value={displayName}
-                onChangeText={setEditedName}
-                editable={isEditing}
-                placeholder="Enter full name"
-              />
+            {isEditing ? (
+              <View style={styles.form}>
+                <Input
+                  variant="glass"
+                  label="Full Name"
+                  value={editedName}
+                  onChangeText={setEditedName}
+                  placeholder="Enter full name"
+                />
 
-              <Input
-                variant="glass"
-                label="Email Address"
-                value={displayEmail}
-                onChangeText={setEditedEmail}
-                editable={isEditing}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholder="Enter email address"
-              />
+                <Input
+                  variant="glass"
+                  label="Email Address"
+                  value={editedEmail}
+                  onChangeText={setEditedEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  placeholder="Enter email address"
+                />
 
-              <Input
-                variant="glass"
-                label="Phone Number"
-                value={displayPhone}
-                onChangeText={setEditedPhone}
-                editable={isEditing}
-                keyboardType="phone-pad"
-                placeholder="Enter phone number"
-              />
+                <Input
+                  variant="glass"
+                  label="Phone Number"
+                  value={editedPhone}
+                  onChangeText={setEditedPhone}
+                  keyboardType="phone-pad"
+                  placeholder="Enter phone number"
+                />
 
-              {isEditing ? (
                 <View style={{ zIndex: 10 }}>
                   <AddressAutocomplete
                     label="Address"
@@ -239,38 +216,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
                     onChange={setEditedAddress}
                   />
                 </View>
-              ) : (
-                <Input
-                  variant="glass"
-                  label="Address"
-                  value={displayAddress}
-                  editable={false}
-                  placeholder="Enter address"
-                />
-              )}
 
-              {profile?.staffId && (
-                <View style={styles.readOnlyRow}>
-                  <View style={styles.readOnlyItem}>
-                    <Typography variant="caption" color="textSecondary">
-                      Employee ID
-                    </Typography>
-                    <Typography variant="body" style={styles.readOnlyValue}>
-                      {profile.staffId}
-                    </Typography>
-                  </View>
-                  <View style={styles.readOnlyItem}>
-                    <Typography variant="caption" color="textSecondary">
-                      Join Date
-                    </Typography>
-                    <Typography variant="body" style={styles.readOnlyValue}>
-                      {profile.joinDate || '—'}
-                    </Typography>
-                  </View>
-                </View>
-              )}
-
-              {isEditing && (
                 <Button
                   title="Save Changes"
                   variant="primary"
@@ -278,8 +224,36 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
                   onPress={handleSaveProfile}
                   style={styles.saveButton}
                 />
-              )}
-            </View>
+              </View>
+            ) : (
+              <View>
+                <InfoRow icon="user" label="Full Name" value={profile?.name} divider={false} />
+                <InfoRow icon="mail" label="Email Address" value={profile?.email} />
+                <InfoRow icon="phone" label="Phone Number" value={profile?.phone} />
+                <InfoRow icon="map-pin" label="Address" value={profile?.address} />
+
+                {profile?.staffId && (
+                  <View style={styles.metaRow}>
+                    <View style={styles.metaCell}>
+                      <Typography variant="caption" color="textSecondary" style={styles.metaLabel}>
+                        Employee ID
+                      </Typography>
+                      <Typography variant="body" style={styles.metaValue}>
+                        {profile.staffId}
+                      </Typography>
+                    </View>
+                    <View style={styles.metaCell}>
+                      <Typography variant="caption" color="textSecondary" style={styles.metaLabel}>
+                        Join Date
+                      </Typography>
+                      <Typography variant="body" style={styles.metaValue}>
+                        {profile.joinDate || '—'}
+                      </Typography>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
           </GlassSurface>
 
           {/* Change Password Card */}
@@ -292,6 +266,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
 
             <View style={styles.form}>
               <Input
+                variant="glass"
                 label="Current Password"
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
@@ -300,6 +275,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
               />
 
               <Input
+                variant="glass"
                 label="New Password"
                 value={newPassword}
                 onChangeText={setNewPassword}
@@ -308,6 +284,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
               />
 
               <Input
+                variant="glass"
                 label="Confirm New Password"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -338,35 +315,6 @@ const styles = StyleSheet.create({
   },
   keyboardContainer: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.three,
-    padding: Spacing.three,
-    marginHorizontal: Spacing.four,
-    marginTop: Spacing.two,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.md,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitles: {
-    flex: 1,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 3,
-  },
-  headerSubtitle: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
   },
   scrollContent: {
     padding: Spacing.four,
@@ -400,20 +348,40 @@ const styles = StyleSheet.create({
   form: {
     gap: Spacing.three,
   },
-  readOnlyRow: {
+  editPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
+  },
+  editPillIcon: {
+    marginRight: 4,
+  },
+  editPillText: {
+    color: BrandColors.tealDark,
+    fontWeight: '700',
+  },
+  metaRow: {
     flexDirection: 'row',
     gap: Spacing.three,
-    marginTop: Spacing.one,
-    paddingTop: Spacing.two,
+    marginTop: Spacing.two,
+    paddingTop: Spacing.three,
     borderTopWidth: 1,
     borderTopColor: 'rgba(30,42,58,0.08)',
   },
-  readOnlyItem: {
+  metaCell: {
     flex: 1,
   },
-  readOnlyValue: {
-    fontWeight: '600',
-    marginTop: 2,
+  metaLabel: {
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  metaValue: {
+    fontWeight: '800',
   },
   saveButton: {
     marginTop: Spacing.two,

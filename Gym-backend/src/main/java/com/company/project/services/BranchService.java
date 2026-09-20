@@ -77,6 +77,7 @@ public class BranchService {
         branch.setPhone(request.getPhone());
         branch.setEmail(request.getEmail());
         branch.setStatus(request.getStatus() != null ? request.getStatus() : "ACTIVE");
+        applyDiscoveryFields(branch, request);
         branch = branchRepository.save(branch);
         try {
             discoverySyncService.syncBranch(branch);
@@ -101,6 +102,7 @@ public class BranchService {
         if (request.getPhone() != null) branch.setPhone(request.getPhone());
         if (request.getEmail() != null) branch.setEmail(request.getEmail());
         if (request.getStatus() != null) branch.setStatus(request.getStatus());
+        applyDiscoveryFields(branch, request);
         branch = branchRepository.save(branch);
         try {
             discoverySyncService.syncBranch(branch);
@@ -284,6 +286,30 @@ public class BranchService {
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
+    /**
+     * Applies fields used by mobile discovery (Track 2) on both create and update.
+     * Same null-means-unchanged convention updateBranch already uses for its
+     * other fields — createBranch calls this against a brand-new Branch, where
+     * every null request field correctly leaves the entity's own default.
+     */
+    private void applyDiscoveryFields(Branch branch, BranchRequestDTO request) {
+        if (request.getLat() != null) branch.setLat(request.getLat());
+        if (request.getLng() != null) branch.setLng(request.getLng());
+        if (request.getCenterType() != null) branch.setCenterType(request.getCenterType());
+        if (request.getAccessType() != null) branch.setAccessType(request.getAccessType());
+        if (request.getOperatingHours() != null) branch.setOperatingHours(request.getOperatingHours());
+        if (request.getDescription() != null) branch.setDescription(request.getDescription());
+        if (request.getEstablishedYear() != null) branch.setEstablishedYear(request.getEstablishedYear());
+        if (request.getAcceptedPaymentMethods() != null) {
+            branch.setAcceptedPaymentMethods(String.join(",", request.getAcceptedPaymentMethods()));
+        }
+        if (request.getBnplEnabled() != null) branch.setBnplEnabled(request.getBnplEnabled());
+        if (request.getBnplProvider() != null) branch.setBnplProvider(request.getBnplProvider());
+        if (request.getTaxPercentage() != null) branch.setTaxPercentage(request.getTaxPercentage());
+        if (request.getTaxInclusive() != null) branch.setTaxInclusive(request.getTaxInclusive());
+        if (request.getTermsAndPolicies() != null) branch.setTermsAndPolicies(request.getTermsAndPolicies());
+    }
+
     private BranchResponseDTO toResponseDTO(Branch branch) {
         BranchResponseDTO dto = new BranchResponseDTO();
         dto.setId(branch.getId());
@@ -299,6 +325,24 @@ public class BranchService {
         // Counts
         dto.setStaffCount(staffBranchRepository.findByBranchId(branch.getId()).size());
         dto.setMemberCount(memberRepository.countByBranchId(branch.getId()));
+        dto.setLat(branch.getLat());
+        dto.setLng(branch.getLng());
+        dto.setCenterType(branch.getCenterType());
+        dto.setAccessType(branch.getAccessType());
+        dto.setOperatingHours(branch.getOperatingHours());
+        dto.setDescription(branch.getDescription());
+        dto.setEstablishedYear(branch.getEstablishedYear());
+        if (branch.getAcceptedPaymentMethods() != null && !branch.getAcceptedPaymentMethods().isBlank()) {
+            dto.setAcceptedPaymentMethods(java.util.Arrays.stream(branch.getAcceptedPaymentMethods().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList()));
+        }
+        dto.setBnplEnabled(branch.isBnplEnabled());
+        dto.setBnplProvider(branch.getBnplProvider());
+        dto.setTaxPercentage(branch.getTaxPercentage());
+        dto.setTaxInclusive(branch.isTaxInclusive());
+        dto.setTermsAndPolicies(branch.getTermsAndPolicies());
         return dto;
     }
 

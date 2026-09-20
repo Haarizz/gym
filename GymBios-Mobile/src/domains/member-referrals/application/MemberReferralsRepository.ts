@@ -1,4 +1,4 @@
-import { MobileReferralProfile, ClaimReferralRequest, ClaimReferralResponse, MobileReferralAttribution, MyReferralClaim, MobileReferralStatus } from '../domain/types';
+import { MobileReferralProfile, ClaimReferralRequest, ClaimReferralResponse, MobileReferralAttribution, MyReferralClaim, MobileReferralStatus, MyReferralReward } from '../domain/types';
 
 export interface MemberReferralsRepository {
   getMyProfile(): Promise<MobileReferralProfile>;
@@ -6,4 +6,5 @@ export interface MemberReferralsRepository {
   getHistory(): Promise<MobileReferralAttribution[]>;
   getMyClaim(): Promise<MyReferralClaim | null>;
   retryMyClaim(): Promise<MobileReferralStatus>;
+  getMyRewards(): Promise<MyReferralReward[]>;
 }

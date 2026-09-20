@@ -8,22 +8,22 @@ import com.company.project.dto.FacilityResponseDTO;
 import com.company.project.dto.MembershipPlanResponseDTO;
 import com.company.project.dto.StaffResponseDTO;
 import com.company.project.entities.Branch;
-import com.company.project.entities.Gym;
 import com.company.project.entities.Member;
 import com.company.project.entities.UserProfile;
 import com.company.project.repositories.BranchRepository;
-import com.company.project.repositories.GymRepository;
+import com.company.project.repositories.BranchImageRepository;
+import com.company.project.repositories.ReviewRepository;
 import com.company.project.repositories.UserProfileRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.services.FacilityService;
 import com.company.project.services.MembershipPlanService;
-import com.company.project.services.MobileReferralResolutionService;
+import com.company.project.services.mobile.referrals.MobileReferralResolutionService;
 import com.company.project.services.StaffService;
 import com.company.project.services.MemberService;
 import com.company.project.security.TenantContextHolder;
 import com.company.project.security.BranchContextHolder;
 import com.company.project.security.UserDetailsImpl;
-import com.company.project.dto.mobile.MobilePurchaseRequestDTO;
+import com.company.project.dto.mobile.discovery.MobilePurchaseRequestDTO;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
 import com.company.project.services.NotificationService;
@@ -48,7 +48,8 @@ public class MobileDiscoveryController {
 
     private final GlobalBranchDiscoveryRepository globalDiscoveryRepository;
     private final BranchRepository branchRepository;
-    private final GymRepository gymRepository;
+    private final BranchImageRepository branchImageRepository;
+    private final ReviewRepository reviewRepository;
     private final FacilityService facilityService;
     private final StaffService staffService;
     private final MembershipPlanService planService;
@@ -72,7 +73,8 @@ public class MobileDiscoveryController {
     public MobileDiscoveryController(
             GlobalBranchDiscoveryRepository globalDiscoveryRepository,
             BranchRepository branchRepository,
-            GymRepository gymRepository,
+            BranchImageRepository branchImageRepository,
+            ReviewRepository reviewRepository,
             FacilityService facilityService,
             StaffService staffService,
             MembershipPlanService planService,
@@ -84,7 +86,8 @@ public class MobileDiscoveryController {
             MobileReferralResolutionService mobileReferralResolutionService) {
         this.globalDiscoveryRepository = globalDiscoveryRepository;
         this.branchRepository = branchRepository;
-        this.gymRepository = gymRepository;
+        this.branchImageRepository = branchImageRepository;
+        this.reviewRepository = reviewRepository;
         this.facilityService = facilityService;
         this.staffService = staffService;
         this.planService = planService;
@@ -111,12 +114,28 @@ public class MobileDiscoveryController {
                     
                     try {
                         TenantContextHolder.setCurrentTenant(c.getTenantSlug());
+                        BranchContextHolder.setActiveBranchId(c.getBranchId());
+
                         Branch branch = branchRepository.findById(c.getBranchId()).orElse(null);
                         if (branch != null) {
                             dto.setCenterType(branch.getCenterType());
+                            dto.setAccessType(branch.getAccessType());
+                            if (branch.getAcceptedPaymentMethods() != null && !branch.getAcceptedPaymentMethods().isBlank()) {
+                                dto.setAcceptedPaymentMethods(java.util.Arrays.stream(branch.getAcceptedPaymentMethods().split(","))
+                                        .map(String::trim)
+                                        .filter(s -> !s.isEmpty())
+                                        .collect(Collectors.toList()));
+                            }
                         }
-                        
-                        BranchContextHolder.setActiveBranchId(c.getBranchId());
+
+                        branchImageRepository.findByBranchIdAndIsCoverTrue(c.getBranchId()).stream()
+                                .findFirst()
+                                .ifPresent(cover -> dto.setCoverImageUrl(cover.getImageUrl()));
+
+                        long reviewCount = reviewRepository.countByBranchId(c.getBranchId());
+                        dto.setReviewCount(reviewCount);
+                        dto.setAvgRating(reviewCount > 0 ? reviewRepository.findAverageRatingByBranchId(c.getBranchId()) : null);
+
                         List<MembershipPlanResponseDTO> plans = planService.getPlans("Active");
                         BigDecimal minPrice = plans.stream()
                             .map(MembershipPlanResponseDTO::getPrice)
@@ -147,11 +166,10 @@ public class MobileDiscoveryController {
 
         try {
             TenantContextHolder.setCurrentTenant(tenantSlug);
+            BranchContextHolder.setActiveBranchId(branchId);
 
             Branch branch = branchRepository.findById(branchId)
                     .orElseThrow(() -> new RuntimeException("Branch not found in tenant DB"));
-
-            Gym gym = gymRepository.findByIsDefaultTrue().orElse(null);
 
             CenterDetailsDTO dto = new CenterDetailsDTO();
             dto.setTenantSlug(tenantSlug);
@@ -164,16 +182,50 @@ public class MobileDiscoveryController {
             dto.setAccessType(branch.getAccessType());
             dto.setOperatingHours(branch.getOperatingHours());
             dto.setPhone(branch.getPhone());
-            dto.setAbout(gym != null ? gym.getAddress() : null); // Mocking about for now
+            dto.setAbout(branch.getDescription());
+            dto.setEstablishedYear(branch.getEstablishedYear());
+            dto.setBnplEnabled(branch.isBnplEnabled());
+            dto.setBnplProvider(branch.getBnplProvider());
+            dto.setTaxPercentage(branch.getTaxPercentage());
+            dto.setTaxInclusive(branch.isTaxInclusive());
+            dto.setTermsAndPolicies(branch.getTermsAndPolicies());
+            if (branch.getAcceptedPaymentMethods() != null && !branch.getAcceptedPaymentMethods().isBlank()) {
+                dto.setAcceptedPaymentMethods(java.util.Arrays.stream(branch.getAcceptedPaymentMethods().split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toList()));
+            }
 
-            // Note: services must be branch aware or filter by branch
-            // The existing services might not take branchId directly if they rely on user context
-            // Assuming we fetch all and filter, or if FacilityService has a getByBranch
-            // For audit/prototype purposes:
-            // dto.setAmenities(facilityService.getActiveFacilities()); 
-            
+            List<com.company.project.dto.BranchImageResponseDTO> images = branchImageRepository
+                    .findByBranchIdOrderBySortOrderAsc(branchId).stream()
+                    .map(img -> {
+                        com.company.project.dto.BranchImageResponseDTO imgDto = new com.company.project.dto.BranchImageResponseDTO();
+                        imgDto.setId(img.getId());
+                        imgDto.setImageUrl(img.getImageUrl());
+                        imgDto.setCover(img.isCover());
+                        imgDto.setSortOrder(img.getSortOrder());
+                        return imgDto;
+                    })
+                    .collect(Collectors.toList());
+            images.stream().filter(com.company.project.dto.BranchImageResponseDTO::isCover).findFirst()
+                    .or(() -> images.stream().findFirst())
+                    .ifPresent(cover -> dto.setCoverImageUrl(cover.getImageUrl()));
+            dto.setGalleryImageUrls(images.stream()
+                    .map(com.company.project.dto.BranchImageResponseDTO::getImageUrl)
+                    .collect(Collectors.toList()));
+
+            long reviewCount = reviewRepository.countByBranchId(branchId);
+            dto.setReviewCount(reviewCount);
+            dto.setAvgRating(reviewCount > 0 ? reviewRepository.findAverageRatingByBranchId(branchId) : null);
+
+            // Branch-scoped the same way getCenterPlans() already scopes plans below —
+            // FacilityService/StaffService read BranchContextHolder internally.
+            dto.setAmenities(facilityService.getFacilities("Active", null));
+            dto.setTrainers(staffService.getStaff(null, null, null, "Active", null, 1, 100).getItems());
+
             return ResponseEntity.ok(dto);
         } finally {
+            BranchContextHolder.clear();
             TenantContextHolder.clear();
         }
     }

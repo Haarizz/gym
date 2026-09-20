@@ -9,6 +9,7 @@ export const referralsKeys = {
   profile: () => [...referralsKeys.all, 'profile'] as const,
   history: () => [...referralsKeys.all, 'history'] as const,
   myClaim: () => [...referralsKeys.all, 'my-claim'] as const,
+  myRewards: () => [...referralsKeys.all, 'my-rewards'] as const,
 };
 
 export const useReferralProfile = () => {
@@ -52,5 +53,12 @@ export const useRetryReferralClaim = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: referralsKeys.myClaim() });
     },
+  });
+};
+
+export const useMyReferralRewards = () => {
+  return useQuery({
+    queryKey: referralsKeys.myRewards(),
+    queryFn: () => referralsService.getMyRewards(),
   });
 };

@@ -1,6 +1,6 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useRestoreSession } from '@/domains/auth';
 import { SlideIn } from '@/shared/components/Animations/SlideIn';
@@ -22,12 +22,23 @@ export type ProfileView =
   | 'transactions'
   | 'settings';
 
+const VALID_VIEWS: ProfileView[] = ['hub', 'my-profile', 'referrals', 'my-performance', 'transactions', 'settings'];
+
 export function ProfileScreen() {
   const router = useRouter();
   const { logout } = useRestoreSession();
+  const { view } = useLocalSearchParams<{ view?: string }>();
   const [activeView, setActiveView] = useState<ProfileView>('hub');
   const [isExiting, setIsExiting] = useState(false);
   const [enterKey, setEnterKey] = useState(0);
+
+  // Lets a deep link (e.g. a "New Reward Generated" push notification) jump straight
+  // to a specific section — /profile?view=referrals — instead of always opening the hub.
+  useEffect(() => {
+    if (view && (VALID_VIEWS as string[]).includes(view)) {
+      setActiveView(view as ProfileView);
+    }
+  }, [view]);
 
   // The Tabs navigator keeps this screen mounted across blur/focus rather
   // than remounting it, so SlideIn's own mount-triggered entrance wouldn't

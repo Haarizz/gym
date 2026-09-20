@@ -3,11 +3,10 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
-import { AppHeader } from '@/shared/components/AppHeader';
 import { Typography } from '@/shared/components/Typography';
 import { Loader } from '@/shared/components/Loader';
 import { EmptyState } from '@/shared/components/EmptyState';
-import { GlassBlob, GlassSurface } from '@/shared/components';
+import { GlassBlob, GlassHeader, GlassSurface } from '@/shared/components';
 
 import { useMyTargets } from '../../hooks/useMyTargets';
 import { TargetCard } from '../components/TargetCard';
@@ -37,10 +36,9 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
       <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
-      <AppHeader
+      <GlassHeader
         title="My Targets"
         subtitle="Track personal goals & progress metrics"
-        colors={[BrandColors.teal, BrandColors.tealDark]}
         onBack={onBack}
       />
 
@@ -150,7 +148,7 @@ const styles = StyleSheet.create({
   summaryDivider: {
     width: 1,
     height: 32,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: 'rgba(30,42,58,0.1)',
   },
   filterBar: {
     flexDirection: 'row',

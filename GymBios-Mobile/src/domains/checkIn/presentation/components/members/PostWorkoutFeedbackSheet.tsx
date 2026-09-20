@@ -188,9 +188,14 @@ export function PostWorkoutFeedbackSheet({
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.stepIndicator}>
-              STEP {currentStep} OF {TOTAL_STEPS}
-            </Text>
+            <View style={styles.headerTopRow}>
+              <Text style={styles.stepIndicator}>
+                STEP {currentStep} OF {TOTAL_STEPS}
+              </Text>
+              <Pressable onPress={onClose} style={styles.closeButton} accessibilityLabel="Close feedback form" accessibilityRole="button">
+                <Feather name="x" size={24} color="#6B6660" />
+              </Pressable>
+            </View>
             <Text style={styles.title}>{STEP_TITLES[currentStep - 1]}</Text>
             <Text style={styles.subtitle}>Tap to continue your feedback</Text>
           </View>
@@ -663,6 +668,15 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 22,
     paddingBottom: 10,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  closeButton: {
+    padding: 4,
+    marginRight: -4,
   },
   stepIndicator: {
     fontSize: 12,

@@ -3,10 +3,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
-import { AppHeader } from '@/shared/components/AppHeader';
 import { Typography } from '@/shared/components/Typography';
 import { Loader } from '@/shared/components/Loader';
-import { GlassBlob, GlassSurface } from '@/shared/components';
+import { GlassBlob, GlassHeader, GlassSurface, InfoRow } from '@/shared/components';
 
 import { useMyPerformance } from '../../hooks/useMyPerformance';
 import { PerformanceOverviewCard } from '../components/PerformanceOverviewCard';
@@ -23,10 +22,9 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
       <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
-      <AppHeader
+      <GlassHeader
         title="My Performance"
         subtitle="Performance scores, analytics & ratings"
-        colors={[BrandColors.teal, BrandColors.tealDark]}
         onBack={onBack}
       />
 
@@ -50,36 +48,33 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
                 You are currently in the top 5% of staff across all gym branches for client satisfaction and attendance rate. Keep up the great consistency!
               </Typography>
 
-              <View style={styles.statList}>
-                <View style={styles.statRow}>
-                  <Typography variant="bodySmall" style={styles.statLabel}>
-                    Average Rating
-                  </Typography>
-                  <View style={styles.ratingBadge}>
-                    <Feather name="star" size={14} color="#eab308" style={{ marginRight: 4 }} />
-                    <Typography variant="bodySmall" style={styles.ratingText}>
-                      4.9 / 5.0
+              <View>
+                <InfoRow
+                  icon="star"
+                  iconColor="#eab308"
+                  iconBackground="rgba(234,179,8,0.14)"
+                  label="Average Rating"
+                  value="4.9 / 5.0"
+                  divider={false}
+                />
+
+                <InfoRow
+                  icon="message-square"
+                  label="Review Feedback Count"
+                  value="128 reviews"
+                />
+
+                <InfoRow
+                  icon="check-circle"
+                  iconColor="#16a34a"
+                  iconBackground="rgba(22,163,74,0.14)"
+                  label="Attendance Rate"
+                  value={
+                    <Typography variant="body" style={styles.attendanceValue}>
+                      98.5%
                     </Typography>
-                  </View>
-                </View>
-
-                <View style={styles.statRow}>
-                  <Typography variant="bodySmall" style={styles.statLabel}>
-                    Review Feedback Count
-                  </Typography>
-                  <Typography variant="bodySmall" style={styles.statValue}>
-                    128 reviews
-                  </Typography>
-                </View>
-
-                <View style={styles.statRow}>
-                  <Typography variant="bodySmall" style={styles.statLabel}>
-                    Attendance Rate
-                  </Typography>
-                  <Typography variant="bodySmall" style={[styles.statValue, { color: '#16a34a' }]}>
-                    98.5%
-                  </Typography>
-                </View>
+                  }
+                />
               </View>
             </GlassSurface>
           </>
@@ -119,32 +114,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: Spacing.three,
   },
-  statList: {
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: Spacing.two,
-    gap: Spacing.two,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  statLabel: {
-    color: BrandColors.textSecondary,
-    fontWeight: '500',
-  },
-  statValue: {
+  attendanceValue: {
     fontWeight: '700',
-    color: BrandColors.textPrimary,
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingText: {
-    fontWeight: '700',
-    color: BrandColors.textPrimary,
+    color: '#16a34a',
+    fontSize: 14.5,
   },
 });

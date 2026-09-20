@@ -1,15 +1,20 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Pressable } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
-import { GlassSurface } from '@/shared/components';
 import type { UserTransaction } from '../../domain';
+
+const HAIRLINE = 'rgba(30,42,58,0.07)';
 
 interface TransactionCardProps {
   transaction: UserTransaction;
+  onPress?: () => void;
+  /** Top hairline separating this row from the one above it — pass false on the first row in the list. */
+  divider?: boolean;
 }
 
-export function TransactionCard({ transaction }: TransactionCardProps) {
+export function TransactionCard({ transaction, onPress, divider = true }: TransactionCardProps) {
+  const Wrapper = onPress ? Pressable : View;
   const isPositive = transaction.type === 'salary' || transaction.type === 'bonus';
   const isPurchase = transaction.type === 'purchase';
 
@@ -31,7 +36,7 @@ export function TransactionCard({ transaction }: TransactionCardProps) {
   const statusColor = transaction.status === 'completed' ? '#166534' : '#854d0e';
 
   return (
-    <GlassSurface radius={Radius.lg} style={styles.card}>
+    <Wrapper onPress={onPress} style={[styles.row, divider && styles.divider]}>
       <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
         <Feather name={iconName} size={18} color={iconColor} />
       </View>
@@ -69,16 +74,22 @@ export function TransactionCard({ transaction }: TransactionCardProps) {
           </Typography>
         </View>
       </View>
-    </GlassSurface>
+      {onPress && (
+        <Feather name="chevron-right" size={16} color={BrandColors.neutral[500]} style={{ marginLeft: 8 }} />
+      )}
+    </Wrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.three,
-    marginBottom: Spacing.two,
+    paddingVertical: Spacing.three,
+  },
+  divider: {
+    borderTopWidth: 1,
+    borderTopColor: HAIRLINE,
   },
   iconBox: {
     width: 40,

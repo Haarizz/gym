@@ -9,7 +9,9 @@
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon",
-      "associatedDomains": ["applinks:TODO_PRODUCTION_DOMAIN"]
+      "associatedDomains": [
+        "applinks:TODO_PRODUCTION_DOMAIN"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -31,7 +33,10 @@
               "pathPrefix": "/catalog/t/"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -50,7 +55,14 @@
         }
       ],
       "expo-secure-store",
-      "expo-image"
+      "expo-image",
+      "expo-sharing",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to find gyms and wellness centers near you."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

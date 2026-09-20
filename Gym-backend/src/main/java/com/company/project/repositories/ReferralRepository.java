@@ -14,6 +14,8 @@ public interface ReferralRepository extends JpaRepository<Referral, Long>, JpaSp
 
     Optional<Referral> findByReferralCode(String referralCode);
 
+    boolean existsByRuleId(Long ruleId);
+
     List<Referral> findByReferrerMemberId(String referrerMemberId);
 
     List<Referral> findByStatus(String status);

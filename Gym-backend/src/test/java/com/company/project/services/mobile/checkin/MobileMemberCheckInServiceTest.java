@@ -236,20 +236,26 @@ class MobileMemberCheckInServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw EntityNotFoundException when principal is null")
+    @DisplayName("Should return empty status when principal is null")
     void testNullPrincipalThrows() {
-        assertThrows(EntityNotFoundException.class, () -> checkInService.getCheckInStatus(null));
+        MemberCheckInStatusResponseDTO result = checkInService.getCheckInStatus(null);
+        assertNotNull(result);
+        assertFalse(result.isCheckedIn());
+
         assertThrows(EntityNotFoundException.class, () -> checkInService.checkIn(null));
         assertThrows(EntityNotFoundException.class, () -> checkInService.checkOut(null));
         verifyNoInteractions(memberRepository);
     }
 
     @Test
-    @DisplayName("Should throw EntityNotFoundException when authenticated user has no linked member record")
+    @DisplayName("Should return empty status when authenticated user has no linked member record")
     void testNonMemberUserThrows() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.empty());
 
-        assertThrows(EntityNotFoundException.class, () -> checkInService.getCheckInStatus(testPrincipal));
+        MemberCheckInStatusResponseDTO result = checkInService.getCheckInStatus(testPrincipal);
+        assertNotNull(result);
+        assertFalse(result.isCheckedIn());
+
         assertThrows(EntityNotFoundException.class, () -> checkInService.checkIn(testPrincipal));
         assertThrows(EntityNotFoundException.class, () -> checkInService.checkOut(testPrincipal));
     }

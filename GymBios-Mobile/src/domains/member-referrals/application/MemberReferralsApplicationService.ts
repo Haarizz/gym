@@ -6,6 +6,7 @@ import {
   MobileReferralAttribution,
   MyReferralClaim,
   MobileReferralStatus,
+  MyReferralReward,
 } from '../domain/types';
 
 export class MemberReferralsApplicationService {
@@ -29,5 +30,9 @@ export class MemberReferralsApplicationService {
 
   async retryMyClaim(): Promise<MobileReferralStatus> {
     return this.repository.retryMyClaim();
+  }
+
+  async getMyRewards(): Promise<MyReferralReward[]> {
+    return this.repository.getMyRewards();
   }
 }

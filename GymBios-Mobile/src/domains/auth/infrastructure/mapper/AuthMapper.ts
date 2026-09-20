@@ -1,10 +1,18 @@
 import { Session } from '../../domain/entities/Session';
 import { User } from '../../domain/entities/User';
+import type { PendingRegistration, RegistrationStatus } from '../../domain/entities/PendingRegistration';
 import type { AppRole, AppRoleValue } from '../../domain/valueObjects/AppRole';
 import { isAppRole } from '../../domain/valueObjects/AppRole';
 import type { Password } from '../../domain/valueObjects/Password';
 import type { Username } from '../../domain/valueObjects/Username';
-import type { LoginRequestApiModel, LoginResponseApiModel, StoredSessionApiModel } from '../api/AuthApiModels';
+import type {
+  LoginRequestApiModel,
+  LoginResponseApiModel,
+  MobileRegisterInitiatedApiModel,
+  MobileRegistrationStatusApiModel,
+  MobileResendOtpApiModel,
+  StoredSessionApiModel,
+} from '../api/AuthApiModels';
 
 const SPRING_ROLE_MAP: Record<string, AppRole> = {
   ROLE_ADMIN: 'admin',
@@ -103,13 +111,45 @@ export function mapLoginResponseToSession(
       id: String(response.userId ?? response.user_id),
       username: response.username,
       email: `${response.username}@gymbios.local`,
-      fullName: response.fullName ?? ROLE_DISPLAY_NAMES[appRole] ?? response.username,
+      fullName: response.fullName ?? response.full_name ?? ROLE_DISPLAY_NAMES[appRole] ?? response.username,
       appRole,
       permissions,
       branchId: response.branchId ?? response.defaultBranchId ?? response.default_branch_id ?? response.branch_id,
       profileCompleted: response.profileCompleted ?? response.profile_completed ?? true,
     }),
   });
+}
+
+export function mapInitiatedResponseToPendingRegistration(
+  response: MobileRegisterInitiatedApiModel,
+): PendingRegistration {
+  return {
+    registrationToken: response.registration_token,
+    maskedEmail: response.masked_email,
+    otpExpiresAt: response.otp_expires_at,
+    resendAvailableAt: response.resend_available_at,
+    emailDeliveryStatus: response.email_delivery_status,
+    devOtp: response.dev_otp,
+  };
+}
+
+export function mapResendResponseToPendingRegistrationUpdate(
+  response: MobileResendOtpApiModel,
+): Pick<PendingRegistration, 'otpExpiresAt' | 'resendAvailableAt' | 'devOtp'> {
+  return {
+    otpExpiresAt: response.otp_expires_at,
+    resendAvailableAt: response.resend_available_at,
+    devOtp: response.dev_otp,
+  };
+}
+
+export function mapRegistrationStatusResponse(response: MobileRegistrationStatusApiModel): RegistrationStatus {
+  return {
+    status: response.status,
+    maskedEmail: response.masked_email,
+    otpExpiresAt: response.otp_expires_at,
+    resendAvailableAt: response.resend_available_at,
+  };
 }
 
 export function mapCredentialsToLoginRequest(

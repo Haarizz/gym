@@ -12,7 +12,6 @@ import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.PromotionCampaignRepository;
-import com.company.project.repositories.mobile.dashboard.MobileMemberDashboardBookingRepository;
 import com.company.project.security.UserDetailsImpl;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
@@ -32,19 +31,16 @@ public class MobileMemberDashboardService {
     private final MemberRepository memberRepository;
     private final AttendanceRepository attendanceRepository;
     private final BookingRepository bookingRepository;
-    private final MobileMemberDashboardBookingRepository dashboardBookingRepository;
     private final PromotionCampaignRepository promotionCampaignRepository;
 
     public MobileMemberDashboardService(
             MemberRepository memberRepository,
             AttendanceRepository attendanceRepository,
             BookingRepository bookingRepository,
-            MobileMemberDashboardBookingRepository dashboardBookingRepository,
             PromotionCampaignRepository promotionCampaignRepository) {
         this.memberRepository = memberRepository;
         this.attendanceRepository = attendanceRepository;
         this.bookingRepository = bookingRepository;
-        this.dashboardBookingRepository = dashboardBookingRepository;
         this.promotionCampaignRepository = promotionCampaignRepository;
     }
 
@@ -162,12 +158,12 @@ public class MobileMemberDashboardService {
         );
 
         // 4. Today's Schedule
-        List<Booking> todayBookings = dashboardBookingRepository.findTodayBookingsByMemberId(member.getId(), today);
+        List<Booking> todayBookings = bookingRepository.findTodayBookingsByMemberId(member.getId(), today);
         List<MemberScheduleItemDTO> scheduleItems = mapScheduleItems(todayBookings, today);
 
         // 5. Activity Stats (backed strictly by verified database records)
         int totalVisits = member.getTotalVisits() != null ? member.getTotalVisits() : (attendances != null ? attendances.size() : 0);
-        int activeBookingsCount = (int) dashboardBookingRepository.countActiveBookingsByMemberId(member.getId());
+        int activeBookingsCount = (int) bookingRepository.countActiveBookingsByMemberId(member.getId());
         int streakDays = computeStreakDays(attendances, today);
 
         MemberActivityStatsDTO activityStats = new MemberActivityStatsDTO(

@@ -1,6 +1,7 @@
 package com.company.project.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public class CenterSummaryDTO {
     private String tenantSlug;
@@ -11,6 +12,11 @@ public class CenterSummaryDTO {
     private Double lng;
     private String centerType;
     private BigDecimal startingPrice;
+    private String accessType;
+    private String coverImageUrl;
+    private Double avgRating;
+    private Long reviewCount;
+    private List<String> acceptedPaymentMethods;
 
     // Getters and setters
     public String getTenantSlug() { return tenantSlug; }
@@ -36,4 +42,19 @@ public class CenterSummaryDTO {
 
     public BigDecimal getStartingPrice() { return startingPrice; }
     public void setStartingPrice(BigDecimal startingPrice) { this.startingPrice = startingPrice; }
+
+    public String getAccessType() { return accessType; }
+    public void setAccessType(String accessType) { this.accessType = accessType; }
+
+    public String getCoverImageUrl() { return coverImageUrl; }
+    public void setCoverImageUrl(String coverImageUrl) { this.coverImageUrl = coverImageUrl; }
+
+    public Double getAvgRating() { return avgRating; }
+    public void setAvgRating(Double avgRating) { this.avgRating = avgRating; }
+
+    public Long getReviewCount() { return reviewCount; }
+    public void setReviewCount(Long reviewCount) { this.reviewCount = reviewCount; }
+
+    public List<String> getAcceptedPaymentMethods() { return acceptedPaymentMethods; }
+    public void setAcceptedPaymentMethods(List<String> acceptedPaymentMethods) { this.acceptedPaymentMethods = acceptedPaymentMethods; }
 }

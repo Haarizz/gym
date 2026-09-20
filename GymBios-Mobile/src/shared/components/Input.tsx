@@ -188,9 +188,9 @@ const styles = StyleSheet.create({
   },
 
   glassInput: {
-    backgroundColor: Glass.fill,
-    borderColor: Glass.border,
-    shadowColor: Glass.shadowColor,
+    backgroundColor: 'rgba(255,255,255,0.65)',
+    borderColor: 'rgba(30,42,58,0.12)',
+    shadowColor: 'transparent',
   },
 
   authInputFocused: {

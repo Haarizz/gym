@@ -12,7 +12,6 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
-import com.company.project.repositories.mobile.bookings.MobileMemberBookingRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.BookingService;
 import com.company.project.services.TrainingSessionService;
@@ -32,7 +31,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class MobileMemberBookingsService {
 
-    private final MobileMemberBookingRepository mobileBookingRepository;
     private final BookingRepository bookingRepository;
     private final AttendanceRepository attendanceRepository;
     private final MemberRepository memberRepository;
@@ -40,13 +38,11 @@ public class MobileMemberBookingsService {
     private final TrainingSessionService trainingSessionService;
 
     public MobileMemberBookingsService(
-            MobileMemberBookingRepository mobileBookingRepository,
             BookingRepository bookingRepository,
             AttendanceRepository attendanceRepository,
             MemberRepository memberRepository,
             BookingService bookingService,
             TrainingSessionService trainingSessionService) {
-        this.mobileBookingRepository = mobileBookingRepository;
         this.bookingRepository = bookingRepository;
         this.attendanceRepository = attendanceRepository;
         this.memberRepository = memberRepository;
@@ -81,7 +77,7 @@ public class MobileMemberBookingsService {
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
 
-        List<Booking> bookings = mobileBookingRepository.findUpcomingBookings(member.getId(), today, now);
+        List<Booking> bookings = bookingRepository.findUpcomingBookings(member.getId(), today, now);
         return bookings.stream().map(b -> mapToMemberBookingDTO(b, false)).collect(Collectors.toList());
     }
 
@@ -93,7 +89,7 @@ public class MobileMemberBookingsService {
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
 
-        List<Booking> bookings = mobileBookingRepository.findPastBookings(member.getId(), today, now);
+        List<Booking> bookings = bookingRepository.findPastBookings(member.getId(), today, now);
         List<Attendance> attendances = attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(member.getId());
 
         return bookings.stream().map(b -> {
@@ -112,10 +108,10 @@ public class MobileMemberBookingsService {
         LocalDate startOfWeek = today.with(DayOfWeek.MONDAY);
         LocalDate endOfWeek = today.with(DayOfWeek.SUNDAY);
 
-        int upcoming = (int) mobileBookingRepository.countUpcomingBookings(member.getId(), today, now);
-        int thisWeek = (int) mobileBookingRepository.countBookingsThisWeek(member.getId(), startOfWeek, endOfWeek);
+        int upcoming = (int) bookingRepository.countUpcomingBookings(member.getId(), today, now);
+        int thisWeek = (int) bookingRepository.countBookingsThisWeek(member.getId(), startOfWeek, endOfWeek);
         
-        List<Booking> pastBookings = mobileBookingRepository.findPastBookings(member.getId(), today, now);
+        List<Booking> pastBookings = bookingRepository.findPastBookings(member.getId(), today, now);
         List<Attendance> attendances = attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(member.getId());
         int attendedCount = (int) pastBookings.stream().filter(b -> isAttended(b, attendances)).count();
 
@@ -133,8 +129,8 @@ public class MobileMemberBookingsService {
         List<com.company.project.dto.TrainingSessionResponseDTO> sessions = trainingSessionService.getSessions("class", null, targetDate, targetDate, null);
         
         // Find existing bookings for this member on this date to check memberBookingState
-        List<Booking> memberBookings = new java.util.ArrayList<>(mobileBookingRepository.findPastBookings(member.getId(), targetDate.plusDays(1), LocalTime.MIDNIGHT));
-        memberBookings.addAll(mobileBookingRepository.findUpcomingBookings(member.getId(), targetDate.minusDays(1), LocalTime.MAX));
+        List<Booking> memberBookings = new java.util.ArrayList<>(bookingRepository.findPastBookings(member.getId(), targetDate.plusDays(1), LocalTime.MIDNIGHT));
+        memberBookings.addAll(bookingRepository.findUpcomingBookings(member.getId(), targetDate.minusDays(1), LocalTime.MAX));
         
         Map<Long, String> sessionStatusMap = memberBookings.stream()
                 .filter(b -> b.getSession() != null && b.getSession().getDate() != null && b.getSession().getDate().equals(targetDate))
@@ -176,7 +172,7 @@ public class MobileMemberBookingsService {
 
     public MemberBookingDTO getBookingDetails(UserDetailsImpl principal, Long bookingId) {
         Member member = requireAuthenticatedMember(principal);
-        Booking booking = mobileBookingRepository.findByIdAndMemberId(bookingId, member.getId())
+        Booking booking = bookingRepository.findByIdAndMemberId(bookingId, member.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found or access denied"));
 
         List<Attendance> attendances = attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(member.getId());
@@ -198,7 +194,7 @@ public class MobileMemberBookingsService {
         BookingResponseDTO response = bookingService.createBooking(webRequest);
         
         // Fetch the created booking
-        Booking booking = mobileBookingRepository.findByIdAndMemberId(Long.valueOf(response.getId()), member.getId())
+        Booking booking = bookingRepository.findByIdAndMemberId(Long.valueOf(response.getId()), member.getId())
                 .orElseThrow(() -> new RuntimeException("Booking creation failed or could not be retrieved"));
         
         return mapToMemberBookingDTO(booking, false);
@@ -207,7 +203,7 @@ public class MobileMemberBookingsService {
     @Transactional
     public MemberBookingDTO cancelBooking(UserDetailsImpl principal, Long bookingId) {
         Member member = requireAuthenticatedMember(principal);
-        Booking booking = mobileBookingRepository.findByIdAndMemberId(bookingId, member.getId())
+        Booking booking = bookingRepository.findByIdAndMemberId(bookingId, member.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found or access denied"));
 
         if (!canCancel(booking)) {
@@ -220,7 +216,7 @@ public class MobileMemberBookingsService {
         // Use existing BookingService which handles notifications and state transitions
         bookingService.updateStatus(bookingId, updateRequest);
         
-        Booking updatedBooking = mobileBookingRepository.findByIdAndMemberId(bookingId, member.getId())
+        Booking updatedBooking = bookingRepository.findByIdAndMemberId(bookingId, member.getId())
                 .orElseThrow(() -> new RuntimeException("Could not retrieve updated booking"));
                 
         return mapToMemberBookingDTO(updatedBooking, false);

@@ -1,5 +1,5 @@
 import type { Result } from '@/core/types';
-import type { Session } from '../../domain/entities/Session';
+import type { PendingRegistration } from '../../domain/entities/PendingRegistration';
 import type { AuthRepository } from '../../domain/repositories/AuthRepository';
 
 export interface RegisterUserDto {
@@ -12,7 +12,7 @@ export interface RegisterUserDto {
 export class RegisterUser {
   constructor(private readonly authRepository: AuthRepository) {}
 
-  async execute(input: RegisterUserDto): Promise<Result<Session, string>> {
+  async execute(input: RegisterUserDto): Promise<Result<PendingRegistration, string>> {
     try {
       if (!input.fullName || !input.username || !input.email || !input.password) {
         return { success: false, error: 'All fields are required.' };

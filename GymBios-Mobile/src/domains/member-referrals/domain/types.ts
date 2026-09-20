@@ -31,3 +31,17 @@ export interface MyReferralClaim {
   claimedAt: string;
   canRetry: boolean;
 }
+
+export type MyReferralRewardStatus = 'PENDING' | 'AVAILABLE' | 'CLAIMED' | 'REDEEMED' | 'EXPIRED' | 'CANCELLED';
+
+/** One of the current user's own referral rewards, as referrer or referee. */
+export interface MyReferralReward {
+  id: number;
+  rewardName: string;
+  rewardType: string;
+  rewardValue: number | null;
+  currency: string | null;
+  status: MyReferralRewardStatus;
+  generatedDate: string | null;
+  redeemedDate: string | null;
+}

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   Modal,
   Pressable,
@@ -7,35 +8,75 @@ import {
   View,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+
+export interface CenterFilters {
+  category: string;
+  priceRange: '' | 'under2k' | '2k-5k' | 'above5k';
+  accessType: string;
+  paymentMode: string;
+}
+
+export const DEFAULT_CENTER_FILTERS: CenterFilters = {
+  category: 'All',
+  priceRange: '',
+  accessType: '',
+  paymentMode: '',
+};
 
 interface CenterFiltersModalProps {
   visible: boolean;
-  selectedCategory: string;
-  selectedGender: string;
+  filters: CenterFilters;
   sortBy: string;
-  onSelectCategory: (cat: string) => void;
-  onSelectGender: (gender: string) => void;
+  onChangeFilters: (filters: CenterFilters) => void;
   onSelectSort: (sort: string) => void;
   onReset: () => void;
   onClose: () => void;
 }
 
 const CATEGORIES = ['All', 'Gym', 'Fitness Center', 'Wellness Center', 'Studio'];
-const GENDERS = ['All', 'Mixed', 'Ladies Only', 'Men Only'];
-const SORTS = ['Rating', 'Distance', 'Price'];
+const PRICE_RANGES: { value: CenterFilters['priceRange']; label: string }[] = [
+  { value: 'under2k', label: 'Under ₹2,000' },
+  { value: '2k-5k', label: '₹2,000–₹5,000' },
+  { value: 'above5k', label: 'Above ₹5,000' },
+];
+const ACCESS_TYPES = ['Mixed', 'Ladies Only', 'Men Only'];
+const PAYMENT_MODES = [
+  { value: 'Cash', label: 'Cash', icon: 'dollar-sign' as const },
+  { value: 'Card', label: 'Card', icon: 'credit-card' as const },
+  { value: 'BNPL', label: 'BNPL', icon: 'zap' as const },
+];
+const SORTS = ['Distance', 'Price', 'Rating'];
 
 export function CenterFiltersModal({
   visible,
-  selectedCategory,
-  selectedGender,
+  filters,
   sortBy,
-  onSelectCategory,
-  onSelectGender,
+  onChangeFilters,
   onSelectSort,
   onReset,
   onClose,
 }: CenterFiltersModalProps) {
+  const [local, setLocal] = useState<CenterFilters>(filters);
+
+  useEffect(() => {
+    if (visible) setLocal(filters);
+  }, [visible, filters]);
+
+  const toggle = <K extends keyof CenterFilters>(key: K, value: CenterFilters[K]) => {
+    setLocal((prev) => ({
+      ...prev,
+      [key]: prev[key] === value ? (key === 'category' ? 'All' : '') : value,
+    }));
+  };
+
+  const activeCount =
+    (local.category !== 'All' ? 1 : 0) +
+    (local.priceRange ? 1 : 0) +
+    (local.accessType ? 1 : 0) +
+    (local.paymentMode ? 1 : 0);
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -52,38 +93,69 @@ export function CenterFiltersModal({
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* Category */}
-            <Text style={styles.sectionTitle}>Category</Text>
+            <Text style={styles.sectionTitle}>Center Type</Text>
             <View style={styles.chipGroup}>
               {CATEGORIES.map((cat) => {
-                const isSelected = selectedCategory === cat;
+                const isSelected = local.category === cat;
                 return (
                   <Pressable
                     key={cat}
                     style={[styles.chip, isSelected && styles.chipSelected]}
-                    onPress={() => onSelectCategory(cat)}
+                    onPress={() => setLocal((prev) => ({ ...prev, category: cat }))}
                   >
-                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                      {cat}
-                    </Text>
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{cat}</Text>
                   </Pressable>
                 );
               })}
             </View>
 
-            {/* Gender Type */}
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Access Type</Text>
+            {/* Price Range */}
+            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Monthly Price</Text>
             <View style={styles.chipGroup}>
-              {GENDERS.map((gender) => {
-                const isSelected = selectedGender === gender;
+              {PRICE_RANGES.map(({ value, label }) => {
+                const isSelected = local.priceRange === value;
                 return (
                   <Pressable
-                    key={gender}
-                    style={[styles.chip, isSelected && styles.chipSelected]}
-                    onPress={() => onSelectGender(gender)}
+                    key={value}
+                    style={[styles.chip, isSelected && styles.chipSelectedGold]}
+                    onPress={() => toggle('priceRange', value)}
                   >
-                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                      {gender}
-                    </Text>
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelectedGold]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Access Type */}
+            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Access Type</Text>
+            <View style={styles.chipGroup}>
+              {ACCESS_TYPES.map((type) => {
+                const isSelected = local.accessType === type;
+                return (
+                  <Pressable
+                    key={type}
+                    style={[styles.chip, isSelected && styles.chipSelectedPink]}
+                    onPress={() => toggle('accessType', type)}
+                  >
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelectedPink]}>{type}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Payment Method */}
+            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Payment Options</Text>
+            <View style={styles.chipGroup}>
+              {PAYMENT_MODES.map(({ value, label, icon }) => {
+                const isSelected = local.paymentMode === value;
+                return (
+                  <Pressable
+                    key={value}
+                    style={[styles.chip, styles.chipWithIcon, isSelected && styles.chipSelected]}
+                    onPress={() => toggle('paymentMode', value)}
+                  >
+                    <Feather name={icon} size={13} color={isSelected ? BrandColors.teal : BrandColors.textSecondary} />
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{label}</Text>
                   </Pressable>
                 );
               })}
@@ -100,9 +172,7 @@ export function CenterFiltersModal({
                     style={[styles.chip, isSelected && styles.chipSelected]}
                     onPress={() => onSelectSort(sort)}
                   >
-                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                      {sort}
-                    </Text>
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{sort}</Text>
                   </Pressable>
                 );
               })}
@@ -110,11 +180,30 @@ export function CenterFiltersModal({
           </ScrollView>
 
           <View style={styles.footer}>
-            <Pressable style={styles.resetButton} onPress={onReset}>
-              <Text style={styles.resetButtonText}>Reset Filters</Text>
+            <Pressable
+              style={styles.resetButton}
+              onPress={() => {
+                setLocal(DEFAULT_CENTER_FILTERS);
+                onReset();
+              }}
+            >
+              <Text style={styles.resetButtonText}>Reset{activeCount > 0 ? ` (${activeCount})` : ''}</Text>
             </Pressable>
-            <Pressable style={styles.applyButton} onPress={onClose}>
-              <Text style={styles.applyButtonText}>Apply Filters</Text>
+            <Pressable
+              style={styles.applyButtonWrapper}
+              onPress={() => {
+                onChangeFilters(local);
+                onClose();
+              }}
+            >
+              <LinearGradient
+                colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.applyButton}
+              >
+                <Text style={styles.applyButtonText}>Apply Filters</Text>
+              </LinearGradient>
             </Pressable>
           </View>
         </View>
@@ -133,7 +222,7 @@ const styles = StyleSheet.create({
     backgroundColor: BrandColors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
-    maxHeight: '80%',
+    maxHeight: '85%',
     paddingTop: Spacing.four,
   },
   header: {
@@ -182,9 +271,22 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
+  chipWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   chipSelected: {
     borderColor: BrandColors.teal,
     backgroundColor: '#F0FDFA',
+  },
+  chipSelectedGold: {
+    borderColor: BrandColors.memberGold,
+    backgroundColor: 'rgba(245, 199, 66, 0.12)',
+  },
+  chipSelectedPink: {
+    borderColor: '#F472B6',
+    backgroundColor: '#FCE7F3',
   },
   chipText: {
     fontSize: 13,
@@ -193,6 +295,14 @@ const styles = StyleSheet.create({
   },
   chipTextSelected: {
     color: BrandColors.teal,
+    fontWeight: '700',
+  },
+  chipTextSelectedGold: {
+    color: BrandColors.trainerAmber,
+    fontWeight: '700',
+  },
+  chipTextSelectedPink: {
+    color: '#BE185D',
     fontWeight: '700',
   },
   footer: {
@@ -215,11 +325,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: BrandColors.textSecondary,
   },
-  applyButton: {
+  applyButtonWrapper: {
     flex: 2,
-    backgroundColor: BrandColors.teal,
-    paddingVertical: Spacing.three,
     borderRadius: Radius.md,
+    overflow: 'hidden',
+  },
+  applyButton: {
+    paddingVertical: Spacing.three,
     alignItems: 'center',
   },
   applyButtonText: {

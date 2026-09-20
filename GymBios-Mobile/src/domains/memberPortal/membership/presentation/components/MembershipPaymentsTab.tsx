@@ -1,11 +1,14 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View, Pressable } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
+import { ReceiptBottomSheet } from '@/shared/components/ReceiptBottomSheet';
 import { useMembershipPayments } from '../../hooks/useMembershipPayments';
 
 export function MembershipPaymentsTab() {
   const { data: payments, isLoading, isError } = useMembershipPayments();
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
 
   return (
     <View style={styles.container}>
@@ -45,7 +48,7 @@ export function MembershipPaymentsTab() {
               const displayAmount = item.paidAmount ?? item.amount ?? 0;
 
               return (
-                <View key={item.id} style={styles.paymentRow}>
+                <Pressable key={item.id} style={styles.paymentRow} onPress={() => setSelectedReceiptId(item.id)}>
                   <View>
                     <Text style={styles.amountText}>₹{displayAmount.toLocaleString()}</Text>
                     <Text style={styles.metaText}>
@@ -63,7 +66,7 @@ export function MembershipPaymentsTab() {
                       {item.status}
                     </Text>
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -80,6 +83,13 @@ export function MembershipPaymentsTab() {
           </Text>
         </View>
       </GlassSurface>
+
+      <ReceiptBottomSheet
+        visible={selectedReceiptId !== null}
+        onClose={() => setSelectedReceiptId(null)}
+        receiptId={selectedReceiptId}
+        accentColor={BrandColors.memberGold}
+      />
     </View>
   );
 }

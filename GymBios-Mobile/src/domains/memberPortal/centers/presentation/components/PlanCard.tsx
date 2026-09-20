@@ -6,9 +6,11 @@ import type { CenterPlan } from '@/domains/discovery';
 interface PlanCardProps {
   plan: CenterPlan;
   onSelect: (plan: CenterPlan) => void;
+  taxPercentage?: number | null;
+  taxInclusive?: boolean;
 }
 
-export function PlanCard({ plan, onSelect }: PlanCardProps) {
+export function PlanCard({ plan, onSelect, taxPercentage, taxInclusive }: PlanCardProps) {
   // Determine if it's a popular plan based on some criteria, maybe discount > 0 or a flag if we had one.
   const isPopular = false; // We can set this to false for now unless we have a specific field for it
 
@@ -51,6 +53,13 @@ export function PlanCard({ plan, onSelect }: PlanCardProps) {
           )}
           <Text style={styles.price}>₹{plan.price.toLocaleString()}</Text>
           {offerText && <Text style={styles.offerBadge}>{offerText}</Text>}
+          {taxPercentage != null && (
+            <Text style={styles.taxText}>
+              {taxInclusive
+                ? 'Tax included'
+                : `+${taxPercentage}% tax = ₹${Math.round(plan.price * (1 + taxPercentage / 100)).toLocaleString()}`}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -157,6 +166,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: Radius.sm,
+    marginTop: 2,
+  },
+  taxText: {
+    fontSize: 10,
+    color: BrandColors.textSecondary,
     marginTop: 2,
   },
   featuresList: {

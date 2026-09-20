@@ -42,12 +42,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabActive: {
-    backgroundColor: Glass.fillStrong,
-    shadowColor: '#0a3f34',
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#fff',
+    shadowColor: '#141923',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowRadius: 10,
+    elevation: 3,
   },
   tabText: {
     fontSize: 13.5,
@@ -55,6 +55,6 @@ const styles = StyleSheet.create({
     color: '#6E7C77',
   },
   tabTextActive: {
-    color: '#0A3F34',
+    color: '#0F3A30',
   },
 });

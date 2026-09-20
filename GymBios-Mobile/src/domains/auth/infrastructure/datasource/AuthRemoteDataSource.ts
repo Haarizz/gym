@@ -4,12 +4,19 @@ import type { Result } from '@/core/types';
 
 import { Session } from '../../domain/entities/Session';
 import { User } from '../../domain/entities/User';
+import type { PendingRegistration, RegistrationStatus } from '../../domain/entities/PendingRegistration';
 import type { AppRole } from '../../domain/valueObjects/AppRole';
 import type { AppRoleValue } from '../../domain/valueObjects/AppRole';
 import type { Password } from '../../domain/valueObjects/Password';
 import type { Username } from '../../domain/valueObjects/Username';
 import { AuthApi } from '../api/AuthApi';
-import { mapCredentialsToLoginRequest, mapLoginResponseToSession } from '../mapper/AuthMapper';
+import {
+  mapCredentialsToLoginRequest,
+  mapInitiatedResponseToPendingRegistration,
+  mapLoginResponseToSession,
+  mapRegistrationStatusResponse,
+  mapResendResponseToPendingRegistrationUpdate,
+} from '../mapper/AuthMapper';
 
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
   admin: ['dashboard:read', 'staff:read', 'deals:read', 'analytics:read'],
@@ -76,7 +83,7 @@ export class AuthRemoteDataSource {
     }
   }
 
-  async registerMobileUser(payload: any): Promise<Result<Session, string>> {
+  async registerMobileUser(payload: any): Promise<Result<PendingRegistration, string>> {
     if (env.useMockApi) {
       return { success: false, error: 'Mock register is not supported' };
     }
@@ -89,12 +96,50 @@ export class AuthRemoteDataSource {
         password: payload.password,
       };
       const response = await this.authApi.registerMobileUser(apiPayload);
-      return { success: true, value: mapLoginResponseToSession(response.data, 'member') };
+      return { success: true, value: mapInitiatedResponseToPendingRegistration(response.data) };
     } catch (error) {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
       return { success: false, error: 'Unable to register. Please try again.' };
+    }
+  }
+
+  async verifyOtp(registrationToken: string, otp: string): Promise<Result<Session, string>> {
+    try {
+      const response = await this.authApi.verifyOtp(registrationToken, otp);
+      return { success: true, value: mapLoginResponseToSession(response.data, 'member') };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Unable to verify code. Please try again.' };
+    }
+  }
+
+  async resendOtp(
+    registrationToken: string,
+  ): Promise<Result<Pick<PendingRegistration, 'otpExpiresAt' | 'resendAvailableAt' | 'devOtp'>, string>> {
+    try {
+      const response = await this.authApi.resendOtp(registrationToken);
+      return { success: true, value: mapResendResponseToPendingRegistrationUpdate(response.data) };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Unable to resend code. Please try again.' };
+    }
+  }
+
+  async getRegistrationStatus(registrationToken: string): Promise<Result<RegistrationStatus, string>> {
+    try {
+      const response = await this.authApi.getRegistrationStatus(registrationToken);
+      return { success: true, value: mapRegistrationStatusResponse(response.data) };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Unable to check registration status.' };
     }
   }
 

@@ -188,8 +188,9 @@ export class ApiProfileRepository implements ProfileRepository {
           totalBonuses: data.summary?.total_bonuses ?? data.summary?.totalBonuses ?? 0,
         },
       };
-    } catch {
+    } catch (error) {
       // Fallback in case of network error or if endpoint is unreachable
+      console.error('Failed to load transactions', error);
       return {
         transactions: [],
         summary: {

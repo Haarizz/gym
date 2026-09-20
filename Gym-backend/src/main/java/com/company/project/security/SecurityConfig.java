@@ -54,8 +54,21 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // Public auth endpoints — no token required (register/login/username-check/mobile-register)
-                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/check-username", "/api/mobile/auth/register", "/error").permitAll()
+                // Uploaded branch images are served as plain static files (BranchImageStorageConfig)
+                // and rendered via <img src="..."> by both the public mobile discovery browse screens
+                // and the admin UI — a browser image request carries no Authorization/X-Tenant-ID
+                // header, so this must stay public rather than falling under the /api/** authenticated()
+                // catch-all below (which it wouldn't match anyway, but is called out here for clarity).
+                .requestMatchers("/uploads/**").permitAll()
+
+                // Public auth endpoints — no token required (register/login/username-check/mobile-register).
+                // The three /api/mobile/auth/{verify-otp,resend-otp,registration-status} routes are
+                // also public: an unverified registration has no JWT to present yet by design — the
+                // opaque X-Registration-Token header (never this permitAll list) is what scopes those
+                // calls to one pending registration. See the email-OTP-verification architecture plan.
+                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/check-username",
+                        "/api/mobile/auth/register", "/api/mobile/auth/verify-otp",
+                        "/api/mobile/auth/resend-otp", "/api/mobile/auth/registration-status", "/error").permitAll()
 
                 // Public lead-capture endpoint — the "Request a demo" onboarding form on the
                 // unauthenticated pricing/login page (business-onboarding-fullscreen.tsx) submits

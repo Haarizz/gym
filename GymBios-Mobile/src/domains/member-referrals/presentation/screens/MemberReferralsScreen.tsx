@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Share } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Share } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Typography } from '@/shared/components/Typography';
-import { Surface } from '@/shared/components/Surface';
 import { Badge } from '@/shared/components/Badge';
 import { Loader } from '@/shared/components/Loader';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
-import { AppHeader } from '@/shared/components/AppHeader';
+import { GlassBlob, GlassHeader, GlassSurface, InfoRow } from '@/shared/components';
 import {
   useReferralProfile,
   useReferralHistory,
   useMyReferralClaim,
   useRetryReferralClaim,
+  useMyReferralRewards,
 } from '../hooks/useMemberReferrals';
-import { Spacing, Colors } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import Feather from '@expo/vector-icons/Feather';
 
 const CLAIM_BADGE_TONE = {
@@ -23,12 +23,34 @@ const CLAIM_BADGE_TONE = {
   EXPIRED: 'muted' as const,
 };
 
+const REWARD_BADGE_TONE = {
+  PENDING: 'default' as const,
+  AVAILABLE: 'default' as const,
+  CLAIMED: 'default' as const,
+  REDEEMED: 'success' as const,
+  EXPIRED: 'muted' as const,
+  CANCELLED: 'muted' as const,
+};
+
+const REWARD_TYPE_LABEL: Record<string, string> = {
+  WALLET_CREDIT: 'Wallet Credit',
+  MEMBERSHIP_EXTENSION: 'Membership Extension',
+  MEMBERSHIP_DISCOUNT: 'Membership Discount',
+  FREE_PT: 'Free PT / Class',
+  FREE_CLASS: 'Free Class',
+  COUPON: 'Coupon',
+  LOYALTY_POINTS: 'Loyalty Points',
+  GIFT: 'Gift',
+  CASH: 'Cash',
+};
+
 export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
   const router = useRouter();
   const { data: profile, isLoading: isLoadingProfile } = useReferralProfile();
   const { data: history = [], isLoading: isLoadingHistory } = useReferralHistory();
   const { data: myClaim, isLoading: isLoadingMyClaim } = useMyReferralClaim();
   const { mutate: retryClaim, isPending: isRetrying } = useRetryReferralClaim();
+  const { data: myRewards = [], isLoading: isLoadingRewards } = useMyReferralRewards();
   const [retryError, setRetryError] = useState<string | null>(null);
 
   const handleRetry = () => {
@@ -61,176 +83,280 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
     }
   };
 
-  if (isLoadingProfile) {
-    return (
-      <View style={styles.center}>
-        <Loader />
-      </View>
-    );
-  }
-
   return (
-    <ScreenLayout>
-      <AppHeader 
-        title="Referrals" 
-        subtitle="Invite friends & earn rewards"
-        colors={['#327f74', '#2a6b62']} 
-        onBack={handleBack} 
-      />
-      <ScrollView style={styles.content}>
-        
-        <Surface style={styles.shareCard}>
-          <Typography variant="subtitle" style={styles.shareTitle}>Your Referral Link</Typography>
-          <View style={styles.codeContainer}>
-            <Typography variant="body" style={[styles.codeText, { fontWeight: 'bold' }]}>{profile?.referralCode}</Typography>
-          </View>
-          <Typography variant="bodySmall" color="textSecondary" style={styles.shareDescription}>
-            Share this link with friends. When they join, you'll earn rewards!
-          </Typography>
-          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-            <Feather name="share-2" size={20} color="#fff" />
-            <Typography variant="body" style={{ color: '#fff', marginLeft: Spacing.one, fontWeight: 'bold' }}>Share Now</Typography>
-          </TouchableOpacity>
-        </Surface>
+    <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+      <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
+      <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
+      <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
 
-        <Typography variant="title" style={styles.historyTitle}>
-          Referral Code You Used
-        </Typography>
+      <GlassHeader title="Referrals" subtitle="Invite friends & earn rewards" onBack={handleBack} />
 
-        {isLoadingMyClaim ? (
+      {isLoadingProfile ? (
+        <View style={styles.center}>
           <Loader />
-        ) : !myClaim ? (
-          <View style={styles.emptyState}>
-            <Typography variant="body" color="textSecondary">You haven't entered anyone's referral code.</Typography>
-          </View>
-        ) : (
-          <Surface style={styles.historyCard}>
-            <View style={styles.historyRow}>
-              <View style={{ flex: 1 }}>
-                <Typography variant="body" style={{ fontWeight: 'bold' }}>Referred by {myClaim.referrerName}</Typography>
-                <Typography variant="bodySmall" color="textSecondary">
-                  {new Date(myClaim.claimedAt).toLocaleDateString()}
-                </Typography>
-              </View>
-              <Badge label={myClaim.status} tone={CLAIM_BADGE_TONE[myClaim.status]} />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Share Card */}
+          <GlassSurface radius={Radius.lg} style={[styles.card, styles.shareCard]}>
+            <Typography variant="subtitle" style={styles.cardTitle}>
+              Your Referral Link
+            </Typography>
+            <View style={styles.codeChip}>
+              <Typography variant="body" style={styles.codeText}>
+                {profile?.referralCode}
+              </Typography>
             </View>
-            {myClaim.canRetry && (
+            <Typography variant="bodySmall" color="textSecondary" style={styles.shareDescription}>
+              Share this link with friends. When they join, you&apos;ll earn rewards!
+            </Typography>
+            <Pressable style={styles.shareButton} onPress={handleShare}>
+              <Feather name="share-2" size={18} color="#ffffff" />
+              <Typography variant="bodySmallBold" style={styles.shareButtonText}>
+                Share Now
+              </Typography>
+            </Pressable>
+          </GlassSurface>
+
+          {/* Referral Code You Used */}
+          <GlassSurface radius={Radius.lg} style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <Feather name="user-check" size={18} color={BrandColors.teal} style={styles.sectionIcon} />
+              <Typography variant="subtitle" style={styles.cardTitle}>
+                Referral Code You Used
+              </Typography>
+            </View>
+
+            {isLoadingMyClaim ? (
+              <Loader />
+            ) : !myClaim ? (
+              <Typography variant="bodySmall" style={styles.emptyText}>
+                You haven&apos;t entered anyone&apos;s referral code.
+              </Typography>
+            ) : (
               <>
-                <TouchableOpacity
-                  style={[styles.retryButton, isRetrying && { opacity: 0.7 }]}
-                  onPress={handleRetry}
-                  disabled={isRetrying}
-                >
-                  <Feather name="refresh-cw" size={16} color="#2a6b62" />
-                  <Typography variant="bodySmall" style={{ color: '#2a6b62', marginLeft: Spacing.half, fontWeight: 'bold' }}>
-                    {isRetrying ? 'Retrying...' : 'Retry'}
-                  </Typography>
-                </TouchableOpacity>
-                {retryError && (
-                  <Typography variant="bodySmall" style={{ color: '#d4183d', marginTop: Spacing.two }}>
-                    {retryError}
-                  </Typography>
+                <InfoRow
+                  icon="user"
+                  label="Referred By"
+                  divider={false}
+                  value={
+                    <View>
+                      <Typography variant="body" style={styles.rowValue}>
+                        {myClaim.referrerName}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {new Date(myClaim.claimedAt).toLocaleDateString()}
+                      </Typography>
+                    </View>
+                  }
+                  right={<Badge label={myClaim.status} tone={CLAIM_BADGE_TONE[myClaim.status]} />}
+                />
+                {myClaim.canRetry && (
+                  <>
+                    <Pressable
+                      style={[styles.retryButton, isRetrying && styles.retryButtonDisabled]}
+                      onPress={handleRetry}
+                      disabled={isRetrying}
+                    >
+                      <Feather name="refresh-cw" size={14} color={BrandColors.tealDark} />
+                      <Typography variant="caption" style={styles.retryText}>
+                        {isRetrying ? 'Retrying...' : 'Retry'}
+                      </Typography>
+                    </Pressable>
+                    {retryError && (
+                      <Typography variant="caption" style={styles.retryErrorText}>
+                        {retryError}
+                      </Typography>
+                    )}
+                  </>
                 )}
               </>
             )}
-          </Surface>
-        )}
+          </GlassSurface>
 
-        <Typography variant="title" style={styles.historyTitle}>
-          Referral History
-        </Typography>
+          {/* My Rewards */}
+          <GlassSurface radius={Radius.lg} style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <Feather name="gift" size={18} color={BrandColors.teal} style={styles.sectionIcon} />
+              <Typography variant="subtitle" style={styles.cardTitle}>
+                My Rewards
+              </Typography>
+            </View>
 
-        {isLoadingHistory ? (
-          <Loader />
-        ) : history.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Typography variant="body" color="textSecondary">No referrals yet.</Typography>
-          </View>
-        ) : (
-          history.map(item => (
-            <Surface key={item.id} style={styles.historyCard}>
-              <View style={styles.historyRow}>
-                <View>
-                  <Typography variant="body" style={{ fontWeight: 'bold' }}>Referred Member ID: {item.refereeGlobalUserId}</Typography>
-                  <Typography variant="bodySmall" color="textSecondary">{new Date(item.createdAt).toLocaleDateString()}</Typography>
-                </View>
-                <Badge label={item.status} />
-              </View>
-            </Surface>
-          ))
-        )}
+            {isLoadingRewards ? (
+              <Loader />
+            ) : myRewards.length === 0 ? (
+              <Typography variant="bodySmall" style={styles.emptyText}>
+                No rewards yet.
+              </Typography>
+            ) : (
+              myRewards.map((reward, index) => (
+                <InfoRow
+                  key={reward.id}
+                  icon="award"
+                  divider={index > 0}
+                  label={REWARD_TYPE_LABEL[reward.rewardType] ?? reward.rewardType}
+                  value={
+                    <View>
+                      <Typography variant="body" style={styles.rowValue}>
+                        {reward.rewardValue != null
+                          ? `${reward.rewardValue}${reward.currency ? ' ' + reward.currency : ''}`
+                          : reward.rewardName}
+                      </Typography>
+                      {reward.generatedDate && (
+                        <Typography variant="caption" color="textSecondary">
+                          {new Date(reward.generatedDate).toLocaleDateString()}
+                        </Typography>
+                      )}
+                    </View>
+                  }
+                  right={<Badge label={reward.status} tone={REWARD_BADGE_TONE[reward.status] ?? 'default'} />}
+                />
+              ))
+            )}
+          </GlassSurface>
 
-      </ScrollView>
-    </ScreenLayout>
+          {/* Referral History */}
+          <GlassSurface radius={Radius.lg} style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <Feather name="users" size={18} color={BrandColors.teal} style={styles.sectionIcon} />
+              <Typography variant="subtitle" style={styles.cardTitle}>
+                Referral History
+              </Typography>
+            </View>
+
+            {isLoadingHistory ? (
+              <Loader />
+            ) : history.length === 0 ? (
+              <Typography variant="bodySmall" style={styles.emptyText}>
+                No referrals yet.
+              </Typography>
+            ) : (
+              history.map((item, index) => (
+                <InfoRow
+                  key={item.id}
+                  icon="user-plus"
+                  divider={index > 0}
+                  label="Referred Member"
+                  value={
+                    <View>
+                      <Typography variant="body" style={styles.rowValue}>
+                        ID: {item.refereeGlobalUserId}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </Typography>
+                    </View>
+                  }
+                  right={<Badge label={item.status} />}
+                />
+              ))
+            )}
+          </GlassSurface>
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: BrandColors.screenBackground,
+  },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
-    flex: 1,
-    padding: Spacing.md,
+  scrollContent: {
+    padding: Spacing.four,
+    gap: Spacing.four,
+    paddingBottom: Spacing.six,
+  },
+  card: {
+    padding: Spacing.four,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: BrandColors.textPrimary,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.two,
+  },
+  sectionIcon: {
+    marginRight: Spacing.two,
   },
   shareCard: {
-    padding: Spacing.three,
-    marginBottom: Spacing.three,
     alignItems: 'center',
   },
-  shareTitle: {
-    marginBottom: Spacing.md,
-  },
-  codeContainer: {
-    backgroundColor: '#f0f4f8',
+  codeChip: {
+    marginTop: Spacing.three,
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: 8,
-    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.four,
+    borderRadius: Radius.md,
+    backgroundColor: 'rgba(50,127,116,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(50,127,116,0.18)',
   },
   codeText: {
     letterSpacing: 2,
-    fontSize: 20,
+    fontSize: 18,
+    fontWeight: '700',
+    color: BrandColors.tealDark,
   },
   shareDescription: {
     textAlign: 'center',
+    marginTop: Spacing.three,
     marginBottom: Spacing.three,
   },
   shareButton: {
     flexDirection: 'row',
-    backgroundColor: '#2a6b62',
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    borderRadius: 24,
+    backgroundColor: BrandColors.teal,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.five,
+    borderRadius: Radius.full,
     alignItems: 'center',
+    gap: Spacing.two,
   },
-  historyTitle: {
-    marginBottom: Spacing.md,
+  shareButtonText: {
+    color: '#ffffff',
   },
-  historyCard: {
-    padding: Spacing.md,
-    marginBottom: Spacing.two,
+  emptyText: {
+    color: 'rgba(30,42,58,0.45)',
+    fontStyle: 'italic',
   },
-  historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  rowValue: {
+    fontWeight: '700',
+    color: BrandColors.textPrimary,
+    fontSize: 14.5,
+    marginBottom: 2,
   },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    marginTop: Spacing.two,
-    paddingVertical: Spacing.half,
-    paddingHorizontal: Spacing.two,
-    borderRadius: 16,
+    gap: 6,
+    marginTop: Spacing.three,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: '#2a6b62',
+    borderColor: 'rgba(50,127,116,0.3)',
+    backgroundColor: 'rgba(50,127,116,0.08)',
   },
-  emptyState: {
-    padding: Spacing.four,
-    alignItems: 'center',
+  retryButtonDisabled: {
+    opacity: 0.7,
+  },
+  retryText: {
+    color: BrandColors.tealDark,
+    fontWeight: '700',
+  },
+  retryErrorText: {
+    color: BrandColors.danger,
+    marginTop: Spacing.two,
   },
 });

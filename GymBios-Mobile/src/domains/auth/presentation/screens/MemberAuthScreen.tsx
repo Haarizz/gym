@@ -27,28 +27,25 @@ export function MemberAuthScreen({ useLogin, useRegister }: MemberAuthScreenProp
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <View style={styles.background}>
         <LinearGradient
-          colors={['#DCEAE2', '#EEF3F0']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={[BrandColors.teal, '#0F3A30', '#0c2721']}
           style={StyleSheet.absoluteFill as any}
         />
-        <GlassBlob color={BrandColors.teal} size={340} opacity={0.38} top={-90} right={-60} />
-        <GlassBlob color={BrandColors.memberGold} size={300} opacity={0.4} top={180} left={-80} />
-        <GlassBlob color={BrandColors.teal} size={240} opacity={0.24} top={620} right={-70} />
+        <GlassBlob color={BrandColors.memberGold} size={260} opacity={0.5} top={210} left={-90} />
+        <GlassBlob color="#fff" size={220} opacity={0.16} top={undefined} bottom={120} right={-80} />
       </View>
 
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
-          
-          <AuthHeader />
+        
+        <AuthHeader />
 
-          <View style={styles.sheet}>
+        <View style={styles.sheet}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
             <AuthTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
             {activeTab === 'signin' ? (
@@ -68,8 +65,8 @@ export function MemberAuthScreen({ useLogin, useRegister }: MemberAuthScreenProp
             )}
 
             <AdminLoginLink />
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -86,7 +83,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   background: {
-    ...StyleSheet.absoluteFill as any,
+    ...StyleSheet.absoluteFill,
   },
   keyboard: {
     flex: 1,
@@ -96,20 +93,20 @@ const styles = StyleSheet.create({
   },
   sheet: {
     flex: 1,
-    backgroundColor: Glass.fillStrong,
-    borderWidth: 1,
-    borderColor: Glass.border,
+    backgroundColor: 'rgba(242,244,247,0.86)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.6)',
     borderBottomWidth: 0,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: 24,
     paddingTop: 26,
     marginTop: -26,
     zIndex: 2,
-    shadowColor: '#0a3f34',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 30,
     elevation: 8,
   },
 });

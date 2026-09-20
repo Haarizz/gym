@@ -9,7 +9,7 @@ import com.company.project.dto.ReferralStatsDTO;
 import com.company.project.dto.ReferralValidationResponseDTO;
 import com.company.project.dto.RewardRuleRequestDTO;
 import com.company.project.dto.RewardRuleResponseDTO;
-import com.company.project.services.MobileReferralResolutionService;
+import com.company.project.services.mobile.referrals.MobileReferralResolutionService;
 import com.company.project.services.ReferralService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

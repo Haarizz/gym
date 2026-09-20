@@ -3,8 +3,7 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors, Spacing } from '@/core/theme';
-import { AppHeader } from '@/shared/components/AppHeader';
-import { GlassBlob } from '@/shared/components';
+import { GlassBlob, GlassHeader } from '@/shared/components';
 
 import { useMySettings } from '../../hooks/useMySettings';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
@@ -43,10 +42,9 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
       <GlassBlob color={BrandColors.teal} size={320} opacity={0.34} top={-40} right={-70} />
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
-      <AppHeader
+      <GlassHeader
         title="Settings"
         subtitle="Notifications, linked accounts & privacy"
-        colors={[BrandColors.teal, BrandColors.tealDark]}
         onBack={onBack}
       />
 
@@ -58,6 +56,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
             description="Receive summaries and account updates via email"
             value={notifications.email}
             onValueChange={(val) => handleToggleNotification('email', val)}
+            divider={false}
           />
           <SettingSwitchRow
             label="Push Notifications"
@@ -93,8 +92,8 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
 
         {/* Linked Accounts */}
         <SettingsCard title="Linked Accounts" icon="link">
-          {settings.linkedAccounts.map((account) => (
-            <LinkedAccountRow key={account.id} account={account} />
+          {settings.linkedAccounts.map((account, index) => (
+            <LinkedAccountRow key={account.id} account={account} divider={index > 0} />
           ))}
         </SettingsCard>
 
@@ -105,6 +104,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
             description="Allow team members and staff to view your profile details"
             value={privacy.profileVisibility}
             onValueChange={(val) => handleTogglePrivacy('profileVisibility', val)}
+            divider={false}
           />
           <SettingSwitchRow
             label="Performance Visibility"

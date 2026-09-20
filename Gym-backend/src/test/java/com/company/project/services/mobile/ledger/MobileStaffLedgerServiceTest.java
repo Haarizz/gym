@@ -120,7 +120,7 @@ class MobileStaffLedgerServiceTest {
         CommissionRule rule = new CommissionRule();
         rule.setRole("Trainer");
         rule.setBaseCommission(new BigDecimal("10.00"));
-        when(commissionRuleRepository.findByRole("Trainer")).thenReturn(Optional.of(rule));
+        when(commissionRuleRepository.findByRoleIgnoreCase("Trainer")).thenReturn(Optional.of(rule));
 
         // Receipts
         when(receiptRepository.findAll(any(Specification.class), any(Pageable.class)))
@@ -176,7 +176,7 @@ class MobileStaffLedgerServiceTest {
         when(salaryPaymentEmployeeRepository.findByEmployeeId("EMP-0010"))
                 .thenReturn(Optional.empty());
         when(salaryPaymentRepository.findAll()).thenReturn(Collections.emptyList());
-        when(commissionRuleRepository.findByRole(any())).thenReturn(Optional.empty());
+        when(commissionRuleRepository.findByRoleIgnoreCase(any())).thenReturn(Optional.empty());
         when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         when(receiptRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
