@@ -1,5 +1,5 @@
 import { apiClient } from '@/core/network/apiClient';
-import { MemberMembershipState, MembershipPayment, AddOnCatalogResponse } from '../domain/models';
+import { MemberMembershipState, MembershipPayment, AddOnCatalogResponse, MobileReceiptDetail } from '../domain/models';
 
 export const membershipApi = {
   getMemberMembership: async (): Promise<MemberMembershipState> => {
@@ -44,6 +44,30 @@ export const membershipApi = {
       paymentMethod: item.payment_method,
       status: item.status,
     }));
+  },
+
+  getMemberReceipt: async (receiptId: number): Promise<MobileReceiptDetail> => {
+    const response = await apiClient.get<any>(`/mobile/member/receipts/${receiptId}`);
+    return {
+      id: response.data.id,
+      receiptNo: response.data.receipt_no,
+      transactionDate: response.data.transaction_date,
+      transactionType: response.data.transaction_type,
+      amount: response.data.amount,
+      paidAmount: response.data.paid_amount,
+      dueAmount: response.data.due_amount,
+      paymentMethod: response.data.payment_method,
+      status: response.data.status,
+      planName: response.data.plan_name,
+      validFrom: response.data.valid_from,
+      validTill: response.data.valid_till,
+      processedBy: response.data.processed_by,
+      memberName: response.data.member_name,
+      memberId: response.data.member_id,
+      memberPhone: response.data.member_phone,
+      membershipType: response.data.membership_type,
+      remarks: response.data.remarks,
+    };
   },
   
   getMemberAddOns: async (page: number = 1, limit: number = 10): Promise<AddOnCatalogResponse> => {

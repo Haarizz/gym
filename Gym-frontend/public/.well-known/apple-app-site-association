@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TODO_APPLE_TEAM_ID.com.anandu389.GymBiosMobile",
+        "paths": ["/catalog/t/*"]
+      }
+    ]
+  }
+}

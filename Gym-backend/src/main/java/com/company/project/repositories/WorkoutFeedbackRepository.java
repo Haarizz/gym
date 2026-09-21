@@ -15,4 +15,5 @@ public interface WorkoutFeedbackRepository extends JpaRepository<WorkoutFeedback
     long countByRecommendWorkout(String recommend);
     long countByFollowUpRequiredTrue();
     long countByFlaggedForReviewTrue();
+    boolean existsByAttendance_Id(Long attendanceId);
 }

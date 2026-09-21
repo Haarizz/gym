@@ -15,9 +15,15 @@ export function Badge({ label, tone = 'default', style, ...rest }: BadgeProps) {
     success: styles.success,
   }[tone];
 
+  const textStyles = {
+    default: styles.labelDefault,
+    muted: styles.labelMuted,
+    success: styles.labelSuccess,
+  }[tone];
+
   return (
     <View style={[styles.base, toneStyles, style]} {...rest}>
-      <Typography variant="caption" style={styles.label}>
+      <Typography variant="caption" style={[styles.label, textStyles]}>
         {label}
       </Typography>
     </View>
@@ -41,8 +47,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#dcfce7',
   },
   label: {
-    color: '#ffffff',
     fontSize: 10,
     fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  labelDefault: {
+    color: '#ffffff',
+  },
+  labelMuted: {
+    color: '#374151',
+  },
+  labelSuccess: {
+    color: '#166534',
   },
 });

@@ -9,6 +9,7 @@ import com.company.project.dto.ReferralStatsDTO;
 import com.company.project.dto.ReferralValidationResponseDTO;
 import com.company.project.dto.RewardRuleRequestDTO;
 import com.company.project.dto.RewardRuleResponseDTO;
+import com.company.project.services.mobile.referrals.MobileReferralResolutionService;
 import com.company.project.services.ReferralService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +23,12 @@ import java.util.Map;
 public class ReferralController {
 
     private final ReferralService referralService;
+    private final MobileReferralResolutionService mobileReferralResolutionService;
 
-    public ReferralController(ReferralService referralService) {
+    public ReferralController(ReferralService referralService,
+                               MobileReferralResolutionService mobileReferralResolutionService) {
         this.referralService = referralService;
+        this.mobileReferralResolutionService = mobileReferralResolutionService;
     }
 
     /** GET /api/referrals?page=1&size=20&status=&search= */
@@ -65,6 +69,17 @@ public class ReferralController {
     public ResponseEntity<String> fixRewards() {
         String diag = referralService.fixRetroactiveRewards();
         return ResponseEntity.ok(diag);
+    }
+
+    /**
+     * POST /api/referrals/retry-pending-mobile (TEMPORARY FIX)
+     * Re-attempts conversion for mobile referral attributions stuck at PENDING —
+     * e.g. from purchases made before the tenant/branch context bug in the
+     * post-purchase conversion path was fixed. Safe to call repeatedly.
+     */
+    @PostMapping("/retry-pending-mobile")
+    public ResponseEntity<String> retryPendingMobileReferrals() {
+        return ResponseEntity.ok(mobileReferralResolutionService.retryPendingAttributions());
     }
 
     /** POST /api/referrals */

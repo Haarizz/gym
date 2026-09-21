@@ -9,7 +9,7 @@ import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.MemberRepository;
-import com.company.project.repositories.mobile.checkin.MobileWorkoutFeedbackRepository;
+import com.company.project.repositories.WorkoutFeedbackRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.WorkoutFeedbackService;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +40,7 @@ class MobileMemberFeedbackServiceTest {
     private AttendanceRepository attendanceRepository;
 
     @Mock
-    private MobileWorkoutFeedbackRepository mobileWorkoutFeedbackRepository;
+    private WorkoutFeedbackRepository workoutFeedbackRepository;
 
     @Mock
     private WorkoutFeedbackService workoutFeedbackService;
@@ -84,7 +84,7 @@ class MobileMemberFeedbackServiceTest {
     void testSubmitFeedbackSuccess() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
         when(attendanceRepository.findById(901L)).thenReturn(Optional.of(completedAttendance));
-        when(mobileWorkoutFeedbackRepository.existsByAttendance_Id(901L)).thenReturn(false);
+        when(workoutFeedbackRepository.existsByAttendance_Id(901L)).thenReturn(false);
 
         MobileMemberFeedbackRequestDTO request = new MobileMemberFeedbackRequestDTO();
         request.setAttendanceId(901L);
@@ -181,7 +181,7 @@ class MobileMemberFeedbackServiceTest {
     void testRejectDuplicateFeedback() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
         when(attendanceRepository.findById(901L)).thenReturn(Optional.of(completedAttendance));
-        when(mobileWorkoutFeedbackRepository.existsByAttendance_Id(901L)).thenReturn(true);
+        when(workoutFeedbackRepository.existsByAttendance_Id(901L)).thenReturn(true);
 
         MobileMemberFeedbackRequestDTO request = new MobileMemberFeedbackRequestDTO();
         request.setAttendanceId(901L);

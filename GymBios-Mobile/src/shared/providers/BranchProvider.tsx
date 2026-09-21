@@ -43,13 +43,15 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     derivedBranchId = branches[0].id;
   }
 
-  // 2. State for user-selected branch
-  const [selectedBranchId, setSelectedBranchId] = useState<BranchId>('ALL');
+  // 2. State for user-selected branch. `null` means "no explicit choice yet",
+  // distinct from 'ALL' which is the user's explicit "All Branches" choice.
+  const [userSelectedBranchId, setUserSelectedBranchId] = useState<BranchId | null>(null);
 
-  // 3. Effective branch ID
-  const effectiveBranchId = selectedBranchId === 'ALL' && derivedBranchId !== 'ALL' 
-    ? derivedBranchId 
-    : selectedBranchId;
+  // 3. Effective branch ID: defer to the derived default only until the user
+  // has made an explicit selection.
+  const effectiveBranchId = userSelectedBranchId === null
+    ? derivedBranchId
+    : userSelectedBranchId;
 
   // 4. Sync API client SYNCHRONOUSLY before children render
   useMemo(() => {
@@ -57,7 +59,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   }, [effectiveBranchId]);
 
   const handleSetSelectedBranch = (id: BranchId) => {
-    setSelectedBranchId(id);
+    setUserSelectedBranchId(id);
     setApiClientBranch(id);
   };
 

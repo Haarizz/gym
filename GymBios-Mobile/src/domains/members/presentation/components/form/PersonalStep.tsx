@@ -8,6 +8,8 @@ import { Input } from '@/shared/components/Input';
 import { FormSection } from '@/shared/components/FormSection';
 import { GENDERS } from '@/domains/members/constants';
 import type { MemberWizardData } from '@/domains/members/hooks/useMemberWizard';
+import { uploadPhoto } from '@/shared/utils/uploadPhoto';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface PersonalStepProps {
   data: MemberWizardData;
@@ -21,9 +23,19 @@ export function PersonalStep({ data, updateField }: PersonalStepProps) {
         photoUri={data.photoUri}
         photoUrl={data.photoUrl}
         name={data.name}
-        onChangePhoto={(uri) => {
+        onChangePhoto={async (uri) => {
           updateField('photoUri', uri);
-          updateField('photoUrl', uri || '');
+          if (!uri) {
+            updateField('photoUrl', '');
+            return;
+          }
+          try {
+            const url = await uploadPhoto(uri);
+            updateField('photoUrl', url);
+          } catch {
+            toast.error('Failed to upload photo. Please try again.');
+            updateField('photoUrl', '');
+          }
         }}
       />
 

@@ -11,6 +11,7 @@ import com.company.project.enums.RedemptionAction;
 import com.company.project.enums.RewardAuditAction;
 import com.company.project.enums.RewardMemberType;
 import com.company.project.enums.RewardStatus;
+import com.company.project.enums.RewardTrigger;
 import com.company.project.enums.RewardType;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.ReferralCampaignRepository;
@@ -31,8 +32,11 @@ import java.math.BigDecimal;
 
 /**
  * RewardEngineService — the only place reward-generation logic lives (never in
- * a controller). Entry point is generateRewardsForReferral(), called by
- * ReferralService.markSuccessful() once a referral flips to "successful".
+ * a controller). Entry point is generateRewardsForReferral(referral, trigger),
+ * called with RewardTrigger.SIGNUP right when a mobile referral code is claimed
+ * (ReferralService.generateSignupRewards()) and with RewardTrigger.PAYMENT once
+ * a referral flips to "successful" (ReferralService.markSuccessful()). A rule
+ * only fires for the trigger its conditionTrigger names (or both, for "both").
  *
  * For each side of the referral (referrer / referee) it walks the active
  * reward rules in priority order and executes the first matching rule. A rule
@@ -84,25 +88,22 @@ public class RewardEngineService {
         this.branchSettingsResolver = branchSettingsResolver;
     }
 
+    /** Defaults to PAYMENT — preserves the original behavior (fire once a referral is "successful") for any call site that doesn't care about signup-triggered rules. */
     public void generateRewardsForReferral(Referral referral) {
-        if (referral == null || !"successful".equals(referral.getStatus())) return;
+        generateRewardsForReferral(referral, RewardTrigger.PAYMENT);
+    }
+
+    public void generateRewardsForReferral(Referral referral, RewardTrigger trigger) {
+        if (referral == null || "expired".equalsIgnoreCase(referral.getStatus())) return;
 
         Long branchId = branchSettingsResolver.resolveForRead();
         ReferralSettings settings = branchId != null ? settingsRepository.findByBranchId(branchId).orElse(null) : null;
         if (settings != null && Boolean.FALSE.equals(settings.getProgramEnabled())) return;
 
-        List<ReferralRewardRule> rules;
-        if (referral.getRuleId() != null) {
-            ReferralRewardRule explicitRule = ruleRepository.findById(referral.getRuleId()).orElse(null);
-            if (explicitRule != null) {
-                rules = java.util.List.of(explicitRule);
-            } else {
-                rules = ruleRepository.findByIsActiveTrueOrderByPriorityDesc();
-            }
-        } else {
-            rules = ruleRepository.findByIsActiveTrueOrderByPriorityDesc();
-        }
-        if (rules.isEmpty()) return;
+        if (referral.getRuleId() == null) return;
+        ReferralRewardRule rule = ruleRepository.findById(referral.getRuleId()).orElse(null);
+        if (rule == null) return;
+        if (!triggerMatches(rule.getConditionTrigger(), trigger)) return;
 
         String refereeMemberId = referral.getRefereeMemberId();
         if (refereeMemberId == null && referral.getRefereeEmail() != null) {
@@ -114,11 +115,11 @@ public class RewardEngineService {
             if (m != null) refereeMemberId = m.getMemberId();
         }
 
-        generateForSide(referral, rules, RewardMemberType.REFERRER, referral.getReferrerMemberId(), settings);
-        generateForSide(referral, rules, RewardMemberType.REFEREE, refereeMemberId, settings);
+        generateForSide(referral, rule, RewardMemberType.REFERRER, referral.getReferrerMemberId(), settings);
+        generateForSide(referral, rule, RewardMemberType.REFEREE, refereeMemberId, settings);
     }
 
-    private void generateForSide(Referral referral, List<ReferralRewardRule> rules,
+    private void generateForSide(Referral referral, ReferralRewardRule rule,
                                   RewardMemberType memberType, String memberId, ReferralSettings settings) {
         if (memberId == null || memberId.isBlank()) return;
 
@@ -139,17 +140,19 @@ public class RewardEngineService {
         final String finalMemberId = memberId;
         final Member finalMember = resolvedMember;
 
-        for (ReferralRewardRule rule : rules) {
-            if (!eligibleFor(rule, memberType)) continue;
-            if (!passesValidation(rule, referral, memberType, finalMemberId, finalMember, settings)) continue;
+        if (!eligibleFor(rule, memberType)) return;
+        if (!passesValidation(rule, referral, memberType, finalMemberId, finalMember, settings)) return;
 
-            createReward(referral, rule, memberType, finalMemberId, settings);
+        createReward(referral, rule, memberType, finalMemberId, settings);
+    }
 
-            if (!Boolean.TRUE.equals(rule.getStackable())) {
-                break; // exclusive match — first matching rule wins
-            }
-            // stackable — keep evaluating so a following rule can also fire
-        }
+    /** Null/unrecognized conditionTrigger falls back to PAYMENT-only, matching the engine's only real behavior before triggers were enforced. */
+    private boolean triggerMatches(String conditionTrigger, RewardTrigger firing) {
+        if (conditionTrigger == null) return firing == RewardTrigger.PAYMENT;
+        if ("both".equalsIgnoreCase(conditionTrigger)) return true;
+        if ("signup".equalsIgnoreCase(conditionTrigger)) return firing == RewardTrigger.SIGNUP;
+        if ("payment".equalsIgnoreCase(conditionTrigger)) return firing == RewardTrigger.PAYMENT;
+        return firing == RewardTrigger.PAYMENT;
     }
 
     private boolean eligibleFor(ReferralRewardRule rule, RewardMemberType memberType) {
@@ -339,8 +342,11 @@ public class RewardEngineService {
             Long targetId = member.getUserId() != null ? member.getUserId() : member.getGlobalUserId();
             if (targetId != null) {
                 try {
+                    // "/my-rewards" used to be a dead end for a member opening this in the mobile
+                    // app (it only ever resolved to the staff-only web Reward Queue view) — this
+                    // deep-links straight into the member's own Referrals > My Rewards section.
                     notificationService.notifyUser(targetId, title, message,
-                            "SUCCESS", priority, "REFERRALS", reward.getId(), "/my-rewards",
+                            "SUCCESS", priority, "REFERRALS", reward.getId(), "/profile?view=referrals",
                             "REWARD_GENERATED_USER_" + reward.getId());
                 } catch (Exception ex) {
                     log.warn("Reward-generated user notification failed for member {}: {}", member.getMemberId(), ex.getMessage());

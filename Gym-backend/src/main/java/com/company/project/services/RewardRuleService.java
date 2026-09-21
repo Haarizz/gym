@@ -4,6 +4,7 @@ import com.company.project.dto.RewardRuleRequestDTO;
 import com.company.project.dto.RewardRuleResponseDTO;
 import com.company.project.entities.ReferralCampaign;
 import com.company.project.entities.ReferralRewardRule;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.ReferralCampaignRepository;
 import com.company.project.repositories.ReferralRewardRuleRepository;
@@ -45,6 +46,8 @@ public class RewardRuleService {
     public RewardRuleResponseDTO create(RewardRuleRequestDTO req) {
         ReferralRewardRule rule = new ReferralRewardRule();
         applyRequest(req, rule);
+        validateSignupEligibility(rule);
+        enforceSingleActiveRule(rule);
         return toDTO(ruleRepository.save(rule));
     }
 
@@ -52,7 +55,25 @@ public class RewardRuleService {
         ReferralRewardRule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Reward rule not found: " + id));
         applyRequest(req, rule);
+        validateSignupEligibility(rule);
+        enforceSingleActiveRule(rule);
         return toDTO(ruleRepository.save(rule));
+    }
+
+    // A "referee"/"both"-eligible rule can never pay out its referee half if it's locked to
+    // "signup" only — the referee isn't a resolvable Member until they actually purchase, and
+    // that purchase IS the "payment" trigger. "Both" lets the referrer get rewarded at signup
+    // while the referee still gets rewarded later at payment.
+    private void validateSignupEligibility(ReferralRewardRule rule) {
+        boolean refereeEligible = rule.getEligibility() != null
+                && ("referee".equalsIgnoreCase(rule.getEligibility()) || "both".equalsIgnoreCase(rule.getEligibility()));
+        boolean signupOnly = rule.getConditionTrigger() != null && "signup".equalsIgnoreCase(rule.getConditionTrigger());
+        if (refereeEligible && signupOnly) {
+            throw new BusinessRuleViolationException(
+                    "A rule eligible for the referee can't use the \"On Signup\" condition — the referee isn't "
+                            + "a member yet at signup, so that reward could never be credited. Use \"Both\" instead "
+                            + "to reward the referee once they complete a purchase.");
+        }
     }
 
     public void delete(Long id) {
@@ -66,7 +87,17 @@ public class RewardRuleService {
         ReferralRewardRule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Reward rule not found: " + id));
         rule.setIsActive(!Boolean.TRUE.equals(rule.getIsActive()));
+        enforceSingleActiveRule(rule);
         return toDTO(ruleRepository.save(rule));
+    }
+
+    // Mirrors ReferralService.enforceSingleActiveRule() — this table has exactly one
+    // active rule at a time (see V44__single_active_reward_rule.sql), and this is the
+    // service the Reward Rules admin page actually calls, so it must enforce it too.
+    private void enforceSingleActiveRule(ReferralRewardRule incomingRule) {
+        if (Boolean.TRUE.equals(incomingRule.getIsActive())) {
+            ruleRepository.deactivateAllExcept(incomingRule.getId());
+        }
     }
 
     public RewardRuleResponseDTO duplicate(Long id) {

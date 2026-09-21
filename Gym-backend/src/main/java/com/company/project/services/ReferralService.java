@@ -15,6 +15,7 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.entities.Referral;
 import com.company.project.entities.ReferralRewardRule;
 import com.company.project.entities.ReferralSettings;
+import com.company.project.enums.RewardTrigger;
 import com.company.project.repositories.ReferralRepository;
 import com.company.project.repositories.ReferralRewardRuleRepository;
 import com.company.project.repositories.ReferralSettingsRepository;
@@ -146,7 +147,7 @@ public class ReferralService {
             ref.setReferralCode(prefix + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase());
         }
 
-        // Apply rule if provided, otherwise auto-assign an active one
+        // Apply rule if provided, otherwise auto-assign the active one
         if (req.getRuleId() != null) {
             ruleRepository.findById(req.getRuleId()).ifPresent(rule -> {
                 ref.setRuleId(rule.getId());
@@ -156,14 +157,11 @@ public class ReferralService {
                 }
             });
         } else {
-            ruleRepository.findByIsActiveTrue().stream()
-                .filter(r -> "referrer".equalsIgnoreCase(r.getEligibility()) || "both".equalsIgnoreCase(r.getEligibility()))
-                .findFirst()
-                .ifPresent(rule -> {
-                    ref.setRuleId(rule.getId());
-                    ref.setRuleName(rule.getName());
-                    ref.setRewardAmount(rule.getValue());
-                });
+            ruleRepository.findByIsActiveTrue().stream().findFirst().ifPresent(rule -> {
+                ref.setRuleId(rule.getId());
+                ref.setRuleName(rule.getName());
+                ref.setRewardAmount(rule.getValue());
+            });
         }
 
         Referral saved = referralRepository.save(ref);
@@ -224,15 +222,12 @@ public class ReferralService {
                     "The referred person's photo must be verified by staff before this referral can be marked successful.");
         }
 
-        if (ref.getRewardAmount() == null || ref.getRewardAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            ruleRepository.findByIsActiveTrue().stream()
-                .filter(r -> "referrer".equalsIgnoreCase(r.getEligibility()) || "both".equalsIgnoreCase(r.getEligibility()))
-                .findFirst()
-                .ifPresent(rule -> {
-                    ref.setRuleId(rule.getId());
-                    ref.setRuleName(rule.getName());
-                    ref.setRewardAmount(rule.getValue());
-                });
+        // Ensure existing referrals use their originally assigned rule
+        // even if the active rule has changed since the referral was created.
+        if (ref.getRuleId() != null && (ref.getRewardAmount() == null || ref.getRewardAmount().compareTo(BigDecimal.ZERO) <= 0)) {
+            ruleRepository.findById(ref.getRuleId()).ifPresent(rule -> {
+                ref.setRewardAmount(rule.getValue());
+            });
         }
 
         if (!"pending".equals(ref.getStatus())) {
@@ -253,7 +248,7 @@ public class ReferralService {
             clone = referralRepository.save(clone);
             clone.setReferralId("REF-" + String.format("%010d", clone.getId()));
             clone = referralRepository.save(clone);
-            rewardEngineService.generateRewardsForReferral(clone);
+            rewardEngineService.generateRewardsForReferral(clone, RewardTrigger.PAYMENT);
             return toDTO(clone);
         }
 
@@ -261,8 +256,15 @@ public class ReferralService {
         ref.setSignupDate(LocalDate.now());
         applyMarkSuccessfulRequest(ref, req);
         Referral saved = referralRepository.save(ref);
-        rewardEngineService.generateRewardsForReferral(saved);
+        rewardEngineService.generateRewardsForReferral(saved, RewardTrigger.PAYMENT);
         return toDTO(saved);
+    }
+
+    /** Fires any SIGNUP-triggered rule for a referral right when it's created (e.g. a mobile referral code claim), before the referee has ever become a paying member. The referral's status is still "pending" here — that's expected. */
+    public void generateSignupRewards(Long referralId) {
+        Referral ref = referralRepository.findById(referralId)
+                .orElseThrow(() -> new EntityNotFoundException("Referral not found: " + referralId));
+        rewardEngineService.generateRewardsForReferral(ref, RewardTrigger.SIGNUP);
     }
 
     private void applyMarkSuccessfulRequest(Referral ref, MarkSuccessfulRequestDTO req) {
@@ -351,7 +353,7 @@ public class ReferralService {
         long pending = referralRepository.countByStatus("pending");
         long expired = referralRepository.countByStatus("expired");
         BigDecimal totalRewards = referralRepository.sumRewardsEarned();
-        long activeRules = ruleRepository.findByIsActiveTrue().size();
+        long activeRules = ruleRepository.findByIsActiveTrue().isEmpty() ? 0L : 1L;
 
         ReferralStatsDTO stats = new ReferralStatsDTO();
         stats.setTotalReferrals(total);
@@ -373,23 +375,18 @@ public class ReferralService {
             debug.append("== DIAGNOSTIC FIX ==\n");
         List<Referral> all = referralRepository.findAll();
         for (Referral ref : all) {
-            if (ref.getRewardAmount() == null || ref.getRewardAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                ruleRepository.findByIsActiveTrue().stream()
-                    .filter(r -> "referrer".equalsIgnoreCase(r.getEligibility()) || "both".equalsIgnoreCase(r.getEligibility()))
-                    .findFirst()
-                    .ifPresent(rule -> {
-                        ref.setRuleId(rule.getId());
-                        ref.setRuleName(rule.getName());
-                        ref.setRewardAmount(rule.getValue());
-                        referralRepository.save(ref);
-                    });
+            if (ref.getRuleId() != null && (ref.getRewardAmount() == null || ref.getRewardAmount().compareTo(BigDecimal.ZERO) <= 0)) {
+                ruleRepository.findById(ref.getRuleId()).ifPresent(rule -> {
+                    ref.setRewardAmount(rule.getValue());
+                    referralRepository.save(ref);
+                });
             }
             if ("successful".equalsIgnoreCase(ref.getStatus())) {
                 List<ReferralReward> existing = rewardRepository.findByReferralId(ref.getId());
                 debug.append("Ref ").append(ref.getId()).append(" (Amt: ").append(ref.getRewardAmount()).append(") has ").append(existing.size()).append(" rewards.\n");
                 
                 debug.append("-> Checking for missing reward generations...\n");
-                rewardEngineService.generateRewardsForReferral(ref);
+                rewardEngineService.generateRewardsForReferral(ref, RewardTrigger.PAYMENT);
                 
                 if (ref.getRewardAmount() != null) {
                     for (ReferralReward r : existing) {
@@ -438,6 +435,8 @@ public class ReferralService {
     public RewardRuleResponseDTO createRule(RewardRuleRequestDTO req) {
         ReferralRewardRule rule = new ReferralRewardRule();
         mapRuleRequest(req, rule);
+        validateSignupEligibility(rule);
+        enforceSingleActiveRule(rule);
         return toRuleDTO(ruleRepository.save(rule));
     }
 
@@ -445,10 +444,35 @@ public class ReferralService {
         ReferralRewardRule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Rule not found: " + id));
         mapRuleRequest(req, rule);
+        validateSignupEligibility(rule);
+        enforceSingleActiveRule(rule);
         return toRuleDTO(ruleRepository.save(rule));
     }
 
+    // A "referee"/"both"-eligible rule can never pay out its referee half if it's locked to
+    // "signup" only — the referee isn't a resolvable Member until they actually purchase, and
+    // that purchase IS the "payment" trigger. "Both" lets the referrer get rewarded at signup
+    // while the referee still gets rewarded later at payment. Mirrors RewardRuleService's check.
+    private void validateSignupEligibility(ReferralRewardRule rule) {
+        boolean refereeEligible = rule.getEligibility() != null
+                && ("referee".equalsIgnoreCase(rule.getEligibility()) || "both".equalsIgnoreCase(rule.getEligibility()));
+        boolean signupOnly = rule.getConditionTrigger() != null && "signup".equalsIgnoreCase(rule.getConditionTrigger());
+        if (refereeEligible && signupOnly) {
+            throw new BusinessRuleViolationException(
+                    "A rule eligible for the referee can't use the \"On Signup\" condition — the referee isn't "
+                            + "a member yet at signup, so that reward could never be credited. Use \"Both\" instead "
+                            + "to reward the referee once they complete a purchase.");
+        }
+    }
+
     public void deleteRule(Long id) {
+        if (referralRepository.existsByRuleId(id) || rewardRepository.existsByRewardRuleId(id)) {
+            ReferralRewardRule rule = ruleRepository.findById(id)
+                    .orElseThrow(() -> new EntityNotFoundException("Rule not found: " + id));
+            rule.setIsActive(false);
+            ruleRepository.save(rule);
+            return;
+        }
         ruleRepository.deleteById(id);
     }
 
@@ -456,6 +480,7 @@ public class ReferralService {
         ReferralRewardRule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Rule not found: " + id));
         rule.setIsActive(!Boolean.TRUE.equals(rule.getIsActive()));
+        enforceSingleActiveRule(rule);
         return toRuleDTO(ruleRepository.save(rule));
     }
 
@@ -465,6 +490,12 @@ public class ReferralService {
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private void enforceSingleActiveRule(ReferralRewardRule incomingRule) {
+        if (Boolean.TRUE.equals(incomingRule.getIsActive())) {
+            ruleRepository.deactivateAllExcept(incomingRule.getId());
+        }
+    }
 
     private void mapRequestToEntity(ReferralRequestDTO req, Referral ref) {
         if (req.getReferrerMemberId() != null) ref.setReferrerMemberId(req.getReferrerMemberId());
@@ -611,9 +642,8 @@ public class ReferralService {
 
         ReferralResponseDTO referralDto = toDTO(ref);
 
-        // Find active reward rules that apply to the referee (new member) or both
-        List<RewardRuleResponseDTO> applicableRules = ruleRepository.findByIsActiveTrue()
-                .stream()
+        // Find the active reward rule that applies to the referee (new member) or both
+        List<RewardRuleResponseDTO> applicableRules = ruleRepository.findByIsActiveTrue().stream()
                 .filter(rule -> "referee".equalsIgnoreCase(rule.getEligibility())
                         || "both".equalsIgnoreCase(rule.getEligibility()))
                 .map(this::toRuleDTO)

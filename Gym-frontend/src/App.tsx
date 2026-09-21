@@ -56,9 +56,11 @@ import { Messaging } from "./pages/messaging";
 import { Automations } from "./pages/automations";
 import { PostWorkoutCheckin } from "./pages/post-workout-checkin";
 import { PlansServicesCatalog } from "./pages/plans-services-catalog";
+import { CatalogResolver } from "./pages/catalog/resolver";
 import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
 import { BranchManagement } from "./pages/branch-management";
+import { BranchSettings } from "./pages/branch-settings";
 import { GymManagement } from "./pages/gym-management";
 import { AssetTransactions } from "./pages/asset-transactions";
 import { AssetHistoryPage } from "./pages/asset-history";
@@ -1072,6 +1074,7 @@ export default function App() {
       <Route path="/automations" element={<Automations />} />
       <Route path="/post-workout-checkin" element={<PostWorkoutCheckin />} />
       <Route path="/plans-services-catalog" element={<PlansServicesCatalog />} />
+      <Route path="/catalog/t/:tenantSlug/b/:branchId" element={<CatalogResolver />} />
       <Route path="/member-connect-reports" element={<MemberConnectReports />} />
       <Route path="/member-connect-analytics" element={<MemberConnectAnalytics />} />
       
@@ -1144,6 +1147,7 @@ export default function App() {
       <Route path="/assets" element={<Assets />} />
       <Route path="/manage-assets" element={<ManageAssets />} />
       <Route path="/branch-management" element={<BranchManagement />} />
+      <Route path="/branch-management/:branchId/settings" element={<BranchSettings />} />
       <Route path="/gym-management" element={<GymManagement />} />
       <Route path="/pending-approval" element={<PendingApproval />} />
       <Route path="/platform-leads" element={<PlatformLeads />} />

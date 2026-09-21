@@ -191,6 +191,15 @@ public class AuthService {
             String staffName = staffRepository.findByUserId(userDetails.getId())
                     .map(com.company.project.entities.Staff::getName)
                     .orElse(null);
+            
+            String fullName = userProfileRepository.findByUserId(userDetails.getId())
+                    .map(com.company.project.entities.UserProfile::getFullName)
+                    .orElse(null);
+            
+            if (fullName == null && staffName != null) {
+                fullName = staffName;
+            }
+
             return AuthResponseDTO.builder()
                     .token(jwt)
                     .username(userDetails.getUsername())
@@ -199,6 +208,7 @@ public class AuthService {
                     .enabled(userDetails.isEnabled())
                     .roleName(roles.stream().findFirst().orElse(null))
                     .staffName(staffName)
+                    .fullName(fullName)
                     .gymName(staffName == null ? resolveGymNameForDisplay() : null)
                     .permissions(extractPermissions(userDetails))
                     .accessibleBranches(accessibleBranches)
@@ -240,6 +250,15 @@ public class AuthService {
         String staffName = staffRepository.findByUserId(userDetails.getId())
                 .map(com.company.project.entities.Staff::getName)
                 .orElse(null);
+        
+        String fullName = userProfileRepository.findByUserId(userDetails.getId())
+                .map(com.company.project.entities.UserProfile::getFullName)
+                .orElse(null);
+        
+        if (fullName == null && staffName != null) {
+            fullName = staffName;
+        }
+
         return AuthResponseDTO.builder()
                 .username(userDetails.getUsername())
                 .roles(roles)
@@ -247,6 +266,7 @@ public class AuthService {
                 .enabled(userDetails.isEnabled())
                 .roleName(roles.stream().findFirst().orElse(null))
                 .staffName(staffName)
+                .fullName(fullName)
                 .gymName(staffName == null ? resolveGymNameForDisplay() : null)
                 .permissions(extractPermissions(userDetails))
                 .accessibleBranches(accessibleBranches)

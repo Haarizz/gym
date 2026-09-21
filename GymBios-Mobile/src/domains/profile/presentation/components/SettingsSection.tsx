@@ -5,11 +5,15 @@ import { Typography } from '@/shared/components/Typography';
 import { GlassSurface } from '@/shared/components';
 import type { LinkedAccount } from '../../domain';
 
+const HAIRLINE = 'rgba(30,42,58,0.07)';
+
 interface SettingSwitchRowProps {
   label: string;
   description?: string;
   value: boolean;
   onValueChange: (val: boolean) => void;
+  /** Top hairline separating this row from the one above it — pass false on the first row in a card. */
+  divider?: boolean;
 }
 
 export function SettingSwitchRow({
@@ -17,9 +21,10 @@ export function SettingSwitchRow({
   description,
   value,
   onValueChange,
+  divider = true,
 }: SettingSwitchRowProps) {
   return (
-    <View style={styles.switchRow}>
+    <View style={[styles.switchRow, divider && styles.divider]}>
       <View style={styles.switchTextWrapper}>
         <Typography variant="body" style={styles.switchLabel}>
           {label}
@@ -42,9 +47,11 @@ export function SettingSwitchRow({
 
 interface LinkedAccountRowProps {
   account: LinkedAccount;
+  /** Top hairline separating this row from the one above it — pass false on the first row in a card. */
+  divider?: boolean;
 }
 
-export function LinkedAccountRow({ account }: LinkedAccountRowProps) {
+export function LinkedAccountRow({ account, divider = true }: LinkedAccountRowProps) {
   const iconName =
     account.type === 'email'
       ? 'mail'
@@ -53,7 +60,7 @@ export function LinkedAccountRow({ account }: LinkedAccountRowProps) {
         : 'credit-card';
 
   return (
-    <View style={styles.accountRow}>
+    <View style={[styles.accountRow, divider && styles.divider]}>
       <View style={styles.accountIconBox}>
         <Feather name={iconName} size={18} color={BrandColors.teal} />
       </View>
@@ -89,7 +96,7 @@ export function SettingsCard({ title, icon, children }: SettingsCardProps) {
           {title}
         </Typography>
       </View>
-      <View style={styles.cardContent}>{children}</View>
+      <View>{children}</View>
     </GlassSurface>
   );
 }
@@ -102,7 +109,7 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.two,
   },
   cardHeaderIcon: {
     marginRight: Spacing.two,
@@ -112,16 +119,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: BrandColors.textPrimary,
   },
-  cardContent: {
-    gap: Spacing.two,
+  divider: {
+    borderTopWidth: 1,
+    borderTopColor: HAIRLINE,
   },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.two,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f8fafc',
+    paddingVertical: 13,
   },
   switchTextWrapper: {
     flex: 1,
@@ -138,7 +144,7 @@ const styles = StyleSheet.create({
   accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.two,
+    paddingVertical: 13,
   },
   accountIconBox: {
     width: 36,

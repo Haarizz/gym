@@ -74,6 +74,13 @@ public class RewardRedemptionService {
             rewardRepository.save(reward);
             auditLogRepository.save(new RewardAuditLog(reward.getId(), RewardAuditAction.REDEEMED,
                     "SYSTEM", "Auto-credited to wallet on generation"));
+        } else if (reward.getRewardType() == RewardType.MEMBERSHIP_EXTENSION) {
+            extendMembership(reward);
+            reward.setStatus(RewardStatus.REDEEMED);
+            reward.setRedeemedDate(LocalDateTime.now());
+            rewardRepository.save(reward);
+            auditLogRepository.save(new RewardAuditLog(reward.getId(), RewardAuditAction.MEMBERSHIP_EXTENDED,
+                    "SYSTEM", reward.getRemarks()));
         }
     }
 

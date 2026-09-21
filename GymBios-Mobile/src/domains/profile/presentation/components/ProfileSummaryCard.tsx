@@ -117,11 +117,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 10,
     backgroundColor: BrandColors.teal,
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -188,6 +188,6 @@ const styles = StyleSheet.create({
   metricDivider: {
     width: 1,
     height: 32,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: 'rgba(30,42,58,0.1)',
   },
 });

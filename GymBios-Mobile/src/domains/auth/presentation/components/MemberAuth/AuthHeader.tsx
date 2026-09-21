@@ -10,10 +10,6 @@ export function AuthHeader() {
 
   return (
     <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 26 }]}>
-      <LinearGradient
-        colors={['#16815F', '#0E6653', '#0A3F34']}
-        style={StyleSheet.absoluteFill as any}
-      />
       <View style={styles.pulseWrap}>
         <Svg viewBox="0 0 360 34" preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
           <Polyline

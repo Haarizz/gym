@@ -69,6 +69,8 @@ export const MODULE_ROUTES = [
   'roles',
   'profile',
   'trainer',
+  'catalog',
+  'catalog/t/[tenantSlug]/b/[branchId]',
 ] as const;
 
 /**

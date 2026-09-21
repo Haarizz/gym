@@ -9,6 +9,10 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.util.matcher.AndRequestMatcher;
+import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.context.ApplicationContext;
@@ -40,6 +44,45 @@ public class TenantContextFilter extends OncePerRequestFilter {
 
     @Value("${tenant.routing.enabled:false}")
     private boolean tenantRoutingEnabled;
+
+    // Custom RequestMatchers to preserve the exact semantics of the previous String.startsWith and String.equals checks,
+    // ensuring 100% equivalence, including any trailing-slash anomalies, without broadening boundaries.
+    private static RequestMatcher uriStartsWith(String prefix) {
+        return request -> request.getRequestURI() != null && request.getRequestURI().startsWith(prefix);
+    }
+
+    private static RequestMatcher uriEquals(String exactPath) {
+        return request -> request.getRequestURI() != null && request.getRequestURI().equals(exactPath);
+    }
+
+    private static final RequestMatcher PROFILE_TRANSACTIONS_PATH = uriEquals("/api/mobile/profile/transactions");
+    private static final RequestMatcher STRICTLY_GLOBAL_PROFILE_PATH = new AndRequestMatcher(
+            uriStartsWith("/api/mobile/profile/"),
+            new NegatedRequestMatcher(PROFILE_TRANSACTIONS_PATH)
+    );
+
+    private static final RequestMatcher STRICTLY_GLOBAL_PATH = new OrRequestMatcher(
+            uriStartsWith("/api/mobile/auth/"),
+            STRICTLY_GLOBAL_PROFILE_PATH,
+            uriStartsWith("/api/mobile/discovery/")
+    );
+
+    private static final RequestMatcher GLOBAL_EXEMPT_PATH = new OrRequestMatcher(
+            uriStartsWith("/api/auth/"),
+            uriStartsWith("/api/mobile/auth/"),
+            STRICTLY_GLOBAL_PROFILE_PATH,
+            uriStartsWith("/api/mobile/discovery/"),
+            uriStartsWith("/api/community"),
+            uriStartsWith("/api/notifications")
+    );
+
+    private static final RequestMatcher OWN_STATUS_CHECK_PATH = uriEquals("/api/members/me");
+
+    private static final RequestMatcher LEGACY_EXEMPT_PATH = new OrRequestMatcher(
+            GLOBAL_EXEMPT_PATH,
+            uriEquals("/api/branches/my-branches"),
+            OWN_STATUS_CHECK_PATH
+    );
 
     public TenantContextFilter(JwtService jwtService, ApplicationContext applicationContext) {
         this.jwtService = jwtService;
@@ -80,31 +123,11 @@ public class TenantContextFilter extends OncePerRequestFilter {
                         }
                     }
 
-                    String path = request.getRequestURI();
-                    boolean isGlobalExemptPath = path.startsWith("/api/auth/")
-                            || path.startsWith("/api/mobile/auth/")
-                            || path.startsWith("/api/mobile/profile/")
-                            || path.startsWith("/api/mobile/discovery/")
-                            || path.startsWith("/api/community")
-                            || path.startsWith("/api/notifications");
-
-                    // A member awaiting reception approval must still be able to check
-                    // their own status (approval_status/app_access_enabled) — otherwise
-                    // the app has no way to detect or display the pending/locked state
-                    // once the access-enabled check below starts blocking everything
-                    // else. Exempt ONLY from that specific check, not from the "not a
-                    // member of this gym" check above it.
-                    boolean isOwnStatusCheckPath = path.equals("/api/members/me");
-
-                    boolean isStrictlyGlobalPath = path.startsWith("/api/mobile/auth/")
-                            || path.startsWith("/api/mobile/profile/")
-                            || path.startsWith("/api/mobile/discovery/");
-
-                    if (tenantSlug != null && !tenantSlug.isBlank() && !isStrictlyGlobalPath) {
+                    if (tenantSlug != null && !tenantSlug.isBlank() && !STRICTLY_GLOBAL_PATH.matches(request)) {
                         TenantContextHolder.setCurrentTenant(tenantSlug);
                         
                         // Validate multi-tenant authorization for global users on protected member paths
-                        if (userDetails.isGlobal() && !isGlobalExemptPath) {
+                        if (userDetails.isGlobal() && !GLOBAL_EXEMPT_PATH.matches(request)) {
                             MemberRepository memberRepository = applicationContext.getBean(MemberRepository.class);
                             var member = memberRepository.findByGlobalUserId(userDetails.getId()).orElse(null);
                             if (member == null) {
@@ -120,7 +143,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
                             // can't be bypassed by calling an API other than /purchase.
                             // /api/members/me stays reachable (see isOwnStatusCheckPath)
                             // so the app can keep checking whether it's been resolved.
-                            if (!isOwnStatusCheckPath && Boolean.FALSE.equals(member.getAppAccessEnabled())) {
+                            if (!OWN_STATUS_CHECK_PATH.matches(request) && Boolean.FALSE.equals(member.getAppAccessEnabled())) {
                                 TenantContextHolder.clear();
                                 response.sendError(HttpServletResponse.SC_FORBIDDEN,
                                         "Access Denied: Membership payment is awaiting approval");
@@ -128,13 +151,8 @@ public class TenantContextFilter extends OncePerRequestFilter {
                             }
                         }
                     } else {
-                        // Keep legacy exemptions for non-mobile apps (staff, trainers)
-                        boolean isLegacyExemptPath = isGlobalExemptPath 
-                                || path.equals("/api/branches/my-branches")
-                                || path.equals("/api/members/me");
-
                         // Global users can access endpoints without a tenant (e.g., to see empty dashboard before joining a gym)
-                        if (!isLegacyExemptPath && !userDetails.isGlobal()) {
+                        if (!LEGACY_EXEMPT_PATH.matches(request) && !userDetails.isGlobal()) {
                             response.sendError(HttpServletResponse.SC_FORBIDDEN,
                                     "Request is missing a valid tenant context");
                             return;

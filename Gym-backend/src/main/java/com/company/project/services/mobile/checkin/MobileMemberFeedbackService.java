@@ -9,7 +9,7 @@ import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.MemberRepository;
-import com.company.project.repositories.mobile.checkin.MobileWorkoutFeedbackRepository;
+import com.company.project.repositories.WorkoutFeedbackRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.WorkoutFeedbackService;
 import org.springframework.stereotype.Service;
@@ -20,17 +20,17 @@ public class MobileMemberFeedbackService {
 
     private final MemberRepository memberRepository;
     private final AttendanceRepository attendanceRepository;
-    private final MobileWorkoutFeedbackRepository mobileWorkoutFeedbackRepository;
+    private final WorkoutFeedbackRepository workoutFeedbackRepository;
     private final WorkoutFeedbackService workoutFeedbackService;
 
     public MobileMemberFeedbackService(
             MemberRepository memberRepository,
             AttendanceRepository attendanceRepository,
-            MobileWorkoutFeedbackRepository mobileWorkoutFeedbackRepository,
+            WorkoutFeedbackRepository workoutFeedbackRepository,
             WorkoutFeedbackService workoutFeedbackService) {
         this.memberRepository = memberRepository;
         this.attendanceRepository = attendanceRepository;
-        this.mobileWorkoutFeedbackRepository = mobileWorkoutFeedbackRepository;
+        this.workoutFeedbackRepository = workoutFeedbackRepository;
         this.workoutFeedbackService = workoutFeedbackService;
     }
 
@@ -74,7 +74,7 @@ public class MobileMemberFeedbackService {
             throw new BusinessRuleViolationException("Feedback can only be submitted for a completed workout session");
         }
 
-        if (mobileWorkoutFeedbackRepository.existsByAttendance_Id(attendanceId)) {
+        if (workoutFeedbackRepository.existsByAttendance_Id(attendanceId)) {
             throw new BusinessRuleViolationException("Feedback has already been submitted for this workout session");
         }
 

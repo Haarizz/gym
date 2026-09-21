@@ -22,6 +22,8 @@ public interface ReferralRewardRepository extends JpaRepository<ReferralReward, 
 
     boolean existsByReferralIdAndRewardRuleIdAndMemberType(Long referralId, Long rewardRuleId, RewardMemberType memberType);
 
+    boolean existsByRewardRuleId(Long rewardRuleId);
+
     long countByMemberIdAndRewardRuleId(String memberId, Long rewardRuleId);
 
     // Global cap enforcement (ReferralSettings.maxRewardsPerMember), independent of any one rule.

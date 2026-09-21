@@ -7,6 +7,11 @@ export interface CenterSummary {
   lng: number | null;
   centerType: string | null;
   startingPrice: number | null;
+  accessType: string | null;
+  coverImageUrl: string | null;
+  avgRating: number | null;
+  reviewCount: number;
+  acceptedPaymentMethods: string[];
 }
 
 export interface FacilityResponse {
@@ -57,6 +62,17 @@ export interface CenterDetails {
   operatingHours: string | null;
   accessType: string | null;
   about: string | null;
+  establishedYear: number | null;
+  coverImageUrl: string | null;
+  galleryImageUrls: string[];
+  acceptedPaymentMethods: string[];
+  bnplEnabled: boolean;
+  bnplProvider: string | null;
+  taxPercentage: number | null;
+  taxInclusive: boolean;
+  termsAndPolicies: string | null;
+  avgRating: number | null;
+  reviewCount: number;
   amenities: FacilityResponse[];
   trainers: StaffResponse[];
 }

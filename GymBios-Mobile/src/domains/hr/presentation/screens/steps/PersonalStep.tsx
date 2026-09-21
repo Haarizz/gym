@@ -5,6 +5,8 @@ import { Input } from '@/shared/components/Input';
 import { FormSection } from '@/shared/components/FormSection';
 import type { StaffWizardData } from '../../hooks/useStaffWizard';
 import { StaffAvatarPicker } from '../../components/wizard/StaffAvatarPicker';
+import { uploadPhoto } from '@/shared/utils/uploadPhoto';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface PersonalStepProps {
   data: StaffWizardData;
@@ -21,9 +23,19 @@ export function PersonalStep({ data, updateField }: PersonalStepProps) {
         photoUri={data.photoUri}
         photoUrl={data.photoUrl}
         name={data.name}
-        onChangePhoto={(uri) => {
+        onChangePhoto={async (uri) => {
           updateField('photoUri', uri);
-          updateField('photoUrl', uri || '');
+          if (!uri) {
+            updateField('photoUrl', '');
+            return;
+          }
+          try {
+            const url = await uploadPhoto(uri);
+            updateField('photoUrl', url);
+          } catch {
+            toast.error('Failed to upload photo. Please try again.');
+            updateField('photoUrl', '');
+          }
         }}
       />
       <FormSection title="Personal Information">

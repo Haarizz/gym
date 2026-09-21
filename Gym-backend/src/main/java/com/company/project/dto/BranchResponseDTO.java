@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class BranchResponseDTO {
     private Long id;
@@ -16,6 +18,19 @@ public class BranchResponseDTO {
     private long staffCount;
     private long trainerCount;
     private long memberCount;
+    private Double lat;
+    private Double lng;
+    private String centerType;
+    private String accessType;
+    private String operatingHours;
+    private String description;
+    private Integer establishedYear;
+    private List<String> acceptedPaymentMethods;
+    private boolean bnplEnabled;
+    private String bnplProvider;
+    private BigDecimal taxPercentage;
+    private boolean taxInclusive;
+    private String termsAndPolicies;
 
     public BranchResponseDTO() {}
 
@@ -57,4 +72,43 @@ public class BranchResponseDTO {
 
     public long getMemberCount() { return memberCount; }
     public void setMemberCount(long memberCount) { this.memberCount = memberCount; }
+
+    public Double getLat() { return lat; }
+    public void setLat(Double lat) { this.lat = lat; }
+
+    public Double getLng() { return lng; }
+    public void setLng(Double lng) { this.lng = lng; }
+
+    public String getCenterType() { return centerType; }
+    public void setCenterType(String centerType) { this.centerType = centerType; }
+
+    public String getAccessType() { return accessType; }
+    public void setAccessType(String accessType) { this.accessType = accessType; }
+
+    public String getOperatingHours() { return operatingHours; }
+    public void setOperatingHours(String operatingHours) { this.operatingHours = operatingHours; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public Integer getEstablishedYear() { return establishedYear; }
+    public void setEstablishedYear(Integer establishedYear) { this.establishedYear = establishedYear; }
+
+    public List<String> getAcceptedPaymentMethods() { return acceptedPaymentMethods; }
+    public void setAcceptedPaymentMethods(List<String> acceptedPaymentMethods) { this.acceptedPaymentMethods = acceptedPaymentMethods; }
+
+    public boolean isBnplEnabled() { return bnplEnabled; }
+    public void setBnplEnabled(boolean bnplEnabled) { this.bnplEnabled = bnplEnabled; }
+
+    public String getBnplProvider() { return bnplProvider; }
+    public void setBnplProvider(String bnplProvider) { this.bnplProvider = bnplProvider; }
+
+    public BigDecimal getTaxPercentage() { return taxPercentage; }
+    public void setTaxPercentage(BigDecimal taxPercentage) { this.taxPercentage = taxPercentage; }
+
+    public boolean isTaxInclusive() { return taxInclusive; }
+    public void setTaxInclusive(boolean taxInclusive) { this.taxInclusive = taxInclusive; }
+
+    public String getTermsAndPolicies() { return termsAndPolicies; }
+    public void setTermsAndPolicies(String termsAndPolicies) { this.termsAndPolicies = termsAndPolicies; }
 }

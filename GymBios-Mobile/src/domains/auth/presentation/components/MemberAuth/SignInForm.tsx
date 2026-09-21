@@ -160,8 +160,13 @@ const styles = StyleSheet.create({
   },
   btnPrimary: {
     marginTop: 8,
-    backgroundColor: '#0E6653', 
-    borderRadius: 13,
+    backgroundColor: '#1B5A4C', 
+    borderRadius: 16,
+    shadowColor: '#1b5a4c',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 22,
+    elevation: 6,
   },
   divider: {
     flexDirection: 'row',

@@ -19,6 +19,7 @@ import { trainingService, TrainingSessionApi } from "../utils/supabase/training-
 import { trainingStreamsService, TrainingStreamApi } from "../utils/supabase/training-streams-service";
 import { facilitiesService } from "../utils/supabase/facilities-service";
 import { leadService } from "../utils/supabase/lead-service";
+import { useBranch } from "../utils/branch-context";
 import {
   Search,
   Maximize2,
@@ -182,7 +183,7 @@ export function PlansServicesCatalog() {
 
   // Auto-refresh functionality for kiosk mode
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (autoRefresh && isFullscreen) {
       interval = setInterval(() => {
         setLastRefresh(new Date());
@@ -277,6 +278,18 @@ export function PlansServicesCatalog() {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const { activeBranchId } = useBranch();
+
+  const getCatalogUrl = () => {
+    // Attempt to infer tenant slug from subdomain, or fallback to localhost
+    const hostnameParts = window.location.hostname.split('.');
+    const tenantSlug = hostnameParts.length > 2 ? hostnameParts[0] : 'default';
+    const branch = activeBranchId || 0;
+    return `https://${window.location.host}/catalog/t/${tenantSlug}/b/${branch}`;
+  };
+
+  const catalogUrl = getCatalogUrl();
 
   const generateQRCode = () => {
     setShowQRCode(true);
@@ -1158,9 +1171,9 @@ export function PlansServicesCatalog() {
           </DialogHeader>
           <div className="flex flex-col items-center py-4 space-y-4">
             <div className="bg-white p-4 rounded-lg border">
-              <QRCode value={window.location.href} size={192} bgColor="#FFFFFF" fgColor="#1f2937" level="M" />
+              <QRCode value={catalogUrl} size={192} bgColor="#FFFFFF" fgColor="#1f2937" level="M" />
             </div>
-            <p className="text-xs text-gray-500 break-all text-center">{window.location.href}</p>
+            <p className="text-xs text-gray-500 break-all text-center">{catalogUrl}</p>
           </div>
         </DialogContent>
       </Dialog>

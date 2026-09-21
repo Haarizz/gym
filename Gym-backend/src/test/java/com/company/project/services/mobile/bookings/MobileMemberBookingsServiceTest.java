@@ -9,7 +9,6 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
-import com.company.project.repositories.mobile.bookings.MobileMemberBookingRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.BookingService;
 import com.company.project.services.TrainingSessionService;
@@ -34,7 +33,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 public class MobileMemberBookingsServiceTest {
 
-    @Mock private MobileMemberBookingRepository mobileBookingRepository;
     @Mock private BookingRepository bookingRepository;
     @Mock private AttendanceRepository attendanceRepository;
     @Mock private MemberRepository memberRepository;
@@ -75,7 +73,7 @@ public class MobileMemberBookingsServiceTest {
     @Test
     void testGetUpcomingBookings() {
         when(memberRepository.findByUserId(1L)).thenReturn(Optional.of(member));
-        when(mobileBookingRepository.findUpcomingBookings(eq(10L), any(LocalDate.class), any(LocalTime.class)))
+        when(bookingRepository.findUpcomingBookings(eq(10L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(Collections.singletonList(booking));
         when(bookingRepository.countBySessionIdAndStatusNot(100L, "cancelled")).thenReturn(5L);
 
@@ -90,7 +88,7 @@ public class MobileMemberBookingsServiceTest {
     @Test
     void testGetBookingDetails_Unauthorized() {
         when(memberRepository.findByUserId(1L)).thenReturn(Optional.of(member));
-        when(mobileBookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.empty());
+        when(bookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () -> 
             mobileMemberBookingsService.getBookingDetails(principal, 500L));
@@ -104,7 +102,7 @@ public class MobileMemberBookingsServiceTest {
         bookingResponseDTO.setId("500");
         
         when(bookingService.createBooking(any())).thenReturn(bookingResponseDTO);
-        when(mobileBookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.of(booking));
         when(bookingRepository.countBySessionIdAndStatusNot(100L, "cancelled")).thenReturn(10L);
 
         CreateMemberBookingRequestDTO req = new CreateMemberBookingRequestDTO();
@@ -121,7 +119,7 @@ public class MobileMemberBookingsServiceTest {
     @Test
     void testCancelBooking() {
         when(memberRepository.findByUserId(1L)).thenReturn(Optional.of(member));
-        when(mobileBookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.of(booking));
 
         // The booking session is in the future, so it can be cancelled
         Booking cancelledBooking = new Booking();
@@ -129,7 +127,7 @@ public class MobileMemberBookingsServiceTest {
         cancelledBooking.setSession(session);
         cancelledBooking.setStatus("cancelled");
         
-        when(mobileBookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.of(booking))
+        when(bookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.of(booking))
                 .thenReturn(Optional.of(cancelledBooking));
 
         MemberBookingDTO result = mobileMemberBookingsService.cancelBooking(principal, 500L);

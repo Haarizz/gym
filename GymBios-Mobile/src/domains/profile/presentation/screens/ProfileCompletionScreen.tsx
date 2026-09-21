@@ -30,6 +30,8 @@ import {
   profileCompletionSchema,
   type ProfileCompletionValues,
 } from '../components/ProfileCompletion/schemas';
+import { useAuthStore } from '@/domains/auth/store/authStore';
+import { uploadPhoto } from '@/shared/utils/uploadPhoto';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -182,7 +184,11 @@ export function ProfileCompletionScreen() {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(1);
   const [dateValue, setDateValue] = useState<Date | undefined>(undefined);
+  const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const { updateProfile, isUpdating } = useMobileProfile();
+
+  const user = useAuthStore((state) => state.user);
 
   const {
     control,
@@ -190,10 +196,11 @@ export function ProfileCompletionScreen() {
     formState: { errors },
     trigger,
     setValue,
+    watch,
   } = useForm<ProfileCompletionValues>({
     resolver: zodResolver(profileCompletionSchema),
     defaultValues: {
-      fullName: '',
+      fullName: user?.fullName || '',
       phone: '',
       dateOfBirth: '',
       gender: '',
@@ -203,8 +210,28 @@ export function ProfileCompletionScreen() {
       emergencyPhone: '',
       bloodType: '',
       medicalConditions: '',
+      photoUrl: '',
     },
   });
+
+  const fullNameValue = watch('fullName');
+
+  const onChangePhoto = async (uri?: string) => {
+    setPhotoUri(uri);
+    if (!uri) {
+      setValue('photoUrl', '');
+      return;
+    }
+    try {
+      setIsUploadingPhoto(true);
+      const url = await uploadPhoto(uri);
+      setValue('photoUrl', url);
+    } catch {
+      Alert.alert('Error', 'Failed to upload photo. Please try again.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   // ── Navigation ──────────────────────────────────────────────────────────────
 
@@ -228,6 +255,10 @@ export function ProfileCompletionScreen() {
   const onBack = () => setStep((s) => s - 1);
 
   const onSubmit = (data: ProfileCompletionValues) => {
+    if (isUploadingPhoto) {
+      Alert.alert('Please wait', 'Your photo is still uploading.');
+      return;
+    }
     updateProfile(data, {
       // No manual navigation here — AuthBootstrap's useEffect reactively
       // detects session.profileCompleted = true and navigates to /(member).
@@ -365,8 +396,9 @@ export function ProfileCompletionScreen() {
               ]}
             >
               <AvatarPicker
-                name=""
-                onChangePhoto={() => {}}
+                name={fullNameValue || ''}
+                photoUri={photoUri}
+                onChangePhoto={onChangePhoto}
               />
             </View>
 
@@ -424,7 +456,6 @@ export function ProfileCompletionScreen() {
                     });
                   }}
                   maximumDate={new Date()}
-                  required
                   error={errors.dateOfBirth?.message}
                 />
               </View>

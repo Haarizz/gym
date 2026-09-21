@@ -1,9 +1,9 @@
 package com.company.project.services.mobile;
 
-import com.company.project.dto.MobileProfileDTO;
+import com.company.project.dto.mobile.profile.MobileProfileDTO;
 import com.company.project.entities.UserProfile;
 import com.company.project.repositories.UserProfileRepository;
-import com.company.project.services.MobileProfileService;
+import com.company.project.services.mobile.profile.MobileProfileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;

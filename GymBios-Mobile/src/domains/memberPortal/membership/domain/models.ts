@@ -55,6 +55,27 @@ export interface MembershipPayment {
   status: string;
 }
 
+export interface MobileReceiptDetail {
+  id: number;
+  receiptNo: string;
+  transactionDate: string;
+  transactionType: string;
+  amount: number;
+  paidAmount: number;
+  dueAmount: number;
+  paymentMethod: string;
+  status: string;
+  planName?: string;
+  validFrom?: string;
+  validTill?: string;
+  processedBy?: string;
+  memberName?: string;
+  memberId?: string;
+  memberPhone?: string;
+  membershipType?: string;
+  remarks?: string;
+}
+
 export interface AddOn {
   id: number;
   name: string;

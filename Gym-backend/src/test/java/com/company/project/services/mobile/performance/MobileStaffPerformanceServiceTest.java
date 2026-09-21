@@ -5,6 +5,7 @@ import com.company.project.entities.*;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.StaffProgressCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class MobileStaffPerformanceServiceTest {
     @Mock
     private WorkoutFeedbackRepository workoutFeedbackRepository;
 
+    @Mock
+    private StaffProgressCalculator progressCalculator;
+
     @InjectMocks
     private MobileStaffPerformanceService performanceService;
 
@@ -58,6 +62,9 @@ class MobileStaffPerformanceServiceTest {
         testStaff.setName("Rahul Sharma");
         testStaff.setEmail("staff@gymbios.com");
         testStaff.setBranch("Main Branch");
+
+        lenient().when(progressCalculator.computeRevenue(any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(progressCalculator.computeConversions(any(), any(), any(), any())).thenReturn(0);
         testStaff.setMonthlyTarget(new BigDecimal("150000"));
         testStaff.setUserId(100L);
     }
@@ -72,8 +79,8 @@ class MobileStaffPerformanceServiceTest {
     @DisplayName("Computes performance from username-matched activity when no staff record is linked")
     void testMissingStaffComputesFromUsernameActivity() {
         when(staffRepository.findByUserId(100L)).thenReturn(Optional.empty());
-        when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
-        when(leadRepository.count(any(Specification.class))).thenReturn(0L);
+        lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
+        lenient().when(leadRepository.count(any(Specification.class))).thenReturn(0L);
         when(followUpRepository.count(any(Specification.class))).thenReturn(0L);
         when(workoutFeedbackRepository.findAll()).thenReturn(Collections.emptyList());
 
@@ -102,8 +109,11 @@ class MobileStaffPerformanceServiceTest {
         when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, today.getYear(), today.getMonthValue()))
                 .thenReturn(List.of(target));
 
-        when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
-        when(leadRepository.count(any(Specification.class))).thenReturn(24L);
+        when(progressCalculator.computeRevenue(any(), any(), any(), any())).thenReturn(new BigDecimal("117000"));
+        when(progressCalculator.computeConversions(any(), any(), any(), any())).thenReturn(24);
+        
+        lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
+        lenient().when(leadRepository.count(any(Specification.class))).thenReturn(24L);
 
         // Ratings 5,5,5,4,4 average to 4.6, matching the rating asserted below.
         List<WorkoutFeedback> feedbacks = new ArrayList<>();
@@ -160,8 +170,8 @@ class MobileStaffPerformanceServiceTest {
         when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, today.getYear(), today.getMonthValue()))
                 .thenReturn(Collections.emptyList());
 
-        when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
-        when(leadRepository.count(any(Specification.class))).thenReturn(0L);
+        lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
+        lenient().when(leadRepository.count(any(Specification.class))).thenReturn(0L);
         when(followUpRepository.count(any(Specification.class))).thenReturn(0L);
         when(workoutFeedbackRepository.findAll()).thenReturn(Collections.emptyList());
         when(staffRepository.findAll(any(Specification.class))).thenReturn(Collections.singletonList(testStaff));
@@ -193,8 +203,8 @@ class MobileStaffPerformanceServiceTest {
         List<Staff> branchList = List.of(peerStaff1, testStaff, peerStaff2);
         when(staffRepository.findAll(any(Specification.class))).thenReturn(branchList);
 
-        when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
-        when(leadRepository.count(any(Specification.class))).thenReturn(10L);
+        lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
+        lenient().when(leadRepository.count(any(Specification.class))).thenReturn(10L);
         when(workoutFeedbackRepository.findAll()).thenReturn(Collections.emptyList());
 
         StaffPerformanceResponseDTO response = performanceService.getStaffPerformance(testPrincipal);

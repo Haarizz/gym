@@ -12,6 +12,8 @@ export const BrandColors = {
   screenBackground: '#f9fafe',
   screenBackgroundAlt: '#eef7f6',
   danger: '#d4183d',
+  red: '#E15B52',
+  redDeep: '#B3261E',
   surface: '#FFFFFF',
   neutral: {
     900: '#1e293b',

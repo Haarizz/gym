@@ -52,6 +52,8 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
 
     // Full transaction history for a member's Statement of Account (primary: by DB id)
     List<Receipt> findByMemberDbIdOrderByTransactionDateAsc(Long memberDbId);
+    
+    List<Receipt> findByMemberDbIdOrderByTransactionDateDesc(Long memberDbId);
 
     // The receipt awaiting reception approval for a mobile Cash/Credit/Mixed purchase
     // (see MobileDiscoveryController/MemberService.approveMemberPayment) — a member

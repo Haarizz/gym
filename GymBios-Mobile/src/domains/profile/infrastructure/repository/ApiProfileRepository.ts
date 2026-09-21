@@ -16,6 +16,8 @@ import type {
 import { ProfileApi, type ApiAuthMeResponse } from '../api/ProfileApi';
 import { useAuthStore } from '@/domains/auth/store';
 import { secureStorage } from '@/core/platform/storage';
+import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
+import { uploadPhoto } from '@/shared/utils/uploadPhoto';
 
 const SETTINGS_STORAGE_KEY = 'gymbios.user_settings';
 const PHOTO_STORAGE_PREFIX = 'gymbios.user_photo_';
@@ -55,14 +57,21 @@ export class ApiProfileRepository implements ProfileRepository {
       }
     }
 
-    // 3. Local persistent photo override if stored
-    const localPhoto = await secureStorage.getItem(`${PHOTO_STORAGE_PREFIX}${userId}`);
+    // 3. Real photo, from the backend — falls back to the last-known local
+    // cache only if the profile fetch fails (e.g. offline).
+    let photoUrl: string | undefined;
+    try {
+      const remoteProfile = await this.api.getMobileProfile();
+      photoUrl = resolveImageUrl(remoteProfile.photoUrl) ?? undefined;
+    } catch {
+      const localPhoto = await secureStorage.getItem(`${PHOTO_STORAGE_PREFIX}${userId}`);
+      photoUrl = localPhoto || undefined;
+    }
 
     const name = localProfile.name || primaryName;
     const email = localProfile.email || currentUser?.email || `${username}@gymbios.local`;
     const phone = localProfile.phone || '';
     const address = localProfile.address || '';
-    const photoUrl = localPhoto || undefined;
     const roleDisplay = primaryRole.toUpperCase();
 
     return {
@@ -176,55 +185,31 @@ export class ApiProfileRepository implements ProfileRepository {
     transactions: UserTransaction[];
     summary: UserTransactionSummary;
   }> {
-    return {
-      transactions: [
-        {
-          id: 'T001',
-          type: 'salary',
-          description: 'Monthly Salary Credit',
-          amount: 4285,
-          date: '2024-10-30T10:00:00Z',
-          status: 'completed',
+    try {
+      const data = await this.api.getTransactions();
+      
+      return {
+        transactions: data.transactions || [],
+        summary: {
+          totalEarnings: data.summary?.total_earnings ?? data.summary?.totalEarnings ?? 0,
+          totalTransactions: data.summary?.total_transactions ?? data.summary?.totalTransactions ?? 0,
+          totalPurchases: data.summary?.total_purchases ?? data.summary?.totalPurchases ?? 0,
+          totalBonuses: data.summary?.total_bonuses ?? data.summary?.totalBonuses ?? 0,
         },
-        {
-          id: 'T002',
-          type: 'bonus',
-          description: 'Quarterly Performance Bonus',
-          amount: 500,
-          date: '2024-10-15T14:30:00Z',
-          status: 'completed',
+      };
+    } catch (error) {
+      // Fallback in case of network error or if endpoint is unreachable
+      console.error('Failed to load transactions', error);
+      return {
+        transactions: [],
+        summary: {
+          totalEarnings: 0,
+          totalTransactions: 0,
+          totalPurchases: 0,
+          totalBonuses: 0,
         },
-        {
-          id: 'T003',
-          type: 'attendance',
-          description: 'Morning Shift Check-in Verified',
-          date: '2024-10-30T07:00:00Z',
-          status: 'completed',
-        },
-        {
-          id: 'T004',
-          type: 'purchase',
-          description: 'Cafeteria & Pro-Shop Purchase',
-          amount: 25,
-          date: '2024-10-29T13:15:00Z',
-          status: 'completed',
-        },
-        {
-          id: 'T005',
-          type: 'membership',
-          description: 'Annual Membership Plan Renewal',
-          amount: 1200,
-          date: '2024-10-01T09:00:00Z',
-          status: 'completed',
-        },
-      ],
-      summary: {
-        totalEarnings: 4785,
-        totalTransactions: 156,
-        totalPurchases: 89,
-        totalBonuses: 2,
-      },
-    };
+      };
+    }
   }
 
   async getSettings(): Promise<UserSettings> {
@@ -303,12 +288,19 @@ export class ApiProfileRepository implements ProfileRepository {
     return updated;
   }
 
-  async updateProfilePhoto(photoUriOrDataUrl: string): Promise<string> {
+  async updateProfilePhoto(localUri: string): Promise<string> {
+    const uploadedUrl = await uploadPhoto(localUri);
+    await this.api.updatePhotoUrl(uploadedUrl);
+
+    const absoluteUrl = resolveImageUrl(uploadedUrl) ?? uploadedUrl;
+
+    // Cache locally as an offline-friendly fallback only — the backend is
+    // the source of truth (see getProfile()).
     const authState = useAuthStore.getState();
     const userId = authState.user?.id || 'default';
+    await secureStorage.setItem(`${PHOTO_STORAGE_PREFIX}${userId}`, absoluteUrl);
 
-    await secureStorage.setItem(`${PHOTO_STORAGE_PREFIX}${userId}`, photoUriOrDataUrl);
-    return photoUriOrDataUrl;
+    return absoluteUrl;
   }
 
   async changePassword(data: ChangePasswordDto): Promise<void> {

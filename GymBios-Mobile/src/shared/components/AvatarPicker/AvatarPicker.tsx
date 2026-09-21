@@ -63,6 +63,7 @@ export function AvatarPicker({
     try {
       const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('[AvatarPicker] gallery permission granted=', permission.granted);
       if (!permission.granted) {
         toast.warning('Gallery access is needed to select a photo.', { title: 'Permission Required' });
         return;
@@ -74,11 +75,13 @@ export function AvatarPicker({
         aspect: [1, 1],
         quality: 0.8,
       });
+      console.log('[AvatarPicker] gallery result canceled=', result.canceled, 'uri=', result.assets?.[0]?.uri);
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         onChangePhoto(result.assets[0].uri);
       }
-    } catch (_err) {
+    } catch (err) {
+      console.error('[AvatarPicker] handleChooseGallery threw', err);
       toast.error('Unable to open image gallery.');
     }
   }, [onChangePhoto]);

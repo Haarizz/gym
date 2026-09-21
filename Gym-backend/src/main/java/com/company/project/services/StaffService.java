@@ -14,6 +14,9 @@ import com.company.project.repositories.RoleRepository;
 import com.company.project.repositories.StaffRepository;
 import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
+import com.company.project.controlplane.entities.UserDirectoryEntry;
+import com.company.project.controlplane.repositories.UserDirectoryRepository;
+import com.company.project.security.TenantContextHolder;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.data.domain.Page;
@@ -41,6 +44,7 @@ public class StaffService {
     private final PasswordEncoder passwordEncoder;
     private final com.company.project.repositories.StaffBranchRepository staffBranchRepository;
     private final BranchService branchService;
+    private final UserDirectoryRepository userDirectoryRepository;
 
     public StaffService(StaffRepository staffRepository,
                         UserRepository userRepository,
@@ -48,7 +52,8 @@ public class StaffService {
                         UserRoleRepository userRoleRepository,
                         PasswordEncoder passwordEncoder,
                         com.company.project.repositories.StaffBranchRepository staffBranchRepository,
-                        BranchService branchService) {
+                        BranchService branchService,
+                        UserDirectoryRepository userDirectoryRepository) {
         this.staffRepository       = staffRepository;
         this.userRepository        = userRepository;
         this.roleRepository        = roleRepository;
@@ -56,6 +61,7 @@ public class StaffService {
         this.passwordEncoder       = passwordEncoder;
         this.staffBranchRepository = staffBranchRepository;
         this.branchService         = branchService;
+        this.userDirectoryRepository = userDirectoryRepository;
     }
 
     @Transactional(readOnly = true)
@@ -183,6 +189,10 @@ public class StaffService {
             user = userRepository.save(user);
             userRoleRepository.save(new UserRole(null, user, securityRole));
 
+            if (TenantContextHolder.getCurrentTenant() != null) {
+                userDirectoryRepository.save(new UserDirectoryEntry(user.getUsername(), user.getEmail(), TenantContextHolder.getCurrentTenant()));
+            }
+
             staff.setUserId(user.getId());
             staff.setAppUsername(req.getAppUsername());
             staff.setAppAccessEnabled(true);
@@ -195,6 +205,13 @@ public class StaffService {
                     && !req.getAppUsername().equals(user.getUsername())) {
                 if (userRepository.existsByUsername(req.getAppUsername())) {
                     throw new RuntimeException("Username already taken: " + req.getAppUsername());
+                }
+                if (TenantContextHolder.getCurrentTenant() != null) {
+                    userDirectoryRepository.findByUsernameOrEmail(user.getUsername(), user.getUsername())
+                            .ifPresent(entry -> {
+                                entry.setUsername(req.getAppUsername());
+                                userDirectoryRepository.save(entry);
+                            });
                 }
                 user.setUsername(req.getAppUsername());
                 staff.setAppUsername(req.getAppUsername());
@@ -267,6 +284,10 @@ public class StaffService {
 
             Role securityRole = resolveSecurityRole(appRole);
             userRoleRepository.save(new UserRole(null, user, securityRole));
+
+            if (TenantContextHolder.getCurrentTenant() != null) {
+                userDirectoryRepository.save(new UserDirectoryEntry(user.getUsername(), user.getEmail(), TenantContextHolder.getCurrentTenant()));
+            }
 
             staff.setUserId(user.getId());
             staff.setAppUsername(appUsername);

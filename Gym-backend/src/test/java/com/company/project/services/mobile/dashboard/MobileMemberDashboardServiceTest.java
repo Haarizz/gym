@@ -7,7 +7,6 @@ import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.PromotionCampaignRepository;
-import com.company.project.repositories.mobile.dashboard.MobileMemberDashboardBookingRepository;
 import com.company.project.security.UserDetailsImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,9 +40,6 @@ class MobileMemberDashboardServiceTest {
 
     @Mock
     private BookingRepository bookingRepository;
-
-    @Mock
-    private MobileMemberDashboardBookingRepository dashboardBookingRepository;
 
     @Mock
     private PromotionCampaignRepository promotionCampaignRepository;
@@ -136,10 +132,10 @@ class MobileMemberDashboardServiceTest {
         booking.setSession(session);
         booking.setStatus("confirmed");
 
-        when(dashboardBookingRepository.findTodayBookingsByMemberId(eq(50L), eq(LocalDate.now())))
+        when(bookingRepository.findTodayBookingsByMemberId(eq(50L), eq(LocalDate.now())))
                 .thenReturn(List.of(booking));
         when(bookingRepository.countBySessionIdAndStatusNot(201L, "cancelled")).thenReturn(17L);
-        when(dashboardBookingRepository.countActiveBookingsByMemberId(50L)).thenReturn(4L);
+        when(bookingRepository.countActiveBookingsByMemberId(50L)).thenReturn(4L);
 
         // Promotion mock
         PromotionCampaign promo = new PromotionCampaign();
@@ -205,16 +201,17 @@ class MobileMemberDashboardServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw EntityNotFoundException when principal has no linked Member record")
+    @DisplayName("Should return empty dashboard when principal has no linked Member record")
     void testNonMemberUserThrows() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.empty());
 
-        EntityNotFoundException exception = assertThrows(
-                EntityNotFoundException.class,
-                () -> dashboardService.getMemberDashboard(testPrincipal)
-        );
+        MemberDashboardResponseDTO result = dashboardService.getMemberDashboard(testPrincipal);
 
-        assertTrue(exception.getMessage().contains("No member profile linked"));
+        assertNotNull(result);
+        assertNotNull(result.getIdentity());
+        assertFalse(result.getCheckInStatus().isCheckedIn());
+        assertEquals("ROLE_MEMBER", result.getIdentity().getUserRole());
+
         verify(memberRepository, times(1)).findByUserId(101L);
         verifyNoInteractions(attendanceRepository);
     }
@@ -226,8 +223,8 @@ class MobileMemberDashboardServiceTest {
         testMember.setExpiryDate(LocalDateTime.now().minusDays(10));
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
         when(attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(50L)).thenReturn(Collections.emptyList());
-        when(dashboardBookingRepository.findTodayBookingsByMemberId(eq(50L), any(LocalDate.class))).thenReturn(Collections.emptyList());
-        when(dashboardBookingRepository.countActiveBookingsByMemberId(50L)).thenReturn(0L);
+        when(bookingRepository.findTodayBookingsByMemberId(eq(50L), any(LocalDate.class))).thenReturn(Collections.emptyList());
+        when(bookingRepository.countActiveBookingsByMemberId(50L)).thenReturn(0L);
         when(promotionCampaignRepository.findByStatusOrderByCreatedAtDesc("active")).thenReturn(Collections.emptyList());
 
         MemberDashboardResponseDTO result = dashboardService.getMemberDashboard(testPrincipal);
@@ -257,8 +254,8 @@ class MobileMemberDashboardServiceTest {
 
         when(attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(50L))
                 .thenReturn(List.of(pastAtt1, pastAtt2));
-        when(dashboardBookingRepository.findTodayBookingsByMemberId(eq(50L), any(LocalDate.class))).thenReturn(Collections.emptyList());
-        when(dashboardBookingRepository.countActiveBookingsByMemberId(50L)).thenReturn(0L);
+        when(bookingRepository.findTodayBookingsByMemberId(eq(50L), any(LocalDate.class))).thenReturn(Collections.emptyList());
+        when(bookingRepository.countActiveBookingsByMemberId(50L)).thenReturn(0L);
         when(promotionCampaignRepository.findByStatusOrderByCreatedAtDesc("active")).thenReturn(Collections.emptyList());
 
         MemberDashboardResponseDTO result = dashboardService.getMemberDashboard(testPrincipal);
@@ -273,8 +270,8 @@ class MobileMemberDashboardServiceTest {
     void testPromotionDateWindowFiltering() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
         when(attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(50L)).thenReturn(Collections.emptyList());
-        when(dashboardBookingRepository.findTodayBookingsByMemberId(eq(50L), any(LocalDate.class))).thenReturn(Collections.emptyList());
-        when(dashboardBookingRepository.countActiveBookingsByMemberId(50L)).thenReturn(0L);
+        when(bookingRepository.findTodayBookingsByMemberId(eq(50L), any(LocalDate.class))).thenReturn(Collections.emptyList());
+        when(bookingRepository.countActiveBookingsByMemberId(50L)).thenReturn(0L);
 
         PromotionCampaign futurePromo = new PromotionCampaign();
         futurePromo.setId(10L);

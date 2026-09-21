@@ -14,7 +14,7 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { ConfirmationModal } from '@/shared/components/ConfirmationModal';
-import { GlassBlob, GlassSurface } from '@/shared/components';
+import { GlassBlob } from '@/shared/components';
 import { useRestoreSession } from '@/domains/auth';
 
 import { useProfile } from '../../hooks/useProfile';
@@ -27,7 +27,7 @@ import { ProfileNavigationRow } from '../components/ProfileNavigationRow';
 interface ProfileHubScreenProps {
   onClose: () => void;
   onNavigateToProfile: () => void;
-  onNavigateToTargets: () => void;
+  onNavigateToReferrals: () => void;
   onNavigateToPerformance: () => void;
   onNavigateToTransactions: () => void;
   onNavigateToSettings: () => void;
@@ -37,7 +37,7 @@ interface ProfileHubScreenProps {
 export function ProfileHubScreen({
   onClose,
   onNavigateToProfile,
-  onNavigateToTargets,
+  onNavigateToReferrals,
   onNavigateToPerformance,
   onNavigateToTransactions,
   onNavigateToSettings,
@@ -136,12 +136,12 @@ export function ProfileHubScreen({
             />
 
             <ProfileNavigationRow
-              icon="target"
-              title="My Targets"
-              subtitle="Active goals & progress"
+              icon="gift"
+              title="Referrals"
+              subtitle="Invite friends & earn rewards"
               iconBgColor="#fef3c7"
               iconColor="#d97706"
-              onPress={onNavigateToTargets}
+              onPress={onNavigateToReferrals}
             />
 
             <ProfileNavigationRow
@@ -153,14 +153,16 @@ export function ProfileHubScreen({
               onPress={onNavigateToPerformance}
             />
 
-            <ProfileNavigationRow
-              icon="credit-card"
-              title="Transactions"
-              subtitle="Salary, purchases & earnings"
-              iconBgColor="#f3e8ff"
-              iconColor="#7c3aed"
-              onPress={onNavigateToTransactions}
-            />
+            {profile?.role?.toLowerCase() !== 'admin' && (
+              <ProfileNavigationRow
+                icon="credit-card"
+                title="Transactions"
+                subtitle="Salary, purchases & earnings"
+                iconBgColor="#f3e8ff"
+                iconColor="#7c3aed"
+                onPress={onNavigateToTransactions}
+              />
+            )}
 
             <ProfileNavigationRow
               icon="settings"
@@ -172,29 +174,27 @@ export function ProfileHubScreen({
             />
           </View>
 
-          {/* Distinct Logout Button */}
+          {/* Logout row — compact tinted glass row, same rhythm as a menu row */}
           <View style={styles.logoutContainer}>
             <Pressable
-              style={({ pressed }) => [pressed && styles.logoutPressed]}
+              style={({ pressed }) => [
+                styles.logoutButton,
+                pressed && styles.logoutPressed,
+                isLoggingOut && styles.logoutButtonDisabled,
+              ]}
               onPress={() => setLogoutModalVisible(true)}
               disabled={isLoggingOut}
               accessibilityRole="button"
               accessibilityLabel="Log out"
             >
-              <GlassSurface
-                tint="#ef4444"
-                radius={Radius.lg}
-                style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
-              >
-                {isLoggingOut ? (
-                  <ActivityIndicator size="small" color="#ef4444" style={styles.logoutIcon} />
-                ) : (
-                  <Feather name="log-out" size={18} color="#ef4444" style={styles.logoutIcon} />
-                )}
-                <Typography variant="body" style={styles.logoutText}>
-                  {isLoggingOut ? 'Logging out...' : 'Log out'}
-                </Typography>
-              </GlassSurface>
+              {isLoggingOut ? (
+                <ActivityIndicator size="small" color={BrandColors.redDeep} style={styles.logoutIcon} />
+              ) : (
+                <Feather name="log-out" size={16} color={BrandColors.redDeep} style={styles.logoutIcon} />
+              )}
+              <Typography variant="body" style={styles.logoutText}>
+                {isLoggingOut ? 'Logging out...' : 'Log Out'}
+              </Typography>
             </Pressable>
           </View>
         </ScrollView>
@@ -278,6 +278,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.three,
+    borderRadius: Radius.lg,
+    backgroundColor: 'rgba(225,91,82,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(225,91,82,0.28)',
   },
   logoutPressed: {
     opacity: 0.85,
@@ -290,7 +294,7 @@ const styles = StyleSheet.create({
     marginRight: Spacing.two,
   },
   logoutText: {
-    color: '#ef4444',
+    color: BrandColors.redDeep,
     fontSize: 15,
     fontWeight: '700',
   },

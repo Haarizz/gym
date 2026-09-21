@@ -2,19 +2,26 @@ import { AuthOrchestrator } from './application/orchestrators/AuthOrchestrator';
 import { LoginUser } from './application/useCases/LoginUser';
 import { LogoutUser } from './application/useCases/LogoutUser';
 import { RefreshSession } from './application/useCases/RefreshSession';
+import { GetPendingRegistration } from './application/useCases/GetPendingRegistration';
 import { RegisterUser } from './application/useCases/RegisterUser';
+import { ResendOtp } from './application/useCases/ResendOtp';
 import { RestoreSession } from './application/useCases/RestoreSession';
 import { SelectAppRole } from './application/useCases/SelectAppRole';
+import { VerifyOtp } from './application/useCases/VerifyOtp';
 import { AuthApi } from './infrastructure/api/AuthApi';
 import { AuthRemoteDataSource } from './infrastructure/datasource/AuthRemoteDataSource';
 import { AuthRepositoryImpl } from './infrastructure/repository/AuthRepositoryImpl';
 import { createAuthBootstrap } from './presentation/components/AuthBootstrap';
 import {
   createUseLogin,
+  createUsePendingRegistration,
   createUseRegister,
+  createUseResendOtp,
   createUseRestoreSession,
   createUseSelectAppRole,
+  createUseVerifyOtp,
 } from './presentation/hooks/useAuthFlow';
+import { createEmailVerificationScreen } from './presentation/screens/EmailVerificationScreen';
 import {
   ADMIN_HEADER,
   ADMIN_TABS,
@@ -48,12 +55,25 @@ const logoutUser = new LogoutUser(authRepository);
 const restoreSession = new RestoreSession(authRepository);
 const refreshSession = new RefreshSession(authRepository);
 const registerUser = new RegisterUser(authRepository);
+const verifyOtpUseCase = new VerifyOtp(authRepository);
+const resendOtpUseCase = new ResendOtp(authRepository);
+const getPendingRegistrationUseCase = new GetPendingRegistration(authRepository);
 
-export const authOrchestrator = new AuthOrchestrator(selectAppRole, loginUser, logoutUser, registerUser);
+export const authOrchestrator = new AuthOrchestrator(
+  selectAppRole,
+  loginUser,
+  logoutUser,
+  registerUser,
+  verifyOtpUseCase,
+  resendOtpUseCase,
+);
 
 export const useSelectAppRole = createUseSelectAppRole(authOrchestrator);
 export const useLogin = createUseLogin(authOrchestrator);
 export const useRegister = createUseRegister(authOrchestrator);
+export const useVerifyOtp = createUseVerifyOtp(authOrchestrator);
+export const useResendOtp = createUseResendOtp(authOrchestrator);
+export const usePendingRegistration = createUsePendingRegistration(getPendingRegistrationUseCase);
 export const useRestoreSession = createUseRestoreSession(restoreSession, authOrchestrator);
 
 export const AuthBootstrap = createAuthBootstrap(useRestoreSession);
@@ -62,6 +82,7 @@ export const RoleLoginScreen = createRoleLoginScreen(useLogin);
 export const SplashRoute = createSplashRoute(useRestoreSession);
 export const RoleSelectionRoute = createRoleSelectionRoute(useSelectAppRole);
 export const MemberAuthScreen = createMemberAuthScreen(useLogin, useRegister);
+export const EmailVerificationScreen = createEmailVerificationScreen(useVerifyOtp, useResendOtp, usePendingRegistration);
 
 export { SplashScreen } from './presentation/screens/SplashScreen';
 export { RoleSelectionScreen } from './presentation/screens/RoleSelectionScreen';

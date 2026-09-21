@@ -75,8 +75,8 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.985 }],
   },
   iconContainer: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',

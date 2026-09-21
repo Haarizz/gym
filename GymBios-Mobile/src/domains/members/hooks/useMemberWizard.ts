@@ -9,6 +9,7 @@ import type {
 } from '../application/directory/MemberDirectoryRepository';
 import { useMemberActions } from './useMemberActions';
 import { useBranchContext } from '@/shared/providers/BranchProvider';
+import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 
 export interface DraftFamilyMember {
   name: string;
@@ -131,8 +132,8 @@ function mapMemberToWizardData(member?: Member): MemberWizardData {
     phone: member?.phone ?? '',
     email: member?.email ?? '',
     address: member?.address ?? '',
-    photoUrl: member?.photoUrl ?? '',
-    photoUri: member?.photoUrl || undefined,
+    photoUrl: resolveImageUrl(member?.photoUrl) ?? '',
+    photoUri: undefined,
 
     membershipType: member?.membershipType ?? '',
     membershipPlanId: member?.membershipPlanId
@@ -189,7 +190,7 @@ function buildCreateRequest(
     phone: data.phone,
     dateOfBirth: formatDateStr(data.dateOfBirth),
     gender: data.gender || undefined,
-    photoUrl: data.photoUri || data.photoUrl || undefined,
+    photoUrl: data.photoUrl || undefined,
     address: data.address || undefined,
     membershipType: data.membershipType,
     membershipPlanId: data.membershipPlanId

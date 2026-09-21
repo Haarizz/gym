@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, Loader } from '@/shared/components';
 import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AdminReportType } from '../../domain/AdminDashboardData';
-import { useAdminDashboard } from '../../hooks/useAdminDashboard';
+import { todayRange, useAdminDashboard, type AdminDashboardDateRange } from '../../hooks/useAdminDashboard';
 import { AdminTopControls } from '../components/AdminTopControls';
 import { AdminAlertsList } from '../components/AdminAlertsList';
 import { AdminKpiGrid } from '../components/AdminKpiGrid';
@@ -13,13 +13,19 @@ import { AdminPaymentMixCard } from '../components/AdminPaymentMixCard';
 import { AdminOperationalHighlightsCard } from '../components/AdminOperationalHighlightsCard';
 import { AdminQuickActionsCard } from '../components/AdminQuickActionsCard';
 import { AdminReportDetailSheet } from '../components/AdminReportDetailSheet';
+import { AdminBranchSelectSheet } from '../components/AdminBranchSelectSheet';
+import { AdminDateRangeSheet } from '../components/AdminDateRangeSheet';
 
 export function AdminDashboardScreen() {
   const [selectedReport, setSelectedReport] = useState<AdminReportType>(null);
-  const { data, isLoading, refetch, isRefetching } = useAdminDashboard();
+  const [range, setRange] = useState<AdminDashboardDateRange>(todayRange());
+  const [branchSheetOpen, setBranchSheetOpen] = useState(false);
+  const [dateSheetOpen, setDateSheetOpen] = useState(false);
+
+  const { data, isLoading, isError, refetch, isRefetching } = useAdminDashboard(range);
   const insets = useSafeAreaInsets();
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <View style={styles.loaderContainer}>
         <Loader message="Loading dashboard..." />
@@ -52,8 +58,17 @@ export function AdminDashboardScreen() {
           branch={data.branch}
           dateText={data.dateText}
           hasAlerts={data.alerts.length > 0}
+          onSelectBranch={() => setBranchSheetOpen(true)}
+          onCalendarPress={() => setDateSheetOpen(true)}
           onRefreshPress={() => refetch()}
         />
+
+        {isError && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>Couldn&apos;t load the latest dashboard data.</Text>
+            <Text style={styles.errorRetry} onPress={() => refetch()}>Tap to retry</Text>
+          </View>
+        )}
 
         <AdminAlertsList alerts={data.alerts} />
 
@@ -71,7 +86,20 @@ export function AdminDashboardScreen() {
 
       <AdminReportDetailSheet
         selectedReport={selectedReport}
+        range={range}
         onClose={() => setSelectedReport(null)}
+      />
+
+      <AdminBranchSelectSheet
+        visible={branchSheetOpen}
+        onClose={() => setBranchSheetOpen(false)}
+      />
+
+      <AdminDateRangeSheet
+        visible={dateSheetOpen}
+        range={range}
+        onSelect={setRange}
+        onClose={() => setDateSheetOpen(false)}
       />
     </View>
   );
@@ -94,5 +122,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: BrandColors.screenBackground,
+  },
+  errorBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#B91C1C',
+    fontWeight: '500',
+    flex: 1,
+  },
+  errorRetry: {
+    fontSize: 12,
+    color: '#B91C1C',
+    fontWeight: '700',
   },
 });

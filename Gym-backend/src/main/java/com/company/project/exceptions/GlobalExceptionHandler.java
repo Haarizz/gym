@@ -48,6 +48,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, "BUSINESS_RULE_VIOLATION", ex.getMessage());
     }
 
+    @ExceptionHandler(OtpException.class)
+    public ResponseEntity<Map<String, Object>> handleOtpException(OtpException ex) {
+        return build(ex.getStatus(), ex.getCode(), ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
         return build(HttpStatus.CONFLICT, "INVALID_STATE", ex.getMessage());

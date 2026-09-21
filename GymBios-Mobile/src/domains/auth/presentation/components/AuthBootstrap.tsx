@@ -44,8 +44,8 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
           // Profile incomplete → send to profile completion
           router.replace('/(auth)/profile-completion');
         } else if (profileCompleted && isProfileCompletion) {
-          // Profile just completed while still on profile-completion screen → go home
-          router.replace('/(member)');
+          // Profile just completed while still on profile-completion screen → go to referral claim
+          router.replace('/(auth)/claim-referral');
         }
       }
     } else if (!inAuthGroup && segments.length > 0) {

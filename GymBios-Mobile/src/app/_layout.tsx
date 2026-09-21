@@ -11,13 +11,17 @@ import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 
 LogBox.ignoreLogs(['Invalid DOM property `transform-origin`']);
 
+import { DeepLinkIntentProvider } from '@/domains/auth/presentation/components/DeepLinkIntentProvider';
+
 export default function RootLayout() {
   return (
-    <AppProviders>
-      <AuthBootstrap>
-        <RootLayoutContent />
-      </AuthBootstrap>
-    </AppProviders>
+    <DeepLinkIntentProvider>
+      <AppProviders>
+        <AuthBootstrap>
+          <RootLayoutContent />
+        </AuthBootstrap>
+      </AppProviders>
+    </DeepLinkIntentProvider>
   );
 }
 
