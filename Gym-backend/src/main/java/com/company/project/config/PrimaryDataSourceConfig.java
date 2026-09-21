@@ -137,6 +137,11 @@ public class PrimaryDataSourceConfig {
                 .dataSource(primaryDataSource)
                 .baselineOnMigrate(flywayBaselineOnMigrate)
                 .baselineVersion(flywayBaselineVersion)
+                // Migrations get renumbered/consolidated over time (already-applied ones
+                // sometimes lose their original version). Without this, any environment
+                // that ran the old-numbered file hard-fails startup with "applied
+                // migration not resolved locally" once the file moves.
+                .ignoreMigrationPatterns("*:missing")
                 .load();
         if (flywayEnabled) {
             flyway.migrate();
