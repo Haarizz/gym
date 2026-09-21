@@ -92,7 +92,7 @@ public class RewardRuleService {
     }
 
     // Mirrors ReferralService.enforceSingleActiveRule() — this table has exactly one
-    // active rule at a time (see V44__single_active_reward_rule.sql), and this is the
+    // active rule at a time (see V50__single_active_reward_rule.sql), and this is the
     // service the Reward Rules admin page actually calls, so it must enforce it too.
     private void enforceSingleActiveRule(ReferralRewardRule incomingRule) {
         if (Boolean.TRUE.equals(incomingRule.getIsActive())) {
