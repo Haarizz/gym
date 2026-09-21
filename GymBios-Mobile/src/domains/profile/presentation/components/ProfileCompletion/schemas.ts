@@ -23,6 +23,7 @@ export const profileCompletionSchema = z.object({
   ...personalInfoSchema.shape,
   ...emergencyInfoSchema.shape,
   ...healthInfoSchema.shape,
+  photoUrl: z.string().optional(),
 });
 
 export type PersonalInfoValues = z.infer<typeof personalInfoSchema>;

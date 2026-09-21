@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { Staff, StaffCertification, WeeklySchedule } from '../../domain/Staff';
 import type { CreateStaffRequest, UpdateStaffRequest } from '../../application/StaffRepository';
 import { useCreateStaff, useUpdateStaff } from './useStaff';
+import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 
 export interface StaffWizardData {
   name: string;
@@ -71,8 +72,8 @@ function mapStaffToWizardData(staff?: Staff): StaffWizardData {
     email: staff?.email ?? '',
     phone: staff?.phone ?? '',
     address: staff?.address ?? '',
-    photoUrl: staff?.photoUrl ?? '',
-    photoUri: staff?.photoUrl || undefined,
+    photoUrl: resolveImageUrl(staff?.photoUrl) ?? '',
+    photoUri: undefined,
     role: staff?.role ?? '',
     department: staff?.department ?? '',
     branch: staff?.branch ?? '',
@@ -94,7 +95,7 @@ function buildCreateRequest(data: StaffWizardData): CreateStaffRequest {
     email: data.email,
     phone: data.phone,
     address: data.address,
-    photoUrl: data.photoUri || data.photoUrl || undefined,
+    photoUrl: data.photoUrl || undefined,
     role: data.role,
     department: data.department,
     branch: data.branch,

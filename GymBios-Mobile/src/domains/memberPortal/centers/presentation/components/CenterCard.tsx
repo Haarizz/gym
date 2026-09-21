@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import type { CenterSummary } from '@/domains/discovery';
-import { resolveImageUrl } from '@/domains/discovery/utils/resolveImageUrl';
+import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 
 const PAYMENT_ICON: Record<string, keyof typeof Feather.glyphMap> = {
   Cash: 'dollar-sign',

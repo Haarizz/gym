@@ -16,6 +16,8 @@ import type {
 import { ProfileApi, type ApiAuthMeResponse } from '../api/ProfileApi';
 import { useAuthStore } from '@/domains/auth/store';
 import { secureStorage } from '@/core/platform/storage';
+import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
+import { uploadPhoto } from '@/shared/utils/uploadPhoto';
 
 const SETTINGS_STORAGE_KEY = 'gymbios.user_settings';
 const PHOTO_STORAGE_PREFIX = 'gymbios.user_photo_';
@@ -55,14 +57,21 @@ export class ApiProfileRepository implements ProfileRepository {
       }
     }
 
-    // 3. Local persistent photo override if stored
-    const localPhoto = await secureStorage.getItem(`${PHOTO_STORAGE_PREFIX}${userId}`);
+    // 3. Real photo, from the backend — falls back to the last-known local
+    // cache only if the profile fetch fails (e.g. offline).
+    let photoUrl: string | undefined;
+    try {
+      const remoteProfile = await this.api.getMobileProfile();
+      photoUrl = resolveImageUrl(remoteProfile.photoUrl) ?? undefined;
+    } catch {
+      const localPhoto = await secureStorage.getItem(`${PHOTO_STORAGE_PREFIX}${userId}`);
+      photoUrl = localPhoto || undefined;
+    }
 
     const name = localProfile.name || primaryName;
     const email = localProfile.email || currentUser?.email || `${username}@gymbios.local`;
     const phone = localProfile.phone || '';
     const address = localProfile.address || '';
-    const photoUrl = localPhoto || undefined;
     const roleDisplay = primaryRole.toUpperCase();
 
     return {
@@ -279,12 +288,19 @@ export class ApiProfileRepository implements ProfileRepository {
     return updated;
   }
 
-  async updateProfilePhoto(photoUriOrDataUrl: string): Promise<string> {
+  async updateProfilePhoto(localUri: string): Promise<string> {
+    const uploadedUrl = await uploadPhoto(localUri);
+    await this.api.updatePhotoUrl(uploadedUrl);
+
+    const absoluteUrl = resolveImageUrl(uploadedUrl) ?? uploadedUrl;
+
+    // Cache locally as an offline-friendly fallback only — the backend is
+    // the source of truth (see getProfile()).
     const authState = useAuthStore.getState();
     const userId = authState.user?.id || 'default';
+    await secureStorage.setItem(`${PHOTO_STORAGE_PREFIX}${userId}`, absoluteUrl);
 
-    await secureStorage.setItem(`${PHOTO_STORAGE_PREFIX}${userId}`, photoUriOrDataUrl);
-    return photoUriOrDataUrl;
+    return absoluteUrl;
   }
 
   async changePassword(data: ChangePasswordDto): Promise<void> {

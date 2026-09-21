@@ -31,6 +31,7 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
   } = useProfileMutations();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
   const [editedName, setEditedName] = useState('');
   const [editedEmail, setEditedEmail] = useState('');
   const [editedPhone, setEditedPhone] = useState('');
@@ -141,10 +142,20 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
           <View style={styles.avatarSection}>
             <AvatarPicker
               name={profile?.name || 'User'}
+              photoUri={photoUri}
               photoUrl={profile?.photoUrl}
               onChangePhoto={async (uri) => {
-                if (uri) {
+                console.log('[MyProfileScreen] onChangePhoto called with', uri);
+                setPhotoUri(uri);
+                if (!uri) return;
+                try {
                   await updatePhoto(uri);
+                  console.log('[MyProfileScreen] updatePhoto resolved');
+                } catch (err: any) {
+                  console.error('[MyProfileScreen] updatePhoto threw', err);
+                  toast.error(err?.message || 'Failed to upload photo.', {
+                    title: 'Error',
+                  });
                 }
               }}
             />

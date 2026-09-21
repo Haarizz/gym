@@ -19,7 +19,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import type { CenterPlan } from '@/domains/discovery';
 import { useCenterDetails, useCenterPlans } from '@/domains/discovery';
-import { resolveImageUrl } from '@/domains/discovery/utils/resolveImageUrl';
+import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 import { PlanCard } from '../components/PlanCard';
 import { PlanPurchaseModal } from '../components/PlanPurchaseModal';
 import { CenterDetailTabs, type CenterDetailTab } from '../components/CenterDetailTabs';
