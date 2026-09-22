@@ -17,6 +17,7 @@ import QRCode from "react-qr-code";
 import { plansService, Plan } from "../utils/supabase/plans-service";
 import { trainingService, TrainingSessionApi } from "../utils/supabase/training-service";
 import { trainingStreamsService, TrainingStreamApi } from "../utils/supabase/training-streams-service";
+import { catalogDisplaySectionService } from "../utils/supabase/catalog-display-section-service";
 import { facilitiesService } from "../utils/supabase/facilities-service";
 import { leadService } from "../utils/supabase/lead-service";
 import { useBranch } from "../utils/branch-context";
@@ -58,11 +59,13 @@ import {
   ExternalLink
 } from 'lucide-react';
 
-// Sample data - in real app, this would come from the GymOS configuration
-const catalogConfig = {
+// Defaults used only until the real GymOS-configured sections load (and as a
+// fallback if that fetch fails) — matches the seeded defaults in V47's
+// catalog_display_sections migration, keyed by section_key.
+const DEFAULT_CATALOG_CONFIG = {
   membershipPlans: true,
   trainingStreams: true,
-  classes: false // This would be controlled by GymOS configuration
+  classes: false
 };
 
 // Membership plans are loaded live from plansService (see fetchPlans below) —
@@ -119,6 +122,8 @@ export function PlansServicesCatalog() {
   const [streamsLoading, setStreamsLoading] = useState(true);
   const [streamsError, setStreamsError] = useState<string | null>(null);
 
+  const [catalogConfig, setCatalogConfig] = useState(DEFAULT_CATALOG_CONFIG);
+
   const fetchPlans = async () => {
     setPlansLoading(true);
     setPlansError(null);
@@ -174,11 +179,27 @@ export function PlansServicesCatalog() {
     }
   };
 
+  const fetchCatalogConfig = async () => {
+    try {
+      const sections = await catalogDisplaySectionService.getAll();
+      const enabled = (key: string) => sections.find(s => s.sectionKey === key)?.enabled ?? false;
+      setCatalogConfig({
+        membershipPlans: enabled('membership-plans'),
+        trainingStreams: enabled('training-streams'),
+        classes: enabled('classes'),
+      });
+    } catch (error) {
+      // Keep the defaults so the kiosk view still shows something usable.
+      console.error('Failed to load catalog display configuration:', error);
+    }
+  };
+
   useEffect(() => {
     fetchPlans();
     fetchSessions();
     fetchFacilities();
     fetchStreams();
+    fetchCatalogConfig();
   }, []);
 
   // Auto-refresh functionality for kiosk mode
@@ -539,7 +560,12 @@ export function PlansServicesCatalog() {
       )}
 
       {/* Content Sections */}
-      <Tabs defaultValue="memberships" className="space-y-6">
+      <Tabs
+        defaultValue={
+          catalogConfig.membershipPlans ? 'memberships' : catalogConfig.trainingStreams ? 'training' : 'classes'
+        }
+        className="space-y-6"
+      >
         <TabsList className={`w-full flex ${isFullscreen ? 'h-16 text-lg' : ''}`}>
           {catalogConfig.membershipPlans && (
             <TabsTrigger value="memberships" className="flex-1 flex items-center justify-center space-x-2">
@@ -553,11 +579,20 @@ export function PlansServicesCatalog() {
               <span>Training Streams</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="classes" className="flex-1 flex items-center justify-center space-x-2">
-            <Calendar className="h-4 w-4" />
-            <span>Scheduled Classes</span>
-          </TabsTrigger>
+          {catalogConfig.classes && (
+            <TabsTrigger value="classes" className="flex-1 flex items-center justify-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <span>Scheduled Classes</span>
+            </TabsTrigger>
+          )}
         </TabsList>
+
+        {!catalogConfig.membershipPlans && !catalogConfig.trainingStreams && !catalogConfig.classes && (
+          <div className="flex flex-col items-center justify-center py-16 text-center text-gray-500">
+            <AlertCircle className="h-8 w-8 mb-3" />
+            <p>No catalog sections are enabled. Enable sections in GymOS &rarr; Plans &amp; Services Catalog Configuration.</p>
+          </div>
+        )}
 
         {/* Membership Plans Section */}
         {catalogConfig.membershipPlans && (
@@ -795,6 +830,7 @@ export function PlansServicesCatalog() {
         )}
 
         {/* Classes Section */}
+        {catalogConfig.classes && (
         <TabsContent value="classes" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
           <div className="text-center mb-8">
             <h2 className={`${isFullscreen ? 'text-3xl' : 'text-2xl'} font-bold mb-4`}>Group Class Schedule</h2>
@@ -904,6 +940,7 @@ export function PlansServicesCatalog() {
             </div>
           )}
         </TabsContent>
+        )}
       </Tabs>
 
       {/* Floating Action Buttons in Fullscreen Mode */}

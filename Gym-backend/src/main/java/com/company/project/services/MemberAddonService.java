@@ -175,7 +175,8 @@ public class MemberAddonService {
                         saved.getTransactionId(),
                         saved.getTransactionId(),
                         saved.getNotes(),
-                        saved.getPaymentBreakdown()
+                        saved.getPaymentBreakdown(),
+                        savedGuardian.getBranchId()
                 );
             }
         } else {
@@ -192,7 +193,8 @@ public class MemberAddonService {
                     saved.getTransactionId(),
                     saved.getTransactionId(),
                     saved.getNotes(),
-                    saved.getPaymentBreakdown()
+                    saved.getPaymentBreakdown(),
+                    targetMember != null ? targetMember.getBranchId() : null
             );
 
             // The two calls above post this purchase to the general ledger and to

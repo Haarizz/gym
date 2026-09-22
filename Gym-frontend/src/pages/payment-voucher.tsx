@@ -259,14 +259,29 @@ export function PaymentVoucher() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, searchQuery, selectedStatus, selectedDateRange, sortField, sortDirection, currentPage, itemsPerPage]);
 
+  // Mirrors loadVouchers' filter shape exactly (including the supplierType/
+  // category split for the "supplier" tab) so the summary cards, the table, and
+  // the Ledger Categories counts always describe the same filtered dataset —
+  // otherwise a Date Range filter with zero matches leaves the table/category
+  // counts at 0 while these cards keep showing unrelated global totals.
   const loadStats = useCallback(async () => {
     try {
-      const s = await paymentVoucherService.getStats();
+      const supplierType = selectedCategory === "supplier" ? "Supplier" : undefined;
+      const category = selectedCategory === "supplier" ? undefined : selectedCategory;
+      const s = await paymentVoucherService.getStats({
+        search: searchQuery || undefined,
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+        supplierType,
+        category: category !== "all" ? category : undefined,
+        from: selectedDateRange.from ? format(selectedDateRange.from, "yyyy-MM-dd") : undefined,
+        to: selectedDateRange.to ? format(selectedDateRange.to, "yyyy-MM-dd") : undefined,
+      });
       setSummaryData(s);
     } catch (err: any) {
       console.error("Failed to load payment voucher stats:", err);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, searchQuery, selectedStatus, selectedDateRange]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
 
@@ -507,7 +522,7 @@ export function PaymentVoucher() {
 
   const handleCreate = async () => {
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
-    if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
+    if (!form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0) { toast.error("Amount must be greater than 0"); return; }
     if (!validatePaymentMethodFields(form)) return;
     setSavingForm(true);
     try {
@@ -525,7 +540,7 @@ export function PaymentVoucher() {
   const handleEdit = async () => {
     if (!editingId) return;
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
-    if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
+    if (!form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0) { toast.error("Amount must be greater than 0"); return; }
     if (!validatePaymentMethodFields(form)) return;
     setSavingForm(true);
     try {

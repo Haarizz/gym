@@ -102,6 +102,7 @@ export function BranchManagement() {
       const newStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
       await branchApi.updateBranchStatus(id, newStatus);
       loadBranches();
+      await refreshBranches();
     } catch (error) {
       console.error('Failed to update status', error);
     }

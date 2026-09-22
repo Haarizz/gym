@@ -184,9 +184,10 @@ export function GymManagement() {
   };
 
   const filteredGyms = gyms.filter(g => {
-    const q = searchQuery || '';
-    return g.name.toLowerCase().includes(q.toLowerCase()) ||
-           g.slug.toLowerCase().includes(q.toLowerCase());
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return g.name.toLowerCase().includes(q) ||
+           g.slug.toLowerCase().includes(q);
   });
 
   if (loading) return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;

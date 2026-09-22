@@ -63,7 +63,7 @@ const PAYMENT_MODE_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> 
 };
 
 interface CreateReceiptProps {
-  onNavigate?: (section: string) => void;
+  onNavigate?: (section: string, params?: Record<string, any>) => void;
   layout?: "page" | "modal";
 }
 
@@ -530,7 +530,12 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                     <Separator />
 
                     <div className="flex items-center justify-between">
-                      <Button variant="outline" size="sm" onClick={() => toast.info("Opening member profile...")} className="gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onNavigate?.("member-history-analytics", { memberId: selectedMember.id })}
+                        className="gap-2"
+                      >
                         <Eye className="h-4 w-4" />View Profile
                       </Button>
                       <Button variant="ghost" size="sm" onClick={resetForm} className="text-red-600 hover:text-red-700 hover:bg-red-50">

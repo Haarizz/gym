@@ -433,7 +433,8 @@ public class ReceiptService {
                     "New member: " + saved.getPlanName()
                             + (saved.getBankAccountName() != null && !saved.getBankAccountName().isBlank()
                                     ? " | Bank: " + saved.getBankAccountName() : ""),
-                    saved.getPaymentBreakdown()
+                    saved.getPaymentBreakdown(),
+                    saved.getBranchId()
             );
         }
         return saved;
@@ -743,7 +744,8 @@ public class ReceiptService {
                     saved.getReceiptNo(),
                     saved.getReceiptNo(),
                     req.getRemarks(),
-                    req.getPaymentBreakdown()
+                    req.getPaymentBreakdown(),
+                    member.getBranchId()
             );
         }
 

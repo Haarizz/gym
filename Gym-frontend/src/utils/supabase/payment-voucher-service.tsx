@@ -112,6 +112,18 @@ export interface PaymentVoucherStats {
   upcomingPayments: number;
 }
 
+// GlobalExceptionHandler returns { message: "..." } for validation errors
+// (e.g. "Amount must be greater than 0") — surface that instead of a generic
+// string, or the whole point of a specific backend message is lost.
+async function errorFrom(res: Response, fallback: string): Promise<Error> {
+  try {
+    const body = await res.json();
+    return new Error(body?.message || fallback);
+  } catch {
+    return new Error(fallback);
+  }
+}
+
 function mapPagination(r: any): Pagination {
   return {
     page: Number(r?.page ?? 1),
@@ -193,9 +205,27 @@ class PaymentVoucherService {
     };
   }
 
-  async getStats(): Promise<PaymentVoucherStats> {
-    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/payment-vouchers/stats`);
-    if (!res.ok) throw new Error("Failed to load payment voucher stats");
+  async getStats(filters: {
+    search?: string;
+    status?: string;
+    supplierType?: string;
+    category?: string;
+    from?: string;
+    to?: string;
+  } = {}): Promise<PaymentVoucherStats> {
+    const params = new URLSearchParams();
+    if (filters.search) params.append("search", filters.search);
+    if (filters.status) params.append("status", filters.status);
+    if (filters.supplierType) params.append("supplier_type", filters.supplierType);
+    if (filters.category) params.append("category", filters.category);
+    if (filters.from) params.append("from", filters.from);
+    if (filters.to) params.append("to", filters.to);
+
+    const qs = params.toString();
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/payment-vouchers/stats${qs ? `?${qs}` : ""}`
+    );
+    if (!res.ok) throw await errorFrom(res, "Failed to load payment voucher stats");
     return mapStats(await res.json());
   }
 
@@ -210,7 +240,7 @@ class PaymentVoucherService {
       method: "POST",
       body: JSON.stringify(toBody(req)),
     });
-    if (!res.ok) throw new Error("Failed to create payment voucher");
+    if (!res.ok) throw await errorFrom(res, "Failed to create payment voucher");
     return mapPaymentVoucher(await res.json());
   }
 
@@ -219,7 +249,7 @@ class PaymentVoucherService {
       method: "PUT",
       body: JSON.stringify(toBody(req)),
     });
-    if (!res.ok) throw new Error("Failed to update payment voucher");
+    if (!res.ok) throw await errorFrom(res, "Failed to update payment voucher");
     return mapPaymentVoucher(await res.json());
   }
 
