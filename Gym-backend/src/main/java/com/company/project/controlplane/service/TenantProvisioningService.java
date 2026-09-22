@@ -444,9 +444,81 @@ public class TenantProvisioningService {
                 .dataSource(tenantDs)
                 .baselineOnMigrate(true)
                 .baselineVersion("0")
+                // Same reasoning as PrimaryDataSourceConfig.flyway(): a tenant DB can
+                // have history for a migration file that's since been renumbered/
+                // renamed upstream — without this, that tenant hard-fails here with
+                // "applied migration not resolved locally" instead of just migrating.
+                .ignoreMigrationPatterns("*:missing")
                 .load();
         flyway.migrate();
     }
+
+    /**
+     * runSchemaAndMigrations only ever runs once, at a tenant's own provisioning
+     * moment — there was no path that re-applies migrations added to the codebase
+     * afterward to an already-provisioned tenant's database. Confirmed live: gyms
+     * provisioned before V52 (branches.accepted_payment_methods and friends) are
+     * still on their provisioning-time schema, so AuthService.login's branch
+     * lookup (SELECT * FROM branches) 500s for every one of their users with
+     * "column b1_0.accepted_payment_methods does not exist" — the immediate cause
+     * of "some gyms can't log in". This walks every provisioned tenant (has a
+     * TenantConnection row) and runs the same Flyway chain runSchemaAndMigrations
+     * uses against each one's own database, via the same pooled DataSource
+     * TenantDataSourceRegistry already builds/caches for live request routing —
+     * safe to re-run any number of times since every migration in this chain is
+     * either additive-and-guarded (IF NOT EXISTS, as V52 is) or already-applied
+     * migrations Flyway simply skips. One tenant's failure is caught and recorded
+     * rather than aborting the rest of the batch, since the whole point is to
+     * unblock as many gyms as possible in one pass — confirmed live against
+     * power-gym: a connection failure isn't the only way a tenant can fail here,
+     * a guarded data-repair migration can too (V50 refuses to auto-pick which of
+     * several already-active referral_reward_rules rows should stay active, and
+     * rightly leaves that to a human). A tenant that fails partway still keeps
+     * whatever migrations DID apply before the failure (each migration commits
+     * individually; Flyway only rolls back the one that failed) — re-running this
+     * after the blocking issue is fixed picks up exactly where it left off.
+     */
+    public List<TenantMigrationResult> catchUpTenantMigrations() {
+        List<TenantMigrationResult> results = new java.util.ArrayList<>();
+        for (Tenant tenant : tenantRepository.findAll()) {
+            String slug = tenant.getSlug();
+            if (tenantConnectionRepository.findByTenantId(tenant.getId()).isEmpty()) {
+                continue; // never provisioned (e.g. still on the primary DB) — nothing to catch up
+            }
+            try {
+                DataSource tenantDs = tenantDataSourceRegistry.getDataSource(slug);
+                Flyway flyway = Flyway.configure()
+                        .dataSource(tenantDs)
+                        .baselineOnMigrate(true)
+                        .baselineVersion("0")
+                        // See runSchemaAndMigrations — a tenant can have history for a
+                        // migration file since renumbered/renamed upstream (confirmed live
+                        // for power-gym's old V42/V43); without this, that tenant fails
+                        // validation here instead of just picking up what's actually new.
+                        .ignoreMigrationPatterns("*:missing")
+                        // Not set on runSchemaAndMigrations's own Flyway instance, where a
+                        // fresh database always applies every migration in a clean, single
+                        // ascending pass. Here the whole point is the opposite: a tenant
+                        // that's behind can have already-applied "future" versions sitting
+                        // ahead of a lower-numbered one it's only just now catching up on
+                        // (confirmed live for power-gym: V44-V47 already applied, V42.1/V43
+                        // still pending) — a renumbering artifact of the sequence a
+                        // migration went through before landing on its current version, not
+                        // an actual ordering dependency violation.
+                        .outOfOrder(true)
+                        .load();
+                int applied = flyway.migrate().migrationsExecuted;
+                log.info("Tenant migration catch-up: slug='{}' applied={}", slug, applied);
+                results.add(new TenantMigrationResult(slug, true, applied + " migration(s) applied", null));
+            } catch (Exception e) {
+                log.error("Tenant migration catch-up failed for slug='{}'", slug, e);
+                results.add(new TenantMigrationResult(slug, false, null, e.getMessage()));
+            }
+        }
+        return results;
+    }
+
+    public record TenantMigrationResult(String tenantSlug, boolean success, String detail, String error) {}
 
     /**
      * user_profiles is one of the newer JPA entities (UserProfile), so the

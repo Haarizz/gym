@@ -181,6 +181,11 @@ public class GymService {
         return !gymRepository.existsBySlug(normalized) && !tenantRepository.existsBySlug(normalized);
     }
 
+    /** Pass-through to TenantProvisioningService.catchUpTenantMigrations — see its javadoc. */
+    public List<TenantProvisioningService.TenantMigrationResult> catchUpTenantMigrations() {
+        return tenantProvisioningService.catchUpTenantMigrations();
+    }
+
     /**
      * Re-provisions a tenant stuck in PROVISION_FAILED. Owner credentials aren't
      * durably stored beyond the original request (no secrets persisted transiently),
