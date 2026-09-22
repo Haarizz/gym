@@ -8,6 +8,7 @@ import com.company.project.dto.PaymentVouchersPageResponseDTO;
 import com.company.project.dto.PaymentVoucherStatsDTO;
 import com.company.project.entities.PaymentVoucher;
 import com.company.project.entities.PaymentVoucherBill;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.PaymentVoucherBillRepository;
 import com.company.project.repositories.PaymentVoucherRepository;
@@ -130,20 +131,36 @@ public class PaymentVoucherService {
     }
 
     /**
-     * True branch-wide stats for the dashboard cards — mirrors ExpenseService.getStats():
-     * a full aggregate over every voucher, independent of the current page/filters, so
-     * these numbers stay correct once the list itself is paginated.
+     * Dashboard-card stats. With no filters, this is the original branch-wide
+     * aggregate (mirrors ExpenseService.getStats()) and "totalPaidThisMonth" means
+     * exactly that — Paid vouchers in the real current calendar month. Once any
+     * filter is active (same params as getPaymentVouchers, via the same buildSpec),
+     * the cards must stay consistent with the table and the Ledger Categories
+     * counts instead of silently showing unrelated global totals while the table
+     * shows a filtered/empty result — "totalPaidThisMonth" then means "total Paid
+     * within the filtered set" (the hardcoded current-month check would otherwise
+     * silently double-filter on top of whatever date range the user picked).
      */
     @Transactional(readOnly = true)
-    public PaymentVoucherStatsDTO getStats() {
-        List<PaymentVoucher> all = paymentVoucherRepository.findAll();
+    public PaymentVoucherStatsDTO getStats(String search, String status, String supplierType,
+                                            String category, LocalDate from, LocalDate to) {
+        boolean filtered = (search != null && !search.isBlank())
+                || (status != null && !status.isBlank() && !status.equalsIgnoreCase("all"))
+                || (supplierType != null && !supplierType.isBlank() && !supplierType.equalsIgnoreCase("all"))
+                || (category != null && !category.isBlank() && !category.equalsIgnoreCase("all"))
+                || from != null || to != null;
+
+        List<PaymentVoucher> all = filtered
+                ? paymentVoucherRepository.findAll(buildSpec(search, status, supplierType, category, from, to))
+                : paymentVoucherRepository.findAll();
 
         LocalDate now = LocalDate.now();
         BigDecimal totalPaidThisMonth = all.stream()
                 .filter(v -> "Paid".equalsIgnoreCase(v.getStatus())
                         && v.getPaymentDate() != null
-                        && v.getPaymentDate().getMonthValue() == now.getMonthValue()
-                        && v.getPaymentDate().getYear() == now.getYear())
+                        && (filtered
+                            || (v.getPaymentDate().getMonthValue() == now.getMonthValue()
+                                && v.getPaymentDate().getYear() == now.getYear())))
                 .map(PaymentVoucher::getAmount)
                 .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -178,7 +195,22 @@ public class PaymentVoucherService {
         return PaymentVoucherResponseDTO.fromEntity(pv, bills);
     }
 
+    /**
+     * The manual create/update paths (this form) had no amount check at all, unlike
+     * createPaymentVoucherFromModule()'s "amount == null || <= 0" guard — a negative
+     * or zero amount saved fine and, once marked "Paid", would post a negative DR/CR
+     * pair to the ledger via onSupplierPaid, corrupting real account balances. Every
+     * write path must go through this the same way, so it can't be bypassed by
+     * calling the API directly even if the frontend form also validates.
+     */
+    private void assertPositiveAmount(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleViolationException("Amount must be greater than 0");
+        }
+    }
+
     public PaymentVoucherResponseDTO createPaymentVoucher(PaymentVoucherRequestDTO req) {
+        assertPositiveAmount(req.getAmount());
         PaymentVoucher pv = new PaymentVoucher();
         pv.setVoucherNo(voucherNumberService.next("PV"));
         applyRequest(pv, req);
@@ -190,6 +222,7 @@ public class PaymentVoucherService {
     }
 
     public PaymentVoucherResponseDTO updatePaymentVoucher(Long id, PaymentVoucherRequestDTO req) {
+        assertPositiveAmount(req.getAmount());
         PaymentVoucher pv = paymentVoucherRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Payment Voucher not found: " + id));
         applyRequest(pv, req);

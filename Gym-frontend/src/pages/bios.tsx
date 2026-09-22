@@ -214,15 +214,19 @@ const DEFAULT_BENCHMARKS = {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-const calculateGrowthRate = (current: number, previous: number) => {
+// Returns null when growth from the previous period is undefined (previous was
+// 0 or less) — the caller decides how to render that ("New" rather than a
+// fabricated "+0.0%", which would misread as no growth).
+const calculateGrowthRate = (current: number, previous: number): number | null => {
   if (previous <= 0) {
-    return 0;
+    return current > 0 ? null : 0;
   }
 
   return Number((((current - previous) / previous) * 100).toFixed(1));
 };
 
-const formatSignedPercent = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+const formatSignedPercent = (value: number | null) =>
+  value === null ? 'New' : `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
 
 const getMetricState = (
   current: number,
@@ -713,8 +717,8 @@ export function BiOS() {
         : 0)
     : 2.1;
 
-  const revenueTrendPositive = revenueGrowthRate >= 0;
-  const memberGrowthPositive = memberGrowthRate >= 0;
+  const revenueTrendPositive = revenueGrowthRate === null || revenueGrowthRate >= 0;
+  const memberGrowthPositive = memberGrowthRate === null || memberGrowthRate >= 0;
   const retentionDeltaPositive = retentionDelta >= 0;
   const recentJoinText = hasGymData ? `+${gymData.recentJoins} new this month` : '+15 new this week';
   const dataSourceCount = hasGymData ? 6 : 8;
@@ -879,7 +883,7 @@ export function BiOS() {
         Math.round(
           retentionRate * 0.5 +
           clamp((gymData.profitMargin ?? 0) * 2.2, 0, 100) * 0.3 +
-          clamp(revenueGrowthRate * 4 + 50, 0, 100) * 0.2
+          (revenueGrowthRate === null ? 100 : clamp(revenueGrowthRate * 4 + 50, 0, 100)) * 0.2
         ),
         0,
         100
@@ -912,8 +916,8 @@ export function BiOS() {
       ['Active Members', activeMembers],
       ['Total Members', totalMembers],
       ['Retention Rate (%)', retentionRate],
-      ['Monthly Revenue Growth (%)', revenueGrowthRate],
-      ['Member Growth (%)', memberGrowthRate],
+      ['Monthly Revenue Growth (%)', revenueGrowthRate === null ? 'New' : revenueGrowthRate],
+      ['Member Growth (%)', memberGrowthRate === null ? 'New' : memberGrowthRate],
       ['Overall Health Score', overallHealthScore],
       ...livePerformanceMetrics.map((metric) => [`${metric.metric} (current)`, metric.current] as [string, number]),
       ...liveBenchmarks.map((benchmark) => [`${benchmark.metric} vs your target`, `${benchmark.value} vs ${benchmark.industry}`] as [string, string]),
@@ -1325,7 +1329,7 @@ export function BiOS() {
                 <span className="text-sm text-gray-600">Profit Margin</span>
                 <span className="font-semibold text-purple-600">{hasGymData ? gymData.profitMargin.toFixed(1) : '23.8'}%</span>
               </div>
-              <Progress value={overallHealthScore} className="h-2" />
+              <Progress value={clamp(hasGymData ? gymData.profitMargin : 23.8, 0, 100)} className="h-2" />
               <p className="text-xs text-gray-500">Overall business health: {overallHealthLabel}</p>
               <div className="flex justify-between pt-2">
                 <Button variant="ghost" size="sm" onClick={handleGenerateReport}>

@@ -2,9 +2,13 @@ package com.company.project.services;
 
 import com.company.project.dto.ReceiptVoucherRequestDTO;
 import com.company.project.dto.ReceiptVoucherResponseDTO;
+import com.company.project.entities.Branch;
 import com.company.project.entities.ReceiptVoucher;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
+import com.company.project.repositories.BranchRepository;
 import com.company.project.repositories.JournalEntrySourceRepository;
+import com.company.project.repositories.JournalVoucherRepository;
 import com.company.project.repositories.ReceiptVoucherRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Sort;
@@ -28,17 +32,26 @@ public class ReceiptVoucherService {
     private final FinancialEventService financialEventService;
     private final VoucherNumberService voucherNumberService;
     private final JournalEntrySourceRepository journalEntrySourceRepository;
+    private final BranchRepository branchRepository;
+    private final JournalVoucherService journalVoucherService;
+    private final JournalVoucherRepository journalVoucherRepository;
 
     public ReceiptVoucherService(ReceiptVoucherRepository receiptVoucherRepository,
                                   NotificationService notificationService,
                                   FinancialEventService financialEventService,
                                   VoucherNumberService voucherNumberService,
-                                  JournalEntrySourceRepository journalEntrySourceRepository) {
+                                  JournalEntrySourceRepository journalEntrySourceRepository,
+                                  BranchRepository branchRepository,
+                                  JournalVoucherService journalVoucherService,
+                                  JournalVoucherRepository journalVoucherRepository) {
         this.receiptVoucherRepository = receiptVoucherRepository;
         this.notificationService = notificationService;
         this.financialEventService = financialEventService;
         this.voucherNumberService = voucherNumberService;
         this.journalEntrySourceRepository = journalEntrySourceRepository;
+        this.branchRepository = branchRepository;
+        this.journalVoucherService = journalVoucherService;
+        this.journalVoucherRepository = journalVoucherRepository;
     }
 
     /**
@@ -120,7 +133,22 @@ public class ReceiptVoucherService {
         return ReceiptVoucherResponseDTO.fromEntity(rv, journalVoucherId);
     }
 
+    /**
+     * The manual create/update paths (this form) had no amount check at all, unlike
+     * createVoucherFromModule()'s "amount == null || <= 0" guard — a negative or
+     * zero amount saved fine and, once marked "completed", would post a negative
+     * DR/CR pair to the ledger via onManualReceiptVoucherPosted, corrupting real
+     * account balances. Every write path must go through this so it can't be
+     * bypassed by calling the API directly even if the frontend form also validates.
+     */
+    private void assertPositiveAmount(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleViolationException("Amount must be greater than 0");
+        }
+    }
+
     public ReceiptVoucherResponseDTO createReceiptVoucher(ReceiptVoucherRequestDTO req) {
+        assertPositiveAmount(req.getAmount());
         ReceiptVoucher rv = new ReceiptVoucher();
         rv.setVoucherNo(voucherNumberService.next("RV"));
         applyRequest(rv, req);
@@ -140,8 +168,26 @@ public class ReceiptVoucherService {
     }
 
     public ReceiptVoucherResponseDTO updateReceiptVoucher(Long id, ReceiptVoucherRequestDTO req) {
+        assertPositiveAmount(req.getAmount());
         ReceiptVoucher rv = receiptVoucherRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
+
+        // Once a voucher is posted to the General Ledger (either auto-created from a
+        // real payment event, or a manual voucher that has since been marked
+        // "completed"), its amount is the source the ledger entry was built from —
+        // silently editing it here would desync the voucher document from the books
+        // it's supposed to be proof of, since the already-posted journal entry is
+        // never re-generated. Every other field can still be corrected (typos in
+        // notes/reference/etc.), just not the amount.
+        boolean alreadyPosted = journalEntrySourceRepository
+                .findBySourceEntityTypeAndSourceEntityId("ReceiptVoucher", rv.getId())
+                .isPresent();
+        if (alreadyPosted && req.getAmount() != null && rv.getAmount().compareTo(req.getAmount()) != 0) {
+            throw new BusinessRuleViolationException(
+                    "This voucher is already posted to the general ledger — its amount can't be changed. "
+                    + "Reverse or adjust it through the ledger instead.");
+        }
+
         applyRequest(rv, req);
         if (req.getStatus() != null && !req.getStatus().isBlank()) {
             rv.setStatus(req.getStatus());
@@ -160,9 +206,27 @@ public class ReceiptVoucherService {
         return toResponseDTO(saved);
     }
 
+    /**
+     * Deleting a voucher that was already posted to the General Ledger must not
+     * leave that journal entry behind — an orphaned JV would still show real
+     * money received in the books for a receipt that, as far as this module is
+     * concerned, no longer exists. Ledger entries are never hard-deleted once
+     * posted (see JournalVoucherService.deleteJournalVoucher's own DRAFT/
+     * CANCELLED-only guard), so this reverses it instead: an equal-and-opposite
+     * entry that zeroes out its effect, same as the standard "correct a posted
+     * entry" path elsewhere in Financials.
+     */
     public void deleteReceiptVoucher(Long id) {
         ReceiptVoucher rv = receiptVoucherRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
+
+        journalEntrySourceRepository
+                .findBySourceEntityTypeAndSourceEntityId("ReceiptVoucher", id)
+                .flatMap(source -> journalVoucherRepository.findByIdAndDeletedAtIsNull(source.getJournalVoucherId()))
+                .filter(jv -> "POSTED".equalsIgnoreCase(jv.getStatus()) && jv.getReversedByVoucherId() == null)
+                .ifPresent(jv -> journalVoucherService.reverseJournalVoucher(
+                        jv.getId(), LocalDate.now(), "Receipt Voucher " + rv.getVoucherNo() + " deleted"));
+
         receiptVoucherRepository.delete(rv);
     }
 
@@ -182,6 +246,32 @@ public class ReceiptVoucherService {
             String transactionId,
             String notes,
             List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown) {
+        createVoucherFromModule(source, sourceCategory, memberName, memberId, amount,
+                paymentMode, reference, transactionId, notes, paymentBreakdown, null);
+    }
+
+    /**
+     * Same as above, plus the branch the underlying record belongs to — unlike
+     * the manual "Add Receipt" form (which always sends a branch), callers of
+     * this module-triggered path previously left the voucher's branch blank
+     * entirely, which showed up as an empty Branch field everywhere the
+     * voucher was displayed or printed. branchId is resolved to a branch name
+     * here (rather than making every caller do its own lookup); a null or
+     * unresolvable id just leaves the branch blank as before, it never fails
+     * the voucher creation.
+     */
+    public void createVoucherFromModule(
+            String source,
+            String sourceCategory,
+            String memberName,
+            Long memberId,
+            BigDecimal amount,
+            String paymentMode,
+            String reference,
+            String transactionId,
+            String notes,
+            List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+            Long branchId) {
 
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
 
@@ -200,6 +290,10 @@ public class ReceiptVoucherService {
         rv.setNotes(notes);
         rv.setStatus("completed");   // "completed" matches FinancialAnalyticsService query
         rv.setVoucherType("Receipt");
+        rv.setBranchId(branchId);
+        if (branchId != null) {
+            branchRepository.findById(branchId).map(Branch::getBranchName).ifPresent(rv::setBranch);
+        }
 
         ReceiptVoucher saved = receiptVoucherRepository.save(rv);
 

@@ -8,6 +8,7 @@ import {
 } from '../components/shared/split-payment-fields';
 import type { SplitPaymentValue, SplitPaymentDetails } from '../components/shared/split-payment-fields';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
+import { downloadReceiptVoucher } from '../utils/receipt-invoice';
 
 // Maps the Payment Mode select value to the SplitPaymentValue key so a
 // single (non-Mixed) method's details can be validated/built by reusing the
@@ -219,6 +220,7 @@ export function ReceiptVoucher() {
         voucherType: rv.voucherType ?? rv.sourceCategory,
         cashierName: '',
         transactionId: rv.transactionId ?? '',
+        journalVoucherId: rv.journalVoucherId,
       })));
     } catch (err: any) {
       toast.error(err.message || 'Failed to load receipt vouchers');
@@ -284,15 +286,6 @@ export function ReceiptVoucher() {
       .then(setBankAccounts)
       .catch(err => console.error('Failed to load bank accounts:', err));
   }, []);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: currencyCode,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const getSourceIcon = (sourceCategory: string) => {
     const source = incomeSourcesConfig.find(s => s.id === sourceCategory);
@@ -393,13 +386,6 @@ export function ReceiptVoucher() {
     .filter(r => r.date === today && r.status === 'completed')
     .length;
 
-  const printDate = selectedReceipt?.date
-    ? new Date(selectedReceipt.date).toLocaleDateString()
-    : '-';
-  const printCreatedAt = selectedReceipt?.createdAt
-    ? new Date(selectedReceipt.createdAt).toLocaleString()
-    : '-';
-
   const applyFilters = () => {
     loadReceipts({
       search: searchTerm || undefined,
@@ -415,6 +401,10 @@ export function ReceiptVoucher() {
       return;
     }
     const amount = parseFloat(newReceipt.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Amount must be greater than 0');
+      return;
+    }
     if (newReceipt.paymentMode === 'Mixed') {
       if (!isSplitPaymentValid(newReceiptSplit, amount)) {
         toast.error('Split payment amounts must add up to the total amount');
@@ -507,6 +497,10 @@ export function ReceiptVoucher() {
     }
     if (!selectedReceipt?._dbId) return;
     const editAmount = parseFloat(editForm.amount);
+    if (isNaN(editAmount) || editAmount <= 0) {
+      toast.error('Amount must be greater than 0');
+      return;
+    }
     if (editForm.paymentMode === 'Mixed') {
       if (!isSplitPaymentValid(editReceiptSplit, editAmount)) {
         toast.error('Split payment amounts must add up to the total amount');
@@ -553,7 +547,7 @@ export function ReceiptVoucher() {
       await loadReceipts();
       setShowEditReceipt(false);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update receipt voucher');
+      toast.error(err.response?.data?.message || err.message || 'Failed to update receipt voucher');
     }
   };
 
@@ -565,7 +559,7 @@ export function ReceiptVoucher() {
       setShowReceiptDetails(false);
       await loadReceipts();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete receipt voucher');
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete receipt voucher');
     }
   };
 
@@ -608,6 +602,32 @@ export function ReceiptVoucher() {
     setShowReceiptDetails(true);
   };
 
+  // Opens the voucher in its own print window (same mechanism as member
+  // receipts) instead of the old approach of hiding the rest of this page via
+  // CSS and calling window.print() on the whole document — that approach
+  // still let the browser paginate against this page's full (invisible)
+  // layout height, producing several mostly-blank pages for one voucher.
+  const printReceipt = (receipt: any) => {
+    if (!receipt) return;
+    downloadReceiptVoucher({
+      voucherNo: receipt.id ?? '-',
+      dateStr: receipt.date ? new Date(receipt.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '-',
+      status: receipt.status ?? 'N/A',
+      branch: receipt.branch ?? '-',
+      memberName: receipt.member ?? '-',
+      memberId: receipt.memberId,
+      paymentMode: receipt.paymentMode ?? '-',
+      reference: receipt.reference,
+      currencyCode,
+      amount: Number(receipt.amount) || 0,
+      source: receipt.source ?? '-',
+      sourceCategory: receipt.sourceCategory ?? '-',
+      transactionId: receipt.transactionId,
+      notes: receipt.notes,
+      createdAtStr: receipt.createdAt ? new Date(receipt.createdAt).toLocaleString() : undefined,
+    });
+  };
+
   const toggleReceiptSelection = (receiptId: string) => {
     setSelectedReceipts(prev => 
       prev.includes(receiptId) 
@@ -618,175 +638,6 @@ export function ReceiptVoucher() {
 
   return (
     <TooltipProvider>
-      <style>{`
-        @media print {
-          body { background: #fff; }
-          body * { visibility: hidden; }
-          .print-receipt, .print-receipt * { visibility: visible !important; }
-          .print-receipt {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 24px;
-            display: block !important;
-          }
-        }
-        .print-receipt { display: none; color: #0f172a; font-family: Arial, sans-serif; }
-        .print-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border-bottom: 2px solid #e2e8f0;
-          padding-bottom: 12px;
-          margin-bottom: 16px;
-        }
-        .print-brand h1 { margin: 0; font-size: 22px; font-weight: 700; }
-        .print-brand p { margin: 4px 0 0; font-size: 12px; color: #64748b; }
-        .print-badge {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.4px;
-          text-transform: uppercase;
-          padding: 6px 10px;
-          border-radius: 999px;
-          border: 1px solid #e2e8f0;
-          background: #f8fafc;
-          color: #0f172a;
-        }
-        .print-meta {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 12px;
-          margin: 16px 0;
-        }
-        .print-meta .label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
-        .print-meta .value { font-size: 14px; font-weight: 600; margin-top: 4px; }
-        .print-card {
-          border: 1px solid #e2e8f0;
-          border-radius: 10px;
-          padding: 12px;
-          background: #fff;
-        }
-        .print-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 12px;
-          margin-bottom: 16px;
-        }
-        .print-amount {
-          border: 2px solid #0f172a;
-          border-radius: 10px;
-          padding: 14px;
-          text-align: right;
-          font-size: 20px;
-          font-weight: 800;
-          margin-bottom: 16px;
-        }
-        .print-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 8px;
-        }
-        .print-table th {
-          text-align: left;
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: #64748b;
-          padding: 8px 6px;
-          border-bottom: 1px solid #e2e8f0;
-        }
-        .print-table td {
-          padding: 10px 6px;
-          font-size: 13px;
-          border-bottom: 1px solid #f1f5f9;
-        }
-        .print-footer {
-          margin-top: 16px;
-          font-size: 11px;
-          color: #64748b;
-          text-align: center;
-        }
-      `}</style>
-
-      <div className="print-receipt">
-        <div className="print-header">
-          <div className="print-brand">
-            <h1>GymBios</h1>
-            <p>Receipt Voucher</p>
-          </div>
-          <div className="print-badge">{selectedReceipt?.status ?? 'N/A'}</div>
-        </div>
-
-        <div className="print-meta">
-          <div>
-            <div className="label">Voucher ID</div>
-            <div className="value">{selectedReceipt?.id ?? '-'}</div>
-          </div>
-          <div>
-            <div className="label">Date</div>
-            <div className="value">{printDate}</div>
-          </div>
-          <div>
-            <div className="label">Branch</div>
-            <div className="value">{selectedReceipt?.branch ?? '-'}</div>
-          </div>
-        </div>
-
-        <div className="print-grid">
-          <div className="print-card">
-            <div className="label">Member</div>
-            <div className="value">{selectedReceipt?.member ?? '-'}</div>
-            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-              ID: {selectedReceipt?.memberId ?? '-'}
-            </div>
-          </div>
-          <div className="print-card">
-            <div className="label">Payment</div>
-            <div className="value">{selectedReceipt?.paymentMode ?? '-'}</div>
-            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-              Reference: {selectedReceipt?.reference ?? '-'}
-            </div>
-          </div>
-        </div>
-
-        <div className="print-amount">
-          {selectedReceipt ? formatCurrency(selectedReceipt.amount) : `${currencyCode} 0`}
-        </div>
-
-        <div className="print-card">
-          <div className="label">Receipt Details</div>
-          <table className="print-table">
-            <thead>
-              <tr>
-                <th>Source</th>
-                <th>Category</th>
-                <th>Transaction</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>{selectedReceipt?.source ?? '-'}</td>
-                <td>{selectedReceipt?.sourceCategory ?? '-'}</td>
-                <td>{selectedReceipt?.transactionId ?? '-'}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="print-card" style={{ marginTop: '12px' }}>
-          <div className="label">Notes</div>
-          <div style={{ fontSize: '12px', marginTop: '6px' }}>
-            {selectedReceipt?.notes ?? '—'}
-          </div>
-        </div>
-
-        <div className="print-footer">
-          Created at: {printCreatedAt}
-        </div>
-      </div>
-
       <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -1270,7 +1121,7 @@ export function ReceiptVoucher() {
                                   Cancel
                                 </DropdownMenuItem>
                               ) : null}
-                              <DropdownMenuItem onClick={() => { openReceiptDetails(receipt); setTimeout(() => window.print(), 300); }}>
+                              <DropdownMenuItem onClick={() => printReceipt(receipt)}>
                                 <Printer className="h-4 w-4 mr-2" />
                                 Print Receipt
                               </DropdownMenuItem>
@@ -1637,7 +1488,18 @@ export function ReceiptVoucher() {
                 </div>
                 <div className="space-y-2">
                   <Label>Amount ({currencyCode}) *</Label>
-                  <Input type="number" placeholder="0.00" value={editForm.amount} onChange={(e) => setEditForm({...editForm, amount: e.target.value})} />
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={editForm.amount}
+                    onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
+                    disabled={!!selectedReceipt?.journalVoucherId}
+                  />
+                  {!!selectedReceipt?.journalVoucherId && (
+                    <p className="text-xs text-muted-foreground">
+                      Amount is locked — this voucher is already posted to the general ledger (JV #{selectedReceipt.journalVoucherId}).
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Payment Mode *</Label>
@@ -1977,7 +1839,7 @@ export function ReceiptVoucher() {
                       <Edit className="h-4 w-4 mr-2" />
                       Edit Receipt
                     </Button>
-                    <Button variant="outline" className="flex-1" onClick={() => window.print()}>
+                    <Button variant="outline" className="flex-1" onClick={() => printReceipt(selectedReceipt)}>
                       <Printer className="h-4 w-4 mr-2" />
                       Print
                     </Button>

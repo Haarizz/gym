@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { CurrencyGlyph } from '../utils/currency';
 import { moduleService, PlatformModuleResponse, ModuleAuditLogEntry } from '../utils/supabase/module-service';
 import { staffService, StaffTarget } from '../utils/supabase/staff-service';
@@ -317,30 +318,6 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
       setCatalogSectionsError('Failed to update section');
     } finally {
       setCatalogToggleId(null);
-    }
-  };
-
-  const [showAddCatalogSection, setShowAddCatalogSection] = useState(false);
-  const [newCatalogSection, setNewCatalogSection] = useState({ sectionKey: '', title: '', description: '' });
-  const [addCatalogSectionError, setAddCatalogSectionError] = useState<string | null>(null);
-  const [addCatalogSectionSaving, setAddCatalogSectionSaving] = useState(false);
-
-  const submitNewCatalogSection = async () => {
-    if (!newCatalogSection.sectionKey.trim() || !newCatalogSection.title.trim()) {
-      setAddCatalogSectionError('Key and title are required');
-      return;
-    }
-    setAddCatalogSectionSaving(true);
-    setAddCatalogSectionError(null);
-    try {
-      const created = await catalogDisplaySectionService.create(newCatalogSection);
-      setCatalogSections(prev => [...prev, created]);
-      setShowAddCatalogSection(false);
-      setNewCatalogSection({ sectionKey: '', title: '', description: '' });
-    } catch (err: any) {
-      setAddCatalogSectionError(err?.response?.data?.message || 'Failed to create section');
-    } finally {
-      setAddCatalogSectionSaving(false);
     }
   };
 
@@ -838,55 +815,10 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
 
             {/* Action Buttons */}
             <div className="flex justify-between pt-2">
-              <Dialog open={showAddCatalogSection} onOpenChange={setShowAddCatalogSection}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Option
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[480px]">
-                  <DialogHeader>
-                    <DialogTitle>Add Catalog Section</DialogTitle>
-                    <DialogDescription>Add a new section to the walk-in inquiry catalog.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-3 py-2">
-                    {addCatalogSectionError && (
-                      <p className="text-sm text-red-600">{addCatalogSectionError}</p>
-                    )}
-                    <div className="space-y-1">
-                      <label className="text-sm text-gray-600">Key (e.g. group-classes)</label>
-                      <input
-                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
-                        value={newCatalogSection.sectionKey}
-                        onChange={(e) => setNewCatalogSection(prev => ({ ...prev, sectionKey: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-sm text-gray-600">Title</label>
-                      <input
-                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
-                        value={newCatalogSection.title}
-                        onChange={(e) => setNewCatalogSection(prev => ({ ...prev, title: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-sm text-gray-600">Description</label>
-                      <input
-                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
-                        value={newCatalogSection.description}
-                        onChange={(e) => setNewCatalogSection(prev => ({ ...prev, description: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setShowAddCatalogSection(false)}>Cancel</Button>
-                    <Button onClick={submitNewCatalogSection} disabled={addCatalogSectionSaving}>
-                      {addCatalogSectionSaving ? 'Saving...' : 'Add Section'}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button variant="ghost" size="sm" onClick={() => toast.info('Add Option is coming soon.')}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add Option
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowCatalogConfig(true)}>
                 <Eye className="h-4 w-4 mr-1" />
                 View All

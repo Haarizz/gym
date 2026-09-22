@@ -490,7 +490,8 @@ public class MemberService {
                     "New member: " + saved.getMembershipPlan()
                             + (request.getBankAccountName() != null && !request.getBankAccountName().isBlank()
                                     ? " | Bank: " + request.getBankAccountName() : ""),
-                    request.getPaymentBreakdown()
+                    request.getPaymentBreakdown(),
+                    saved.getBranchId()
             );
         }
 
@@ -742,7 +743,8 @@ public class MemberService {
                     null,
                     "New family member (" + fm.getRelationship() + ") of " + head.getName()
                             + ": " + savedDep.getMembershipPlan(),
-                    fm.getPaymentBreakdown()
+                    fm.getPaymentBreakdown(),
+                    savedDep.getBranchId()
             );
         }
     }
@@ -887,7 +889,8 @@ public class MemberService {
                     saved.getMemberId(),
                     null,
                     "Renewal: " + saved.getMembershipPlan(),
-                    null
+                    null,
+                    saved.getBranchId()
             );
         }
 
@@ -968,7 +971,8 @@ public class MemberService {
                     "Renewal for family member " + savedMinor.getName()
                             + " (billed to " + savedGuardian.getName() + ")"
                             + (fullyPaid ? "" : " — partial payment"),
-                    null
+                    null,
+                    savedGuardian.getBranchId()
             );
         }
 
@@ -1056,7 +1060,8 @@ public class MemberService {
                     savedHead.getMemberId(),
                     null,
                     "Family renewal (" + totalMembers + " member(s)): " + savedHead.getMembershipPlan(),
-                    request.getPaymentBreakdown()
+                    request.getPaymentBreakdown(),
+                    savedHead.getBranchId()
             );
         }
 

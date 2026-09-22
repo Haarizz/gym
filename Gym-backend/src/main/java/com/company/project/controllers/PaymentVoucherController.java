@@ -40,8 +40,14 @@ public class PaymentVoucherController {
     }
 
     @GetMapping("/stats")
-    public ResponseEntity<PaymentVoucherStatsDTO> getStats() {
-        return ResponseEntity.ok(paymentVoucherService.getStats());
+    public ResponseEntity<PaymentVoucherStatsDTO> getStats(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(name = "supplier_type", required = false) String supplierType,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(paymentVoucherService.getStats(search, status, supplierType, category, from, to));
     }
 
     @GetMapping("/{id}")
