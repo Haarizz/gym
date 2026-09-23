@@ -2,39 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useCurrency, CurrencyValue } from '../utils/currency';
 import { toast } from 'sonner';
 import { receiptVoucherService, type ReceiptVoucher as RVType } from '../utils/supabase/receipt-voucher-service';
-import {
-  SplitPaymentFields, isSplitPaymentValid, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
-  EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
-} from '../components/shared/split-payment-fields';
-import type { SplitPaymentValue, SplitPaymentDetails } from '../components/shared/split-payment-fields';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
 import { downloadReceiptVoucher } from '../utils/receipt-invoice';
-
-// Maps the Payment Mode select value to the SplitPaymentValue key so a
-// single (non-Mixed) method's details can be validated/built by reusing the
-// same helpers Mixed Payment legs use.
-const PAYMENT_MODE_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
-  Cash: 'cash', Card: 'card', Cheque: 'cheque', 'Bank Transfer': 'bankTransfer', 'Online Transfer': 'online'
-};
-
-// This page's Create/Edit forms keep card type / online payment type / bank
-// account flat on the form object (cardType, onlinePaymentType, ...) rather
-// than as a separate SplitPaymentDetails object like Mixed Payment legs use —
-// this adapts the flat form fields into that shape so the same validators/
-// breakdown-builder can be reused instead of duplicating the logic.
-function detailsFromForm(f: { cardType: string; onlinePaymentType: string; onlineProviderName: string; bankAccountId: string; transactionId: string }): SplitPaymentDetails {
-  return {
-    ...EMPTY_SPLIT_DETAILS,
-    cardType: f.cardType,
-    cardReference: f.transactionId,
-    chequeNumber: f.transactionId,
-    bankTransferReference: f.transactionId,
-    bankTransferAccountId: f.bankAccountId,
-    onlinePaymentType: f.onlinePaymentType,
-    onlineProviderName: f.onlineProviderName,
-    onlineReference: f.transactionId,
-  };
-}
+import { usePaymentManager } from '../payments/usePaymentManager';
+import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
+import { PAYMENT_TYPES, PaymentLine } from '../payments/paymentModel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -254,19 +226,12 @@ export function ReceiptVoucher() {
     source: '',
     sourceCategory: '',
     amount: '',
-    paymentMode: '',
     reference: '',
     notes: '',
     branch: 'Dubai Branch',
     transactionId: '',
     approvedBy: '',
     status: 'completed',
-    // Method-specific detail — Card Type, Online Payment Type/Provider, and
-    // the ledger bank account for Bank Transfer.
-    cardType: '',
-    onlinePaymentType: '',
-    onlineProviderName: '',
-    bankAccountId: '',
   };
 
   // New receipt form state
@@ -275,11 +240,9 @@ export function ReceiptVoucher() {
   // Edit receipt form state
   const [editForm, setEditForm] = useState({ ...emptyForm });
 
-  // Mixed payment split state (shared between Add and Edit dialogs)
-  const [newReceiptSplit, setNewReceiptSplit] = useState<SplitPaymentValue>(EMPTY_SPLIT_PAYMENT);
-  const [newReceiptSplitDetails, setNewReceiptSplitDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
-  const [editReceiptSplit, setEditReceiptSplit] = useState<SplitPaymentValue>(EMPTY_SPLIT_PAYMENT);
-  const [editReceiptSplitDetails, setEditReceiptSplitDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
+  // Independent payment-allocation state per dialog — Add and Edit are separate forms.
+  const newReceiptPaymentManager = usePaymentManager({ invoiceTotal: parseFloat(newReceipt.amount) || 0 });
+  const editReceiptPaymentManager = usePaymentManager({ invoiceTotal: parseFloat(editForm.amount) || 0 });
   const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
   useEffect(() => {
     accountHeadsService.getBankAccounts()
@@ -395,8 +358,38 @@ export function ReceiptVoucher() {
     });
   };
 
+  // Derives payment_mode/payment_breakdown from an allocation panel's lines:
+  // a single method sends its own name; two or more send "Mixed" plus a leg
+  // per line, each carrying its own reference/bank account detail.
+  const derivePaymentModeAndBreakdown = (lines: PaymentLine[]) => {
+    const methodLabelByType: Record<string, string> = {
+      [PAYMENT_TYPES.CASH]: 'Cash',
+      [PAYMENT_TYPES.CARD]: 'Card',
+      [PAYMENT_TYPES.ONLINE]: 'Online Transfer',
+    };
+    if (lines.length === 0) {
+      return { paymentMode: 'Cash', paymentBreakdown: undefined as any };
+    }
+    if (lines.length === 1) {
+      const line = lines[0];
+      return {
+        paymentMode: line.paymentType === PAYMENT_TYPES.CARD && line.paymentSubtype ? line.paymentSubtype : methodLabelByType[line.paymentType],
+        paymentBreakdown: undefined as any,
+      };
+    }
+    return {
+      paymentMode: 'Mixed',
+      paymentBreakdown: lines.map(line => ({
+        method: line.paymentType === PAYMENT_TYPES.CARD && line.paymentSubtype ? line.paymentSubtype : methodLabelByType[line.paymentType],
+        amount: line.amount,
+        ...(line.reference ? { reference: line.reference } : {}),
+        ...(line.bankAccountName ? { bank_account_name: line.bankAccountName } : {}),
+      })),
+    };
+  };
+
   const handleAddReceipt = async () => {
-    if (!newReceipt.member || !newReceipt.source || !newReceipt.amount || !newReceipt.paymentMode) {
+    if (!newReceipt.member || !newReceipt.source || !newReceipt.amount) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -405,39 +398,19 @@ export function ReceiptVoucher() {
       toast.error('Amount must be greater than 0');
       return;
     }
-    if (newReceipt.paymentMode === 'Mixed') {
-      if (!isSplitPaymentValid(newReceiptSplit, amount)) {
-        toast.error('Split payment amounts must add up to the total amount');
-        return;
-      }
-      if (!isSplitPaymentDetailsValid(newReceiptSplit, newReceiptSplitDetails)) {
-        toast.error('Please fill in the required details for each payment method used in the split');
-        return;
-      }
-    } else {
-      const legKey = PAYMENT_MODE_TO_LEG_KEY[newReceipt.paymentMode];
-      if (legKey && legKey !== 'cash') {
-        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: amount };
-        if (!isSplitPaymentDetailsValid(probe, detailsFromForm(newReceipt))) {
-          toast.error(`Please fill in the required ${newReceipt.paymentMode} details`);
-          return;
-        }
-      }
+    if (!newReceiptPaymentManager.settleable) {
+      toast.error('Allocate the full amount before continuing');
+      return;
     }
     try {
-      const legKey = PAYMENT_MODE_TO_LEG_KEY[newReceipt.paymentMode];
-      const paymentBreakdown = newReceipt.paymentMode === 'Mixed'
-        ? buildSplitPaymentBreakdown(newReceiptSplit, newReceiptSplitDetails, bankAccounts)
-        : (legKey && legKey !== 'cash'
-            ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: amount }, detailsFromForm(newReceipt), bankAccounts)
-            : undefined);
+      const { paymentMode, paymentBreakdown } = derivePaymentModeAndBreakdown(newReceiptPaymentManager.paymentLines);
       await receiptVoucherService.createReceiptVoucher({
         date: newReceipt.date,
         source: newReceipt.source,
         sourceCategory: newReceipt.sourceCategory,
         memberName: newReceipt.member,
         amount,
-        paymentMode: newReceipt.paymentMode,
+        paymentMode,
         paymentBreakdown,
         status: newReceipt.status || 'completed',
         branch: newReceipt.branch,
@@ -451,8 +424,7 @@ export function ReceiptVoucher() {
       await loadReceipts();
       setShowAddReceipt(false);
       setNewReceipt({ ...emptyForm });
-      setNewReceiptSplit(EMPTY_SPLIT_PAYMENT);
-      setNewReceiptSplitDetails(EMPTY_SPLIT_DETAILS);
+      newReceiptPaymentManager.clearLines();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create receipt voucher');
     }
@@ -465,33 +437,49 @@ export function ReceiptVoucher() {
       source: receipt.source,
       sourceCategory: receipt.sourceCategory,
       amount: String(receipt.amount),
-      paymentMode: receipt.paymentMode,
       reference: receipt.reference,
       notes: receipt.notes,
       branch: receipt.branch,
       transactionId: receipt.transactionId || '',
       approvedBy: receipt.approvedBy || '',
       status: receipt.status,
-      cardType: '',
-      onlinePaymentType: '',
-      onlineProviderName: '',
-      bankAccountId: '',
     });
+    editReceiptPaymentManager.clearLines();
+    // Rebuild allocation lines from the stored breakdown. A voucher created
+    // under the old Cheque/Bank Transfer tiles has no equivalent tender in
+    // the new model — fold either into an ONLINE line so the amount and
+    // reference aren't silently dropped when re-opened for editing.
     const legs: { method: string; amount: number; reference?: string }[] = receipt.paymentBreakdown || [];
-    setEditReceiptSplit({
-      cash: legs.find(l => l.method === 'Cash')?.amount || 0,
-      card: legs.find(l => l.method === 'Card')?.amount || 0,
-      cheque: legs.find(l => l.method === 'Cheque')?.amount || 0,
-      bankTransfer: legs.find(l => l.method === 'Bank Transfer')?.amount || 0,
-      online: legs.find(l => l.method === 'Online Payment')?.amount || 0,
-    });
-    setEditReceiptSplitDetails(EMPTY_SPLIT_DETAILS);
+    if (legs.length > 0) {
+      for (const leg of legs) {
+        if (leg.method === 'Card') {
+          editReceiptPaymentManager.addLine({ paymentType: PAYMENT_TYPES.CARD, paymentSubtype: 'Card', amount: leg.amount, reference: leg.reference ?? null });
+        } else if (leg.method === 'Online Payment' || leg.method === 'Online Transfer') {
+          editReceiptPaymentManager.addLine({ paymentType: PAYMENT_TYPES.ONLINE, amount: leg.amount, reference: leg.reference ?? null });
+        } else if (leg.method === 'Cheque' || leg.method === 'Bank Transfer') {
+          editReceiptPaymentManager.addLine({ paymentType: PAYMENT_TYPES.ONLINE, amount: leg.amount, reference: leg.reference ?? null });
+        } else {
+          editReceiptPaymentManager.addLine({ paymentType: PAYMENT_TYPES.CASH, amount: leg.amount });
+        }
+      }
+    } else if (receipt.amount > 0) {
+      const single = receipt.paymentMode === 'Card'
+        ? PAYMENT_TYPES.CARD
+        : (receipt.paymentMode === 'Online Transfer' || receipt.paymentMode === 'Bank Transfer' || receipt.paymentMode === 'Cheque')
+          ? PAYMENT_TYPES.ONLINE
+          : PAYMENT_TYPES.CASH;
+      editReceiptPaymentManager.addLine(
+        single === PAYMENT_TYPES.CARD
+          ? { paymentType: single, paymentSubtype: 'Card', amount: receipt.amount }
+          : { paymentType: single, amount: receipt.amount }
+      );
+    }
     setSelectedReceipt(receipt);
     setShowEditReceipt(true);
   };
 
   const handleEditReceipt = async () => {
-    if (!editForm.member || !editForm.source || !editForm.amount || !editForm.paymentMode) {
+    if (!editForm.member || !editForm.source || !editForm.amount) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -501,39 +489,19 @@ export function ReceiptVoucher() {
       toast.error('Amount must be greater than 0');
       return;
     }
-    if (editForm.paymentMode === 'Mixed') {
-      if (!isSplitPaymentValid(editReceiptSplit, editAmount)) {
-        toast.error('Split payment amounts must add up to the total amount');
-        return;
-      }
-      if (!isSplitPaymentDetailsValid(editReceiptSplit, editReceiptSplitDetails)) {
-        toast.error('Please fill in the required details for each payment method used in the split');
-        return;
-      }
-    } else {
-      const legKey = PAYMENT_MODE_TO_LEG_KEY[editForm.paymentMode];
-      if (legKey && legKey !== 'cash') {
-        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: editAmount };
-        if (!isSplitPaymentDetailsValid(probe, detailsFromForm(editForm))) {
-          toast.error(`Please fill in the required ${editForm.paymentMode} details`);
-          return;
-        }
-      }
+    if (!editReceiptPaymentManager.settleable) {
+      toast.error('Allocate the full amount before continuing');
+      return;
     }
     try {
-      const legKey = PAYMENT_MODE_TO_LEG_KEY[editForm.paymentMode];
-      const paymentBreakdown = editForm.paymentMode === 'Mixed'
-        ? buildSplitPaymentBreakdown(editReceiptSplit, editReceiptSplitDetails, bankAccounts)
-        : (legKey && legKey !== 'cash'
-            ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: editAmount }, detailsFromForm(editForm), bankAccounts)
-            : undefined);
+      const { paymentMode, paymentBreakdown } = derivePaymentModeAndBreakdown(editReceiptPaymentManager.paymentLines);
       await receiptVoucherService.updateReceiptVoucher(selectedReceipt._dbId, {
         date: editForm.date,
         source: editForm.source,
         sourceCategory: editForm.sourceCategory,
         memberName: editForm.member,
         amount: editAmount,
-        paymentMode: editForm.paymentMode,
+        paymentMode,
         paymentBreakdown,
         status: editForm.status,
         branch: editForm.branch,
@@ -1245,117 +1213,14 @@ export function ReceiptVoucher() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Payment Mode *</Label>
-                  <Select value={newReceipt.paymentMode} onValueChange={(value) => setNewReceipt({...newReceipt, paymentMode: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Cash">
-                        <div className="flex items-center space-x-2">
-                          <Banknote className="h-4 w-4 text-green-600" />
-                          <span>Cash</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="Card">
-                        <div className="flex items-center space-x-2">
-                          <CreditCard className="h-4 w-4 text-blue-600" />
-                          <span>Card</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="Online Transfer">
-                        <div className="flex items-center space-x-2">
-                          <Smartphone className="h-4 w-4 text-purple-600" />
-                          <span>Online Transfer</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="Cheque">
-                        <div className="flex items-center space-x-2">
-                          <FileCheck className="h-4 w-4 text-gray-600" />
-                          <span>Cheque</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="Bank Transfer">
-                        <div className="flex items-center space-x-2">
-                          <Building2 className="h-4 w-4 text-teal-600" />
-                          <span>Bank Transfer</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="Mixed">
-                        <div className="flex items-center space-x-2">
-                          <Split className="h-4 w-4 text-orange-600" />
-                          <span>Mixed</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
-              {newReceipt.paymentMode === 'Card' && (
-                <div className="space-y-2">
-                  <Label>Card Type *</Label>
-                  <Select value={newReceipt.cardType} onValueChange={(v) => setNewReceipt({ ...newReceipt, cardType: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
-                    <SelectContent>
-                      {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {newReceipt.paymentMode === 'Online Transfer' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Payment Type *</Label>
-                    <Select value={newReceipt.onlinePaymentType} onValueChange={(v) => setNewReceipt({ ...newReceipt, onlinePaymentType: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select payment type" /></SelectTrigger>
-                      <SelectContent>
-                        {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {newReceipt.onlinePaymentType === 'Other' && (
-                    <div className="space-y-2">
-                      <Label>Payment Provider Name *</Label>
-                      <Input
-                        value={newReceipt.onlineProviderName}
-                        onChange={(e) => setNewReceipt({ ...newReceipt, onlineProviderName: e.target.value })}
-                        placeholder="Provider name"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {newReceipt.paymentMode === 'Bank Transfer' && (
-                <div className="space-y-2">
-                  <Label>Bank Account (Ledger)</Label>
-                  <Select value={newReceipt.bankAccountId} onValueChange={(v) => setNewReceipt({ ...newReceipt, bankAccountId: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {bankAccounts.map(account => (
-                        <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {newReceipt.paymentMode === 'Mixed' && (
-                <SplitPaymentFields
-                  total={parseFloat(newReceipt.amount) || 0}
-                  value={newReceiptSplit}
-                  onChange={setNewReceiptSplit}
-                  details={newReceiptSplitDetails}
-                  onDetailsChange={setNewReceiptSplitDetails}
-                  bankAccounts={bankAccounts}
-                  currencyCode={currencyCode}
-                />
-              )}
+              <PaymentAllocationPanel
+                manager={newReceiptPaymentManager}
+                invoiceTotal={parseFloat(newReceipt.amount) || 0}
+                bankAccounts={bankAccounts}
+                offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE]}
+              />
 
               <div className="space-y-2">
                 <Label>Reference / Description *</Label>
@@ -1422,11 +1287,11 @@ export function ReceiptVoucher() {
                 <Button variant="outline" onClick={() => setShowAddReceipt(false)}>
                   Cancel
                 </Button>
-                <Button variant="outline" onClick={handleAddReceipt}>
+                <Button variant="outline" onClick={handleAddReceipt} disabled={!newReceiptPaymentManager.settleable}>
                   <Printer className="h-4 w-4 mr-2" />
                   Save & Print
                 </Button>
-                <Button onClick={handleAddReceipt}>
+                <Button onClick={handleAddReceipt} disabled={!newReceiptPaymentManager.settleable}>
                   Save Receipt
                 </Button>
               </div>
@@ -1501,83 +1366,22 @@ export function ReceiptVoucher() {
                     </p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Payment Mode *</Label>
-                  <Select value={editForm.paymentMode} onValueChange={(v) => setEditForm({...editForm, paymentMode: v})}>
-                    <SelectTrigger><SelectValue placeholder="Select payment mode" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Cash"><div className="flex items-center space-x-2"><Banknote className="h-4 w-4 text-green-600" /><span>Cash</span></div></SelectItem>
-                      <SelectItem value="Card"><div className="flex items-center space-x-2"><CreditCard className="h-4 w-4 text-blue-600" /><span>Card</span></div></SelectItem>
-                      <SelectItem value="Online Transfer"><div className="flex items-center space-x-2"><Smartphone className="h-4 w-4 text-purple-600" /><span>Online Transfer</span></div></SelectItem>
-                      <SelectItem value="Cheque"><div className="flex items-center space-x-2"><FileCheck className="h-4 w-4 text-gray-600" /><span>Cheque</span></div></SelectItem>
-                      <SelectItem value="Bank Transfer"><div className="flex items-center space-x-2"><Building2 className="h-4 w-4 text-teal-600" /><span>Bank Transfer</span></div></SelectItem>
-                      <SelectItem value="Mixed"><div className="flex items-center space-x-2"><Split className="h-4 w-4 text-orange-600" /><span>Mixed</span></div></SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
-              {editForm.paymentMode === 'Card' && (
-                <div className="space-y-2">
-                  <Label>Card Type *</Label>
-                  <Select value={editForm.cardType} onValueChange={(v) => setEditForm({ ...editForm, cardType: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
-                    <SelectContent>
-                      {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+              {selectedReceipt?.journalVoucherId ? (
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-sm font-medium">Payment allocation is locked</p>
+                  <p className="text-xs text-muted-foreground">
+                    This voucher is already posted to the general ledger (JV #{selectedReceipt.journalVoucherId}) — the payment method and amount can no longer be changed here.
+                  </p>
+                  <p className="text-sm mt-2">{editReceiptPaymentManager.summary ?? '—'}</p>
                 </div>
-              )}
-
-              {editForm.paymentMode === 'Online Transfer' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Payment Type *</Label>
-                    <Select value={editForm.onlinePaymentType} onValueChange={(v) => setEditForm({ ...editForm, onlinePaymentType: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select payment type" /></SelectTrigger>
-                      <SelectContent>
-                        {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {editForm.onlinePaymentType === 'Other' && (
-                    <div className="space-y-2">
-                      <Label>Payment Provider Name *</Label>
-                      <Input
-                        value={editForm.onlineProviderName}
-                        onChange={(e) => setEditForm({ ...editForm, onlineProviderName: e.target.value })}
-                        placeholder="Provider name"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {editForm.paymentMode === 'Bank Transfer' && (
-                <div className="space-y-2">
-                  <Label>Bank Account (Ledger)</Label>
-                  <Select value={editForm.bankAccountId} onValueChange={(v) => setEditForm({ ...editForm, bankAccountId: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {bankAccounts.map(account => (
-                        <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {editForm.paymentMode === 'Mixed' && (
-                <SplitPaymentFields
-                  total={parseFloat(editForm.amount) || 0}
-                  value={editReceiptSplit}
-                  onChange={setEditReceiptSplit}
-                  details={editReceiptSplitDetails}
-                  onDetailsChange={setEditReceiptSplitDetails}
+              ) : (
+                <PaymentAllocationPanel
+                  manager={editReceiptPaymentManager}
+                  invoiceTotal={parseFloat(editForm.amount) || 0}
                   bankAccounts={bankAccounts}
-                  currencyCode={currencyCode}
+                  offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE]}
                 />
               )}
 
@@ -1614,7 +1418,7 @@ export function ReceiptVoucher() {
               </div>
               <div className="flex items-center justify-end space-x-3 pt-4 border-t">
                 <Button variant="outline" onClick={() => setShowEditReceipt(false)}>Cancel</Button>
-                <Button onClick={handleEditReceipt}>Save Changes</Button>
+                <Button onClick={handleEditReceipt} disabled={!editReceiptPaymentManager.settleable}>Save Changes</Button>
               </div>
             </div>
           </DialogContent>

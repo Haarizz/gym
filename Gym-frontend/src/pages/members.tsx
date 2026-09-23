@@ -46,7 +46,6 @@ import {
   Banknote,
   CreditCard,
   Wallet,
-  ArrowLeftRight,
   Snowflake,
   Info,
   MoreVertical,
@@ -67,20 +66,12 @@ import { authService } from '../utils/supabase/auth-service';
 import { receiptsService, Receipt as ApiReceipt } from '../utils/supabase/receipts-service';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
 import { staffService, Staff } from '../utils/supabase/staff-service';
-import {
-  SplitPaymentFields, isSplitPaymentValid, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
-  EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
-} from '../components/shared/split-payment-fields';
-import type { SplitPaymentValue, SplitPaymentDetails } from '../components/shared/split-payment-fields';
 import { FaPlus } from 'react-icons/fa6';
-
-// Maps the renewal panel's top-level payment method to the SplitPaymentValue
-// key so its rich detail fields (card type, online payment type, ...) can be
-// validated/built by reusing the same helpers Mixed/Split legs use — a single
-// top-level method is just a split with one active leg.
-const RENEWAL_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
-  cash: 'cash', card: 'card', online: 'online',
-};
+import { usePaymentManager } from '../payments/usePaymentManager';
+import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
+import { buildPaymentPayload } from '../payments/paymentPayload';
+import { PAYMENT_TYPES } from '../payments/paymentModel';
+import type { CreditCustomer } from '../payments/modals/CreditModal';
 
 const membershipPlans = [
   {
@@ -259,26 +250,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [selectedMemberForRenewal, setSelectedMemberForRenewal] = useState<any>(null);
   const [selectedNewPlan, setSelectedNewPlan] = useState<any>(null);
   const [operationType, setOperationType] = useState<"renewal" | "upgrade" | "downgrade" | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [splitPayment, setSplitPayment] = useState(false);
-  // Rich per-method detail (card type, online payment type, ...) for whichever
-  // single top-level method is selected — reuses the same shape/helpers as the
-  // Split/Mixed legs below so validation and payload-building stay consistent.
-  const [renewalMethodDetails, setRenewalMethodDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
-  const [splitLegs, setSplitLegs] = useState<SplitPaymentValue>(EMPTY_SPLIT_PAYMENT);
-  const [splitLegDetails, setSplitLegDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
   const [renewalBankAccounts, setRenewalBankAccounts] = useState<AccountHead[]>([]);
   // Which staff member actually processed this renewal — credited toward their
   // revenue target regardless of which account is logged in.
   const [staffOptions, setStaffOptions] = useState<Staff[]>([]);
   const [renewalProcessedByStaffId, setRenewalProcessedByStaffId] = useState('');
   const [familyRenewalProcessedByStaffId, setFamilyRenewalProcessedByStaffId] = useState('');
-  // "Credit" — renews the membership now but defers some/all of the fee as an
-  // outstanding due, mirroring the Add Member credit flow: an optional amount
-  // received now (via a real method), with the remainder left as Member.outstandingBalance.
-  const [creditAmountReceived, setCreditAmountReceived] = useState("");
-  const [creditReceivedVia, setCreditReceivedVia] = useState("cash");
-  const [creditMethodDetails, setCreditMethodDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
   const [discountAmount, setDiscountAmount] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -877,6 +854,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     return Math.round(Math.max(0, total) * 100) / 100;
   };
 
+  const renewalPaymentManager = usePaymentManager({ invoiceTotal: calculateTotalAmount() });
+
   const handleProcessRenewalUpgrade = async () => {
     if (!selectedMemberForRenewal || !selectedNewPlan) {
       toast.error('Missing Information', {
@@ -886,50 +865,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }
 
     const totalAmount = calculateTotalAmount();
-    const isCredit = paymentMethod === 'credit' && !splitPayment;
 
-    // Validate payment
-    if (splitPayment) {
-      if (!isSplitPaymentValid(splitLegs, totalAmount)) {
-        toast.error('Split Payment Error', {
-          description: `Split amounts must add up to the total amount (${totalAmount}).`,
-        });
-        return;
-      }
-      if (!isSplitPaymentDetailsValid(splitLegs, splitLegDetails)) {
-        toast.error('Missing Payment Details', {
-          description: 'Please fill in the required details for each method used in the split.',
-        });
-        return;
-      }
-    } else if (isCredit) {
-      const received = parseFloat(creditAmountReceived) || 0;
-      if (received > totalAmount) {
-        toast.error('Invalid Amount', {
-          description: 'Amount received now cannot exceed the total amount.',
-        });
-        return;
-      }
-      if (received > 0) {
-        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [creditReceivedVia as keyof SplitPaymentValue]: received };
-        if (!isSplitPaymentDetailsValid(probe, creditMethodDetails)) {
-          toast.error('Missing Payment Details', {
-            description: `Please fill in the required details for ${creditReceivedVia}.`,
-          });
-          return;
-        }
-      }
-    } else {
-      const legKey = RENEWAL_METHOD_TO_LEG_KEY[paymentMethod];
-      if (legKey && legKey !== 'cash') {
-        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: totalAmount };
-        if (!isSplitPaymentDetailsValid(probe, renewalMethodDetails)) {
-          toast.error('Missing Payment Details', {
-            description: `Please fill in the required ${paymentMethod} details.`,
-          });
-          return;
-        }
-      }
+    if (!renewalPaymentManager.settleable) {
+      toast.error('Payment Incomplete', {
+        description: 'Allocate the full amount (or leave the remainder on Credit) before continuing.',
+      });
+      return;
     }
 
     // Compute new end date from plan duration
@@ -952,39 +893,42 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     );
 
     // How much is actually being collected now, the real method(s) it moved
-    // through, and the per-leg detail (card type, online payment type, ...).
+    // through, and the per-leg detail (card network, online reference, ...).
     // "Credit" itself is never sent as a real payment method — it's only the
     // absence of one; any amount received now always carries its real method.
-    let amountReceived = totalAmount;
-    let effectivePaymentMethod = paymentMethod === 'card' ? 'Card' : paymentMethod === 'online' ? 'Online Payment' : 'Cash';
+    const renewalPayload = buildPaymentPayload(renewalPaymentManager.paymentLines, totalAmount);
+    const amountReceived = renewalPayload.paidAmount;
+    const nonCreditLines = renewalPaymentManager.paymentLines.filter(l => l.paymentType !== PAYMENT_TYPES.CREDIT);
+    const methodLabelByType: Record<string, string> = {
+      [PAYMENT_TYPES.CASH]: 'Cash',
+      [PAYMENT_TYPES.CARD]: 'Card',
+      [PAYMENT_TYPES.ONLINE]: 'Online Payment',
+    };
+    let effectivePaymentMethod: string;
     let paymentBreakdown: any[] | undefined;
     let bankAccountCode: string | undefined;
     let bankAccountName: string | undefined;
 
-    if (splitPayment) {
-      effectivePaymentMethod = 'Mixed';
-      paymentBreakdown = buildSplitPaymentBreakdown(splitLegs, splitLegDetails, renewalBankAccounts);
-    } else if (isCredit) {
-      amountReceived = parseFloat(creditAmountReceived) || 0;
-      if (amountReceived > 0) {
-        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [creditReceivedVia as keyof SplitPaymentValue]: amountReceived };
-        const legs = buildSplitPaymentBreakdown(probe, creditMethodDetails, renewalBankAccounts);
-        paymentBreakdown = legs;
-        effectivePaymentMethod = legs[0]?.method || 'Cash';
-        if (creditReceivedVia === 'bankTransfer') {
-          const account = renewalBankAccounts.find(a => String(a.id) === creditMethodDetails.bankTransferAccountId);
-          bankAccountCode = account?.code;
-          bankAccountName = account?.name;
-        }
-      } else {
-        effectivePaymentMethod = 'Credit';
+    if (nonCreditLines.length === 0) {
+      effectivePaymentMethod = 'Credit';
+    } else if (nonCreditLines.length === 1) {
+      const line = nonCreditLines[0];
+      effectivePaymentMethod = line.paymentType === PAYMENT_TYPES.CARD && line.paymentSubtype
+        ? line.paymentSubtype
+        : methodLabelByType[line.paymentType];
+      if (line.paymentType === PAYMENT_TYPES.ONLINE && line.bankAccountId) {
+        const account = renewalBankAccounts.find(a => String(a.id) === line.bankAccountId);
+        bankAccountCode = account?.code;
+        bankAccountName = account?.name;
       }
     } else {
-      const legKey = RENEWAL_METHOD_TO_LEG_KEY[paymentMethod];
-      if (legKey && legKey !== 'cash') {
-        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: totalAmount };
-        paymentBreakdown = buildSplitPaymentBreakdown(probe, renewalMethodDetails, renewalBankAccounts);
-      }
+      effectivePaymentMethod = 'Mixed';
+      paymentBreakdown = nonCreditLines.map(line => ({
+        method: line.paymentType === PAYMENT_TYPES.CARD && line.paymentSubtype ? line.paymentSubtype : methodLabelByType[line.paymentType],
+        amount: line.amount,
+        ...(line.reference ? { reference: line.reference } : {}),
+        ...(line.bankAccountName ? { bank_account_name: line.bankAccountName } : {}),
+      }));
     }
 
     // Call backend — a member billed to their family head (minor, or an adult
@@ -1044,14 +988,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       setSelectedNewPlan(null);
       setOperationType(null);
       setRenewalSearchTerm("");
-      setPaymentMethod("cash");
-      setSplitPayment(false);
-      setRenewalMethodDetails(EMPTY_SPLIT_DETAILS);
-      setSplitLegs(EMPTY_SPLIT_PAYMENT);
-      setSplitLegDetails(EMPTY_SPLIT_DETAILS);
-      setCreditAmountReceived("");
-      setCreditReceivedVia("cash");
-      setCreditMethodDetails(EMPTY_SPLIT_DETAILS);
+      renewalPaymentManager.clearLines();
       setDiscountAmount("");
       setCouponCode("");
     }, 3000);
@@ -1917,6 +1854,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           setSelectedNewPlan(null);
                           setOperationType(null);
                           setRenewalSearchTerm("");
+                          renewalPaymentManager.clearLines();
                         }}
                       >
                         Clear
@@ -2165,301 +2103,17 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   </div>
                 </div>
 
-                {/* Payment Method */}
-                <div>
-                  <Label>Payment Method</Label>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-2">
-                    <Button
-                      variant={!splitPayment && paymentMethod === 'cash' ? 'default' : 'outline'}
-                      onClick={() => {
-                        setPaymentMethod('cash');
-                        setSplitPayment(false);
-                      }}
-                      className={!splitPayment && paymentMethod === 'cash' ? 'bg-gradient-primary' : ''}
-                    >
-                      <Banknote className="mr-2 h-4 w-4" />
-                      Cash
-                    </Button>
-                    <Button
-                      variant={!splitPayment && paymentMethod === 'card' ? 'default' : 'outline'}
-                      onClick={() => {
-                        setPaymentMethod('card');
-                        setSplitPayment(false);
-                      }}
-                      className={!splitPayment && paymentMethod === 'card' ? 'bg-gradient-primary' : ''}
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Card
-                    </Button>
-                    <Button
-                      variant={!splitPayment && paymentMethod === 'online' ? 'default' : 'outline'}
-                      onClick={() => {
-                        setPaymentMethod('online');
-                        setSplitPayment(false);
-                      }}
-                      className={!splitPayment && paymentMethod === 'online' ? 'bg-gradient-primary' : ''}
-                    >
-                      <Wallet className="mr-2 h-4 w-4" />
-                      Online
-                    </Button>
-                    <Button
-                      variant={!splitPayment && paymentMethod === 'credit' ? 'default' : 'outline'}
-                      onClick={() => {
-                        setPaymentMethod('credit');
-                        setSplitPayment(false);
-                      }}
-                      className={!splitPayment && paymentMethod === 'credit' ? 'bg-gradient-primary' : ''}
-                    >
-                      <Clock className="mr-2 h-4 w-4" />
-                      Credit
-                    </Button>
-                    <Button
-                      variant={splitPayment ? 'default' : 'outline'}
-                      onClick={() => setSplitPayment(!splitPayment)}
-                      className={splitPayment ? 'bg-gradient-primary' : ''}
-                    >
-                      <ArrowLeftRight className="mr-2 h-4 w-4" />
-                      Split
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Card details */}
-                {!splitPayment && paymentMethod === 'card' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gradient-light rounded-lg">
-                    <div>
-                      <Label className="text-xs">Card Type <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={renewalMethodDetails.cardType}
-                        onValueChange={(v) => setRenewalMethodDetails({ ...renewalMethodDetails, cardType: v })}
-                      >
-                        <SelectTrigger className="mt-1"><SelectValue placeholder="Select card type" /></SelectTrigger>
-                        <SelectContent>
-                          {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Reference (optional)</Label>
-                      <Input
-                        value={renewalMethodDetails.cardReference}
-                        onChange={(e) => setRenewalMethodDetails({ ...renewalMethodDetails, cardReference: e.target.value })}
-                        className="mt-1"
-                        placeholder="Transaction number"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Online Payment details */}
-                {!splitPayment && paymentMethod === 'online' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gradient-light rounded-lg">
-                    <div>
-                      <Label className="text-xs">Payment Type <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={renewalMethodDetails.onlinePaymentType}
-                        onValueChange={(v) => setRenewalMethodDetails({ ...renewalMethodDetails, onlinePaymentType: v })}
-                      >
-                        <SelectTrigger className="mt-1"><SelectValue placeholder="Select payment type" /></SelectTrigger>
-                        <SelectContent>
-                          {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Transaction / Reference ID <span className="text-red-500">*</span></Label>
-                      <Input
-                        value={renewalMethodDetails.onlineReference}
-                        onChange={(e) => setRenewalMethodDetails({ ...renewalMethodDetails, onlineReference: e.target.value })}
-                        className="mt-1"
-                        placeholder="Transaction ID"
-                      />
-                    </div>
-                    {renewalMethodDetails.onlinePaymentType === 'Other' && (
-                      <div className="md:col-span-2">
-                        <Label className="text-xs">Payment Provider Name <span className="text-red-500">*</span></Label>
-                        <Input
-                          value={renewalMethodDetails.onlineProviderName}
-                          onChange={(e) => setRenewalMethodDetails({ ...renewalMethodDetails, onlineProviderName: e.target.value })}
-                          className="mt-1"
-                          placeholder="Provider name"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Credit details */}
-                {!splitPayment && paymentMethod === 'credit' && (
-                  <div className="space-y-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                    <p className="text-xs text-orange-700">
-                      Membership renews now; anything not received today stays as the member's outstanding due.
-                    </p>
-                    <div>
-                      <Label className="text-xs">Amount Received Now (optional)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0"
-                        value={creditAmountReceived}
-                        onChange={(e) => setCreditAmountReceived(e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    {(parseFloat(creditAmountReceived) || 0) > 0 && (
-                      <>
-                        <div>
-                          <Label className="text-xs">Received Via <span className="text-red-500">*</span></Label>
-                          <Select value={creditReceivedVia} onValueChange={setCreditReceivedVia}>
-                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="cash">Cash</SelectItem>
-                              <SelectItem value="card">Card</SelectItem>
-                              <SelectItem value="cheque">Cheque</SelectItem>
-                              <SelectItem value="bankTransfer">Bank Transfer</SelectItem>
-                              <SelectItem value="online">Online Payment</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {creditReceivedVia === 'card' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-xs">Card Type <span className="text-red-500">*</span></Label>
-                              <Select
-                                value={creditMethodDetails.cardType}
-                                onValueChange={(v) => setCreditMethodDetails({ ...creditMethodDetails, cardType: v })}
-                              >
-                                <SelectTrigger className="mt-1"><SelectValue placeholder="Select card type" /></SelectTrigger>
-                                <SelectContent>
-                                  {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-xs">Reference (optional)</Label>
-                              <Input
-                                value={creditMethodDetails.cardReference}
-                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, cardReference: e.target.value })}
-                                className="mt-1"
-                              />
-                            </div>
-                          </div>
-                        )}
-                        {creditReceivedVia === 'cheque' && (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <Label className="text-xs">Cheque Number <span className="text-red-500">*</span></Label>
-                              <Input
-                                value={creditMethodDetails.chequeNumber}
-                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, chequeNumber: e.target.value })}
-                                className="mt-1"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Bank Name (optional)</Label>
-                              <Input
-                                value={creditMethodDetails.chequeBankName}
-                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, chequeBankName: e.target.value })}
-                                className="mt-1"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Cheque Date (optional)</Label>
-                              <Input
-                                type="date"
-                                value={creditMethodDetails.chequeDate}
-                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, chequeDate: e.target.value })}
-                                className="mt-1"
-                              />
-                            </div>
-                          </div>
-                        )}
-                        {creditReceivedVia === 'bankTransfer' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-xs">Reference <span className="text-red-500">*</span></Label>
-                              <Input
-                                value={creditMethodDetails.bankTransferReference}
-                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, bankTransferReference: e.target.value })}
-                                className="mt-1"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Bank Account (Ledger)</Label>
-                              <Select
-                                value={creditMethodDetails.bankTransferAccountId}
-                                onValueChange={(v) => setCreditMethodDetails({ ...creditMethodDetails, bankTransferAccountId: v })}
-                              >
-                                <SelectTrigger className="mt-1">
-                                  <SelectValue placeholder={renewalBankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {renewalBankAccounts.map(account => (
-                                    <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        )}
-                        {creditReceivedVia === 'online' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-xs">Payment Type <span className="text-red-500">*</span></Label>
-                              <Select
-                                value={creditMethodDetails.onlinePaymentType}
-                                onValueChange={(v) => setCreditMethodDetails({ ...creditMethodDetails, onlinePaymentType: v })}
-                              >
-                                <SelectTrigger className="mt-1"><SelectValue placeholder="Select payment type" /></SelectTrigger>
-                                <SelectContent>
-                                  {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-xs">Transaction / Reference ID <span className="text-red-500">*</span></Label>
-                              <Input
-                                value={creditMethodDetails.onlineReference}
-                                onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, onlineReference: e.target.value })}
-                                className="mt-1"
-                              />
-                            </div>
-                            {creditMethodDetails.onlinePaymentType === 'Other' && (
-                              <div className="md:col-span-2">
-                                <Label className="text-xs">Payment Provider Name <span className="text-red-500">*</span></Label>
-                                <Input
-                                  value={creditMethodDetails.onlineProviderName}
-                                  onChange={(e) => setCreditMethodDetails({ ...creditMethodDetails, onlineProviderName: e.target.value })}
-                                  className="mt-1"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-                    <p className="text-sm font-medium">
-                      Due after renewal:{' '}
-                      <span className="text-orange-700">
-                        <CurrencyGlyph /> {Math.max(0, calculateTotalAmount() - (parseFloat(creditAmountReceived) || 0)).toLocaleString()}
-                      </span>
-                    </p>
-                  </div>
-                )}
-
-                {/* Split Payment Fields */}
-                {splitPayment && (
-                  <SplitPaymentFields
-                    total={calculateTotalAmount()}
-                    value={splitLegs}
-                    onChange={setSplitLegs}
-                    details={splitLegDetails}
-                    onDetailsChange={setSplitLegDetails}
-                    bankAccounts={renewalBankAccounts}
-                    currencyCode={currencyCode}
-                  />
-                )}
+                {/* Payment */}
+                <PaymentAllocationPanel
+                  manager={renewalPaymentManager}
+                  invoiceTotal={calculateTotalAmount()}
+                  bankAccounts={renewalBankAccounts}
+                  customers={selectedMemberForRenewal ? [{
+                    code: getMemberId(selectedMemberForRenewal),
+                    name: selectedMemberForRenewal.name,
+                  } as CreditCustomer] : []}
+                  offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE, PAYMENT_TYPES.CREDIT]}
+                />
               </CardContent>
             </Card>
           )}
@@ -2517,24 +2171,26 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">Payment Method</Label>
-                      <p className="font-semibold capitalize">
-                        {splitPayment ? 'Split Payment' : paymentMethod === 'credit' ? 'Credit' : paymentMethod}
+                      <p className="font-semibold">
+                        {renewalPaymentManager.summary ?? '—'}
                       </p>
                     </div>
                     <div className="col-span-2">
                       <Label className="text-xs text-muted-foreground">Total Amount</Label>
                       <p className="text-2xl font-bold text-primary"><CurrencyGlyph /> {calculateTotalAmount()}</p>
                     </div>
-                    {!splitPayment && paymentMethod === 'credit' && (
+                    {renewalPaymentManager.totalByType(PAYMENT_TYPES.CREDIT) > 0 && (
                       <div className="col-span-2 pt-1 border-t">
                         <div className="flex justify-between text-sm mt-2">
                           <span className="text-muted-foreground">Received Now</span>
-                          <span className="font-medium"><CurrencyGlyph /> {(parseFloat(creditAmountReceived) || 0).toLocaleString()}</span>
+                          <span className="font-medium">
+                            <CurrencyGlyph /> {(calculateTotalAmount() - renewalPaymentManager.totalByType(PAYMENT_TYPES.CREDIT)).toLocaleString()}
+                          </span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-orange-700 font-medium">Due After Renewal</span>
                           <span className="text-orange-700 font-medium">
-                            <CurrencyGlyph /> {Math.max(0, calculateTotalAmount() - (parseFloat(creditAmountReceived) || 0)).toLocaleString()}
+                            <CurrencyGlyph /> {renewalPaymentManager.totalByType(PAYMENT_TYPES.CREDIT).toLocaleString()}
                           </span>
                         </div>
                       </div>
@@ -2555,6 +2211,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
                   <Button
                     onClick={handleProcessRenewalUpgrade}
+                    disabled={!renewalPaymentManager.settleable}
                     className="w-full h-12 text-lg bg-gradient-primary hover:bg-gradient-primary-hover"
                   >
                     {operationType === 'renewal' ? (
