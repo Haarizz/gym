@@ -13,7 +13,6 @@ import {
   User,
   Phone,
   Mail,
-  CreditCard,
   DollarSign,
   FileText,
   Download,
@@ -25,13 +24,9 @@ import {
   Calendar,
   Receipt,
   Hash,
-  Wallet,
-  Building2,
   Eye,
   Loader2,
-  Printer,
-  FileCheck,
-  Split
+  Printer
 } from 'lucide-react';
 import { toast } from "sonner";
 import { getCompanyDetails } from "../utils/company-details";
@@ -39,28 +34,19 @@ import { getVatRate, splitVatInclusive } from "../utils/tax";
 import { buildFullReceiptHtml, type ReceiptPrintData } from "../utils/receipt-invoice";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Checkbox } from "../components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { format } from "date-fns";
 import { membersService } from '../utils/supabase/members-service';
 import type { Member } from '../utils/supabase/members-service';
 import { billingService } from '../utils/supabase/billing-service';
 import type { Receipt as ReceiptDTO } from '../utils/supabase/receipts-service';
-import {
-  SplitPaymentFields, isSplitPaymentValid, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
-  EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
-} from '../components/shared/split-payment-fields';
-import type { SplitPaymentValue, SplitPaymentDetails } from '../components/shared/split-payment-fields';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
 import { staffService, Staff } from '../utils/supabase/staff-service';
-
-// Maps the Payment Mode radio value to the SplitPaymentValue key so a single
-// (non-Mixed) method's details can be validated/built by reusing the same
-// helpers Mixed Payment legs use — the top-level method is just a Mixed
-// payment with a single active leg.
-const PAYMENT_MODE_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
-  Cash: 'cash', Card: 'card', Cheque: 'cheque', 'Bank Transfer': 'bankTransfer', Online: 'online'
-};
+import { usePaymentManager } from '../payments/usePaymentManager';
+import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
+import { buildPaymentPayload } from '../payments/paymentPayload';
+import { toLegacyPayment } from '../payments/legacyPaymentBridge';
+import { PAYMENT_TYPES } from '../payments/paymentModel';
 
 interface CreateReceiptProps {
   onNavigate?: (section: string, params?: Record<string, any>) => void;
@@ -87,15 +73,9 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
 
   // Payment state
   const [paymentAmounts, setPaymentAmounts]   = useState<Record<string, string>>({});
-  const [paymentMode, setPaymentMode]         = useState("Cash");
   const [transactionReference, setTransactionReference] = useState("");
   const [paymentDate, setPaymentDate]         = useState(format(new Date(), "yyyy-MM-dd"));
   const [autoApplyAmount, setAutoApplyAmount] = useState("");
-  const [splitPayment, setSplitPayment]       = useState<SplitPaymentValue>(EMPTY_SPLIT_PAYMENT);
-  const [splitDetails, setSplitDetails]       = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
-  // Method-specific details for the top-level (non-Mixed) Payment Mode — Card
-  // Type, Cheque Number, Bank Transfer reference/account, Online Payment type.
-  const [methodDetails, setMethodDetails]     = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
   const [bankAccounts, setBankAccounts]       = useState<AccountHead[]>([]);
   // Which staff member actually collected this payment — credited toward their
   // revenue target regardless of which account is logged in.
@@ -200,6 +180,11 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
   const calculateBalanceRemaining = () =>
     calculateTotalDue() - calculateTotalPayment();
 
+  // Settles calculateTotalPayment() — how that single total was actually
+  // received. Which bills it covers is decided separately, on the left,
+  // via paymentAmounts/FIFO auto-apply; the two concerns don't overlap.
+  const paymentManager = usePaymentManager({ invoiceTotal: calculateTotalPayment() });
+
   // ── FIFO auto-apply ───────────────────────────────────────────────────────
   const handleAutoApplyPayment = () => {
     const amountToApply = autoApplyAmount ? parseFloat(autoApplyAmount) : calculateTotalPayment();
@@ -240,41 +225,11 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
         return false;
       }
     }
-    if (paymentMode === "Mixed") {
-      if (!isSplitPaymentValid(splitPayment, total)) {
-        toast.error("Split payment amounts must add up to the total payment");
-        return false;
-      }
-      if (!isSplitPaymentDetailsValid(splitPayment, splitDetails)) {
-        toast.error("Please fill in the required details for each payment method used in the split");
-        return false;
-      }
-    } else {
-      const legKey = PAYMENT_MODE_TO_LEG_KEY[paymentMode];
-      if (legKey && legKey !== 'cash') {
-        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: total };
-        if (!isSplitPaymentDetailsValid(probe, methodDetails)) {
-          toast.error(`Please fill in the required ${paymentMode} details`);
-          return false;
-        }
-      }
+    if (!paymentManager.settleable) {
+      toast.error("Allocate the full payment amount before continuing");
+      return false;
     }
     return true;
-  };
-
-  // Builds the payment_breakdown leg(s) for whatever's currently selected —
-  // several legs for Mixed, a single leg carrying the method's rich detail
-  // (card type, cheque number, ...) for any other non-Cash method, none for
-  // plain Cash (nothing extra to record beyond the amount itself).
-  const buildBreakdownForSubmit = () => {
-    const total = calculateTotalPayment();
-    if (paymentMode === "Mixed") {
-      return buildSplitPaymentBreakdown(splitPayment, splitDetails, bankAccounts);
-    }
-    const legKey = PAYMENT_MODE_TO_LEG_KEY[paymentMode];
-    if (!legKey || legKey === 'cash') return undefined;
-    const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: total };
-    return buildSplitPaymentBreakdown(probe, methodDetails, bankAccounts);
   };
 
   // ── Generate receipt (real API) ───────────────────────────────────────────
@@ -289,13 +244,31 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
 
     setSubmitting(true);
     try {
+      const methodLabelByType: Record<string, string> = {
+        [PAYMENT_TYPES.CASH]: 'Cash',
+        [PAYMENT_TYPES.CARD]: 'Card',
+        [PAYMENT_TYPES.ONLINE]: 'Online',
+      };
+      const lines = paymentManager.paymentLines;
+      const paymentMethodToSend = lines.length <= 1
+        ? (lines[0] ? (lines[0].paymentType === PAYMENT_TYPES.CARD && lines[0].paymentSubtype ? lines[0].paymentSubtype : methodLabelByType[lines[0].paymentType]) : 'Cash')
+        : 'Mixed';
+      const paymentBreakdown = lines.length > 1
+        ? lines.map(line => ({
+            method: line.paymentType === PAYMENT_TYPES.CARD && line.paymentSubtype ? line.paymentSubtype : methodLabelByType[line.paymentType],
+            amount: line.amount,
+            ...(line.reference ? { reference: line.reference } : {}),
+            ...(line.bankAccountName ? { bank_account_name: line.bankAccountName } : {}),
+          }))
+        : undefined;
+
       const result = await billingService.settlePayment({
         member_db_id:    Number(selectedMember.id),
-        payment_method:  paymentMode,
+        payment_method:  paymentMethodToSend,
         payment_date:    paymentDate,
         transaction_ref: transactionReference || undefined,
         bill_payments:   billPayments,
-        payment_breakdown: buildBreakdownForSubmit(),
+        payment_breakdown: paymentBreakdown,
         processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
       });
 
@@ -354,7 +327,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
       vatAmount,
       invoiceAmount: totalPaid,
       totalPaid,
-      paymentMethod: paymentMode,
+      paymentMethod: paymentManager.summary ?? 'Cash',
       transactionDate: dateStr,
       transactionRef: transactionReference || undefined,
     };
@@ -382,22 +355,12 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
     setSelectedMember(null);
     setPendingBills([]);
     setPaymentAmounts({});
-    setPaymentMode("Cash");
     setTransactionReference("");
     setPaymentDate(format(new Date(), "yyyy-MM-dd"));
     setReceiptGenerated(false);
     setGeneratedReceiptNo("");
     setAutoApplyAmount("");
-    setSplitPayment(EMPTY_SPLIT_PAYMENT);
-    setSplitDetails(EMPTY_SPLIT_DETAILS);
-    setMethodDetails(EMPTY_SPLIT_DETAILS);
-  };
-
-  // Switching Payment Mode clears the previous method's detail fields so a
-  // stale Card Type/Cheque Number doesn't linger into a different method.
-  const handlePaymentModeChange = (mode: string) => {
-    setPaymentMode(mode);
-    setMethodDetails(EMPTY_SPLIT_DETAILS);
+    paymentManager.clearLines();
   };
 
   const membershipStatusLabel = (s: string) =>
@@ -718,188 +681,24 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                   <CardDescription>Choose payment method and enter transaction details</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Payment Mode */}
-                  <div>
-                    <Label className="text-base mb-3 block">Payment Mode *</Label>
-                    <RadioGroup value={paymentMode} onValueChange={handlePaymentModeChange}>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          { value: "Cash",          icon: <Wallet className="h-5 w-5" />,        label: "Cash" },
-                          { value: "Card",          icon: <CreditCard className="h-5 w-5" />,    label: "Card" },
-                          { value: "Cheque",        icon: <FileCheck className="h-5 w-5" />,     label: "Cheque" },
-                          { value: "Mixed",         icon: <Split className="h-5 w-5" />,         label: "Mixed" },
-                          { value: "Bank Transfer", icon: <Building2 className="h-5 w-5" />,     label: "Bank Transfer" },
-                          { value: "Online",        icon: <DollarSign className="h-5 w-5" />,    label: "Online" },
-                        ].map(opt => (
-                          <div
-                            key={opt.value}
-                            className={`flex items-center space-x-2 border rounded-xl p-4 cursor-pointer transition-all ${
-                              paymentMode === opt.value ? "border-[#2B7A78] bg-[#DFF5F4]/30" : "border-border hover:border-[#2B7A78]/50"
-                            }`}
-                            onClick={() => handlePaymentModeChange(opt.value)}
-                          >
-                            <RadioGroupItem value={opt.value} id={opt.value} />
-                            <Label htmlFor={opt.value} className="flex items-center gap-2 cursor-pointer flex-1">
-                              {opt.icon}{opt.label}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Mixed Payment Split */}
-                  {paymentMode === "Mixed" && (
-                    <SplitPaymentFields
-                      total={calculateTotalPayment()}
-                      value={splitPayment}
-                      onChange={setSplitPayment}
-                      details={splitDetails}
-                      onDetailsChange={setSplitDetails}
-                      bankAccounts={bankAccounts}
-                      currencyCode={currencyCode}
-                    />
-                  )}
-
-                  {/* Card details */}
-                  {paymentMode === "Card" && (
-                    <div className="space-y-3 p-3 border rounded-lg bg-[#F9FAFB]">
-                      <div>
-                        <Label className="text-xs">Card Type <span className="text-red-500">*</span></Label>
-                        <Select value={methodDetails.cardType} onValueChange={(v) => setMethodDetails(prev => ({ ...prev, cardType: v }))}>
-                          <SelectTrigger className="mt-1"><SelectValue placeholder="Select card type" /></SelectTrigger>
-                          <SelectContent>
-                            {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="text-xs">Reference (optional)</Label>
-                        <Input
-                          value={methodDetails.cardReference}
-                          onChange={(e) => setMethodDetails(prev => ({ ...prev, cardReference: e.target.value }))}
-                          className="mt-1"
-                          placeholder="Transaction number"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Cheque details */}
-                  {paymentMode === "Cheque" && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 border rounded-lg bg-[#F9FAFB]">
-                      <div>
-                        <Label className="text-xs">Cheque Number <span className="text-red-500">*</span></Label>
-                        <Input
-                          value={methodDetails.chequeNumber}
-                          onChange={(e) => setMethodDetails(prev => ({ ...prev, chequeNumber: e.target.value }))}
-                          className="mt-1"
-                          placeholder="Cheque number"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Bank Name (optional)</Label>
-                        <Input
-                          value={methodDetails.chequeBankName}
-                          onChange={(e) => setMethodDetails(prev => ({ ...prev, chequeBankName: e.target.value }))}
-                          className="mt-1"
-                          placeholder="e.g. SBI"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Cheque Date (optional)</Label>
-                        <Input
-                          type="date"
-                          value={methodDetails.chequeDate}
-                          onChange={(e) => setMethodDetails(prev => ({ ...prev, chequeDate: e.target.value }))}
-                          className="mt-1"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bank Transfer details */}
-                  {paymentMode === "Bank Transfer" && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 border rounded-lg bg-[#F9FAFB]">
-                      <div>
-                        <Label className="text-xs">Reference <span className="text-red-500">*</span></Label>
-                        <Input
-                          value={methodDetails.bankTransferReference}
-                          onChange={(e) => setMethodDetails(prev => ({ ...prev, bankTransferReference: e.target.value }))}
-                          className="mt-1"
-                          placeholder="Transaction ID"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Bank Account (Ledger)</Label>
-                        <Select
-                          value={methodDetails.bankTransferAccountId}
-                          onValueChange={(v) => setMethodDetails(prev => ({ ...prev, bankTransferAccountId: v }))}
-                        >
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {bankAccounts.map(account => (
-                              <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Online Payment details */}
-                  {paymentMode === "Online" && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 border rounded-lg bg-[#F9FAFB]">
-                      <div>
-                        <Label className="text-xs">Payment Type <span className="text-red-500">*</span></Label>
-                        <Select
-                          value={methodDetails.onlinePaymentType}
-                          onValueChange={(v) => setMethodDetails(prev => ({ ...prev, onlinePaymentType: v }))}
-                        >
-                          <SelectTrigger className="mt-1"><SelectValue placeholder="Select payment type" /></SelectTrigger>
-                          <SelectContent>
-                            {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="text-xs">Transaction / Reference ID <span className="text-red-500">*</span></Label>
-                        <Input
-                          value={methodDetails.onlineReference}
-                          onChange={(e) => setMethodDetails(prev => ({ ...prev, onlineReference: e.target.value }))}
-                          className="mt-1"
-                          placeholder="Transaction ID"
-                        />
-                      </div>
-                      {methodDetails.onlinePaymentType === 'Other' && (
-                        <div className="md:col-span-2">
-                          <Label className="text-xs">Payment Provider Name <span className="text-red-500">*</span></Label>
-                          <Input
-                            value={methodDetails.onlineProviderName}
-                            onChange={(e) => setMethodDetails(prev => ({ ...prev, onlineProviderName: e.target.value }))}
-                            className="mt-1"
-                            placeholder="Provider name"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <PaymentAllocationPanel
+                    manager={paymentManager}
+                    invoiceTotal={calculateTotalPayment()}
+                    bankAccounts={bankAccounts}
+                    offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE]}
+                  />
 
                   {/* Transaction Reference */}
-                  {(paymentMode !== "Cash") && (
-                    <div>
-                      <Label htmlFor="transactionRef">Transaction Reference (Optional)</Label>
-                      <Input
-                        id="transactionRef"
-                        placeholder="Enter transaction reference or ID"
-                        value={transactionReference}
-                        onChange={(e) => setTransactionReference(e.target.value)}
-                        className="mt-2"
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <Label htmlFor="transactionRef">Transaction Reference (Optional)</Label>
+                    <Input
+                      id="transactionRef"
+                      placeholder="Enter transaction reference or ID"
+                      value={transactionReference}
+                      onChange={(e) => setTransactionReference(e.target.value)}
+                      className="mt-2"
+                    />
+                  </div>
 
                   {/* Payment Date */}
                   <div>
@@ -971,7 +770,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                       <>
                         <Button
                           onClick={handleGenerateReceipt}
-                          disabled={calculateTotalPayment() === 0 || submitting}
+                          disabled={calculateTotalPayment() === 0 || submitting || !paymentManager.settleable}
                           className="w-full text-white gap-2"
                           style={{ backgroundColor: '#2B7A78' }}
                           size="lg"
@@ -1106,7 +905,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Payment Mode:</span>
-                    <span className="font-medium">{paymentMode}</span>
+                    <span className="font-medium">{paymentManager.summary ?? '—'}</span>
                   </div>
                   {transactionReference && (
                     <div className="flex justify-between">
