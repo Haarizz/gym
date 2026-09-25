@@ -197,7 +197,7 @@ class PaymentVoucherService {
     const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/payment-vouchers?${params.toString()}`
     );
-    if (!res.ok) throw new Error("Failed to load payment vouchers");
+    if (!res.ok) throw await errorFrom(res, "Failed to load payment vouchers");
     const data = await res.json();
     return {
       vouchers: (data?.vouchers ?? []).map(mapPaymentVoucher),
@@ -231,7 +231,7 @@ class PaymentVoucherService {
 
   async getPaymentVoucher(id: string): Promise<PaymentVoucher> {
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/payment-vouchers/${id}`);
-    if (!res.ok) throw new Error("Failed to load payment voucher");
+    if (!res.ok) throw await errorFrom(res, "Failed to load payment voucher");
     return mapPaymentVoucher(await res.json());
   }
 
@@ -258,7 +258,7 @@ class PaymentVoucherService {
       method: "PATCH",
       body: JSON.stringify({ status }),
     });
-    if (!res.ok) throw new Error("Failed to update payment voucher status");
+    if (!res.ok) throw await errorFrom(res, "Failed to update payment voucher status");
     return mapPaymentVoucher(await res.json());
   }
 
@@ -266,7 +266,7 @@ class PaymentVoucherService {
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/payment-vouchers/${id}`, {
       method: "DELETE",
     });
-    if (!res.ok) throw new Error("Failed to delete payment voucher");
+    if (!res.ok) throw await errorFrom(res, "Failed to delete payment voucher");
   }
 }
 

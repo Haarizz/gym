@@ -315,8 +315,30 @@ public class PaymentVoucherService {
         pv.setNotes(req.getNotes());
     }
 
+    /**
+     * Same reasoning as assertPositiveAmount, applied to the Bill Entries rows —
+     * these feed the supplier ledger/statement the same way the voucher's own
+     * amount does, so a negative value here is just as corrupting even though
+     * the top-level amount is already guarded. Zero is allowed (e.g. a bill row
+     * that's fully settled has remainingBalance == 0); only negative is rejected.
+     */
+    private void assertNonNegativeBillAmounts(List<PaymentVoucherBillDTO> billDTOs) {
+        if (billDTOs == null) return;
+        for (PaymentVoucherBillDTO dto : billDTOs) {
+            if (isNegative(dto.getOriginalAmount()) || isNegative(dto.getPaidAmount()) || isNegative(dto.getRemainingBalance())) {
+                throw new BusinessRuleViolationException(
+                        "Bill " + (dto.getBillNo() != null ? dto.getBillNo() : "entry") + ": amounts cannot be negative");
+            }
+        }
+    }
+
+    private static boolean isNegative(BigDecimal v) {
+        return v != null && v.compareTo(BigDecimal.ZERO) < 0;
+    }
+
     private List<PaymentVoucherBill> saveBills(Long paymentVoucherId, List<PaymentVoucherBillDTO> billDTOs) {
         if (billDTOs == null || billDTOs.isEmpty()) return Collections.emptyList();
+        assertNonNegativeBillAmounts(billDTOs);
         return billDTOs.stream().map(dto -> {
             PaymentVoucherBill bill = new PaymentVoucherBill();
             bill.setPaymentVoucherId(paymentVoucherId);

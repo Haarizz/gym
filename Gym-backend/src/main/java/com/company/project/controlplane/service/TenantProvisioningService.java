@@ -438,7 +438,7 @@ public class TenantProvisioningService {
             emfBean.destroy();
         }
 
-        dropUserProfilesSoFlywayCanCreateItCleanly(tenantDs);
+        dropHibernateBootstrappedTablesSoFlywayCanCreateThemCleanly(tenantDs);
 
         Flyway flyway = Flyway.configure()
                 .dataSource(tenantDs)
@@ -548,11 +548,38 @@ public class TenantProvisioningService {
      * is defined by V24 itself, so nothing is lost by not letting Hibernate
      * create it first; V36 (also already applied by every environment that
      * needs it) adds the two audit columns V24 itself is missing.
+     *
+     * The identical collision then turned up one entity/migration pair at a time
+     * as each was added — MobileReferralProfile/MobileReferralAttribution vs.
+     * V42.1__add_mobile_referral_tables.sql (confirmed live: tenant "new-gym", id
+     * 22, PROVISION_FAILED at RUN_MIGRATIONS, stuck forever with only V29's seeded
+     * "Main Gym"/slug "main" placeholder since createInitialBranchAndGym — the step
+     * that renames it to the real gym name/slug — never got to run), then
+     * MobilePendingRegistration vs. V51__create_mobile_pending_registrations.sql
+     * (confirmed live: tenant "nwe-gym", id 24, same failure one migration later,
+     * immediately after the V42.1 fix above was deployed). BranchImage/Review vs.
+     * V53__create_branch_images_and_reviews.sql have the exact same unconditional-
+     * CREATE-TABLE-with-a-matching-@Entity shape and would fail the same way the
+     * moment a tenant's first provisioning run reached V53, just not yet reported.
+     * Rather than keep discovering and patching these one migration at a time,
+     * this drops every table known to collide this way in one place — the fix for
+     * the NEXT such entity/migration pair is adding one line here, not waiting for
+     * a gym to get stuck on it first. None of these tables has an FK to another
+     * (all cross-references are plain BIGINT columns), so drop order doesn't matter.
+     * Each migration listed can't be edited in place (checksummed everywhere
+     * already applied, e.g. power-gym) — same reasoning as V24 above — so Flyway's
+     * own CREATE TABLE must stay the sole, legitimate creator on a fresh tenant's
+     * first run.
      */
-    private void dropUserProfilesSoFlywayCanCreateItCleanly(DataSource tenantDs) throws Exception {
+    private void dropHibernateBootstrappedTablesSoFlywayCanCreateThemCleanly(DataSource tenantDs) throws Exception {
         try (Connection conn = tenantDs.getConnection();
              Statement stmt = conn.createStatement()) {
-            stmt.execute("DROP TABLE IF EXISTS user_profiles");
+            stmt.execute("DROP TABLE IF EXISTS user_profiles");                    // V24
+            stmt.execute("DROP TABLE IF EXISTS mobile_referral_attributions");     // V42.1
+            stmt.execute("DROP TABLE IF EXISTS mobile_referral_profiles");         // V42.1
+            stmt.execute("DROP TABLE IF EXISTS mobile_pending_registrations");     // V51
+            stmt.execute("DROP TABLE IF EXISTS branch_images");                    // V53
+            stmt.execute("DROP TABLE IF EXISTS reviews");                         // V53
         }
     }
 

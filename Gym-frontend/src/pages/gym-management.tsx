@@ -107,6 +107,15 @@ export function GymManagement() {
     return raw != null ? Number(raw) : null;
   };
 
+  // BG_60: a TENANT-sourced row now shows up immediately with status PROVISIONING
+  // (or PROVISION_FAILED) instead of being missing from the list until its
+  // dedicated database finishes provisioning — see GymService.toResponseDTO's
+  // placeholder path. Neither status has a tenant database to write to yet, so
+  // actions that update/deactivate one (Edit, status toggle) must stay disabled
+  // until it reaches a real status (ACTIVE/INACTIVE/SUSPENDED).
+  const isProvisioningPlaceholder = (gym: GymDTO): boolean =>
+    gym.source === 'TENANT' && (gym.status === 'PROVISIONING' || gym.status === 'PROVISION_FAILED');
+
   const handleEditGym = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingGym) return;
@@ -266,11 +275,16 @@ export function GymManagement() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-3">
+                      {/* BG_60: a TENANT-sourced row can now appear while still PROVISIONING/
+                          PROVISION_FAILED (see GymService.toResponseDTO placeholder) — its
+                          dedicated database doesn't exist yet, so Edit/status-toggle (which
+                          write to that database) are disabled until it's actually provisioned. */}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => openEditModal(gym)}
+                        disabled={isProvisioningPlaceholder(gym)}
                         aria-label="Edit gym"
                       >
                         <Edit2 className="h-4 w-4" />
@@ -278,6 +292,7 @@ export function GymManagement() {
                       <Switch
                         checked={gym.status === 'ACTIVE'}
                         onCheckedChange={() => toggleStatus(gym)}
+                        disabled={isProvisioningPlaceholder(gym)}
                         aria-label="Toggle Status"
                       />
                       {gym.source === 'TENANT' && !((gym as any).isDefault ?? (gym as any).is_default) && (

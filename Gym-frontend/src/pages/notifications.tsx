@@ -9,6 +9,7 @@ import {
   BellOff,
   Trash2,
   RefreshCw,
+  ChevronLeft,
   ChevronRight,
   Users,
   CreditCard,
@@ -22,9 +23,8 @@ import {
   Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
-import { notificationService, AppNotification } from "../../utils/supabase/notification-service";
-import styles from "./NotificationPanel.module.css";
+import { notificationService, AppNotification } from "../utils/supabase/notification-service";
+import styles from "../components/shared/NotificationPanel.module.css";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -60,11 +60,6 @@ function isYesterday(isoString: string): boolean {
     d.getDate() === yesterday.getDate()
   );
 }
-
-// ── Type / priority configs ───────────────────────────────────────────────────
-// Colors are CSS custom properties (var(--success) etc.) defined in globals.css,
-// applied via the --row-accent custom property rather than Tailwind color
-// utility classes (see NotificationPanel.module.css for why).
 
 const TYPE_CONFIG = {
   SUCCESS: { icon: CheckCircle, accent: "var(--success)" },
@@ -176,8 +171,6 @@ function NotificationRow({
   );
 }
 
-// ── Section label ─────────────────────────────────────────────────────────────
-
 function SectionLabel({ label, count }: { label: string; count: number }) {
   return (
     <div className={styles.sectionLabel}>
@@ -186,8 +179,6 @@ function SectionLabel({ label, count }: { label: string; count: number }) {
     </div>
   );
 }
-
-// ── Skeleton row ──────────────────────────────────────────────────────────────
 
 function SkeletonRow() {
   return (
@@ -202,24 +193,13 @@ function SkeletonRow() {
   );
 }
 
-// ── Panel ─────────────────────────────────────────────────────────────────────
-
-interface Props {
-  open: boolean;
-  onClose: () => void;
-  onCountChange: (count: number) => void;
-}
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 type FilterTab = "all" | "unread";
 
-export function NotificationPanel({ open, onClose, onCountChange }: Props) {
+export function Notifications() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  // Authoritative unread count from the server — NOT derived from `notifications`,
-  // since that array only ever holds whichever page(s) have been scrolled into
-  // view. Counting unread rows within that partial list was what made the panel's
-  // own header disagree with the sidebar bell (which always queries the true
-  // total). Both now read from the same /unread-count endpoint.
   const [unreadCount, setUnreadCount] = useState(0);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -246,19 +226,17 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
     try {
       const count = await notificationService.getUnreadCount();
       setUnreadCount(count);
-      onCountChange(count);
     } catch {
       // keep last known value rather than flashing to 0
     }
-  }, [onCountChange]);
+  }, []);
 
   useEffect(() => {
-    if (open) {
-      setPage(0);
-      loadPage(0, true);
-      refreshUnreadCount();
-    }
-  }, [open, loadPage, refreshUnreadCount]);
+    setPage(0);
+    loadPage(0, true);
+    refreshUnreadCount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!loaderRef.current || !hasMore) return;
@@ -301,7 +279,6 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
       await notificationService.markAllRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
-      onCountChange(0);
     } catch {
       toast.error("Failed to mark all notifications as read");
     }
@@ -316,161 +293,141 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
   const earlierItems = visible.filter((n) => !isToday(n.createdAt) && !isYesterday(n.createdAt));
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className={styles.panel}>
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <SheetHeader className={styles.header} style={{ padding: 0 }}>
-          <div className={styles.headerInner}>
-            <div className={styles.headerTop}>
-              <SheetTitle asChild>
-                <div className={styles.titleRow}>
-                  <div className={styles.bellBadge}>
-                    <Bell style={{ height: 19, width: 19 }} />
-                  </div>
-                  <div className={styles.titleText}>
-                    <h2>Notifications</h2>
-                    <p>{unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}</p>
-                  </div>
-                  {unreadCount > 0 && (
-                    <span className={styles.unreadPill}>{unreadCount > 99 ? "99+" : unreadCount}</span>
-                  )}
-                </div>
-              </SheetTitle>
+    <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px 60px" }}>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 20 }}>
+        <button
+          onClick={() => navigate(-1)}
+          className={styles.iconBtn}
+          aria-label="Back"
+          style={{ marginBottom: 12 }}
+        >
+          <ChevronLeft style={{ height: 18, width: 18 }} />
+        </button>
 
-              <div className={styles.headerActions}>
-                <button
-                  onClick={() => { loadPage(0, true); refreshUnreadCount(); }}
-                  disabled={refreshing}
-                  className={styles.iconBtn}
-                  aria-label="Refresh"
-                >
-                  <RefreshCw className={refreshing ? styles.spin : ""} style={{ height: 16, width: 16 }} />
-                </button>
-                {unreadCount > 0 && (
-                  <button onClick={handleMarkAllRead} className={styles.markAllBtn}>
-                    <BellOff style={{ height: 14, width: 14 }} />
-                    Mark all read
-                  </button>
-                )}
-              </div>
+        <div className={styles.headerTop} style={{ alignItems: "center" }}>
+          <div className={styles.titleRow}>
+            <div className={styles.bellBadge} style={{ height: 44, width: 44 }}>
+              <Bell style={{ height: 21, width: 21 }} />
             </div>
-
-            <div className={styles.tabs} role="tablist">
-              <button
-                role="tab"
-                aria-selected={filter === "all"}
-                onClick={() => setFilter("all")}
-                className={`${styles.tab} ${filter === "all" ? styles.tabActive : ""}`}
-              >
-                All
-              </button>
-              <button
-                role="tab"
-                aria-selected={filter === "unread"}
-                onClick={() => setFilter("unread")}
-                className={`${styles.tab} ${filter === "unread" ? styles.tabActive : ""}`}
-              >
-                Unread{unreadCount > 0 ? ` (${unreadCount})` : ""}
-              </button>
+            <div className={styles.titleText}>
+              <h2 style={{ fontSize: 20 }}>Notifications</h2>
+              <p>{unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}</p>
             </div>
+            {unreadCount > 0 && (
+              <span className={styles.unreadPill}>{unreadCount > 99 ? "99+" : unreadCount}</span>
+            )}
           </div>
-        </SheetHeader>
 
-        {/* ── Body ───────────────────────────────────────────────────────── */}
-        <div className={styles.body}>
-          {refreshing ? (
-            <div>
-              {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
-            </div>
-          ) : visible.length === 0 ? (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>
-                <Inbox />
-              </div>
-              <div>
-                <p className={styles.emptyTitle}>
-                  {filter === "unread" ? "No unread notifications" : "You're all caught up"}
-                </p>
-                <p className={styles.emptySub}>
-                  {filter === "unread"
-                    ? "Switch to All to see your full history"
-                    : "New alerts will appear here automatically"}
-                </p>
-              </div>
-              {filter === "unread" ? (
-                <button onClick={() => setFilter("all")} className={styles.emptyLink}>
-                  View all notifications
-                </button>
-              ) : (
-                <button onClick={() => { onClose(); navigate("/notifications"); }} className={styles.emptyLink}>
-                  Go to notifications page
-                </button>
-              )}
-            </div>
-          ) : (
-            <>
-              {todayItems.length > 0 && (
-                <div>
-                  <SectionLabel label="Today" count={todayItems.length} />
-                  {todayItems.map((n) => (
-                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
-                  ))}
-                </div>
-              )}
-
-              {yesterdayItems.length > 0 && (
-                <div>
-                  <SectionLabel label="Yesterday" count={yesterdayItems.length} />
-                  {yesterdayItems.map((n) => (
-                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
-                  ))}
-                </div>
-              )}
-
-              {earlierItems.length > 0 && (
-                <div>
-                  <SectionLabel label="Earlier" count={earlierItems.length} />
-                  {earlierItems.map((n) => (
-                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
-                  ))}
-                </div>
-              )}
-
-              {/* Infinite scroll sentinel */}
-              <div ref={loaderRef} className={styles.loadMore}>
-                {loading && (
-                  <div className={styles.loadMoreText}>
-                    <RefreshCw className={styles.spin} style={{ height: 14, width: 14 }} />
-                    Loading more…
-                  </div>
-                )}
-                {!hasMore && visible.length > 0 && (
-                  <p className={styles.endText}>— End of notifications —</p>
-                )}
-              </div>
-            </>
-          )}
+          <div className={styles.headerActions}>
+            <button
+              onClick={() => { loadPage(0, true); refreshUnreadCount(); }}
+              disabled={refreshing}
+              className={styles.iconBtn}
+              aria-label="Refresh"
+            >
+              <RefreshCw className={refreshing ? styles.spin : ""} style={{ height: 16, width: 16 }} />
+            </button>
+            {unreadCount > 0 && (
+              <button onClick={handleMarkAllRead} className={styles.markAllBtn}>
+                <BellOff style={{ height: 14, width: 14 }} />
+                Mark all read
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* ── Footer ─────────────────────────────────────────────────────── */}
-        {notifications.length > 0 && (
-          <div className={styles.footer}>
-            <button
-              onClick={() => { onClose(); navigate("/notifications"); }}
-              className={styles.footerLink}
-            >
-              View all
-            </button>
-            <button
-              onClick={handleMarkAllRead}
-              disabled={unreadCount === 0}
-              className={styles.footerLink}
-            >
-              Mark all read
-            </button>
+        <div className={styles.tabs} role="tablist" style={{ maxWidth: 280, marginTop: 18 }}>
+          <button
+            role="tab"
+            aria-selected={filter === "all"}
+            onClick={() => setFilter("all")}
+            className={`${styles.tab} ${filter === "all" ? styles.tabActive : ""}`}
+          >
+            All
+          </button>
+          <button
+            role="tab"
+            aria-selected={filter === "unread"}
+            onClick={() => setFilter("unread")}
+            className={`${styles.tab} ${filter === "unread" ? styles.tabActive : ""}`}
+          >
+            Unread{unreadCount > 0 ? ` (${unreadCount})` : ""}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Body ───────────────────────────────────────────────────────── */}
+      <div style={{ border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", background: "var(--card)" }}>
+        {refreshing ? (
+          <div>
+            {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
           </div>
+        ) : visible.length === 0 ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>
+              <Inbox />
+            </div>
+            <div>
+              <p className={styles.emptyTitle}>
+                {filter === "unread" ? "No unread notifications" : "You're all caught up"}
+              </p>
+              <p className={styles.emptySub}>
+                {filter === "unread"
+                  ? "Switch to All to see your full history"
+                  : "New alerts will appear here automatically"}
+              </p>
+            </div>
+            {filter === "unread" && (
+              <button onClick={() => setFilter("all")} className={styles.emptyLink}>
+                View all notifications
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {todayItems.length > 0 && (
+              <div>
+                <SectionLabel label="Today" count={todayItems.length} />
+                {todayItems.map((n) => (
+                  <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
+                ))}
+              </div>
+            )}
+
+            {yesterdayItems.length > 0 && (
+              <div>
+                <SectionLabel label="Yesterday" count={yesterdayItems.length} />
+                {yesterdayItems.map((n) => (
+                  <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
+                ))}
+              </div>
+            )}
+
+            {earlierItems.length > 0 && (
+              <div>
+                <SectionLabel label="Earlier" count={earlierItems.length} />
+                {earlierItems.map((n) => (
+                  <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
+                ))}
+              </div>
+            )}
+
+            {/* Infinite scroll sentinel */}
+            <div ref={loaderRef} className={styles.loadMore}>
+              {loading && (
+                <div className={styles.loadMoreText}>
+                  <RefreshCw className={styles.spin} style={{ height: 14, width: 14 }} />
+                  Loading more…
+                </div>
+              )}
+              {!hasMore && visible.length > 0 && (
+                <p className={styles.endText}>— End of notifications —</p>
+              )}
+            </div>
+          </>
         )}
-      </SheetContent>
-    </Sheet>
+      </div>
+    </div>
   );
 }
