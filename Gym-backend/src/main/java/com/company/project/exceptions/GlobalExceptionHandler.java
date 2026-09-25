@@ -53,6 +53,11 @@ public class GlobalExceptionHandler {
         return build(ex.getStatus(), ex.getCode(), ex.getMessage());
     }
 
+    @ExceptionHandler(CommunityGlobalPrincipalNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleCommunityGlobalPrincipal(CommunityGlobalPrincipalNotSupportedException ex) {
+        return build(HttpStatus.FORBIDDEN, "COMMUNITY_GLOBAL_PRINCIPAL_NOT_SUPPORTED", ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
         return build(HttpStatus.CONFLICT, "INVALID_STATE", ex.getMessage());

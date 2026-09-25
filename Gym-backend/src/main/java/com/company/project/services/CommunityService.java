@@ -2,6 +2,7 @@ package com.company.project.services;
 
 import com.company.project.dto.*;
 import com.company.project.entities.*;
+import com.company.project.exceptions.CommunityGlobalPrincipalNotSupportedException;
 import com.company.project.repositories.CommunityPostCommentRepository;
 import com.company.project.repositories.CommunityPostLikeRepository;
 import com.company.project.repositories.CommunityPostRepository;
@@ -396,6 +397,13 @@ public class CommunityService {
             throw new SecurityException("Not authenticated");
         }
 
+        // A global principal's ID is a primary-DB users.id; looking it up in this
+        // tenant's users table can match an unrelated tenant user with the same
+        // numeric ID and attribute content to them. Refuse before the lookup.
+        if (userDetails.isGlobal()) {
+            throw new CommunityGlobalPrincipalNotSupportedException();
+        }
+
         return userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new SecurityException("User not found"));
     }
@@ -410,6 +418,13 @@ public class CommunityService {
 
         Object principal = authentication.getPrincipal();
         if (!(principal instanceof UserDetailsImpl userDetails)) {
+            return null;
+        }
+
+        // Same ID-space mismatch as getCurrentUserOrThrow: a global principal's ID
+        // must not be matched against this tenant's community_post_likes.user_id,
+        // or likedByMe reflects some other tenant user's likes.
+        if (userDetails.isGlobal()) {
             return null;
         }
 
