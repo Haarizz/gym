@@ -110,6 +110,45 @@ class TenantContextFilterTest {
     }
 
     @Test
+    void testGlobalCommunity_GlobalPendingMember_NotRoutedOrGated() throws ServletException, IOException {
+        // A pending membership at the selected gym must not block the global feed, and
+        // the global Community must never be routed to the caller's selected gym.
+        setupMockAuth(true, "ROLE_MEMBER");
+        mockTenantHeader("gym-a");
+        mockRequestUri("/api/mobile/community/feed");
+
+        String[] capturedTenant = new String[1];
+        doAnswer(invocation -> {
+            capturedTenant[0] = TenantContextHolder.getCurrentTenant();
+            return null;
+        }).when(filterChain).doFilter(any(), any());
+
+        tenantContextFilter.doFilterInternal(request, response, filterChain);
+
+        assertNull(capturedTenant[0], "Global Community requests must not be tenant-routed");
+        verify(filterChain).doFilter(request, response);
+        verify(applicationContext, never()).getBean(MemberRepository.class);
+    }
+
+    @Test
+    void testGlobalCommunity_TenantStaff_NotRouted() throws ServletException, IOException {
+        setupMockAuth(false, "ROLE_MANAGER");
+        mockTenantHeader("gym-a");
+        mockRequestUri("/api/mobile/community/feed");
+
+        String[] capturedTenant = new String[1];
+        doAnswer(invocation -> {
+            capturedTenant[0] = TenantContextHolder.getCurrentTenant();
+            return null;
+        }).when(filterChain).doFilter(any(), any());
+
+        tenantContextFilter.doFilterInternal(request, response, filterChain);
+
+        assertNull(capturedTenant[0]);
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
     void testProfileTransactions_GlobalPendingMember_Protected() throws ServletException, IOException {
         setupMockAuth(true, "ROLE_MEMBER");
         mockTenantHeader("gym-a");
