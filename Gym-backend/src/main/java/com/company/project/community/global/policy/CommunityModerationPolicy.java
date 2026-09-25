@@ -34,7 +34,7 @@ public final class CommunityModerationPolicy {
      * @param moderationEnabled rollout flag; when off nobody moderates
      */
     public record Viewer(CommunityActor actor, Long authorId, String verifiedGym, boolean moderationEnabled) {
-        boolean isAuthorOf(long contentAuthorId) {
+        public boolean isAuthorOf(long contentAuthorId) {
             return authorId != null && authorId == contentAuthorId;
         }
     }
