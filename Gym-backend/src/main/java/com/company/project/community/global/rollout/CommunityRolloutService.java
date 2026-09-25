@@ -24,7 +24,13 @@ import java.util.Map;
 @Service
 public class CommunityRolloutService {
 
-    public enum Surface { MOBILE, WEB }
+    /**
+     * MOBILE/WEB: the new clients, gated by their surface flags and global_reads.
+     * LEGACY: the compatibility adapter behind the old /api/community endpoints —
+     * available as soon as authority is GLOBAL, independent of the pilot surface
+     * flags, because old clients must keep working through the cutover.
+     */
+    public enum Surface { MOBILE, WEB, LEGACY }
 
     public enum Operation { POST, COMMENT, LIKE, REPORT }
 
@@ -69,6 +75,12 @@ public class CommunityRolloutService {
             throw CommunityException.unavailable("COMMUNITY_DISABLED", "The Community is temporarily unavailable");
         }
         State s = state();
+        if (surface == Surface.LEGACY) {
+            if (!s.isGlobalAuthority()) {
+                throw CommunityException.unavailable("COMMUNITY_NOT_ENABLED", "The compatibility adapter is only active after cutover");
+            }
+            return;
+        }
         if (!s.isGlobalAuthority() || !s.globalReads()) {
             throw CommunityException.unavailable("COMMUNITY_NOT_ENABLED", "The GymBios Community isn't available yet");
         }

@@ -223,8 +223,10 @@ public class GlobalCommunityService {
 
             long postId = db.inTransaction(() -> {
                 long authorId = authors.upsert(actor, profile);
+                // Old clients present a gym-scoped Community, so what their users write stays gym-only.
+                String visibility = req.surface() == Surface.LEGACY ? "GYM" : "PUBLIC";
                 long id = posts.insert(new NewPost(authorId, ctx.tenantSlug(), ctx.branchId(), ctx.memberId(),
-                        ctx.gymName(), ctx.branchName(), valid.topic(), valid.content(), valid.type()));
+                        ctx.gymName(), ctx.branchName(), valid.topic(), valid.content(), valid.type(), visibility));
                 if (image != null) {
                     posts.insertImage(id, image);
                 }

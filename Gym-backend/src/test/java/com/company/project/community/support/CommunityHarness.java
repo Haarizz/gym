@@ -5,6 +5,7 @@ import com.company.project.community.global.CommunityModerationService;
 import com.company.project.community.global.CommunityViews;
 import com.company.project.community.global.GlobalCommunityService;
 import com.company.project.community.global.GlobalCommunityService.Request;
+import com.company.project.community.global.LegacyCommunityCompatAdapter;
 import com.company.project.community.global.content.CommunityContentValidator;
 import com.company.project.community.global.identity.CommunityActorResolver;
 import com.company.project.community.global.identity.CommunityAuthorProfiles;
@@ -80,6 +81,9 @@ public final class CommunityHarness implements AutoCloseable {
     public final CommunityModerationService moderation;
     public final CommunityPostStore posts;
     public final CommunityRolloutStore rolloutStore;
+    public final LegacyCommunityCompatAdapter adapter;
+    public final TenantDataSources dataSources;
+    private MockHttpServletRequest currentRequest;
 
     public CommunityHarness() throws SQLException {
         control = databases.createControlPlane();
@@ -92,7 +96,7 @@ public final class CommunityHarness implements AutoCloseable {
         ReflectionTestUtils.setField(jwtService, "jwtSecret", SECRET);
         ReflectionTestUtils.setField(jwtService, "jwtExpirationMs", 3_600_000);
 
-        TenantDataSources dataSources = mock(TenantDataSources.class);
+        dataSources = mock(TenantDataSources.class);
         when(dataSources.resolve(anyString())).thenReturn(Optional.empty());
         when(dataSources.resolve("gym-a")).thenReturn(Optional.of(new TenantDb("gym-a", gymA, false)));
         when(dataSources.resolve("gym-b")).thenReturn(Optional.of(new TenantDb("gym-b", gymB, false)));
@@ -120,6 +124,13 @@ public final class CommunityHarness implements AutoCloseable {
                 interactions, moderationStore, validator, views, audit);
         moderation = new CommunityModerationService(community, actorResolver, profiles, rollout, db, authors, posts,
                 interactions, moderationStore, validator, views, audit);
+        adapter = new LegacyCommunityCompatAdapter(rollout, actorResolver, gymContexts, dataSources, community, authors,
+                posts, interactions, db);
+    }
+
+    /** Adds a header (e.g. X-Tenant-ID) to the current simulated request. */
+    public void header(String name, String value) {
+        currentRequest.addHeader(name, value);
     }
 
     private DataSource gymDatabase(String name) throws SQLException {
@@ -207,6 +218,7 @@ public final class CommunityHarness implements AutoCloseable {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, list));
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
+        currentRequest = request;
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
     }
 

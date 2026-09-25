@@ -28,8 +28,10 @@ public class CommunityPostStore {
                           LocalDateTime createdAt, boolean hasImage, Integer imageWidth, Integer imageHeight,
                           String imageAspectRatio, Integer imageCropPosition, Integer imageCropZoom) {}
 
+    /** visibility: PUBLIC for the new clients; GYM for posts written through the legacy (gym-scoped) API. */
     public record NewPost(long authorId, String authorTenantSlug, Long authorBranchId, Long authorMemberId,
-                          String authorGymName, String authorBranchName, String topic, String content, String type) {}
+                          String authorGymName, String authorBranchName, String topic, String content, String type,
+                          String visibility) {}
 
     public record NewImage(String contentType, byte[] data, int width, int height, String aspectRatio,
                            Integer cropPosition, Integer cropZoom, String sha256) {}
@@ -70,7 +72,7 @@ public class CommunityPostStore {
         return db.jdbc().queryForObject("INSERT INTO global_community_posts (author_id, author_tenant_slug, "
                         + "author_branch_id, author_member_id, author_gym_name, author_branch_name, topic, content, type, "
                         + "visibility, status, origin) VALUES (:authorId, :authorTenantSlug, :authorBranchId, :authorMemberId, "
-                        + ":authorGymName, :authorBranchName, :topic, :content, :type, 'PUBLIC', 'ACTIVE', 'GLOBAL') RETURNING id",
+                        + ":authorGymName, :authorBranchName, :topic, :content, :type, :visibility, 'ACTIVE', 'GLOBAL') RETURNING id",
                 new MapSqlParameterSource()
                         .addValue("authorId", post.authorId())
                         .addValue("authorTenantSlug", post.authorTenantSlug())
@@ -80,7 +82,8 @@ public class CommunityPostStore {
                         .addValue("authorBranchName", post.authorBranchName())
                         .addValue("topic", post.topic())
                         .addValue("content", post.content())
-                        .addValue("type", post.type()),
+                        .addValue("type", post.type())
+                        .addValue("visibility", post.visibility()),
                 Long.class);
     }
 
@@ -245,7 +248,7 @@ public class CommunityPostStore {
                 new MapSqlParameterSource("authorId", authorId).addValue("ids", postIds), Long.class));
     }
 
-    static String escapeLike(String value) {
+    public static String escapeLike(String value) {
         StringBuilder out = new StringBuilder();
         for (char c : value.toCharArray()) {
             if (c == '%' || c == '_' || c == '\\') {
