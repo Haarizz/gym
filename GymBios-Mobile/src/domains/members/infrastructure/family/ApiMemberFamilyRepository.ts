@@ -50,12 +50,14 @@ interface MemberResponse {
   membership_plan_id?: number | null;
   membership_plan_name?: string | null;
   membership_plan_price?: number | null;
-  status: string;
-  start_date: string;
-  end_date?: string | null;
+  // MemberResponseDTO serializes membership_status / membership_start_date /
+  // membership_end_date, not status / start_date / end_date / is_frozen —
+  // see the same note in ApiMemberDirectoryRepository (BG_64).
+  membership_status: string;
+  membership_start_date: string;
+  membership_end_date?: string | null;
   payment_status: string;
 
-  is_frozen: boolean;
   freeze_start_date?: string | null;
   freeze_end_date?: string | null;
   freeze_days_used?: number | null;
@@ -141,12 +143,12 @@ export class ApiMemberFamilyRepository implements MemberFamilyRepository {
       membershipPlanId: response.membership_plan_id ?? undefined,
       membershipPlanName: response.membership_plan_name ?? undefined,
       membershipPlanPrice: response.membership_plan_price ?? undefined,
-      status: response.status,
-      startDate: response.start_date,
-      endDate: response.end_date ?? undefined,
+      status: response.membership_status,
+      startDate: response.membership_start_date,
+      endDate: response.membership_end_date ?? undefined,
       paymentStatus: response.payment_status,
 
-      isFrozen: response.is_frozen,
+      isFrozen: response.membership_status?.toLowerCase() === 'frozen',
       freezeStartDate: response.freeze_start_date ?? undefined,
       freezeEndDate: response.freeze_end_date ?? undefined,
       freezeDaysUsed: response.freeze_days_used ?? undefined,

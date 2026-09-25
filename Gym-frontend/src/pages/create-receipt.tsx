@@ -131,9 +131,17 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
     setSearchTerm("");
     setShowSuggestions(false);
     setPaymentAmounts({});
+    setAutoApplyAmount("");
     setReceiptGenerated(false);
     setGeneratedReceiptNo("");
     setPendingBills([]);
+    // The "how was this paid" panel (Cash/Card/Online/Credit entries) is its own
+    // independent state (usePaymentManager) — clearing paymentAmounts above does
+    // NOT clear it. Without this, switching to a different member mid-session
+    // carried over the previous member's payment lines/amounts unchanged, so the
+    // allocation panel silently stayed out of sync with the newly selected
+    // member's dues.
+    paymentManager.clearLines();
 
     setBillsLoading(true);
     try {

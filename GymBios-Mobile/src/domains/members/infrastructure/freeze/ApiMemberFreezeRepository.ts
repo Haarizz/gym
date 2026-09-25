@@ -22,12 +22,17 @@ interface MemberResponse {
   membership_plan_id?: number | null;
   membership_plan_name?: string | null;
   membership_plan_price?: number | null;
-  status: string;
-  start_date: string;
-  end_date?: string | null;
+  // POST /members/{id}/freeze and /unfreeze both return MemberResponseDTO
+  // (see MemberController), which serializes membership_status /
+  // membership_start_date / membership_end_date — not status / start_date /
+  // end_date / is_frozen. Those keys don't exist on the real response, so
+  // reading them left every freeze/unfreeze result's status/isFrozen
+  // undefined regardless of what the backend actually persisted (BG_64).
+  membership_status: string;
+  membership_start_date: string;
+  membership_end_date?: string | null;
   payment_status: string;
 
-  is_frozen: boolean;
   freeze_start_date?: string | null;
   freeze_end_date?: string | null;
   freeze_days_used?: number | null;
@@ -83,12 +88,14 @@ export class ApiMemberFreezeRepository implements MemberFreezeRepository {
       membershipPlanId: response.membership_plan_id ?? undefined,
       membershipPlanName: response.membership_plan_name ?? undefined,
       membershipPlanPrice: response.membership_plan_price ?? undefined,
-      status: response.status,
-      startDate: response.start_date,
-      endDate: response.end_date ?? undefined,
+      status: response.membership_status,
+      startDate: response.membership_start_date,
+      endDate: response.membership_end_date ?? undefined,
       paymentStatus: response.payment_status,
 
-      isFrozen: response.is_frozen,
+      // No boolean is_frozen on the DTO — derive it the same way the backend
+      // itself does (MobileMemberMembershipService, buildSpec's status filter).
+      isFrozen: response.membership_status?.toLowerCase() === 'frozen',
       freezeStartDate: response.freeze_start_date ?? undefined,
       freezeEndDate: response.freeze_end_date ?? undefined,
       freezeDaysUsed: response.freeze_days_used ?? undefined,

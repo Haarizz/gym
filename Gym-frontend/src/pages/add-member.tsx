@@ -111,6 +111,20 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 const CARD_TYPE_OPTIONS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Maestro', 'Diners Club', 'Other'];
 const ONLINE_PAYMENT_TYPE_OPTIONS = ['Google Pay', 'PhonePe', 'Paytm', 'BHIM', 'Samsung Pay', 'Apple Pay', 'Amazon Pay', 'UPI', 'Other'];
 
+// A member must be at least this old — rejects today's date and other
+// obviously-wrong entries (newborns, typos) while still allowing young
+// children to be registered (BG_61).
+const MIN_MEMBER_AGE_YEARS = 1;
+
+// The latest Date of Birth selectable/acceptable: today minus the minimum age,
+// as a "YYYY-MM-DD" string for use as the date input's max bound and for
+// submit-time validation.
+const getMaxDateOfBirth = (): string => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - MIN_MEMBER_AGE_YEARS);
+  return d.toISOString().split('T')[0];
+};
+
 // Whole-years age as of today, from a "YYYY-MM-DD" date-of-birth string.
 // Returns null for empty/invalid/future-dated input so callers can hide the
 // Age readout instead of showing a nonsense value.
@@ -971,10 +985,31 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       // Strip time components for accurate date-only comparison
       joinD.setHours(0, 0, 0, 0);
       startD.setHours(0, 0, 0, 0);
-      
+
       if (startD < joinD) {
         toast.error('Invalid Dates', {
           description: 'Start date cannot be earlier than joining date.',
+          duration: 4000
+        });
+        return;
+      }
+    }
+
+    // Date of Birth must be a real, plausible birthdate — the `max` on the date
+    // input is only a soft hint (still bypassable by typing), so re-check here.
+    // Rejects today's date and anything younger than MIN_MEMBER_AGE_YEARS (BG_61).
+    if (formData.dateOfBirth) {
+      const dob = new Date(formData.dateOfBirth);
+      if (isNaN(dob.getTime()) || dob > new Date()) {
+        toast.error('Invalid Date of Birth', {
+          description: 'Date of birth cannot be in the future.',
+          duration: 4000
+        });
+        return;
+      }
+      if (formData.dateOfBirth > getMaxDateOfBirth()) {
+        toast.error('Invalid Date of Birth', {
+          description: `Member must be at least ${MIN_MEMBER_AGE_YEARS} year${MIN_MEMBER_AGE_YEARS === 1 ? '' : 's'} old.`,
           duration: 4000
         });
         return;
@@ -1272,6 +1307,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     const hasPayment = paymentManager.paymentLines.length > 0;
     const payload = buildPaymentPayload(paymentManager.paymentLines, finalPrice);
     const outstandingBalance = payload.creditBalance;
+    // In edit mode with no new payment entered (e.g. only updating profile/access
+    // credentials), leave outstanding balance and payment status untouched rather
+    // than forcing them from an empty payment line set — otherwise every
+    // credentials-only save would wipe the member's real outstanding dues to 0
+    // (BG_63).
+    const shouldUpdatePaymentFields = !isEditMode || hasPayment;
     const paymentStatus = !hasPayment ? 'paid' : (outstandingBalance > 0 ? 'pending' : 'paid');
 
     // Resolve the selected plan name
@@ -1327,7 +1368,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       membership_start_date: toIso(formData.startDate),
       membership_end_date: toIso(endDateStr),
       expiry_date: toIso(endDateStr),
-      payment_status: paymentStatus as any,
+      ...(shouldUpdatePaymentFields ? { payment_status: paymentStatus as any } : {}),
       monthly_fee: membershipDetails.price,
       membership_fee: getFinalPrice(),
       emergency_contact: formData.emergencyContact,
@@ -1340,7 +1381,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       current_medications: formData.currentMedications,
       chronic_illnesses: formData.chronicIllnesses,
       health_notes: formData.healthNotes || '',
-      outstanding_balance: outstandingBalance,
+      ...(shouldUpdatePaymentFields ? { outstanding_balance: outstandingBalance } : {}),
       last_payment_date: hasPayment ? toIso(new Date().toISOString().split('T')[0]) : undefined,
       payment_method_used: effectivePaymentMethodLabel,
       bank_account_code: selectedBankAccount?.code,
@@ -1843,7 +1884,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <Input
                   id="dateOfBirth"
                   type="date"
-                  max={new Date().toISOString().split('T')[0]}
+                  max={getMaxDateOfBirth()}
                   value={formData.dateOfBirth}
                   onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
                 />

@@ -659,7 +659,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
         </div>
 
         {/* Search Bar */}
-        <Card className="overflow-hidden border-primary/10 shadow-sm">
+        <Card className="overflow-visible border-primary/10 shadow-sm">
           <CardContent className="p-4 sm:p-5">
             <div className="relative">
               <div className="relative flex-1">
@@ -673,7 +673,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 />
               </div>
               {searchOpen && searchResults.length > 0 && (
-                <div className="absolute z-20 mt-1 w-full bg-white border border-primary/20 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                <div className="absolute z-50 mt-1 w-full bg-white border border-primary/20 rounded-lg shadow-lg max-h-64 overflow-y-auto">
                   {searchResults.map((r) => (
                     <button
                       key={r.id}
@@ -992,7 +992,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <Receipt className="h-4 w-4 mr-2" />
                 View Receipts
               </Button>
-              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('members')}>
+              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('members', { tab: 'renewals', memberId: memberId })}>
                 <RefreshCcw className="h-4 w-4 mr-2" />
                 Renew / Upgrade Plan
               </Button>

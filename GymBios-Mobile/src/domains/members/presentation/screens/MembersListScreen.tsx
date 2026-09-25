@@ -52,13 +52,13 @@ export function MembersListScreen({
         (member.membershipPlanName ?? '').toLowerCase().includes(query);
 
       const matchesStatus =
-        !statusFilter || member.status.toUpperCase() === statusFilter.toUpperCase();
+        !statusFilter || (member.status ?? '').toUpperCase() === statusFilter.toUpperCase();
       const matchesMembershipType =
         !membershipTypeFilter ||
-        member.membershipType.toUpperCase() === membershipTypeFilter.toUpperCase();
+        (member.membershipType ?? '').toUpperCase() === membershipTypeFilter.toUpperCase();
       const matchesPaymentStatus =
         !paymentStatusFilter ||
-        member.paymentStatus.toUpperCase() === paymentStatusFilter.toUpperCase();
+        (member.paymentStatus ?? '').toUpperCase() === paymentStatusFilter.toUpperCase();
 
       return (
         matchesSearch &&

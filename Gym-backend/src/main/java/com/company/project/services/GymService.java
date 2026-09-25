@@ -354,16 +354,32 @@ public class GymService {
      * Tenant row (every gym created since Phase 3's cutover) — there is no primary-DB
      * Gym entity to read from at all, so every field is read live from the tenant's
      * own dedicated database's own gyms row (identical shape everywhere, per Flyway/
-     * Hibernate's shared bootstrap). Returns null (skip, don't fail the whole list)
-     * if the tenant has no reachable connection yet — mid-provisioning, or a genuine
-     * connection failure — consistent with the "refresh shortly" UX createGym's
-     * response already sets expectations for.
+     * Hibernate's shared bootstrap).
+     *
+     * BG_60: while no TenantConnection exists yet (mid-provisioning, or the pipeline
+     * landed in PROVISION_FAILED), this used to return null and skip the tenant from
+     * the list entirely — so a freshly-created gym vanished from Gym Clients until
+     * async provisioning had progressed far enough to reach the STORE_CONNECTION
+     * step, well after createGym's own immediate loadGyms() refresh already ran.
+     * Instead, build a minimal placeholder straight from the control-plane Tenant
+     * row (the only fields that exist this early) so the row shows up immediately
+     * with its real PROVISIONING/PROVISION_FAILED status, same as createGym's 202
+     * response already reports.
      */
     private GymResponseDTO toResponseDTO(Tenant tenant) {
         TenantConnection connection = tenantConnectionRepository.findByTenantId(tenant.getId()).orElse(null);
         if (connection == null) {
-            log.info("Skipping tenant '{}' from gym list — not yet provisioned (no TenantConnection)", tenant.getSlug());
-            return null;
+            log.info("Tenant '{}' has no TenantConnection yet (status={}) — listing a provisioning placeholder", tenant.getSlug(), tenant.getStatus());
+            GymResponseDTO placeholder = new GymResponseDTO();
+            placeholder.setSource("TENANT");
+            placeholder.setId(tenant.getId());
+            placeholder.setTenantId(tenant.getId());
+            placeholder.setName(tenant.getName());
+            placeholder.setSlug(tenant.getSlug());
+            placeholder.setStatus(tenant.getStatus());
+            placeholder.setCreatedAt(tenant.getCreatedAt());
+            placeholder.setUpdatedAt(tenant.getUpdatedAt());
+            return placeholder;
         }
         GymResponseDTO dto = new GymResponseDTO();
         dto.setSource("TENANT");

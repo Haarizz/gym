@@ -174,18 +174,25 @@ public class ReceiptVoucherService {
 
         // Once a voucher is posted to the General Ledger (either auto-created from a
         // real payment event, or a manual voucher that has since been marked
-        // "completed"), its amount is the source the ledger entry was built from —
-        // silently editing it here would desync the voucher document from the books
-        // it's supposed to be proof of, since the already-posted journal entry is
-        // never re-generated. Every other field can still be corrected (typos in
-        // notes/reference/etc.), just not the amount.
-        boolean alreadyPosted = journalEntrySourceRepository
-                .findBySourceEntityTypeAndSourceEntityId("ReceiptVoucher", rv.getId())
-                .isPresent();
-        if (alreadyPosted && req.getAmount() != null && rv.getAmount().compareTo(req.getAmount()) != 0) {
-            throw new BusinessRuleViolationException(
-                    "This voucher is already posted to the general ledger — its amount can't be changed. "
-                    + "Reverse or adjust it through the ledger instead.");
+        // "completed"), its amount is the source the original journal entry was built
+        // from. If the amount changes, that entry is now wrong — silently leaving it
+        // in place would desync the voucher document from the books it's supposed to
+        // be proof of. Rather than block the edit outright, reverse the stale entry
+        // and repost a fresh one for the corrected amount, dated today (the actual
+        // correction date), same as reversing any other posted journal entry.
+        var existingSource = journalEntrySourceRepository
+                .findBySourceEntityTypeAndSourceEntityId("ReceiptVoucher", rv.getId());
+        boolean amountChanged = req.getAmount() != null && rv.getAmount().compareTo(req.getAmount()) != 0;
+
+        if (existingSource.isPresent() && amountChanged) {
+            journalVoucherRepository.findByIdAndDeletedAtIsNull(existingSource.get().getJournalVoucherId())
+                    .filter(jv -> "POSTED".equalsIgnoreCase(jv.getStatus()) && jv.getReversedByVoucherId() == null)
+                    .ifPresent(jv -> journalVoucherService.reverseJournalVoucher(
+                            jv.getId(), LocalDate.now(),
+                            "Receipt Voucher " + rv.getVoucherNo() + " amount corrected"));
+            // Clear the idempotency guard so postToLedgerIfNeeded() below can post a
+            // new entry for the corrected amount instead of silently no-op'ing.
+            journalEntrySourceRepository.deleteBySourceEntityTypeAndSourceEntityId("ReceiptVoucher", rv.getId());
         }
 
         applyRequest(rv, req);

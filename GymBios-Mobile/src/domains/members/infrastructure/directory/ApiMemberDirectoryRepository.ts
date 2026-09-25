@@ -26,12 +26,16 @@ interface MemberResponse {
   membership_plan_name?: string | null;
   membership_plan?: string | null;
   membership_plan_price?: number | null;
-  status: string;
-  start_date: string;
-  end_date?: string | null;
+  // Backend's MemberResponseDTO (com.company.project.dto.MemberResponseDTO,
+  // global Jackson SNAKE_CASE strategy) serializes these as membership_status /
+  // membership_start_date / membership_end_date — there is no bare status /
+  // start_date / end_date / is_frozen on this DTO. Reading those non-existent
+  // keys left every member's status/isFrozen undefined app-wide (BG_64).
+  membership_status: string;
+  membership_start_date: string;
+  membership_end_date?: string | null;
   payment_status: string;
 
-  is_frozen: boolean;
   freeze_start_date?: string | null;
   freeze_end_date?: string | null;
   freeze_days_used?: number | null;
@@ -161,12 +165,15 @@ export class ApiMemberDirectoryRepository
       membershipPlanId: response.membership_plan_id ?? undefined,
       membershipPlanName: response.membership_plan_name ?? response.membership_plan ?? undefined,
       membershipPlanPrice: response.membership_plan_price ?? undefined,
-      status: response.status,
-      startDate: response.start_date,
-      endDate: response.end_date ?? undefined,
+      status: response.membership_status,
+      startDate: response.membership_start_date,
+      endDate: response.membership_end_date ?? undefined,
       paymentStatus: response.payment_status,
 
-      isFrozen: response.is_frozen,
+      // The DTO has no boolean is_frozen field — derive it the same way the
+      // backend itself does (MobileMemberMembershipService, buildSpec's
+      // status filter): membership_status === "frozen".
+      isFrozen: response.membership_status?.toLowerCase() === 'frozen',
       freezeStartDate: response.freeze_start_date ?? undefined,
       freezeEndDate: response.freeze_end_date ?? undefined,
       freezeDaysUsed: response.freeze_days_used ?? undefined,

@@ -521,9 +521,28 @@ export function PaymentVoucher() {
     return true;
   };
 
+  // Bill Entries rows have no `min` enforcement beyond the browser's soft hint
+  // (spinner-only — a pasted or typed negative value passes through), unlike
+  // the top-level Amount field's explicit JS guard. Catches that gap here too.
+  const validateBillAmounts = (f: PVForm) => {
+    for (const bill of f.bills) {
+      const original = parseFloat(bill.originalAmount);
+      const paid = parseFloat(bill.paidAmount);
+      const remaining = parseFloat(bill.remainingBalance);
+      if ((bill.originalAmount && (isNaN(original) || original < 0)) ||
+          (bill.paidAmount && (isNaN(paid) || paid < 0)) ||
+          (bill.remainingBalance && (isNaN(remaining) || remaining < 0))) {
+        toast.error(`Bill ${bill.billNo || "entry"}: amounts cannot be negative`);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleCreate = async () => {
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
     if (!form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0) { toast.error("Amount must be greater than 0"); return; }
+    if (!validateBillAmounts(form)) return;
     if (!validatePaymentMethodFields(form)) return;
     setSavingForm(true);
     try {
@@ -542,6 +561,7 @@ export function PaymentVoucher() {
     if (!editingId) return;
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
     if (!form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0) { toast.error("Amount must be greater than 0"); return; }
+    if (!validateBillAmounts(form)) return;
     if (!validatePaymentMethodFields(form)) return;
     setSavingForm(true);
     try {
@@ -822,13 +842,13 @@ export function PaymentVoucher() {
                       <Input type="date" value={bill.billDate} onChange={e => updateBill(idx, "billDate", e.target.value)} className="h-7 text-xs" />
                     </td>
                     <td className="p-1">
-                      <Input type="number" value={bill.originalAmount} onChange={e => updateBill(idx, "originalAmount", e.target.value)} className="h-7 text-xs text-right" />
+                      <Input type="number" min="0" step="0.01" value={bill.originalAmount} onChange={e => updateBill(idx, "originalAmount", e.target.value)} className="h-7 text-xs text-right" />
                     </td>
                     <td className="p-1">
-                      <Input type="number" value={bill.paidAmount} onChange={e => updateBill(idx, "paidAmount", e.target.value)} className="h-7 text-xs text-right" />
+                      <Input type="number" min="0" step="0.01" value={bill.paidAmount} onChange={e => updateBill(idx, "paidAmount", e.target.value)} className="h-7 text-xs text-right" />
                     </td>
                     <td className="p-1">
-                      <Input type="number" value={bill.remainingBalance} onChange={e => updateBill(idx, "remainingBalance", e.target.value)} className="h-7 text-xs text-right" />
+                      <Input type="number" min="0" step="0.01" value={bill.remainingBalance} onChange={e => updateBill(idx, "remainingBalance", e.target.value)} className="h-7 text-xs text-right" />
                     </td>
                     <td className="p-1">
                       <Input type="date" value={bill.dueDate} onChange={e => updateBill(idx, "dueDate", e.target.value)} className="h-7 text-xs" />
@@ -1221,9 +1241,11 @@ export function PaymentVoucher() {
                                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(voucher); }}>
                                       <Edit className="h-4 w-4 mr-2" /> Edit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusUpdate(voucher.id, "Paid"); }}>
-                                      <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
-                                    </DropdownMenuItem>
+                                    {voucher.status !== "Paid" && (
+                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusUpdate(voucher.id, "Paid"); }}>
+                                        <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
+                                      </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem
                                       onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(voucher.id); }}
                                       className="text-destructive"
@@ -1415,18 +1437,22 @@ export function PaymentVoucher() {
                 )}
 
                 <div className="flex flex-col space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={cn("grid gap-3", selectedVoucher.status !== "Paid" ? "grid-cols-2" : "grid-cols-1")}>
                     <Button className="btn-primary" onClick={() => { setIsDetailsOpen(false); openEdit(selectedVoucher); }}>
                       <Edit className="h-4 w-4 mr-2" /> Edit Voucher
                     </Button>
-                    <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Paid")}>
-                      <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
-                    </Button>
+                    {selectedVoucher.status !== "Paid" && (
+                      <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Paid")}>
+                        <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
+                      </Button>
+                    )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Partial")}>
-                      <Clock className="h-4 w-4 mr-2" /> Mark Partial
-                    </Button>
+                  <div className={cn("grid gap-3", selectedVoucher.status !== "Paid" ? "grid-cols-2" : "grid-cols-1")}>
+                    {selectedVoucher.status !== "Paid" && (
+                      <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Partial")}>
+                        <Clock className="h-4 w-4 mr-2" /> Mark Partial
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       className="text-destructive border-destructive hover:bg-destructive/10"

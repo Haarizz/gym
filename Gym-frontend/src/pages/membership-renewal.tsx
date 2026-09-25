@@ -220,9 +220,16 @@ interface MembershipRenewalProps {
 }
 
 export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
-    const location = useLocation();
+  const location = useLocation();
   const navMemberId: number | null = (location.state as any)?.memberId ?? null;
-  const [mainTab, setMainTab] = useState<'details' | 'renewal' | 'payments' | 'history'>('details');
+  const [mainTab, setMainTab] = useState<'details' | 'renewal' | 'payments' | 'history'>((location.state as any)?.tab || 'details');
+
+  useEffect(() => {
+    if ((location.state as any)?.tab) {
+      setMainTab((location.state as any).tab);
+    }
+  }, [location.state]);
+
   const [showRenewalSheet, setShowRenewalSheet] = useState(false);
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const [showFreezeSheet, setShowFreezeSheet] = useState(false);

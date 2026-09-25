@@ -7901,6 +7901,61 @@ html {
     background-color: var(--gymbios-error);
   }
 
+  /* bg-gymbios-success / -warning / -error (plus /10 opacity and text- variants)
+     — used by payment-voucher.tsx's status badges and summary-card icon tiles.
+     These were never generated here (only the shorter .bg-success/.status-success
+     aliases above exist), so they rendered as invisible white-on-transparent
+     text instead of a colored badge/icon. See docs/bug BG_51. */
+  .bg-gymbios-success {
+    background-color: var(--gymbios-success);
+  }
+
+  .bg-gymbios-warning {
+    background-color: var(--gymbios-warning);
+  }
+
+  .bg-gymbios-error {
+    background-color: var(--gymbios-error);
+  }
+
+  .text-gymbios-success {
+    color: var(--gymbios-success);
+  }
+
+  .text-gymbios-warning {
+    color: var(--gymbios-warning);
+  }
+
+  .text-gymbios-error {
+    color: var(--gymbios-error);
+  }
+
+  .bg-gymbios-success\/10 {
+    background-color: var(--gymbios-success);
+  }
+
+  .bg-gymbios-warning\/10 {
+    background-color: var(--gymbios-warning);
+  }
+
+  .bg-gymbios-error\/10 {
+    background-color: var(--gymbios-error);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-gymbios-success\/10 {
+      background-color: color-mix(in oklab, var(--gymbios-success) 10%, transparent);
+    }
+
+    .bg-gymbios-warning\/10 {
+      background-color: color-mix(in oklab, var(--gymbios-warning) 10%, transparent);
+    }
+
+    .bg-gymbios-error\/10 {
+      background-color: color-mix(in oklab, var(--gymbios-error) 10%, transparent);
+    }
+  }
+
   .top-nav {
     background-color: var(--gymbios-white);
     border-bottom: 2px solid var(--gymbios-primary);

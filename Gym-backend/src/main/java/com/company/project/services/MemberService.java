@@ -30,6 +30,8 @@ import com.company.project.repositories.UserBranchRepository;
 import com.company.project.controlplane.repositories.UserDirectoryRepository;
 import com.company.project.controlplane.entities.UserDirectoryEntry;
 import com.company.project.security.TenantContextHolder;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.context.annotation.Lazy;
@@ -71,6 +73,9 @@ public class MemberService {
     private final BranchService branchService;
     private final UserBranchRepository userBranchRepository;
     private final UserDirectoryRepository userDirectoryRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public MemberService(MemberRepository memberRepository,
                          MembershipPlanRepository planRepository,
@@ -131,10 +136,20 @@ public class MemberService {
      * Mobile Cash/Credit/Mixed purchases awaiting reception approval — backs the
      * web app's Approvals tab. See MobileDiscoveryController.purchaseMembership for
      * how a member lands in this state.
+     *
+     * Deliberately cross-branch: the "Payment awaiting approval" notification that
+     * points staff here (NotificationService.notifyRoles in purchaseMembership) is
+     * fired with no branch_id, i.e. every ADMIN/MANAGER/RECEPTIONIST sees it
+     * regardless of which branch they currently have active. This table must match
+     * that scope, or a receptionist viewing one branch sees the notification but an
+     * empty/zero Approvals page for a purchase made at another branch (BG_66) —
+     * disable BranchFilterAspect's session-level filter for this one read so it
+     * isn't silently narrowed to entityManager's active branch.
      */
     @Transactional(readOnly = true)
     public MembersPageResponseDTO getPendingApprovals(int page, int limit) {
         Pageable pageable = PageRequest.of(page - 1, limit);
+        entityManager.unwrap(org.hibernate.Session.class).disableFilter("branchFilter");
         Page<Member> memberPage = memberRepository.findByApprovalStatusOrderByJoinDateDesc("PENDING", pageable);
 
         List<MemberResponseDTO> dtos = memberPage.getContent().stream()
@@ -153,8 +168,13 @@ public class MemberService {
     /**
      * Reception/admin approves a mobile Cash/Credit/Mixed purchase: unlocks the
      * member's app access and posts the deferred receipt to the General Ledger.
+     *
+     * Filter disabled for the same cross-branch reason as getPendingApprovals: the
+     * member being approved may belong to a branch other than the approver's
+     * currently active one (see BG_66).
      */
     public MemberResponseDTO approveMemberPayment(Long memberId, String approvedBy) {
+        entityManager.unwrap(org.hibernate.Session.class).disableFilter("branchFilter");
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
         if (!"PENDING".equals(member.getApprovalStatus())) {
@@ -186,8 +206,11 @@ public class MemberService {
      * Reception/admin rejects a mobile Cash/Credit/Mixed purchase: the member stays
      * locked out and their membership is marked inactive rather than left "Active"
      * with no valid payment behind it.
+     *
+     * Filter disabled for the same cross-branch reason as getPendingApprovals (BG_66).
      */
     public MemberResponseDTO rejectMemberPayment(Long memberId, String rejectedBy, String reason) {
+        entityManager.unwrap(org.hibernate.Session.class).disableFilter("branchFilter");
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
         if (!"PENDING".equals(member.getApprovalStatus())) {
@@ -1398,10 +1421,15 @@ public class MemberService {
                 // member past its end date as "Expired" regardless of the stored value.
                 Expression<LocalDateTime> effectiveEndDate =
                         cb.coalesce(root.get("membershipEndDate"), root.get("expiryDate"));
+                
+                LocalDateTime startOfToday = LocalDateTime.now().toLocalDate().atStartOfDay();
+                
                 Predicate expiredByDate = cb.and(
-                        cb.notEqual(root.get("membershipStatus"), "pending_approval"),
+                        cb.notEqual(cb.lower(root.get("membershipStatus")), "pending_approval"),
+                        cb.notEqual(cb.lower(root.get("membershipStatus")), "frozen"),
+                        cb.notEqual(cb.lower(root.get("membershipStatus")), "suspended"),
                         cb.isNotNull(effectiveEndDate),
-                        cb.lessThan(effectiveEndDate, LocalDateTime.now())
+                        cb.lessThan(effectiveEndDate, startOfToday)
                 );
                 if ("expired".equalsIgnoreCase(status)) {
                     predicates.add(cb.or(cb.equal(root.get("membershipStatus"), status), expiredByDate));

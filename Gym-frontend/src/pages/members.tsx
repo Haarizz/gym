@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -132,7 +132,27 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // search input never unmounts (and loses focus) while the user is typing.
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState((location.state as any)?.tab || initialTab);
+  
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.tab) {
+      setActiveTab(state.tab);
+    }
+    if (state?.tab === 'renewals' && state?.memberId) {
+      membersService.getMemberById(String(state.memberId)).then(member => {
+        if (member) {
+          setSelectedMemberForRenewal(member);
+          setRenewalSearchTerm(member.name);
+          setShowSuggestions(false);
+          setSelectedNewPlan(null);
+          setOperationType(null);
+        }
+      }).catch(console.error);
+    }
+  }, [location.state]);
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
