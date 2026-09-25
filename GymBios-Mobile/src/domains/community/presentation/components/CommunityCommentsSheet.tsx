@@ -16,13 +16,24 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet, EmptyState, Loader, Typography } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
 import { useAuthStore } from '@/domains/auth';
-import { useCommunityComments } from '../../hooks/useCommunity';
+import { useCommunityComments, useCommunityMode } from '../../hooks/useCommunity';
 import {
   useAddCommunityComment,
   useDeleteCommunityComment,
+  useModerateCommunityComment,
+  useReportCommunityComment,
 } from '../../hooks/useCommunityActions';
+import type { CommunityComment } from '../../domain/community.types';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+
+/** Why a member can't comment at their selected gym (codes from the server). */
+const BLOCKED_REASONS: Record<string, string> = {
+  NOT_A_MEMBER: 'Only members of your selected gym can comment.',
+  APP_ACCESS_PENDING: 'You can comment once your membership is approved.',
+  GYM_CONTEXT_REQUIRED: 'Select one of your gyms to comment.',
+  MEMBERSHIP_UNDETERMINED: 'Your membership couldn\'t be confirmed.',
+};
 
 interface CommunityCommentsSheetProps {
   postId: number | null;
@@ -50,6 +61,44 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
 
   const addMutation = useAddCommunityComment();
   const deleteMutation = useDeleteCommunityComment();
+  const moderateMutation = useModerateCommunityComment();
+  const reportMutation = useReportCommunityComment();
+  const { mode, config } = useCommunityMode();
+  const commentBlocked = mode === 'global' && config != null && !config.canComment;
+  const blockedMessage = config?.readOnly
+    ? 'The Community is read-only right now.'
+    : BLOCKED_REASONS[config?.postingBlockedReason ?? ''] ?? 'Commenting isn\'t available right now.';
+
+  const handleModerate = useCallback(
+    (comment: CommunityComment, action: 'hide' | 'restore') => {
+      if (!postId) return;
+      const scopes = action === 'hide' ? comment.capabilities?.hideScopes : comment.capabilities?.restoreScopes;
+      moderateMutation.mutate(
+        { postId, commentId: comment.id, action, scope: scopes?.[0] },
+        { onError: () => toast.error('Could not update the comment.', { title: 'Error' }) },
+      );
+    },
+    [moderateMutation, postId],
+  );
+
+  const handleReport = useCallback(
+    (commentId: number) => {
+      const send = (reason: 'SPAM' | 'HARASSMENT') =>
+        reportMutation.mutate(
+          { commentId, reason },
+          {
+            onSuccess: () => toast.success('Thanks — the gym\'s moderators will review it.', { title: 'Reported' }),
+            onError: () => toast.error('Could not send the report.', { title: 'Error' }),
+          },
+        );
+      Alert.alert('Report comment', 'What\'s wrong with this comment?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Spam', onPress: () => send('SPAM') },
+        { text: 'Abusive', onPress: () => send('HARASSMENT') },
+      ]);
+    },
+    [reportMutation],
+  );
 
   const handleSend = useCallback(() => {
     if (!postId || !commentText.trim()) return;
@@ -116,7 +165,9 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
       ) : (
         <View style={styles.commentsList}>
           {comments.map((comment) => {
-            const isOwn = user?.id != null && Number(user.id) === comment.authorUserId;
+            // Global API: server-computed; legacy API: previous rule.
+            const caps = comment.capabilities;
+            const isOwn = caps ? caps.canDelete : user?.id != null && Number(user.id) === comment.authorUserId;
             const initials = comment.authorUsername?.slice(0, 2).toUpperCase() ?? '??';
             const timeAgo = comment.createdAt
               ? formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })
@@ -137,7 +188,42 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
                   <Typography variant="bodySmall" color="textSecondary">
                     {comment.content}
                   </Typography>
+                  {comment.hidden && (
+                    <Typography variant="caption" color="textSecondary" style={{ fontStyle: 'italic' }}>
+                      Hidden by gym moderators
+                    </Typography>
+                  )}
                 </View>
+                {caps && caps.restoreScopes.length > 0 && (
+                  <Pressable
+                    onPress={() => handleModerate(comment, 'restore')}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
+                    accessibilityLabel="Restore comment"
+                  >
+                    <Feather name="eye" size={14} color={theme.textSecondary} />
+                  </Pressable>
+                )}
+                {caps && caps.hideScopes.length > 0 && (
+                  <Pressable
+                    onPress={() => handleModerate(comment, 'hide')}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
+                    accessibilityLabel="Hide comment"
+                  >
+                    <Feather name="eye-off" size={14} color={theme.textSecondary} />
+                  </Pressable>
+                )}
+                {caps?.canReport && (
+                  <Pressable
+                    onPress={() => handleReport(comment.id)}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
+                    accessibilityLabel="Report comment"
+                  >
+                    <Feather name="flag" size={14} color={theme.textSecondary} />
+                  </Pressable>
+                )}
                 {isOwn && (
                   <Pressable
                     onPress={() => handleDeleteComment(comment.id)}
@@ -155,6 +241,13 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
       )}
 
       {/* Input */}
+      {commentBlocked ? (
+        <View style={[styles.inputRow, { borderTopColor: theme.border }]}>
+          <Typography variant="caption" color="textSecondary">
+            {blockedMessage}
+          </Typography>
+        </View>
+      ) : (
       <View style={[styles.inputRow, { borderTopColor: theme.border }]}>
         <TextInput
           style={[styles.input, { backgroundColor: theme.muted, color: theme.text }]}
@@ -185,6 +278,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
           )}
         </Pressable>
       </View>
+      )}
     </AppBottomSheet>
   );
 }

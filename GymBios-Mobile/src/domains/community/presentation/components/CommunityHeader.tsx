@@ -6,10 +6,14 @@ import { useRouter } from 'expo-router';
 
 import { Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components';
+import { useCommunityMode } from '../../hooks/useCommunity';
 
 export function CommunityHeader() {
   const { headerColors, primaryColor } = useCommunityTheme();
   const router = useRouter();
+  // The global Community is one community across every GymBios gym, not the selected gym's.
+  const { mode } = useCommunityMode();
+  const isGlobal = mode === 'global';
 
   return (
     <LinearGradient
@@ -32,11 +36,11 @@ export function CommunityHeader() {
 
         <View style={styles.titleContainer}>
           <Typography variant="bodySmallBold" style={styles.title}>
-            Community
+            {isGlobal ? 'GymBios Community' : 'Community'}
           </Typography>
 
           <Typography variant="caption" style={styles.subtitle}>
-            Connect · Share · Inspire
+            {isGlobal ? 'One community across GymBios gyms' : 'Connect · Share · Inspire'}
           </Typography>
         </View>
 

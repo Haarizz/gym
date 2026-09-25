@@ -60,9 +60,14 @@ public final class GlobalCommunityDtos {
                          List<String> imageTypes, List<String> postTypes, List<String> aspectRatios,
                          List<String> reportReasons) {}
 
-    /** What the calling client may show; safe to call even when the Community is off. */
+    /**
+     * What the calling client may show; safe to call even when the Community is off.
+     * postingGym* describe the gym the caller would post as (checked exactly like a
+     * real post); postingBlockedReason is the refusal code when they can't.
+     */
     public record ClientConfig(boolean available, boolean readOnly, boolean canPost, boolean canComment,
-                               boolean canLike, boolean canReport, boolean moderation, Limits limits) {}
+                               boolean canLike, boolean canReport, boolean moderation, Limits limits,
+                               String postingGymSlug, String postingGymName, String postingBlockedReason) {}
 
     // ── Requests ────────────────────────────────────────────────────────────
 

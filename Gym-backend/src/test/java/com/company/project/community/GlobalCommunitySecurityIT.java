@@ -399,4 +399,23 @@ class GlobalCommunitySecurityIT {
         assertTrue(seen.containsAll(created), "every created post appears exactly once");
         assertTrue(pages >= 3, "7+ posts at 3 per page need at least 3 pages");
     }
+
+    @Test
+    void configReportsThePostingGymExactlyAsAPostWouldBeChecked() {
+        h.asJohn();
+        var ok = h.community.clientConfig(mobile("gym-a"));
+        assertTrue(ok.canPost());
+        assertEquals("gym-a", ok.postingGymSlug());
+        assertEquals("FitZone A", ok.postingGymName());
+
+        h.asJessica();
+        var blocked = h.community.clientConfig(mobile("gym-a"));
+        assertFalse(blocked.canPost());
+        assertFalse(blocked.canComment());
+        assertTrue(blocked.canLike(), "liking needs no membership (C3)");
+        assertEquals("NOT_A_MEMBER", blocked.postingBlockedReason());
+
+        h.asPending();
+        assertEquals("APP_ACCESS_PENDING", h.community.clientConfig(mobile("gym-a")).postingBlockedReason());
+    }
 }

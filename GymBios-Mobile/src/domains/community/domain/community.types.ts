@@ -1,8 +1,38 @@
+/**
+ * Which backend API serves the Community. 'global' is the GymBios-wide
+ * Community (/api/mobile/community); 'legacy' is the old gym-scoped API, used
+ * whenever the global one isn't available (older backends, before rollout).
+ */
+export type CommunityApiMode = 'legacy' | 'global';
+
 export interface CommunityPostImage {
-  dataUrl: string;
+  /** Inline data: URL (legacy API only). */
+  dataUrl: string | null;
+  /** Authenticated image URL (global API only). */
+  uri?: string;
+  headers?: Record<string, string>;
   aspectRatio: string;
   cropPosition: number | null;
   cropZoom: number | null;
+}
+
+/** Server-computed actions for the current viewer (global API only). The server still enforces every one. */
+export interface CommunityPostCapabilities {
+  canLike: boolean;
+  canComment: boolean;
+  canReport: boolean;
+  canArchive: boolean;
+  canUnarchive: boolean;
+  canDelete: boolean;
+  canHide: boolean;
+  canRestore: boolean;
+}
+
+export interface CommunityCommentCapabilities {
+  canDelete: boolean;
+  canReport: boolean;
+  hideScopes: string[];
+  restoreScopes: string[];
 }
 
 export interface CommunityPost {
@@ -19,6 +49,13 @@ export interface CommunityPost {
   authorRoles: string[];
   createdAt: string;
   archived: boolean;
+  /** Global API only: ownership computed by the server (never compare user IDs across identity spaces). */
+  isMine?: boolean;
+  capabilities?: CommunityPostCapabilities;
+  status?: 'ACTIVE' | 'ARCHIVED' | 'HIDDEN';
+  visibility?: 'PUBLIC' | 'GYM';
+  authorGymName?: string | null;
+  authorBranchName?: string | null;
 }
 
 export interface CommunityComment {
@@ -29,6 +66,10 @@ export interface CommunityComment {
   authorUsername: string;
   authorRoles: string[];
   createdAt: string;
+  /** Global API only. */
+  isMine?: boolean;
+  hidden?: boolean;
+  capabilities?: CommunityCommentCapabilities;
 }
 
 export interface TypeBreakdown {
@@ -77,6 +118,8 @@ export interface PaginationInfo {
 export interface CommunityPostsPageResponse {
   posts: CommunityPost[];
   pagination: PaginationInfo;
+  /** Next page token: a page number (legacy) or an opaque cursor (global); null/undefined when there are no more. */
+  nextPageParam?: number | string | null;
 }
 
 export interface CreateCommunityPostRequest {
@@ -96,4 +139,30 @@ export interface CreateCommunityCommentRequest {
 export interface ToggleCommunityLikeResponse {
   liked: boolean;
   likeCount: number;
+}
+
+export type CommunityReportReason = 'SPAM' | 'HARASSMENT' | 'HATE' | 'NUDITY' | 'VIOLENCE' | 'SELF_HARM' | 'OTHER';
+
+export interface CommunityLimits {
+  topic: number;
+  post: number;
+  comment: number;
+  imageBytes: number;
+  imageDimension: number;
+  imageTypes: string[];
+}
+
+/** What the global Community lets this user do right now (GET /mobile/community/config). */
+export interface CommunityClientConfig {
+  available: boolean;
+  readOnly: boolean;
+  canPost: boolean;
+  canComment: boolean;
+  canLike: boolean;
+  canReport: boolean;
+  moderation: boolean;
+  limits: CommunityLimits;
+  postingGymSlug: string | null;
+  postingGymName: string | null;
+  postingBlockedReason: string | null;
 }

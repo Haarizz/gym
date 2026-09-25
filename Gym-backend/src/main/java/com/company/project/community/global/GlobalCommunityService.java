@@ -201,9 +201,23 @@ public class GlobalCommunityService {
                 CommunityContentValidator.MAX_IMAGE_BYTES, CommunityContentValidator.MAX_IMAGE_DIMENSION,
                 List.of("image/jpeg", "image/png"), sorted(CommunityContentValidator.POST_TYPES),
                 sorted(CommunityContentValidator.ASPECT_RATIOS), sorted(CommunityContentValidator.REPORT_REASONS));
+        String postingSlug = null;
+        String postingName = null;
+        String blocked = null;
+        if (available) {
+            try {
+                GymContext ctx = gymContexts.resolveForWrite(actor, requestedGym(actor, null, req));
+                postingSlug = ctx.tenantSlug();
+                postingName = ctx.gymName();
+            } catch (CommunityException e) {
+                blocked = e.getCode();
+            }
+        }
+        boolean canWriteThere = blocked == null;
         return new GlobalCommunityDtos.ClientConfig(available, available && !open,
-                open && writer && s.opPost(), open && writer && s.opComment(), open && writer && s.opLike(),
-                open && writer && s.opReport() && s.reports(), available && s.moderation() && actor.isTenant(), limits);
+                open && writer && canWriteThere && s.opPost(), open && writer && canWriteThere && s.opComment(),
+                open && writer && s.opLike(), open && writer && s.opReport() && s.reports(),
+                available && s.moderation() && actor.isTenant(), limits, postingSlug, postingName, blocked);
     }
 
     // ── Posts ───────────────────────────────────────────────────────────────

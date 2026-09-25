@@ -21,11 +21,25 @@ import {
   useDeleteCommunityPost,
   useArchiveCommunityPost,
   useUnarchiveCommunityPost,
+  useReportCommunityPost,
+  useModerateCommunityPost,
 } from '../../hooks/useCommunityActions';
-import type { CommunityPost } from '../../domain/community.types';
+import type { CommunityPost, CommunityReportReason } from '../../domain/community.types';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
-// Roles that are permitted to moderate (archive/unarchive) posts.
+// Legacy API only: roles shown archive/unarchive. The global API sends
+// server-computed capabilities instead, and the server enforces every action.
 const MODERATOR_ROLES = ['admin', 'staff'] as const;
+
+export const REPORT_REASONS: { value: CommunityReportReason; label: string }[] = [
+  { value: 'SPAM', label: 'Spam' },
+  { value: 'HARASSMENT', label: 'Harassment or bullying' },
+  { value: 'HATE', label: 'Hate speech' },
+  { value: 'NUDITY', label: 'Nudity or sexual content' },
+  { value: 'VIOLENCE', label: 'Violence' },
+  { value: 'SELF_HARM', label: 'Self-harm' },
+  { value: 'OTHER', label: 'Something else' },
+];
 
 /** Returns a display colour for a given post type. */
 function getTypeColor(type: string, primaryColor: string): string {
@@ -68,14 +82,19 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
   const appRole = useAuthStore((s) => s.appRole);
 
   const [actionsVisible, setActionsVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
 
   const likeMutation = useToggleCommunityLike();
   const deleteMutation = useDeleteCommunityPost();
   const archiveMutation = useArchiveCommunityPost();
   const unarchiveMutation = useUnarchiveCommunityPost();
+  const reportMutation = useReportCommunityPost();
+  const moderateMutation = useModerateCommunityPost();
 
-  const isOwnPost = user?.id != null && Number(user.id) === post.authorUserId;
-  const isModerator = appRole != null && (MODERATOR_ROLES as readonly string[]).includes(appRole);
+  // Global API: the server says what this viewer may do. Legacy API: previous rules.
+  const caps = post.capabilities;
+  const isOwnPost = post.isMine ?? (user?.id != null && Number(user.id) === post.authorUserId);
+  const isModerator = !caps && appRole != null && (MODERATOR_ROLES as readonly string[]).includes(appRole);
 
   const isPendingLike = likeMutation.isPending;
 
@@ -91,14 +110,35 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
 
   const handleLike = useCallback(() => {
     if (isPendingLike) return;
-    likeMutation.mutate(post.id);
-  }, [isPendingLike, likeMutation, post.id]);
+    likeMutation.mutate({ postId: post.id, liked: post.likedByMe });
+  }, [isPendingLike, likeMutation, post.id, post.likedByMe]);
 
   const handleActions = useCallback(() => {
     setActionsVisible(true);
   }, []);
 
-  const showActionsMenu = isOwnPost || isModerator;
+  const showActionsMenu = caps
+    ? caps.canDelete || caps.canArchive || caps.canUnarchive || caps.canHide || caps.canRestore || caps.canReport
+    : isOwnPost || isModerator;
+
+  const handleReport = (reason: CommunityReportReason) => {
+    setReportVisible(false);
+    reportMutation.mutate(
+      { postId: post.id, reason },
+      {
+        onSuccess: () => toast.success('Thanks — the gym\'s moderators will review it.', { title: 'Reported' }),
+        onError: () => toast.error('Could not send the report.', { title: 'Error' }),
+      },
+    );
+  };
+
+  const handleModerate = (action: 'hide' | 'restore') => {
+    setActionsVisible(false);
+    moderateMutation.mutate(
+      { postId: post.id, action },
+      { onError: (err) => toast.error((err as Error)?.message ?? 'Could not update the post.', { title: 'Error' }) },
+    );
+  };
 
   return (
     <View
@@ -114,42 +154,133 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
         title="Post Actions"
         onClose={() => setActionsVisible(false)}
       >
-        <View style={styles.actionsList}>
-          {isOwnPost && (
-            <Pressable
-              style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
-              onPress={() => {
-                setActionsVisible(false);
-                Alert.alert('Delete Post', 'This action cannot be undone.', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(post.id) },
-                ]);
-              }}
-            >
-              <Feather name="trash-2" size={20} color={theme.error} />
-              <Typography variant="body" color="error">Delete Post</Typography>
-            </Pressable>
-          )}
-
-          {isModerator && (
-            <Pressable
-              style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
-              onPress={() => {
-                setActionsVisible(false);
-                if (post.archived) {
-                  unarchiveMutation.mutate(post.id);
-                } else {
-                  Alert.alert('Archive Post', 'Hide this post from the main feed?', [
+        {caps ? (
+          <View style={styles.actionsList}>
+            {caps.canHide && (
+              <Pressable
+                style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
+                onPress={() => {
+                  setActionsVisible(false);
+                  Alert.alert('Hide Post', 'Hide this post from the GymBios Community? Your gym can restore it later.', [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Archive', onPress: () => archiveMutation.mutate(post.id) },
+                    { text: 'Hide', style: 'destructive', onPress: () => handleModerate('hide') },
                   ]);
-                }
-              }}
+                }}
+              >
+                <Feather name="eye-off" size={20} color={theme.text} />
+                <Typography variant="body">Hide Post</Typography>
+              </Pressable>
+            )}
+            {caps.canRestore && (
+              <Pressable
+                style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
+                onPress={() => handleModerate('restore')}
+              >
+                <Feather name="eye" size={20} color={theme.text} />
+                <Typography variant="body">Restore Post</Typography>
+              </Pressable>
+            )}
+            {(caps.canArchive || caps.canUnarchive) && (
+              <Pressable
+                style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
+                onPress={() => {
+                  setActionsVisible(false);
+                  if (caps.canUnarchive) {
+                    unarchiveMutation.mutate(post.id);
+                  } else {
+                    archiveMutation.mutate(post.id);
+                  }
+                }}
+              >
+                <Feather name="archive" size={20} color={theme.text} />
+                <Typography variant="body">{caps.canUnarchive ? 'Unarchive Post' : 'Archive Post'}</Typography>
+              </Pressable>
+            )}
+            {caps.canReport && (
+              <Pressable
+                style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
+                onPress={() => {
+                  setActionsVisible(false);
+                  setReportVisible(true);
+                }}
+              >
+                <Feather name="flag" size={20} color={theme.text} />
+                <Typography variant="body">Report Post</Typography>
+              </Pressable>
+            )}
+            {caps.canDelete && (
+              <Pressable
+                style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
+                onPress={() => {
+                  setActionsVisible(false);
+                  Alert.alert('Delete Post', 'This action cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(post.id) },
+                  ]);
+                }}
+              >
+                <Feather name="trash-2" size={20} color={theme.error} />
+                <Typography variant="body" color="error">Delete Post</Typography>
+              </Pressable>
+            )}
+          </View>
+        ) : (
+          <View style={styles.actionsList}>
+            {isOwnPost && (
+              <Pressable
+                style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
+                onPress={() => {
+                  setActionsVisible(false);
+                  Alert.alert('Delete Post', 'This action cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(post.id) },
+                  ]);
+                }}
+              >
+                <Feather name="trash-2" size={20} color={theme.error} />
+                <Typography variant="body" color="error">Delete Post</Typography>
+              </Pressable>
+            )}
+
+            {isModerator && (
+              <Pressable
+                style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
+                onPress={() => {
+                  setActionsVisible(false);
+                  if (post.archived) {
+                    unarchiveMutation.mutate(post.id);
+                  } else {
+                    Alert.alert('Archive Post', 'Hide this post from the main feed?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Archive', onPress: () => archiveMutation.mutate(post.id) },
+                    ]);
+                  }
+                }}
+              >
+                <Feather name="archive" size={20} color={theme.text} />
+                <Typography variant="body">{post.archived ? 'Unarchive Post' : 'Archive Post'}</Typography>
+              </Pressable>
+            )}
+          </View>
+        )}
+      </AppBottomSheet>
+
+      {/* Report reasons */}
+      <AppBottomSheet
+        visible={reportVisible}
+        title="Why are you reporting this post?"
+        onClose={() => setReportVisible(false)}
+      >
+        <View style={styles.actionsList}>
+          {REPORT_REASONS.map((r) => (
+            <Pressable
+              key={r.value}
+              style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
+              onPress={() => handleReport(r.value)}
             >
-              <Feather name="archive" size={20} color={theme.text} />
-              <Typography variant="body">{post.archived ? 'Unarchive Post' : 'Archive Post'}</Typography>
+              <Typography variant="body">{r.label}</Typography>
             </Pressable>
-          )}
+          ))}
         </View>
       </AppBottomSheet>
 
@@ -169,8 +300,8 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
               </View>
             )}
           </View>
-          <Typography variant="caption" color="textSecondary">
-            {timeAgo}
+          <Typography variant="caption" color="textSecondary" numberOfLines={1}>
+            {post.authorGymName ? `${post.authorGymName} · ${timeAgo}` : timeAgo}
           </Typography>
         </View>
 
@@ -207,7 +338,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
       </Typography>
 
       {/* Image */}
-      {post.image?.dataUrl ? (
+      {post.image?.uri || post.image?.dataUrl ? (
         <View
           style={[
             styles.imageWrap,
@@ -215,13 +346,27 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
           ]}
         >
           <Image
-            source={{ uri: post.image.dataUrl }}
+            source={
+              post.image.uri
+                ? { uri: post.image.uri, headers: post.image.headers }
+                : { uri: post.image.dataUrl ?? undefined }
+            }
             style={styles.image}
             resizeMode="cover"
             accessibilityLabel="Post image"
           />
         </View>
       ) : null}
+
+      {/* Hidden label (global API: visible only to the author and the gym's moderators) */}
+      {post.status === 'HIDDEN' && (
+        <View style={styles.archivedBanner}>
+          <Feather name="eye-off" size={12} color={theme.textSecondary} />
+          <Typography variant="caption" color="textSecondary" style={{ marginLeft: 4 }}>
+            Hidden by gym moderators
+          </Typography>
+        </View>
+      )}
 
       {/* Archived label */}
       {post.archived && (
@@ -238,7 +383,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
         <Pressable
           style={({ pressed }) => [styles.interactionBtn, pressed && styles.interactionPressed]}
           onPress={handleLike}
-          disabled={isPendingLike}
+          disabled={isPendingLike || (caps ? !caps.canLike : false)}
           accessibilityLabel={post.likedByMe ? 'Unlike' : 'Like'}
           hitSlop={12}
         >

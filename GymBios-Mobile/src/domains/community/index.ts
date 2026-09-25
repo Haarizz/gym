@@ -12,12 +12,18 @@ export type {
   CreateCommunityPostRequest,
   CreateCommunityCommentRequest,
   ToggleCommunityLikeResponse,
+  CommunityApiMode,
+  CommunityClientConfig,
+  CommunityPostCapabilities,
+  CommunityCommentCapabilities,
+  CommunityReportReason,
 } from './domain/community.types';
 
 export type { CommunityRepository } from './application/CommunityRepository';
 export { CommunityService } from './application/CommunityService';
 
 export { ApiCommunityRepository } from './infrastructure/ApiCommunityRepository';
+export { ApiGlobalCommunityRepository } from './infrastructure/ApiGlobalCommunityRepository';
 
 export {
   communityKeys,
@@ -26,6 +32,8 @@ export {
   useCommunityLeaderboard,
   useCommunityFeed,
   useCommunityComments,
+  useCommunityConfig,
+  useCommunityMode,
 } from './hooks/useCommunity';
 
 export {
@@ -36,6 +44,10 @@ export {
   useDeleteCommunityComment,
   useArchiveCommunityPost,
   useUnarchiveCommunityPost,
+  useReportCommunityPost,
+  useReportCommunityComment,
+  useModerateCommunityPost,
+  useModerateCommunityComment,
 } from './hooks/useCommunityActions';
 
 // Presentation screens (consumed by Expo Router route files)
