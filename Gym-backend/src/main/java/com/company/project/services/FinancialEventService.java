@@ -715,12 +715,16 @@ public class FinancialEventService {
                         + (voucher.getMemberName() != null ? " — " + voucher.getMemberName() : "")));
         lines.add(cr(revenueCode, revenueName, amount, "Manual receipt — " + voucher.getSourceCategory()));
 
-        LocalDate date = voucher.getDate() != null ? voucher.getDate() : LocalDate.now();
-
+        // Deliberately LocalDate.now() rather than voucher.getDate() — the latter is
+        // a user-editable "Voucher Date" field on the Receipt Voucher form that can
+        // sit unchanged for a while before someone finally marks the voucher
+        // "completed" (which is what triggers this post). The journal entry's date
+        // must reflect when it was actually posted to the books, not whatever stale
+        // date happened to be on the form at that moment.
         JournalVoucher jv = createAndPost(
                 "Receipt Voucher: " + voucher.getVoucherNo()
                 + (voucher.getSource() != null ? " — " + voucher.getSource() : ""),
-                date, lines, "RECEIPT_VOUCHER");
+                LocalDate.now(), lines, "RECEIPT_VOUCHER");
 
         registerSource("ReceiptVoucher", voucher.getId(), "RECEIPT_VOUCHER", jv.getId());
     }

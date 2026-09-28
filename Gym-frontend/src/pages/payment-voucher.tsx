@@ -50,19 +50,10 @@ import {
   ChevronsUpDown
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
-import {
-  SplitPaymentFields, isSplitPaymentValid, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
-  EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
-} from "../components/shared/split-payment-fields";
-import type { SplitPaymentValue, SplitPaymentDetails } from "../components/shared/split-payment-fields";
 import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
-
-// Maps the Payment Method select value to the SplitPaymentValue key so a
-// single (non-Mixed) method's details can be validated/built by reusing the
-// same helpers Mixed Payment legs use.
-const PAYMENT_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
-  Cash: 'cash', Card: 'card', Cheque: 'cheque', 'Bank Transfer': 'bankTransfer', 'Digital Wallet': 'online'
-};
+import { usePaymentManager } from "../payments/usePaymentManager";
+import { PaymentAllocationPanel } from "../payments/PaymentAllocationPanel";
+import { PAYMENT_TYPES } from "../payments/paymentModel";
 
 interface PaymentVoucher {
   id: string;
@@ -110,12 +101,6 @@ interface PVForm {
   notes: string;
   bills: BillForm[];
 }
-
-// Method-specific details for Card ("Card") and Digital Wallet ("Digital
-// Wallet", the online-payment equivalent on this page) plus the ledger bank
-// account id backing the freetext Bank Account field for Bank Transfer —
-// reuses the same shape Mixed Payment legs use.
-const emptyMethodDetails: SplitPaymentDetails = { ...EMPTY_SPLIT_DETAILS };
 
 interface BillForm {
   billNo: string;
@@ -259,14 +244,29 @@ export function PaymentVoucher() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, searchQuery, selectedStatus, selectedDateRange, sortField, sortDirection, currentPage, itemsPerPage]);
 
+  // Mirrors loadVouchers' filter shape exactly (including the supplierType/
+  // category split for the "supplier" tab) so the summary cards, the table, and
+  // the Ledger Categories counts always describe the same filtered dataset —
+  // otherwise a Date Range filter with zero matches leaves the table/category
+  // counts at 0 while these cards keep showing unrelated global totals.
   const loadStats = useCallback(async () => {
     try {
-      const s = await paymentVoucherService.getStats();
+      const supplierType = selectedCategory === "supplier" ? "Supplier" : undefined;
+      const category = selectedCategory === "supplier" ? undefined : selectedCategory;
+      const s = await paymentVoucherService.getStats({
+        search: searchQuery || undefined,
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+        supplierType,
+        category: category !== "all" ? category : undefined,
+        from: selectedDateRange.from ? format(selectedDateRange.from, "yyyy-MM-dd") : undefined,
+        to: selectedDateRange.to ? format(selectedDateRange.to, "yyyy-MM-dd") : undefined,
+      });
       setSummaryData(s);
     } catch (err: any) {
       console.error("Failed to load payment voucher stats:", err);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, searchQuery, selectedStatus, selectedDateRange]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
 
@@ -299,10 +299,7 @@ export function PaymentVoucher() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PVForm>(emptyForm);
-  const [splitPayment, setSplitPayment] = useState<SplitPaymentValue>(EMPTY_SPLIT_PAYMENT);
-  const [splitDetails, setSplitDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
-  // Card Type / Digital Wallet details for the top-level (non-Mixed) Payment Method.
-  const [methodDetails, setMethodDetails] = useState<SplitPaymentDetails>(emptyMethodDetails);
+  const paymentManager = usePaymentManager({ invoiceTotal: parseFloat(form.amount) || 0 });
   const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierOpen, setSupplierOpen] = useState(false);
@@ -396,9 +393,7 @@ export function PaymentVoucher() {
 
   const openCreate = () => {
     setForm(emptyForm);
-    setSplitPayment(EMPTY_SPLIT_PAYMENT);
-    setSplitDetails(EMPTY_SPLIT_DETAILS);
-    setMethodDetails(emptyMethodDetails);
+    paymentManager.clearLines();
     setShowCreateDialog(true);
   };
 
@@ -427,79 +422,118 @@ export function PaymentVoucher() {
         status: b.status,
       })),
     });
+    paymentManager.clearLines();
+    // Rebuild allocation lines from the stored breakdown. A voucher created
+    // under the old Cheque/Bank Transfer tiles has no equivalent tender in
+    // the new model — fold either into an ONLINE line so the amount and
+    // reference aren't silently dropped when re-opened for editing.
     const legs = voucher.paymentBreakdown ?? [];
-    setSplitPayment({
-      cash: legs.find(l => l.method === "Cash")?.amount || 0,
-      card: legs.find(l => l.method === "Card")?.amount || 0,
-      cheque: legs.find(l => l.method === "Cheque")?.amount || 0,
-      bankTransfer: legs.find(l => l.method === "Bank Transfer")?.amount || 0,
-      online: legs.find(l => l.method === "Online Payment")?.amount || 0,
-    });
-    setSplitDetails(EMPTY_SPLIT_DETAILS);
-    setMethodDetails(emptyMethodDetails);
+    if (legs.length > 0) {
+      for (const leg of legs) {
+        if (leg.method === "Card") {
+          paymentManager.addLine({ paymentType: PAYMENT_TYPES.CARD, paymentSubtype: "Card", amount: leg.amount, reference: leg.reference ?? null });
+        } else if (leg.method === "Online Payment") {
+          paymentManager.addLine({ paymentType: PAYMENT_TYPES.ONLINE, amount: leg.amount, reference: leg.reference ?? null });
+        } else if (leg.method === "Cheque" || leg.method === "Bank Transfer") {
+          paymentManager.addLine({ paymentType: PAYMENT_TYPES.ONLINE, amount: leg.amount, reference: leg.reference ?? null });
+        } else {
+          paymentManager.addLine({ paymentType: PAYMENT_TYPES.CASH, amount: leg.amount });
+        }
+      }
+    } else if (voucher.amount > 0) {
+      const single = voucher.paymentMethod === "Card"
+        ? PAYMENT_TYPES.CARD
+        : (voucher.paymentMethod === "Digital Wallet" || voucher.paymentMethod === "Bank Transfer" || voucher.paymentMethod === "Cheque")
+          ? PAYMENT_TYPES.ONLINE
+          : PAYMENT_TYPES.CASH;
+      paymentManager.addLine(
+        single === PAYMENT_TYPES.CARD
+          ? { paymentType: single, paymentSubtype: "Card", amount: voucher.amount }
+          : { paymentType: single, amount: voucher.amount }
+      );
+    }
     setShowEditDialog(true);
   };
 
-  // Builds the payment_breakdown leg(s) for whatever's currently selected —
-  // several legs for Mixed, a single leg carrying the method's rich detail
-  // (card type, online payment type, ...) for Card/Digital Wallet, none for
-  // Cash/Cheque/Bank Transfer (those already have their own scalar fields).
-  const buildBreakdownForSubmit = (f: PVForm) => {
-    if (f.paymentMethod === "Mixed") {
-      return buildSplitPaymentBreakdown(splitPayment, splitDetails, bankAccounts);
+  // Derives payment_method/payment_breakdown from the allocation panel's
+  // lines: a single method sends its own name; two or more send "Mixed"
+  // plus a leg per line, each carrying its own reference/bank account detail.
+  const derivePaymentMethodAndBreakdown = () => {
+    const lines = paymentManager.paymentLines;
+    const methodLabelByType: Record<string, string> = {
+      [PAYMENT_TYPES.CASH]: 'Cash',
+      [PAYMENT_TYPES.CARD]: 'Card',
+      [PAYMENT_TYPES.ONLINE]: 'Digital Wallet',
+    };
+    if (lines.length === 0) {
+      return { paymentMethod: 'Cash', paymentBreakdown: undefined as any };
     }
-    const legKey = PAYMENT_METHOD_TO_LEG_KEY[f.paymentMethod];
-    if (legKey !== 'card' && legKey !== 'online') return undefined;
-    const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: parseFloat(f.amount) || 0 };
-    return buildSplitPaymentBreakdown(probe, methodDetails, bankAccounts);
+    if (lines.length === 1) {
+      const line = lines[0];
+      return {
+        paymentMethod: line.paymentType === PAYMENT_TYPES.CARD && line.paymentSubtype ? line.paymentSubtype : methodLabelByType[line.paymentType],
+        paymentBreakdown: undefined as any,
+      };
+    }
+    return {
+      paymentMethod: 'Mixed',
+      paymentBreakdown: lines.map(line => ({
+        method: line.paymentType === PAYMENT_TYPES.CARD && line.paymentSubtype ? line.paymentSubtype : methodLabelByType[line.paymentType],
+        amount: line.amount,
+        ...(line.reference ? { reference: line.reference } : {}),
+        ...(line.bankAccountName ? { bank_account_name: line.bankAccountName } : {}),
+      })),
+    };
   };
 
-  const toRequest = (f: PVForm): PaymentVoucherCreateRequest => ({
-    supplierName: f.supplierName,
-    supplierType: f.supplierType,
-    billNo: f.billNo || undefined,
-    paymentDate: f.paymentDate,
-    amount: parseFloat(f.amount) || 0,
-    paymentMethod: f.paymentMethod,
-    paymentBreakdown: buildBreakdownForSubmit(f),
-    status: f.status || "Pending",
-    description: f.description,
-    bankAccount: f.bankAccount || undefined,
-    chequeNo: f.chequeNo || undefined,
-    chequeDate: f.chequeDate || undefined,
-    notes: f.notes || undefined,
-    bills: f.bills.map(b => ({
-      billNo: b.billNo,
-      billDate: b.billDate,
-      originalAmount: parseFloat(b.originalAmount) || 0,
-      paidAmount: parseFloat(b.paidAmount) || 0,
-      remainingBalance: parseFloat(b.remainingBalance) || 0,
-      dueDate: b.dueDate,
-      status: b.status,
-    })),
-  });
+  const toRequest = (f: PVForm): PaymentVoucherCreateRequest => {
+    const { paymentMethod, paymentBreakdown } = derivePaymentMethodAndBreakdown();
+    return {
+      supplierName: f.supplierName,
+      supplierType: f.supplierType,
+      billNo: f.billNo || undefined,
+      paymentDate: f.paymentDate,
+      amount: parseFloat(f.amount) || 0,
+      paymentMethod,
+      paymentBreakdown,
+      status: f.status || "Pending",
+      description: f.description,
+      bankAccount: f.bankAccount || undefined,
+      notes: f.notes || undefined,
+      bills: f.bills.map(b => ({
+        billNo: b.billNo,
+        billDate: b.billDate,
+        originalAmount: parseFloat(b.originalAmount) || 0,
+        paidAmount: parseFloat(b.paidAmount) || 0,
+        remainingBalance: parseFloat(b.remainingBalance) || 0,
+        dueDate: b.dueDate,
+        status: b.status,
+      })),
+    };
+  };
 
-  // Shared by handleCreate/handleEdit: split-amount validity + required
-  // method-specific fields (Card Type, Online Payment Type, ...).
+  // Shared by handleCreate/handleEdit.
   const validatePaymentMethodFields = (f: PVForm) => {
-    const amount = parseFloat(f.amount) || 0;
-    if (f.paymentMethod === "Mixed") {
-      if (!isSplitPaymentValid(splitPayment, amount)) {
-        toast.error("Split payment amounts must add up to the total amount");
+    if (!paymentManager.settleable) {
+      toast.error("Allocate the full amount before continuing");
+      return false;
+    }
+    return true;
+  };
+
+  // Bill Entries rows have no `min` enforcement beyond the browser's soft hint
+  // (spinner-only — a pasted or typed negative value passes through), unlike
+  // the top-level Amount field's explicit JS guard. Catches that gap here too.
+  const validateBillAmounts = (f: PVForm) => {
+    for (const bill of f.bills) {
+      const original = parseFloat(bill.originalAmount);
+      const paid = parseFloat(bill.paidAmount);
+      const remaining = parseFloat(bill.remainingBalance);
+      if ((bill.originalAmount && (isNaN(original) || original < 0)) ||
+          (bill.paidAmount && (isNaN(paid) || paid < 0)) ||
+          (bill.remainingBalance && (isNaN(remaining) || remaining < 0))) {
+        toast.error(`Bill ${bill.billNo || "entry"}: amounts cannot be negative`);
         return false;
-      }
-      if (!isSplitPaymentDetailsValid(splitPayment, splitDetails)) {
-        toast.error("Please fill in the required details for each payment method used in the split");
-        return false;
-      }
-    } else {
-      const legKey = PAYMENT_METHOD_TO_LEG_KEY[f.paymentMethod];
-      if (legKey === 'card' || legKey === 'online') {
-        const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: amount };
-        if (!isSplitPaymentDetailsValid(probe, methodDetails)) {
-          toast.error(`Please fill in the required ${f.paymentMethod} details`);
-          return false;
-        }
       }
     }
     return true;
@@ -507,7 +541,8 @@ export function PaymentVoucher() {
 
   const handleCreate = async () => {
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
-    if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
+    if (!form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0) { toast.error("Amount must be greater than 0"); return; }
+    if (!validateBillAmounts(form)) return;
     if (!validatePaymentMethodFields(form)) return;
     setSavingForm(true);
     try {
@@ -525,7 +560,8 @@ export function PaymentVoucher() {
   const handleEdit = async () => {
     if (!editingId) return;
     if (!form.supplierName.trim()) { toast.error("Supplier name is required"); return; }
-    if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error("Valid amount is required"); return; }
+    if (!form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0) { toast.error("Amount must be greater than 0"); return; }
+    if (!validateBillAmounts(form)) return;
     if (!validatePaymentMethodFields(form)) return;
     setSavingForm(true);
     try {
@@ -718,103 +754,25 @@ export function PaymentVoucher() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Payment Method</Label>
-          <Select
-            value={form.paymentMethod}
-            onValueChange={v => { setForm(f => ({ ...f, paymentMethod: v })); setMethodDetails(emptyMethodDetails); }}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Cash">Cash</SelectItem>
-              <SelectItem value="Card">Card</SelectItem>
-              <SelectItem value="Cheque">Cheque</SelectItem>
-              <SelectItem value="Mixed">Mixed</SelectItem>
-              <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-              <SelectItem value="Digital Wallet">Digital Wallet</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Status</Label>
-          <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Pending">Pending</SelectItem>
-              <SelectItem value="Paid">Paid</SelectItem>
-              <SelectItem value="Partial">Partial</SelectItem>
-              <SelectItem value="Overdue">Overdue</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-2">
+        <Label>Status</Label>
+        <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Paid">Paid</SelectItem>
+            <SelectItem value="Partial">Partial</SelectItem>
+            <SelectItem value="Overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {form.paymentMethod === "Card" && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Card Type *</Label>
-            <Select value={methodDetails.cardType} onValueChange={v => setMethodDetails(d => ({ ...d, cardType: v }))}>
-              <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
-              <SelectContent>
-                {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Reference (optional)</Label>
-            <Input
-              value={methodDetails.cardReference}
-              onChange={e => setMethodDetails(d => ({ ...d, cardReference: e.target.value }))}
-              placeholder="Transaction number"
-            />
-          </div>
-        </div>
-      )}
-
-      {form.paymentMethod === "Digital Wallet" && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Payment Type *</Label>
-            <Select value={methodDetails.onlinePaymentType} onValueChange={v => setMethodDetails(d => ({ ...d, onlinePaymentType: v }))}>
-              <SelectTrigger><SelectValue placeholder="Select payment type" /></SelectTrigger>
-              <SelectContent>
-                {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Transaction / Reference ID *</Label>
-            <Input
-              value={methodDetails.onlineReference}
-              onChange={e => setMethodDetails(d => ({ ...d, onlineReference: e.target.value }))}
-              placeholder="Transaction ID"
-            />
-          </div>
-          {methodDetails.onlinePaymentType === 'Other' && (
-            <div className="col-span-2 space-y-2">
-              <Label>Payment Provider Name *</Label>
-              <Input
-                value={methodDetails.onlineProviderName}
-                onChange={e => setMethodDetails(d => ({ ...d, onlineProviderName: e.target.value }))}
-                placeholder="Provider name"
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {form.paymentMethod === "Mixed" && (
-        <SplitPaymentFields
-          total={parseFloat(form.amount) || 0}
-          value={splitPayment}
-          onChange={setSplitPayment}
-          details={splitDetails}
-          onDetailsChange={setSplitDetails}
-          bankAccounts={bankAccounts}
-          currencyCode={currencyCode}
-        />
-      )}
+      <PaymentAllocationPanel
+        manager={paymentManager}
+        invoiceTotal={parseFloat(form.amount) || 0}
+        bankAccounts={bankAccounts}
+        offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE]}
+      />
 
       <div className="space-y-2">
         <Label>Bill No</Label>
@@ -835,56 +793,13 @@ export function PaymentVoucher() {
       </div>
 
       <div className="space-y-2">
-        <Label>Bank Account</Label>
-        {form.paymentMethod === "Bank Transfer" ? (
-          <>
-            <Select
-              value={bankAccounts.find(a => a.name === form.bankAccount)?.id ? String(bankAccounts.find(a => a.name === form.bankAccount)!.id) : ""}
-              onValueChange={id => {
-                const account = bankAccounts.find(a => String(a.id) === id);
-                setForm(f => ({ ...f, bankAccount: account?.name ?? f.bankAccount }));
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={bankAccounts.length ? 'Select bank account (ledger)' : 'No bank accounts in ledger'} />
-              </SelectTrigger>
-              <SelectContent>
-                {bankAccounts.map(account => (
-                  <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">Accounts pulled from the Chart of Accounts (Ledger).</p>
-          </>
-        ) : (
-          <Input
-            value={form.bankAccount}
-            onChange={e => setForm(f => ({ ...f, bankAccount: e.target.value }))}
-            placeholder="e.g. Emirates NBD Current"
-          />
-        )}
+        <Label>Bank Account (optional note)</Label>
+        <Input
+          value={form.bankAccount}
+          onChange={e => setForm(f => ({ ...f, bankAccount: e.target.value }))}
+          placeholder="e.g. Emirates NBD Current"
+        />
       </div>
-
-      {form.paymentMethod === "Cheque" && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Cheque Number</Label>
-            <Input
-              value={form.chequeNo}
-              onChange={e => setForm(f => ({ ...f, chequeNo: e.target.value }))}
-              placeholder="CHQ-000001"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Cheque Date</Label>
-            <Input
-              type="date"
-              value={form.chequeDate}
-              onChange={e => setForm(f => ({ ...f, chequeDate: e.target.value }))}
-            />
-          </div>
-        </div>
-      )}
 
       <div className="space-y-2">
         <Label>Notes</Label>
@@ -927,13 +842,13 @@ export function PaymentVoucher() {
                       <Input type="date" value={bill.billDate} onChange={e => updateBill(idx, "billDate", e.target.value)} className="h-7 text-xs" />
                     </td>
                     <td className="p-1">
-                      <Input type="number" value={bill.originalAmount} onChange={e => updateBill(idx, "originalAmount", e.target.value)} className="h-7 text-xs text-right" />
+                      <Input type="number" min="0" step="0.01" value={bill.originalAmount} onChange={e => updateBill(idx, "originalAmount", e.target.value)} className="h-7 text-xs text-right" />
                     </td>
                     <td className="p-1">
-                      <Input type="number" value={bill.paidAmount} onChange={e => updateBill(idx, "paidAmount", e.target.value)} className="h-7 text-xs text-right" />
+                      <Input type="number" min="0" step="0.01" value={bill.paidAmount} onChange={e => updateBill(idx, "paidAmount", e.target.value)} className="h-7 text-xs text-right" />
                     </td>
                     <td className="p-1">
-                      <Input type="number" value={bill.remainingBalance} onChange={e => updateBill(idx, "remainingBalance", e.target.value)} className="h-7 text-xs text-right" />
+                      <Input type="number" min="0" step="0.01" value={bill.remainingBalance} onChange={e => updateBill(idx, "remainingBalance", e.target.value)} className="h-7 text-xs text-right" />
                     </td>
                     <td className="p-1">
                       <Input type="date" value={bill.dueDate} onChange={e => updateBill(idx, "dueDate", e.target.value)} className="h-7 text-xs" />
@@ -1326,9 +1241,11 @@ export function PaymentVoucher() {
                                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(voucher); }}>
                                       <Edit className="h-4 w-4 mr-2" /> Edit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusUpdate(voucher.id, "Paid"); }}>
-                                      <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
-                                    </DropdownMenuItem>
+                                    {voucher.status !== "Paid" && (
+                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusUpdate(voucher.id, "Paid"); }}>
+                                        <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
+                                      </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem
                                       onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(voucher.id); }}
                                       className="text-destructive"
@@ -1520,18 +1437,22 @@ export function PaymentVoucher() {
                 )}
 
                 <div className="flex flex-col space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={cn("grid gap-3", selectedVoucher.status !== "Paid" ? "grid-cols-2" : "grid-cols-1")}>
                     <Button className="btn-primary" onClick={() => { setIsDetailsOpen(false); openEdit(selectedVoucher); }}>
                       <Edit className="h-4 w-4 mr-2" /> Edit Voucher
                     </Button>
-                    <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Paid")}>
-                      <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
-                    </Button>
+                    {selectedVoucher.status !== "Paid" && (
+                      <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Paid")}>
+                        <CheckCircle className="h-4 w-4 mr-2" /> Mark as Paid
+                      </Button>
+                    )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Partial")}>
-                      <Clock className="h-4 w-4 mr-2" /> Mark Partial
-                    </Button>
+                  <div className={cn("grid gap-3", selectedVoucher.status !== "Paid" ? "grid-cols-2" : "grid-cols-1")}>
+                    {selectedVoucher.status !== "Paid" && (
+                      <Button variant="outline" onClick={() => handleStatusUpdate(selectedVoucher.id, "Partial")}>
+                        <Clock className="h-4 w-4 mr-2" /> Mark Partial
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       className="text-destructive border-destructive hover:bg-destructive/10"
@@ -1587,7 +1508,7 @@ export function PaymentVoucher() {
             <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={savingForm}>
               Cancel
             </Button>
-            <Button className="btn-primary shadow-sm hover:shadow-md transition-all" onClick={handleCreate} disabled={savingForm}>
+            <Button className="btn-primary shadow-sm hover:shadow-md transition-all" onClick={handleCreate} disabled={savingForm || !paymentManager.settleable}>
               {savingForm ? "Saving..." : "Create Voucher"}
             </Button>
           </DialogFooter>
@@ -1605,7 +1526,7 @@ export function PaymentVoucher() {
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={savingForm}>
               Cancel
             </Button>
-            <Button className="btn-primary shadow-sm hover:shadow-md transition-all" onClick={handleEdit} disabled={savingForm}>
+            <Button className="btn-primary shadow-sm hover:shadow-md transition-all" onClick={handleEdit} disabled={savingForm || !paymentManager.settleable}>
               {savingForm ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>

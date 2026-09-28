@@ -311,3 +311,186 @@ export async function downloadReceiptInvoice(receipt: Receipt, currencyCode: str
     printInFlight = false;
   }
 }
+
+// A Receipt Voucher is a Financials/ledger document (source + category +
+// notes, no VAT/member-billing framing), so it doesn't fit ReceiptPrintData —
+// but it must still print through the same isolated-window mechanism as a
+// member receipt, not the old hidden-DOM-node + window.print() approach that
+// paginated on the whole page's (invisible) layout height instead of just the
+// voucher's own content and produced several mostly-blank pages.
+export interface ReceiptVoucherPrintData {
+  voucherNo: string;
+  dateStr: string;
+  status: string;
+  branch: string;
+  memberName: string;
+  memberId?: string;
+  paymentMode: string;
+  reference?: string;
+  currencyCode: string;
+  amount: number;
+  source: string;
+  sourceCategory: string;
+  transactionId?: string;
+  notes?: string;
+  createdAtStr?: string;
+}
+
+export function buildReceiptVoucherHtml(data: ReceiptVoucherPrintData, company: CompanyDetails): string {
+  const statusClass = data.status.toLowerCase() === "completed" ? "" : " style=\"background:#fef3c7;color:#92400e;\"";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Voucher - ${escapeHtml(data.voucherNo)}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans', 'Noto Sans Arabic', sans-serif; padding: 20px; background: #f5f5f5; }
+        .invoice {
+          font-variant-numeric: tabular-nums lining-nums;
+          font-feature-settings: "tnum" 1, "lnum" 1;
+        }
+        .receipt-container {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: white;
+            padding: 20mm;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+            box-sizing: border-box;
+        }
+        ${COMPANY_HEADER_CSS}
+        .receipt-title { text-align: center; font-size: 28px; color: #333; margin: 30px 0; font-weight: 600; letter-spacing: 1px; }
+        .receipt-info { display: flex; justify-content: space-between; margin-bottom: 30px; padding: 20px; background: #f9fafb; border-radius: 6px; }
+        .info-block { flex: 1; }
+        .info-label { color: #888; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
+        .info-value { color: #333; font-size: 14px; font-weight: 600; }
+        .receipt-number { color: #327F74; font-size: 18px; font-weight: bold; }
+        .status-badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #dcfce7; color: #166534; }
+        .customer-section { margin-bottom: 30px; padding: 20px; background: #f9fafb; border-left: 4px solid #327F74; border-radius: 6px; }
+        .section-title { color: #327F74; font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px; }
+        .customer-name { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 5px; }
+        .customer-detail { color: #666; font-size: 14px; margin-bottom: 3px; }
+        .items-table { width: 100%; border-collapse: collapse; margin: 30px 0; }
+        .items-table thead { background: #327F74; color: white; }
+        .items-table th { padding: 15px; text-align: left; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .items-table td { padding: 15px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #333; }
+        .totals-section { margin-top: 30px; padding: 20px; background: #f9fafb; border-radius: 6px; }
+        .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 14px; }
+        .total-row.grand-total { font-size: 20px; font-weight: bold; color: #327F74; padding-top: 15px; margin-top: 10px; border-top: 2px solid #327F74; }
+        .payment-info { margin: 30px 0; padding: 20px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; }
+        .payment-method { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #333; }
+        .payment-label { font-weight: 600; color: #78350f; }
+        .footer { margin-top: 40px; padding-top: 30px; border-top: 2px solid #e5e7eb; text-align: center; }
+        .thank-you { font-size: 18px; color: #327F74; font-weight: 600; margin-bottom: 15px; }
+        .footer-note { color: #888; font-size: 12px; line-height: 1.6; margin-bottom: 10px; }
+        .contact-info { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #666; font-size: 12px; }
+        .print-info { margin-top: 30px; padding: 15px; background: #f3f4f6; border-radius: 6px; font-size: 11px; color: #666; text-align: center; }
+        * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        @media print {
+            body { padding: 0; background: white; }
+            .receipt-container { box-shadow: none; width: auto; min-height: auto; margin: 0; border-radius: 0; padding: 0; }
+            .header { margin-bottom: 8px; padding-bottom: 6px; }
+            .header-left .company-logo { max-height: 42px; margin-bottom: 3px; }
+            .company-name { font-size: 20px; margin-bottom: 2px; }
+            .company-details { font-size: 9px; line-height: 1.3; }
+            .qr-top-right { width: 92px; height: 92px; }
+            .qr-inner svg { width: 66px; height: 66px; }
+            .qr-inner .qr-label { font-size: 8px; margin-top: 3px; }
+            .qr-inner .qr-rcpt { font-size: 8px; margin-top: 1px; }
+            .receipt-title { margin: 6px 0; font-size: 15px; }
+            .receipt-info { margin-bottom: 8px; padding: 8px; }
+            .customer-section { margin-bottom: 8px; padding: 8px; }
+            .section-title { margin-bottom: 4px; }
+            .customer-name { margin-bottom: 2px; }
+            .customer-detail { margin-bottom: 0; }
+            .items-table { margin: 8px 0; }
+            .items-table th, .items-table td { padding: 5px; }
+            .totals-section { margin-top: 8px; padding: 8px; }
+            .total-row { padding: 2px 0; }
+            .total-row.grand-total { padding-top: 6px; margin-top: 4px; }
+            .payment-info { margin: 8px 0; padding: 8px; }
+            .payment-method + .payment-method { margin-top: 4px !important; }
+            .footer { margin-top: 16px; padding-top: 12px; }
+            .thank-you { margin-bottom: 10px; font-size: 16px; }
+            .footer-note { margin-bottom: 8px; line-height: 1.5; }
+            .contact-info { margin-top: 12px; padding-top: 12px; line-height: 1.5; }
+            .print-info { display: none; }
+            @page { size: A4; margin: 8mm 10mm; }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container invoice">
+        <div class="header">${buildCompanyHeaderHtml(company, data.voucherNo, {
+          date: data.dateStr,
+          billTo: data.memberName,
+          amount: `${data.currencyCode} ${data.amount.toFixed(2)}`,
+          status: data.status,
+        })}</div>
+        <div class="receipt-title">Receipt Voucher</div>
+        <div class="receipt-info">
+            <div class="info-block">
+              <div class="info-label">Voucher Number</div>
+              <div class="receipt-number">${escapeHtml(data.voucherNo)}</div>
+            </div>
+            <div class="info-block"><div class="info-label">Date</div><div class="info-value">${escapeHtml(data.dateStr)}</div></div>
+            <div class="info-block"><div class="info-label">Branch</div><div class="info-value">${escapeHtml(data.branch)}</div></div>
+            <div class="info-block"><div class="info-label">Status</div><div><span class="status-badge"${statusClass}>${escapeHtml(data.status)}</span></div></div>
+        </div>
+        <div class="customer-section">
+            <div class="section-title">Member</div>
+            <div class="customer-name">${escapeHtml(data.memberName)}</div>
+            ${data.memberId ? `<div class="customer-detail"><strong>Member ID:</strong> ${escapeHtml(data.memberId)}</div>` : ""}
+        </div>
+        <table class="items-table">
+            <thead><tr><th>Source</th><th>Category</th><th>Transaction</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>${escapeHtml(data.source)}</td>
+                <td>${escapeHtml(data.sourceCategory)}</td>
+                <td>${escapeHtml(data.transactionId || "-")}</td>
+              </tr>
+            </tbody>
+        </table>
+        <div class="totals-section">
+            <div class="total-row grand-total"><span>Amount:</span><span>${data.currencyCode} ${data.amount.toFixed(2)}</span></div>
+        </div>
+        <div class="payment-info">
+            <div class="payment-method"><span class="payment-label">Payment Method:</span><span>${escapeHtml(data.paymentMode)}</span></div>
+            ${data.reference ? `<div class="payment-method" style="margin-top: 8px;"><span class="payment-label">Reference:</span><span>${escapeHtml(data.reference)}</span></div>` : ""}
+        </div>
+        ${data.notes ? `<div class="customer-section" style="border-left-color:#94a3b8;"><div class="section-title" style="color:#64748b;">Notes</div><div class="customer-detail">${escapeHtml(data.notes)}</div></div>` : ""}
+        <div class="footer">
+            <div class="thank-you">Thank you for your business!</div>
+            <div class="footer-note">This is an official receipt voucher issued by ${escapeHtml(company.name)}. Please retain this receipt for your records.</div>
+            <div class="contact-info">${buildCompanyFooterHtml(company)}</div>
+        </div>
+        <div class="print-info">Voucher generated on ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })} at ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}${data.createdAtStr ? `<br>Created at: ${escapeHtml(data.createdAtStr)}` : ""}</div>
+    </div>
+    <script>window.onload = function(){ window.print(); }</script>
+</body>
+</html>`;
+}
+
+let voucherPrintInFlight = false;
+
+export async function downloadReceiptVoucher(data: ReceiptVoucherPrintData) {
+  if (voucherPrintInFlight) return;
+  voucherPrintInFlight = true;
+  try {
+    const win = window.open("", "_blank", "width=820,height=900");
+    const company = await getCompanyDetails();
+    const html = buildReceiptVoucherHtml(data, company);
+    if (win) { win.document.write(html); win.document.close(); }
+  } finally {
+    voucherPrintInFlight = false;
+  }
+}

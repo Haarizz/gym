@@ -50,6 +50,19 @@ export interface ReceiptVoucherCreateRequest {
   voucherType?: string;
 }
 
+// GlobalExceptionHandler returns { message: "..." } for validation errors
+// (e.g. "Amount must be greater than 0", "already posted to the general
+// ledger" from BG_47/48) — surface that instead of a generic string, or the
+// whole point of a specific backend message is lost.
+async function errorFrom(res: Response, fallback: string): Promise<Error> {
+  try {
+    const body = await res.json();
+    return new Error(body?.message || fallback);
+  } catch {
+    return new Error(fallback);
+  }
+}
+
 function mapReceiptVoucher(r: any): ReceiptVoucher {
   return {
     id: String(r.id),
@@ -132,7 +145,7 @@ class ReceiptVoucherService {
       method: "POST",
       body: JSON.stringify(toBody(req)),
     });
-    if (!res.ok) throw new Error("Failed to create receipt voucher");
+    if (!res.ok) throw await errorFrom(res, "Failed to create receipt voucher");
     return mapReceiptVoucher(await res.json());
   }
 
@@ -141,7 +154,7 @@ class ReceiptVoucherService {
       method: "PUT",
       body: JSON.stringify(toBody(req)),
     });
-    if (!res.ok) throw new Error("Failed to update receipt voucher");
+    if (!res.ok) throw await errorFrom(res, "Failed to update receipt voucher");
     return mapReceiptVoucher(await res.json());
   }
 
@@ -150,7 +163,7 @@ class ReceiptVoucherService {
       method: "PATCH",
       body: JSON.stringify({ status }),
     });
-    if (!res.ok) throw new Error("Failed to update receipt voucher status");
+    if (!res.ok) throw await errorFrom(res, "Failed to update receipt voucher status");
     return mapReceiptVoucher(await res.json());
   }
 
@@ -158,7 +171,7 @@ class ReceiptVoucherService {
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/receipt-vouchers/${id}`, {
       method: "DELETE",
     });
-    if (!res.ok) throw new Error("Failed to delete receipt voucher");
+    if (!res.ok) throw await errorFrom(res, "Failed to delete receipt voucher");
   }
 }
 

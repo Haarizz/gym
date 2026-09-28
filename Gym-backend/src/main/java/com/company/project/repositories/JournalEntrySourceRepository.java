@@ -10,4 +10,6 @@ public interface JournalEntrySourceRepository extends JpaRepository<JournalEntry
     boolean existsBySourceEntityTypeAndSourceEntityId(String sourceEntityType, Long sourceEntityId);
 
     Optional<JournalEntrySource> findBySourceEntityTypeAndSourceEntityId(String sourceEntityType, Long sourceEntityId);
+
+    void deleteBySourceEntityTypeAndSourceEntityId(String sourceEntityType, Long sourceEntityId);
 }

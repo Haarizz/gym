@@ -213,6 +213,7 @@ interface Props {
 type FilterTab = "all" | "unread";
 
 export function NotificationPanel({ open, onClose, onCountChange }: Props) {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   // Authoritative unread count from the server — NOT derived from `notifications`,
   // since that array only ever holds whichever page(s) have been scrolled into
@@ -396,9 +397,13 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
                     : "New alerts will appear here automatically"}
                 </p>
               </div>
-              {filter === "unread" && (
+              {filter === "unread" ? (
                 <button onClick={() => setFilter("all")} className={styles.emptyLink}>
                   View all notifications
+                </button>
+              ) : (
+                <button onClick={() => { onClose(); navigate("/notifications"); }} className={styles.emptyLink}>
+                  Go to notifications page
                 </button>
               )}
             </div>
@@ -450,9 +455,12 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
         {/* ── Footer ─────────────────────────────────────────────────────── */}
         {notifications.length > 0 && (
           <div className={styles.footer}>
-            <p className={styles.footerText}>
-              {notifications.length} notification{notifications.length !== 1 ? "s" : ""} total
-            </p>
+            <button
+              onClick={() => { onClose(); navigate("/notifications"); }}
+              className={styles.footerLink}
+            >
+              View all
+            </button>
             <button
               onClick={handleMarkAllRead}
               disabled={unreadCount === 0}

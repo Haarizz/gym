@@ -12,20 +12,12 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
-import {
-  EMPTY_SPLIT_PAYMENT, EMPTY_SPLIT_DETAILS, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
-  CARD_TYPE_OPTIONS
-} from "../components/shared/split-payment-fields";
-import type { SplitPaymentValue, SplitPaymentDetails } from "../components/shared/split-payment-fields";
 import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
-
-// Maps this page's Payment Method select value to the SplitPaymentValue key
-// so Credit Card/Cheque/Bank Transfer's method-specific details can be
-// validated/built by reusing the same helpers Mixed Payment legs use
-// elsewhere in the app.
-const PURCHASE_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
-  cash: 'cash', credit_card: 'card', cheque: 'cheque', bank_transfer: 'bankTransfer'
-};
+import { usePaymentManager } from "../payments/usePaymentManager";
+import { PaymentAllocationPanel } from "../payments/PaymentAllocationPanel";
+import { PAYMENT_TYPES } from "../payments/paymentModel";
+import { buildPaymentPayload } from "../payments/paymentPayload";
+import { toLegacyPayment } from "../payments/legacyPaymentBridge";
 import {
   ShoppingBag,
   Plus,
@@ -189,9 +181,8 @@ export function Purchase() {
   const [selectedBill, setSelectedBill]                 = useState<SupplierBill | null>(null);
   const [showPaymentDialog, setShowPaymentDialog]       = useState(false);
   const [payingBill, setPayingBill]                     = useState<SupplierBill | null>(null);
-  const [payAmount, setPayAmount]                       = useState('');
-  const [payMethod, setPayMethod]                       = useState('cash');
-  const [payMethodDetails, setPayMethodDetails]         = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
+  const payingBillBalance = payingBill ? Math.max(0, payingBill.totalAmount - payingBill.amountPaid) : 0;
+  const paymentManager = usePaymentManager({ invoiceTotal: payingBillBalance });
   const [payNotes, setPayNotes]                         = useState('');
   const [confirmingId, setConfirmingId]                 = useState<number | null>(null);
   const [bankAccounts, setBankAccounts]                 = useState<AccountHead[]>([]);
@@ -405,31 +396,25 @@ export function Purchase() {
   // â”€â”€ Record payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleRecordPayment = async () => {
     if (!payingBill) return;
-    const amount = parseFloat(payAmount);
-    if (!amount || amount <= 0) {
-      toast.error('Please enter a valid payment amount');
+    if (!paymentManager.settleable) {
+      toast.error('Allocate the full payment amount before continuing');
       return;
-    }
-    const legKey = PURCHASE_METHOD_TO_LEG_KEY[payMethod];
-    if (legKey && legKey !== 'cash') {
-      const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: amount };
-      if (!isSplitPaymentDetailsValid(probe, payMethodDetails)) {
-        toast.error('Please fill in the required payment details');
-        return;
-      }
     }
     setSaving(true);
     try {
-      const paymentBreakdown = legKey && legKey !== 'cash'
-        ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: amount }, payMethodDetails, bankAccounts)
-        : undefined;
-      await supplierBillService.recordPayment(payingBill.id, amount, payMethod, payNotes || undefined, paymentBreakdown);
+      const payload = buildPaymentPayload(paymentManager.paymentLines, payingBillBalance);
+      const legacy = toLegacyPayment(paymentManager.paymentLines);
+      const amount = payload.paidAmount;
+      const paymentMethod = legacy.paymentMethod === 'CASH' ? 'cash'
+        : legacy.paymentMethod === 'CARD' ? 'credit_card'
+        : legacy.paymentMethod === 'ONLINE' ? 'bank_transfer'
+        : 'Mixed';
+      const paymentBreakdown = legacy.paymentBreakdown;
+      await supplierBillService.recordPayment(payingBill.id, amount, paymentMethod, payNotes || undefined, paymentBreakdown);
       toast.success('Payment recorded successfully');
       setShowPaymentDialog(false);
       setPayingBill(null);
-      setPayAmount('');
-      setPayMethod('cash');
-      setPayMethodDetails(EMPTY_SPLIT_DETAILS);
+      paymentManager.clearLines();
       setPayNotes('');
       await loadData();
     } catch (err: any) {
@@ -989,7 +974,6 @@ export function Purchase() {
                                   className="text-green-600 hover:text-green-700"
                                   onClick={() => {
                                     setPayingBill(bill);
-                                    setPayAmount(String(bill.totalAmount - bill.amountPaid));
                                     setShowPaymentDialog(true);
                                   }}
                                 >
@@ -1816,7 +1800,6 @@ export function Purchase() {
                       <Button
                         onClick={() => {
                           setPayingBill(selectedBill);
-                          setPayAmount(String(selectedBill.totalAmount - selectedBill.amountPaid));
                           setShowBillDetail(false);
                           setShowPaymentDialog(true);
                         }}
@@ -1836,7 +1819,7 @@ export function Purchase() {
       {/* â”€â”€ Record Payment Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={showPaymentDialog} onOpenChange={open => {
         setShowPaymentDialog(open);
-        if (!open) { setPayingBill(null); setPayAmount(''); setPayMethod('cash'); setPayMethodDetails(EMPTY_SPLIT_DETAILS); setPayNotes(''); }
+        if (!open) { setPayingBill(null); paymentManager.clearLines(); setPayNotes(''); }
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1845,97 +1828,17 @@ export function Purchase() {
               Record Payment
             </DialogTitle>
             <DialogDescription>
-              {payingBill && `Bill ${payingBill.billNumber} â€” Balance: ${currencyCode} ${(payingBill.totalAmount - payingBill.amountPaid).toFixed(2)}`}
+              {payingBill && `Bill ${payingBill.billNumber} â€” Balance: ${currencyCode} ${payingBillBalance.toFixed(2)}`}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label>Amount ({currencyCode}) *</Label>
-              <Input
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="Enter payment amount"
-                value={payAmount}
-                onChange={e => setPayAmount(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label>Payment Method</Label>
-              <Select value={payMethod} onValueChange={(v) => { setPayMethod(v); setPayMethodDetails(EMPTY_SPLIT_DETAILS); }}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="credit_card">Credit Card</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {payMethod === 'credit_card' && (
-              <div>
-                <Label>Card Type *</Label>
-                <Select value={payMethodDetails.cardType} onValueChange={(v) => setPayMethodDetails(d => ({ ...d, cardType: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
-                  <SelectContent>
-                    {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {payMethod === 'cheque' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Cheque Number *</Label>
-                  <Input
-                    value={payMethodDetails.chequeNumber}
-                    onChange={e => setPayMethodDetails(d => ({ ...d, chequeNumber: e.target.value }))}
-                    placeholder="Cheque number"
-                  />
-                </div>
-                <div>
-                  <Label>Bank Name (optional)</Label>
-                  <Input
-                    value={payMethodDetails.chequeBankName}
-                    onChange={e => setPayMethodDetails(d => ({ ...d, chequeBankName: e.target.value }))}
-                    placeholder="e.g. SBI"
-                  />
-                </div>
-              </div>
-            )}
-
-            {payMethod === 'bank_transfer' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Reference *</Label>
-                  <Input
-                    value={payMethodDetails.bankTransferReference}
-                    onChange={e => setPayMethodDetails(d => ({ ...d, bankTransferReference: e.target.value }))}
-                    placeholder="Transaction ID"
-                  />
-                </div>
-                <div>
-                  <Label>Bank Account (Ledger)</Label>
-                  <Select value={payMethodDetails.bankTransferAccountId} onValueChange={(v) => setPayMethodDetails(d => ({ ...d, bankTransferAccountId: v }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {bankAccounts.map(account => (
-                        <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <PaymentAllocationPanel
+              manager={paymentManager}
+              invoiceTotal={payingBillBalance}
+              bankAccounts={bankAccounts}
+              offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE]}
+            />
 
             <div>
               <Label>Notes</Label>
@@ -1951,7 +1854,7 @@ export function Purchase() {
               <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleRecordPayment} disabled={saving}>
+              <Button onClick={handleRecordPayment} disabled={saving || !paymentManager.settleable}>
                 {saving
                   ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   : <CreditCard className="mr-2 h-4 w-4" />

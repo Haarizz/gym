@@ -848,7 +848,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                 <div
                   key={action.id}
                   className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
-                  onClick={() => onNavigate?.('membership-renewal', selectedMemberId ? { memberId: selectedMemberId } : undefined)}
+                  onClick={() => onNavigate?.('membership-renewal', selectedMemberId ? { memberId: selectedMemberId, tab: 'renewal' } : { tab: 'renewal' })}
                 >
                   <Card className="bg-white border-0 shadow-sm h-full">
                     <CardContent className="flex flex-col items-center justify-center p-6 h-40">

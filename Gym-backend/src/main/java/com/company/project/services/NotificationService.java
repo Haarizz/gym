@@ -5,6 +5,8 @@ import com.company.project.dto.NotificationResponseDTO;
 import com.company.project.entities.Notification;
 import com.company.project.repositories.NotificationRepository;
 import com.company.project.security.UserDetailsImpl;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -41,12 +43,32 @@ public class NotificationService {
     private final RoleService roleService;
     private final TransactionTemplate isolatedInsert;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     public NotificationService(NotificationRepository notificationRepository, RoleService roleService,
                                PlatformTransactionManager transactionManager) {
         this.notificationRepository = notificationRepository;
         this.roleService = roleService;
         this.isolatedInsert = new TransactionTemplate(transactionManager);
         this.isolatedInsert.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
+
+    /**
+     * Notification.branchId is optional by design (see Notification entity):
+     * NULL means "visible from any branch" (used by every role-wide alert this
+     * service fires — reward/payment/approval notifications never set a branch).
+     * NotificationRepository's own queries already implement that NULL-passthrough
+     * correctly in JPQL, but BranchFilterAspect enables a stricter Hibernate
+     * session filter (bare "branch_id = :branchId", no NULL passthrough) on every
+     * @Transactional method, which silently re-excludes those NULL-branch rows
+     * before the JPQL predicate even runs — making a company-wide notification
+     * invisible to a receptionist except when their active branch happens to be
+     * null. Disable it for every notification read/write path so the
+     * repository's own logic is what actually decides visibility (BG_66/BG_67).
+     */
+    private void disableBranchFilter() {
+        entityManager.unwrap(org.hibernate.Session.class).disableFilter("branchFilter");
     }
 
     // ── Public trigger methods ────────────────────────────────────────────────
@@ -132,7 +154,12 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public Page<NotificationResponseDTO> getForCurrentUser(int page, int size) {
         UserContext ctx = currentUserContext();
+        // allowedModulesForRoles calls RoleService, a separate @Transactional bean
+        // whose own proxied call re-triggers BranchFilterAspect on this same
+        // session — so disabling the filter must happen AFTER that call, right
+        // before the notification query itself, or it gets silently re-enabled.
         Set<String> allowedModules = allowedModulesForRoles(ctx.roles);
+        disableBranchFilter();
         List<Notification> visible = notificationRepository
                 .findAllForUser(ctx.companyId, ctx.userId, ctx.roles, BranchContextHolder.getActiveBranchId()).stream()
                 .filter(n -> isModuleVisible(n.getModule(), allowedModules))
@@ -149,13 +176,19 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public long getUnreadCount() {
         UserContext ctx = currentUserContext();
+        // allowedModulesForRoles calls RoleService, a separate @Transactional bean
+        // whose own proxied call re-triggers BranchFilterAspect on this same
+        // session — so disabling the filter must happen AFTER that call, right
+        // before the notification query itself, or it gets silently re-enabled.
         Set<String> allowedModules = allowedModulesForRoles(ctx.roles);
+        disableBranchFilter();
         return notificationRepository.findUnreadForUser(ctx.companyId, ctx.userId, ctx.roles, BranchContextHolder.getActiveBranchId()).stream()
                 .filter(n -> isModuleVisible(n.getModule(), allowedModules))
                 .count();
     }
 
     public void markRead(Long notificationId) {
+        disableBranchFilter();
         notificationRepository.findById(notificationId).ifPresent(n -> {
             if (isVisibleToCurrentUser(n)) {
                 n.setRead(true);
@@ -170,6 +203,7 @@ public class NotificationService {
     }
 
     public void softDelete(Long notificationId) {
+        disableBranchFilter();
         notificationRepository.findById(notificationId).ifPresent(n -> {
             if (isVisibleToCurrentUser(n)) {
                 n.setDeleted(true);

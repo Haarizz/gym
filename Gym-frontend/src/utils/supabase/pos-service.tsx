@@ -35,6 +35,14 @@ export interface PaymentSplitLeg {
   reference?: string;
 }
 
+export interface PaymentAllocationLeg {
+  type: string;
+  subtype: string | null;
+  amount: number;
+  reference: string | null;
+  bankAccountName?: string | null;
+}
+
 export interface SaleTransactionRequest {
   posSessionId?: number;
   memberId?: number;
@@ -48,6 +56,16 @@ export interface SaleTransactionRequest {
   totalAmount: number;
   receivedAmount?: number;
   notes?: string;
+  // Progressive/mixed settlement — ordered allocation list plus the figures
+  // derived from it. Additive: a backend built before this field existed
+  // ignores it and still has paymentMethod/paymentBreakdown to fall back on.
+  paymentAllocations?: PaymentAllocationLeg[];
+  paymentSummary?: string;
+  changeDue?: number;
+  creditBalance?: number;
+  cashTaken?: boolean;
+  creditAccountCode?: string | null;
+  creditAccountName?: string | null;
 }
 
 export interface SaleTransactionItem {
@@ -192,6 +210,13 @@ function toTransactionBody(req: SaleTransactionRequest): Record<string, any> {
     total_amount: req.totalAmount,
     received_amount: req.receivedAmount,
     notes: req.notes,
+    payment_allocations: req.paymentAllocations,
+    payment_summary: req.paymentSummary,
+    change_due: req.changeDue,
+    credit_balance: req.creditBalance,
+    cash_taken: req.cashTaken,
+    credit_account_code: req.creditAccountCode,
+    credit_account_name: req.creditAccountName,
   };
 }
 

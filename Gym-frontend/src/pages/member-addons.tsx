@@ -7,8 +7,6 @@ import {
   Calendar,
   DollarSign,
   Package,
-  CreditCard,
-  Smartphone,
   Building2,
   CheckCircle,
   ArrowLeft,
@@ -74,19 +72,12 @@ import { addonPlansService, AddonPlan as ApiAddonPlan } from "../utils/supabase/
 import { facilitiesService, FacilityApi } from "../utils/supabase/facilities-service";
 import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
 import { staffService, Staff } from "../utils/supabase/staff-service";
-import {
-  EMPTY_SPLIT_DETAILS, EMPTY_SPLIT_PAYMENT, isSplitPaymentDetailsValid, buildSplitPaymentBreakdown,
-  CARD_TYPE_OPTIONS, ONLINE_PAYMENT_TYPE_OPTIONS
-} from "../components/shared/split-payment-fields";
-import type { SplitPaymentValue, SplitPaymentDetails } from "../components/shared/split-payment-fields";
-
-// Maps this page's Payment Method select value to the SplitPaymentValue key
-// so Card/UPI/Bank Transfer's method-specific details can be validated/built
-// by reusing the same helpers Mixed Payment legs use elsewhere in the app.
-// "UPI" is this page's Online Payment equivalent.
-const ADDON_METHOD_TO_LEG_KEY: Partial<Record<string, keyof SplitPaymentValue>> = {
-  Cash: 'cash', Card: 'card', UPI: 'online', 'Bank Transfer': 'bankTransfer'
-};
+import { usePaymentManager } from "../payments/usePaymentManager";
+import { PaymentAllocationPanel } from "../payments/PaymentAllocationPanel";
+import { buildPaymentPayload } from "../payments/paymentPayload";
+import { toLegacyPayment } from "../payments/legacyPaymentBridge";
+import { PAYMENT_TYPES } from "../payments/paymentModel";
+import type { CreditCustomer } from "../payments/modals/CreditModal";
 
 interface MemberAddonsProps {
   onNavigate?: (section: string) => void;
@@ -207,8 +198,6 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [transactions, setTransactions] = useState<MemberAddon[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
-  const [methodDetails, setMethodDetails] = useState<SplitPaymentDetails>(EMPTY_SPLIT_DETAILS);
   const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
   useEffect(() => {
     accountHeadsService.getBankAccounts()
@@ -225,12 +214,6 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   }, []);
   const [customValidity, setCustomValidity] = useState<number>(30);
   const [customAmount, setCustomAmount] = useState<number>(0);
-  // Only used when the selected member is billed to a family head — how much
-  // is being collected right now; any remainder becomes a due on the head's
-  // account instead of the member's own. Defaults to the full amount (fully
-  // paid), matching this page's existing "always paid" behavior for members
-  // who carry their own balance.
-  const [minorPaidNow, setMinorPaidNow] = useState<string>("");
   const [transactionSearchQuery, setTransactionSearchQuery] = useState("");
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<string>("all");
   const [lastCreatedAddon, setLastCreatedAddon] = useState<MemberAddon | null>(null);
@@ -358,6 +341,13 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [memberWalletBalance, setMemberWalletBalance] = useState(0);
   const [walletAmountApplied, setWalletAmountApplied] = useState(0);
 
+  // The panel settles amountToPay (sticker price minus reward/wallet
+  // deductions), never the sticker price itself. Only a billed-to-head
+  // member may leave a balance on CREDIT — everyone else must fully cover
+  // amountToPay with CASH/CARD/ONLINE.
+  const amountToPay = Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) - walletAmountApplied);
+  const paymentManager = usePaymentManager({ invoiceTotal: amountToPay });
+
   // Load transactions from API on mount
   useEffect(() => {
     const load = async () => {
@@ -477,7 +467,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     setSelectedAddon(addon);
     setCustomValidity(addon.validity);
     setCustomAmount(addon.price);
-    setMinorPaidNow(String(addon.price));
+    paymentManager.clearLines();
     setRewardApplied(false);
     setAvailableReward(null);
     setWalletAmountApplied(0);
@@ -516,24 +506,15 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const handleConfirmPurchase = async () => {
     if (!selectedMember || !selectedAddon || customAmount === undefined || customAmount < 0) return;
 
-    const amountToPay = Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) - walletAmountApplied);
-
     const billedToHead = selectedMember.billedToHead;
-    // A billed-to-head member's fee may be left partially or fully unpaid
-    // now — the remainder becomes a due on their family head's account
-    // instead of theirs. Any other member's add-on is always fully paid,
-    // same as before.
-    const paidNowAmount = billedToHead
-      ? Math.max(0, Math.min(amountToPay, parseFloat(minorPaidNow || "0") || 0))
-      : amountToPay;
 
-    const legKey = ADDON_METHOD_TO_LEG_KEY[paymentMethod];
-    if (paidNowAmount > 0 && legKey && legKey !== 'cash') {
-      const probe: SplitPaymentValue = { ...EMPTY_SPLIT_PAYMENT, [legKey]: paidNowAmount };
-      if (!isSplitPaymentDetailsValid(probe, methodDetails)) {
-        toast.error(`Please fill in the required ${paymentMethod} details`);
-        return;
-      }
+    if (amountToPay > 0 && !paymentManager.settleable) {
+      toast.error(
+        billedToHead
+          ? "Allocate the full amount (or leave the remainder on Credit) before continuing"
+          : "Allocate the full amount before continuing"
+      );
+      return;
     }
 
     const newExpiry = calculateNewExpiry();
@@ -541,11 +522,14 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
 
     try {
       setIsSubmitting(true);
-      const paymentBreakdown = paidNowAmount > 0 && legKey && legKey !== 'cash'
-        ? buildSplitPaymentBreakdown({ ...EMPTY_SPLIT_PAYMENT, [legKey]: paidNowAmount }, methodDetails, bankAccounts)
-        : undefined;
-        
-      let paymentModeToSend = paymentMethod;
+      const hasPayment = amountToPay > 0 && paymentManager.paymentLines.length > 0;
+      const payload = hasPayment ? buildPaymentPayload(paymentManager.paymentLines, amountToPay) : null;
+      const legacy = hasPayment ? toLegacyPayment(paymentManager.paymentLines) : null;
+      const paidNowAmount = payload ? payload.paidAmount : 0;
+
+      const paymentBreakdown = legacy?.paymentBreakdown;
+
+      let paymentModeToSend: string = legacy?.paymentMethod ?? "Cash";
       if (amountToPay === 0) {
         if (walletAmountApplied > 0) paymentModeToSend = "Wallet";
         else if (rewardApplied) paymentModeToSend = "Reward";
@@ -584,9 +568,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       setAvailableReward(null);
       setRewardApplied(false);
       setNotes("");
-      setPaymentMethod("Cash");
-      setMethodDetails(EMPTY_SPLIT_DETAILS);
-      setMinorPaidNow("");
+      paymentManager.clearLines();
       setProcessedByStaffId("");
     } catch (err: any) {
       toast.error(err?.message || "Failed to save add-on purchase. Please try again.");
@@ -1138,123 +1120,36 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                 </div>
               )}
 
-              {/* Family billing notice + partial payment, only for a member billed to a family head */}
+              {/* Family billing notice, only for a member billed to a family head */}
               {selectedMember?.billedToHead && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
                   <div className="h-0.5 w-full bg-gradient-to-r from-amber-400 to-amber-600" />
-                  <div className="px-4 py-3 space-y-2">
+                  <div className="px-4 py-3">
                     <p className="text-[11px] text-amber-900">
-                      <strong>{selectedMember.name}</strong> is billed to their family head — this charge
-                      will be added to <strong>{selectedMember.familyHeadName || "their family head"}</strong>'s
+                      <strong>{selectedMember.name}</strong> is billed to their family head — any amount left on
+                      Credit below will be added to <strong>{selectedMember.familyHeadName || "their family head"}</strong>'s
                       account, not shown as a due on {selectedMember.name}.
                     </p>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="minorPaidNow" className="text-xs font-medium">
-                        Amount Received Now ({currencyCode}) <span className="text-muted-foreground font-normal">(optional)</span>
-                      </Label>
-                      <Input
-                        id="minorPaidNow"
-                        type="number"
-                        min={0}
-                        max={customAmount}
-                        value={minorPaidNow}
-                        onChange={(e) => setMinorPaidNow(e.target.value)}
-                        placeholder="0.00"
-                      />
-                      <p className="text-[11px] text-muted-foreground">
-                        Leave less than the full amount to bill the remainder as a due to{" "}
-                        {selectedMember.familyHeadName || "the family head"}.
-                      </p>
-                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Payment Method */}
-              <div className="space-y-1.5">
-                <Label htmlFor="payment" className="text-xs font-medium">Payment Method</Label>
-                <Select
-                  value={paymentMethod}
-                  onValueChange={(v) => { setPaymentMethod(v); setMethodDetails(EMPTY_SPLIT_DETAILS); }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Cash">
-                      <div className="flex items-center gap-2"><DollarSign className="h-4 w-4" />Cash</div>
-                    </SelectItem>
-                    <SelectItem value="Card">
-                      <div className="flex items-center gap-2"><CreditCard className="h-4 w-4" />Card</div>
-                    </SelectItem>
-                    <SelectItem value="UPI">
-                      <div className="flex items-center gap-2"><Smartphone className="h-4 w-4" />UPI / QR</div>
-                    </SelectItem>
-                    <SelectItem value="Bank Transfer">
-                      <div className="flex items-center gap-2"><Building2 className="h-4 w-4" />Bank Transfer</div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {paymentMethod === 'Card' && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Card Type <span className="text-red-500">*</span></Label>
-                  <Select value={methodDetails.cardType || undefined} onValueChange={(v) => setMethodDetails(d => ({ ...d, cardType: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select card type" /></SelectTrigger>
-                    <SelectContent>
-                      {CARD_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {paymentMethod === 'UPI' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Payment Type <span className="text-red-500">*</span></Label>
-                    <Select value={methodDetails.onlinePaymentType || undefined} onValueChange={(v) => setMethodDetails(d => ({ ...d, onlinePaymentType: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent>
-                        {ONLINE_PAYMENT_TYPE_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Reference ID <span className="text-red-500">*</span></Label>
-                    <Input
-                      value={methodDetails.onlineReference}
-                      onChange={(e) => setMethodDetails(d => ({ ...d, onlineReference: e.target.value }))}
-                      placeholder="Transaction ID"
-                    />
-                  </div>
-                  {methodDetails.onlinePaymentType === 'Other' && (
-                    <div className="col-span-2 space-y-1.5">
-                      <Label className="text-xs font-medium">Payment Provider Name <span className="text-red-500">*</span></Label>
-                      <Input
-                        value={methodDetails.onlineProviderName}
-                        onChange={(e) => setMethodDetails(d => ({ ...d, onlineProviderName: e.target.value }))}
-                        placeholder="Provider name"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {paymentMethod === 'Bank Transfer' && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Bank Account (Ledger)</Label>
-                  <Select value={methodDetails.bankTransferAccountId || undefined} onValueChange={(v) => setMethodDetails(d => ({ ...d, bankTransferAccountId: v }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={bankAccounts.length ? 'Select bank account' : 'No bank accounts in ledger'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {bankAccounts.map(account => (
-                        <SelectItem key={account.id} value={String(account.id)}>{account.code} — {account.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Payment */}
+              {amountToPay > 0 && (
+                <PaymentAllocationPanel
+                  manager={paymentManager}
+                  invoiceTotal={amountToPay}
+                  bankAccounts={bankAccounts}
+                  customers={selectedMember ? [{
+                    code: selectedMember.membershipId,
+                    name: selectedMember.familyHeadName || selectedMember.name,
+                  } as CreditCustomer] : []}
+                  offeredTypes={
+                    selectedMember?.billedToHead
+                      ? [PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE, PAYMENT_TYPES.CREDIT]
+                      : [PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE]
+                  }
+                />
               )}
 
               {/* Notes */}
@@ -1306,7 +1201,11 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             <Button variant="outline" onClick={() => setIsPurchaseDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmPurchase} disabled={isSubmitting} className="gap-2">
+            <Button
+              onClick={handleConfirmPurchase}
+              disabled={isSubmitting || (amountToPay > 0 && !paymentManager.settleable)}
+              className="gap-2"
+            >
               <span className="inline-flex items-center justify-center w-4 h-4 shrink-0">
                 <FaCircleCheck className="w-4 h-4" />
               </span>
@@ -1335,7 +1234,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
               { label: "Amount", value: `${currencyCode} ${customAmount}` },
               ...(selectedMember?.billedToHead
                 ? [{ label: "Billed To", value: selectedMember.familyHeadName || "Family Head" }]
-                : [{ label: "Payment", value: paymentMethod }]),
+                : [{ label: "Payment", value: lastCreatedAddon?.payment_mode ?? "" }]),
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>

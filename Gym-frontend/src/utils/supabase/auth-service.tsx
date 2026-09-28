@@ -266,8 +266,15 @@ class AuthService {
     if (isAllBranches && options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase())) {
       // Allow auth operations to pass through
       if (!url.includes('/auth/')) {
+        // Shaped like the real backend's error body (see GlobalExceptionHandler —
+        // { timestamp, status, error, message }) so parseApiError() can surface this
+        // reason too, instead of every caller's generic "Failed to X" fallback
+        // hiding why the request was actually blocked.
         return new Response(
-          JSON.stringify({ error: "All Branches mode is read-only. Please select a specific branch to make changes." }), 
+          JSON.stringify({
+            error: "Forbidden",
+            message: "All Branches mode is read-only. Please select a specific branch to make changes.",
+          }),
           {
             status: 403,
             statusText: "Forbidden",

@@ -211,7 +211,8 @@ public class SaleTransactionService {
                 transaction.getTransactionNumber(),
                 transaction.getTransactionNumber(),
                 transaction.getNotes(),
-                transaction.getPaymentBreakdown()
+                transaction.getPaymentBreakdown(),
+                transaction.getBranchId()
         );
 
         return SaleTransactionResponseDTO.fromEntity(transaction, savedItems);

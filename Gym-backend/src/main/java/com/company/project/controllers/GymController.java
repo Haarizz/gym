@@ -102,6 +102,19 @@ public class GymController {
         return ResponseEntity.accepted().body(gymService.retryProvisioning(tenantId, requestBody));
     }
 
+    /**
+     * POST /api/gyms/catch-up-migrations — runs any Flyway migrations added to the
+     * codebase since each tenant was provisioned against that tenant's own database
+     * (see TenantProvisioningService.catchUpTenantMigrations). Synchronous and can
+     * take a while with many tenants, but each is independent and idempotent, so
+     * it's safe to call again if it's interrupted.
+     */
+    @PostMapping("/catch-up-migrations")
+    @PreAuthorize("hasAuthority('GYM_MANAGEMENT_EDIT')")
+    public ResponseEntity<List<com.company.project.controlplane.service.TenantProvisioningService.TenantMigrationResult>> catchUpMigrations() {
+        return ResponseEntity.ok(gymService.catchUpTenantMigrations());
+    }
+
     /** PUT /api/gyms/{id} — update gym details */
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('GYM_MANAGEMENT_EDIT')")

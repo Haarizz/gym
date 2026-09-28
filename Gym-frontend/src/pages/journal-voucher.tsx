@@ -20,11 +20,12 @@ import {
 } from "../components/ui/dropdown-menu";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import { Separator } from "../components/ui/separator";
 import {
   Plus, Search, Download, MoreHorizontal, Edit, Trash2, Eye,
   CalendarIcon, FileText, CheckCircle, XCircle, Clock, RefreshCw,
-  BookOpen, DollarSign, ArrowUpDown, AlertTriangle,
+  BookOpen, DollarSign, ArrowUpDown, AlertTriangle, ChevronsUpDown, Check,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../components/ui/utils";
@@ -35,7 +36,7 @@ import {
   type JournalVoucherLine,
   type JournalVoucherCreateRequest,
 } from "../utils/supabase/journal-voucher-service";
-import { ledgersService, type AccountHead } from "../utils/supabase/ledgers-service";
+import { ledgersService, type AccountHead, type CostCenter } from "../utils/supabase/ledgers-service";
 
 const emptyLine = (): JournalVoucherLine => ({
   accountCode: "",
@@ -72,7 +73,8 @@ export function JournalVoucherPage() {
   const [viewingVoucher, setViewingVoucher] = useState<JournalVoucher | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [accountHeads, setAccountHeads] = useState<AccountHead[]>([]);
-  const [accountSearch, setAccountSearch] = useState<Record<number, string>>({});
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [openAccountRow, setOpenAccountRow] = useState<number | null>(null);
   const [form, setForm] = useState<JournalVoucherCreateRequest>(defaultForm);
   const [formDate, setFormDate] = useState<Date>(new Date());
 
@@ -117,16 +119,25 @@ export function JournalVoucherPage() {
     }
   };
 
+  const loadCostCenters = async () => {
+    try {
+      const data = await ledgersService.getCostCenters({ isActive: true });
+      setCostCenters(data);
+    } catch {
+      // non-critical — cost center is optional
+    }
+  };
+
   const openCreate = () => {
     resetForm();
-    setAccountSearch({});
     loadAccountHeads();
+    loadCostCenters();
     setIsFormOpen(true);
   };
 
   const openEdit = (v: JournalVoucher) => {
     loadAccountHeads();
-    setAccountSearch({});
+    loadCostCenters();
     setEditingId(v.id);
     // parse "yyyy-MM-dd" as local date to avoid UTC midnight timezone shift
     if (v.date) {
@@ -213,16 +224,28 @@ export function JournalVoucherPage() {
   };
 
   const updateLine = (index: number, field: keyof JournalVoucherLine, value: any) => {
-    const updated = [...form.lines];
-    updated[index] = { ...updated[index], [field]: value };
-    setForm({ ...form, lines: updated });
+    setForm((prev) => {
+      const updated = [...prev.lines];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, lines: updated };
+    });
   };
 
-  const addLine = () => setForm({ ...form, lines: [...form.lines, emptyLine()] });
+  // Updates multiple fields on a line atomically (e.g. selecting an account sets both
+  // code and name at once) — avoids the stale-closure race of calling updateLine twice.
+  const updateLineFields = (index: number, fields: Partial<JournalVoucherLine>) => {
+    setForm((prev) => {
+      const updated = [...prev.lines];
+      updated[index] = { ...updated[index], ...fields };
+      return { ...prev, lines: updated };
+    });
+  };
+
+  const addLine = () => setForm((prev) => ({ ...prev, lines: [...prev.lines, emptyLine()] }));
 
   const removeLine = (index: number) => {
     if (form.lines.length <= 2) { toast.error("Minimum 2 lines required"); return; }
-    setForm({ ...form, lines: form.lines.filter((_, i) => i !== index) });
+    setForm((prev) => ({ ...prev, lines: prev.lines.filter((_, i) => i !== index) }));
   };
 
   return (
@@ -445,24 +468,27 @@ export function JournalVoucherPage() {
 
       {/* Create / Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) resetForm(); }}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent
+          className="flex flex-col p-0 gap-0 overflow-hidden"
+          style={{ width: "min(960px, 95vw)", maxWidth: "95vw", height: "min(720px, 90vh)" }}
+        >
+          <DialogHeader className="px-6 pt-6 pb-4 shrink-0 border-b">
             <DialogTitle>{editingId ? "Edit Journal Voucher" : "New Journal Voucher"}</DialogTitle>
             <DialogDescription>
               Enter the journal entry details. Debit total must equal Credit total.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-1">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
             {/* Header Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(formDate, "PPP")}
+                      <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="truncate">{format(formDate, "PPP")}</span>
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -485,7 +511,7 @@ export function JournalVoucherPage() {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-2 md:col-span-1">
                 <Label>Status</Label>
                 <Select value={form.status ?? "DRAFT"} onValueChange={(v) => setForm({ ...form, status: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -496,13 +522,14 @@ export function JournalVoucherPage() {
                 </Select>
               </div>
 
-              <div className="space-y-2 md:col-span-3">
+              <div className="space-y-2 col-span-2 md:col-span-3">
                 <Label>Narration / Description</Label>
                 <Textarea
                   value={form.narration}
                   onChange={(e) => setForm({ ...form, narration: e.target.value })}
                   placeholder="Describe the purpose of this journal entry..."
-                  rows={1}
+                  rows={2}
+                  className="resize-none"
                 />
               </div>
             </div>
@@ -519,131 +546,192 @@ export function JournalVoucherPage() {
                 </Button>
               </div>
 
-              <div className="rounded-lg bg-white overflow-x-auto shadow-sm border border-gray-100">
-                <Table className="min-w-full">
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead>Account Code</TableHead>
-                      <TableHead>Account Name</TableHead>
-                      <TableHead className="text-right">Debit ({currencyCode})</TableHead>
-                      <TableHead className="text-right">Credit ({currencyCode})</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Cost Center</TableHead>
-                      <TableHead className="w-10"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {form.lines.map((line, idx) => {
-                      const searchVal = accountSearch[idx] ?? line.accountCode;
-                      const suggestions = accountHeads.filter((a) => {
-                        const q = searchVal.toLowerCase();
-                        return q.length >= 1 && (
-                          a.code.toLowerCase().includes(q) ||
-                          a.name.toLowerCase().includes(q)
-                        );
-                      }).slice(0, 6);
-                      const showSuggestions = suggestions.length > 0 && searchVal.length >= 1 && searchVal !== line.accountCode;
+              <div className="rounded-lg bg-white shadow-sm border border-gray-100 w-full overflow-x-auto">
+                <div style={{ minWidth: "640px" }}>
+                {/* Header row */}
+                <div
+                  className="grid gap-2 bg-slate-50 rounded-t-lg px-2 py-2 text-xs font-medium text-foreground border-b border-gray-100"
+                  style={{ gridTemplateColumns: "1.1fr 1.3fr 0.85fr 0.85fr 1.2fr 0.8fr 32px" }}
+                >
+                  <div>Account Code</div>
+                  <div>Account Name</div>
+                  <div className="text-right truncate">Debit ({currencyCode})</div>
+                  <div className="text-right truncate">Credit ({currencyCode})</div>
+                  <div>Description</div>
+                  <div>Cost Center</div>
+                  <div></div>
+                </div>
 
-                      return (
-                      <TableRow key={idx}>
-                        <TableCell className="relative">
-                          <Input
-                            value={searchVal}
-                            onChange={(e) => {
-                              setAccountSearch({ ...accountSearch, [idx]: e.target.value });
-                              updateLine(idx, "accountCode", e.target.value);
-                              updateLine(idx, "accountName", "");
-                            }}
-                            placeholder="1000 or name..."
-                            className="w-36"
-                          />
-                          {showSuggestions && (
-                            <div className="absolute z-50 top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto">
-                              {suggestions.map((a) => (
-                                <button
-                                  key={a.id}
-                                  type="button"
-                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex flex-col"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    updateLine(idx, "accountCode", a.code);
-                                    updateLine(idx, "accountName", a.name);
-                                    setAccountSearch({ ...accountSearch, [idx]: a.code });
-                                  }}
-                                >
-                                  <span className="font-mono font-medium">{a.code}</span>
-                                  <span className="text-gray-500 text-xs">{a.name}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={line.accountName}
-                            onChange={(e) => updateLine(idx, "accountName", e.target.value)}
-                            placeholder="Cash in Hand"
-                            className="min-w-[140px]"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={line.debit || ""}
-                            onChange={(e) => updateLine(idx, "debit", parseFloat(e.target.value) || 0)}
-                            className="w-28 text-right"
-                            placeholder="0.00"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={line.credit || ""}
-                            onChange={(e) => updateLine(idx, "credit", parseFloat(e.target.value) || 0)}
-                            className="w-28 text-right"
-                            placeholder="0.00"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={line.description ?? ""}
-                            onChange={(e) => updateLine(idx, "description", e.target.value)}
-                            placeholder="Optional note"
-                            className="min-w-[130px]"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={line.costCenter ?? ""}
-                            onChange={(e) => updateLine(idx, "costCenter", e.target.value)}
-                            placeholder="CC-001"
-                            className="w-24"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-red-500"
-                            onClick={() => removeLine(idx)}
-                          >
-                            ×
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                    })}
-                  </TableBody>
-                </Table>
+                {form.lines.map((line, idx) => {
+                  const selectedAccount = accountHeads.find(
+                    (a) => a.code === line.accountCode && a.name === line.accountName
+                  );
+                  const selectAccount = (a: AccountHead) => {
+                    updateLineFields(idx, { accountCode: a.code, accountName: a.name });
+                    setOpenAccountRow(null);
+                  };
+
+                  return (
+                    <div
+                      key={idx}
+                      className="grid gap-2 items-center px-2 py-1.5 border-b border-gray-50 last:border-b-0"
+                      style={{ gridTemplateColumns: "1.1fr 1.3fr 0.85fr 0.85fr 1.2fr 0.8fr 32px" }}
+                    >
+                      {/* Account Code dropdown */}
+                      <div className="min-w-0">
+                        <Popover open={openAccountRow === idx} onOpenChange={(open) => setOpenAccountRow(open ? idx : null)}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={openAccountRow === idx}
+                              className="w-full justify-between font-normal bg-white px-2"
+                            >
+                              <span className="truncate font-mono">{line.accountCode || "Select code"}</span>
+                              <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent style={{ width: "300px" }} className="p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search code or name..." />
+                              <CommandList>
+                                <CommandEmpty>No account found.</CommandEmpty>
+                                <CommandGroup>
+                                  {accountHeads.map((a) => (
+                                    <CommandItem
+                                      key={a.id}
+                                      value={`${a.code} ${a.name}`}
+                                      onSelect={() => selectAccount(a)}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4 shrink-0",
+                                          selectedAccount?.id === a.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <span className="flex flex-col min-w-0">
+                                        <span className="font-mono font-medium">{a.code}</span>
+                                        <span className="text-gray-500 text-xs truncate">{a.name}</span>
+                                      </span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {/* Account Name dropdown (same list, kept in sync with code) */}
+                      <div className="min-w-0">
+                        <Popover open={openAccountRow === -(idx + 1)} onOpenChange={(open) => setOpenAccountRow(open ? -(idx + 1) : null)}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={openAccountRow === -(idx + 1)}
+                              className="w-full justify-between font-normal bg-white px-2"
+                            >
+                              <span className="truncate">{line.accountName || "Select account"}</span>
+                              <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent style={{ width: "300px" }} className="p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search account name..." />
+                              <CommandList>
+                                <CommandEmpty>No account found.</CommandEmpty>
+                                <CommandGroup>
+                                  {accountHeads.map((a) => (
+                                    <CommandItem
+                                      key={a.id}
+                                      value={`${a.name} ${a.code}`}
+                                      onSelect={() => selectAccount(a)}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4 shrink-0",
+                                          selectedAccount?.id === a.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <span className="flex flex-col min-w-0">
+                                        <span className="truncate">{a.name}</span>
+                                        <span className="text-gray-500 text-xs font-mono">{a.code}</span>
+                                      </span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="min-w-0">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={line.debit || ""}
+                          onChange={(e) => updateLine(idx, "debit", parseFloat(e.target.value) || 0)}
+                          className="w-full box-border text-right"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={line.credit || ""}
+                          onChange={(e) => updateLine(idx, "credit", parseFloat(e.target.value) || 0)}
+                          className="w-full box-border text-right"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <Input
+                          value={line.description ?? ""}
+                          onChange={(e) => updateLine(idx, "description", e.target.value)}
+                          placeholder="Optional note"
+                          className="w-full box-border"
+                        />
+                      </div>
+                      {/* Cost Center dropdown */}
+                      <div className="min-w-0">
+                        <Select
+                          value={line.costCenter || "__none__"}
+                          onValueChange={(v) => updateLine(idx, "costCenter", v === "__none__" ? "" : v)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">—</SelectItem>
+                            {costCenters.map((c) => (
+                              <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex justify-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-500 shrink-0"
+                          onClick={() => removeLine(idx)}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+                </div>
               </div>
 
               {/* Balance indicator */}
-              <div className="flex items-center justify-between p-3 rounded-md bg-white border border-gray-100 shadow-sm">
-                <div className="flex items-center gap-6 text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 rounded-md bg-white border border-gray-100 shadow-sm">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
                   <span>Total Debit: <strong><CurrencyGlyph /> {formTotalDebit.toFixed(2)}</strong></span>
                   <span>Total Credit: <strong><CurrencyGlyph /> {formTotalCredit.toFixed(2)}</strong></span>
                   <span>
@@ -653,11 +741,11 @@ export function JournalVoucherPage() {
                   </span>
                 </div>
                 {isBalanced ? (
-                  <Badge className="bg-green-100 text-green-800">
+                  <Badge className="bg-green-100 text-green-800 w-fit">
                     <CheckCircle className="h-3 w-3 mr-1" /> Balanced
                   </Badge>
                 ) : (
-                  <Badge className="bg-red-100 text-red-800">
+                  <Badge className="bg-red-100 text-red-800 w-fit">
                     <AlertTriangle className="h-3 w-3 mr-1" /> Unbalanced
                   </Badge>
                 )}
@@ -665,7 +753,7 @@ export function JournalVoucherPage() {
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-3 sticky bottom-0 bg-white border-t px-6 py-3 -mx-6">
+          <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-white shrink-0">
             <Button variant="outline" onClick={() => { setIsFormOpen(false); resetForm(); }}>Cancel</Button>
             <Button
               onClick={handleSubmit}
@@ -681,8 +769,11 @@ export function JournalVoucherPage() {
       {/* View Details Dialog */}
       {viewingVoucher && (
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent
+            className="flex flex-col p-0 gap-0 overflow-hidden"
+            style={{ width: "min(900px, 95vw)", maxWidth: "95vw", height: "min(640px, 90vh)" }}
+          >
+            <DialogHeader className="px-6 pt-6 pb-4 shrink-0 border-b">
               <DialogTitle className="flex items-center gap-3">
                 <BookOpen className="h-5 w-5 text-primary" />
                 {viewingVoucher.voucherNo}
@@ -692,7 +783,7 @@ export function JournalVoucherPage() {
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-gray-500">Date:</span> <strong>{viewingVoucher.date}</strong></div>
                 <div><span className="text-gray-500">Reference:</span> <strong>{viewingVoucher.reference || "—"}</strong></div>
@@ -709,55 +800,65 @@ export function JournalVoucherPage() {
 
               <Separator />
 
-              <Table className="min-w-full">
-                <TableHeader className="bg-slate-50">
-                  <TableRow>
-                    <TableHead>Account Code</TableHead>
-                    <TableHead>Account Name</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {viewingVoucher.lines.map((line, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-mono">{line.accountCode}</TableCell>
-                      <TableCell>{line.accountName}</TableCell>
-                      <TableCell className="text-right">{line.debit > 0 ? `${line.debit.toFixed(2)}` : "—"}</TableCell>
-                      <TableCell className="text-right">{line.credit > 0 ? `${line.credit.toFixed(2)}` : "—"}</TableCell>
-                      <TableCell className="text-gray-600">{line.description || "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow className="bg-gray-50 font-semibold">
-                    <TableCell colSpan={2}>Total</TableCell>
-                    <TableCell className="text-right">{viewingVoucher.totalDebit.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{viewingVoucher.totalCredit.toFixed(2)}</TableCell>
-                    <TableCell></TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              <div className="rounded-lg bg-white shadow-sm border border-gray-100 w-full overflow-x-auto">
+                <div style={{ minWidth: "560px" }}>
+                  <div
+                    className="grid gap-2 bg-slate-50 rounded-t-lg px-3 py-2 text-xs font-medium text-foreground border-b border-gray-100"
+                    style={{ gridTemplateColumns: "1fr 1.4fr 0.8fr 0.8fr 1.4fr" }}
+                  >
+                    <div>Account Code</div>
+                    <div>Account Name</div>
+                    <div className="text-right">Debit</div>
+                    <div className="text-right">Credit</div>
+                    <div>Description</div>
+                  </div>
 
-              {viewingVoucher.status === "DRAFT" && (
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => { handlePost(viewingVoucher.id); setIsViewOpen(false); }}
+                  {viewingVoucher.lines.map((line, idx) => (
+                    <div
+                      key={idx}
+                      className="grid gap-2 items-center px-3 py-2 text-sm border-b border-gray-50 last:border-b-0"
+                      style={{ gridTemplateColumns: "1fr 1.4fr 0.8fr 0.8fr 1.4fr" }}
+                    >
+                      <div className="font-mono truncate">{line.accountCode}</div>
+                      <div className="truncate">{line.accountName}</div>
+                      <div className="text-right">{line.debit > 0 ? line.debit.toFixed(2) : "—"}</div>
+                      <div className="text-right">{line.credit > 0 ? line.credit.toFixed(2) : "—"}</div>
+                      <div className="text-gray-600 truncate">{line.description || "—"}</div>
+                    </div>
+                  ))}
+
+                  <div
+                    className="grid gap-2 items-center px-3 py-2 text-sm bg-gray-50 font-semibold rounded-b-lg"
+                    style={{ gridTemplateColumns: "1fr 1.4fr 0.8fr 0.8fr 1.4fr" }}
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Post Voucher
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="text-orange-600 border-orange-300"
-                    onClick={() => { handleCancel(viewingVoucher.id); setIsViewOpen(false); }}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Cancel Voucher
-                  </Button>
+                    <div className="col-span-2">Total</div>
+                    <div className="text-right">{viewingVoucher.totalDebit.toFixed(2)}</div>
+                    <div className="text-right">{viewingVoucher.totalCredit.toFixed(2)}</div>
+                    <div></div>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
+
+            {viewingVoucher.status === "DRAFT" && (
+              <div className="flex gap-3 px-6 py-4 border-t bg-white shrink-0">
+                <Button
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => { handlePost(viewingVoucher.id); setIsViewOpen(false); }}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Post Voucher
+                </Button>
+                <Button
+                  variant="outline"
+                  className="text-orange-600 border-orange-300"
+                  onClick={() => { handleCancel(viewingVoucher.id); setIsViewOpen(false); }}
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Cancel Voucher
+                </Button>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       )}

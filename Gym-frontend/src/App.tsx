@@ -21,6 +21,7 @@ import {
   SidebarTrigger,
 } from "./components/ui/sidebar";
 import { Dashboard } from "./pages/dashboard";
+import { Notifications } from "./pages/notifications";
 import { Members } from "./pages/members";
 import { MemberConnect } from "./pages/member-connect";
 import { Billing } from "./pages/billing";
@@ -1043,6 +1044,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to={isGymbiosAdmin ? "/gym-management" : "/dashboard"} replace />} />
       <Route path="/dashboard" element={<Dashboard onNavigate={handleNavClick} />} />
+      <Route path="/notifications" element={<Notifications />} />
       <Route path="/approvals" element={<Approvals />} />
       <Route path="/community" element={<Community />} />
       <Route path="/members" element={<Members onNavigate={handleNavClick} initialTab={navigationParams.tab} />} />
