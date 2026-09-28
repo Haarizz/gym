@@ -4,15 +4,35 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Button, Input, Typography } from '@/shared/components';
 import { loginSchema, type LoginValues } from './schemas';
+import { SocialAuthButtons } from './SocialAuthButtons';
 
 interface SignInFormProps {
   isLoading: boolean;
   errorMessage?: string;
   onLogin: (values: LoginValues) => void;
   onSwitchToSignup: () => void;
+  onGoogleSignIn?: () => void;
+  isGoogleLoading?: boolean;
+  isGoogleAvailable?: boolean;
+  onAppleSignIn?: () => void;
+  isAppleLoading?: boolean;
+  isAppleAvailable?: boolean;
+  socialErrorMessage?: string;
 }
 
-export function SignInForm({ isLoading, errorMessage, onLogin, onSwitchToSignup }: SignInFormProps) {
+export function SignInForm({
+  isLoading,
+  errorMessage,
+  onLogin,
+  onSwitchToSignup,
+  onGoogleSignIn,
+  isGoogleLoading,
+  isGoogleAvailable,
+  onAppleSignIn,
+  isAppleLoading,
+  isAppleAvailable,
+  socialErrorMessage,
+}: SignInFormProps) {
   const {
     control,
     handleSubmit,
@@ -32,9 +52,7 @@ export function SignInForm({ isLoading, errorMessage, onLogin, onSwitchToSignup 
   return (
     <View style={styles.panel}>
       <Typography style={styles.panelTitle}>Welcome back</Typography>
-      <Typography style={styles.panelSub}>
-        Sign in to pick up where you left off.
-      </Typography>
+      <Typography style={styles.panelSub}>Sign in to pick up where you left off.</Typography>
 
       <View style={styles.fields}>
         <Controller
@@ -92,19 +110,27 @@ export function SignInForm({ isLoading, errorMessage, onLogin, onSwitchToSignup 
         </View>
       ) : null}
 
-      <Button
-        label="Sign in"
-        size="lg"
-        loading={isLoading}
-        onPress={handleSubmit(onLogin)}
-        style={styles.btnPrimary}
-      />
+      <Button label="Sign in" size="lg" loading={isLoading} onPress={handleSubmit(onLogin)} style={styles.btnPrimary} />
 
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Typography style={styles.dividerText}>or</Typography>
-        <View style={styles.dividerLine} />
-      </View>
+      {onGoogleSignIn && onAppleSignIn && (isGoogleAvailable || isAppleAvailable) ? (
+        <>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Typography style={styles.dividerText}>or</Typography>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <SocialAuthButtons
+            onGoogleSignIn={onGoogleSignIn}
+            isGoogleLoading={!!isGoogleLoading}
+            isGoogleAvailable={!!isGoogleAvailable}
+            onAppleSignIn={onAppleSignIn}
+            isAppleLoading={!!isAppleLoading}
+            isAppleAvailable={!!isAppleAvailable}
+            errorMessage={socialErrorMessage}
+          />
+        </>
+      ) : null}
 
       <Pressable style={styles.switchLine} onPress={onSwitchToSignup}>
         <Typography style={styles.switchText}>
@@ -160,7 +186,7 @@ const styles = StyleSheet.create({
   },
   btnPrimary: {
     marginTop: 8,
-    backgroundColor: '#1B5A4C', 
+    backgroundColor: '#1B5A4C',
     borderRadius: 16,
     shadowColor: '#1b5a4c',
     shadowOffset: { width: 0, height: 10 },

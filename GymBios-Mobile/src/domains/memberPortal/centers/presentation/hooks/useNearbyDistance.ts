@@ -12,6 +12,7 @@ interface UseNearbyDistanceResult {
   isLocating: boolean;
   permissionDenied: boolean;
   requestLocation: () => Promise<Coordinates | null>;
+  clearLocation: () => void;
 }
 
 export function useNearbyDistance(): UseNearbyDistanceResult {
@@ -56,5 +57,12 @@ export function useNearbyDistance(): UseNearbyDistanceResult {
     }
   };
 
-  return { coords, locationLabel, isLocating, permissionDenied, requestLocation };
+  // Only forgets the fetched position in-app — the device's location setting
+  // and the granted permission are left untouched.
+  const clearLocation = () => {
+    setCoords(null);
+    setLocationLabel(null);
+  };
+
+  return { coords, locationLabel, isLocating, permissionDenied, requestLocation, clearLocation };
 }

@@ -10,6 +10,11 @@ export interface ProfileApiModel {
   bloodType?: string;
   medicalConditions?: string;
   photoUrl?: string;
+  allergies?: string;
+  currentMedications?: string;
+  chronicIllnesses?: string;
+  height?: string;
+  weight?: string;
 }
 
 export interface UpdateProfileRequestApiModel {
@@ -24,4 +29,9 @@ export interface UpdateProfileRequestApiModel {
   bloodType?: string;
   medicalConditions?: string;
   photoUrl?: string;
+  allergies?: string;
+  currentMedications?: string;
+  chronicIllnesses?: string;
+  height?: string;
+  weight?: string;
 }

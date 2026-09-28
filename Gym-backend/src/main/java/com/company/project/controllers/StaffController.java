@@ -1,9 +1,12 @@
 package com.company.project.controllers;
 
 import com.company.project.dto.StaffPageResponseDTO;
+import com.company.project.dto.StaffPerformanceMetricsDTO;
 import com.company.project.dto.StaffRequestDTO;
 import com.company.project.dto.StaffResponseDTO;
+import com.company.project.dto.StaffSummaryDTO;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.StaffOverviewService;
 import com.company.project.services.StaffService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,14 +14,21 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/staff")
 public class StaffController {
 
-    private final StaffService staffService;
+    // Upper bound on ids per performance request — each id costs several revenue/lead queries.
+    private static final int MAX_PERFORMANCE_IDS = 100;
 
-    public StaffController(StaffService staffService) {
+    private final StaffService staffService;
+    private final StaffOverviewService staffOverviewService;
+
+    public StaffController(StaffService staffService, StaffOverviewService staffOverviewService) {
         this.staffService = staffService;
+        this.staffOverviewService = staffOverviewService;
     }
 
     // Deliberately not permission-gated beyond authenticated(): several unrelated pages
@@ -52,6 +62,30 @@ public class StaffController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(404).body("No staff record linked to this account.");
         }
+    }
+
+    /**
+     * GET /api/staff/summary
+     * Branch-scoped headcount KPIs: total, active/inactive, and today's present/absent.
+     */
+    @GetMapping("/summary")
+    @PreAuthorize("hasAuthority('STAFF_VIEW')")
+    public ResponseEntity<StaffSummaryDTO> getStaffSummary() {
+        return ResponseEntity.ok(staffOverviewService.getSummary());
+    }
+
+    /**
+     * GET /api/staff/performance?ids=1,2,3
+     * Current-month performance snapshot (target achievement, conversion, PT sessions,
+     * attendance, rating) for the given staff — typically the page shown in the list.
+     */
+    @GetMapping("/performance")
+    @PreAuthorize("hasAuthority('STAFF_VIEW')")
+    public ResponseEntity<List<StaffPerformanceMetricsDTO>> getStaffPerformance(@RequestParam List<Long> ids) {
+        if (ids.size() > MAX_PERFORMANCE_IDS) {
+            ids = ids.subList(0, MAX_PERFORMANCE_IDS);
+        }
+        return ResponseEntity.ok(staffOverviewService.getPerformance(ids));
     }
 
     @GetMapping("/{id}")

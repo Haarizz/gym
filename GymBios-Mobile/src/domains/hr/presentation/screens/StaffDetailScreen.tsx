@@ -8,7 +8,7 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Avatar } from '@/shared/components/Avatar';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { Typography } from '@/shared/components/Typography';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { useStaff } from '../hooks/useStaff';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
@@ -62,9 +62,11 @@ export function StaffDetailScreen({
     router.push(`/(admin)/staff/edit/${staffId}` as any);
   }, [router, staffId]);
 
+  const tabBarInset = useTabBarBottomInset();
+
   if (!selectedStaff) {
     return (
-      <ScreenLayout>
+      <ScreenLayout edges={TAB_SCREEN_EDGES}>
         <AppHeader
           title="Staff Details"
           colors={[theme.primary, theme.primary]}
@@ -87,13 +89,15 @@ export function StaffDetailScreen({
     .toUpperCase();
 
   return (
-    <ScreenLayout>
+    <ScreenLayout edges={TAB_SCREEN_EDGES}>
       <AppHeader
         title="Staff Details"
         colors={[theme.primary, theme.primary]}
         onBack={onBack}
       />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset + Spacing.four }]}
+      >
         {/* Profile Card */}
         <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
           <View style={styles.profileHeader}>
@@ -221,11 +225,13 @@ export function StaffDetailScreen({
   );
 }
 
+// RoleTabsLayout already pads the top inset; the floating tab bar is cleared via padding.
+const TAB_SCREEN_EDGES = ['left', 'right'] as const;
+
 const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing.four,
     gap: Spacing.md,
-    paddingBottom: Spacing.six,
   },
   loadingContainer: {
     flex: 1,

@@ -189,7 +189,7 @@ export function RoleTabsLayout({
                 title: tab.title,
                 tabBarLabel: tab.title,
                 href: (tab.name === 'index' ? `/${roleGroup}` : `/${roleGroup}/${tab.name}`) as any,
-                tabBarIcon: renderTabBarIcon(tab.icon, activeColor),
+                tabBarIcon: renderTabBarIcon(tab.icon, activeColor, tab.title),
               }}
             />
           ))}

@@ -100,6 +100,18 @@ export function CenterDetailScreen() {
   };
 
   const handleSelectPlan = (plan: CenterPlan) => {
+    const type = plan.planType?.toLowerCase();
+    if (type === 'couple' || type === 'family') {
+      router.push({
+        pathname: '/(member)/family/purchase' as any,
+        params: {
+          tenantSlug,
+          branchId,
+          planId: plan.id.toString(),
+        }
+      });
+      return;
+    }
     setSelectedPlan(plan);
     setIsPurchaseModalVisible(true);
   };

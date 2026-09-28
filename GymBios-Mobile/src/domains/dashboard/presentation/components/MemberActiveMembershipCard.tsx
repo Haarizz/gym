@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Glass, Radius, Spacing, TypographyScale } from '@/core/theme';
 import type { MemberInfo } from '../../domain/MemberDashboardData';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 
 interface MemberActiveMembershipCardProps {
   memberInfo: MemberInfo;
@@ -14,6 +15,12 @@ const GOLD_START = 'rgba(255,214,110,0.88)';
 const GOLD_END   = 'rgba(242,187,61,0.68)';
 
 export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershipCardProps) {
+  const { selectedBranchId, availableBranches } = useBranchContext();
+  const branchName =
+    selectedBranchId === 'ALL'
+      ? 'All branches'
+      : availableBranches.find((b) => b.id === selectedBranchId)?.branch_name || 'All branches';
+
   const formattedDate = memberInfo.validUntil
     ? new Date(memberInfo.validUntil).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -22,7 +29,9 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
       })
     : '-';
 
-  if (!memberInfo.isActive || memberInfo.membershipType === 'No Active Plan') {
+  const isFrozen = memberInfo.isFrozen;
+
+  if (!isFrozen && (!memberInfo.isActive || memberInfo.membershipType === 'No Active Plan')) {
     return (
       <View style={[styles.card, styles.inactiveCard]}>
         <View style={styles.topRow}>
@@ -61,16 +70,16 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
 
       <View style={styles.topRow}>
         <View style={styles.infoLeft}>
-          <Text style={styles.badgeLabel}>Active Membership</Text>
+          <Text style={styles.badgeLabel}>{isFrozen ? 'Frozen Membership' : 'Active Membership'}</Text>
           <Text style={styles.membershipType}>{memberInfo.membershipType}</Text>
           <View style={styles.locationRow}>
             <Feather name="map-pin" size={12} color="rgba(74,50,0,0.75)" />
-            <Text style={styles.gymName}>{memberInfo.gymName}</Text>
+            <Text style={styles.gymName}>{branchName}</Text>
           </View>
         </View>
         {/* Active pill — amber-dark semi-transparent glass */}
         <View style={styles.statusPill}>
-          <Text style={styles.statusText}>{memberInfo.isActive ? 'ACTIVE' : 'INACTIVE'}</Text>
+          <Text style={styles.statusText}>{isFrozen ? 'FROZEN' : (memberInfo.isActive ? 'ACTIVE' : 'INACTIVE')}</Text>
         </View>
       </View>
 

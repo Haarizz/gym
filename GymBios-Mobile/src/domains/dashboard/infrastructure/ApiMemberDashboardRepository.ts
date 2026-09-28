@@ -21,6 +21,8 @@ export interface MemberDashboardApiDTO {
     membership_type?: string;
     membershipType?: string;
     status?: string;
+    is_frozen?: boolean;
+    isFrozen?: boolean;
     active?: boolean;
     start_date?: string;
     startDate?: string;
@@ -202,7 +204,7 @@ export class ApiMemberDashboardRepository implements MemberDashboardRepository {
         membership?.membership_type ||
         'No Active Plan',
 
-      daysRemaining: membership?.daysRemaining ?? membership?.days_remaining ?? 0,
+      daysRemaining: membership?.daysRemaining ?? membership?.days_remaining ?? (membership as any)?.remaining_days ?? (membership as any)?.remainingDays ?? 0,
 
       validUntil:
         (membership?.expiryDate || membership?.expiry_date)?.split('T')[0] ||
@@ -210,7 +212,14 @@ export class ApiMemberDashboardRepository implements MemberDashboardRepository {
         '',
 
       isActive: membership?.active ?? false,
+      status: membership?.status,
+      isFrozen: membership?.isFrozen ?? membership?.is_frozen ?? (membership?.status?.toLowerCase() === 'frozen'),
     };
+
+    if (!memberInfo.daysRemaining && memberInfo.validUntil) {
+      const diff = new Date(memberInfo.validUntil).getTime() - new Date().getTime();
+      memberInfo.daysRemaining = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    }
 
     const checkInStatus = rawCheckIn
       ? {

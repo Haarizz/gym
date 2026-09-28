@@ -32,7 +32,8 @@ export function MemberCentersScreen({
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   const { data: centers = [], isLoading, isRefetching, refetch } = useCenters();
-  const { coords, locationLabel, requestLocation } = useNearbyDistance();
+  const { coords, locationLabel, isLocating, requestLocation, clearLocation } = useNearbyDistance();
+  const isLocationOn = coords != null;
 
   const goToDetail = (center: CenterSummary, tab: 'overview' | 'plans' = 'overview') => {
     router.push(`/(member)/centers/${center.tenantSlug}/${center.branchId}?tab=${tab}` as any);
@@ -49,18 +50,6 @@ export function MemberCentersScreen({
     handledDeepLinkRef.current = linkKey;
     router.push(`/(member)/centers/${initialDeepLink.tenantSlug}/${initialDeepLink.branchId}?tab=overview` as any);
   }, [initialDeepLink, router]);
-
-  // Distance sort needs the device's coordinates before it can do anything —
-  // request them lazily the first time the user actually asks for that sort,
-  // rather than prompting for location permission on screen load.
-  useEffect(() => {
-    if (sortBy !== 'Distance' || coords) return;
-    requestLocation().then((result) => {
-      if (!result) {
-        toast.warning('Enable location access to sort centers by distance.', { title: 'Location unavailable' });
-      }
-    });
-  }, [sortBy, coords, requestLocation]);
 
   const filteredCenters = useMemo(() => {
     const filtered = centers.filter((center) => {
@@ -99,7 +88,9 @@ export function MemberCentersScreen({
         if (b.startingPrice == null) return -1;
         return a.startingPrice - b.startingPrice;
       });
-    } else if (sortBy === 'Distance') {
+    } else if (sortBy === 'Distance' && coords) {
+      // Location is only requested from the "Use My Location" button, so until
+      // then there are no coordinates and the list keeps its original order.
       sorted.sort((a, b) => {
         const da = distanceKm(a);
         const db = distanceKm(b);
@@ -137,10 +128,20 @@ export function MemberCentersScreen({
   };
 
   const handleUseMyLocation = () => {
+    if (isLocating) return;
+    // Second tap turns the in-app location off — the list falls back to its
+    // original order and distances disappear from the cards.
+    if (isLocationOn) {
+      clearLocation();
+      return;
+    }
     requestLocation().then((result) => {
       if (!result) {
         toast.warning('Enable location access to find centers near you.', { title: 'Location unavailable' });
+        return;
       }
+      // Closest centers first once we know where the user is.
+      setSortBy('Distance');
     });
   };
 
@@ -187,20 +188,27 @@ export function MemberCentersScreen({
 
         <View style={styles.heroActionsRow}>
           <Pressable
-            style={[styles.locationButton, locationLabel && styles.locationButtonActive]}
+            style={[styles.locationButton, isLocationOn && styles.locationButtonActive]}
             onPress={handleUseMyLocation}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isLocationOn, busy: isLocating }}
           >
-            <Feather
-              name="navigation"
-              size={14}
-              color={locationLabel ? BrandColors.teal : '#FFFFFF'}
-            />
+            {isLocating ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Feather
+                name="navigation"
+                size={14}
+                color={isLocationOn ? BrandColors.teal : '#FFFFFF'}
+              />
+            )}
             <Text
-              style={[styles.locationButtonText, locationLabel && styles.locationButtonTextActive]}
+              style={[styles.locationButtonText, isLocationOn && styles.locationButtonTextActive]}
               numberOfLines={1}
             >
-              {locationLabel || 'Use My Location'}
+              {isLocationOn ? locationLabel || 'Near Me' : 'Use My Location'}
             </Text>
+            {isLocationOn && <Feather name="x" size={14} color={BrandColors.teal} />}
           </Pressable>
 
           <Pressable 

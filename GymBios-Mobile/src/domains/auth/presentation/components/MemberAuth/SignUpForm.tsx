@@ -5,15 +5,35 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Input, Typography } from '@/shared/components';
 import { signupSchema, type SignupValues } from './schemas';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
+import { SocialAuthButtons } from './SocialAuthButtons';
 
 interface SignUpFormProps {
   onSwitchToSignin: () => void;
   onRegister: (values: SignupValues) => void;
   isLoading?: boolean;
   errorMessage?: string | null;
+  onGoogleSignIn?: () => void;
+  isGoogleLoading?: boolean;
+  isGoogleAvailable?: boolean;
+  onAppleSignIn?: () => void;
+  isAppleLoading?: boolean;
+  isAppleAvailable?: boolean;
+  socialErrorMessage?: string;
 }
 
-export function SignUpForm({ onSwitchToSignin, onRegister, isLoading, errorMessage }: SignUpFormProps) {
+export function SignUpForm({
+  onSwitchToSignin,
+  onRegister,
+  isLoading,
+  errorMessage,
+  onGoogleSignIn,
+  isGoogleLoading,
+  isGoogleAvailable,
+  onAppleSignIn,
+  isAppleLoading,
+  isAppleAvailable,
+  socialErrorMessage,
+}: SignUpFormProps) {
   const {
     control,
     handleSubmit,
@@ -38,9 +58,7 @@ export function SignUpForm({ onSwitchToSignin, onRegister, isLoading, errorMessa
   return (
     <View style={styles.panel}>
       <Typography style={styles.panelTitle}>Create your account</Typography>
-      <Typography style={styles.panelSub}>
-        Join your gym's member app in under a minute.
-      </Typography>
+      <Typography style={styles.panelSub}>Join your gym's member app in under a minute.</Typography>
 
       <View style={styles.fields}>
         <Controller
@@ -124,13 +142,10 @@ export function SignUpForm({ onSwitchToSignin, onRegister, isLoading, errorMessa
         />
       </View>
 
-      {errorMessage && (
-        <Typography style={styles.errorText}>{errorMessage}</Typography>
-      )}
+      {errorMessage && <Typography style={styles.errorText}>{errorMessage}</Typography>}
 
       <Typography style={styles.terms}>
-        By creating an account, you agree to GymBios's{' '}
-        <Typography style={styles.termsLink}>Terms</Typography> and{' '}
+        By creating an account, you agree to GymBios's <Typography style={styles.termsLink}>Terms</Typography> and{' '}
         <Typography style={styles.termsLink}>Privacy Policy</Typography>.
       </Typography>
 
@@ -142,11 +157,25 @@ export function SignUpForm({ onSwitchToSignin, onRegister, isLoading, errorMessa
         style={styles.btnPrimary}
       />
 
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Typography style={styles.dividerText}>or</Typography>
-        <View style={styles.dividerLine} />
-      </View>
+      {onGoogleSignIn && onAppleSignIn && (isGoogleAvailable || isAppleAvailable) ? (
+        <>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Typography style={styles.dividerText}>or</Typography>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <SocialAuthButtons
+            onGoogleSignIn={onGoogleSignIn}
+            isGoogleLoading={!!isGoogleLoading}
+            isGoogleAvailable={!!isGoogleAvailable}
+            onAppleSignIn={onAppleSignIn}
+            isAppleLoading={!!isAppleLoading}
+            isAppleAvailable={!!isAppleAvailable}
+            errorMessage={socialErrorMessage}
+          />
+        </>
+      ) : null}
 
       <Pressable style={styles.switchLine} onPress={onSwitchToSignin}>
         <Typography style={styles.switchText}>
@@ -184,7 +213,7 @@ const styles = StyleSheet.create({
   },
   btnPrimary: {
     marginTop: 8,
-    backgroundColor: '#1B5A4C', 
+    backgroundColor: '#1B5A4C',
     borderRadius: 16,
     shadowColor: '#1b5a4c',
     shadowOffset: { width: 0, height: 10 },

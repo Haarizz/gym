@@ -1,6 +1,7 @@
 package com.company.project.dto;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
 /**
  * One leg of a payment — either one of several legs in a Mixed payment, or the
@@ -80,4 +81,32 @@ public class PaymentSplitDTO {
 
     public String getProviderName() { return providerName; }
     public void setProviderName(String providerName) { this.providerName = providerName; }
+
+    // Value equality is required, not cosmetic: this is stored via a JPA
+    // AttributeConverter, and Hibernate dirty-checks converted attributes with
+    // equals(). With identity equality every loaded Receipt looked modified, so
+    // any read-write transaction that merely read receipts issued a spurious
+    // UPDATE on commit (rejected in All Branches mode by BranchSecurityListener).
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof PaymentSplitDTO)) return false;
+        PaymentSplitDTO that = (PaymentSplitDTO) o;
+        return Objects.equals(method, that.method) &&
+                Objects.equals(amount, that.amount) &&
+                Objects.equals(reference, that.reference) &&
+                Objects.equals(cardType, that.cardType) &&
+                Objects.equals(chequeNumber, that.chequeNumber) &&
+                Objects.equals(chequeDate, that.chequeDate) &&
+                Objects.equals(bankName, that.bankName) &&
+                Objects.equals(bankAccountCode, that.bankAccountCode) &&
+                Objects.equals(bankAccountName, that.bankAccountName) &&
+                Objects.equals(onlinePaymentType, that.onlinePaymentType) &&
+                Objects.equals(providerName, that.providerName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(method, amount, reference, cardType, chequeNumber, chequeDate, bankName, bankAccountCode, bankAccountName, onlinePaymentType, providerName);
+    }
 }

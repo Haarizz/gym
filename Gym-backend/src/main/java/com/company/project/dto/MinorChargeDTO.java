@@ -1,6 +1,7 @@
 package com.company.project.dto;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
 /**
  * One line item within a guardian's Receipt representing a minor family
@@ -46,4 +47,26 @@ public class MinorChargeDTO {
 
     public Boolean getPaid() { return paid; }
     public void setPaid(Boolean paid) { this.paid = paid; }
+
+    // Value equality is required, not cosmetic: this is stored via a JPA
+    // AttributeConverter, and Hibernate dirty-checks converted attributes with
+    // equals(). With identity equality every loaded Receipt looked modified, so
+    // any read-write transaction that merely read receipts issued a spurious
+    // UPDATE on commit (rejected in All Branches mode by BranchSecurityListener).
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof MinorChargeDTO)) return false;
+        MinorChargeDTO that = (MinorChargeDTO) o;
+        return Objects.equals(memberId, that.memberId) &&
+                Objects.equals(memberDbId, that.memberDbId) &&
+                Objects.equals(name, that.name) &&
+                Objects.equals(amount, that.amount) &&
+                Objects.equals(paid, that.paid);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(memberId, memberDbId, name, amount, paid);
+    }
 }

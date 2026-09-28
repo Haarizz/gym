@@ -17,6 +17,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     boolean existsBySessionId(Long sessionId);
     long deleteBySessionId(Long sessionId);
 
+    // (className, bookedCount) for group classes (PT excluded) in the period
+    @Query("SELECT s.name, COUNT(b) FROM Booking b JOIN b.session s " +
+           "WHERE s.date BETWEEN :start AND :end AND LOWER(s.status) <> 'cancelled' " +
+           "AND LOWER(s.type) <> 'pt' AND LOWER(b.status) <> 'cancelled' GROUP BY s.name")
+    List<Object[]> countClassBookingsByNameBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
     @Query("select b.session.id, count(b) from Booking b where b.session.id in :sessionIds and b.status <> 'cancelled' group by b.session.id")
     List<Object[]> countActiveBySessionIds(@Param("sessionIds") List<Long> sessionIds);
 

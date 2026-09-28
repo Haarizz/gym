@@ -1,11 +1,12 @@
 import { Feather } from '@expo/vector-icons';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, View, ScrollView, Pressable } from 'react-native';
+import { FlatList, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/core/hooks';
-import { Radius, Spacing } from '@/core/theme';
+import { useCurrency } from '@/core/providers/CurrencyProvider';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 
 import { EmptyState } from '@/shared/components/EmptyState';
 import { Pagination } from '@/shared/components/Pagination';
@@ -15,7 +16,7 @@ import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { StaffCard } from '../components/StaffCard';
-import { useStaff } from '../hooks/useStaff';
+import { useStaff, useStaffPerformance, useStaffSummary } from '../hooks/useStaff';
 import type { Staff } from '../../domain/Staff';
 
 interface AdminStaffScreenProps {
@@ -23,13 +24,26 @@ interface AdminStaffScreenProps {
   onNavigateToCreate: () => void;
 }
 
+// RoleTabsLayout already pads the top inset and the list pads past the tab bar.
+const TAB_SCREEN_EDGES = ['left', 'right'] as const;
+
+const PRESENT_COLOR = '#16a34a';
+const ABSENT_COLOR = '#dc2626';
+
 export function AdminStaffScreen({
   onNavigateToDetail,
   onNavigateToCreate,
 }: AdminStaffScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { currencyCode } = useCurrency();
   const { staff, loading, refresh, page, totalPages, setPage } = useStaff();
+  const { data: summary, refetch: refetchSummary } = useStaffSummary();
+  const staffIds = useMemo(() => staff.map((s) => s.id), [staff]);
+  const {
+    byStaffId: performanceById,
+    refresh: refreshPerformance,
+  } = useStaffPerformance(staffIds);
   const { selectedBranchId } = useBranchContext();
 
   const handleCreate = useCallback(() => {
@@ -39,6 +53,26 @@ export function AdminStaffScreen({
     }
     onNavigateToCreate();
   }, [selectedBranchId, onNavigateToCreate]);
+
+  const handleMessage = useCallback((member: Staff) => {
+    if (!member.phone) {
+      toast.info('This staff member does not have a phone number recorded.', {
+        title: 'No Phone Number',
+      });
+      return;
+    }
+    Linking.openURL(`sms:${member.phone.replace(/\s+/g, '')}`).catch(() => {
+      toast.error('Unable to launch SMS messaging on this device.', {
+        title: 'Error',
+      });
+    });
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    refresh();
+    refetchSummary();
+    refreshPerformance();
+  }, [refresh, refetchSummary, refreshPerformance]);
 
   const [search, setSearch] = useState('');
 
@@ -53,61 +87,52 @@ export function AdminStaffScreen({
     );
   }, [staff, search]);
 
-  const totalStaff = staff.length;
-  const activeStaff = staff.filter((s) => s.status?.toUpperCase() === 'ACTIVE').length;
-  const inactiveStaff = staff.filter((s) => s.status?.toUpperCase() === 'INACTIVE').length;
-
   const renderItem = useCallback(
     ({ item }: { item: Staff }) => (
-      <StaffCard staff={item} onPress={onNavigateToDetail} />
+      <StaffCard
+        staff={item}
+        performance={performanceById.get(item.id)}
+        currencyCode={currencyCode}
+        onPress={onNavigateToDetail}
+        onMessage={handleMessage}
+      />
     ),
-    [onNavigateToDetail],
+    [performanceById, currencyCode, onNavigateToDetail, handleMessage],
   );
 
-  const renderHeader = useCallback(
+  // Must be an element, not a component: a component whose identity changes on
+  // every keystroke is remounted by FlatList, which drops focus from the search input.
+  const listHeader = useMemo(
     () => (
       <View style={styles.headerContainer}>
-        <View style={styles.searchRow}>
-          <View style={styles.searchContainer}>
-            <SearchBar
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search staff by name or role..."
-            />
-          </View>
-          <Pressable
-            style={[styles.addButton, { backgroundColor: theme.primary }]}
-            onPress={handleCreate}
-            accessibilityLabel="Add staff"
-          >
-            <Feather name="plus" size={20} color={theme.background} />
-          </Pressable>
-        </View>
+        <SearchBar
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search staff by name or role..."
+        />
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContainer}
-        >
-          <Pressable style={[styles.filterChip, { backgroundColor: theme.primary }]}>
-            <Typography variant="bodySmallBold" style={{ color: theme.background }}>
-              All · {totalStaff}
-            </Typography>
-          </Pressable>
-          <Pressable style={[styles.filterChip, { backgroundColor: theme.backgroundElement }]}>
-            <Typography variant="bodySmallBold" color="textSecondary">
-              Active · {activeStaff}
-            </Typography>
-          </Pressable>
-          <Pressable style={[styles.filterChip, { backgroundColor: theme.backgroundElement }]}>
-            <Typography variant="bodySmallBold" color="textSecondary">
-              Inactive · {inactiveStaff}
-            </Typography>
-          </Pressable>
-        </ScrollView>
+        <View style={styles.summaryRow}>
+          {[
+            { label: 'Total Staff', value: summary?.totalStaff, color: theme.text },
+            { label: 'Present', value: summary?.presentToday, color: PRESENT_COLOR },
+            { label: 'Absent', value: summary?.absentToday, color: ABSENT_COLOR },
+          ].map((kpi) => (
+            <View
+              key={kpi.label}
+              style={[styles.summaryCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+            >
+              <Typography variant="caption" color="textSecondary" style={styles.summaryLabel}>
+                {kpi.label}
+              </Typography>
+              <Typography variant="subtitle" style={[styles.summaryValue, { color: kpi.color }]}>
+                {kpi.value ?? '—'}
+              </Typography>
+            </View>
+          ))}
+        </View>
       </View>
     ),
-    [search, totalStaff, activeStaff, inactiveStaff, theme, handleCreate],
+    [search, summary, theme],
   );
 
   const renderEmpty = useCallback(
@@ -131,22 +156,36 @@ export function AdminStaffScreen({
   const renderFooter = useCallback(() => {
     if (loading && staff.length === 0) return null;
     return (
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
+      <View style={styles.footer}>
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+        {staff.length > 0 ? (
+          <Pressable
+            style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+            onPress={handleCreate}
+            accessibilityRole="button"
+          >
+            <Feather name="plus" size={18} color={BrandColors.white} />
+            <Typography variant="bodySmallBold" style={styles.addButtonLabel}>
+              Add New Staff Member
+            </Typography>
+          </Pressable>
+        ) : null}
+      </View>
     );
-  }, [loading, staff.length, page, totalPages, setPage]);
+  }, [loading, staff.length, page, totalPages, setPage, handleCreate]);
 
   return (
-    <ScreenLayout>
+    <ScreenLayout edges={TAB_SCREEN_EDGES}>
       <View style={styles.container}>
         <FlatList
           data={filteredStaff}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          ListHeaderComponent={renderHeader}
+          ListHeaderComponent={listHeader}
           ListFooterComponent={renderFooter}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={[
@@ -154,7 +193,7 @@ export function AdminStaffScreen({
             { paddingBottom: insets.bottom + 120 }
           ]}
           refreshing={loading}
-          onRefresh={refresh}
+          onRefresh={handleRefresh}
           showsVerticalScrollIndicator={false}
         />
       </View>
@@ -167,38 +206,47 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.two,
-    gap: Spacing.four,
+    paddingTop: Spacing.three,
+    gap: Spacing.three,
   },
-  searchRow: {
+  summaryRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
-    alignItems: 'center',
+    gap: Spacing.md,
   },
-  searchContainer: {
+  summaryCard: {
     flex: 1,
+    borderRadius: Radius.md,
+    borderWidth: 0.5,
+    padding: Spacing.md,
+  },
+  summaryLabel: {
+    marginBottom: Spacing.one,
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  footer: {
+    gap: Spacing.three,
   },
   addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  filterContainer: {
     gap: Spacing.two,
-    paddingRight: Spacing.four,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: BrandColors.teal,
   },
-  filterChip: {
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.full,
+  addButtonPressed: {
+    backgroundColor: BrandColors.tealDark,
+  },
+  addButtonLabel: {
+    color: BrandColors.white,
   },
   listContent: {
     flexGrow: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
 });

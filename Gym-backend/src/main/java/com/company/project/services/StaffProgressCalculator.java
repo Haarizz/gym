@@ -116,4 +116,31 @@ public class StaffProgressCalculator {
 
         return Math.max(leadConversions, paidReceipts);
     }
+
+    /**
+     * Share (0–100) of the staff member's leads — assigned to them or created by them — that
+     * are converted. A null staff counts every lead, matching accounts with no Staff record.
+     */
+    public int computeLeadConversionRate(Staff staff, String username) {
+        long totalLeads = leadRepository.count(staffLeadsSpec(staff, username, false));
+        if (totalLeads == 0) return 0;
+        long convertedLeads = leadRepository.count(staffLeadsSpec(staff, username, true));
+        return (int) Math.round(((double) convertedLeads / totalLeads) * 100);
+    }
+
+    private Specification<Lead> staffLeadsSpec(Staff staff, String username, boolean convertedOnly) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (convertedOnly) {
+                predicates.add(cb.equal(root.get("status"), "converted"));
+            }
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
+                        cb.equal(root.get("createdBy"), username)
+                ));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
 }

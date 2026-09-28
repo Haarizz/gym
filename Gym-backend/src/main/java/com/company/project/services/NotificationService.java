@@ -15,7 +15,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.company.project.security.BranchContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,10 +39,14 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final RoleService roleService;
+    private final TransactionTemplate isolatedInsert;
 
-    public NotificationService(NotificationRepository notificationRepository, RoleService roleService) {
+    public NotificationService(NotificationRepository notificationRepository, RoleService roleService,
+                               PlatformTransactionManager transactionManager) {
         this.notificationRepository = notificationRepository;
         this.roleService = roleService;
+        this.isolatedInsert = new TransactionTemplate(transactionManager);
+        this.isolatedInsert.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     // ── Public trigger methods ────────────────────────────────────────────────
@@ -190,8 +197,13 @@ public class NotificationService {
 
     /** Save and silently ignore duplicate eventKey violations (idempotency). */
     private void saveIgnoreDuplicate(Notification n) {
+        // Each insert gets its own transaction. Catching around a bare save() isn't
+        // enough: the failing (transactional) repository call has already marked the
+        // surrounding transaction rollback-only, so its commit would then throw
+        // UnexpectedRollbackException at whoever called notify* — e.g. a member
+        // purchase failing because a reused member id collided with an old eventKey.
         try {
-            notificationRepository.save(n);
+            isolatedInsert.executeWithoutResult(status -> notificationRepository.save(n));
         } catch (DataIntegrityViolationException ignored) {
             // Duplicate eventKey — notification already exists, skip
         } catch (Exception ignored) {

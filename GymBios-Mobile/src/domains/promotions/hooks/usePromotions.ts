@@ -5,6 +5,7 @@ import { promotionKeys } from './promotionKeys';
 import type {
   PromotionCampaignRequest,
   PromotionCampaignResponse,
+  PromotionImpact,
 } from '../domain/PromotionCampaign';
 import type { ApplyAccessDaysRequest } from '../domain/AccessDays';
 
@@ -114,17 +115,27 @@ export function useRedeemPromotion() {
       id,
       revenue,
       savings,
+      memberId,
     }: {
       id: number;
       revenue?: number;
       savings?: number;
-    }) => promotionService.redeemPromotion(id, revenue, savings),
+      memberId?: number;
+    }) => promotionService.redeemPromotion(id, revenue, savings, memberId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: promotionKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: promotionKeys.impact() });
       queryClient.invalidateQueries({
         queryKey: promotionKeys.detail(variables.id),
       });
     },
+  });
+}
+
+export function usePromotionImpact() {
+  return useQuery<PromotionImpact, Error>({
+    queryKey: promotionKeys.impact(),
+    queryFn: () => promotionService.getMonthlyImpact(),
   });
 }
 

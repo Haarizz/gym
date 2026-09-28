@@ -179,6 +179,24 @@ public class MemberService {
         }
         Member saved = memberRepository.save(member);
 
+        // A mobile Family/Couple purchase locks every family member created with it
+        // behind the head's approval (see registerFamilyAdult/createBilledToHeadRecord)
+        // — the head's one payment covered them all, so approving it approves them.
+        for (Member dep : pendingDependentsOf(saved)) {
+            com.company.project.entities.Receipt depReceipt = receiptService.findPendingReceiptForMember(dep.getId());
+            if (depReceipt != null) {
+                receiptService.approveReceipt(depReceipt, approvedBy);
+            }
+            dep.setApprovalStatus("APPROVED");
+            dep.setApprovedBy(approvedBy);
+            dep.setApprovedAt(LocalDateTime.now());
+            dep.setAppAccessEnabled(true);
+            if ("pending_approval".equals(dep.getMembershipStatus())) {
+                dep.setMembershipStatus("Active");
+            }
+            memberRepository.save(dep);
+        }
+
         return MemberResponseDTO.fromEntity(saved);
     }
 
@@ -206,7 +224,29 @@ public class MemberService {
         member.setMembershipStatus("inactive");
         Member saved = memberRepository.save(member);
 
+        for (Member dep : pendingDependentsOf(saved)) {
+            com.company.project.entities.Receipt depReceipt = receiptService.findPendingReceiptForMember(dep.getId());
+            if (depReceipt != null) {
+                receiptService.rejectReceipt(depReceipt, rejectedBy, reason);
+            }
+            dep.setApprovalStatus("REJECTED");
+            dep.setApprovedBy(rejectedBy);
+            dep.setApprovedAt(LocalDateTime.now());
+            dep.setRejectionReason(reason);
+            dep.setMembershipStatus("inactive");
+            memberRepository.save(dep);
+        }
+
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    private List<Member> pendingDependentsOf(Member head) {
+        if (!Boolean.TRUE.equals(head.getIsFamilyHead()) || head.getMemberId() == null) {
+            return List.of();
+        }
+        return memberRepository.findByFamilyHeadId(head.getMemberId()).stream()
+                .filter(dep -> "PENDING".equals(dep.getApprovalStatus()))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -643,7 +683,7 @@ public class MemberService {
      * (falling back to pricePerMember) for every member beyond that cap. index is
      * 0-based across the whole family, head included (head is always index 0).
      */
-    private BigDecimal memberPriceForIndex(MembershipPlan plan, int index) {
+    public BigDecimal memberPriceForIndex(MembershipPlan plan, int index) {
         BigDecimal base = plan.getPricePerMember() != null ? plan.getPricePerMember() : BigDecimal.ZERO;
         Integer max = plan.getMaxFamilyMembers();
         if (max == null || max <= 0 || index < max) return base;
@@ -701,6 +741,7 @@ public class MemberService {
         dep.setRelationshipToHead(fm.getRelationship());
         dep.setIsMinor(false);
         dep.setBilledToHead(false);
+        boolean awaitingApproval = applyHeadApprovalGate(dep, head);
 
         if (dep.getMembershipPlan() != null) {
             planRepository.findByName(dep.getMembershipPlan()).ifPresent(plan -> {
@@ -728,6 +769,13 @@ public class MemberService {
         com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
                 savedDep, "New", savedDep.getPaymentStatus(), fm.getPaymentBreakdown(),
                 fm.getBankAccountCode(), fm.getBankAccountName(), fm.getProcessedByStaffId());
+
+        // Same deferral as the head's own receipt in createMember: nothing posts to
+        // the ledger until reception confirms the head's Cash/Credit/Mixed payment.
+        if (awaitingApproval) {
+            receiptService.markPendingApproval(receipt);
+            return;
+        }
 
         if (receipt.getPaidAmount() != null && receipt.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
             financialEventService.onMemberPaymentReceived(receipt);
@@ -779,11 +827,28 @@ public class MemberService {
         dep.setRelationshipToHead(fm.getRelationship());
         dep.setIsMinor(Boolean.TRUE.equals(fm.getIsMinor()));
         dep.setBilledToHead(true);
+        applyHeadApprovalGate(dep, head);
         if (fm.getDateOfBirth() != null) dep.setDateOfBirth(parseDate(fm.getDateOfBirth()));
 
         Member savedDep = memberRepository.save(dep);
         savedDep.setMemberId("MBR-" + String.format("%010d", savedDep.getId()));
         memberRepository.save(savedDep);
+    }
+
+    /**
+     * A family member created alongside a head whose mobile Cash/Credit/Mixed
+     * payment is still awaiting reception approval is locked out of the app the
+     * same way the head is, until approveMemberPayment/rejectMemberPayment settles
+     * the head (which cascades here). Returns whether the gate was applied.
+     */
+    private boolean applyHeadApprovalGate(Member dep, Member head) {
+        if (!"PENDING".equals(head.getApprovalStatus())) {
+            return false;
+        }
+        dep.setApprovalStatus("PENDING");
+        dep.setAppAccessEnabled(false);
+        dep.setMembershipStatus("pending_approval");
+        return true;
     }
 
     public MemberResponseDTO updateMember(Long id, MemberRequestDTO request) {

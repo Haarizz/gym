@@ -3,7 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
 import { Loader } from '@/shared/components';
-import { ROLE_SELECTION_HREF } from '../navigation/routes';
+import { ROLE_SELECTION_HREF, MEMBER_AUTH_HREF } from '../navigation/routes';
 
 import type { createUseRestoreSession } from '../hooks/useAuthFlow';
 
@@ -49,7 +49,7 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
         }
       }
     } else if (!inAuthGroup && segments.length > 0) {
-      router.replace(ROLE_SELECTION_HREF);
+      router.replace(MEMBER_AUTH_HREF);
     }
   }, [isHydrated, isRestoring, isAuthenticated, session, segments, router]);
 

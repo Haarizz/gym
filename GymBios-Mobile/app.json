@@ -11,7 +11,8 @@
       "icon": "./assets/expo.icon",
       "associatedDomains": [
         "applinks:TODO_PRODUCTION_DOMAIN"
-      ]
+      ],
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -62,7 +63,9 @@
         {
           "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to find gyms and wellness centers near you."
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -210,6 +210,11 @@ export function ProfileCompletionScreen() {
       emergencyPhone: '',
       bloodType: '',
       medicalConditions: '',
+      allergies: '',
+      currentMedications: '',
+      chronicIllnesses: '',
+      height: '',
+      weight: '',
       photoUrl: '',
     },
   });
@@ -549,29 +554,46 @@ export function ProfileCompletionScreen() {
                 )}
               />
 
-              {/* Allergies — display only, not in current API model */}
-              <CharTextInput
-                label="Allergies"
-                optional
-                value=""
-                onChangeText={() => {}}
-                placeholder="e.g. Peanuts, Penicillin, Dust, Latex"
+              <Controller
+                control={control}
+                name="allergies"
+                render={({ field: { onChange, value } }) => (
+                  <CharTextInput
+                    label="Allergies"
+                    optional
+                    value={value ?? ''}
+                    onChangeText={onChange}
+                    placeholder="e.g. Peanuts, Penicillin, Dust, Latex"
+                  />
+                )}
               />
 
-              <CharTextInput
-                label="Current medications"
-                optional
-                value=""
-                onChangeText={() => {}}
-                placeholder="e.g. Metformin 500mg, Vitamin D 1000IU"
+              <Controller
+                control={control}
+                name="currentMedications"
+                render={({ field: { onChange, value } }) => (
+                  <CharTextInput
+                    label="Current medications"
+                    optional
+                    value={value ?? ''}
+                    onChangeText={onChange}
+                    placeholder="e.g. Metformin 500mg, Vitamin D 1000IU"
+                  />
+                )}
               />
 
-              <CharTextInput
-                label="Chronic illnesses"
-                optional
-                value=""
-                onChangeText={() => {}}
-                placeholder="e.g. Heart Disease, Arthritis, COPD"
+              <Controller
+                control={control}
+                name="chronicIllnesses"
+                render={({ field: { onChange, value } }) => (
+                  <CharTextInput
+                    label="Chronic illnesses"
+                    optional
+                    value={value ?? ''}
+                    onChangeText={onChange}
+                    placeholder="e.g. Heart Disease, Arthritis, COPD"
+                  />
+                )}
               />
 
               <Controller
@@ -591,17 +613,33 @@ export function ProfileCompletionScreen() {
               />
 
               <View style={[styles.row2, { marginTop: 0 }]}>
-                <Input
-                  label="Height (cm)"
-                  placeholder="170"
-                  keyboardType="numeric"
-                  containerStyle={{ flex: 1 }}
+                <Controller
+                  control={control}
+                  name="height"
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      label="Height (cm)"
+                      placeholder="170"
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      keyboardType="numeric"
+                      containerStyle={{ flex: 1 }}
+                    />
+                  )}
                 />
-                <Input
-                  label="Weight (kg)"
-                  placeholder="70"
-                  keyboardType="numeric"
-                  containerStyle={{ flex: 1 }}
+                <Controller
+                  control={control}
+                  name="weight"
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      label="Weight (kg)"
+                      placeholder="70"
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      keyboardType="numeric"
+                      containerStyle={{ flex: 1 }}
+                    />
+                  )}
                 />
               </View>
             </SectionCard>

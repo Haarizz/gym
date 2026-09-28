@@ -12,5 +12,11 @@ export const signupSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
+export const socialUsernameSchema = z.object({
+  username: z.string().min(1, 'Username is required').regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'),
+  fullName: z.string().min(1, 'Full name is required'),
+});
+
 export type LoginValues = z.infer<typeof loginSchema>;
 export type SignupValues = z.infer<typeof signupSchema>;
+export type SocialUsernameValues = z.infer<typeof socialUsernameSchema>;

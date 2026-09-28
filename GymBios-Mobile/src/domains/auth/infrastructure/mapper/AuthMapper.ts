@@ -1,16 +1,23 @@
 import { Session } from '../../domain/entities/Session';
 import { User } from '../../domain/entities/User';
 import type { PendingRegistration, RegistrationStatus } from '../../domain/entities/PendingRegistration';
+import type { PendingSocialRegistration } from '../../domain/entities/PendingSocialRegistration';
+import type { SocialAuthOutcome } from '../../domain/entities/SocialAuthOutcome';
 import type { AppRole, AppRoleValue } from '../../domain/valueObjects/AppRole';
 import { isAppRole } from '../../domain/valueObjects/AppRole';
 import type { Password } from '../../domain/valueObjects/Password';
 import type { Username } from '../../domain/valueObjects/Username';
 import type {
+  AppleAuthRequestApiModel,
+  GoogleAuthRequestApiModel,
+  LinkProviderRequestApiModel,
   LoginRequestApiModel,
   LoginResponseApiModel,
   MobileRegisterInitiatedApiModel,
   MobileRegistrationStatusApiModel,
   MobileResendOtpApiModel,
+  SocialAuthApiModel,
+  SocialCompleteRequestApiModel,
   StoredSessionApiModel,
 } from '../api/AuthApiModels';
 
@@ -181,6 +188,78 @@ export function mapSessionToStored(session: Session): StoredSessionApiModel {
     },
     branchId: session.user.branchId,
     profileCompleted: session.profileCompleted,
+  };
+}
+
+// ── Social sign-in (Google/Apple) ───────────────────────────────────────────
+
+export function mapIdTokenToGoogleAuthRequest(idToken: string): GoogleAuthRequestApiModel {
+  return { id_token: idToken };
+}
+
+/** fullNameHint is Apple's client-submitted, unverified name — advisory pre-fill only, never trusted as identity. */
+export function mapIdentityTokenToAppleAuthRequest(
+  identityToken: string,
+  fullNameHint: string | null,
+): AppleAuthRequestApiModel {
+  return {
+    identity_token: identityToken,
+    user: fullNameHint ? { full_name: fullNameHint } : undefined,
+  };
+}
+
+export function mapToSocialCompleteRequest(username: string, fullName: string | null): SocialCompleteRequestApiModel {
+  return { username, full_name: fullName ?? undefined };
+}
+
+export function mapToLinkProviderRequest(token: string): LinkProviderRequestApiModel {
+  return { token };
+}
+
+/**
+ * The AUTHENTICATED branch reuses mapLoginResponseToSession as-is — the
+ * backend returns the identical AuthResponseDTO shape for both a password
+ * login and a social sign-in. Always resolved as 'member' (matches
+ * verifyOtp's identical hardcoding — social sign-in only ever exists for the
+ * member app surface today).
+ */
+export function mapSocialAuthResponseToOutcome(response: SocialAuthApiModel): SocialAuthOutcome {
+  if (response.status === 'AUTHENTICATED') {
+    if (!response.session) {
+      throw new Error('Malformed social auth response: AUTHENTICATED with no session.');
+    }
+    return { kind: 'authenticated', session: mapLoginResponseToSession(response.session, 'member') };
+  }
+
+  if (response.status === 'LINK_REQUIRED') {
+    return {
+      kind: 'linkRequired',
+      maskedEmail: response.masked_email ?? '',
+      provider: response.provider ?? 'GOOGLE',
+    };
+  }
+
+  return {
+    kind: 'needsUsername',
+    pendingToken: response.pending_token ?? '',
+    suggestedUsername: response.suggested_username ?? null,
+    prefillFullName: response.prefill_full_name ?? null,
+    maskedEmail: response.masked_email ?? '',
+    expiresAt: response.expires_at ?? '',
+    provider: response.provider ?? 'GOOGLE',
+  };
+}
+
+export function mapNeedsUsernameOutcomeToPendingSocialRegistration(
+  outcome: Extract<SocialAuthOutcome, { kind: 'needsUsername' }>,
+): PendingSocialRegistration {
+  return {
+    provider: outcome.provider,
+    pendingToken: outcome.pendingToken,
+    suggestedUsername: outcome.suggestedUsername,
+    prefillFullName: outcome.prefillFullName,
+    maskedEmail: outcome.maskedEmail,
+    expiresAt: outcome.expiresAt,
   };
 }
 

@@ -68,7 +68,16 @@ public class SecurityConfig {
                 // calls to one pending registration. See the email-OTP-verification architecture plan.
                 .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/check-username",
                         "/api/mobile/auth/register", "/api/mobile/auth/verify-otp",
-                        "/api/mobile/auth/resend-otp", "/api/mobile/auth/registration-status", "/error").permitAll()
+                        "/api/mobile/auth/resend-otp", "/api/mobile/auth/registration-status",
+                        // Google/Apple sign-in: resolve-or-create and registration-completion
+                        // endpoints, same "no token yet" reasoning as the OTP endpoints above —
+                        // the provider token itself (Google idToken / Apple identityToken) and
+                        // the opaque X-Social-Registration-Token header are what scope these
+                        // calls, never this permitAll list. /{provider}/link is deliberately NOT
+                        // listed here — it requires an authenticated Bearer token and falls
+                        // through to the authenticated() catch-all below.
+                        "/api/mobile/auth/google", "/api/mobile/auth/google/complete",
+                        "/api/mobile/auth/apple", "/api/mobile/auth/apple/complete", "/error").permitAll()
 
                 // Public lead-capture endpoint — the "Request a demo" onboarding form on the
                 // unauthenticated pricing/login page (business-onboarding-fullscreen.tsx) submits

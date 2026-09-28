@@ -1,4 +1,5 @@
-import { View, StyleSheet } from 'react-native';
+import { useRef, useEffect } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Glass } from '@/core/theme';
 import { TabIcon } from './tabConfigs';
@@ -91,25 +92,77 @@ export const RoleTabBarStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  tabLabel: {
+    position: 'absolute',
+    bottom: -8,
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
+    width: 80,
+  },
 });
 
-export function renderTabBarIcon(iconName: TabIcon, activeColor: string) {
+export function renderTabBarIcon(iconName: TabIcon, activeColor: string, title: string) {
   return function TabBarIcon({ focused }: { focused: boolean }) {
     const iconColor = focused ? contrastIconColor(activeColor) : 'rgba(30,42,58,0.45)';
+    const animation = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+    useEffect(() => {
+      Animated.spring(animation, {
+        toValue: focused ? 1 : 0,
+        friction: 6,
+        tension: 50,
+        useNativeDriver: true,
+      }).start();
+    }, [focused, animation]);
+
+    const iconScale = animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 0.82],
+    });
+
+    const iconTranslateY = animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, -6],
+    });
+
+    const textOpacity = animation;
+
+    const textTranslateY = animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [6, 2],
+    });
+
     return (
       <View style={RoleTabBarStyles.iconWrapper}>
-        {focused && (
-          <View style={[RoleTabBarStyles.iconGlow, { backgroundColor: activeColor }]} />
-        )}
-        <View
+        <Animated.View style={[{ alignItems: 'center', justifyContent: 'center' }, { transform: [{ scale: iconScale }, { translateY: iconTranslateY }] }]}>
+          {focused && (
+            <View style={[RoleTabBarStyles.iconGlow, { backgroundColor: activeColor }]} />
+          )}
+          <View
+            style={[
+              RoleTabBarStyles.iconContainerInner,
+              focused && {
+                backgroundColor: `${activeColor}E6`, // 90% opacity for better contrast
+              },
+            ]}>
+            <Feather name={iconName} color={iconColor} size={22} />
+          </View>
+        </Animated.View>
+
+        <Animated.Text
+          numberOfLines={1}
           style={[
-            RoleTabBarStyles.iconContainerInner,
-            focused && {
-              backgroundColor: `${activeColor}E6`, // 90% opacity for better contrast
+            RoleTabBarStyles.tabLabel,
+            {
+              color: activeColor,
+              opacity: textOpacity,
+              transform: [{ translateY: textTranslateY }],
             },
           ]}>
-          <Feather name={iconName} color={iconColor} size={22} />
-        </View>
+          {title}
+        </Animated.Text>
       </View>
     );
   };

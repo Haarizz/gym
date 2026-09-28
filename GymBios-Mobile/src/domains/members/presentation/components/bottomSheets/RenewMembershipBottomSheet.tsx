@@ -34,7 +34,7 @@ export function RenewMembershipBottomSheet({
   const [paymentMethod, setPaymentMethod] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const isFamily = member.membershipType.toUpperCase() === 'FAMILY';
+  const isFamily = member.membershipType?.toUpperCase() === 'FAMILY';
   const isMinor = member.familyRole?.toUpperCase() === 'MINOR';
 
   const handleSubmit = useCallback(async () => {

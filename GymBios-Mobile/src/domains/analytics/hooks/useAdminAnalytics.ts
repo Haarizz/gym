@@ -65,8 +65,8 @@ export function useAdminAnalytics() {
         },
         operations: {
           classUtilization: (raw.operations?.class_utilization || []).map((item: any) => ({
-            classType: item.class_type,
-            utilization: item.utilization,
+            classType: item.class_type ?? 'Class',
+            utilization: Number(item.utilization ?? 0),
           })),
           trainerProductivity: {
             averageSessionsPerTrainer: raw.operations?.trainer_productivity?.average_sessions_per_trainer ?? 0,
@@ -74,8 +74,8 @@ export function useAdminAnalytics() {
             ptPackageSales: raw.operations?.trainer_productivity?.pt_package_sales ?? 0,
           },
           addonPerformance: (raw.operations?.addon_performance || []).map((item: any) => ({
-            name: item.name,
-            revenue: item.revenue,
+            name: item.name ?? 'Add-on',
+            revenue: Number(item.revenue ?? 0),
           })),
         }
       };

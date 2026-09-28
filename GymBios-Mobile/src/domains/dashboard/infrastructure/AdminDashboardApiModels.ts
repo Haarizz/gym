@@ -41,6 +41,7 @@ export interface AdminDashboardPaymentMixItemApi {
 }
 
 export interface AdminDashboardOperationalHighlightApi {
+  id: string;
   label: string;
   value: string;
 }

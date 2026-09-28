@@ -1,3 +1,10 @@
 import { MemberBookingsScreen } from '@/domains/memberPortal';
+import { MemberApprovalGate } from '@/domains/discovery/presentation/MemberApprovalGate';
 
-export default MemberBookingsScreen;
+export default function MemberBookingsRoute() {
+  return (
+    <MemberApprovalGate>
+      <MemberBookingsScreen />
+    </MemberApprovalGate>
+  );
+}

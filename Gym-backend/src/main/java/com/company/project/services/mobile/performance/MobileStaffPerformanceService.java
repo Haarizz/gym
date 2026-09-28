@@ -132,7 +132,7 @@ public class MobileStaffPerformanceService {
                 : new ArrayList<>();
 
         // 7. Performance Breakdown
-        int conversionRate = computeConversionRate(staff, principal.getUsername(), startOfMonth, startOfNextMonth);
+        int conversionRate = progressCalculator.computeLeadConversionRate(staff, principal.getUsername());
         int followUpCompletion = computeFollowUpCompletion(staff);
         int customerSatisfaction = computeCustomerSatisfaction(rating);
         BreakdownDTO breakdown = new BreakdownDTO(conversionRate, followUpCompletion, customerSatisfaction);
@@ -287,37 +287,6 @@ public class MobileStaffPerformanceService {
         }
 
         return items;
-    }
-
-    private int computeConversionRate(Staff staff, String username, LocalDateTime startOfMonth, LocalDateTime startOfNextMonth) {
-        Specification<Lead> staffLeadsSpec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-
-        long totalLeads = leadRepository.count(staffLeadsSpec);
-        if (totalLeads == 0) return 0;
-
-        Specification<Lead> staffConvertedSpec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "converted"));
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-
-        long convertedLeads = leadRepository.count(staffConvertedSpec);
-        return (int) Math.round(((double) convertedLeads / totalLeads) * 100);
     }
 
     private int computeFollowUpCompletion(Staff staff) {

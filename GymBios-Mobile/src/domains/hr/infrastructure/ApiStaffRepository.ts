@@ -5,6 +5,11 @@ import type {
   UpdateStaffRequest,
 } from '../application/StaffRepository';
 import type { Staff, StaffPage } from '../domain/Staff';
+import type {
+  StaffPerformance,
+  StaffPerformanceStatus,
+  StaffSummary,
+} from '../domain/StaffOverview';
 import type { StaffTarget, StaffTargetFilters } from '../domain/StaffTarget';
 
 import { apiClient } from '@/core/network/apiClient';
@@ -78,6 +83,28 @@ interface StaffTargetResponse {
   forecast?: number;
 }
 
+interface StaffSummaryResponse {
+  total_staff: number;
+  active_staff: number;
+  inactive_staff: number;
+  present_today: number;
+  absent_today: number;
+}
+
+interface StaffPerformanceResponse {
+  staff_id: string;
+  revenue_target: number | null;
+  revenue_achieved: number | null;
+  achievement_percentage: number;
+  conversion_rate: number;
+  pt_sessions: number;
+  attendance_rate: number;
+  rating: number;
+  rating_count: number;
+  present_today: boolean;
+  performance_status: StaffPerformanceStatus;
+}
+
 export class ApiStaffRepository implements StaffRepository {
   async getStaff(filters?: StaffFilters): Promise<StaffPage> {
     const response = await apiClient.get<StaffPageResponse>(
@@ -149,6 +176,42 @@ export class ApiStaffRepository implements StaffRepository {
     );
 
     return (response.data ?? []).map(item => this.toStaffTargetDomain(item));
+  }
+
+  async getSummary(): Promise<StaffSummary> {
+    const response = await apiClient.get<StaffSummaryResponse>('/staff/summary');
+    const d = response.data;
+
+    return {
+      totalStaff: d.total_staff,
+      activeStaff: d.active_staff,
+      inactiveStaff: d.inactive_staff,
+      presentToday: d.present_today,
+      absentToday: d.absent_today,
+    };
+  }
+
+  async getPerformance(staffIds: string[]): Promise<StaffPerformance[]> {
+    if (staffIds.length === 0) return [];
+    // Comma-joined so Spring binds it straight to List<Long> (axios would send ids[]=…).
+    const response = await apiClient.get<StaffPerformanceResponse[]>(
+      '/staff/performance',
+      { params: { ids: staffIds.join(',') } },
+    );
+
+    return (response.data ?? []).map(item => ({
+      staffId: String(item.staff_id),
+      revenueTarget: item.revenue_target ?? 0,
+      revenueAchieved: item.revenue_achieved ?? 0,
+      achievementPercentage: item.achievement_percentage,
+      conversionRate: item.conversion_rate,
+      ptSessions: item.pt_sessions,
+      attendanceRate: item.attendance_rate,
+      rating: item.rating,
+      ratingCount: item.rating_count,
+      presentToday: item.present_today,
+      performanceStatus: item.performance_status,
+    }));
   }
 
   private toDomain(response: StaffResponse): Staff {

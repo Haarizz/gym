@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -51,6 +52,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OtpException.class)
     public ResponseEntity<Map<String, Object>> handleOtpException(OtpException ex) {
         return build(ex.getStatus(), ex.getCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(CommunityGlobalPrincipalNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleCommunityGlobalPrincipal(CommunityGlobalPrincipalNotSupportedException ex) {
+        return build(HttpStatus.FORBIDDEN, "COMMUNITY_GLOBAL_PRINCIPAL_NOT_SUPPORTED", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
@@ -172,6 +178,24 @@ public class GlobalExceptionHandler {
         }
         Matcher matcher = TYPE_LENGTH_PATTERN.matcher(message);
         return matcher.find() ? matcher.group(1) + " characters" : null;
+    }
+
+    /**
+     * The transaction failed at commit/flush time — typically an entity listener
+     * (e.g. BranchSecurityListener's @PreUpdate) or a validator rejecting a write
+     * that only happens when Hibernate flushes. Spring's own message ("Could not
+     * commit JPA transaction") is meaningless to an end user, so surface the
+     * branch-security reason when that is the cause, and a generic one otherwise.
+     */
+    @ExceptionHandler(TransactionSystemException.class)
+    public ResponseEntity<Map<String, Object>> handleTransactionSystem(TransactionSystemException ex) {
+        log.error("Transaction failed to commit", ex);
+        Throwable cause = ex.getMostSpecificCause();
+        if (cause instanceof SecurityException && cause.getMessage() != null) {
+            return build(HttpStatus.FORBIDDEN, "ACCESS_DENIED", cause.getMessage());
+        }
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "TRANSACTION_FAILED",
+                "We couldn't complete this request. Please try again, or select a specific branch if the problem continues.");
     }
 
     /**

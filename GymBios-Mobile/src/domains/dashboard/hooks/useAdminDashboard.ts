@@ -50,6 +50,13 @@ const PAYMENT_MODE_COLORS: Record<string, string> = {
 };
 const FALLBACK_PAYMENT_COLOR = '#94A3B8';
 
+// Accent colors for highlights that need attention, keyed by highlight id.
+// Applied only when the count is non-zero so an all-clear row stays neutral.
+const HIGHLIGHT_COLORS: Record<string, string> = {
+  'renewals-due': '#DC2626',
+  'pending-follow-ups': '#CA8A04',
+};
+
 export const adminDashboardKeys = {
   all: ['dashboard', 'admin'] as const,
 };
@@ -83,7 +90,11 @@ function mapAlerts(api: AdminDashboardResponseApi): AdminAlertItem[] {
 }
 
 function mapHighlights(api: AdminDashboardResponseApi): AdminOperationalHighlight[] {
-  return api.operational_highlights.map((h) => ({ label: h.label, value: h.value }));
+  return api.operational_highlights.map((h) => ({
+    label: h.label,
+    value: h.value,
+    color: parseInt(h.value, 10) > 0 ? HIGHLIGHT_COLORS[h.id] : undefined,
+  }));
 }
 
 function formatDateText(fromIso: string, toIso: string): string {

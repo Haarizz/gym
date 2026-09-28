@@ -52,13 +52,13 @@ export function MembersListScreen({
         (member.membershipPlanName ?? '').toLowerCase().includes(query);
 
       const matchesStatus =
-        !statusFilter || member.status.toUpperCase() === statusFilter.toUpperCase();
+        !statusFilter || member.status?.toUpperCase() === statusFilter.toUpperCase();
       const matchesMembershipType =
         !membershipTypeFilter ||
-        member.membershipType.toUpperCase() === membershipTypeFilter.toUpperCase();
+        member.membershipType?.toUpperCase() === membershipTypeFilter.toUpperCase();
       const matchesPaymentStatus =
         !paymentStatusFilter ||
-        member.paymentStatus.toUpperCase() === paymentStatusFilter.toUpperCase();
+        member.paymentStatus?.toUpperCase() === paymentStatusFilter.toUpperCase();
 
       return (
         matchesSearch &&
@@ -76,7 +76,9 @@ export function MembersListScreen({
     [onNavigateToDetail],
   );
 
-  const renderHeader = useCallback(
+  // Must be an element, not a component: a component whose identity changes on
+  // every keystroke is remounted by FlatList, which drops focus from the search input.
+  const listHeader = useMemo(
     () => (
       <View style={styles.headerContainer}>
         <SearchBar
@@ -191,7 +193,7 @@ export function MembersListScreen({
           data={filteredMembers}
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}
-          ListHeaderComponent={renderHeader}
+          ListHeaderComponent={listHeader}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={styles.listContent}
           refreshing={loading}

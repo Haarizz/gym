@@ -2,6 +2,7 @@ import type { PromotionRepository } from './PromotionRepository';
 import type {
   PromotionCampaignRequest,
   PromotionCampaignResponse,
+  PromotionImpact,
 } from '../domain/PromotionCampaign';
 import type { EligibleMember } from '../domain/EligibleMember';
 import type {
@@ -52,8 +53,13 @@ export class PromotionService {
     id: number,
     revenue?: number,
     savings?: number,
+    memberId?: number,
   ): Promise<PromotionCampaignResponse> {
-    return this.repository.redeemPromotion(id, revenue, savings);
+    return this.repository.redeemPromotion(id, revenue, savings, memberId);
+  }
+
+  getMonthlyImpact(): Promise<PromotionImpact> {
+    return this.repository.getMonthlyImpact();
   }
 
   getEligibilityMembers(): Promise<EligibleMember[]> {

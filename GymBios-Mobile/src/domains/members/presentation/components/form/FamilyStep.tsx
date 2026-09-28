@@ -38,7 +38,7 @@ export function FamilyStep({
   const [memberPhone, setMemberPhone] = useState('');
   const [memberRelationship, setMemberRelationship] = useState('SPOUSE');
 
-  const isFamily = data.membershipType.toUpperCase() === 'FAMILY';
+  const isFamily = data.membershipType?.toUpperCase() === 'FAMILY';
 
   const handleOpenModal = useCallback(() => {
     setMemberName('');

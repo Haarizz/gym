@@ -21,6 +21,19 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     boolean existsByEmail(String email);
 
+    boolean existsByEmailIgnoreCase(String email);
+
+    /**
+     * Whether this email already has a membership of its own in this tenant — any
+     * member row with that email other than excludeMemberId, ignoring family seats
+     * still waiting to be claimed (no global account, not a family head/individual).
+     * Used when claiming a Family/Couple invitation: an existing own membership
+     * wins over the invitation.
+     */
+    @Query("SELECT COUNT(m) > 0 FROM Member m WHERE LOWER(m.email) = LOWER(:email) AND m.memberId <> :excludeMemberId "
+            + "AND (m.globalUserId IS NOT NULL OR m.familyHeadId IS NULL)")
+    boolean existsOwnMembershipByEmail(@Param("email") String email, @Param("excludeMemberId") String excludeMemberId);
+
     Optional<Member> findByEmail(String email);
 
     Optional<Member> findByPhone(String phone);

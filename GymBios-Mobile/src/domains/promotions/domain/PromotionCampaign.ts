@@ -113,6 +113,23 @@ export interface PromotionCampaignResponse {
 
   createdAt?: string | null;
   updatedAt?: string | null;
+
+  /** Null when the promotion isn't scoped to a single branch. */
+  branchId?: number | null;
+  /** Resolved display name; "All Branches" when branchId is null. */
+  branchName?: string | null;
+}
+
+/** Current calendar month's revenue/new members attributable to promotions and referrals. */
+export interface PromotionImpact {
+  /** yyyy-MM */
+  month: string;
+  revenueFromDeals: number;
+  promotionRevenue: number;
+  referralRevenue: number;
+  newMembers: number;
+  promotionRedemptions: number;
+  referralConversions: number;
 }
 
 export type PromotionCampaign = PromotionCampaignResponse;

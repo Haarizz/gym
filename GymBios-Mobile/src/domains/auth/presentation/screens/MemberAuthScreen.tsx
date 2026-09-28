@@ -6,6 +6,7 @@ import { BrandColors, Glass } from '@/core/theme';
 import { GlassBlob } from '@/shared/components';
 
 import type { createUseLogin, createUseRegister } from '../hooks/useAuthFlow';
+import type { createUseAppleSignIn, createUseGoogleSignIn } from '../hooks/useSocialAuthFlow';
 import { AuthHeader } from '../components/MemberAuth/AuthHeader';
 import { AuthTabs } from '../components/MemberAuth/AuthTabs';
 import { SignInForm } from '../components/MemberAuth/SignInForm';
@@ -15,12 +16,27 @@ import { AdminLoginLink } from '../components/MemberAuth/AdminLoginLink';
 interface MemberAuthScreenProps {
   useLogin: ReturnType<typeof createUseLogin>;
   useRegister: ReturnType<typeof createUseRegister>;
+  useGoogleSignIn: ReturnType<typeof createUseGoogleSignIn>;
+  useAppleSignIn: ReturnType<typeof createUseAppleSignIn>;
 }
 
-export function MemberAuthScreen({ useLogin, useRegister }: MemberAuthScreenProps) {
+export function MemberAuthScreen({ useLogin, useRegister, useGoogleSignIn, useAppleSignIn }: MemberAuthScreenProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const { login, isLoading: isLoginLoading, errorMessage: loginError } = useLogin('member');
   const { register, isLoading: isRegisterLoading, errorMessage: registerError } = useRegister();
+  const {
+    signInWithGoogle,
+    isLoading: isGoogleLoading,
+    errorMessage: googleError,
+    isAvailable: isGoogleAvailable,
+  } = useGoogleSignIn();
+  const {
+    signInWithApple,
+    isLoading: isAppleLoading,
+    errorMessage: appleError,
+    isAvailable: isAppleAvailable,
+  } = useAppleSignIn();
+  const socialErrorMessage = googleError ?? appleError;
 
   return (
     <View style={styles.root}>
@@ -49,18 +65,32 @@ export function MemberAuthScreen({ useLogin, useRegister }: MemberAuthScreenProp
             <AuthTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
             {activeTab === 'signin' ? (
-              <SignInForm 
-                isLoading={isLoginLoading} 
-                errorMessage={loginError} 
-                onLogin={(values) => login({ username: values.username, password: values.password })} 
-                onSwitchToSignup={() => setActiveTab('signup')} 
+              <SignInForm
+                isLoading={isLoginLoading}
+                errorMessage={loginError}
+                onLogin={(values) => login({ username: values.username, password: values.password })}
+                onSwitchToSignup={() => setActiveTab('signup')}
+                onGoogleSignIn={signInWithGoogle}
+                isGoogleLoading={isGoogleLoading}
+                isGoogleAvailable={isGoogleAvailable}
+                onAppleSignIn={signInWithApple}
+                isAppleLoading={isAppleLoading}
+                isAppleAvailable={isAppleAvailable}
+                socialErrorMessage={socialErrorMessage}
               />
             ) : (
-              <SignUpForm 
+              <SignUpForm
                 isLoading={isRegisterLoading}
                 errorMessage={registerError}
                 onRegister={register}
-                onSwitchToSignin={() => setActiveTab('signin')} 
+                onSwitchToSignin={() => setActiveTab('signin')}
+                onGoogleSignIn={signInWithGoogle}
+                isGoogleLoading={isGoogleLoading}
+                isGoogleAvailable={isGoogleAvailable}
+                onAppleSignIn={signInWithApple}
+                isAppleLoading={isAppleLoading}
+                isAppleAvailable={isAppleAvailable}
+                socialErrorMessage={socialErrorMessage}
               />
             )}
 
@@ -72,9 +102,21 @@ export function MemberAuthScreen({ useLogin, useRegister }: MemberAuthScreenProp
   );
 }
 
-export function createMemberAuthScreen(useLogin: ReturnType<typeof createUseLogin>, useRegister: ReturnType<typeof createUseRegister>) {
+export function createMemberAuthScreen(
+  useLogin: ReturnType<typeof createUseLogin>,
+  useRegister: ReturnType<typeof createUseRegister>,
+  useGoogleSignIn: ReturnType<typeof createUseGoogleSignIn>,
+  useAppleSignIn: ReturnType<typeof createUseAppleSignIn>,
+) {
   return function MemberAuthScreenContainer() {
-    return <MemberAuthScreen useLogin={useLogin} useRegister={useRegister} />;
+    return (
+      <MemberAuthScreen
+        useLogin={useLogin}
+        useRegister={useRegister}
+        useGoogleSignIn={useGoogleSignIn}
+        useAppleSignIn={useAppleSignIn}
+      />
+    );
   };
 }
 

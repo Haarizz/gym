@@ -2,10 +2,33 @@ package com.company.project.repositories;
 
 import com.company.project.entities.TrainingSession;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 public interface TrainingSessionRepository extends JpaRepository<TrainingSession, Long> {
     List<TrainingSession> findTop5ByStatusOrderByDateDescStartTimeDesc(String status);
     long countByDateBetween(java.time.LocalDate startDate, java.time.LocalDate endDate);
+
+    @Query("SELECT COUNT(s) FROM TrainingSession s " +
+           "WHERE s.date BETWEEN :start AND :end AND LOWER(s.status) <> 'cancelled'")
+    long countNonCancelledBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    // (className, totalCapacity) for group classes (PT excluded) in the period
+    @Query("SELECT s.name, COALESCE(SUM(s.capacity), 0) FROM TrainingSession s " +
+           "WHERE s.date BETWEEN :start AND :end AND LOWER(s.status) <> 'cancelled' " +
+           "AND LOWER(s.type) <> 'pt' GROUP BY s.name ORDER BY s.name")
+    List<Object[]> sumClassCapacityByNameBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    // (trainerId, sessionCount) for non-cancelled PT sessions in the period
+    @Query("SELECT s.trainer.id, COUNT(s) FROM TrainingSession s " +
+           "WHERE s.trainer.id IN :trainerIds AND LOWER(s.type) = 'pt' " +
+           "AND LOWER(s.status) <> 'cancelled' AND s.date BETWEEN :start AND :end " +
+           "GROUP BY s.trainer.id")
+    List<Object[]> countPtSessionsByTrainerBetween(@Param("trainerIds") Collection<Long> trainerIds,
+                                                   @Param("start") LocalDate start,
+                                                   @Param("end") LocalDate end);
 }

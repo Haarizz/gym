@@ -1,5 +1,5 @@
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing } from '@/core/theme';
 import { Surface } from '@/shared/components/Surface';
@@ -7,6 +7,11 @@ import { Surface } from '@/shared/components/Surface';
 interface ScreenLayoutProps {
   children: React.ReactNode;
   scrollable?: boolean;
+  /**
+   * Safe-area edges to pad. Screens rendered inside RoleTabsLayout already get the top
+   * inset from it, so they should omit 'top' to avoid a blank band under the header.
+   */
+  edges?: readonly Edge[];
 }
 
 // Keep these in sync with the floating tab bar defined in RoleTabsLayout,
@@ -21,7 +26,7 @@ export function useTabBarBottomInset(): number {
   return TAB_BAR_HEIGHT + insets.bottom;
 }
 
-export function ScreenLayout({ children, scrollable = false }: ScreenLayoutProps) {
+export function ScreenLayout({ children, scrollable = false, edges }: ScreenLayoutProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
@@ -42,6 +47,7 @@ export function ScreenLayout({ children, scrollable = false }: ScreenLayoutProps
   return (
     <Surface background="backgroundElement" style={styles.container}>
       <SafeAreaView
+        edges={edges}
         style={[
           styles.safeArea,
           shouldCapWidth && styles.contentCapped,

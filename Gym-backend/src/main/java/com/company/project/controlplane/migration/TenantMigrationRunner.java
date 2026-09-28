@@ -68,6 +68,12 @@ public class TenantMigrationRunner implements CommandLineRunner {
     @Override
     public void run(String... args) {
         List<Tenant> tenants = tenantRepository.findAll();
+        java.util.Map<org.flywaydb.core.api.MigrationVersion, FlywayHistoryInspector.LocalMigration> localMigrations;
+        try {
+            localMigrations = FlywayHistoryInspector.loadLocalMigrations();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Could not read db/migration files", e);
+        }
         log.info("TenantMigrationRunner: starting schema migration rollout for {} tenant(s)", tenants.size());
 
         int migrated = 0;
@@ -82,7 +88,25 @@ public class TenantMigrationRunner implements CommandLineRunner {
             }
             try {
                 DataSource tenantDs = tenantDataSourceRegistry.getDataSource(tenant.getSlug());
-                Flyway flyway = Flyway.configure().dataSource(tenantDs).load();
+                // Same "*:missing" tolerance as the primary DB's Flyway (PrimaryDataSourceConfig):
+                // tenants that ran a since-renumbered migration must not fail validation.
+                Flyway flyway = Flyway.configure()
+                        .dataSource(tenantDs)
+                        .ignoreMigrationPatterns("*:missing")
+                        .load();
+                // repair() realigns a row's description/checksum to whatever file now has
+                // its version — correct for an edited file, but for a RENUMBERED one it
+                // relabels the row as a migration that never ran. Refuse those tenants;
+                // TenantFlywayHistoryRepairRunner fixes their history first.
+                List<FlywayHistoryInspector.HistoryRow> renumbered = FlywayHistoryInspector.hasHistoryTable(tenantDs)
+                        ? FlywayHistoryInspector.findRenumberedRows(FlywayHistoryInspector.readHistory(tenantDs), localMigrations)
+                        : List.of();
+                if (!renumbered.isEmpty()) {
+                    String scripts = renumbered.stream().map(FlywayHistoryInspector.HistoryRow::script)
+                            .collect(java.util.stream.Collectors.joining(", "));
+                    throw new IllegalStateException("flyway_schema_history has rows run from since-renumbered files ("
+                            + scripts + ") — run with tenant.history-repair.enabled=true first");
+                }
                 // repair() before migrate(): a migration file legitimately edited after a
                 // tenant was already provisioned against the old version (e.g. V24 gaining
                 // an "IF NOT EXISTS" guard, same schema effect either way) leaves that

@@ -3,6 +3,7 @@ import type { PromotionRepository } from '../application/PromotionRepository';
 import type {
   PromotionCampaignRequest,
   PromotionCampaignResponse,
+  PromotionImpact,
 } from '../domain/PromotionCampaign';
 import type { EligibleMember } from '../domain/EligibleMember';
 import type {
@@ -83,16 +84,23 @@ export class ApiPromotionRepository implements PromotionRepository {
     id: number,
     revenue?: number,
     savings?: number,
+    memberId?: number,
   ): Promise<PromotionCampaignResponse> {
     const params: Record<string, number> = {};
     if (revenue !== undefined) params.revenue = revenue;
     if (savings !== undefined) params.savings = savings;
+    if (memberId !== undefined) params.memberId = memberId;
 
     const response = await apiClient.post<PromotionCampaignResponse>(
       `/promotions/${id}/redeem`,
       null,
       { params },
     );
+    return response.data;
+  }
+
+  async getMonthlyImpact(): Promise<PromotionImpact> {
+    const response = await apiClient.get<PromotionImpact>('/promotions/impact');
     return response.data;
   }
 

@@ -1,3 +1,10 @@
 import { MemberTrainerScreen } from '@/domains/memberPortal';
+import { MemberApprovalGate } from '@/domains/discovery/presentation/MemberApprovalGate';
 
-export default MemberTrainerScreen;
+export default function MemberTrainerRoute() {
+  return (
+    <MemberApprovalGate>
+      <MemberTrainerScreen />
+    </MemberApprovalGate>
+  );
+}

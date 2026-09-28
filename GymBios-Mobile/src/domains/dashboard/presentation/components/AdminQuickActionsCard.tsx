@@ -38,6 +38,19 @@ export function AdminQuickActionsCard({
     else router.push('/(admin)/facilities' as any);
   };
 
+  // Explicit 2×2 rows with flex: 1 cells: percentage widths plus a fixed gap overflow and
+  // wrap into a lopsided column on narrow screens or with a large system font scale.
+  const rows = [
+    [
+      { label: 'Create Offer', onPress: handleCreateOffer },
+      { label: 'Add Staff', onPress: handleAddStaff },
+    ],
+    [
+      { label: 'View Reports', onPress: handleViewReports },
+      { label: 'Manage Branch', onPress: handleManageBranch },
+    ],
+  ];
+
   return (
     <LinearGradient
       colors={[BrandColors.teal, BrandColors.tealDark]}
@@ -47,41 +60,28 @@ export function AdminQuickActionsCard({
     >
       <Text style={styles.title}>Quick Actions</Text>
       <View style={styles.grid}>
-        <Pressable
-          style={styles.button}
-          onPress={handleCreateOffer}
-          accessibilityRole="button"
-          accessibilityLabel="Create Offer"
-        >
-          <Text style={styles.buttonText}>Create Offer</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.button}
-          onPress={handleAddStaff}
-          accessibilityRole="button"
-          accessibilityLabel="Add Staff"
-        >
-          <Text style={styles.buttonText}>Add Staff</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.button}
-          onPress={handleViewReports}
-          accessibilityRole="button"
-          accessibilityLabel="View Reports"
-        >
-          <Text style={styles.buttonText}>View Reports</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.button}
-          onPress={handleManageBranch}
-          accessibilityRole="button"
-          accessibilityLabel="Manage Branch"
-        >
-          <Text style={styles.buttonText}>Manage Branch</Text>
-        </Pressable>
+        {rows.map((row, rowIndex) => (
+          <View key={rowIndex} style={styles.row}>
+            {row.map((action) => (
+              <Pressable
+                key={action.label}
+                style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                onPress={action.onPress}
+                accessibilityRole="button"
+                accessibilityLabel={action.label}
+              >
+                <Text
+                  style={styles.buttonText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {action.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ))}
       </View>
     </LinearGradient>
   );
@@ -104,12 +104,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.three,
   },
   grid: {
+    gap: Spacing.two,
+  },
+  row: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: Spacing.two,
   },
   button: {
-    width: '48.5%',
+    flex: 1,
+    paddingHorizontal: Spacing.two,
     backgroundColor: Glass.fill,
     borderWidth: 1,
     borderColor: Glass.border,
@@ -117,6 +120,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  buttonPressed: {
+    opacity: 0.8,
   },
   buttonText: {
     fontSize: 13,

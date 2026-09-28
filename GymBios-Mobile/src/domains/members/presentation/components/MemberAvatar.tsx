@@ -8,8 +8,8 @@ interface MemberAvatarProps {
   size?: number;
 }
 
-function getInitials(name: string): string {
-  return name
+function getInitials(name: string | null | undefined): string {
+  return (name ?? '')
     .trim()
     .split(' ')
     .filter(Boolean)

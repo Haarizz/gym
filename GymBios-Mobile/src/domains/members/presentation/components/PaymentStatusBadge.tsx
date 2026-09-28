@@ -4,7 +4,7 @@ import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 
 interface PaymentStatusBadgeProps {
-  status: string;
+  status?: string | null;
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
@@ -15,7 +15,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
 };
 
 function getStatusStyle(status: string) {
-  return STATUS_STYLES[status.toUpperCase()] ?? {
+  return STATUS_STYLES[status] ?? {
     bg: '#f3f4f6',
     text: '#374151',
     border: '#e5e7eb',
@@ -23,12 +23,13 @@ function getStatusStyle(status: string) {
 }
 
 export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
-  const style = getStatusStyle(status);
+  const label = (status ?? '').toUpperCase() || '—';
+  const style = getStatusStyle(label);
 
   return (
     <View style={[styles.badge, { backgroundColor: style.bg, borderColor: style.border }]}>
       <Typography variant="caption" style={[styles.text, { color: style.text }]}>
-        {status.toUpperCase()}
+        {label}
       </Typography>
     </View>
   );

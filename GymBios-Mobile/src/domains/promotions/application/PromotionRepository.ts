@@ -1,6 +1,7 @@
 import type {
   PromotionCampaignRequest,
   PromotionCampaignResponse,
+  PromotionImpact,
 } from '../domain/PromotionCampaign';
 import type { EligibleMember } from '../domain/EligibleMember';
 import type {
@@ -18,7 +19,13 @@ export interface PromotionRepository {
   duplicatePromotion(id: number): Promise<PromotionCampaignResponse>;
   bulkAction(action: string, ids: number[]): Promise<BulkPromotionActionResponse>;
   validateCode(code: string): Promise<PromotionCampaignResponse>;
-  redeemPromotion(id: number, revenue?: number, savings?: number): Promise<PromotionCampaignResponse>;
+  redeemPromotion(
+    id: number,
+    revenue?: number,
+    savings?: number,
+    memberId?: number,
+  ): Promise<PromotionCampaignResponse>;
+  getMonthlyImpact(): Promise<PromotionImpact>;
   getEligibilityMembers(): Promise<EligibleMember[]>;
   applyAccessDays(request: ApplyAccessDaysRequest): Promise<ApplyAccessDaysResponse>;
 }

@@ -5,6 +5,7 @@ import type { Result } from '@/core/types';
 import { Session } from '../../domain/entities/Session';
 import { User } from '../../domain/entities/User';
 import type { PendingRegistration, RegistrationStatus } from '../../domain/entities/PendingRegistration';
+import type { SocialAuthOutcome } from '../../domain/entities/SocialAuthOutcome';
 import type { AppRole } from '../../domain/valueObjects/AppRole';
 import type { AppRoleValue } from '../../domain/valueObjects/AppRole';
 import type { Password } from '../../domain/valueObjects/Password';
@@ -12,10 +13,15 @@ import type { Username } from '../../domain/valueObjects/Username';
 import { AuthApi } from '../api/AuthApi';
 import {
   mapCredentialsToLoginRequest,
+  mapIdentityTokenToAppleAuthRequest,
+  mapIdTokenToGoogleAuthRequest,
   mapInitiatedResponseToPendingRegistration,
   mapLoginResponseToSession,
   mapRegistrationStatusResponse,
   mapResendResponseToPendingRegistrationUpdate,
+  mapSocialAuthResponseToOutcome,
+  mapToLinkProviderRequest,
+  mapToSocialCompleteRequest,
 } from '../mapper/AuthMapper';
 
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
@@ -140,6 +146,66 @@ export class AuthRemoteDataSource {
         return { success: false, error: error.message };
       }
       return { success: false, error: 'Unable to check registration status.' };
+    }
+  }
+
+  async authenticateWithGoogle(idToken: string): Promise<Result<SocialAuthOutcome, string>> {
+    try {
+      const response = await this.authApi.googleAuth(mapIdTokenToGoogleAuthRequest(idToken));
+      return { success: true, value: mapSocialAuthResponseToOutcome(response.data) };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Unable to continue with Google. Please try again.' };
+    }
+  }
+
+  async authenticateWithApple(
+    identityToken: string,
+    fullNameHint: string | null,
+  ): Promise<Result<SocialAuthOutcome, string>> {
+    try {
+      const response = await this.authApi.appleAuth(mapIdentityTokenToAppleAuthRequest(identityToken, fullNameHint));
+      return { success: true, value: mapSocialAuthResponseToOutcome(response.data) };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Unable to continue with Apple. Please try again.' };
+    }
+  }
+
+  async completeSocialRegistration(
+    provider: 'GOOGLE' | 'APPLE',
+    pendingToken: string,
+    username: string,
+    fullName: string | null,
+  ): Promise<Result<Session, string>> {
+    try {
+      const payload = mapToSocialCompleteRequest(username, fullName);
+      const response =
+        provider === 'GOOGLE'
+          ? await this.authApi.completeGoogleRegistration(pendingToken, payload)
+          : await this.authApi.completeAppleRegistration(pendingToken, payload);
+      return { success: true, value: mapLoginResponseToSession(response.data, 'member') };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Unable to finish creating your account. Please try again.' };
+    }
+  }
+
+  async linkProvider(provider: 'GOOGLE' | 'APPLE', providerToken: string): Promise<Result<void, string>> {
+    try {
+      await this.authApi.linkProvider(provider, mapToLinkProviderRequest(providerToken));
+      return { success: true, value: undefined };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: 'Unable to link this account. Please try again.' };
     }
   }
 

@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { Branch, useMyBranches } from '@/domains/branch';
 import { setApiClientBranch } from '@/core/network/apiClient';
 import { useAuthStore } from '@/domains/auth/store';
 import { ApiMemberDirectoryRepository } from '@/domains/members/infrastructure/directory/ApiMemberDirectoryRepository';
 import { useQuery } from '@tanstack/react-query';
+import { useMembershipApprovalStatus } from '@/domains/discovery/hooks/useMembershipApprovalStatus';
 
 export type BranchId = number | 'ALL';
 
@@ -30,7 +31,14 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     retry: false,
   });
 
-  const { data: branches, isLoading: isBranchesLoading } = useMyBranches();
+  // /api/branches/my-branches is 403'd by TenantContextFilter while a member's
+  // Cash/Credit/Mixed purchase awaits reception approval — hold it until
+  // /api/members/me confirms access isn't pending (see MemberApprovalGate).
+  const approval = useMembershipApprovalStatus({ enabled: appRole === 'member' });
+  const isApprovalPending = approval.data?.approvalStatus === 'PENDING';
+  const { data: branches, isLoading: isBranchesLoading } = useMyBranches({
+    enabled: appRole !== 'member' || (!approval.isLoading && !isApprovalPending),
+  });
 
   // 1. Determine the best available branch ID based on loaded data
   let derivedBranchId: BranchId = 'ALL';
@@ -63,8 +71,20 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     setApiClientBranch(id);
   };
 
-  // Block rendering until we resolve the branch ID for members
-  if (appRole === 'member' && !user?.branchId && (isMemberProfileLoading || isBranchesLoading)) {
+  // Block rendering until we resolve the branch ID for members — but only on
+  // the first resolution. Returning to the foreground (e.g. after an OS
+  // permission / "turn on location" dialog) refetches these queries, and a
+  // query with no cached data goes back to isLoading; unmounting children then
+  // would tear down the tab navigator and drop the user back on Home.
+  const isResolving =
+    appRole === 'member' &&
+    (approval.isLoading || (!user?.branchId && (isMemberProfileLoading || isBranchesLoading)));
+  const hasResolvedRef = useRef(false);
+  if (!isResolving) {
+    hasResolvedRef.current = true;
+  }
+
+  if (isResolving && !hasResolvedRef.current) {
     return null; // Block children from mounting without the branch context
   }
 

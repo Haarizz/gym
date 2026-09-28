@@ -13,6 +13,7 @@ export {
   useBulkPromotionAction,
   useValidatePromotionCode,
   useRedeemPromotion,
+  usePromotionImpact,
   useEligibilityMembers,
   useApplyAccessDays,
 } from './hooks/usePromotions';

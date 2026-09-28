@@ -12,10 +12,13 @@ import { ClassUtilizationCard } from '../components/ClassUtilizationCard';
 import { TrainerProductivityCard } from '../components/TrainerProductivityCard';
 import { AddOnPerformanceCard } from '../components/AddOnPerformanceCard';
 import { BrandColors, Spacing, Radius } from '@/core/theme';
+import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function AdminAnalyticsScreen() {
   const { data: analytics, isLoading, isError } = useAdminAnalytics();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
+  const insets = useSafeAreaInsets();
 
   if (isLoading) {
     return (
@@ -94,7 +97,13 @@ export function AdminAnalyticsScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Stack.Screen options={{ title: 'Analytics', headerShadowVisible: false }} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.contentContainer,
+          { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 24 }
+        ]}
+      >
         <AIInsightsCard insights={analytics.aiInsights} />
         
         <AnalyticsTabs selected={activeTab} onSelect={setActiveTab} />
@@ -128,7 +137,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: Spacing.four,
-    paddingBottom: Spacing.six,
   },
   metricsRow: {
     flexDirection: 'row',

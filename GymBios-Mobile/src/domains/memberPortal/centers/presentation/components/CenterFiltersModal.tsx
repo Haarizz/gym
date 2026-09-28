@@ -91,7 +91,11 @@ export function CenterFiltersModal({
             </Pressable>
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Category */}
             <Text style={styles.sectionTitle}>Center Type</Text>
             <View style={styles.chipGroup}>
@@ -250,7 +254,15 @@ const styles = StyleSheet.create({
     backgroundColor: BrandColors.screenBackground,
   },
   body: {
+    // Shrink within the sheet's maxHeight so the footer never covers content.
+    flexShrink: 1,
+  },
+  // Padding lives on the content container (not the ScrollView itself) so the
+  // bottom inset is part of the scrollable area and the last row can scroll
+  // fully clear of the footer.
+  bodyContent: {
     padding: Spacing.four,
+    paddingBottom: Spacing.six,
   },
   sectionTitle: {
     fontSize: 15,

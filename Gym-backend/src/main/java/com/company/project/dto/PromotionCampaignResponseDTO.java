@@ -58,6 +58,10 @@ public class PromotionCampaignResponseDTO {
     private String createdAt;
     private String updatedAt;
 
+    // Null branchId means the promotion isn't scoped to one branch.
+    private Long branchId;
+    private String branchName;
+
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter ISO_DATE_TIME = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -108,6 +112,16 @@ public class PromotionCampaignResponseDTO {
 
         dto.createdAt = p.getCreatedAt() != null ? p.getCreatedAt().format(ISO_DATE_TIME) + "Z" : null;
         dto.updatedAt = p.getUpdatedAt() != null ? p.getUpdatedAt().format(ISO_DATE_TIME) + "Z" : null;
+        dto.branchId = p.getBranchId();
+        return dto;
+    }
+
+    /** Same as {@link #fromEntity(PromotionCampaign)}, plus a resolved branch display name. */
+    public static PromotionCampaignResponseDTO fromEntity(PromotionCampaign p, java.util.Map<Long, String> branchNames) {
+        PromotionCampaignResponseDTO dto = fromEntity(p);
+        dto.branchName = p.getBranchId() == null
+                ? "All Branches"
+                : branchNames.getOrDefault(p.getBranchId(), null);
         return dto;
     }
 
@@ -151,4 +165,6 @@ public class PromotionCampaignResponseDTO {
     public String getPolicyConfigJson() { return policyConfigJson; }
     public String getCreatedAt() { return createdAt; }
     public String getUpdatedAt() { return updatedAt; }
+    public Long getBranchId() { return branchId; }
+    public String getBranchName() { return branchName; }
 }

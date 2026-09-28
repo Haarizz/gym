@@ -101,7 +101,9 @@ export function PromotionForm({
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Android is always edge-to-edge, so the window no longer resizes for the
+        // keyboard — the view has to shrink itself or fields below stay hidden.
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
         {/* Header */}

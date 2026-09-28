@@ -31,4 +31,11 @@ public interface ReferralRepository extends JpaRepository<Referral, Long>, JpaSp
 
     @Query("SELECT COALESCE(SUM(r.rewardAmount), 0) FROM Referral r WHERE r.status = 'successful'")
     java.math.BigDecimal sumRewardsEarned();
+
+    // Successful referrals whose referee signed up inside [from, to) — the
+    // referral half of the Deals screen's monthly impact.
+    @Query("SELECT r FROM Referral r WHERE r.status = 'successful' " +
+            "AND r.signupDate >= :from AND r.signupDate < :to")
+    List<Referral> findSuccessfulSignedUpBetween(@org.springframework.data.repository.query.Param("from") java.time.LocalDate from,
+                                                 @org.springframework.data.repository.query.Param("to") java.time.LocalDate to);
 }

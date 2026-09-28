@@ -1,4 +1,9 @@
 import { AuthOrchestrator } from './application/orchestrators/AuthOrchestrator';
+import { AuthenticateWithApple } from './application/useCases/AuthenticateWithApple';
+import { AuthenticateWithGoogle } from './application/useCases/AuthenticateWithGoogle';
+import { CompleteSocialRegistration } from './application/useCases/CompleteSocialRegistration';
+import { GetPendingSocialRegistration } from './application/useCases/GetPendingSocialRegistration';
+import { LinkProvider } from './application/useCases/LinkProvider';
 import { LoginUser } from './application/useCases/LoginUser';
 import { LogoutUser } from './application/useCases/LogoutUser';
 import { RefreshSession } from './application/useCases/RefreshSession';
@@ -21,7 +26,15 @@ import {
   createUseSelectAppRole,
   createUseVerifyOtp,
 } from './presentation/hooks/useAuthFlow';
+import {
+  createUseAppleSignIn,
+  createUseCompleteSocialRegistration,
+  createUseGoogleSignIn,
+  createUseLinkProvider,
+  createUsePendingSocialRegistration,
+} from './presentation/hooks/useSocialAuthFlow';
 import { createEmailVerificationScreen } from './presentation/screens/EmailVerificationScreen';
+import { createSocialUsernameScreen } from './presentation/screens/SocialUsernameScreen';
 import {
   ADMIN_HEADER,
   ADMIN_TABS,
@@ -58,6 +71,11 @@ const registerUser = new RegisterUser(authRepository);
 const verifyOtpUseCase = new VerifyOtp(authRepository);
 const resendOtpUseCase = new ResendOtp(authRepository);
 const getPendingRegistrationUseCase = new GetPendingRegistration(authRepository);
+const authenticateWithGoogleUseCase = new AuthenticateWithGoogle(authRepository);
+const authenticateWithAppleUseCase = new AuthenticateWithApple(authRepository);
+const completeSocialRegistrationUseCase = new CompleteSocialRegistration(authRepository);
+const linkProviderUseCase = new LinkProvider(authRepository);
+const getPendingSocialRegistrationUseCase = new GetPendingSocialRegistration(authRepository);
 
 export const authOrchestrator = new AuthOrchestrator(
   selectAppRole,
@@ -66,6 +84,10 @@ export const authOrchestrator = new AuthOrchestrator(
   registerUser,
   verifyOtpUseCase,
   resendOtpUseCase,
+  authenticateWithGoogleUseCase,
+  authenticateWithAppleUseCase,
+  completeSocialRegistrationUseCase,
+  linkProviderUseCase,
 );
 
 export const useSelectAppRole = createUseSelectAppRole(authOrchestrator);
@@ -75,14 +97,20 @@ export const useVerifyOtp = createUseVerifyOtp(authOrchestrator);
 export const useResendOtp = createUseResendOtp(authOrchestrator);
 export const usePendingRegistration = createUsePendingRegistration(getPendingRegistrationUseCase);
 export const useRestoreSession = createUseRestoreSession(restoreSession, authOrchestrator);
+export const useGoogleSignIn = createUseGoogleSignIn(authOrchestrator);
+export const useAppleSignIn = createUseAppleSignIn(authOrchestrator);
+export const useCompleteSocialRegistration = createUseCompleteSocialRegistration(authOrchestrator);
+export const useLinkProvider = createUseLinkProvider(authOrchestrator);
+export const usePendingSocialRegistration = createUsePendingSocialRegistration(getPendingSocialRegistrationUseCase);
 
 export const AuthBootstrap = createAuthBootstrap(useRestoreSession);
 export const RoleLoginScreen = createRoleLoginScreen(useLogin);
 
 export const SplashRoute = createSplashRoute(useRestoreSession);
 export const RoleSelectionRoute = createRoleSelectionRoute(useSelectAppRole);
-export const MemberAuthScreen = createMemberAuthScreen(useLogin, useRegister);
+export const MemberAuthScreen = createMemberAuthScreen(useLogin, useRegister, useGoogleSignIn, useAppleSignIn);
 export const EmailVerificationScreen = createEmailVerificationScreen(useVerifyOtp, useResendOtp, usePendingRegistration);
+export const SocialUsernameScreen = createSocialUsernameScreen(useCompleteSocialRegistration, usePendingSocialRegistration);
 
 export { SplashScreen } from './presentation/screens/SplashScreen';
 export { RoleSelectionScreen } from './presentation/screens/RoleSelectionScreen';

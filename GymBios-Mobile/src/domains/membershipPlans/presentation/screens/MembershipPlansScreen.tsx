@@ -111,7 +111,9 @@ export function MembershipPlansScreen({
     [deletePlan],
   );
 
-  const renderListHeader = useCallback(
+  // Must be an element, not a component: a component whose identity changes on
+  // every keystroke is remounted by FlatList, which drops focus from the search input.
+  const listHeader = useMemo(
     () => (
       <View style={styles.headerContainer}>
         {/* Page title */}
@@ -151,7 +153,7 @@ export function MembershipPlansScreen({
           onEdit={handleEdit}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
-          ListHeaderComponent={renderListHeader}
+          ListHeaderComponent={listHeader}
           emptyTitle={
             search || statusFilter !== 'All'
               ? 'No Plans Found'

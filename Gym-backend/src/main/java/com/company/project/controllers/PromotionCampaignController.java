@@ -5,6 +5,7 @@ import com.company.project.dto.ApplyAccessDaysResponseDTO;
 import com.company.project.dto.EligibleMemberDTO;
 import com.company.project.dto.PromotionCampaignRequestDTO;
 import com.company.project.dto.PromotionCampaignResponseDTO;
+import com.company.project.dto.PromotionImpactDTO;
 import com.company.project.services.PromotionCampaignService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -94,8 +95,14 @@ public class PromotionCampaignController {
     public ResponseEntity<PromotionCampaignResponseDTO> redeemPromotion(
             @PathVariable Long id,
             @RequestParam(required = false) BigDecimal revenue,
-            @RequestParam(required = false) BigDecimal savings) {
-        return ResponseEntity.ok(promotionService.redeemPromotion(id, revenue, savings));
+            @RequestParam(required = false) BigDecimal savings,
+            @RequestParam(required = false) Long memberId) {
+        return ResponseEntity.ok(promotionService.redeemPromotion(id, revenue, savings, memberId));
+    }
+
+    @GetMapping("/impact")
+    public ResponseEntity<PromotionImpactDTO> getMonthlyImpact() {
+        return ResponseEntity.ok(promotionService.getMonthlyImpact());
     }
 
     @GetMapping("/eligibility-members")

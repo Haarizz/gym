@@ -5,16 +5,23 @@ import com.company.project.dto.ApplyAccessDaysResponseDTO;
 import com.company.project.dto.EligibleMemberDTO;
 import com.company.project.dto.PromotionCampaignRequestDTO;
 import com.company.project.dto.PromotionCampaignResponseDTO;
+import com.company.project.dto.PromotionImpactDTO;
+import com.company.project.entities.Branch;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.entities.PromotionAccessDaysAudit;
 import com.company.project.entities.PromotionCampaign;
+import com.company.project.entities.PromotionRedemption;
+import com.company.project.entities.Referral;
 import com.company.project.exceptions.EntityNotFoundException;
+import com.company.project.repositories.BranchRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.repositories.PromotionAccessDaysAuditRepository;
 import com.company.project.repositories.PromotionCampaignRepository;
+import com.company.project.repositories.PromotionRedemptionRepository;
 import com.company.project.repositories.ReceiptRepository;
+import com.company.project.repositories.ReferralRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,8 +29,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,30 +46,94 @@ public class PromotionCampaignService {
     private final MembershipPlanRepository membershipPlanRepository;
     private final ReceiptRepository receiptRepository;
     private final PromotionAccessDaysAuditRepository accessDaysAuditRepository;
+    private final PromotionRedemptionRepository redemptionRepository;
+    private final ReferralRepository referralRepository;
+    private final BranchRepository branchRepository;
 
     public PromotionCampaignService(PromotionCampaignRepository promotionRepository,
                                      MemberRepository memberRepository,
                                      MembershipPlanRepository membershipPlanRepository,
                                      ReceiptRepository receiptRepository,
-                                     PromotionAccessDaysAuditRepository accessDaysAuditRepository) {
+                                     PromotionAccessDaysAuditRepository accessDaysAuditRepository,
+                                     PromotionRedemptionRepository redemptionRepository,
+                                     ReferralRepository referralRepository,
+                                     BranchRepository branchRepository) {
         this.promotionRepository = promotionRepository;
         this.memberRepository = memberRepository;
         this.membershipPlanRepository = membershipPlanRepository;
         this.receiptRepository = receiptRepository;
         this.accessDaysAuditRepository = accessDaysAuditRepository;
+        this.redemptionRepository = redemptionRepository;
+        this.referralRepository = referralRepository;
+        this.branchRepository = branchRepository;
     }
 
     public List<PromotionCampaignResponseDTO> getPromotions(String status) {
+        // The daily scheduler is the only other thing that flips statuses, so
+        // without this a promotion whose end date passed at midnight would
+        // still come back as "active" until 08:00.
+        autoTransitionStatuses();
         List<PromotionCampaign> items = (status != null && !status.isBlank())
                 ? promotionRepository.findByStatusOrderByCreatedAtDesc(status)
                 : promotionRepository.findAllByOrderByCreatedAtDesc();
-        return items.stream().map(PromotionCampaignResponseDTO::fromEntity).collect(Collectors.toList());
+        Map<Long, String> branchNames = branchNames();
+        return items.stream()
+                .map(p -> PromotionCampaignResponseDTO.fromEntity(p, branchNames))
+                .collect(Collectors.toList());
     }
 
     public PromotionCampaignResponseDTO getPromotionById(Long id) {
+        autoTransitionStatuses();
         PromotionCampaign promotion = promotionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Promotion not found: " + id));
-        return PromotionCampaignResponseDTO.fromEntity(promotion);
+        return PromotionCampaignResponseDTO.fromEntity(promotion, branchNames());
+    }
+
+    private Map<Long, String> branchNames() {
+        return branchRepository.findAll().stream()
+                .filter(b -> b.getBranchName() != null)
+                .collect(Collectors.toMap(Branch::getId, Branch::getBranchName, (a, b) -> a));
+    }
+
+    /**
+     * Current calendar month's revenue and new-member conversions attributable
+     * to promotion redemptions and successful referrals.
+     */
+    @Transactional(readOnly = true)
+    public PromotionImpactDTO getMonthlyImpact() {
+        YearMonth month = YearMonth.now();
+        LocalDate from = month.atDay(1);
+        LocalDate to = month.plusMonths(1).atDay(1);
+        LocalDateTime fromTs = from.atStartOfDay();
+        LocalDateTime toTs = to.atStartOfDay();
+
+        BigDecimal promotionRevenue = redemptionRepository.sumRevenueBetween(fromTs, toTs);
+        long redemptions = redemptionRepository.countByRedeemedAtGreaterThanEqualAndRedeemedAtLessThan(fromTs, toTs);
+
+        List<Referral> conversions = referralRepository.findSuccessfulSignedUpBetween(from, to);
+        BigDecimal referralRevenue = conversions.stream()
+                .map(Referral::getPurchaseAmount)
+                .filter(a -> a != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Keyed by business member id so a member who both came in through a
+        // referral and redeemed a promotion is only counted once.
+        Set<String> newMembers = new HashSet<>();
+        for (Referral r : conversions) {
+            newMembers.add(r.getRefereeMemberId() != null ? r.getRefereeMemberId() : "referral:" + r.getId());
+        }
+        for (Long memberDbId : redemptionRepository.findDistinctMemberIdsBetween(fromTs, toTs)) {
+            memberRepository.findById(memberDbId).ifPresent(m -> {
+                if (m.getJoinDate() != null
+                        && !m.getJoinDate().isBefore(fromTs) && m.getJoinDate().isBefore(toTs)) {
+                    newMembers.add(m.getMemberId() != null ? m.getMemberId() : "member:" + m.getId());
+                }
+            });
+        }
+
+        return new PromotionImpactDTO(month.toString(),
+                promotionRevenue != null ? promotionRevenue : BigDecimal.ZERO,
+                referralRevenue, newMembers.size(), redemptions, conversions.size());
     }
 
     public PromotionCampaignResponseDTO createPromotion(PromotionCampaignRequestDTO req) {
@@ -291,9 +366,17 @@ public class PromotionCampaignService {
     /**
      * Increment the usage count when a promotion is successfully redeemed.
      */
-    public PromotionCampaignResponseDTO redeemPromotion(Long id, BigDecimal revenue, BigDecimal savings) {
+    public PromotionCampaignResponseDTO redeemPromotion(Long id, BigDecimal revenue, BigDecimal savings, Long memberId) {
         PromotionCampaign promotion = promotionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Promotion not found: " + id));
+
+        PromotionRedemption redemption = new PromotionRedemption();
+        redemption.setPromotionId(promotion.getId());
+        redemption.setMemberId(memberId);
+        redemption.setRevenue(revenue);
+        redemption.setSavings(savings);
+        redemption.setRedeemedAt(LocalDateTime.now());
+        redemptionRepository.save(redemption);
 
         int currentCount = promotion.getUsageCount() != null ? promotion.getUsageCount() : 0;
         promotion.setUsageCount(currentCount + 1);

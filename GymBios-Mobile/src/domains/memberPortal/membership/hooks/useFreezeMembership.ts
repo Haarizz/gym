@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { membershipApi } from '../infrastructure/membership.api';
-import { memberMembershipKeys } from './useMemberMembership';
+import { invalidateMembershipQueries } from './invalidateMembershipQueries';
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface FreezeMembershipParams {
@@ -15,7 +15,7 @@ export function useFreezeMembership() {
     mutationFn: (params: FreezeMembershipParams) =>
       membershipApi.freezeMembership(params.durationDays, params.reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: memberMembershipKeys.all });
+      void invalidateMembershipQueries(queryClient);
     },
     onError: (error: any) => {
       const message = error?.response?.data?.message || 'Failed to freeze membership.';

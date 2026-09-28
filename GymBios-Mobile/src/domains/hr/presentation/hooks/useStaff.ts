@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useBranchContext } from '@/shared/providers/BranchProvider';
+import { useBranchContext, type BranchId } from '@/shared/providers/BranchProvider';
 
 import type { Staff } from '../../domain/Staff';
+import type { StaffPerformance } from '../../domain/StaffOverview';
 import type {
   CreateStaffRequest,
   StaffFilters,
@@ -22,6 +23,8 @@ export const staffKeys = {
     [...staffKeys.lists(), filters] as const,
   details: () => [...staffKeys.all, 'detail'] as const,
   detail: (id: string) => [...staffKeys.details(), id] as const,
+  summary: (branchId: BranchId) => [...staffKeys.all, 'summary', branchId] as const,
+  performance: (ids: string[]) => [...staffKeys.all, 'performance', ids] as const,
 };
 
 export function useStaff(initialFilters?: StaffFilters) {
@@ -150,4 +153,31 @@ export function useDeleteStaff() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
+}
+
+/** Branch-scoped headcount KPIs (total / present / absent) for the staff list header. */
+export function useStaffSummary() {
+  const { selectedBranchId } = useBranchContext();
+
+  return useQuery({
+    queryKey: staffKeys.summary(selectedBranchId),
+    queryFn: () => staffService.getSummary(),
+  });
+}
+
+/** Current-month performance for the given staff, keyed by staff id for list lookups. */
+export function useStaffPerformance(staffIds: string[]) {
+  const query = useQuery({
+    queryKey: staffKeys.performance(staffIds),
+    queryFn: () => staffService.getPerformance(staffIds),
+    enabled: staffIds.length > 0,
+  });
+
+  const byStaffId = useMemo(() => {
+    const map = new Map<string, StaffPerformance>();
+    for (const item of query.data ?? []) map.set(item.staffId, item);
+    return map;
+  }, [query.data]);
+
+  return { byStaffId, loading: query.isFetching, refresh: query.refetch };
 }

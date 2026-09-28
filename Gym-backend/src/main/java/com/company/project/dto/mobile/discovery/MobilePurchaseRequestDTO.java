@@ -61,4 +61,11 @@ public class MobilePurchaseRequestDTO {
 
     public String getBankAccountName() { return bankAccountName; }
     public void setBankAccountName(String bankAccountName) { this.bankAccountName = bankAccountName; }
+
+    @jakarta.validation.Valid
+    @JsonProperty("connectedMembers")
+    private List<com.company.project.dto.mobile.family.MobileFamilyConnectedMemberDTO> connectedMembers;
+
+    public List<com.company.project.dto.mobile.family.MobileFamilyConnectedMemberDTO> getConnectedMembers() { return connectedMembers; }
+    public void setConnectedMembers(List<com.company.project.dto.mobile.family.MobileFamilyConnectedMemberDTO> connectedMembers) { this.connectedMembers = connectedMembers; }
 }

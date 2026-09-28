@@ -2,12 +2,16 @@ package com.company.project.services.mobile.analytics;
 
 import com.company.project.dto.dashboard.DashboardDTOs.KPIData;
 import com.company.project.dto.dashboard.DashboardDTOs.MemberChurnData;
-import com.company.project.dto.dashboard.DashboardDTOs.ClassAttendance;
 import com.company.project.dto.mobile.analytics.*;
+import com.company.project.entities.AddonPlan;
+import com.company.project.repositories.AddonPlanRepository;
+import com.company.project.repositories.BookingRepository;
+import com.company.project.repositories.MemberAddonRepository;
 import com.company.project.repositories.MemberRepository;
-import com.company.project.repositories.ReceiptRepository;
+import com.company.project.repositories.ReviewRepository;
 import com.company.project.repositories.TrainingSessionRepository;
 import com.company.project.repositories.StaffRepository;
+import com.company.project.repositories.mobile.dashboard.AdminDashboardBookingRepository;
 import com.company.project.services.DashboardService;
 import com.company.project.services.FinancialAnalyticsService;
 import org.springframework.stereotype.Service;
@@ -15,8 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,23 +35,35 @@ public class MobileAdminAnalyticsService {
     private final DashboardService dashboardService;
     private final FinancialAnalyticsService financialAnalyticsService;
     private final MemberRepository memberRepository;
-    private final ReceiptRepository receiptRepository;
     private final TrainingSessionRepository trainingSessionRepository;
     private final StaffRepository staffRepository;
+    private final BookingRepository bookingRepository;
+    private final AdminDashboardBookingRepository adminDashboardBookingRepository;
+    private final ReviewRepository reviewRepository;
+    private final MemberAddonRepository memberAddonRepository;
+    private final AddonPlanRepository addonPlanRepository;
 
     public MobileAdminAnalyticsService(
             DashboardService dashboardService,
             FinancialAnalyticsService financialAnalyticsService,
             MemberRepository memberRepository,
-            ReceiptRepository receiptRepository,
             TrainingSessionRepository trainingSessionRepository,
-            StaffRepository staffRepository) {
+            StaffRepository staffRepository,
+            BookingRepository bookingRepository,
+            AdminDashboardBookingRepository adminDashboardBookingRepository,
+            ReviewRepository reviewRepository,
+            MemberAddonRepository memberAddonRepository,
+            AddonPlanRepository addonPlanRepository) {
         this.dashboardService = dashboardService;
         this.financialAnalyticsService = financialAnalyticsService;
         this.memberRepository = memberRepository;
-        this.receiptRepository = receiptRepository;
         this.trainingSessionRepository = trainingSessionRepository;
         this.staffRepository = staffRepository;
+        this.bookingRepository = bookingRepository;
+        this.adminDashboardBookingRepository = adminDashboardBookingRepository;
+        this.reviewRepository = reviewRepository;
+        this.memberAddonRepository = memberAddonRepository;
+        this.addonPlanRepository = addonPlanRepository;
     }
 
     public MobileAdminAnalyticsResponseDTO getAnalytics() {
@@ -139,44 +158,68 @@ public class MobileAdminAnalyticsService {
     }
 
     private OperationsDTO buildOperations() {
-        // Class Utilization
-        List<ClassAttendance> classAtt = dashboardService.getClassAttendance();
-        List<ClassUtilizationDTO> classUtilization = classAtt.stream()
-            .map(c -> new ClassUtilizationDTO(c.getClassName() != null ? c.getClassName() : "Class", c.getPercentage()))
-            .collect(Collectors.toList());
+        // All operations metrics cover the current month to date
+        LocalDate today = LocalDate.now();
+        LocalDate monthStart = today.withDayOfMonth(1);
+        LocalDateTime monthStartDateTime = monthStart.atStartOfDay();
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
 
-        // Trainer Productivity
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
-        
-        long activeTrainers = staffRepository.countByRole("trainer");
-        if (activeTrainers == 0) activeTrainers = 1;
-        long totalSessionsThisMonth = trainingSessionRepository.countByDateBetween(startOfMonth.toLocalDate(), now.toLocalDate());
-        
-        int avgSessions = (int) (totalSessionsThisMonth / activeTrainers);
-        
-        // PT Package Sales
-        BigDecimal ptSales = receiptRepository.sumPaidInPeriodByCategory("PT Package", startOfMonth, now);
-        if (ptSales == null) ptSales = BigDecimal.ZERO;
-        
-        TrainerProductivityDTO productivity = new TrainerProductivityDTO(
-            avgSessions,
-            4.8, // Mocked rating until feedback system is fully integrated
-            ptSales
+        return new OperationsDTO(
+            buildClassUtilization(monthStart, today),
+            buildTrainerProductivity(monthStart, today),
+            buildAddonPerformance(monthStartDateTime, tomorrowStart)
         );
+    }
 
-        // Add-on Performance
-        List<Map<String, Object>> revenueSource = financialAnalyticsService.getRevenueBySource();
-        List<AddOnPerformanceDTO> addOns = new ArrayList<>();
-        if (revenueSource != null) {
-            for (Map<String, Object> r : revenueSource) {
-                addOns.add(new AddOnPerformanceDTO(
-                    (String) r.get("source"),
-                    r.get("amount") instanceof BigDecimal ? (BigDecimal) r.get("amount") : new BigDecimal(r.get("amount").toString())
-                ));
-            }
+    // Booked seats / total capacity per group class this month (PT sessions excluded)
+    private List<ClassUtilizationDTO> buildClassUtilization(LocalDate start, LocalDate end) {
+        Map<String, Long> bookedByClass = new HashMap<>();
+        for (Object[] row : bookingRepository.countClassBookingsByNameBetween(start, end)) {
+            bookedByClass.put((String) row[0], ((Number) row[1]).longValue());
         }
 
-        return new OperationsDTO(classUtilization, productivity, addOns);
+        List<ClassUtilizationDTO> result = new ArrayList<>();
+        for (Object[] row : trainingSessionRepository.sumClassCapacityByNameBetween(start, end)) {
+            String className = (String) row[0];
+            long capacity = ((Number) row[1]).longValue();
+            long booked = bookedByClass.getOrDefault(className, 0L);
+            int utilization = capacity > 0 ? (int) Math.round((double) booked * 100 / capacity) : 0;
+            result.add(new ClassUtilizationDTO(className != null ? className : "Class", utilization));
+        }
+        result.sort((a, b) -> Integer.compare(b.getUtilization(), a.getUtilization()));
+        return result;
+    }
+
+    private TrainerProductivityDTO buildTrainerProductivity(LocalDate start, LocalDate end) {
+        // Role is stored inconsistently ("trainer", "Trainer", "TRAINER", "Personal Trainer")
+        long trainers = staffRepository.countByRoleContainingIgnoreCase("trainer");
+        long sessions = trainingSessionRepository.countNonCancelledBetween(start, end);
+        int avgSessions = trainers > 0 ? (int) Math.round((double) sessions / trainers) : 0;
+
+        Double avgRating = reviewRepository.findAverageRating();
+        double satisfaction = avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0;
+
+        // Same source as the admin dashboard "PT Sales" KPI: paid bookings on PT sessions
+        BigDecimal ptSales = adminDashboardBookingRepository.sumPaidPtBookingsInPeriod(start, end.plusDays(1));
+
+        return new TrainerProductivityDTO(avgSessions, satisfaction, ptSales != null ? ptSales : BigDecimal.ZERO);
+    }
+
+    // Add-on revenue this month; active add-on plans with no sales are listed at zero
+    private List<AddOnPerformanceDTO> buildAddonPerformance(LocalDateTime start, LocalDateTime end) {
+        Map<String, BigDecimal> revenueByAddon = new LinkedHashMap<>();
+        for (AddonPlan plan : addonPlanRepository.findByIsActiveTrueOrderByNameAsc()) {
+            if (plan.getName() != null) revenueByAddon.put(plan.getName(), BigDecimal.ZERO);
+        }
+        for (Object[] row : memberAddonRepository.sumRevenueByAddonNameInPeriod(start, end)) {
+            String name = row[0] != null ? (String) row[0] : "Add-on";
+            BigDecimal amount = row[1] instanceof BigDecimal ? (BigDecimal) row[1] : new BigDecimal(row[1].toString());
+            revenueByAddon.merge(name, amount, BigDecimal::add);
+        }
+
+        return revenueByAddon.entrySet().stream()
+            .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
+            .map(e -> new AddOnPerformanceDTO(e.getKey(), e.getValue()))
+            .collect(Collectors.toList());
     }
 }

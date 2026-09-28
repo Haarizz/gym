@@ -61,10 +61,22 @@ public class TenantContextFilter extends OncePerRequestFilter {
             new NegatedRequestMatcher(PROFILE_TRANSACTIONS_PATH)
     );
 
+    // Family purchase/quote target a gym the caller is typically NOT a member of yet,
+    // and claim-pending runs before the app knows any tenant at all — all three
+    // pick their tenant(s) themselves, like /api/mobile/discovery/. The other
+    // /api/mobile/family/ endpoints (view, resend, revoke) stay tenant-routed and
+    // membership-checked by X-Tenant-ID as usual.
+    private static final RequestMatcher STRICTLY_GLOBAL_FAMILY_PATH = new OrRequestMatcher(
+            uriStartsWith("/api/mobile/family/purchase/"),
+            uriStartsWith("/api/mobile/family/quote/"),
+            uriEquals("/api/mobile/family/invitations/claim-pending")
+    );
+
     private static final RequestMatcher STRICTLY_GLOBAL_PATH = new OrRequestMatcher(
             uriStartsWith("/api/mobile/auth/"),
             STRICTLY_GLOBAL_PROFILE_PATH,
-            uriStartsWith("/api/mobile/discovery/")
+            uriStartsWith("/api/mobile/discovery/"),
+            STRICTLY_GLOBAL_FAMILY_PATH
     );
 
     private static final RequestMatcher GLOBAL_EXEMPT_PATH = new OrRequestMatcher(
@@ -72,6 +84,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
             uriStartsWith("/api/mobile/auth/"),
             STRICTLY_GLOBAL_PROFILE_PATH,
             uriStartsWith("/api/mobile/discovery/"),
+            STRICTLY_GLOBAL_FAMILY_PATH,
             uriStartsWith("/api/community"),
             uriStartsWith("/api/notifications")
     );

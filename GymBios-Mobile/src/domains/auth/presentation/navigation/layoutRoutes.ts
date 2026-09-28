@@ -45,6 +45,9 @@ export const FULL_SCREEN_ROUTES: readonly RoutePattern[] = [
 
   // Schedule
   ['schedule', 'add-class'],
+
+  // Family
+  ['family', 'purchase'],
 ] as const;
 
 /**
@@ -71,6 +74,8 @@ export const MODULE_ROUTES = [
   'trainer',
   'catalog',
   'catalog/t/[tenantSlug]/b/[branchId]',
+  'family',
+  'family/purchase',
 ] as const;
 
 /**

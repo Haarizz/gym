@@ -65,6 +65,49 @@ export interface MobileRegistrationStatusApiModel {
   resend_available_at: string;
 }
 
+// ── Social sign-in (Google/Apple) ───────────────────────────────────────────
+// Field names are snake_case to match the backend's global SNAKE_CASE naming
+// strategy, same convention as the models above.
+
+export interface GoogleAuthRequestApiModel {
+  id_token: string;
+}
+
+export interface AppleAuthRequestApiModel {
+  identity_token: string;
+  user?: { full_name?: string | null };
+}
+
+export interface SocialCompleteRequestApiModel {
+  username: string;
+  full_name?: string | null;
+}
+
+export interface LinkProviderRequestApiModel {
+  token: string;
+}
+
+/**
+ * Envelope MobileSocialAuthController's /google and /apple endpoints return.
+ * Exactly one of the shapes below is populated, selected by `status` — mirrors
+ * the backend's MobileSocialAuthResponseDTO.
+ */
+export interface SocialAuthApiModel {
+  status: 'AUTHENTICATED' | 'LINK_REQUIRED' | 'NEEDS_USERNAME';
+  session?: LoginResponseApiModel;
+  pending_token?: string;
+  suggested_username?: string | null;
+  prefill_full_name?: string | null;
+  masked_email?: string;
+  expires_at?: string;
+  provider?: 'GOOGLE' | 'APPLE';
+}
+
+export interface LinkProviderResponseApiModel {
+  status: 'LINKED';
+  provider: 'GOOGLE' | 'APPLE';
+}
+
 export interface StoredSessionApiModel {
   accessToken: string;
   refreshToken: string;

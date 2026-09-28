@@ -17,7 +17,7 @@ export interface MembershipApprovalStatus {
  * endpoint, but deliberately leaves /api/members/me reachable so the app can keep
  * polling this exact status (see TenantContextFilter's isOwnStatusCheckPath).
  */
-export function useMembershipApprovalStatus() {
+export function useMembershipApprovalStatus(options: { enabled?: boolean } = {}) {
   const activeTenant = useAuthStore((s) => s.activeTenant);
 
   return useQuery<MembershipApprovalStatus>({
@@ -33,7 +33,7 @@ export function useMembershipApprovalStatus() {
         gymName: data?.name ?? null,
       };
     },
-    enabled: !!activeTenant,
+    enabled: !!activeTenant && (options.enabled ?? true),
     retry: false,
     staleTime: 1000 * 30,
   });

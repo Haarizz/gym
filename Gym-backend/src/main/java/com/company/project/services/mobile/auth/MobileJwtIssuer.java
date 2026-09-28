@@ -3,6 +3,8 @@ package com.company.project.services.mobile.auth;
 import com.company.project.controlplane.repositories.UserDirectoryRepository;
 import com.company.project.dto.AuthResponseDTO;
 import com.company.project.entities.User;
+import com.company.project.entities.UserProfile;
+import com.company.project.repositories.UserProfileRepository;
 import com.company.project.security.JwtService;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.RoleService;
@@ -30,14 +32,17 @@ public class MobileJwtIssuer {
     private final JwtService jwtService;
     private final RoleService roleService;
     private final UserDirectoryRepository userDirectoryRepository;
+    private final UserProfileRepository userProfileRepository;
 
     @Value("${tenant.routing.enabled:false}")
     private boolean tenantRoutingEnabled;
 
-    public MobileJwtIssuer(JwtService jwtService, RoleService roleService, UserDirectoryRepository userDirectoryRepository) {
+    public MobileJwtIssuer(JwtService jwtService, RoleService roleService, UserDirectoryRepository userDirectoryRepository,
+                            UserProfileRepository userProfileRepository) {
         this.jwtService = jwtService;
         this.roleService = roleService;
         this.userDirectoryRepository = userDirectoryRepository;
+        this.userProfileRepository = userProfileRepository;
     }
 
     public AuthResponseDTO issueForNewMember(User user, String fullName) {
@@ -86,6 +91,79 @@ public class MobileJwtIssuer {
                 .accessibleBranches(List.of())
                 .defaultBranchId(null)
                 .profileCompleted(false)
+                .build();
+    }
+
+    /**
+     * Issues a member JWT for an account that was just created by verified
+     * Google/Apple provider-token possession — no OTP, no password check,
+     * since the provider's cryptographic verification already served as the
+     * authentication event (see MobileSocialAuthService.completeRegistration).
+     * Same shape as {@link #issueForNewMember}, kept as a separate method
+     * (rather than modifying that one) since the two call sites represent
+     * different authentication events worth distinguishing in code, even
+     * though the resulting claims/response are structurally identical.
+     */
+    public AuthResponseDTO issueForNewSocialMember(User user, String fullName) {
+        return buildResponse(user, fullName, false);
+    }
+
+    /**
+     * Issues a member JWT for a returning user whose Google/Apple identity
+     * was already linked to this account (MobileSocialAuthService.
+     * resolveOrCreate's existing-link branch) — same no-password-check shape,
+     * but unlike a brand-new registration, profileCompleted must reflect the
+     * account's real state rather than being hardcoded false.
+     */
+    public AuthResponseDTO issueForExistingSocialMember(User user) {
+        UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+        boolean profileCompleted = profile == null || profile.isProfileCompleted();
+        String fullName = profile != null ? profile.getFullName() : null;
+        return buildResponse(user, fullName, profileCompleted);
+    }
+
+    private AuthResponseDTO buildResponse(User user, String fullName, boolean profileCompleted) {
+        List<String> permissionKeys = roleService.getEffectivePermissionKeysForRoleNames(List.of("MEMBER"));
+        UserDetailsImpl userDetails = UserDetailsImpl.build(user, permissionKeys);
+
+        boolean hasDirectoryEntry = userDirectoryRepository
+                .findByUsernameOrEmail(user.getUsername(), user.getUsername())
+                .isPresent();
+        boolean isGlobalUser = tenantRoutingEnabled && !hasDirectoryEntry;
+
+        Map<String, Object> extraClaims = new HashMap<>();
+        if (isGlobalUser) {
+            extraClaims.put(JwtService.IS_GLOBAL_CLAIM, true);
+            userDetails.setGlobal(true);
+        }
+
+        String jwt = jwtService.generateToken(extraClaims, userDetails);
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .filter(a -> a.startsWith("ROLE_"))
+                .map(a -> a.replace("ROLE_", ""))
+                .collect(Collectors.toList());
+
+        List<String> permissions = userDetails.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .filter(a -> !a.startsWith("ROLE_"))
+                .collect(Collectors.toList());
+
+        return AuthResponseDTO.builder()
+                .token(jwt)
+                .username(user.getUsername())
+                .roles(roles)
+                .userId(user.getId())
+                .enabled(user.isEnabled())
+                .roleName(roles.stream().findFirst().orElse(null))
+                .staffName(null)
+                .fullName(fullName)
+                .gymName(null)
+                .permissions(permissions)
+                .accessibleBranches(List.of())
+                .defaultBranchId(null)
+                .profileCompleted(profileCompleted)
                 .build();
     }
 }

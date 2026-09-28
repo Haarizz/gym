@@ -1,7 +1,9 @@
 import type { Result } from '@/core/types';
 
 import type { PendingRegistration, RegistrationStatus } from '../entities/PendingRegistration';
+import type { PendingSocialRegistration } from '../entities/PendingSocialRegistration';
 import type { Session } from '../entities/Session';
+import type { SocialAuthOutcome, SocialProvider } from '../entities/SocialAuthOutcome';
 import type { AppRoleValue } from '../valueObjects/AppRole';
 import type { Password } from '../valueObjects/Password';
 import type { Username } from '../valueObjects/Username';
@@ -32,4 +34,21 @@ export interface AuthRepository {
   persistPendingRegistration(pending: PendingRegistration): Promise<Result<void, string>>;
   getStoredPendingRegistration(): Promise<Result<PendingRegistration | null, string>>;
   clearPendingRegistration(): Promise<Result<void, string>>;
+
+  /** Provider validation only — no session/pending row is created unless the outcome demands it. */
+  authenticateWithGoogle(idToken: string): Promise<Result<SocialAuthOutcome, string>>;
+  /** fullNameHint is Apple's client-submitted, unverified name hint — see SocialAuthOutcome. */
+  authenticateWithApple(identityToken: string, fullNameHint: string | null): Promise<Result<SocialAuthOutcome, string>>;
+  completeSocialRegistration(
+    provider: SocialProvider,
+    pendingToken: string,
+    username: string,
+    fullName: string | null,
+  ): Promise<Result<Session, string>>;
+  /** Requires an existing, recently-issued session — see LinkProvider use case. */
+  linkProvider(provider: SocialProvider, providerToken: string): Promise<Result<void, string>>;
+
+  persistPendingSocialRegistration(pending: PendingSocialRegistration): Promise<Result<void, string>>;
+  getStoredPendingSocialRegistration(): Promise<Result<PendingSocialRegistration | null, string>>;
+  clearPendingSocialRegistration(): Promise<Result<void, string>>;
 }

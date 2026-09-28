@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { useCurrency } from '@/core/providers/CurrencyProvider';
 
 interface TrainerProductivityData {
   averageSessionsPerTrainer: number;
@@ -9,11 +10,14 @@ interface TrainerProductivityData {
 }
 
 interface TrainerProductivityCardProps {
-  data: TrainerProductivityData;
+  data?: TrainerProductivityData;
 }
 
 export function TrainerProductivityCard({ data }: TrainerProductivityCardProps) {
-  if (!data) return null;
+  const { formatCurrency } = useCurrency();
+  const averageSessions = data?.averageSessionsPerTrainer ?? 0;
+  const satisfaction = data?.memberSatisfaction ?? 0;
+  const ptSales = data?.ptPackageSales ?? 0;
 
   return (
     <View style={styles.card}>
@@ -22,17 +26,17 @@ export function TrainerProductivityCard({ data }: TrainerProductivityCardProps) 
       <View style={styles.list}>
         <View style={[styles.row, styles.borderBottom]}>
           <Text style={styles.label}>Avg. Sessions per Trainer</Text>
-          <Text style={styles.value}>{data.averageSessionsPerTrainer}</Text>
+          <Text style={styles.value}>{averageSessions}</Text>
         </View>
         
         <View style={[styles.row, styles.borderBottom]}>
           <Text style={styles.label}>Member Satisfaction</Text>
-          <Text style={[styles.value, { color: '#16A34A' }]}>{data.memberSatisfaction}/5.0</Text>
+          <Text style={[styles.value, { color: '#16A34A' }]}>{satisfaction.toFixed(1)}/5.0</Text>
         </View>
         
         <View style={styles.row}>
           <Text style={styles.label}>PT Package Sales</Text>
-          <Text style={styles.value}>₹{(data.ptPackageSales / 1000).toFixed(1)}k</Text>
+          <Text style={styles.value}>{formatCurrency(ptSales, { maximumFractionDigits: 0 })}</Text>
         </View>
       </View>
     </View>

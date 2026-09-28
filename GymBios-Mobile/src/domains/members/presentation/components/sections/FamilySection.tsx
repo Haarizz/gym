@@ -20,14 +20,14 @@ export function FamilySection({
   onAddFamilyMember,
   onSelectMember,
 }: FamilySectionProps) {
-  const isFamily = member.membershipType.toUpperCase() === 'FAMILY';
+  const isFamily = member.membershipType?.toUpperCase() === 'FAMILY';
 
   if (!isFamily) {
     return null;
   }
 
-  const adults = family?.members.filter(m => m.familyRole.toUpperCase() === 'ADULT') ?? [];
-  const minors = family?.members.filter(m => m.familyRole.toUpperCase() === 'MINOR') ?? [];
+  const adults = family?.members.filter(m => m.familyRole?.toUpperCase() === 'ADULT') ?? [];
+  const minors = family?.members.filter(m => m.familyRole?.toUpperCase() === 'MINOR') ?? [];
 
   return (
     <FormSection title="Family">

@@ -5,6 +5,7 @@ import type {
   UpdateStaffRequest,
 } from './StaffRepository';
 import type { Staff, StaffPage } from '../domain/Staff';
+import type { StaffPerformance, StaffSummary } from '../domain/StaffOverview';
 import type { StaffTarget, StaffTargetFilters } from '../domain/StaffTarget';
 
 export class StaffService {
@@ -35,5 +36,13 @@ export class StaffService {
 
   getTargets(filters?: StaffTargetFilters): Promise<StaffTarget[]> {
     return this.repository.getTargets(filters);
+  }
+
+  getSummary(): Promise<StaffSummary> {
+    return this.repository.getSummary();
+  }
+
+  getPerformance(staffIds: string[]): Promise<StaffPerformance[]> {
+    return this.repository.getPerformance(staffIds);
   }
 }

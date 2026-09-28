@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { useCurrency } from '@/core/providers/CurrencyProvider';
 
 interface AddOnPerformanceData {
   name: string;
@@ -12,16 +13,21 @@ interface AddOnPerformanceCardProps {
 }
 
 export function AddOnPerformanceCard({ data }: AddOnPerformanceCardProps) {
-  if (!data || data.length === 0) return null;
+  const { formatCurrency } = useCurrency();
+  const items = data ?? [];
 
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Add-on Performance</Text>
-      
-      {data.map((item, index) => (
-        <View key={item.name} style={[styles.row, index < data.length - 1 && styles.borderBottom]}>
+
+      {items.length === 0 && (
+        <Text style={styles.emptyText}>No add-on sales this month</Text>
+      )}
+
+      {items.map((item, index) => (
+        <View key={`${item.name}-${index}`} style={[styles.row, index < items.length - 1 && styles.borderBottom]}>
           <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.revenue}>₹{(item.revenue / 1000).toFixed(0)}K</Text>
+          <Text style={styles.revenue}>{formatCurrency(item.revenue ?? 0, { maximumFractionDigits: 0 })}</Text>
         </View>
       ))}
     </View>
@@ -55,6 +61,10 @@ const styles = StyleSheet.create({
   borderBottom: {
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#6B7280',
   },
   name: {
     fontSize: 13,

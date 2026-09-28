@@ -1,4 +1,5 @@
 import type { Staff, StaffPage } from '../domain/Staff';
+import type { StaffPerformance, StaffSummary } from '../domain/StaffOverview';
 import type { StaffTarget, StaffTargetFilters } from '../domain/StaffTarget';
 
 export interface StaffFilters {
@@ -53,4 +54,8 @@ export interface StaffRepository {
   deleteStaff(id: string): Promise<void>;
 
   getTargets(filters?: StaffTargetFilters): Promise<StaffTarget[]>;
+
+  getSummary(): Promise<StaffSummary>;
+
+  getPerformance(staffIds: string[]): Promise<StaffPerformance[]>;
 }

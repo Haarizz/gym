@@ -1,32 +1,79 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Share } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { ScreenLayout } from '@/shared/layouts';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import type { createUseRestoreSession } from '@/domains/auth/presentation/hooks/useAuthFlow';
-import { usePromotions } from '@/domains/promotions/hooks/usePromotions';
+import { usePromotions, usePromotionImpact } from '@/domains/promotions/hooks/usePromotions';
+import type { PromotionCampaignResponse } from '@/domains/promotions/domain/PromotionCampaign';
 import { useReferrals } from '@/domains/referrals/hooks/useReferrals';
+import { formatCompactCurrency, formatCount } from '@/domains/dashboard/utils/adminDashboardFormat';
 
-interface AdminDealsScreenProps {
-  useRestoreSession: ReturnType<typeof createUseRestoreSession>;
+// Local yyyy-MM-dd, matching the date-only format the backend sends.
+function todayIso(): string {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${mm}-${dd}`;
 }
+
+// The backend refreshes date-driven statuses on read, but a cached list can
+// still outlive an end date (e.g. the app left open past midnight), so the
+// badge is derived from the dates rather than trusted blindly.
+function getEffectiveStatus(deal: PromotionCampaignResponse, today: string): string {
+  const status = (deal.status || '').toLowerCase();
+  if (status === 'draft' || status === 'paused') return status;
+  if (deal.endDate && deal.endDate.slice(0, 10) < today) return 'expired';
+  if (deal.startDate && deal.startDate.slice(0, 10) > today) return 'scheduled';
+  return status;
+}
+
+const STATUS_COLORS: Record<string, { bg: string; border: string; fg: string }> = {
+  active: { bg: '#dcfce7', border: '#bbf7d0', fg: '#15803d' },
+  scheduled: { bg: '#dbeafe', border: '#bfdbfe', fg: '#1d4ed8' },
+  paused: { bg: '#fef3c7', border: '#fde68a', fg: '#b45309' },
+  expired: { bg: '#fee2e2', border: '#fecaca', fg: '#b91c1c' },
+  draft: { bg: '#f3f4f6', border: '#e5e7eb', fg: '#4b5563' },
+};
 
 export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof createUseRestoreSession>) {
   return function AdminDealsScreen() {
-    const { logout, isLoggingOut } = useRestoreSession();
+    useRestoreSession();
     const router = useRouter();
 
     const { data: activePromotions, isLoading: isLoadingActive, error: activeError } = usePromotions('active');
     const { data: allPromotions, isLoading: isLoadingAll } = usePromotions();
     const { data: referralPage, isLoading: isLoadingReferrals, error: referralsError } = useReferrals();
+    const { data: impact, isLoading: isLoadingImpact, error: impactError } = usePromotionImpact();
 
     const handleCreateOffer = () => {
       router.push('/(admin)/promotions/create');
     };
 
-    const activeDeals = activePromotions || [];
+    const today = todayIso();
+    const activeDeals = (activePromotions || []).filter(
+      (deal) => getEffectiveStatus(deal, today) === 'active',
+    );
+
+    const handleCopy = async (code: string) => {
+      try {
+        await Clipboard.setStringAsync(code);
+        toast.success(`Promo code ${code} copied to clipboard.`);
+      } catch {
+        toast.error('Could not copy the promo code.');
+      }
+    };
+
+    const handleShare = (deal: PromotionCampaignResponse, discountText: string) => {
+      if (!deal.code) return;
+      Share.share({
+        message: `${deal.name}: use code ${deal.code} to get ${discountText}.`,
+      }).catch(() => {});
+    };
     const totalRedemptions = (allPromotions || []).reduce((sum, deal) => sum + (deal.usageCount || 0), 0);
     const referralsList = referralPage?.referrals || [];
 
@@ -67,22 +114,34 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
             ) : (
               <View style={styles.dealsList}>
                 {activeDeals.map((deal) => {
-                  const discountText = deal.discountType === 'percentage' 
-                    ? `${deal.discountValue}% OFF` 
+                  const discountText = deal.discountType === 'percentage'
+                    ? `${deal.discountValue}% OFF`
                     : `₹${deal.discountValue} OFF`;
-                    
+                  const status = getEffectiveStatus(deal, today);
+                  const statusColor = STATUS_COLORS[status] ?? STATUS_COLORS.draft;
+                  const usageCount = deal.usageCount || 0;
+                  const usagePercent = deal.usageLimit
+                    ? Math.min((usageCount / deal.usageLimit) * 100, 100)
+                    : 0;
+
                   return (
                     <View key={deal.id} style={styles.dealCard}>
                       {/* Deal Header */}
                       <View style={styles.dealHeader}>
-                        <View>
+                        <View style={styles.dealHeaderInfo}>
                           <Text style={styles.dealTitle}>{deal.name}</Text>
                           <View style={styles.discountBadge}>
                             <Text style={styles.discountText}>{discountText}</Text>
                           </View>
                         </View>
-                        <View style={styles.statusBadge}>
-                          <Text style={styles.statusText}>{deal.status.toUpperCase()}</Text>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            { backgroundColor: statusColor.bg, borderColor: statusColor.border },
+                          ]}>
+                          <Text style={[styles.statusText, { color: statusColor.fg }]}>
+                            {status.toUpperCase()}
+                          </Text>
                         </View>
                       </View>
 
@@ -93,10 +152,16 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                           <Text style={styles.codeValue}>{deal.code || 'N/A'}</Text>
                         </View>
                         <View style={styles.codeActions}>
-                          <TouchableOpacity style={styles.iconButton}>
+                          <TouchableOpacity
+                            style={styles.iconButton}
+                            disabled={!deal.code}
+                            onPress={() => deal.code && handleCopy(deal.code)}>
                             <Feather name="copy" size={16} color="#4b5563" />
                           </TouchableOpacity>
-                          <TouchableOpacity style={[styles.iconButton, { backgroundColor: BrandColors.teal }]}>
+                          <TouchableOpacity
+                            style={[styles.iconButton, { backgroundColor: BrandColors.teal }]}
+                            disabled={!deal.code}
+                            onPress={() => handleShare(deal, discountText)}>
                             <Feather name="share-2" size={16} color="#ffffff" />
                           </TouchableOpacity>
                         </View>
@@ -112,32 +177,25 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                         </View>
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Branches:</Text>
-                          {/* Gap identified: Branch data is not available on PromotionCampaignResponse */}
-                          <Text style={[styles.detailValue, { color: '#ef4444', fontStyle: 'italic' }]}>
-                            Pending Backend Data
-                          </Text>
+                          <Text style={styles.detailValue}>{deal.branchName || 'Unknown Branch'}</Text>
                         </View>
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Usage:</Text>
                           <Text style={styles.detailValue}>
-                            {deal.usageCount || 0} / {deal.usageLimit || '∞'}
+                            {usageCount} / {deal.usageLimit || '∞'}
                           </Text>
                         </View>
                       </View>
 
                       {/* Progress Bar */}
-                      {deal.usageLimit ? (
-                        <View style={styles.progressContainer}>
-                          <View style={styles.progressBarBg}>
-                            <View
-                              style={[
-                                styles.progressBarFill,
-                                { width: `${Math.min(((deal.usageCount || 0) / deal.usageLimit) * 100, 100)}%` },
-                              ]}
-                            />
-                          </View>
+                      <View style={styles.progressContainer}>
+                        <View style={styles.progressBarBg}>
+                          <View style={[styles.progressBarFill, { width: `${usagePercent}%` }]} />
                         </View>
-                      ) : null}
+                        {!deal.usageLimit ? (
+                          <Text style={styles.progressHint}>No usage limit set</Text>
+                        ) : null}
+                      </View>
                     </View>
                   );
                 })}
@@ -149,6 +207,9 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Referral Codes</Text>
+              <TouchableOpacity onPress={() => router.push('/(admin)/referrals')}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
             </View>
             
             {isLoadingReferrals ? (
@@ -201,16 +262,25 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
 
           {/* Quick Stats */}
           <View style={styles.quickStatsCard}>
-            <Text style={styles.quickStatsTitle}>This Month's Impact</Text>
-            <View style={styles.pendingContainerDark}>
-              <Feather name="clock" size={24} color="rgba(255, 255, 255, 0.7)" />
-              <Text style={styles.pendingTextDark}>Pending Backend Support</Text>
-              <Text style={styles.pendingSubtextDark}>
-                Missing API capabilities:
-                1. Revenue attributable to promotions/referrals scoped to the current month.
-                2. New member conversions attributable to deals/referrals scoped to the current month.
-              </Text>
-            </View>
+            <Text style={styles.quickStatsTitle}>{"This Month's Impact"}</Text>
+            {isLoadingImpact ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : impactError ? (
+              <Text style={styles.quickStatsError}>{"Failed to load this month's impact."}</Text>
+            ) : (
+              <View style={styles.quickStatsRow}>
+                <View style={styles.quickStatBox}>
+                  <Text style={styles.quickStatLabel}>Revenue from Deals</Text>
+                  <Text style={styles.quickStatValue}>
+                    {formatCompactCurrency(impact?.revenueFromDeals ?? 0)}
+                  </Text>
+                </View>
+                <View style={styles.quickStatBox}>
+                  <Text style={styles.quickStatLabel}>New Members</Text>
+                  <Text style={styles.quickStatValue}>{formatCount(impact?.newMembers ?? 0)}</Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
       </ScreenLayout>
@@ -289,6 +359,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: Spacing.three,
+  },
+  dealHeaderInfo: {
+    flex: 1,
+    marginRight: Spacing.two,
   },
   dealTitle: {
     fontSize: 15,
@@ -386,6 +460,11 @@ const styles = StyleSheet.create({
     backgroundColor: BrandColors.teal,
     borderRadius: 4,
   },
+  progressHint: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginTop: Spacing.one,
+  },
   referralCard: {
     backgroundColor: 'rgba(245, 199, 66, 0.05)',
     borderWidth: 1,
@@ -475,45 +554,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  pendingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.two,
-    gap: Spacing.two,
-    backgroundColor: '#f9fafb',
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-    borderStyle: 'dashed',
-  },
-  pendingText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  pendingSubtext: {
-    fontSize: 12,
-    color: '#6b7280',
-    textAlign: 'center',
-    paddingHorizontal: Spacing.four,
-  },
-  pendingContainerDark: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.six,
-    gap: Spacing.two,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: Radius.md,
-  },
-  pendingTextDark: {
-    fontSize: 14,
-    fontWeight: '600',
+  quickStatsError: {
     color: '#ffffff',
-  },
-  pendingSubtextDark: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    paddingHorizontal: Spacing.four,
   },
 });

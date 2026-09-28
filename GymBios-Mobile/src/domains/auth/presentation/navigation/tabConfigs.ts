@@ -17,7 +17,7 @@ export interface HeaderConfig {
 }
 
 export const ADMIN_TABS: TabConfig[] = [
-  { name: 'index', title: 'Dashboard', icon: 'grid' },
+  { name: 'index', title: 'Dashboard', icon: 'home' },
   { name: 'staff', title: 'Staff', icon: 'users' },
   { name: 'deals', title: 'Deals', icon: 'tag' },
   { name: 'analytics', title: 'Analytics', icon: 'bar-chart-2' },

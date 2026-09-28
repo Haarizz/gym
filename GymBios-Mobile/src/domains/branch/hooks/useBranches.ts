@@ -4,12 +4,13 @@ import { ApiBranchRepository } from '../infrastructure/ApiBranchRepository';
 
 const branchRepository = new ApiBranchRepository();
 
-export function useMyBranches() {
+export function useMyBranches(options: { enabled?: boolean } = {}) {
   const appRole = useAuthStore(state => state.appRole);
 
   return useQuery({
     queryKey: ['my-branches'],
     queryFn: () => branchRepository.getMyBranches(),
+    enabled: options.enabled ?? true,
     // A member whose Cash/Credit/Mixed purchase is still awaiting reception
     // approval gets a 403 here by design (see TenantContextFilter on the
     // backend) — retrying is pointless until staff act, and the default

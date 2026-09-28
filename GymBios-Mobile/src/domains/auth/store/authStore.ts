@@ -89,6 +89,16 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
     if (stored) {
       get().setActiveTenant(stored);
     }
+
+    // Every login/sign-up path awaits this, so a Family/Couple membership bought
+    // for this member's email is linked (and its gym selected, if they have none
+    // yet) before they land on the dashboard.
+    if (get().appRole === 'member') {
+      const { claimPendingFamilyInvitations } = await import(
+        '@/domains/family/application/claimPendingFamilyInvitations'
+      );
+      await claimPendingFamilyInvitations(get().activeTenant, get().setActiveTenant);
+    }
   },
   reset: () => {
     setApiClientToken(null);

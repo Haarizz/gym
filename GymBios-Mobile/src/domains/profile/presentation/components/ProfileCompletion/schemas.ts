@@ -17,6 +17,11 @@ export const emergencyInfoSchema = z.object({
 export const healthInfoSchema = z.object({
   bloodType: z.string().optional(),
   medicalConditions: z.string().optional(),
+  allergies: z.string().optional(),
+  currentMedications: z.string().optional(),
+  chronicIllnesses: z.string().optional(),
+  height: z.string().optional(),
+  weight: z.string().optional(),
 });
 
 export const profileCompletionSchema = z.object({

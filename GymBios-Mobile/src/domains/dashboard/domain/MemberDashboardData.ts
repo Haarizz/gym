@@ -6,6 +6,8 @@ export interface MemberInfo {
   daysRemaining: number;
   validUntil: string;
   isActive: boolean;
+  status?: string;
+  isFrozen: boolean;
 }
 
 export interface MemberTodayScheduleItem {

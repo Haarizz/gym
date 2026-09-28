@@ -111,18 +111,31 @@ public class ReceiptService {
                 Member member = memberOpt.get();
                 bills = receiptRepository.findPendingByMemberName(member.getName());
                 // Self-heal: stamp the correct member_db_id so future lookups hit the fast path
-                for (Receipt r : bills) {
-                    if (r.getMemberDbId() == null || !r.getMemberDbId().equals(memberDbId)) {
-                        r.setMemberDbId(memberDbId);
-                        receiptRepository.save(r);
-                    }
-                }
+                selfHealMemberDbId(bills, memberDbId);
             }
         }
 
         return bills.stream()
                 .map(ReceiptResponseDTO::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Stamps the correct member_db_id onto receipts that were only found via the
+     * member-name fallback, so later lookups hit the fast path. Skipped in All
+     * Branches mode: BranchSecurityListener rejects every UPDATE there, and since
+     * that fires at flush/commit time it would fail the whole (otherwise read-only)
+     * request with "Could not commit JPA transaction". The heal is only an
+     * optimisation, so it simply happens on the next branch-scoped read instead.
+     */
+    private void selfHealMemberDbId(List<Receipt> receipts, Long memberDbId) {
+        if (com.company.project.security.BranchContextHolder.getActiveBranchId() == null) return;
+        for (Receipt r : receipts) {
+            if (r.getMemberDbId() == null || !r.getMemberDbId().equals(memberDbId)) {
+                r.setMemberDbId(memberDbId);
+                receiptRepository.save(r);
+            }
+        }
     }
 
     // ── Member Statement of Account ──────────────────────────────────────────
@@ -170,12 +183,7 @@ public class ReceiptService {
         // Fallback: handles stale/null member_db_id on older receipts, same as getPendingBillsForMember.
         if (receipts.isEmpty()) {
             receipts = receiptRepository.findByMemberNameOrderByTransactionDateAsc(member.getName());
-            for (Receipt r : receipts) {
-                if (r.getMemberDbId() == null || !r.getMemberDbId().equals(memberDbId)) {
-                    r.setMemberDbId(memberDbId);
-                    receiptRepository.save(r);
-                }
-            }
+            selfHealMemberDbId(receipts, memberDbId);
         }
 
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");

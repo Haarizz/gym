@@ -7,6 +7,9 @@ export interface EnvConfig {
   environment: AppEnvironment;
   appVersion: string;
   useMockApi: boolean;
+  /** Public, non-secret Google OAuth client IDs — see .env for why these are safe here. */
+  googleWebClientId: string;
+  googleIosClientId: string;
 }
 
 function resolveEnvironment(): AppEnvironment {
@@ -24,4 +27,6 @@ export const env: EnvConfig = {
   environment: resolveEnvironment(),
   appVersion: Constants.expoConfig?.version ?? '1.0.0',
   useMockApi: process.env.EXPO_PUBLIC_USE_MOCK_API === 'true',
+  googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
+  googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '',
 };

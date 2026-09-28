@@ -12,6 +12,12 @@ export const StorageKeys = {
    */
   pendingRegistration: 'gymbios.pending_registration',
   /**
+   * The locally-persisted handle for a Google/Apple NEEDS_USERNAME
+   * registration — same role as pendingRegistration above, but for the social
+   * sign-in flow. Never a session credential.
+   */
+  pendingSocialRegistration: 'gymbios.pending_social_registration',
+  /**
    * @deprecated Was a single device-wide key, so a stale tenant left behind by
    * a previously logged-in account on this device would get inherited by
    * whichever account logs in next. Superseded by {@link activeTenantKey},

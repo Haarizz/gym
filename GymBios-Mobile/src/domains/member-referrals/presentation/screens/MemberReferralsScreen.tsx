@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Share } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Share, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Typography } from '@/shared/components/Typography';
@@ -15,6 +15,8 @@ import {
 } from '../hooks/useMemberReferrals';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import Feather from '@expo/vector-icons/Feather';
+import * as Clipboard from 'expo-clipboard';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 const CLAIM_BADGE_TONE = {
   PENDING: 'default' as const,
@@ -70,16 +72,47 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
     }
   };
 
+  const referralCode = profile?.referralCode;
+  const referralUrl = profile?.url;
+
+  const handleCopy = async () => {
+    if (!referralCode) {
+      toast.error('Your referral code is not available yet.');
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(referralCode);
+      toast.success(`Referral code ${referralCode} copied to clipboard.`);
+    } catch {
+      toast.error('Could not copy the referral code.');
+    }
+  };
+
   const handleShare = async () => {
-    if (profile?.url) {
-      try {
-        await Share.share({
-          message: `Join me at GymBios! Use my referral link: ${profile.url}`,
-          url: profile.url,
-        });
-      } catch (error) {
-        console.error(error);
+    if (!referralCode) {
+      toast.error('Your referral code is not available yet.');
+      return;
+    }
+    // Android ignores `url`, so the link must also be part of the message.
+    const message = referralUrl
+      ? `Join me at GymBios! Use my referral code ${referralCode} or sign up here: ${referralUrl}`
+      : `Join me at GymBios! Use my referral code ${referralCode} when you sign up.`;
+    try {
+      if (Platform.OS === 'web') {
+        // RN Share is unsupported on web; use the Web Share API when present, else copy.
+        const nav = typeof navigator !== 'undefined' ? (navigator as any) : undefined;
+        if (nav?.share) {
+          await nav.share({ text: message, url: referralUrl });
+        } else {
+          await Clipboard.setStringAsync(message);
+          toast.success('Invite message copied to clipboard.');
+        }
+        return;
       }
+      await Share.share(Platform.OS === 'ios' && referralUrl ? { message, url: referralUrl } : { message });
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return;
+      toast.error('Could not open the share sheet.');
     }
   };
 
@@ -102,20 +135,34 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
             <Typography variant="subtitle" style={styles.cardTitle}>
               Your Referral Link
             </Typography>
-            <View style={styles.codeChip}>
+            <Pressable
+              style={styles.codeChip}
+              onPress={handleCopy}
+              accessibilityRole="button"
+              accessibilityLabel="Copy referral code"
+            >
               <Typography variant="body" style={styles.codeText}>
-                {profile?.referralCode}
+                {referralCode ?? '—'}
               </Typography>
-            </View>
+              <Feather name="copy" size={16} color={BrandColors.tealDark} />
+            </Pressable>
             <Typography variant="bodySmall" color="textSecondary" style={styles.shareDescription}>
               Share this link with friends. When they join, you&apos;ll earn rewards!
             </Typography>
-            <Pressable style={styles.shareButton} onPress={handleShare}>
-              <Feather name="share-2" size={18} color="#ffffff" />
-              <Typography variant="bodySmallBold" style={styles.shareButtonText}>
-                Share Now
-              </Typography>
-            </Pressable>
+            <View style={styles.actionRow}>
+              <Pressable style={styles.copyButton} onPress={handleCopy}>
+                <Feather name="copy" size={18} color={BrandColors.tealDark} />
+                <Typography variant="bodySmallBold" style={styles.copyButtonText}>
+                  Copy Code
+                </Typography>
+              </Pressable>
+              <Pressable style={styles.shareButton} onPress={handleShare}>
+                <Feather name="share-2" size={18} color="#ffffff" />
+                <Typography variant="bodySmallBold" style={styles.shareButtonText}>
+                  Share Now
+                </Typography>
+              </Pressable>
+            </View>
           </GlassSurface>
 
           {/* Referral Code You Used */}
@@ -294,6 +341,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   codeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
     marginTop: Spacing.three,
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.four,
@@ -312,6 +362,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.three,
     marginBottom: Spacing.three,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+  copyButton: {
+    flexDirection: 'row',
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.five,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(50,127,116,0.3)',
+    backgroundColor: 'rgba(50,127,116,0.08)',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  copyButtonText: {
+    color: BrandColors.tealDark,
   },
   shareButton: {
     flexDirection: 'row',

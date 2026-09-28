@@ -14,14 +14,18 @@ interface ClassUtilizationCardProps {
 import { LinearGradient } from 'expo-linear-gradient';
 
 export function ClassUtilizationCard({ data }: ClassUtilizationCardProps) {
-  if (!data || data.length === 0) return null;
+  const items = data ?? [];
 
   return (
     <LinearGradient colors={['#F5C742', '#F59E0B']} style={styles.card}>
       <Text style={styles.title}>Class Utilization</Text>
-      
-      {data.map((item, index) => (
-        <View key={`${item.classType}-${index}`} style={[styles.row, index < data.length - 1 && styles.borderBottom]}>
+
+      {items.length === 0 && (
+        <Text style={styles.emptyText}>No classes scheduled this month</Text>
+      )}
+
+      {items.map((item, index) => (
+        <View key={`${item.classType}-${index}`} style={[styles.row, index < items.length - 1 && styles.borderBottom]}>
           <Text style={styles.className}>{item.classType}</Text>
           
           <View style={styles.progressContainer}>
@@ -86,6 +90,10 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 4,
     backgroundColor: '#FFF',
+  },
+  emptyText: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   percentageText: {
     fontSize: 12,
